@@ -4,7 +4,12 @@
 //! carries the four-digit code 9983, which `hsn_warning_not_six_digits` names.
 //!
 //! Every answer is Tally's own bytes, taken from one book state (the marks of
-//! W18 and of the books W18b and W18c restored are the same). The order below is the
+//! W18 and of the books W18b and W18c restored are the same), except three,
+//! which are DERIVED and say so where they are built: the rates answer `Q` (the
+//! lab was not sent the scoped rates request with the HSN/SAC fields on this
+//! book, nor on any: `w18_scoped_rates_hsn`) and the two voucher-numbering
+//! answers `X` and `Y` (the lab was not asked them on this book: the 16 Oct
+//! answers with the rows above this book's mark removed). The order below is the
 //! order the build, the post's reads before its dialog and a verification each
 //! asked in, as observed against a replay of those answers; it is not an order
 //! read off the code. Each position is checked against the SHA-256 of the
@@ -17,14 +22,14 @@ use super::*;
 /// The build: 108 requests, no write.
 const W18_BUILD: &str = concat!(
     "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeT",
-    "sTseeNsNseeCsCseeOsOseemsmseekskseewswsese",
+    "sTseeNsNseeCsCseeOsOseemsmseseeXsXsYsYseseekskseewswsese",
 );
 
 /// The post's reads before its dialog: the verification readback, then the
 /// admission's reads again. 120 requests.
 const W18_POST_BEFORE_DIALOG: &str = concat!(
     "seesesemsmseewswseewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbsese",
-    "eQsQseeTsTseeNsNseeCsCseeOsOseecscsese",
+    "eQsQseeTsTseeNsNseeCsCseeOsOseecscseseemsmseseeXsXsYsYsese",
 );
 
 /// A verification of the saved batch, no post: 26 requests.
@@ -51,6 +56,45 @@ fn w18_request_sha256(letter: char) -> &'static str {
     }
 }
 
+/// The master mark of the W18 book (`ALTMSTID` of `w18-marks`).
+const W18_MASTER_MARK: u64 = 243;
+
+/// DERIVED, not Tally's bytes: a numbering answer of the pilot lab (read on
+/// 16 Oct 2026, at master mark 245) as of the W18 book (mark 243). The code
+/// refuses a numbering read with a voucher type newer than the mark it is
+/// bounded by, so the answer is served with the rows above this book's mark
+/// removed: every removed row must carry an `ALTERID` above the mark and the
+/// removed names must be exactly `BRIDGE Sales Two`, and the rows left must
+/// equal the W18 voucher-types capture (name, AlterID, GUID). The files are
+/// the answers whole, as received.
+fn w18_types_as_of_the_book(answer: &str) -> String {
+    const ROW: &str = "<VOUCHERTYPE NAME=\"";
+    let mut kept = String::new();
+    let mut removed = Vec::new();
+    let mut rest = answer;
+    while let Some(start) = rest.find(ROW) {
+        let end = start + rest[start..].find("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+        let (name, alter, _) = pilot_type_rows(&rest[start..end]).remove(0);
+        if alter > W18_MASTER_MARK {
+            removed.push(name);
+            kept.push_str(&rest[..start]);
+        } else {
+            kept.push_str(&rest[..end]);
+        }
+        rest = &rest[end..];
+    }
+    kept.push_str(rest);
+    assert_eq!(removed, ["BRIDGE Sales Two"], "{removed:?}");
+    let mut left = pilot_type_rows(&kept);
+    let mut book = pilot_type_rows(&captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-voucher-types.utf16le.xml"
+    )));
+    left.sort();
+    book.sort();
+    assert_eq!(left, book, "the rows left are not the W18 voucher types");
+    kept
+}
+
 /// Tally's answer to one kind of read, from the W18 sitting; the company
 /// list, the currencies and the rates listing are byte-equal to the 9 and 12
 /// Oct answers the earlier replay already holds, and are read from there.
@@ -59,7 +103,8 @@ fn w18_plan(letter: char) -> ScenarioPlan {
         's' => return status(),
         'e' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml"),
         'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml"),
-        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml"),
+        // DERIVED: see `w18_scoped_rates_hsn`.
+        'Q' => return pilot_answer(super::super::super::tests::w18_scoped_rates_hsn()),
         'm' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-marks.utf16le.xml"),
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-book-extent.utf16le.xml"),
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-compliance.utf16le.xml"),
@@ -70,6 +115,16 @@ fn w18_plan(letter: char) -> ScenarioPlan {
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-tax-units.utf16le.xml"),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-company-object.utf16le.xml"),
         'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"),
+        // DERIVED: the 16 Oct 2026 numbering answers (pilot-lab-numbering-*)
+        // with the rows above this book's master mark removed.
+        'X' | 'Y' => {
+            let bytes: &[u8] = if letter == 'X' {
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-numbering-masters.utf16le.xml")
+            } else {
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-numbering-series.utf16le.xml")
+            };
+            return pilot_answer(w18_types_as_of_the_book(&captured(bytes)));
+        }
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18b-verification-window.utf16le.xml"),
         other => panic!("unknown kind {other}"),
     };
@@ -115,7 +170,7 @@ fn w18_kinds(observed: &[tally_protocol_simulator::ObservedRequest]) -> String {
             if (request.method.as_str(), request.path.as_str()) == ("GET", "/status") {
                 's'
             } else {
-                "ebcLQOPgTNkwCm"
+                "ebcLQOPgTNkwCmXY"
                     .chars()
                     .find(|letter| w18_request_sha256(*letter) == request.request_body_sha256)
                     .unwrap_or('?')

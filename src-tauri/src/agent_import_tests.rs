@@ -2429,34 +2429,69 @@ fn utf16le(bytes: &[u8]) -> String {
 /// not hold. The removal is counted, and the rows left must be the scoped read's
 /// rows, name for name, each under one of the four parents.
 pub(super) fn pilot_scoped_rates_hsn() -> String {
-    const PARENTS: [&str; 4] = [
-        "Duties &amp; Taxes",
-        "Indirect Expenses",
-        "Sales Accounts",
-        "Sundry Debtors",
-    ];
-    let whole = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml"));
     let scoped = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml"));
-    let names = |xml: &str| -> Vec<String> {
-        let mut out = Vec::new();
-        let mut rest = xml;
-        while let Some(at) = rest.find("<LEDGER NAME=\"") {
-            let from = at + "<LEDGER NAME=\"".len();
-            out.push(rest[from..from + rest[from..].find('"').unwrap()].to_string());
-            rest = &rest[from..];
+    derived_scoped_rates_hsn(&ledger_row_names(&scoped))
+}
+
+/// DERIVED, not Tally's bytes: as [`pilot_scoped_rates_hsn`], for the book of
+/// the lab's W18 sittings (`pilot-lab-w18`), which the lab was not asked the
+/// scoped rates request on either. The rows are the lab's W16 answer's rows of
+/// the ledgers that the W18 catalogue holds under the four parents (the two
+/// books hold the same 18 ledgers), counted and asserted equal, name for name.
+pub(super) fn w18_scoped_rates_hsn() -> String {
+    let catalogue = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"));
+    let mut wanted = Vec::new();
+    let mut rest = catalogue.as_str();
+    while let Some(at) = rest.find("<LEDGER NAME=\"") {
+        let from = at + "<LEDGER NAME=\"".len();
+        let end = from + rest[from..].find("</LEDGER>").unwrap();
+        let row = &rest[from..end];
+        if SCOPE_PARENTS
+            .iter()
+            .any(|parent| row.contains(&format!(">{parent}</PARENT>")))
+        {
+            wanted.push(row[..row.find('"').unwrap()].to_string());
         }
-        out
-    };
-    let wanted = names(&scoped);
+        rest = &rest[end..];
+    }
+    derived_scoped_rates_hsn(&wanted)
+}
+
+/// The four parents of the lab invoices' ledgers.
+const SCOPE_PARENTS: [&str; 4] = [
+    "Duties &amp; Taxes",
+    "Indirect Expenses",
+    "Sales Accounts",
+    "Sundry Debtors",
+];
+
+/// The names of the `<LEDGER NAME="…">` rows of an answer, in answer order.
+fn ledger_row_names(xml: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = xml;
+    while let Some(at) = rest.find("<LEDGER NAME=\"") {
+        let from = at + "<LEDGER NAME=\"".len();
+        out.push(rest[from..from + rest[from..].find('"').unwrap()].to_string());
+        rest = &rest[from..];
+    }
+    out
+}
+
+/// The lab's W16 answer (the unrestricted rates read with the HSN/SAC fields)
+/// with every ledger row removed whose name is not in `wanted`; the removal is
+/// counted, each row left is under one of the four parents, and the rows left
+/// are `wanted`, name for name.
+fn derived_scoped_rates_hsn(wanted: &[String]) -> String {
+    let whole = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml"));
     let mut kept = whole.clone();
     let mut removed = 0;
     let mut at = 0;
     while let Some(start) = kept[at..].find("<LEDGER NAME=\"").map(|found| found + at) {
         let end = start + kept[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
-        let name = names(&kept[start..end]).remove(0);
+        let name = ledger_row_names(&kept[start..end]).remove(0);
         if wanted.contains(&name) {
             assert!(
-                PARENTS
+                SCOPE_PARENTS
                     .iter()
                     .any(|parent| kept[start..end].contains(&format!(">{parent}</PARENT>"))),
                 "{name} is under none of the four parents"
@@ -2468,8 +2503,12 @@ pub(super) fn pilot_scoped_rates_hsn() -> String {
             at = start;
         }
     }
-    assert_eq!(removed, names(&whole).len() - wanted.len(), "rows removed");
-    assert_eq!(names(&kept), wanted, "the rows left are the scoped read's");
+    assert_eq!(
+        removed,
+        ledger_row_names(&whole).len() - wanted.len(),
+        "rows removed"
+    );
+    assert_eq!(&ledger_row_names(&kept), wanted, "the rows left are wanted");
     kept
 }
 

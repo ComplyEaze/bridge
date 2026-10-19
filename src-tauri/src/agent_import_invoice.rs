@@ -1267,6 +1267,7 @@ pub(super) fn first_difference(
         party_bill_wise,
         company_state,
         sales_ledgers,
+        hsn_warnings,
     } = recorded;
     if *voucher_type_guid != now.voucher_type_guid {
         Some("voucher_type")
@@ -1282,6 +1283,8 @@ pub(super) fn first_difference(
         Some("company_state")
     } else if *sales_ledgers != now.sales_ledgers {
         Some("sales_ledgers")
+    } else if *hsn_warnings != now.hsn_warnings {
+        Some("hsn_warnings")
     } else {
         None
     }
@@ -2353,7 +2356,8 @@ impl InvoiceJudge<'_> {
         // is read for every admitted invoice, because its settings decide
         // whether the measured order holds at any level; the groups only when
         // a sales ledger's own row defers.
-        let hsn_refusals = self.sales_hsn_refusals(&sales_ledgers, &facts, &as_of, answers)?;
+        let (hsn_refusals, hsn_warnings) =
+            self.sales_hsn_refusals(&sales_ledgers, &facts, &as_of, answers)?;
         if !hsn_refusals.is_empty() {
             return Err(Verdict::Refused(hsn_refusals));
         }
@@ -2363,6 +2367,7 @@ impl InvoiceJudge<'_> {
             bill_wise,
             company_state,
             sales_ledgers,
+            hsn_warnings,
         ))
     }
 
@@ -2375,7 +2380,7 @@ impl InvoiceJudge<'_> {
         facts: &BTreeMap<String, LedgerFacts>,
         as_of: &str,
         answers: &InvoiceAnswers,
-    ) -> Result<Vec<InvoiceRefusal>, Verdict> {
+    ) -> Result<(Vec<InvoiceRefusal>, Vec<wire::HsnWarning>), Verdict> {
         let mut sales = sales_ledgers
             .iter()
             .map(|name| (name, facts.get(name)))
@@ -2405,7 +2410,8 @@ impl InvoiceJudge<'_> {
                 let chain = fact
                     .map(|fact| fact.group_names.as_slice())
                     .filter(|names| !names.is_empty());
-                let step = match fact.and_then(|fact| fact.rates.as_ref()) {
+                let rates = fact.and_then(|fact| fact.rates.as_ref());
+                let step = match rates {
                     // Not reachable after the classification; this check
                     // never passes a ledger it did not read.
                     None => wire::HsnStep::Refused(wire::HSN_NOT_MEASURED),
@@ -2413,24 +2419,18 @@ impl InvoiceJudge<'_> {
                         wire::resolve_hsn(&row.hsn, chain, groups.as_ref(), &company, as_of)
                     }
                 };
-                (name.as_str(), step)
+                let supply = rates.map_or(wire::SupplyType::NotJudged, |row| row.supply);
+                (name.as_str(), step, supply)
             })
             .collect::<Vec<_>>();
         if groups.is_none()
             && steps
                 .iter()
-                .any(|(_, step)| *step == wire::HsnStep::NeedsGroups)
+                .any(|(_, step, _)| *step == wire::HsnStep::NeedsGroups)
         {
             return Err(Verdict::Need(Need::GroupHsn));
         }
-        Ok(steps
-            .into_iter()
-            .filter_map(|(name, step)| match step {
-                wire::HsnStep::Resolved { .. } => None,
-                wire::HsnStep::Refused(code) => Some(refuse_ledger(code, name)),
-                wire::HsnStep::NeedsGroups => Some(refuse_ledger(wire::HSN_NOT_MEASURED, name)),
-            })
-            .collect())
+        Ok(hsn_admission(steps))
     }
 }
 

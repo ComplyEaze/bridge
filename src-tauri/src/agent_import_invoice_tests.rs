@@ -1572,7 +1572,7 @@ fn a_re_read_admits_only_the_observation_the_build_recorded() {
 #[test]
 fn the_first_field_that_moved_is_the_one_named() {
     type Move = fn(&mut InvoiceObserved);
-    let moves: [(&str, Move); 7] = [
+    let moves: [(&str, Move); 8] = [
         ("voucher_type", |o| o.voucher_type_guid.push('x')),
         ("party_gstin", |o| o.party_gstin = Some("X".into())),
         ("party_state", |o| o.party_state.push('x')),
@@ -1584,6 +1584,14 @@ fn the_first_field_that_moved_is_the_one_named() {
         }),
         ("company_state", |o| o.company_state.push('x')),
         ("sales_ledgers", |o| o.sales_ledgers.push("Other".into())),
+        ("hsn_warnings", |o| {
+            o.hsn_warnings.push(wire::HsnWarning {
+                code: wire::HsnWarningCode::NotSixDigits,
+                ledger: "Sales".into(),
+                level: wire::HsnLevel::Ledger,
+                characters: 4,
+            })
+        }),
     ];
     let recorded = observed();
     for (name, moved) in &moves {

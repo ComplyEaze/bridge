@@ -19,14 +19,14 @@
 //! book.
 use super::*;
 
-/// The build: 108 requests, no write.
+/// The build: 122 requests, no write.
 const W18_BUILD: &str = concat!(
     "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeT",
     "sTseeNsNseeCsCseeOsOseemsmseseeXsXsYsYseseekskseewswsese",
 );
 
 /// The post's reads before its dialog: the verification readback, then the
-/// admission's reads again. 120 requests.
+/// admission's reads again. 140 requests.
 const W18_POST_BEFORE_DIALOG: &str = concat!(
     "seesesemsmseewswseewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbsese",
     "eQsQseeTsTseeNsNseeCsCseeOsOseecscseseemsmseseeXsXsYsYsese",
@@ -37,10 +37,14 @@ const W18_VERIFY: &str = "seesesemsmseewswseewswsese";
 
 const W18_GUID: &str = PILOT_GUID;
 
-/// The SHA-256 of the request the build sends for each kind of read: the
-/// lab's, as in the 9 Oct replay, except the number read, which is
-/// `w18-number-0040.xml` (`../r09-number-new-invoice.xml` with the number
-/// changed only), and the two listings named below.
+/// The SHA-256 of the request the build sends for each kind of read. Each is
+/// a request the lab answered, as in the 9 Oct replay, except: the number
+/// read, which is `w18-number-0040.xml` (`../r09-number-new-invoice.xml` with
+/// the number changed only); the two listings named below; `Q`, the rates
+/// request, which is the code's own and was not sent to the lab (see
+/// `w18_scoped_rates_hsn`); and `X` and `Y`, which are the code's requests the
+/// lab answered on 16 Oct 2026 on a later state of the book (see
+/// `w18_types_as_of_the_book`).
 fn w18_request_sha256(letter: char) -> &'static str {
     match letter {
         'N' => "84f6b7228f3e8c94d028c302c289ed7f99d9076eb45b4b0676adcbc67dc497d8",
@@ -95,9 +99,11 @@ fn w18_types_as_of_the_book(answer: &str) -> String {
     kept
 }
 
-/// Tally's answer to one kind of read, from the W18 sitting; the company
-/// list, the currencies and the rates listing are byte-equal to the 9 and 12
-/// Oct answers the earlier replay already holds, and are read from there.
+/// Tally's answer to one kind of read, from the W18 sittings, except the
+/// three DERIVED ones named below (`Q`, `X`, `Y`). The company list and the
+/// currencies are byte-equal to the 9 Oct answers the earlier replay already
+/// holds, and are read from there; so is the unrestricted rates listing (12 Oct
+/// 2026) that `Q` is cut from.
 fn w18_plan(letter: char) -> ScenarioPlan {
     let bytes: &[u8] = match letter {
         's' => return status(),
@@ -179,8 +185,10 @@ fn w18_kinds(observed: &[tally_protocol_simulator::ObservedRequest]) -> String {
         .collect()
 }
 
-/// Every request of the run was the one the lab answered at its position (but
-/// for the two named in `w18_request_sha256`), and no more were made.
+/// Every request of the run was, at its position, the request named in
+/// `w18_request_sha256` (the lab's own for every kind but `Q`, whose request
+/// is the code's, and `X` and `Y`, whose answers the lab gave on a later state
+/// of the book), and no more were made.
 fn assert_asked_as_the_lab_was(
     order: &str,
     observed: &[tally_protocol_simulator::ObservedRequest],

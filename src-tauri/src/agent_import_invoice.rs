@@ -1036,8 +1036,10 @@ impl super::super::Server {
     /// unused: a refusal there comes back under its own code), and what the
     /// build recorded must be unchanged (`import_invoice_masters_changed`, its
     /// `cause` naming the first field that differs): the
-    /// party's GSTIN, state, registration and bill-wise flag, the type's GUID
-    /// and the company's state (its registration's, ADR 0004 slice 1). Run
+    /// party's GSTIN, state, registration and bill-wise flag, the type's GUID,
+    /// the company's state (its registration's, ADR 0004 slice 1), the sales
+    /// ledgers and the HSN/SAC warnings on their codes (see `first_difference`
+    /// for the whole list, in order). Run
     /// before the approval
     /// dialog and again, after it is answered, before the post is dispatched,
     /// because a dialog can stay open and a book can change under it. The post
@@ -2372,8 +2374,9 @@ impl InvoiceJudge<'_> {
     }
 
     /// One refusal per sales ledger (the classification's sales lines) whose
-    /// HSN/SAC does not resolve on the invoice date, or the next answer the
-    /// check needs.
+    /// HSN/SAC does not resolve on the invoice date, and the warnings on the
+    /// codes that do, in ledger-name order; or the next answer the check
+    /// needs.
     fn sales_hsn_refusals(
         &self,
         sales_ledgers: &[String],

@@ -6,9 +6,10 @@ Windows lab, reads only, one request at a time, each answer written straight to 
 `curl.exe -o` and never piped. The data is synthetic: the company, its GSTIN (of the synthetic family
 the fixtures may carry) and its ledgers were made for these measurements.
 
-Together they are every read a Sales invoice build sends, taken from one book state (the book that
-holds the four-digit sales ledger `BRIDGE Svc 4D 5%`), so a build on that ledger can be replayed from
-them. They come from two sittings on that day, tied together by the company's marks, and one on 13 Oct for the two listings whose to-dates the build asks differently (below):
+Together they are the reads a Sales invoice build sent when they were taken, from one book state (the
+book that holds the four-digit sales ledger `BRIDGE Svc 4D 5%`), so a build on that ledger can be
+replayed from them. The code has since added three reads that the lab was not asked on this book: the
+replay serves their answers DERIVED (see "Three answers the replay serves DERIVED" below). They come from two sittings on that day, tied together by the company's marks, and one on 13 Oct for the two listings whose to-dates the build asks differently (below):
 
 - **W18** (15:58 UTC), reads only, no backup taken: every read of the build but the verification
   window. The answers are on `lab/1342-w18-answers` (commits `0f475e40d` and `43a6de41e`), with the
@@ -63,8 +64,37 @@ The lab was first asked `r05` and `r06` with `SVTODATE`
   marks equal W18's, `0a2d7f08...`): the compliance answer is byte-equal to W18's (38,278 bytes), and the
   paired answer is not: the same 18 ledgers, `CLOSINGBALANCE` different on 13 of them and nothing else
   different, so its closing balances follow the to-date. The paired fixture here is therefore W18c's
-  answer. The replay test names the SHA-256 of each request the build sends; every request is the lab's
-  own, byte for byte, at every position (status probes aside).
+  answer. The replay test names the SHA-256 of each request the build sends; every request is one the lab
+  answered, byte for byte, at every position (status probes aside), except the three kinds in the next
+  section.
+
+## Three answers the replay serves DERIVED
+
+The code now sends three reads the lab was not asked on this book, and the replay serves a derived
+answer for each (named DERIVED where it is built, in `agent_import_tests.rs` and
+`agent_import_w18_replay_tests.rs`). None is Tally's bytes.
+
+- **`Q`, the rates read restricted to the invoice's parents, with the three HSN/SAC fields.** The request is
+  the code's, SHA-256 `3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc`; the lab was not
+  sent it on any book (it answered the four-parent request without the fields on 10 Oct 2026 and the
+  unrestricted request with them on 12 Oct 2026). The answer is the unrestricted answer
+  (`../pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml`, byte-equal to what W18 read) cut to the ledgers
+  this directory's catalogue (`w18-ledger-catalogue-v2`) holds under the four parents the invoice's ledgers
+  sit under (`Duties & Taxes`, `Indirect Expenses`, `Sales Accounts`, `Sundry Debtors`), the removal
+  counted and the rows left asserted equal to the catalogue's, name for name. Not sent to the lab; derived
+  from W16 by the parent filter (protocol reference section 11e, PARTIAL: the lab's 10 Oct restricted read
+  held exactly the unrestricted read's rows under the parents it named, on one book and one spelling).
+- **`X` and `Y`, the voucher-type numbering reads.** The requests are the code's, `229f54c9...` and
+  `e83a1df1...`; the lab answered them on 16 Oct 2026 (`../pilot-lab/pilot-lab-numbering-masters.utf16le.xml`
+  and `...-series.utf16le.xml`), when its book stood at master mark 245, not at W18's 243. The replay serves
+  those answers with the rows above 243 removed: one row, `BRIDGE Sales Two` (AlterID 245), counted and
+  named by the test; the rows left must equal this directory's voucher-types read in name, AlterID and
+  GUID. The series-level fields of the rows left have no W18 capture, so for them the inference is not
+  checked.
+
+Captures on this book are owed (`CAPTURE-1640` and its W18 addendum, written for the next lab sitting). A
+capture of the numbering reads at W18's state needs the book restored from the backup the W18b and W18c
+sittings used; on the live book, whose mark is now 245, it would be the numbering of a different state.
 
 ## What is not measured
 

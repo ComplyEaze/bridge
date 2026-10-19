@@ -1429,3 +1429,119 @@ fn the_queue_precheck_judges_the_currency_and_the_limits_before_any_read() {
         Err(Refusal::InvoiceReadUnusable { .. })
     ));
 }
+
+/// DERIVED, not Tally's bytes: the scoped rates answer (itself derived,
+/// `pilot_scoped_rates_hsn`) with the one `HSNCODE` of `BRIDGE Svc 998313 5%`
+/// cut to its first four digits, which draws `hsn_warning_not_six_digits`.
+fn pilot_rate_listing_with_a_four_digit_code() -> String {
+    let listing = pilot_rate_listing();
+    let from = "<HSNCODE TYPE=\"String\">998313</HSNCODE>";
+    assert_eq!(listing.matches(from).count(), 1);
+    listing.replace(from, "<HSNCODE TYPE=\"String\">9983</HSNCODE>")
+}
+
+/// The compliance listing the build and the queue read, as the pilot lab
+/// answered it: read through the code's own reader over the lab's answers.
+async fn pilot_listing() -> crate::tally::runtime::PartyLedgerMasterListing {
+    let from = ADMISSION_ORDER.find("ebsbs").unwrap();
+    let to = ADMISSION_ORDER.find("eQsQse").unwrap();
+    let lab = pilot_lab_over(&ADMISSION_ORDER[from..to]);
+    lab.server
+        .runtime
+        .fetch_agent_party_ledger_masters_with_evidence(
+            lab.server.tally_config(),
+            &lab.identity,
+            today(),
+            crate::tally::connection::ComplianceRead::Standard,
+        )
+        .await
+        .unwrap()
+}
+
+/// The answers the queue would read for the pilot invoice, `rates` being its
+/// scoped rates answer.
+async fn pilot_queue_answers(rates: String) -> InvoiceAnswers {
+    InvoiceAnswers {
+        marks: Some(pilot_marks_captured()),
+        listing: Some(pilot_listing().await),
+        rates: Some(rates),
+        voucher_types: Some(pilot_text(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"))),
+        number: Some(pilot_text(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"))),
+        registration: Some(pilot_tax_units()),
+        company_hsn: Some(pilot_text(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"))),
+        ..InvoiceAnswers::default()
+    }
+}
+
+fn pilot_text(bytes: &[u8]) -> String {
+    utf16(bytes)
+}
+
+/// The queue's re-read of an invoice with a recorded HSN/SAC warning
+/// (#1337, #691): the warning the build recorded, read again, is admitted; a
+/// warning that is gone, one that came, and one that moved are each the master
+/// that changed, named `hsn_warnings` (and not a wiring fault or a refusal).
+/// The answers are the lab's own except the rates answer, which is derived
+/// twice (the parent filter, then one code cut to four digits for the warned
+/// case).
+#[tokio::test]
+async fn the_queue_holds_a_warned_invoice_to_the_warning_the_build_recorded() {
+    use crate::tally::approved_import::{
+        ApprovedImportAdmissionError::InvoiceMastersChanged, QueuedInvoice,
+    };
+    let guid = pilot_lab_guid();
+    let catalogue = pilot_catalogue();
+    let control = ledger::NumberControl::NoneStanding;
+    let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    let plan = plan_of(&voucher, &control);
+    let warned = pilot_queue_answers(pilot_rate_listing_with_a_four_digit_code()).await;
+    let unwarned = pilot_queue_answers(pilot_rate_listing()).await;
+    // What the build records of each.
+    let observed_of = |answers: &InvoiceAnswers| {
+        InvoiceJudge {
+            company_name: PILOT,
+            company_guid: &guid,
+            voucher: &voucher,
+            catalogue: &catalogue,
+            control: &control,
+        }
+        .judge(answers)
+        .unwrap_or_else(|verdict| panic!("{verdict:?}"))
+    };
+    let (recorded_warned, recorded_unwarned) = (observed_of(&warned), observed_of(&unwarned));
+    assert_eq!(recorded_warned.hsn_warnings.len(), 1);
+    assert_eq!(
+        recorded_warned.hsn_warnings[0].ledger,
+        "BRIDGE Svc 998313 5%"
+    );
+    assert!(recorded_unwarned.hsn_warnings.is_empty());
+    let queue = |recorded: &invoice::InvoiceObserved, answers: &InvoiceAnswers| {
+        let mut saved = voucher.clone();
+        saved.invoice.as_mut().unwrap().observed = Some(recorded.clone());
+        invoice::admit_queued_invoice(
+            &saved,
+            PILOT,
+            &guid,
+            &catalogue,
+            &control,
+            &today(),
+            &QueuedInvoice {
+                plan: &plan,
+                answers,
+            },
+        )
+    };
+    // The recorded warning, read again: admitted; so is no warning twice.
+    assert_eq!(queue(&recorded_warned, &warned), Ok(()));
+    assert_eq!(queue(&recorded_unwarned, &unwarned), Ok(()));
+    // A warning that is gone, and one that came, are changes.
+    let changed = Err(InvoiceMastersChanged {
+        field: "hsn_warnings",
+    });
+    assert_eq!(queue(&recorded_warned, &unwarned), changed);
+    assert_eq!(queue(&recorded_unwarned, &warned), changed);
+    // A warning that moved (the build recorded another length) is a change too.
+    let mut moved = recorded_warned.clone();
+    moved.hsn_warnings[0].characters += 1;
+    assert_eq!(queue(&moved, &warned), changed);
+}

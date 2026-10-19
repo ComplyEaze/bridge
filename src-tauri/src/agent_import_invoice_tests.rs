@@ -105,6 +105,7 @@ fn sales_rates(cgst: &str, igst: &str) -> wire::LedgerRateRow {
         rounding_method: None,
         rounding_limit: Some("0".to_string()),
         hsn: Ok(None),
+        supply: wire::SupplyType::NotJudged,
     }
 }
 
@@ -116,6 +117,7 @@ fn tax_rates(half: &str) -> wire::LedgerRateRow {
         rounding_method: Some("Not Applicable".to_string()),
         rounding_limit: Some("0".to_string()),
         hsn: Ok(None),
+        supply: wire::SupplyType::NotJudged,
     }
 }
 
@@ -675,6 +677,7 @@ fn observed() -> InvoiceObserved {
         party_bill_wise: true,
         company_state: RAJ.to_string(),
         sales_ledgers: vec!["Sales".to_string()],
+        hsn_warnings: Vec::new(),
     }
 }
 
@@ -1180,6 +1183,41 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
         change(&mut changed);
         assert_ne!(digest(&base), digest(&changed));
     }
+    // Each part of an HSN/SAC warning the dialog speaks for is bound too.
+    let warning = |code, ledger: &str, level: wire::HsnLevel, characters| wire::HsnWarning {
+        code,
+        ledger: ledger.into(),
+        level,
+        characters,
+    };
+    let listed = |warnings: Vec<wire::HsnWarning>| {
+        let mut voucher = base.clone();
+        let seen = voucher.invoice.as_mut().unwrap().observed.as_mut().unwrap();
+        seen.hsn_warnings = warnings;
+        digest(&voucher)
+    };
+    let warned = |code, level: wire::HsnLevel, characters| {
+        listed(vec![warning(code, "Sales", level, characters)])
+    };
+    let not_six = wire::HsnWarningCode::NotSixDigits;
+    let warned_digests = [
+        digest(&base),
+        warned(not_six, wire::HsnLevel::Ledger, 4),
+        warned(wire::HsnWarningCode::SacForGoods, wire::HsnLevel::Ledger, 4),
+        warned(not_six, wire::HsnLevel::Company, 4),
+        warned(not_six, wire::HsnLevel::Group("Sales Sub".into()), 4),
+        warned(not_six, wire::HsnLevel::Group("Sales Top".into()), 4),
+        warned(not_six, wire::HsnLevel::Ledger, 8),
+        listed(vec![warning(not_six, "Sales B", wire::HsnLevel::Ledger, 4)]),
+        listed(vec![
+            warning(not_six, "Sales", wire::HsnLevel::Ledger, 4),
+            warning(not_six, "Sales B", wire::HsnLevel::Ledger, 4),
+        ]),
+    ];
+    let distinct = warned_digests
+        .iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(distinct.len(), warned_digests.len());
     // A voucher with no invoice detail still binds its voucher number. The golden
     // pin of how a plain voucher is encoded lives in agent_import_bill_wise_tests.rs
     // (the_party_digest_of_a_known_batch_is_pinned); this checks only the number.
@@ -1473,6 +1511,7 @@ fn what_the_build_records_follows_the_customers_evidence() {
         true,
         RAJ.into(),
         vec!["Sales".into()],
+        Vec::new(),
     );
     assert_eq!(
         registered,
@@ -1484,6 +1523,7 @@ fn what_the_build_records_follows_the_customers_evidence() {
             party_bill_wise: true,
             company_state: RAJ.into(),
             sales_ledgers: vec!["Sales".into()],
+            hsn_warnings: Vec::new(),
         }
     );
     let unregistered = observe(
@@ -1492,6 +1532,7 @@ fn what_the_build_records_follows_the_customers_evidence() {
         false,
         RAJ.into(),
         vec!["Sales".into()],
+        Vec::new(),
     );
     assert_eq!(
         (
@@ -1531,7 +1572,7 @@ fn a_re_read_admits_only_the_observation_the_build_recorded() {
 #[test]
 fn the_first_field_that_moved_is_the_one_named() {
     type Move = fn(&mut InvoiceObserved);
-    let moves: [(&str, Move); 7] = [
+    let moves: [(&str, Move); 8] = [
         ("voucher_type", |o| o.voucher_type_guid.push('x')),
         ("party_gstin", |o| o.party_gstin = Some("X".into())),
         ("party_state", |o| o.party_state.push('x')),
@@ -1543,6 +1584,14 @@ fn the_first_field_that_moved_is_the_one_named() {
         }),
         ("company_state", |o| o.company_state.push('x')),
         ("sales_ledgers", |o| o.sales_ledgers.push("Other".into())),
+        ("hsn_warnings", |o| {
+            o.hsn_warnings.push(wire::HsnWarning {
+                code: wire::HsnWarningCode::NotSixDigits,
+                ledger: "Sales".into(),
+                level: wire::HsnLevel::Ledger,
+                characters: 4,
+            })
+        }),
     ];
     let recorded = observed();
     for (name, moved) in &moves {
@@ -2682,6 +2731,7 @@ fn pilot_invoice(
                 party_bill_wise: false,
                 company_state: RAJ.to_string(),
                 sales_ledgers: sales.iter().map(|ledger| ledger.to_string()).collect(),
+                hsn_warnings: Vec::new(),
             }),
         }),
         entries,
@@ -2923,4 +2973,41 @@ fn an_invoice_whose_sales_lines_were_not_recorded_is_not_observed() {
     let (differences, lines) = hsn_outcome(&v, &utf16le(STATUS_INCLUDED));
     assert_eq!(differences, ["invoice_not_observed"]);
     assert_eq!(lines, Vec::<serde_json::Value>::new());
+}
+
+/// A sales ledger whose code resolved is warned about and never refused; one
+/// whose code did not is refused and carries no warning.
+#[test]
+fn a_resolved_code_is_warned_about_and_an_unresolved_one_refused() {
+    let resolved = |code: &str| wire::HsnStep::Resolved {
+        code: code.to_string(),
+        level: wire::HsnLevel::Ledger,
+    };
+    let (refusals, warnings) = hsn_admission(vec![
+        ("A", resolved("9983"), wire::SupplyType::Services),
+        ("B", resolved("998313"), wire::SupplyType::Services),
+        (
+            "C",
+            wire::HsnStep::Refused(wire::HSN_NOT_MEASURED),
+            wire::SupplyType::Services,
+        ),
+        ("D", wire::HsnStep::NeedsGroups, wire::SupplyType::Services),
+    ]);
+    assert_eq!(
+        refusals,
+        [
+            refuse_ledger(wire::HSN_NOT_MEASURED, "C"),
+            refuse_ledger(wire::HSN_NOT_MEASURED, "D")
+        ]
+    );
+    assert_eq!(
+        warnings,
+        wire::hsn_warnings(
+            "A",
+            "9983",
+            &wire::HsnLevel::Ledger,
+            wire::SupplyType::Services
+        )
+    );
+    assert_eq!(warnings.len(), 1);
 }

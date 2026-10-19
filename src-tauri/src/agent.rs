@@ -1525,7 +1525,8 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "import_invoice_masters_changed" => Some(
             "Since this invoice was built, what Tally says about it has changed: the \
              customer's GSTIN, state, registration type or bill-wise setting, the voucher \
-             type, or the state of the company's GST registration. Nothing was posted. Build the invoice again, so it \
+             type, the sales ledgers or the HSN/SAC warnings on their codes, or the state of \
+             the company's GST registration. Nothing was posted. Build the invoice again, so it \
              is checked against the book as it is now, and show the user the new approval \
              text.",
         ),

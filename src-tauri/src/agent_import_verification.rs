@@ -1024,7 +1024,7 @@ pub(super) fn voucher_is_accounting_effective(voucher: &ReadVoucher) -> Result<b
 /// Every place a verification result names a ledger, as a path from the
 /// result (`*` for each element of an array). The one list that marking reads,
 /// and that its test holds against the names the verifier marks.
-pub(super) const VERIFICATION_NAME_FIELDS: [&[&str]; 6] = [
+pub(super) const VERIFICATION_NAME_FIELDS: [&[&str]; 8] = [
     &[
         "vouchers", "*", "diffs", "*", "entries", "expected", "*", "ledger",
     ],
@@ -1034,6 +1034,8 @@ pub(super) const VERIFICATION_NAME_FIELDS: [&[&str]; 6] = [
     &["vouchers", "*", "invoice_lines", "*", "ledger"],
     &["vouchers", "*", "invoice_lines", "*", "hsn_ledger_source"],
     &["vouchers", "*", "invoice_lines", "*", "hsn_group_source"],
+    &["hsn_warnings", "*", "ledger"],
+    &["hsn_warnings", "*", "group"],
     &["masters_after_post", "ledgers", "*"],
 ];
 

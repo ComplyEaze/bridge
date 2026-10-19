@@ -2429,34 +2429,69 @@ fn utf16le(bytes: &[u8]) -> String {
 /// not hold. The removal is counted, and the rows left must be the scoped read's
 /// rows, name for name, each under one of the four parents.
 pub(super) fn pilot_scoped_rates_hsn() -> String {
-    const PARENTS: [&str; 4] = [
-        "Duties &amp; Taxes",
-        "Indirect Expenses",
-        "Sales Accounts",
-        "Sundry Debtors",
-    ];
-    let whole = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml"));
     let scoped = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml"));
-    let names = |xml: &str| -> Vec<String> {
-        let mut out = Vec::new();
-        let mut rest = xml;
-        while let Some(at) = rest.find("<LEDGER NAME=\"") {
-            let from = at + "<LEDGER NAME=\"".len();
-            out.push(rest[from..from + rest[from..].find('"').unwrap()].to_string());
-            rest = &rest[from..];
+    derived_scoped_rates_hsn(&ledger_row_names(&scoped))
+}
+
+/// DERIVED, not Tally's bytes: as [`pilot_scoped_rates_hsn`], for the book of
+/// the lab's W18 sittings (`pilot-lab-w18`), which the lab was not asked the
+/// scoped rates request on either. The rows are the lab's W16 answer's rows of
+/// the ledgers that the W18 catalogue holds under the four parents (the two
+/// books hold the same 18 ledgers), counted and asserted equal, name for name.
+pub(super) fn w18_scoped_rates_hsn() -> String {
+    let catalogue = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"));
+    let mut wanted = Vec::new();
+    let mut rest = catalogue.as_str();
+    while let Some(at) = rest.find("<LEDGER NAME=\"") {
+        let from = at + "<LEDGER NAME=\"".len();
+        let end = from + rest[from..].find("</LEDGER>").unwrap();
+        let row = &rest[from..end];
+        if SCOPE_PARENTS
+            .iter()
+            .any(|parent| row.contains(&format!(">{parent}</PARENT>")))
+        {
+            wanted.push(row[..row.find('"').unwrap()].to_string());
         }
-        out
-    };
-    let wanted = names(&scoped);
+        rest = &rest[end..];
+    }
+    derived_scoped_rates_hsn(&wanted)
+}
+
+/// The four parents of the lab invoices' ledgers.
+const SCOPE_PARENTS: [&str; 4] = [
+    "Duties &amp; Taxes",
+    "Indirect Expenses",
+    "Sales Accounts",
+    "Sundry Debtors",
+];
+
+/// The names of the `<LEDGER NAME="…">` rows of an answer, in answer order.
+fn ledger_row_names(xml: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = xml;
+    while let Some(at) = rest.find("<LEDGER NAME=\"") {
+        let from = at + "<LEDGER NAME=\"".len();
+        out.push(rest[from..from + rest[from..].find('"').unwrap()].to_string());
+        rest = &rest[from..];
+    }
+    out
+}
+
+/// The lab's W16 answer (the unrestricted rates read with the HSN/SAC fields)
+/// with every ledger row removed whose name is not in `wanted`; the removal is
+/// counted, each row left is under one of the four parents, and the rows left
+/// are `wanted`, name for name.
+fn derived_scoped_rates_hsn(wanted: &[String]) -> String {
+    let whole = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml"));
     let mut kept = whole.clone();
     let mut removed = 0;
     let mut at = 0;
     while let Some(start) = kept[at..].find("<LEDGER NAME=\"").map(|found| found + at) {
         let end = start + kept[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
-        let name = names(&kept[start..end]).remove(0);
+        let name = ledger_row_names(&kept[start..end]).remove(0);
         if wanted.contains(&name) {
             assert!(
-                PARENTS
+                SCOPE_PARENTS
                     .iter()
                     .any(|parent| kept[start..end].contains(&format!(">{parent}</PARENT>"))),
                 "{name} is under none of the four parents"
@@ -2468,8 +2503,12 @@ pub(super) fn pilot_scoped_rates_hsn() -> String {
             at = start;
         }
     }
-    assert_eq!(removed, names(&whole).len() - wanted.len(), "rows removed");
-    assert_eq!(names(&kept), wanted, "the rows left are the scoped read's");
+    assert_eq!(
+        removed,
+        ledger_row_names(&whole).len() - wanted.len(),
+        "rows removed"
+    );
+    assert_eq!(&ledger_row_names(&kept), wanted, "the rows left are wanted");
     kept
 }
 
@@ -5046,7 +5085,9 @@ fn the_name_field_list_covers_every_name_a_verification_marks() {
         "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan",
             "observed":{"voucher_type_guid":"g","party_state":"Rajasthan",
                 "party_registration_type":"Unregistered/Consumer","party_bill_wise":false,
-                "company_state":"Rajasthan","sales_ledgers":["BRIDGE Svc 998313 5%"]}},
+                "company_state":"Rajasthan","sales_ledgers":["BRIDGE Svc 998313 5%"],
+                "hsn_warnings":[{"code":"hsn_warning_not_six_digits","ledger":"BRIDGE Svc 998313 5%",
+                    "level":{"group":"Private Group"},"characters":4}]}},
         "entries":[{"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"}]
     }))
     .unwrap();
@@ -5057,6 +5098,7 @@ fn the_name_field_list_covers_every_name_a_verification_marks() {
         .unwrap()
         .push(json!({"bridge_txn_id":"invoice-1","status":"posted_verified"}));
     verification::mark_invoice_readback(&mut result, "invoice-1", &[], &lines);
+    result["hsn_warnings"] = json!(super::invoice::hsn_warnings_json(&invoice));
     let mut marked = std::collections::BTreeSet::new();
     marked_paths(&result, "", &mut marked);
     assert!(!marked.is_empty(), "the verifier marks its names");
@@ -5348,6 +5390,62 @@ fn a_masters_record_past_the_record_bound_reads_as_a_pending_check() {
         read_masters_record(&path),
         Some(json!({"state": MASTERS_CHECK_PENDING}))
     );
+}
+
+/// A saved invoice's HSN/SAC warnings are listed with the ledger and the group
+/// marked as party names, and the plain warning goes last, after the warnings
+/// the invoice and amendment guidance rewrite; an invoice with none adds
+/// nothing.
+#[test]
+fn a_saved_invoices_hsn_warnings_are_listed_and_the_plain_warning_goes_last() {
+    let invoice = |warnings: Value| -> ImportVoucher {
+        serde_json::from_value(json!({
+            "bridge_txn_id":"invoice-1","date":"20260801","voucher_type":"Sales",
+            "voucher_number":"BP/26-27/0010",
+            "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan",
+                "observed":{"voucher_type_guid":"g","party_state":"Rajasthan",
+                    "party_registration_type":"Unregistered/Consumer","party_bill_wise":false,
+                    "company_state":"Rajasthan","sales_ledgers":["Sales A","Sales B"],
+                    "hsn_warnings":warnings}},
+            "entries":[{"ledger":"Walk-in","amount":"1051.00","side":"Dr"}]
+        }))
+        .unwrap()
+    };
+    let marked = |name: &str| json!({ super::super::PARTY_NAME_MARKER: name });
+    let mut warnings = json!(["first", "second"]);
+    let listed = hsn_warnings_of(
+        &[invoice(json!([
+            {"code":"hsn_warning_not_six_digits","ledger":"Sales A","level":{"group":"Sub"},"characters":4},
+            {"code":"hsn_warning_sac_for_goods","ledger":"Sales B","level":"company","characters":6}
+        ]))],
+        &mut warnings,
+    );
+    assert_eq!(
+        serde_json::to_value(&listed).unwrap(),
+        json!([
+            {"code":"hsn_warning_not_six_digits","ledger":marked("Sales A"),"source":"group",
+             "group":marked("Sub"),"characters":4},
+            {"code":"hsn_warning_sac_for_goods","ledger":marked("Sales B"),"source":"company",
+             "group":null,"characters":6}
+        ])
+    );
+    assert_eq!(warnings, json!(["first", "second", INVOICE_HSN_WARNING]));
+    let mut untouched = json!(["first"]);
+    assert!(hsn_warnings_of(&[invoice(json!([]))], &mut untouched).is_empty());
+    assert_eq!(untouched, json!(["first"]));
+    // A verification result carries the same list, and no key without one.
+    let warned = invoice(json!([
+        {"code":"hsn_warning_sac_for_goods","ledger":"Sales B","level":"company","characters":6}
+    ]));
+    let mut proof = json!({"counts":{}});
+    with_hsn_warnings(&mut proof, std::slice::from_ref(&warned));
+    assert_eq!(
+        serde_json::to_value(&proof["hsn_warnings"]).unwrap(),
+        serde_json::to_value(super::invoice::hsn_warnings_json(&warned)).unwrap()
+    );
+    let mut plain = json!({"counts":{}});
+    with_hsn_warnings(&mut plain, &[invoice(json!([]))]);
+    assert_eq!(plain, json!({"counts":{}}));
 }
 
 // bridge#724: a voucher written without a number is numbered by its voucher

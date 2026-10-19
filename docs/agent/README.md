@@ -2415,7 +2415,11 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    Choose **Post voucher** (for a batch,
    **Post N vouchers**) on macOS or **Yes** on Windows to permit this attempt. **Cancel** or Escape
    declines on macOS; Return may leave the dialog open. Windows defaults to
-   **No**. Long or directionally ambiguous previews are refused; use the
+   **No**, and its window also takes the keyboard (Windows 10, a full-screen Tally,
+   one screen, each tried once, #1780: on the 0.6.0 release candidate a Down arrow
+   moved its buttons; on the published 0.6.0 a typed **n** declined it and a typed
+   **y** approved it; macOS not measured). When you ask for a post, stop typing in Tally until you have
+   answered the window with the mouse. Long or directionally ambiguous previews are refused; use the
    manual file workflow instead. A desktop session is required.
 4. Bridge refreshes company identity, product/mode, date admission and exact
    masters, checks the batch is absent, then records a durable dispatch intent

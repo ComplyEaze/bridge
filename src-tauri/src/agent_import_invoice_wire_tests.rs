@@ -736,7 +736,7 @@ fn the_ledger_rates_request_is_the_answered_one_with_the_hsn_fields() {
     let rendered =
         render_ledger_rates_request("BRIDGE PILOT LAB", ("20260401", "20260801")).unwrap();
     assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
-    let answered = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.request.utf16le.xml"));
+    let answered = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.request.utf16le.xml"));
     assert_eq!(
         answered.trim_start_matches('\u{feff}').replace(
             "ROUNDINGLIMIT</FETCH>",
@@ -1169,7 +1169,7 @@ fn the_status_read_back_request_is_the_one_the_lab_answered() {
 /// changed (answered on 12 Oct 2026).
 #[test]
 fn the_group_hsn_request_is_the_answered_listing_with_the_hsn_rows() {
-    let sent = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.request.utf16le.xml"));
+    let sent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.request.utf16le.xml"));
     let rendered = render_group_hsn_request("BRIDGE PILOT LAB");
     assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
     assert_eq!(

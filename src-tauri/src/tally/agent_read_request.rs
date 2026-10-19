@@ -131,10 +131,22 @@ impl AgentReadRequest {
     /// HSN/SAC, rendered from the pinned `InvoiceCompanyHsnV1` template under
     /// the same rules as [`Self::company_object`]: the verified company's name
     /// is the only variable, and the response is admitted by GUID.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the admission renders it by the identity's name")
+    )]
     pub(crate) fn invoice_company_hsn(
         identity: &super::VerifiedCompanyIdentity,
     ) -> Result<Self, AgentReadRequestError> {
-        let company = verified_company_name(identity)?;
+        Self::invoice_company_hsn_named(identity.display_name())
+    }
+
+    /// [`Self::invoice_company_hsn`] for a company named by a verified
+    /// identity's display name, which the invoice admission carries: the same
+    /// validation, the same template, so the request is the identity's.
+    pub(crate) fn invoice_company_hsn_named(name: &str) -> Result<Self, AgentReadRequestError> {
+        let company = bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(name)
+            .map_err(|_| AgentReadRequestError)?;
         Ok(Self(
             bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::InvoiceCompanyHsnV1 {
                 company: &company,

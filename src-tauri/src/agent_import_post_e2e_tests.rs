@@ -6438,7 +6438,9 @@ macro_rules! pilot_queue_block {
             "eQsQse",
             "eTsTse",
             "eNsNse",
-            "eCsCse"
+            "eCsCse",
+            "eOsOse",
+            "eGsGse"
         )
     };
 }
@@ -6472,11 +6474,11 @@ macro_rules! pilot_queue_block {
 // `pilot_queue_block!`) before its closing profile and the aim marks (#1337).
 const PILOT_ORDER: &str = concat!(
     "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQse",
-    "eTsTseeNsNseeCsCseemsmseseeXsXsYsYseseekskseewswseseseesesemsmse",
-    "ewswseewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsb",
-    "sbseseeQsQseeTsTseeNsNseeCsCseecscseseemsmseseeXsXsYsYseseekskse",
-    "emsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeTsTseeNsNse",
-    "eCsCseseemekskseecscse",
+    "eTsTseeNsNseeCsCseeOsOseemsmseseeXsXsYsYseseekskseewswseseseeses",
+    "emsmseewswseewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsP",
+    "sgsgsbsbseseeQsQseeTsTseeNsNseeCsCseeOsOseecscseseemsmseseeXsXsY",
+    "sYseseekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQse",
+    "eTsTseeNsNseeCsCseeOsOseseemekskseecscse",
     // The invoice's masters, read again in the queue after the approval (#1337).
     pilot_queue_block!(),
     "seeewswseewswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
@@ -6500,8 +6502,13 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'b' => "eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49", // r03-book-extent.xml
         'c' => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661", // r04-currencies.xml
         'L' => "c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386", // r05-ledgers-compliance.xml
-        'Q' => "ec5f0fa02de3c9e577a21c4aefd3d2991b7f780002038075a14d7257dcc5d71d", // q1-rates-four-parents.xml (#1331)
+        // q1-rates-four-parents.xml (#1331) with the three HSN/SAC fields of
+        // w16-ledger-rates-hsn.xml added: the request the code renders, which
+        // the lab was not sent (the same edit turns the lab's unrestricted
+        // request into its W16 one: 2e728e00... to 03de8fa7...).
+        'Q' => "3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc",
         'O' => "72d8cd921a2a89aa781cbd768d013e58f167c2dc5072249fa92df5bdad301648", // w14-company-object.xml
+        'G' => "237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02", // w16-groups-hsn.xml
         'P' => "71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f", // r06-ledgers-paired.xml
         'g' => "20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f", // r07-groups.xml
         'T' => "c351d6c62a09ce5173355f3998ef12746f01aba253ea8bdc42664b1b9766fb00", // r08-voucher-types.xml
@@ -6617,8 +6624,9 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml"),
         'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml"),
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
-        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml"),
+        'Q' => unreachable!("DERIVED: served by pilot_plan from the lab's W16 answer"),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"),
+        'G' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.utf16le.xml"),
         'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
@@ -6635,6 +6643,10 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
 }
 
 fn pilot_plan(letter: char) -> ScenarioPlan {
+    if letter == 'Q' {
+        // DERIVED: see `pilot_scoped_rates_hsn`.
+        return pilot_answer(super::super::tests::pilot_scoped_rates_hsn());
+    }
     match pilot_bytes(letter) {
         // DERIVED: the two numbering answers as of the invoice round.
         Some(bytes) if matches!(letter, 'X' | 'Y') => {
@@ -6974,6 +6986,9 @@ fn pilot_queue_positions(letter: char) -> Vec<usize> {
 
 /// The captured answer to a kind of read, as text.
 fn pilot_text(letter: char) -> String {
+    if letter == 'Q' {
+        return super::super::tests::pilot_scoped_rates_hsn();
+    }
     captured(pilot_bytes(letter).expect("a kind with an answer"))
 }
 

@@ -2020,21 +2020,6 @@ impl Server {
         self.post_admitted_read(identity, admitted).await
     }
 
-    /// The company object read of an invoice build's HSN/SAC check: the one
-    /// Object export a tool sends, from its pinned profile, never through
-    /// [`Self::post_read`] (which admits Collection exports only).
-    async fn post_invoice_company_hsn_read(
-        &self,
-        identity: &VerifiedCompanyIdentity,
-    ) -> Result<(String, Evidence), ToolFailure> {
-        let admitted =
-            crate::tally::agent_read_request::AgentReadRequest::invoice_company_hsn(identity)
-                .map_err(|error| error.to_string())?;
-        self.post_admitted_read(identity, admitted)
-            .await
-            .map(|(body, evidence, _)| (body, evidence))
-    }
-
     /// One admitted read, paired and inside the company's identity brackets.
     /// An invoice plan carries its requests already admitted (#1337), so the
     /// build sends the very request the queue will send again.

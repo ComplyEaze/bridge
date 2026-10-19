@@ -1819,6 +1819,8 @@ async fn read_invoice_plan(
         answers.number_control = Some(paired(client, identity, request, &mut evidence).await?);
     }
     answers.registration = Some(paired(client, identity, &plan.registration, &mut evidence).await?);
+    answers.company_hsn = Some(paired(client, identity, &plan.company_hsn, &mut evidence).await?);
+    answers.group_hsn = Some(paired(client, identity, &plan.group_hsn, &mut evidence).await?);
     Ok((answers, evidence))
 }
 

@@ -97,6 +97,13 @@ pub(crate) struct InvoiceReadPlan {
     /// The same read for the invoice the journal held as the number's control.
     pub(crate) number_control: Option<AgentReadRequest>,
     pub(crate) registration: AgentReadRequest,
+    /// The company object the HSN/SAC check reads once the classification
+    /// admits, and the groups with their HSN/SAC rows. The build sends the
+    /// groups only when a sales ledger's own row defers to them; the queue
+    /// sends them whenever it sends the invoice's reads, and the judge asks the
+    /// answer only when it is needed.
+    pub(crate) company_hsn: AgentReadRequest,
+    pub(crate) group_hsn: AgentReadRequest,
 }
 
 /// What the queue has read when it asks whether an invoice's reads may go on.
@@ -139,6 +146,8 @@ pub(crate) struct InvoiceAnswers {
     pub(crate) number: Option<String>,
     pub(crate) number_control: Option<String>,
     pub(crate) registration: Option<String>,
+    pub(crate) company_hsn: Option<String>,
+    pub(crate) group_hsn: Option<String>,
 }
 
 /// An invoice's plan and the answers the queue read for it.

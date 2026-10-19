@@ -115,9 +115,23 @@ fn parents_of(scope: &InvoiceLedgerScope) -> Vec<String> {
 
 // ---- The pilot lab's own bytes ----
 
+/// The lab's request with the HSN/SAC check's three fields added to its field
+/// list (#691, W16): the edit that turns the lab's unrestricted rates request
+/// into the one it answered on 12 Oct 2026 (the code renders the restricted one
+/// with the same three fields, which the lab was not sent as such). The edit
+/// must apply exactly once.
+fn with_the_hsn_fields(request: String) -> String {
+    const FROM: &str = "ROUNDINGLIMIT</FETCH>";
+    assert_eq!(request.matches(FROM).count(), 1);
+    request.replace(
+        FROM,
+        "ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH>",
+    )
+}
+
 /// The scope the lab invoice's legs make is the four parents, and the request
-/// it renders is, byte for byte, the one the lab answered (the file starts
-/// with a byte order mark).
+/// it renders is, byte for byte, the one the lab answered on 10 Oct 2026 (the
+/// file starts with a byte order mark) with the HSN/SAC fields added.
 #[test]
 fn the_lab_invoices_legs_make_the_request_the_lab_answered() {
     let scope = scope_of(&pilot_catalogue(), &LEGS).unwrap();
@@ -132,7 +146,7 @@ fn the_lab_invoices_legs_make_the_request_the_lab_answered() {
     );
     let rendered =
         wire::render_ledger_rates_request_for_parents(PILOT, WINDOW, scope.part()).unwrap();
-    assert_eq!(captured(SCOPED_REQUEST), rendered);
+    assert_eq!(with_the_hsn_fields(captured(SCOPED_REQUEST)), rendered);
     // Naming a ledger twice, or in another order, is the same scope.
     let mut shuffled = LEGS.to_vec();
     shuffled.reverse();
@@ -193,7 +207,10 @@ fn the_case_changed_filter_is_the_request_the_lab_answered() {
     let scope = scope_of(&synthetic(&[("Sales", "SALES ACCOUNTS")]), &["Sales"]).unwrap();
     let rendered =
         wire::render_ledger_rates_request_for_parents(PILOT, WINDOW, scope.part()).unwrap();
-    assert_eq!(captured(CASE_CHANGED_REQUEST), rendered);
+    assert_eq!(
+        with_the_hsn_fields(captured(CASE_CHANGED_REQUEST)),
+        rendered
+    );
 }
 
 /// `$Parent` folds case on this book (reference 11e): the filter spelled

@@ -123,7 +123,8 @@ const PILOT: &str = "BRIDGE PILOT LAB";
 /// marks, b book extent, c currencies, L the compliance listing, P the paired
 /// listing, g groups, Q the listing with each ledger's GST rate and rounding,
 /// restricted to the parents of the ledgers the invoice names (#1331),
-/// T voucher types, N the number read, C the company's tax units;
+/// T voucher types, N the number read, C the company's tax units, O the company
+/// object (the HSN/SAC check, once the classification admits);
 /// U is the number read for a number the book uses.
 ///
 /// The marks read; the ledger listing (its currency read inside two extents,
@@ -137,7 +138,8 @@ const ADMISSION_ORDER: &str = concat!(
     "eQsQse",
     "eTsTse",
     "eNsNse",
-    "eCsCse"
+    "eCsCse",
+    "eOsOse"
 );
 
 /// The lab's request files the tests pin a read to, by sha256: the number
@@ -148,8 +150,11 @@ const LAB_R09_SHA256: &str = "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc
 const LAB_R10_SHA256: &str = "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6";
 const LAB_R16_SHA256: &str = "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38";
 /// The rates read restricted to the four parents of the lab invoices' ledgers
-/// (`q1-rates-four-parents.xml`, the request the code renders).
-const LAB_Q1_SHA256: &str = "ec5f0fa02de3c9e577a21c4aefd3d2991b7f780002038075a14d7257dcc5d71d";
+/// (`q1-rates-four-parents.xml`) with the HSN/SAC check's three fields added to
+/// its field list: the request the code renders, which the lab was not sent as
+/// such (the same edit turns its unrestricted request into the W16 one it
+/// answered).
+const LAB_Q1_SHA256: &str = "3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc";
 
 /// The sha256 of each request sent where `order` has `letter`.
 fn sent_as<'a>(
@@ -179,7 +184,8 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
         'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
-        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml"),
+        'Q' => return answer(pilot_scoped_rates_hsn()),
+        'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
@@ -289,10 +295,10 @@ fn pilot_lab_with_units(units: String) -> Lab {
     pilot_lab_replacing('C', units)
 }
 
-/// The captured scoped rate listing (`pilot-lab-ledger-rates-scoped.utf16le.xml`,
-/// decoded).
+/// The answer to the scoped rates read with the HSN/SAC fields: the lab's W16
+/// answer restricted to the scope's rows (DERIVED, `pilot_scoped_rates_hsn`).
 fn pilot_rate_listing() -> String {
-    utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml"))
+    pilot_scoped_rates_hsn()
 }
 
 /// DERIVED, not Tally's bytes: the captured rate listing with every ledger row
@@ -422,8 +428,9 @@ fn pilot_observed() -> serde_json::Value {
 }
 
 /// The whole of one admission: 6 requests for the marks, 40 for the ledger
-/// listing, and 6 each for the voucher types, the number read and the
-/// company's tax units, in that order. Each case stops where its answer decides
+/// listing, and 6 each for the voucher types, the number read, the
+/// company's tax units and (once the classification admits) the company object,
+/// in that order. Each case stops where its answer decides
 /// it, which the request count shows. The invoice the pilot lab's book took,
 /// to its walk-in customer under `BRIDGE Sales`, is admitted after every read
 /// and records what it observed; a ledger of the book that is no customer,
@@ -433,7 +440,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
     let walk_in = "BRIDGE Walk-in";
     let goods = "BRIDGE Goods 18%";
     for (party, filed, outcome, requests) in [
-        (walk_in, "BRIDGE Sales", Ok(()), 70),
+        (walk_in, "BRIDGE Sales", Ok(()), 76),
         (
             goods,
             "BRIDGE Sales",
@@ -634,7 +641,8 @@ async fn a_number_the_book_already_uses_is_refused_after_the_number_read() {
 }
 
 /// The re-read a post makes before its approval window, and again after it,
-/// is a whole admission (70 requests when it reaches the company's tax units).
+/// is a whole admission (70 requests when it reaches the company's tax units, 76
+/// once the company object is read, which the admitted invoice does).
 /// The invoice the build admitted, saved with what it observed, passes; saved
 /// with an observation the re-read does not make (another type's GUID), it is
 /// "a master changed"; and what refuses it comes back under its own code (a
@@ -652,7 +660,7 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
             ADMISSION_ORDER,
             pilot_observed(),
             None,
-            70,
+            76,
         ),
         (
             "BRIDGE Sales",
@@ -660,7 +668,7 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
             ADMISSION_ORDER,
             other_type,
             Some("import_invoice_masters_changed"),
-            70,
+            76,
         ),
         (
             "Sales",
@@ -927,15 +935,26 @@ async fn a_control_the_read_does_not_find_refuses_the_build_naming_its_batch() {
 
 /// The rate read of an admission is restricted to the parents of the ledgers
 /// the invoice names (#1331): both sends of it (the read and its repeat) are
-/// the request the lab was sent, byte for byte (`q1-rates-four-parents.xml`,
-/// `pilot-lab-ledger-rates-scoped.request.utf16le.xml`), and no other request
-/// of the admission is that one.
+/// the request the lab was sent on 10 Oct 2026 (`q1-rates-four-parents.xml`,
+/// `pilot-lab-ledger-rates-scoped.request.utf16le.xml`) with the HSN/SAC fields
+/// added to its field list (one counted edit; the lab was not sent the result),
+/// byte for byte, and no other request of the admission is that one.
 #[tokio::test]
 async fn the_rate_read_is_restricted_to_the_parents_of_the_invoices_ledgers() {
     let (seen, _, requests) = admit("BRIDGE Walk-in", "BRIDGE Sales").await;
     assert_eq!(seen, Ok(()));
-    let rendered = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.request.utf16le.xml");
-    assert_eq!(crate::agent::sha256_hex(rendered), LAB_Q1_SHA256);
+    let lab = utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.request.utf16le.xml"));
+    let from = "ROUNDINGLIMIT</FETCH>";
+    assert_eq!(lab.matches(from).count(), 1);
+    let expected = lab.replace(
+        from,
+        "ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH>",
+    );
+    let words: Vec<u8> = expected
+        .encode_utf16()
+        .flat_map(|unit| unit.to_le_bytes())
+        .collect();
+    assert_eq!(crate::agent::sha256_hex(&words), LAB_Q1_SHA256);
     assert_eq!(sent_as(ADMISSION_ORDER, &requests, 'Q'), [LAB_Q1_SHA256; 2]);
     assert_eq!(
         requests

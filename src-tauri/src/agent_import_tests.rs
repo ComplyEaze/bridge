@@ -5021,8 +5021,8 @@ fn the_name_field_list_covers_every_name_a_verification_marks() {
     result["masters_after_post"] = json!({"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Private Changed Ledger"]});
     // An invoice row with the HSN/SAC evidence of its sales line, made by the
     // read-back's own code from the lab's read-back of BP/26-27/0010, edited
-    // in one place: its first sales line names a group source, which no
-    // capture fills.
+    // in one place (DERIVED, not Tally's bytes; the value is invented): its
+    // first sales line names a group source, which no capture fills.
     let readback = String::from_utf16(
         &include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"

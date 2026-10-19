@@ -607,7 +607,8 @@ code-signed.
   Payment 1, then in the batch Payment 2, Receipt 3, Contra 2. On Windows the approval window showed in front of a
   full-screen Tally and in front of Claude Desktop, with No as the default (one screen, one run). In that run a key meant for Tally (the Down arrow) moved the selection
   inside the approval window (No, Cancel, Yes) and Tally did not react: the window takes keyboard focus. No is still the
-  default, so Enter alone refuses; arrow keys followed by Enter can reach Yes. A typed letter was not tried (#1148,
+  default, so Enter alone refuses; arrow keys followed by Enter can reach Yes. A typed letter was not tried in that run (later that day, on the published file, a typed n
+  declined the window and a typed y approved it: #1780) (#1148,
   #1589, #1630).
 - **Not run in that pass:** a batch of Journals; a batch larger than 3 or near 50; a post Tally refused or that landed
   partly; amendments; the review acknowledgement window (no voucher raised a doubt); a post that needs an On Account

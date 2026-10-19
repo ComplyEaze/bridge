@@ -1576,8 +1576,14 @@ fn gst_status_differences(fields: &BTreeMap<String, String>) -> Vec<GstStatusDif
         // `status_of_flags` reads the three status flags only and never states these three
         // (the status tool decides them from `ISCANCELLED`, `ISOPTIONAL` and `ISPOSTDATED`
         // first). A cancelled or optional invoice is refused earlier, by the field
-        // comparison, which wants both flags `No`; this arm only makes the match
-        // exhaustive, and were it ever reached it is no pass.
+        // comparison, which wants both flags `No`. A post-dated one is not: the
+        // read-back does not fetch `ISPOSTDATED`, so an invoice a person marks
+        // post-dated after the post reads included here and stays verified (on
+        // master's status read the flag reads Yes on such a voucher and its three
+        // flags still read included). Fetching it changes the request the lab
+        // answered, so it needs a lab answer first: the follow-up fetches
+        // `ISPOSTDATED` and decides the state with `status_of_voucher`. This arm
+        // only makes the match exhaustive, and were it ever reached it is no pass.
         Ok(GstStatus::Cancelled | GstStatus::Optional | GstStatus::PostDated) => {
             Some(GstStatusDifference::Unreadable)
         }

@@ -7305,8 +7305,9 @@ fn pilot_element<'a>(xml: &'a str, tag: &str) -> &'a str {
     &xml[starts[0]..end]
 }
 
-/// The lab's read-back of `BP/26-27/0010` carrying the GSTR-1 flags of an
-/// invoice Tally lists as uncertain. No capture shows 0010 uncertain: the three
+/// SYNTHETIC, not Tally's answer: the lab's read-back of `BP/26-27/0010`
+/// carrying the GSTR-1 flags of an invoice Tally lists as uncertain. No capture
+/// shows 0010 uncertain: the three
 /// flag elements are copied, as Tally wrote them, from the lab's read-back of
 /// `BP/26-27/0021` while its GSTR-1 listed it as uncertain, and nothing else
 /// changes.

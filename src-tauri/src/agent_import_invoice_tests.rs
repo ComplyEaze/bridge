@@ -2536,8 +2536,8 @@ fn status_fields_that_did_not_come_back_are_one_difference_never_a_pass() {
     let not_asked = utf16le(STATUS_NOT_ASKED);
     assert!(STATUS_TAGS.iter().all(|tag| !not_asked.contains(tag)));
     assert_eq!(status_codes(&not_asked), ["gst_status_not_reported"]);
-    // Edited in one place each, from the included answer: no capture lacks a
-    // single field.
+    // DERIVED, not Tally's bytes: edited in one place each (counted), from the
+    // included answer: no capture lacks a single field.
     let included = utf16le(STATUS_INCLUDED);
     assert_eq!(
         status_codes(&without(&included, "ISGSTOVERRIDDEN")),
@@ -2561,8 +2561,8 @@ fn status_fields_that_did_not_come_back_are_one_difference_never_a_pass() {
     );
 }
 
-/// The states no capture shows, each from a captured answer edited in one
-/// place (the flag's text): excluded (never observed), uncertain and accepted
+/// DERIVED, not Tally's bytes: the states no capture shows, each from a
+/// captured answer edited in one place (the flag's text, counted): excluded (never observed), uncertain and accepted
 /// together, two flags Yes, and a value that is neither Yes nor No.
 #[test]
 fn a_state_no_capture_shows_is_read_from_a_captured_answer_edited_in_one_place() {
@@ -2830,8 +2830,8 @@ fn every_sales_line_with_a_code_and_a_source_is_clean_and_shown() {
     }
 }
 
-/// The states no capture shows, each from the re-saved read-back of
-/// `BP/26-27/0021` edited in one place on its third sales line: a source with
+/// DERIVED, not Tally's bytes: the states no capture shows, each from the
+/// re-saved read-back of `BP/26-27/0021` edited in one place (counted) on its third sales line: a source with
 /// no code, a code with no source, the five elements not returned at all, and
 /// a code behind a control-character reference (cleaned as every other
 /// value). Only a code and a source together are clean.

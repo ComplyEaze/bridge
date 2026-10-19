@@ -5,4 +5,6 @@ src-tauri/crates/tally-protocol-simulator/src/server.rs
 src-tauri/src/agent.rs
 src-tauri/src/agent_read_profiles.rs
 src-tauri/src/tally/agent_read_request.rs
+src-tauri/src/tally/approved_import.rs
+src-tauri/src/tally/runtime.rs
 reviewer: lamemustafa

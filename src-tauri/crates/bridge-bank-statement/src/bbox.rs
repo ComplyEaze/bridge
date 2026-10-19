@@ -2,8 +2,7 @@
 //!
 //! Not used on the production path. It exists so the sanitised real-statement
 //! captures in `scripts/fixtures/*-bbox-capture.xml` — the only fixtures whose
-//! geometry this repository did not write — can drive the same parser, and so
-//! the Rust port can be compared with the Python reference on identical input.
+//! geometry this repository did not write — can drive the same parser.
 
 use crate::geometry::{Page, Word};
 use regex::Regex;

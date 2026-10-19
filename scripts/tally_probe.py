@@ -55,7 +55,7 @@ def post(xml,timeout=300,tag='q'):
     el=time.time()-t0
     # A timed-out or failed curl can still leave a PARTIAL file on disk, and a
     # truncated capture that happens to contain '<ENVELOPE' would otherwise be
-    # read as a valid response - the corpus verifier would then reason from
+    # read as a valid response - a corpus check would then reason from
     # missing rows instead of reporting transport failure. Transport failure is
     # NoResponse regardless of what bytes were written.
     if done.returncode!=0:

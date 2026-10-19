@@ -94,7 +94,7 @@ fn optional_text_constraints_publish_unicode_lengths_and_reject_controls() {
     }
     assert_eq!(
         properties["voucher_number"]["not"]["pattern"],
-        r"[\u0000-\u001F\u007F-\u009F$]"
+        r"[\u0000-\u001F\u007F-\u009F$]|^\s|\s$"
     );
 }
 

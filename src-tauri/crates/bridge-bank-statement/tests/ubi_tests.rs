@@ -1,6 +1,6 @@
 //! The Union Bank of India layout: one printed line per transaction.
 //!
-//! There is no Python reference for this profile. The shapes were described
+//! The shapes were described
 //! from the text layer of one real statement (68 rows) without any of its
 //! values; every line here is synthetic.
 

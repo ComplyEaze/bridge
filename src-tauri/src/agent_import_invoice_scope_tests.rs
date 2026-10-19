@@ -417,7 +417,10 @@ fn a_parent_that_differs_only_in_case_from_a_scoped_one_is_refused() {
 /// before any request, under the plan's own cause.
 #[test]
 fn a_scope_too_large_for_one_read_is_refused() {
-    let limit = crate::tally::connection::parent_partition_limits(crate::tally::connection::ComplianceRead::Standard).max_ledgers_per_part;
+    let limit = crate::tally::connection::parent_partition_limits(
+        crate::tally::connection::ComplianceRead::Standard,
+    )
+    .max_ledgers_per_part;
     let names = (0..=limit)
         .map(|index| format!("Ledger {index}"))
         .collect::<Vec<_>>();

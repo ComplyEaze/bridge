@@ -376,6 +376,12 @@ pub(super) fn invoice_ledger_rates_scoped_read(
         .map(ReadRequest)
 }
 
+/// The group listing with each group's HSN/SAC rows, for the HSN/SAC check
+/// of an invoice (rows bound to the company by GUID).
+pub(super) fn invoice_group_hsn_read(company: &str) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_group_hsn_request(company))
+}
+
 /// The company's GST registrations, for an invoice build (rows bound to the
 /// company by GUID).
 pub(super) fn invoice_company_registration_read(company: &str) -> ReadRequest {

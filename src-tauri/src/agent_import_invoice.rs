@@ -28,7 +28,7 @@ mod wire;
 
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
-    render_company_registration_request, render_invoice_number_request,
+    render_company_registration_request, render_group_hsn_request, render_invoice_number_request,
     render_invoice_readback_request, render_ledger_rates_request_for_parents,
     render_voucher_types_request,
 };
@@ -123,6 +123,9 @@ pub(super) struct LedgerFacts {
     /// Reserved names of the ledger's groups, nearest first, only when the
     /// chain resolved to the root. Empty when it did not.
     pub(super) reserved_groups: Vec<String>,
+    /// The same groups' own names, nearest first, under the same rule: the
+    /// chain the HSN/SAC check walks.
+    pub(super) group_names: Vec<String>,
     pub(super) duty_head: DutyHead,
     pub(super) gstin: GstinEvidence,
     pub(super) registration_type: Option<String>,
@@ -1152,12 +1155,16 @@ pub(super) fn fit_plan(
         number,
         number_control,
         registration,
+        company_hsn,
+        group_hsn,
     } = wanted;
     if *company_name != carried.company_name
         || *ledger_count != carried.ledger_count
         || *voucher_types != carried.voucher_types
         || *number != carried.number
         || *registration != carried.registration
+        || *company_hsn != carried.company_hsn
+        || *group_hsn != carried.group_hsn
     {
         return Err(ApprovedImportAdmissionError::AdmissionInconsistent);
     }
@@ -1860,6 +1867,12 @@ pub(super) enum Need {
     Number,
     NumberControl,
     Registration,
+    /// The company object, for the HSN/SAC check (asked once the classification
+    /// admits).
+    CompanyHsn,
+    /// The groups with their HSN/SAC rows, asked only when a sales ledger's own
+    /// row defers to its groups.
+    GroupHsn,
 }
 
 /// Why the judge has no observation yet.
@@ -2022,6 +2035,13 @@ impl InvoiceJudge<'_> {
             Need::Registration => {
                 admitted(super::super::invoice_company_registration_read(company))
             }
+            Need::GroupHsn => admitted(super::super::invoice_group_hsn_read(company)),
+            Need::CompanyHsn => {
+                crate::tally::agent_read_request::AgentReadRequest::invoice_company_hsn_named(
+                    company,
+                )
+                .map_err(|error| Verdict::Failed(error.to_string()))
+            }
             Need::Rates => {
                 let scope = self.scope()?;
                 let window = self.year()?;
@@ -2082,6 +2102,8 @@ impl InvoiceJudge<'_> {
             number: self.request(Need::Number)?,
             number_control: self.number_control_request()?,
             registration: self.request(Need::Registration)?,
+            company_hsn: self.request(Need::CompanyHsn)?,
+            group_hsn: self.request(Need::GroupHsn)?,
         })
     }
 
@@ -2145,14 +2167,14 @@ impl InvoiceJudge<'_> {
             };
             let parent = record.ledger.parent.returned_text().map(str::to_string);
             let chain = index.ancestry_chain(parent.as_deref());
-            let reserved_groups = if chain.is_complete() {
+            let (reserved_groups, group_names) = if chain.is_complete() {
                 chain
                     .hops
                     .iter()
-                    .map(|hop| hop.reserved_name.clone())
-                    .collect()
+                    .map(|hop| (hop.reserved_name.clone(), hop.name.clone()))
+                    .unzip()
             } else {
-                Vec::new()
+                (Vec::new(), Vec::new())
             };
             let (gstin, registration_type) = gstin_evidence(
                 record.ledger.party_gstin.returned_text(),
@@ -2163,6 +2185,7 @@ impl InvoiceJudge<'_> {
                 entry.ledger.clone(),
                 LedgerFacts {
                     reserved_groups,
+                    group_names,
                     duty_head: duty_head_of(&record.fields.gst_duty_head),
                     gstin,
                     registration_type,
@@ -2257,11 +2280,22 @@ impl InvoiceJudge<'_> {
         let roles = classify_sales_invoice(voucher, &facts, &company_state, &as_of)
             .map_err(Verdict::Refused)?;
         let party = &voucher.entries[roles.party].ledger;
-        let sales_ledgers = roles
+        let sales_ledgers: Vec<String> = roles
             .sales
             .iter()
             .map(|&index| voucher.entries[index].ledger.clone())
             .collect();
+        // 5. The HSN/SAC each sales line's ledger resolves to on the invoice
+        // date (#691, section 9.16), asked only of an invoice admitted so
+        // far: a code is fixed in Tally and the rest by the caller, and an
+        // invoice refused above costs these reads nothing. The company object
+        // is read for every admitted invoice, because its settings decide
+        // whether the measured order holds at any level; the groups only when
+        // a sales ledger's own row defers.
+        let hsn_refusals = self.sales_hsn_refusals(&sales_ledgers, &facts, &as_of, answers)?;
+        if !hsn_refusals.is_empty() {
+            return Err(Verdict::Refused(hsn_refusals));
+        }
         Ok(observe(
             &facts[party].gstin,
             resolved.guid,
@@ -2269,6 +2303,73 @@ impl InvoiceJudge<'_> {
             company_state,
             sales_ledgers,
         ))
+    }
+
+    /// One refusal per sales ledger (the classification's sales lines) whose
+    /// HSN/SAC does not resolve on the invoice date, or the next answer the
+    /// check needs.
+    fn sales_hsn_refusals(
+        &self,
+        sales_ledgers: &[String],
+        facts: &BTreeMap<String, LedgerFacts>,
+        as_of: &str,
+        answers: &InvoiceAnswers,
+    ) -> Result<Vec<InvoiceRefusal>, Verdict> {
+        let mut sales = sales_ledgers
+            .iter()
+            .map(|name| (name, facts.get(name)))
+            .collect::<Vec<_>>();
+        sales.sort_by(|left, right| left.0.cmp(right.0));
+        sales.dedup_by(|left, right| left.0 == right.0);
+        let Some(company_body) = answers.company_hsn.as_deref() else {
+            return Err(Verdict::Need(Need::CompanyHsn));
+        };
+        let company = wire::parse_company_hsn(company_body, self.company_guid)
+            .map_err(|code| Verdict::Failed(code.to_string()))?;
+        // The build reads the groups only when a sales ledger's own row defers
+        // to them. The queue's `read_invoice_plan` always reads them, and an
+        // answer that is present is always parsed here, needed or not: a groups
+        // answer that cannot be read fails the post in the queue only
+        // (`InvoiceReadUnusable`, before any intent), never the build.
+        let groups = match answers.group_hsn.as_deref() {
+            Some(body) => Some(
+                wire::parse_group_hsn(body, self.company_guid)
+                    .map_err(|code| Verdict::Failed(code.to_string()))?,
+            ),
+            None => None,
+        };
+        let steps = sales
+            .iter()
+            .map(|(name, fact)| {
+                let chain = fact
+                    .map(|fact| fact.group_names.as_slice())
+                    .filter(|names| !names.is_empty());
+                let step = match fact.and_then(|fact| fact.rates.as_ref()) {
+                    // Not reachable after the classification; this check
+                    // never passes a ledger it did not read.
+                    None => wire::HsnStep::Refused(wire::HSN_NOT_MEASURED),
+                    Some(row) => {
+                        wire::resolve_hsn(&row.hsn, chain, groups.as_ref(), &company, as_of)
+                    }
+                };
+                (name.as_str(), step)
+            })
+            .collect::<Vec<_>>();
+        if groups.is_none()
+            && steps
+                .iter()
+                .any(|(_, step)| *step == wire::HsnStep::NeedsGroups)
+        {
+            return Err(Verdict::Need(Need::GroupHsn));
+        }
+        Ok(steps
+            .into_iter()
+            .filter_map(|(name, step)| match step {
+                wire::HsnStep::Resolved { .. } => None,
+                wire::HsnStep::Refused(code) => Some(refuse_ledger(code, name)),
+                wire::HsnStep::NeedsGroups => Some(refuse_ledger(wire::HSN_NOT_MEASURED, name)),
+            })
+            .collect())
     }
 }
 
@@ -2386,10 +2487,12 @@ impl super::super::Server {
                         answers.listing = Some(listing);
                     }
                     Need::LedgerCount
+                    | Need::CompanyHsn
                     | Need::Rates
                     | Need::VoucherTypes
                     | Need::Number
                     | Need::NumberControl
+                    | Need::GroupHsn
                     | Need::Registration => {
                         let request = judge.request(need).map_err(|verdict| match verdict {
                             Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
@@ -2403,6 +2506,8 @@ impl super::super::Server {
                             Need::VoucherTypes => &mut answers.voucher_types,
                             Need::Number => &mut answers.number,
                             Need::NumberControl => &mut answers.number_control,
+                            Need::CompanyHsn => &mut answers.company_hsn,
+                            Need::GroupHsn => &mut answers.group_hsn,
                             _ => &mut answers.registration,
                         };
                         *slot = Some(xml);

@@ -62,6 +62,7 @@ fn facts_for(names: &[(&str, &[&str], DutyHead)]) -> BTreeMap<String, LedgerFact
                 name.to_string(),
                 LedgerFacts {
                     reserved_groups: groups.iter().map(|g| g.to_string()).collect(),
+                    group_names: groups.iter().map(|g| g.to_string()).collect(),
                     duty_head: *head,
                     gstin: GstinEvidence::NotReported,
                     registration_type: None,
@@ -103,6 +104,7 @@ fn sales_rates(cgst: &str, igst: &str) -> wire::LedgerRateRow {
         rate_of_tax_calculation: Some("0".to_string()),
         rounding_method: None,
         rounding_limit: Some("0".to_string()),
+        hsn: Ok(None),
     }
 }
 
@@ -113,6 +115,7 @@ fn tax_rates(half: &str) -> wire::LedgerRateRow {
         rate_of_tax_calculation: Some(half.to_string()),
         rounding_method: Some("Not Applicable".to_string()),
         rounding_limit: Some("0".to_string()),
+        hsn: Ok(None),
     }
 }
 

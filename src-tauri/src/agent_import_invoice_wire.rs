@@ -808,7 +808,11 @@ pub(super) fn parse_company_registration(
 /// `RATEOFTAXCALCULATION`, `ROUNDINGMETHOD`, `ROUNDINGLIMIT`) added and
 /// nothing else changed. Sent in UTF-16 on a licensed TallyPrime 7.1 Silver
 /// synthetic company on 10 Oct 2026, it was answered with the fields (the
-/// `pilot-lab` fixtures). `window` is the financial year's start and the
+/// `pilot-lab` fixtures). The three fields of the HSN/SAC check
+/// (`HSNDETAILS.LIST`, `GSTTYPEOFSUPPLY`, `GSTAPPLICABLE`) follow them, as
+/// the lab answered them on 12 Oct 2026 (lab request set W16, the
+/// `pilot-lab-ledger-rates-hsn` fixture; `GSTTYPEOFSUPPLY` and `GSTAPPLICABLE`
+/// are for the code warnings that follow). `window` is the financial year's start and the
 /// invoice date, as the request that was measured carried them (a ledger's
 /// rate rows came back whole; whether the window changes them was not tried).
 /// `None` when a date is not eight digits.
@@ -840,7 +844,7 @@ fn render_ledger_rates(
     }
     let (formula, filters) = bridge_tally_protocol::native_outstandings::parent_filter_parts(part);
     Some(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
         from = window.0,
         to = window.1,
@@ -1041,6 +1045,11 @@ pub(in crate::agent::agent_import) struct LedgerRateRow {
     pub(super) rate_of_tax_calculation: Option<String>,
     pub(super) rounding_method: Option<String>,
     pub(super) rounding_limit: Option<String>,
+    /// The ledger's HSN/SAC rows, for the HSN/SAC check. A defect in them
+    /// (a repeated element) is kept here rather than failing the listing, so
+    /// it refuses a sales ledger only, never an invoice through its party or
+    /// tax ledger.
+    pub(super) hsn: Result<HsnRows, &'static str>,
 }
 
 /// The elements the lab's GST rows carried (10 Oct 2026, fourteen ledgers),
@@ -1181,12 +1190,35 @@ pub(super) fn parse_ledger_rates_and_rows(
             rate_of_tax_calculation: ledger.text_of("RATEOFTAXCALCULATION")?,
             rounding_method: ledger.text_of("ROUNDINGMETHOD")?,
             rounding_limit: ledger.text_of("ROUNDINGLIMIT")?,
+            hsn: hsn::hsn_rows(ledger),
         };
         if out.insert(name, row).is_some() {
             return Err("invoice_ledger_rates_name_repeated");
         }
     }
     Ok((out, listed))
+}
+
+// ---- The HSN/SAC check's two other reads (#691, W16, 12 Oct 2026) ----
+
+#[path = "agent_import_invoice_hsn.rs"]
+mod hsn;
+pub(super) use hsn::{
+    parse_company_hsn, parse_group_hsn, resolve_hsn, HsnRows, HsnStep,
+    NOT_MEASURED as HSN_NOT_MEASURED,
+};
+
+/// The group listing the build's compliance read already sends (the
+/// `List of Groups` snapshot, bound to the company by GUID) with
+/// `HSNDETAILS.LIST` added to its field list and nothing else changed, as the
+/// lab answered it on 12 Oct 2026 (lab request set W16, the
+/// `pilot-lab-groups-hsn` fixture: one `HSNDETAILS.LIST` per group, empty on a
+/// group with no code).
+pub(in crate::agent) fn render_group_hsn_request(company: &str) -> String {
+    format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Groups</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"List of Groups\" ISMODIFY=\"Yes\"><FETCH>NAME, PARENT, GUID, MASTERID, ALTERID, RESERVEDNAME, HSNDETAILS.LIST</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        company = xml_escape(company),
+    )
 }
 
 #[cfg(test)]

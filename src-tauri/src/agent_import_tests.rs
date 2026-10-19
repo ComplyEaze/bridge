@@ -2416,6 +2416,63 @@ fn utf16le(bytes: &[u8]) -> String {
     .unwrap()
 }
 
+/// DERIVED, not Tally's bytes: the answer to the rates read the code sends now
+/// (restricted to the parents of the invoice's ledgers, #1331, with the three
+/// HSN/SAC fields added to its field list, #691), which the lab was not sent.
+/// It is the lab's answer to the unrestricted read with those three fields
+/// (`pilot-lab-ledger-rates-hsn`, 12 Oct 2026) with every ledger row removed
+/// that the lab's answer to the restricted read (`pilot-lab-ledger-rates-scoped`,
+/// 10 Oct 2026) does not hold: that read held exactly the unrestricted read's
+/// rows under the four parents (PROVENANCE; PARTIAL: one book, one spelling),
+/// and the book gained two ledgers (`BRIDGE Svc 4D 5%`, `BRIDGE Svc INH 5%`)
+/// between the two days, which the 10 Oct catalogue the replay pairs with does
+/// not hold. The removal is counted, and the rows left must be the scoped read's
+/// rows, name for name, each under one of the four parents.
+pub(super) fn pilot_scoped_rates_hsn() -> String {
+    const PARENTS: [&str; 4] = [
+        "Duties &amp; Taxes",
+        "Indirect Expenses",
+        "Sales Accounts",
+        "Sundry Debtors",
+    ];
+    let whole = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml"));
+    let scoped = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml"));
+    let names = |xml: &str| -> Vec<String> {
+        let mut out = Vec::new();
+        let mut rest = xml;
+        while let Some(at) = rest.find("<LEDGER NAME=\"") {
+            let from = at + "<LEDGER NAME=\"".len();
+            out.push(rest[from..from + rest[from..].find('"').unwrap()].to_string());
+            rest = &rest[from..];
+        }
+        out
+    };
+    let wanted = names(&scoped);
+    let mut kept = whole.clone();
+    let mut removed = 0;
+    let mut at = 0;
+    while let Some(start) = kept[at..].find("<LEDGER NAME=\"").map(|found| found + at) {
+        let end = start + kept[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
+        let name = names(&kept[start..end]).remove(0);
+        if wanted.contains(&name) {
+            assert!(
+                PARENTS
+                    .iter()
+                    .any(|parent| kept[start..end].contains(&format!(">{parent}</PARENT>"))),
+                "{name} is under none of the four parents"
+            );
+            at = end;
+        } else {
+            kept.replace_range(start..end, "");
+            removed += 1;
+            at = start;
+        }
+    }
+    assert_eq!(removed, names(&whole).len() - wanted.len(), "rows removed");
+    assert_eq!(names(&kept), wanted, "the rows left are the scoped read's");
+    kept
+}
+
 /// BRIDGE PILOT LAB's GUID, from its captured company list.
 pub(super) fn pilot_lab_guid() -> String {
     captured_company_guid(

@@ -1529,6 +1529,28 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              is checked against the book as it is now, and show the user the new approval \
              text.",
         ),
+        "invoice_sales_ledger_hsn_unresolved" => Some(
+            "The named sales ledger has no HSN/SAC code on the invoice date: not on the \
+             ledger, not on any group above it, and not at company level. Nothing was \
+             written. Ask the user to set the code in Tally on the ledger, a group or the \
+             company, dated on or before the invoice date, then build again. Do not post \
+             first and fix the code after: in a lab test, Tally marked an invoice saved \
+             without a code as uncertain in GSTR-1, correcting the master did not clear it, \
+             and only opening and saving the invoice again did. ComplyEaze Bridge does not \
+             choose or suggest the code.",
+        ),
+        "invoice_sales_ledger_hsn_source_not_measured" => Some(
+            "The HSN/SAC code of the named sales ledger, or the company's GST settings for \
+             it, are set up in a way ComplyEaze Bridge has not checked against Tally, so it \
+             cannot confirm that Tally will accept the code: for example a code from GST \
+             classification, several entries on one date, no entry in force on the invoice \
+             date, a code that would have to come from further up than two groups, a code \
+             shorter than the minimum \
+             length in the company's GST details, or company HSN/SAC settings other than \
+             the ones checked. Nothing was written. Tell the user which ledger it is and \
+             ask them to check its HSN/SAC details and the company's GST details in Tally. \
+             Do not change the invoice to get past this.",
+        ),
         "invoice_company_registration_absent"
         | "invoice_company_registration_not_yet_in_force"
         | "invoice_company_registration_inactive"

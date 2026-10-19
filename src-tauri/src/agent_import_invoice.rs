@@ -2326,6 +2326,11 @@ impl InvoiceJudge<'_> {
         };
         let company = wire::parse_company_hsn(company_body, self.company_guid)
             .map_err(|code| Verdict::Failed(code.to_string()))?;
+        // The build reads the groups only when a sales ledger's own row defers
+        // to them. The queue's `read_invoice_plan` always reads them, and an
+        // answer that is present is always parsed here, needed or not: a groups
+        // answer that cannot be read fails the post in the queue only
+        // (`InvoiceReadUnusable`, before any intent), never the build.
         let groups = match answers.group_hsn.as_deref() {
             Some(body) => Some(
                 wire::parse_group_hsn(body, self.company_guid)

@@ -100,8 +100,9 @@ pub(crate) struct InvoiceReadPlan {
     /// The company object the HSN/SAC check reads once the classification
     /// admits, and the groups with their HSN/SAC rows. The build sends the
     /// groups only when a sales ledger's own row defers to them; the queue
-    /// sends them whenever it sends the invoice's reads, and the judge asks the
-    /// answer only when it is needed.
+    /// sends them whenever it sends the invoice's reads, and the judge parses
+    /// an answer that is present whether or not it is needed, so a groups
+    /// answer that cannot be read fails the post in the queue only.
     pub(crate) company_hsn: AgentReadRequest,
     pub(crate) group_hsn: AgentReadRequest,
 }

@@ -18,6 +18,47 @@ fn native_dispatch_coordination_dir_requires_an_absolute_os_root() {
     assert_eq!(stable_coordination_dir(Some(PathBuf::from("Bridge"))), None);
 }
 
+#[test]
+fn the_profile_coordination_root_requires_an_absolute_profile() {
+    let directory = tempfile::tempdir().unwrap();
+    let profile = directory.path().to_path_buf();
+    assert_eq!(
+        profile_coordination_dir(Some(profile.clone())),
+        Some(profile.join(".complyeaze-bridge").join("coordination"))
+    );
+    assert_eq!(profile_coordination_dir(None), None);
+    assert_eq!(profile_coordination_dir(Some(PathBuf::from("me"))), None);
+}
+
+/// Off Windows every lock has one root, the one it always had.
+#[cfg(not(windows))]
+#[test]
+fn off_windows_a_lock_is_taken_under_the_one_coordination_root() {
+    assert_eq!(
+        dispatch_coordination_roots(),
+        default_dispatch_coordination_dir().map(|root| vec![root])
+    );
+}
+
+/// On Windows a lock is taken under AppData first, then under the profile,
+/// outside AppData, where a packaged process's writes are not redirected.
+#[cfg(windows)]
+#[test]
+fn on_windows_a_lock_is_taken_under_app_data_then_the_profile() {
+    let roots = dispatch_coordination_roots().expect("both known folders");
+    assert_eq!(roots.len(), 2);
+    assert_eq!(
+        Some(&roots[0]),
+        default_dispatch_coordination_dir().as_ref()
+    );
+    let app_data = windows_local_app_data_dir().expect("LocalAppData");
+    assert!(!roots[1].starts_with(&app_data), "{roots:?}");
+    assert!(
+        roots[1].ends_with(".complyeaze-bridge\\coordination"),
+        "{roots:?}"
+    );
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn macos_coordination_dir_uses_the_historical_application_support_root() {

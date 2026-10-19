@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
 
 /// The shape of the lab's voucher-type collection (measured 6 Oct 2026): a
 /// CMPINFO counter named like the rows, then one VOUCHERTYPE per type with its
@@ -215,7 +216,7 @@ fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
         "A$B",
         "x OR y; \"",
         "\u{e9}",
-        "12345678901234567",
+        "1".repeat(17).as_str(),
     ] {
         assert!(
             render_invoice_number_request("Co", bad_number, ("20250401", "20260331")).is_none(),
@@ -223,7 +224,7 @@ fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
         );
     }
     assert!(
-        render_invoice_number_request("Co", "1234567890123456", ("20250401", "20260331")).is_some()
+        render_invoice_number_request("Co", &"1".repeat(16), ("20250401", "20260331")).is_some()
     );
     assert!(render_invoice_number_request("Co", "1", ("2025-04-01", "20260331")).is_none());
 }
@@ -262,10 +263,10 @@ fn only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate() {
 
 #[test]
 fn the_readback_read_is_dated_and_by_type_guid_and_number() {
-    let guid = "11111111-2222-4333-8444-555555555555-00000193";
+    let guid = &format!("{}-00000193", sentinel_uuid(0x5));
     let request =
         render_invoice_readback_request("Co", guid, "278", ("20250401", "20260331")).unwrap();
-    assert!(request.contains("$Date &gt;= $$Date:\"20250401\" AND $Date &lt;= $$Date:\"20260331\" AND $VoucherNumber = \"278\" AND $GUID:VoucherType:$VoucherTypeName = \"11111111-2222-4333-8444-555555555555-00000193\"</SYSTEM>"));
+    assert!(request.contains(&format!("$Date &gt;= $$Date:\"20250401\" AND $Date &lt;= $$Date:\"20260331\" AND $VoucherNumber = \"278\" AND $GUID:VoucherType:$VoucherTypeName = \"{guid}\"</SYSTEM>")));
     assert!(request.contains("ALLLEDGERENTRIES.*"));
     assert!(
         render_invoice_readback_request("Co", "g\"", "278", ("20250401", "20260331")).is_none()
@@ -273,11 +274,20 @@ fn the_readback_read_is_dated_and_by_type_guid_and_number() {
     assert!(render_invoice_readback_request("Co", guid, "A B", ("20250401", "20260331")).is_none());
 }
 
-/// The pilot lab's tax units as Tally answered (see the set's PROVENANCE).
-const TAX_UNITS: &str = include_str!(
-    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-typed-request.utf8.xml"
-);
-const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+/// The pilot lab's tax units as Tally answered the code's own request (see the
+/// set's PROVENANCE), decoded.
+static TAX_UNITS: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"))
+});
+
+/// The pilot lab's GUID with its last character changed: a company that is
+/// not the lab.
+fn another_guid() -> String {
+    let mut guid = pilot_lab_guid();
+    let last = guid.pop().unwrap();
+    guid.push(if last == '6' { '7' } else { '6' });
+    guid
+}
 const REGISTRATION_ROW: &str =
     "<GSTREGISTRATIONDETAILS.LIST>\r\n      <FROMDATE>20260401</FROMDATE>";
 
@@ -288,7 +298,7 @@ fn units_with(from: &str, to: &str) -> String {
 }
 
 fn registration(xml: &str, as_of: &str) -> Result<CompanyRegistration, RegistrationOutcome> {
-    parse_company_registration(xml, PILOT_GUID, as_of)
+    parse_company_registration(xml, &pilot_lab_guid(), as_of)
 }
 
 fn refused_as(xml: &str, as_of: &str) -> &'static str {
@@ -306,16 +316,20 @@ fn the_company_registration_in_force_is_read_from_the_captured_tax_units() {
         gstin: "08ZZZZZ0000Z1ZQ".into(),
         state: "Rajasthan".into(),
     });
-    assert_eq!(registration(TAX_UNITS, "20260801"), read);
+    assert_eq!(registration(&TAX_UNITS, "20260801"), read);
     // A row dated on the invoice date applies; a day earlier nothing does.
-    assert_eq!(registration(TAX_UNITS, "20260401"), read);
+    assert_eq!(registration(&TAX_UNITS, "20260401"), read);
     assert_eq!(
-        refused_as(TAX_UNITS, "20260331"),
+        refused_as(&TAX_UNITS, "20260331"),
         "invoice_company_registration_not_yet_in_force"
     );
     // The company's GUID is matched without regard to case.
     assert_eq!(
-        parse_company_registration(TAX_UNITS, &PILOT_GUID.to_ascii_uppercase(), "20260801"),
+        parse_company_registration(
+            &TAX_UNITS,
+            &pilot_lab_guid().to_ascii_uppercase(),
+            "20260801"
+        ),
         read
     );
 }
@@ -384,11 +398,17 @@ fn a_registration_that_is_not_one_regular_unit_in_force_is_refused() {
             "invoice_company_registration_unbound",
         ),
         (
-            units_with("bfef-d32e2ab93c85-000000cd", "bfef-d32e2ab93c86-000000cd"),
+            units_with(
+                &format!("{}-000000cd", pilot_lab_guid()),
+                &format!("{}-000000cd", another_guid()),
+            ),
             "invoice_company_registration_unbound",
         ),
         (
-            units_with("bfef-d32e2ab93c85-00000064", "bfef-d32e2ab93c86-00000064"),
+            units_with(
+                &format!("{}-00000064", pilot_lab_guid()),
+                &format!("{}-00000064", another_guid()),
+            ),
             "invoice_company_registration_unbound",
         ),
     ];
@@ -408,6 +428,12 @@ fn a_registration_that_is_not_one_regular_unit_in_force_is_refused() {
     let registered = TAX_UNITS
         .find("<TAXUNIT NAME=\"Rajasthan Registration\"")
         .unwrap();
+    assert_eq!(
+        TAX_UNITS[registered..]
+            .matches("<GSTOLDREGNUMBER/>")
+            .count(),
+        1
+    );
     let old_gstin = format!(
         "{}{}",
         &TAX_UNITS[..registered],
@@ -484,10 +510,7 @@ fn a_tax_unit_answer_that_cannot_be_read_is_a_failed_read() {
     );
     assert_eq!(
         registration(
-            &units_with(
-                "<GUID>6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000cd</GUID>",
-                ""
-            ),
+            &units_with(&format!("<GUID>{}-000000cd</GUID>", pilot_lab_guid()), ""),
             "20260801"
         ),
         Err(RegistrationOutcome::Failed("invoice_tax_unit_without_guid"))
@@ -504,11 +527,9 @@ fn a_tax_unit_answer_that_cannot_be_read_is_a_failed_read() {
     );
 }
 
-/// One of the rehearsal's captured answers (see the PROVENANCE table beside
-/// the fixtures): Tally's own bytes, decoded. In the two read-backs of the
-/// registered customer's invoices one token, the customer's GSTIN, is a
-/// substitute named in that table.
-fn rehearsal(bytes: &[u8]) -> String {
+/// One of the pilot lab's captured answers (see the PROVENANCE table beside
+/// the fixtures): Tally's own bytes, decoded.
+fn captured(bytes: &[u8]) -> String {
     String::from_utf16(
         &bytes
             .chunks_exact(2)
@@ -518,24 +539,25 @@ fn rehearsal(bytes: &[u8]) -> String {
     .unwrap()
 }
 
-/// The voucher types as the lab book answered on 7 Oct 2026: the type keyed
-/// for the rehearsal resolves, the predefined Sales type (an Automatic series)
-/// does not, and two raw control characters in a class name do not stop the
-/// read.
+/// The voucher types as the pilot lab's book answered on 9 Oct 2026 (the
+/// `pilot-lab` set): `BRIDGE
+/// Sales`, a Sales-class type with one Manual series, resolves; the predefined Sales type (an Automatic series)
+/// does not; a type the book lacks is not found; and two raw control
+/// characters in `BRIDGE Sales`'s class name do not stop the read.
 #[test]
-fn the_captured_voucher_types_resolve_the_manual_type_and_refuse_the_automatic_one() {
-    let xml = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-voucher-types.utf16le.xml"));
+fn the_pilot_labs_voucher_types_resolve_its_manual_type_and_refuse_the_automatic_one() {
+    let xml = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"));
     assert_eq!(xml.matches('\u{5}').count(), 2);
     let types = parse_voucher_types(&xml).unwrap();
     assert_eq!(types.len(), 25);
     assert_eq!(
-        resolve_voucher_type(&types, "Sales Manual", "Sales"),
+        resolve_voucher_type(&types, "BRIDGE Sales", "Sales"),
         Ok(ResolvedVoucherType {
-            guid: "ae1490be-52c5-4544-9ffc-4b7da85f9797-00000106".into(),
+            guid: format!("{}-000000ce", pilot_lab_guid()),
             class: "Sales".into(),
         })
     );
-    let manual = types.iter().find(|row| row.name == "Sales Manual").unwrap();
+    let manual = types.iter().find(|row| row.name == "BRIDGE Sales").unwrap();
     assert_eq!(
         (manual.parent.as_str(), manual.reserved_name.as_str()),
         ("Sales", "")
@@ -553,100 +575,127 @@ fn the_captured_voucher_types_resolve_the_manual_type_and_refuse_the_automatic_o
         Err("invoice_voucher_type_numbering_not_manual")
     );
     assert_eq!(
-        resolve_voucher_type(&types, "Sales Manual", "Purchase"),
+        resolve_voucher_type(&types, "BRIDGE Sales", "Purchase"),
         Err("invoice_voucher_type_wrong_class")
+    );
+    assert_eq!(
+        resolve_voucher_type(&types, "Sales Acc", "Sales"),
+        Err("invoice_voucher_type_not_found")
     );
 }
 
-/// The duplicate-number read's three captured answers: a number one invoice
-/// carries, a number nothing carries (a collection with no row, which is an
-/// answer), and a number a Purchase and a Sales voucher share.
+/// The duplicate-number read's captured answers on the pilot lab's book: a
+/// number its first invoice carries, and a number nothing carries (a
+/// collection with no row, which is an answer). The first answer's header
+/// counts (`<VOUCHER>30</VOUCHER>` among them) are not rows. Every row in
+/// both answers is of the Sales class, so these bytes cannot tell the
+/// Sales-class count from a count of every row:
+/// `only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate` is the
+/// test that does.
 #[test]
-fn the_captured_number_answers_count_only_sales_class_vouchers() {
-    for (name, vouchers, sales) in [
-        ("number-known", 1, 1),
-        ("number-absent", 0, 0),
-        ("number-shared", 2, 1),
+fn the_captured_number_answers_count_their_rows_not_their_header() {
+    for (name, xml, vouchers, sales) in [
+        (
+            "number-in-use",
+            captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml")),
+            1,
+            1,
+        ),
+        (
+            "number-new-invoice",
+            captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml")),
+            0,
+            0,
+        ),
     ] {
-        let xml = match name {
-            "number-known" => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-known.utf16le.xml")),
-            "number-absent" => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml")),
-            _ => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-shared.utf16le.xml")),
-        };
         assert_eq!(count_vouchers(&xml), Ok(vouchers), "{name}");
         assert_eq!(count_sales_vouchers(&xml), Ok(sales), "{name}");
     }
 }
 
 /// The control beside the number read, on Tally's own answers: it passes only
-/// on a row with the known number, its date and the Sales class. The shared
-/// answer holds a Sales voucher numbered 12 on 18 Sep 2025 and a Purchase
-/// voucher numbered 12 on 22 Jul 2025.
+/// on a row with the known number, its date and the Sales class. The pilot
+/// lab's answer holds its first invoice, numbered BP/26-27/0001 on 1 Aug 2026.
 #[test]
 fn the_control_row_is_the_known_invoice_with_its_date_and_class() {
-    let known = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-known.utf16le.xml"));
-    let absent = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml"));
-    let shared = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-shared.utf16le.xml"));
+    let known = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"));
+    let absent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"));
     assert_eq!(
-        control_row_found(&known, "TG/25-26/001", "20260310"),
+        control_row_found(&known, "BP/26-27/0001", "20260801"),
         Ok(true)
     );
     // A read that returns no row is never a control.
     assert_eq!(
-        control_row_found(&absent, "TG/25-26/001", "20260310"),
+        control_row_found(&absent, "BP/26-27/0001", "20260801"),
         Ok(false)
     );
-    assert_eq!(control_row_found(&shared, "12", "20250918"), Ok(true));
-    // The Purchase row has the number and its own date, and is not Sales.
-    assert_eq!(control_row_found(&shared, "12", "20250722"), Ok(false));
     // The number on another date; another number.
-    assert_eq!(control_row_found(&shared, "12", "20250101"), Ok(false));
     assert_eq!(
-        control_row_found(&shared, "TG/25-26/001", "20250918"),
+        control_row_found(&known, "BP/26-27/0001", "20260802"),
+        Ok(false)
+    );
+    assert_eq!(
+        control_row_found(&known, "BP/26-27/0002", "20260801"),
+        Ok(false)
+    );
+    // A row of the number that is not Sales class is not the control (the
+    // captured answer with one edit: no captured answer of this book holds
+    // such a row).
+    assert_eq!(
+        control_row_found(
+            &known.replace(
+                "<BRIDGEVCHISSALES TYPE=\"Logical\">Yes</BRIDGEVCHISSALES>",
+                "<BRIDGEVCHISSALES TYPE=\"Logical\">No</BRIDGEVCHISSALES>"
+            ),
+            "BP/26-27/0001",
+            "20260801"
+        ),
         Ok(false)
     );
     // An answer with no collection is an error, as for the read it controls.
     assert_eq!(
         control_row_found(
             "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA></DATA></ENVELOPE>",
-            "12",
-            "20250918"
+            "BP/26-27/0001",
+            "20260801"
         ),
         Err("invoice_read_collection_absent")
     );
 }
 
-/// The read-back of the two invoices ComplyEaze Bridge posted and of one keyed
-/// by hand, as Tally answered: every field the comparison reads comes back on
-/// a posted invoice; a keyed one in this book carries no reference.
+/// The read-back of the invoice ComplyEaze Bridge posted on the pilot lab's
+/// book, as Tally answered after the post: every field the comparison reads
+/// comes back, and the walk-in customer's invoice carries no GSTIN and no bill
+/// allocation.
 #[test]
-fn the_captured_read_backs_carry_every_field_of_a_posted_invoice() {
+fn the_captured_read_back_carries_every_field_of_a_posted_invoice() {
     let field = |read: &ReadInvoice, key: &str| read.fields.get(key).cloned();
-    let Ok(Readback::One(registered)) =
-        parse_invoice_readback(&rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-registered.utf16le.xml")))
+    let Ok(Readback::One(posted)) =
+        parse_invoice_readback(&captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml")))
     else {
         panic!("one voucher");
     };
+    let posted_guid = format!("{}-0000000b", pilot_lab_guid());
     for (key, value) in [
-        ("DATE", "20260311"),
-        ("VOUCHERNUMBER", "TG/25-26/002"),
-        ("VOUCHERTYPENAME", "Sales Manual"),
-        ("REFERENCE", "TG/25-26/002"),
-        ("REFERENCEDATE", "20260311"),
-        ("PARTYLEDGERNAME", "TG Buyer Regular RJ"),
-        ("PARTYGSTIN", "08ZZZZZ0000Z1ZQ"),
+        ("DATE", "20260801"),
+        ("VOUCHERNUMBER", "BP/26-27/0010"),
+        ("VOUCHERTYPENAME", "BRIDGE Sales"),
+        ("REFERENCE", "BP/26-27/0010"),
+        ("REFERENCEDATE", "20260801"),
+        ("PARTYLEDGERNAME", "BRIDGE Walk-in"),
         ("STATENAME", "Rajasthan"),
         ("PLACEOFSUPPLY", "Rajasthan"),
-        ("GSTREGISTRATIONTYPE", "Regular"),
+        ("GSTREGISTRATIONTYPE", "Unregistered/Consumer"),
         ("ISINVOICE", "Yes"),
         ("ISCANCELLED", "No"),
         ("ISOPTIONAL", "No"),
-        ("GUID", "ae1490be-52c5-4544-9ffc-4b7da85f9797-0000003e"),
-        ("ALTERID", "64"),
+        ("GUID", posted_guid.as_str()),
+        ("ALTERID", "17"),
     ] {
-        assert_eq!(field(&registered, key).as_deref(), Some(value), "{key}");
+        assert_eq!(field(&posted, key).as_deref(), Some(value), "{key}");
     }
-    let legs = registered
+    assert_eq!(field(&posted, "PARTYGSTIN"), None);
+    let legs = posted
         .legs
         .iter()
         .map(|leg| {
@@ -660,64 +709,20 @@ fn the_captured_read_backs_carry_every_field_of_a_posted_invoice() {
     assert_eq!(
         legs,
         [
-            ("TG Buyer Regular RJ", "-1457.00", 1),
-            ("Sales - Goods", "1234.50", 0),
-            ("Output CGST", "111.11", 0),
-            ("Output SGST", "111.11", 0),
-            ("Round Off", "0.28", 0),
+            ("BRIDGE Walk-in", "-1051.00", 0),
+            ("BRIDGE Svc 998313 5%", "600.40", 0),
+            ("BRIDGE Svc 998314 5%", "400.40", 0),
+            ("BRIDGE CGST 2.5%", "25.02", 0),
+            ("BRIDGE SGST 2.5%", "25.02", 0),
+            ("BRIDGE Round Off", "0.16", 0),
         ]
     );
-    assert_eq!(
-        registered.legs[0].allocations,
-        [(
-            Some("TG/25-26/002".to_string()),
-            Some("New Ref".to_string()),
-            "-1457.00".to_string()
-        )]
-    );
-
-    let Ok(Readback::One(unregistered)) =
-        parse_invoice_readback(&rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-unregistered.utf16le.xml")))
-    else {
-        panic!("one voucher");
-    };
-    assert_eq!(
-        field(&unregistered, "VOUCHERNUMBER").as_deref(),
-        Some("TG/25-26/003")
-    );
-    assert_eq!(
-        field(&unregistered, "GSTREGISTRATIONTYPE").as_deref(),
-        Some("Unregistered/Consumer")
-    );
-    assert_eq!(field(&unregistered, "PARTYGSTIN"), None);
-    assert_eq!(field(&unregistered, "ALTERID").as_deref(), Some("65"));
-    assert_eq!(unregistered.legs.len(), 4);
-    assert!(unregistered
-        .legs
-        .iter()
-        .all(|leg| leg.allocations.is_empty()));
-
-    let Ok(Readback::One(keyed)) = parse_invoice_readback(&rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-keyed-registered.utf16le.xml")))
-    else {
-        panic!("one voucher");
-    };
-    assert_eq!(
-        field(&keyed, "VOUCHERNUMBER").as_deref(),
-        Some("TG/25-26/001")
-    );
-    assert_eq!(
-        field(&keyed, "PARTYGSTIN").as_deref(),
-        Some("08ZZZZZ0000Z1ZQ")
-    );
-    assert_eq!(
-        (field(&keyed, "REFERENCE"), field(&keyed, "REFERENCEDATE")),
-        (None, None)
-    );
-    assert_eq!(keyed.legs.len(), 4);
+    // The same read before the post: a collection with no voucher.
+    assert!(matches!(
+        parse_invoice_readback(&captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml"))),
+        Ok(Readback::Absent)
+    ));
 }
-
-/// The synthetic company's GUID in the lab's answers.
-const LAB_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 
 const RATES_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml");
 
@@ -725,7 +730,7 @@ const RATES_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/test
 /// the one the code renders (the file starts with a byte order mark).
 #[test]
 fn the_ledger_rates_request_is_the_one_the_lab_answered() {
-    let sent = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.request.utf16le.xml"));
+    let sent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.request.utf16le.xml"));
     let rendered =
         render_ledger_rates_request("BRIDGE PILOT LAB", ("20260401", "20260801")).unwrap();
     assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
@@ -812,7 +817,7 @@ fn the_captured_rate_listing_is_read_with_every_field_in_its_place() {
         "BRIDGE CGST 2.5%",
         "BRIDGE Output CGST XML",
     ];
-    let rates = parse_ledger_rates(&rehearsal(RATES_ANSWER), LAB_GUID, &named).unwrap();
+    let rates = parse_ledger_rates(&captured(RATES_ANSWER), &pilot_lab_guid(), &named).unwrap();
     assert_eq!(rates.len(), 3, "only the ledgers asked for are read");
     let svc = &rates["BRIDGE Svc 998313 5%"];
     assert_eq!(svc.rate_of_tax_calculation.as_deref(), Some("0"));
@@ -873,7 +878,7 @@ fn the_captured_rate_listing_is_read_with_every_field_in_its_place() {
 
 #[test]
 fn a_rate_listing_that_is_not_this_companys_or_not_whole_is_refused() {
-    let xml = rehearsal(RATES_ANSWER);
+    let xml = captured(RATES_ANSWER);
     let named = ["BRIDGE Svc 998313 5%"];
     // Another company's answer.
     assert_eq!(
@@ -881,14 +886,14 @@ fn a_rate_listing_that_is_not_this_companys_or_not_whole_is_refused() {
         Err("invoice_ledger_rates_company_mismatch")
     );
     // One row of another company, the last one: every row is bound, not the first.
-    let last = xml.rfind(LAB_GUID).unwrap();
+    let last = xml.rfind(&pilot_lab_guid()).unwrap();
     let mut foreign = xml.clone();
     foreign.replace_range(
-        last..last + LAB_GUID.len(),
+        last..last + pilot_lab_guid().len(),
         "00000000-0000-4000-8000-000000000001",
     );
     assert_eq!(
-        parse_ledger_rates(&foreign, LAB_GUID, &named),
+        parse_ledger_rates(&foreign, &pilot_lab_guid(), &named),
         Err("invoice_ledger_rates_company_mismatch")
     );
     // A ledger asked for, named twice.
@@ -896,28 +901,28 @@ fn a_rate_listing_that_is_not_this_companys_or_not_whole_is_refused() {
     let end = xml[first..].find("</LEDGER>").unwrap() + first + "</LEDGER>".len();
     let twice = format!("{}{}{}", &xml[..end], &xml[first..end], &xml[end..]);
     assert_eq!(
-        parse_ledger_rates(&twice, LAB_GUID, &["Cash"]),
+        parse_ledger_rates(&twice, &pilot_lab_guid(), &["Cash"]),
         Err("invoice_ledger_rates_name_repeated")
     );
     // The same duplicate in a ledger the invoice does not name is not read.
-    assert!(parse_ledger_rates(&twice, LAB_GUID, &named).is_ok());
+    assert!(parse_ledger_rates(&twice, &pilot_lab_guid(), &named).is_ok());
     // Tally's error answer, a truncated one, and one with no collection.
     assert_eq!(
         parse_ledger_rates(
             &xml.replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>"),
-            LAB_GUID,
+            &pilot_lab_guid(),
             &named
         ),
         Err("invoice_read_status_not_success")
     );
     assert_eq!(
-        parse_ledger_rates(&xml[..xml.len() / 2], LAB_GUID, &named),
+        parse_ledger_rates(&xml[..xml.len() / 2], &pilot_lab_guid(), &named),
         Err("invoice_read_malformed")
     );
     assert_eq!(
         parse_ledger_rates(
             "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY></BODY></ENVELOPE>",
-            LAB_GUID,
+            &pilot_lab_guid(),
             &named
         ),
         Err("invoice_read_collection_absent")
@@ -939,12 +944,12 @@ fn an_empty_rate_listing_is_its_own_failure_and_a_listing_without_the_ledger_is_
             "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA>{empty}</DATA></BODY></ENVELOPE>"
         );
         assert_eq!(
-            parse_ledger_rates(&xml, LAB_GUID, &["L"]),
+            parse_ledger_rates(&xml, &pilot_lab_guid(), &["L"]),
             Err("invoice_ledger_rates_listing_empty"),
             "{empty}"
         );
     }
-    let other = parse_ledger_rates(&ledger_answer("Other", ""), LAB_GUID, &["L"]).unwrap();
+    let other = parse_ledger_rates(&ledger_answer("Other", ""), &pilot_lab_guid(), &["L"]).unwrap();
     assert!(other.is_empty());
 }
 
@@ -956,15 +961,18 @@ fn an_empty_rate_listing_is_its_own_failure_and_a_listing_without_the_ledger_is_
 fn a_nameless_ledger_row_fails_the_rate_read_and_the_captured_listing_has_none() {
     let nameless = ledger_answer("L", "").replace("<LEDGER NAME=\"L\">", "<LEDGER>");
     assert_eq!(
-        parse_ledger_rates(&nameless, LAB_GUID, &["L"]),
+        parse_ledger_rates(&nameless, &pilot_lab_guid(), &["L"]),
         Err("invoice_ledger_rates_row_unnamed")
     );
     let beside = ledger_answer("L", "").replace(
         "</COLLECTION>",
-        &format!("<LEDGER><BRIDGECOMPANYGUID>{LAB_GUID}</BRIDGECOMPANYGUID></LEDGER></COLLECTION>"),
+        &format!(
+            "<LEDGER><BRIDGECOMPANYGUID>{guid}</BRIDGECOMPANYGUID></LEDGER></COLLECTION>",
+            guid = pilot_lab_guid()
+        ),
     );
     assert_eq!(
-        parse_ledger_rates(&beside, LAB_GUID, &["L"]),
+        parse_ledger_rates(&beside, &pilot_lab_guid(), &["L"]),
         Err("invoice_ledger_rates_row_unnamed")
     );
     // Another company's nameless row is refused as another company's.
@@ -988,7 +996,7 @@ fn a_nameless_ledger_row_fails_the_rate_read_and_the_captured_listing_has_none()
         "Cash",
         "Profit & Loss A/c",
     ];
-    let rates = parse_ledger_rates(&rehearsal(RATES_ANSWER), LAB_GUID, &named).unwrap();
+    let rates = parse_ledger_rates(&captured(RATES_ANSWER), &pilot_lab_guid(), &named).unwrap();
     assert_eq!(rates.keys().map(String::as_str).collect::<Vec<_>>(), named);
 }
 
@@ -996,8 +1004,9 @@ fn a_nameless_ledger_row_fails_the_rate_read_and_the_captured_listing_has_none()
 fn ledger_answer(name: &str, inner: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
-         <LEDGER NAME=\"{name}\"><BRIDGECOMPANYGUID>{LAB_GUID}</BRIDGECOMPANYGUID>{inner}</LEDGER>\
-         </COLLECTION></DATA></BODY></ENVELOPE>"
+         <LEDGER NAME=\"{name}\"><BRIDGECOMPANYGUID>{guid}</BRIDGECOMPANYGUID>{inner}</LEDGER>\
+         </COLLECTION></DATA></BODY></ENVELOPE>",
+        guid = pilot_lab_guid()
     )
 }
 
@@ -1015,7 +1024,8 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
         )
     };
     let unmeasured = |inner: String| {
-        let rates = parse_ledger_rates(&ledger_answer("L", &inner), LAB_GUID, &["L"]).unwrap();
+        let rates =
+            parse_ledger_rates(&ledger_answer("L", &inner), &pilot_lab_guid(), &["L"]).unwrap();
         rates["L"].gst_rows[0].unmeasured
     };
     assert!(!unmeasured(row(
@@ -1055,25 +1065,31 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
             "L",
             "<ROUNDINGMETHOD></ROUNDINGMETHOD><ROUNDINGLIMIT>0</ROUNDINGLIMIT>",
         ),
-        LAB_GUID,
+        &pilot_lab_guid(),
         &["L"],
     )
     .unwrap();
     assert_eq!(present["L"].rounding_method.as_deref(), Some(""));
     assert_eq!(present["L"].rate_of_tax_calculation, None);
     // A ledger name with an entity decodes like the other reads' names.
-    let named = parse_ledger_rates(&ledger_answer("A &amp; B", ""), LAB_GUID, &["A & B"]).unwrap();
+    let named = parse_ledger_rates(
+        &ledger_answer("A &amp; B", ""),
+        &pilot_lab_guid(),
+        &["A & B"],
+    )
+    .unwrap();
     assert!(named.contains_key("A & B"));
     // A row of a ledger nobody named may be malformed in every way the parse
     // refuses for a named one: it is not read.
     let broken = format!(
-        "<LEDGER NAME=\"Other\"><BRIDGECOMPANYGUID>{LAB_GUID}</BRIDGECOMPANYGUID>\
+        "<LEDGER NAME=\"Other\"><BRIDGECOMPANYGUID>{guid}</BRIDGECOMPANYGUID>\
          <GSTDETAILS.LIST><APPLICABLEFROM>1</APPLICABLEFROM><APPLICABLEFROM>2</APPLICABLEFROM>\
          <STATEWISEDETAILS.LIST><RATEDETAILS.LIST></RATEDETAILS.LIST></STATEWISEDETAILS.LIST>\
-         </GSTDETAILS.LIST></LEDGER><LEDGER/>"
+         </GSTDETAILS.LIST></LEDGER><LEDGER/>",
+        guid = pilot_lab_guid()
     );
     let answer = ledger_answer("L", "").replace("</COLLECTION>", &format!("{broken}</COLLECTION>"));
-    let wanted = parse_ledger_rates(&answer, LAB_GUID, &["L"]);
+    let wanted = parse_ledger_rates(&answer, &pilot_lab_guid(), &["L"]);
     assert_eq!(
         wanted,
         Err("invoice_ledger_rates_company_mismatch"),
@@ -1083,11 +1099,11 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
         "</COLLECTION>",
         &format!("{}</COLLECTION>", broken.replace("<LEDGER/>", "")),
     );
-    assert!(parse_ledger_rates(&answer, LAB_GUID, &["L"]).is_ok());
+    assert!(parse_ledger_rates(&answer, &pilot_lab_guid(), &["L"]).is_ok());
     // The same row, asked for, is refused for what is wrong with it (a head
     // with no name; an element twice is refused under its own code).
     assert_eq!(
-        parse_ledger_rates(&answer, LAB_GUID, &["Other"]),
+        parse_ledger_rates(&answer, &pilot_lab_guid(), &["Other"]),
         Err("invoice_ledger_rates_head_unnamed")
     );
     let twice = ledger_answer(
@@ -1095,7 +1111,7 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
         "<GSTDETAILS.LIST><APPLICABLEFROM>1</APPLICABLEFROM><APPLICABLEFROM>2</APPLICABLEFROM></GSTDETAILS.LIST>",
     );
     assert_eq!(
-        parse_ledger_rates(&twice, LAB_GUID, &["L"]),
+        parse_ledger_rates(&twice, &pilot_lab_guid(), &["L"]),
         Err("invoice_read_field_repeated")
     );
     let no_name = ledger_answer(
@@ -1104,7 +1120,7 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
          <RATEDETAILS.LIST><GSTRATE>5</GSTRATE></RATEDETAILS.LIST></STATEWISEDETAILS.LIST></GSTDETAILS.LIST>",
     );
     assert_eq!(
-        parse_ledger_rates(&no_name, LAB_GUID, &["L"]),
+        parse_ledger_rates(&no_name, &pilot_lab_guid(), &["L"]),
         Err("invoice_ledger_rates_head_unnamed")
     );
 }

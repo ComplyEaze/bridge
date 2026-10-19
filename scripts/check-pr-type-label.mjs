@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // A release proposal reads each merged pull request's type label. Failing here, at the pull
 // request, keeps a missing label from blocking a release later.
-import { pathToFileURL } from "node:url";
+import { existsSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 export const TYPE_LABELS = ["type:feature", "type:bug", "type:rectify", "type:chore"];
 
@@ -12,7 +13,7 @@ export function typeLabelProblem(labels) {
   return `A pull request needs exactly one of ${TYPE_LABELS.join(", ")}; ${found}.`;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const labels = JSON.parse(process.env.PR_LABELS ?? "");
   if (!Array.isArray(labels) || labels.some((name) => typeof name !== "string")) {
     throw new Error("PR_LABELS must be a JSON array of label names");

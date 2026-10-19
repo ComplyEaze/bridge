@@ -7,8 +7,6 @@
 //! Contra or Journal batch reports.
 use super::*;
 
-const GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
-
 fn row(
     suffix: u32,
     voucher_type: &str,
@@ -40,11 +38,11 @@ fn row(
 
 const PAYMENT: &[(&str, &str, &str)] = &[("Rent", "-500.00", "Yes"), ("Bank", "500.00", "No")];
 const INVOICE: &[(&str, &str, &str)] = &[
-    ("TG Buyer Regular RJ", "-1457.00", "Yes"),
-    ("Sales - Goods", "1234.50", "No"),
-    ("Output CGST", "111.11", "No"),
-    ("Output SGST", "111.11", "No"),
-    ("Round Off", "0.28", "No"),
+    ("Customer Regular RJ", "-1181.00", "Yes"),
+    ("Sales - Goods", "1000.40", "No"),
+    ("Output CGST", "90.04", "No"),
+    ("Output SGST", "90.04", "No"),
+    ("Round Off", "0.52", "No"),
 ];
 
 /// Two Payments with the same figures, and two invoices of one type with the
@@ -53,8 +51,8 @@ fn window() -> ImportReadSource {
     ImportReadSource::admit(vec![
         row(0x31, "Payment", Some("7"), PAYMENT),
         row(0x32, "Payment", Some("8"), PAYMENT),
-        row(0x3d, "Sales Manual", Some("TG/25-26/011"), INVOICE),
-        row(0x3e, "Sales Manual", Some("TG/25-26/002"), INVOICE),
+        row(0x3d, "Sales Invoice", Some("INV/26-27/011"), INVOICE),
+        row(0x3e, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
     ])
     .unwrap()
 }
@@ -62,10 +60,10 @@ fn window() -> ImportReadSource {
 /// A saved batch of one Payment dated 11-Mar-2026.
 fn payment_batch(debit: &str, amount: &str) -> ImportLedgerLine {
     serde_json::from_value(json!({
-        "batch_id":"bridge-00000000-0000-4000-8000-00000000000a",
+        "batch_id": sentinel_batch_id(0xa),
         "identity_scheme":"batch_v1",
         "company_guid":GUID,
-        "company":{"name":"Lab", "guid":GUID, "company_number":"100017", "books_from":"20250401"},
+        "company":{"name":"Lab", "guid":GUID, "company_number":"100001", "books_from":"20250401"},
         "txn_ids":["p-1"],
         "date_from":"20260311", "date_to":"20260311",
         "sha256":"0000000000000000000000000000000000000000000000000000000000000000",
@@ -82,7 +80,7 @@ fn payment_batch(debit: &str, amount: &str) -> ImportLedgerLine {
 /// The duplicate report's hash of the two Payments, and of the two invoices as
 /// a bank batch's verification reports them: by date, type and entries.
 const PAYMENT_PAIR: &str = "b02463e73435fbf5d99596cbfab38688c8d529a2afe49a7191ef3800e40ba1b6";
-const INVOICE_PAIR: &str = "9c90d86d02b9080592f000dd1fa4c2030f90da3e4c3fcb7ccb27b152bc61bf0a";
+const INVOICE_PAIR: &str = "c5fae948c9774d5890275af7150ba97f101de124cad5205c779f86e5d102265b";
 
 fn pair(hash: &str, first: u32, second: u32) -> Value {
     json!({"fingerprint_sha256":hash, "kind":"accounting_fingerprint", "remote_ids":[],
@@ -109,7 +107,7 @@ fn a_bank_batch_reads_a_window_with_same_figures_invoices_as_it_always_has() {
         )
         .unwrap(),
         json!({"ambiguous_within_batch":[], "counts":counts("not_found"), "duplicates":[],
-            "unrelated_duplicates_in_window":[pair(INVOICE_PAIR, 0x3d, 0x3e), pair(PAYMENT_PAIR, 0x31, 0x32)],
+            "unrelated_duplicates_in_window":[pair(PAYMENT_PAIR, 0x31, 0x32), pair(INVOICE_PAIR, 0x3d, 0x3e)],
             "vouchers":[{"bridge_txn_id":"p-1", "status":"not_found"}]})
     );
     // A Payment with the figures of the two in the window matches both, by tag
@@ -130,7 +128,7 @@ fn a_bank_batch_reads_a_window_with_same_figures_invoices_as_it_always_has() {
 
 const KEYED: u32 = 0x3d;
 const OTHER_FIGURES: &[(&str, &str, &str)] = &[
-    ("TG Buyer Regular RJ", "-118.00", "Yes"),
+    ("Customer Regular RJ", "-118.00", "Yes"),
     ("Sales - Goods", "100.00", "No"),
     ("Output CGST", "9.00", "No"),
     ("Output SGST", "9.00", "No"),
@@ -142,13 +140,13 @@ fn invoice_batch(number: &str) -> ImportLedgerLine {
     line.vouchers[0] = serde_json::from_value(json!({
         "bridge_txn_id":"p-1", "date":"20260311", "voucher_type":"Sales",
         "narration":null, "reference":null, "voucher_number":number,
-        "invoice":{"voucher_type_name":"Sales Manual", "place_of_supply":"Rajasthan",
+        "invoice":{"voucher_type_name":"Sales Invoice", "place_of_supply":"Rajasthan",
             "round_off_ledger":"Round Off"},
-        "entries":[{"ledger":"TG Buyer Regular RJ", "amount":"1457.00", "side":"Dr"},
-            {"ledger":"Sales - Goods", "amount":"1234.50", "side":"Cr"},
-            {"ledger":"Output CGST", "amount":"111.11", "side":"Cr"},
-            {"ledger":"Output SGST", "amount":"111.11", "side":"Cr"},
-            {"ledger":"Round Off", "amount":"0.28", "side":"Cr"}]
+        "entries":[{"ledger":"Customer Regular RJ", "amount":"1181.00", "side":"Dr"},
+            {"ledger":"Sales - Goods", "amount":"1000.40", "side":"Cr"},
+            {"ledger":"Output CGST", "amount":"90.04", "side":"Cr"},
+            {"ledger":"Output SGST", "amount":"90.04", "side":"Cr"},
+            {"ledger":"Round Off", "amount":"0.52", "side":"Cr"}]
     }))
     .unwrap();
     line
@@ -172,31 +170,31 @@ fn absent(result: &Value) -> bool {
 
 #[test]
 fn two_invoices_that_differ_only_by_their_number_are_two_documents() {
-    let keyed = || vec![row(KEYED, "Sales Manual", Some("TG/25-26/011"), INVOICE)];
+    let keyed = || vec![row(KEYED, "Sales Invoice", Some("INV/26-27/011"), INVOICE)];
     // The acceptance case: the keyed twin does not stop another number.
-    let result = before_a_post("TG/25-26/002", keyed(), InvoiceIdentity::ByNumber);
+    let result = before_a_post("INV/26-27/002", keyed(), InvoiceIdentity::ByNumber);
     assert!(absent(&result), "{result}");
     // It is listed beside the verdict, attributed to nothing.
     assert_eq!(
         result["vouchers"][0]["same_figures_other_number"],
         json!({"count":1, "attribution":"not_established", "entries":[{
             "guid":format!("{GUID}-{KEYED:08x}"), "master_id":KEYED.to_string(),
-            "alter_id":KEYED, "voucher_number":"TG/25-26/011"}]})
+            "alter_id":KEYED, "voucher_number":"INV/26-27/011"}]})
     );
     // Its own number is refused: the invoice is in the book.
-    let same = before_a_post("TG/25-26/011", keyed(), InvoiceIdentity::ByNumber);
+    let same = before_a_post("INV/26-27/011", keyed(), InvoiceIdentity::ByNumber);
     assert!(!absent(&same), "{same}");
-    assert_eq!(same["vouchers"][0]["voucher_number"], "TG/25-26/011");
+    assert_eq!(same["vouchers"][0]["voucher_number"], "INV/26-27/011");
     // Beside an unsettled batch of this machine the figures are enough.
-    let strict = before_a_post("TG/25-26/002", keyed(), InvoiceIdentity::ByNumberOrFigures);
+    let strict = before_a_post("INV/26-27/002", keyed(), InvoiceIdentity::ByNumberOrFigures);
     assert!(!absent(&strict), "{strict}");
     assert!(strict["vouchers"][0]
         .get("same_figures_other_number")
         .is_none());
     // A voucher of another type with the figures and the number is not it.
     let other_type = before_a_post(
-        "TG/25-26/002",
-        vec![row(KEYED, "Sales", Some("TG/25-26/002"), INVOICE)],
+        "INV/26-27/002",
+        vec![row(KEYED, "Sales", Some("INV/26-27/002"), INVOICE)],
         InvoiceIdentity::ByNumberOrFigures,
     );
     assert!(absent(&other_type), "{other_type}");
@@ -206,11 +204,11 @@ fn two_invoices_that_differ_only_by_their_number_are_two_documents() {
 fn a_number_in_use_is_this_invoice_whatever_the_figures_and_however_it_is_spelt() {
     // The number under other figures: in the book, and the difference shows.
     let other = before_a_post(
-        "TG/25-26/002",
+        "INV/26-27/002",
         vec![row(
             KEYED,
-            "Sales Manual",
-            Some("TG/25-26/002"),
+            "Sales Invoice",
+            Some("INV/26-27/002"),
             OTHER_FIGURES,
         )],
         InvoiceIdentity::ByNumber,
@@ -226,16 +224,18 @@ fn a_number_in_use_is_this_invoice_whatever_the_figures_and_however_it_is_spelt(
     );
     // Case and surrounding space do not make another number before a post;
     // the stored spelling is still reported as a difference.
-    for stored in ["tg/25-26/002", " TG/25-26/002 "] {
+    for stored in ["inv/26-27/002", " INV/26-27/002 "] {
         let result = before_a_post(
-            "TG/25-26/002",
-            vec![row(KEYED, "Sales Manual", Some(stored), INVOICE)],
+            "INV/26-27/002",
+            vec![row(KEYED, "Sales Invoice", Some(stored), INVOICE)],
             InvoiceIdentity::ByNumber,
         );
         assert!(!absent(&result), "{stored:?} {result}");
         assert_eq!(
             result["vouchers"][0]["diffs"],
-            json!(["voucher_number"]),
+            // The batch attributes by its tag, so it writes its narration with the tag (#1608):
+            // a keyed twin that holds none reads as a narration difference beside the number.
+            json!(["voucher_number", "narration"]),
             "{stored:?}"
         );
     }
@@ -245,14 +245,14 @@ fn a_number_in_use_is_this_invoice_whatever_the_figures_and_however_it_is_spelt(
 fn a_voucher_with_no_number_is_this_invoice_when_its_figures_are() {
     for missing in [None, Some(""), Some("  ")] {
         let same = before_a_post(
-            "TG/25-26/002",
-            vec![row(KEYED, "Sales Manual", missing, INVOICE)],
+            "INV/26-27/002",
+            vec![row(KEYED, "Sales Invoice", missing, INVOICE)],
             InvoiceIdentity::ByNumber,
         );
         assert!(!absent(&same), "{missing:?} {same}");
         let other = before_a_post(
-            "TG/25-26/002",
-            vec![row(KEYED, "Sales Manual", missing, OTHER_FIGURES)],
+            "INV/26-27/002",
+            vec![row(KEYED, "Sales Invoice", missing, OTHER_FIGURES)],
             InvoiceIdentity::ByNumber,
         );
         assert!(absent(&other), "{missing:?} {other}");
@@ -261,11 +261,11 @@ fn a_voucher_with_no_number_is_this_invoice_when_its_figures_are() {
 
 #[test]
 fn a_posted_invoice_beside_a_keyed_twin_is_no_duplicate_and_beside_its_own_number_is_one() {
-    let posted = row(0x3e, "Sales Manual", Some("TG/25-26/002"), INVOICE);
-    let twin = row(KEYED, "Sales Manual", Some("TG/25-26/011"), INVOICE);
+    let posted = row(0x3e, "Sales Invoice", Some("INV/26-27/002"), INVOICE);
+    let twin = row(KEYED, "Sales Invoice", Some("INV/26-27/011"), INVOICE);
     let read = |rows: Vec<ReadVoucher>| {
         verify_batch_as(
-            &invoice_batch("TG/25-26/002"),
+            &invoice_batch("INV/26-27/002"),
             &ImportReadSource::admit(rows).unwrap(),
             Attribution::Span(None),
             InvoiceIdentity::ByNumber,
@@ -276,7 +276,7 @@ fn a_posted_invoice_beside_a_keyed_twin_is_no_duplicate_and_beside_its_own_numbe
     assert_eq!(beside_a_twin["counts"]["matching_content_observed"], 1);
     assert_eq!(
         beside_a_twin["vouchers"][0]["voucher_number"],
-        "TG/25-26/002"
+        "INV/26-27/002"
     );
     assert_eq!(beside_a_twin["vouchers"][0]["diffs"], json!([]));
     assert_eq!(beside_a_twin["duplicates"], json!([]));
@@ -284,7 +284,7 @@ fn a_posted_invoice_beside_a_keyed_twin_is_no_duplicate_and_beside_its_own_numbe
     // A second voucher under the same number is a duplicate of the batch.
     let twice = read(vec![
         posted,
-        row(0x3f, "Sales Manual", Some("TG/25-26/002"), INVOICE),
+        row(0x3f, "Sales Invoice", Some("INV/26-27/002"), INVOICE),
     ]);
     assert_eq!(twice["counts"]["duplicate_fingerprint"], 1, "{twice}");
     assert_eq!(twice["duplicates"].as_array().unwrap().len(), 1, "{twice}");
@@ -297,7 +297,7 @@ fn a_posted_invoice_beside_a_keyed_twin_is_no_duplicate_and_beside_its_own_numbe
 #[test]
 fn an_invoice_batch_still_reads_vouchers_of_other_types_by_their_content() {
     let result = verify_batch_as(
-        &invoice_batch("TG/25-26/002"),
+        &invoice_batch("INV/26-27/002"),
         &window(),
         Attribution::Tag,
         InvoiceIdentity::ByNumber,
@@ -334,7 +334,12 @@ fn a_journal_that_carries_a_number_is_still_matched_by_its_content() {
         )
         .unwrap();
         assert_eq!(result["counts"]["matching_content_observed"], 1, "{result}");
-        assert_eq!(result["vouchers"][0]["diffs"], json!(["voucher_number"]));
+        // The batch attributes by its tag, so it writes its narration with the tag (#1608): the
+        // row holds none, which reads as a narration difference beside the number.
+        assert_eq!(
+            result["vouchers"][0]["diffs"],
+            json!(["voucher_number", "narration"])
+        );
     }
 }
 
@@ -366,12 +371,11 @@ fn the_identity_is_read_from_the_journal_only_for_an_invoice_batch() {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let bank = payment_batch("Rent", "500.00");
     let mut earlier = invoice_batch("INV/1");
-    earlier.batch_id = "bridge-00000000-0000-4000-8000-00000000000b".into();
+    earlier.batch_id = sentinel_batch_id(0xb);
     let invoice = invoice_batch("INV/2");
     server.append_import_ledger(&earlier).expect("saved batch");
     // The exclusive lock held by another writer.
@@ -430,17 +434,16 @@ fn a_verification_beside_an_unsettled_batch_matches_the_invoice_by_its_figures()
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
-    let mut earlier = invoice_batch("TG/25-26/011");
-    earlier.batch_id = "bridge-00000000-0000-4000-8000-00000000000b".into();
-    let invoice = invoice_batch("TG/25-26/002");
+    let mut earlier = invoice_batch("INV/26-27/011");
+    earlier.batch_id = sentinel_batch_id(0xb);
+    let invoice = invoice_batch("INV/26-27/002");
     let keyed = || {
         ImportReadSource::admit(vec![row(
             KEYED,
-            "Sales Manual",
-            Some("TG/25-26/011"),
+            "Sales Invoice",
+            Some("INV/26-27/011"),
             INVOICE,
         )])
         .unwrap()

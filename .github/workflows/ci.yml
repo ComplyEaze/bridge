@@ -111,21 +111,21 @@ jobs:
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.py$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes\.py$|retain-macos-test-binaries\.py$))'; then
+          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.py$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes\.py$|retain-macos-test-binaries\.py$))' <<< "$changed_files"; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
           fi
 
           # The mutation records check runs when the crate it guards changes, or this workflow does.
-          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/ci\.yml|src-tauri/crates/bridge-tax-audit/)'; then
+          if grep -Eq '^(\.github/workflows/ci\.yml|src-tauri/crates/bridge-tax-audit/)' <<< "$changed_files"; then
             echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
           else
             echo 'tax_audit=false' >> "$GITHUB_OUTPUT"
           fi
 
           # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.
-          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.py|capture-package-log(\.test)?\.py|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)'; then
+          if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.py|capture-package-log(\.test)?\.py|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
           else
             echo 'bundle=false' >> "$GITHUB_OUTPUT"
@@ -321,7 +321,7 @@ jobs:
         working-directory: src-tauri
         run: >-
           cargo test --locked -p bridge-tally-protocol --no-fail-fast
-          --features jsonex-parser,jsonex-request-builder,india-tax-observation-parser,bills-payments-observation-parser,bills-native-outstandings-probe
+          --features bills-native-outstandings-probe
       - name: Test isolated native outstandings qualification path
         working-directory: tools
         run: |
@@ -344,7 +344,7 @@ jobs:
         working-directory: src-tauri
         run: >-
           cargo clippy --locked -p bridge-tally-protocol
-          --features jsonex-parser,jsonex-request-builder,india-tax-observation-parser,bills-payments-observation-parser,bills-native-outstandings-probe
+          --features bills-native-outstandings-probe
           --all-targets -- -D warnings -A clippy::pedantic
       - name: Lint isolated native outstandings qualification path
         working-directory: tools
@@ -352,11 +352,6 @@ jobs:
           cargo clippy --locked -p bridge-tally-compatibility --features bills-native-outstandings-probe-receipt --all-targets -- -D warnings -A clippy::pedantic
           cargo clippy --locked -p bridge-tally-read-transport --features bills-native-outstandings-probe-transport --all-targets -- -D warnings -A clippy::pedantic
           cargo clippy --locked -p bridge-tally-live-read --features bills-native-outstandings-probe-runner --all-targets -- -D warnings -A clippy::pedantic
-      - name: Produce parser-only synthetic qualification smoke receipt
-        working-directory: tools
-        run: >-
-          cargo run --locked --release -p bridge-tally-qualification --
-          run ci-smoke target/tally-qualification-smoke.json 7 3
       - name: Enforce exact Tally compatibility claims
         working-directory: tools
         run: >-
@@ -384,12 +379,6 @@ jobs:
         run: node scripts/check-fixture-provenance.mjs
       - name: Enforce Tally request-builder hazard allowlist
         run: node scripts/check-tally-request-builder-hazards.mjs
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: tally-parser-qualification-smoke
-          path: tools/target/tally-qualification-smoke.json
-          if-no-files-found: error
-          retention-days: 7
 
   native:
     name: Native checks (${{ matrix.os }})

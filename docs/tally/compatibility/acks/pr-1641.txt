@@ -1,0 +1,5 @@
+docs/adr/0004-tally-write-safety.md
+src-tauri/src/endpoint_coordination.rs
+src-tauri/src/endpoint_wire.rs
+src-tauri/src/local_files/file.rs
+reviewer: lamemustafa

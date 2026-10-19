@@ -15,7 +15,15 @@ fn identical_batch() -> (ImportLedgerLine, Vec<ReadVoucher>) {
             alter_id: Some(11 + index as u64),
             date: bridge_tally_core::TallyDate::parse(voucher.date.as_str()).unwrap(),
             voucher_type: Some(voucher.voucher_type.as_str().into()),
-            narration: Some(format!("[BRIDGE:{}]", voucher.bridge_txn_id)),
+            narration: Some(
+                format!(
+                    "{} [BRIDGE:{}]",
+                    voucher.narration.as_deref().unwrap_or(""),
+                    voucher.bridge_txn_id
+                )
+                .trim()
+                .to_string(),
+            ),
             voucher_number: None,
             cancelled: Some(false),
             optional: Some(false),
@@ -38,6 +46,8 @@ fn identical_batch() -> (ImportLedgerLine, Vec<ReadVoucher>) {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,

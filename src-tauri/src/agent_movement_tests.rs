@@ -231,7 +231,7 @@ async fn movement_read_preserves_observed_count_after_accounting_exclusions() {
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         observed.name.clone(),
-        observed.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&observed.guid.clone().unwrap()),
         observed.company_number.clone().unwrap(),
         observed.books_from.clone().unwrap(),
         &companies,
@@ -276,8 +276,7 @@ async fn movement_read_preserves_observed_count_after_accounting_exclusions() {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         // A caller-held high-water mark small enough to bound the window, so
         // the pre-flight (protocol reference §11c) sends nothing of its own.

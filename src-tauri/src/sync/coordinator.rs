@@ -318,7 +318,6 @@ fn snapshot_error_code(error: &SnapshotError) -> &'static str {
         SnapshotError::StateStore(_) => "snapshot_state_store_failed",
         SnapshotError::Mirror(_) => "snapshot_mirror_failed",
         SnapshotError::Reconciliation(_) => "snapshot_reconciliation_failed",
-        SnapshotError::ConcurrentCheckpoint => "snapshot_checkpoint_changed",
         SnapshotError::StateInvariant(_) => "snapshot_state_invariant_failed",
         SnapshotError::Serialization => "snapshot_serialization_failed",
     }

@@ -77,8 +77,8 @@ impl LabGuardConfig {
     fn from_values(target: &str, deny_raw: &str) -> Result<Self, String> {
         let target_guid = parse_native_company_guid(target.trim())
             .map_err(|_| "lab_target_guid_invalid".to_string())?
-            .hyphenated()
-            .to_string();
+            .as_str()
+            .to_owned();
         let mut deny_guids = Vec::new();
         for candidate in deny_raw.split(',') {
             let candidate = candidate.trim();
@@ -87,8 +87,8 @@ impl LabGuardConfig {
             }
             let guid = parse_native_company_guid(candidate)
                 .map_err(|_| "lab_deny_guids_invalid".to_string())?
-                .hyphenated()
-                .to_string();
+                .as_str()
+                .to_owned();
             deny_guids.push(guid);
         }
         if deny_guids.is_empty() {
@@ -1506,7 +1506,7 @@ mod tests {
             .unwrap();
         let identity = VerifiedCompanyIdentity::from_observed_companies(
             observed.name.clone(),
-            observed.guid.clone().unwrap(),
+            crate::tally::test_company_guid(&observed.guid.clone().unwrap()),
             observed.company_number.clone().unwrap(),
             observed.books_from.clone().unwrap(),
             &companies,
@@ -1543,8 +1543,7 @@ mod tests {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         let expected = render_lab_master_collection(
             identity.display_name(),

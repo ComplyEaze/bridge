@@ -29,7 +29,7 @@ import {
   operatorSelectedOutstandingsAsOf,
   refreshAutomaticOutstandingsAsOf,
 } from "./outstandings-as-of";
-import { MirrorProofScreen } from "./MirrorProofScreen";
+import { guidanceForGap, MirrorProofScreen } from "./MirrorProofScreen";
 import { ErrorBoundary, ReloadGuardContext } from "./ErrorBoundary";
 import { ClientSwitcher, type ClientSwitcherClient } from "./ClientSwitcher";
 import { JournalPostingScreen } from "./JournalPostingScreen";
@@ -1229,7 +1229,7 @@ function App() {
         ? "Let the active phase finish or cancel explicitly"
         : latestAttemptNeedsReview
           ? latestDurableJob?.failure_code
-            ? `Review ${formatIdentifier(latestDurableJob.failure_code)} before relying on the older baseline`
+            ? `Review "${guidanceForGap(latestDurableJob.failure_code).title}" before relying on the older baseline`
             : "Review the latest non-Verified attempt before relying on the older baseline"
           : !status
             ? "Review offline evidence, then probe before any new live read"
@@ -1609,6 +1609,7 @@ function App() {
             liveReadSuppressed={isLocalEvidenceReadSuppressed(evidenceDrawerOpen, evidenceDrawerEntry)}
             openBookCount={completeCurrentProbeCompanies.length}
             asOf={outstandingsAsOfSelection.value}
+            asOfOperatorSelected={outstandingsAsOfSelection.operatorSelected}
             onAsOfChange={changeOutstandingsAsOf}
             onTallyReadActivityChange={changeChildTallyReadActivity}
             onExportNoticeChange={setOutstandingsExportNotice}

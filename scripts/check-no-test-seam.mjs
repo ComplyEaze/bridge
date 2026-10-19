@@ -10,7 +10,7 @@
 // optimiser keeps it. The override is pdfium_library() in
 // src-tauri/src/agent_bank_statement.rs, whose bare `#[cfg(test)]` lookup
 // reads the variable PDFIUM_OVERRIDE_MARKER names. The stand-in is the
-// example src-tauri/examples/approval_standin.rs, which uses STANDIN_MARKER at
+// example src-tauri/crates/bridge-approval-standin/examples/approval_standin.rs, which uses STANDIN_MARKER at
 // runtime the same way. A binary holding any marker was compiled with that
 // test-only code.
 //
@@ -38,7 +38,7 @@
 // its name, and also by its first bytes (a gzip, zip, zstd, xz, bzip2 or 7z
 // signature) wherever it sits, whatever it is called (#839).
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -230,8 +230,9 @@ export function testBuildExecutables(release, sourceRoot = root) {
       standin: onlyExecutable(artifacts, "approval_standin example", (message) => isStandin(message) && message.profile?.test === false),
     };
   }
-  // The release path keeps `-p bridge`, whose release dependencies are what bundle-smoke's cache holds. `cargo test
-  // --example` would build the example as a test harness, without its `main`, so the example is built on its own.
+  // The release path keeps `-p bridge` for the harness, whose release dependencies are what bundle-smoke's cache holds. `cargo test
+  // --example` would build the example as a test harness, without its `main`, so the example is built on its own, in its own
+  // package: an example of `bridge` would make cargo compile `bridge`'s plain lib in release a second time (3m 41s on the Windows runner).
   return {
     harness: onlyExecutable(
       cargoArtifacts(["test", "--no-run", "--lib", "-p", "bridge", "--release"], sourceRoot),
@@ -239,7 +240,7 @@ export function testBuildExecutables(release, sourceRoot = root) {
       isHarness,
     ),
     standin: onlyExecutable(
-      cargoArtifacts(["build", "--example", "approval_standin", "-p", "bridge", "--release"], sourceRoot),
+      cargoArtifacts(["build", "--example", "approval_standin", "-p", "bridge-approval-standin", "--release"], sourceRoot),
       "approval_standin example",
       isStandin,
     ),
@@ -278,7 +279,7 @@ function main(argumentsList) {
   console.log(`no test-only code in ${paths.length} path(s): ${paths.map((path) => basename(path)).join(", ")}`);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     main(process.argv.slice(2));
   } catch (error) {

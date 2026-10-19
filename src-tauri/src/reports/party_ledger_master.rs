@@ -9,6 +9,7 @@ use bridge_tally_core::{ExactDecimal, TallyDate};
 use bridge_tally_protocol::{
     PartyLedgerMasterFieldObservation, PartyLedgerMasterFields, TallyNamedMaster,
 };
+use serde::Serialize;
 
 use crate::tally::OutstandingsCurrencyAssertion;
 
@@ -16,6 +17,33 @@ use crate::tally::OutstandingsCurrencyAssertion;
 /// currency precision beyond that documented representation boundary rather
 /// than quietly selecting a two-decimal format.
 pub(crate) const MAX_RENDERABLE_CURRENCY_DECIMAL_PLACES: u8 = 15;
+
+/// Which date ends the workbook's balance snapshot. Only a date the CA typed
+/// can be refused for preceding the books or reported as moved (#903); the
+/// host's date keeps the rule it had (#875).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum BalanceDateBasis {
+    /// The Bridge host's calendar date, the default.
+    HostToday(TallyDate),
+    /// The date the CA chose on the Outstandings screen.
+    Requested(TallyDate),
+}
+
+/// What a note says, so the app and the tests read the kind and not the words.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceNoteKind {
+    /// A voucher is dated after the balance snapshot's end.
+    LaterDatedVoucher,
+    /// The typed date was moved to the next date Tally accepts as a boundary.
+    DateMoved,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SourceNote {
+    pub kind: SourceNoteKind,
+    pub text: String,
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct PartyLedgerMasterSource {
@@ -29,10 +57,12 @@ pub(crate) struct PartyLedgerMasterSource {
     pub(crate) currency_decimal_places: u8,
     pub(crate) from: TallyDate,
     pub(crate) to: TallyDate,
+    /// What `to` was chosen from.
+    pub(crate) balance_date_basis: BalanceDateBasis,
     /// The extent's last voucher date when the read was pinned. It is after
     /// `to` only when the balance snapshot was ended at the host's today, or at
     /// the start of the books when the host's date is earlier, because the book
-    /// holds a later-dated voucher (#875).
+    /// holds a later-dated voucher (#875), or at a date the CA typed (#903).
     pub(crate) last_voucher_date: TallyDate,
     pub(crate) rows: Vec<PartyLedgerMasterRow>,
     /// Ordered master/balance/group request body commitments (UTF-16LE on wire).
@@ -67,13 +97,58 @@ impl PartyLedgerMasterSource {
     /// It claims no count and no cause: a later date may be legitimate
     /// (post-dated entries) or a typing error.
     pub(crate) fn later_dated_vouchers_note(&self) -> Option<String> {
-        (self.last_voucher_date > self.to).then(|| {
-            format!(
+        (self.last_voucher_date > self.to).then(|| match &self.balance_date_basis {
+            BalanceDateBasis::HostToday(_) => format!(
                 "Vouchers dated after {} (the book's last voucher date is {}) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first month boundary (the 1st, 2nd or 31st of a month) on or after this computer's date, or on or after the start of the books if that is later; if this computer's date is wrong, correct it and export again.",
                 self.to.as_str(),
                 self.last_voucher_date.as_str()
-            )
+            ),
+            BalanceDateBasis::Requested(requested) => format!(
+                "Vouchers dated after {} (the book's last voucher date is {}) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first month boundary (the 1st, 2nd or 31st of a month) on or after the date chosen for this export, {}.",
+                self.to.as_str(),
+                self.last_voucher_date.as_str(),
+                requested.as_str()
+            ),
         })
+    }
+
+    /// Said in the workbook when the date the CA typed is not a date Tally
+    /// accepts as the end of a balance period, so "as of 15 August" is not
+    /// read as balances to 15 August.
+    pub(crate) fn date_moved_note(&self) -> Option<String> {
+        match &self.balance_date_basis {
+            BalanceDateBasis::Requested(requested) if requested != &self.to => Some(format!(
+                "The date chosen for this export, {}, is not a date Tally accepts as the end of a balance period. The balances end at the next date it accepts, {} (the 1st, 2nd or 31st of a month), and include the vouchers dated {}.",
+                requested.as_str(),
+                self.to.as_str(),
+                self.to.as_str()
+            )),
+            _ => None,
+        }
+    }
+
+    /// The notes of this source, the moved date first.
+    pub(crate) fn notes(&self) -> Vec<SourceNote> {
+        [
+            (SourceNoteKind::DateMoved, self.date_moved_note()),
+            (
+                SourceNoteKind::LaterDatedVoucher,
+                self.later_dated_vouchers_note(),
+            ),
+        ]
+        .into_iter()
+        .filter_map(|(kind, text)| text.map(|text| SourceNote { kind, text }))
+        .collect()
+    }
+
+    /// The notes as the workbook says them, in one string.
+    pub(crate) fn notes_text(&self) -> Option<String> {
+        let texts = self
+            .notes()
+            .into_iter()
+            .map(|note| note.text)
+            .collect::<Vec<_>>();
+        (!texts.is_empty()).then(|| texts.join(" "))
     }
 }
 

@@ -2,6 +2,7 @@ use bridge_tally_core::{ExactDecimal, TallyDate};
 use bridge_tally_protocol::{PartyLedgerMasterFieldObservation, PartyLedgerMasterFields};
 
 use super::*;
+use crate::reports::party_ledger_master::BalanceDateBasis;
 use crate::tally::OutstandingsCurrencyAssertion;
 
 /// Tally's reserved root as every Bridge reader returns it
@@ -31,6 +32,7 @@ fn maps_only_immutable_group_evidence_and_lists_everything_else() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260331").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260331").unwrap()),
         last_voucher_date: TallyDate::parse("20260331").unwrap(),
         rows: vec![
             row("Customer", "Regional customers", "-100"),
@@ -83,6 +85,7 @@ fn contra_signed_sundry_debtor_is_excluded_not_netted_against_its_group_subtotal
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![
             row("Customer advance", "Sundry Debtors", "100"),
@@ -124,6 +127,7 @@ fn contra_signed_sundry_creditor_is_excluded_not_netted_against_its_group_subtot
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![
             row("Supplier advance", "Sundry Creditors", "-200"),
@@ -165,6 +169,7 @@ fn cash_in_hand_and_bank_accounts_keep_separate_group_subtotals_and_totals() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![
             row("Bank balance", "Bank Accounts", "-200"),
@@ -220,6 +225,7 @@ fn contra_signed_bank_account_is_excluded_not_netted_against_its_group_subtotal(
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![
             row("Overdraft", "Bank Accounts", "200"),
@@ -270,6 +276,7 @@ fn empty_closing_balance_is_excluded_not_manufactured_as_zero() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![missing],
         request_sha256: "0".repeat(64),

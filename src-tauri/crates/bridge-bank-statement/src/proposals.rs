@@ -14,7 +14,8 @@
 //! to name. It never reaches Tally except through Bridge's own derivation.
 
 use crate::bank::{
-    Bank, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES, PARSER_SENTINELS,
+    Bank, BankReference, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES,
+    PARSER_SENTINELS,
 };
 use crate::cash::{CashAnswer, CashAnswers, CashMovement, PURPOSE_NOT_CONFIRMED};
 use crate::date::Date;
@@ -24,7 +25,7 @@ use crate::parse::Row;
 use crate::refusal::Refusal;
 use crate::text::{ledger_key, mapping_key, squash, strip};
 use bridge_tally_primitives::ExactDecimal;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -104,15 +105,17 @@ pub fn suspense_tag<'a>(
     ledgers: impl IntoIterator<Item = &'a str>,
 ) -> Option<SuspenseTag> {
     if narration.ends_with(&format!(" | {PURPOSE_NOT_CONFIRMED}")) {
-        Some(SuspenseTag::PurposeNotConfirmed)
-    } else if ledgers
-        .into_iter()
-        .any(|ledger| narration.ends_with(&format!(" | {UNIDENTIFIED} {ledger}")))
-    {
-        Some(SuspenseTag::Unidentified)
-    } else {
-        None
+        return Some(SuspenseTag::PurposeNotConfirmed);
     }
+    // The loose fold `build` decided "unidentified" by (`ledger_key`), applied to both
+    // sides: a book that reads the ledger back in another case or spacing must still
+    // match the tag written for it.
+    let folded = ledger_key(narration);
+    ledgers
+        .into_iter()
+        .filter(|ledger| !ledger_key(ledger).is_empty())
+        .any(|ledger| folded.ends_with(&ledger_key(&format!(" | {UNIDENTIFIED} {ledger}"))))
+        .then_some(SuspenseTag::Unidentified)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -121,7 +124,7 @@ pub enum Side {
     Cr,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VoucherType {
     Payment,
     Receipt,
@@ -156,7 +159,7 @@ pub struct Proposal {
     pub entries: Vec<Entry>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Disposition {
     Voucher(VoucherType),
@@ -165,6 +168,26 @@ pub enum Disposition {
     /// A cash withdrawal or deposit nobody has answered yet. No voucher is
     /// proposed, and `build_import_xml` refuses the proposals until it is.
     NeedsAnswer,
+}
+
+/// Which way money moved on the statement's own account.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Direction {
+    /// A debit-column row: money left the account.
+    Outflow,
+    /// A credit-column row: money arrived.
+    Inflow,
+}
+
+impl Direction {
+    fn of(outward: bool) -> Self {
+        if outward {
+            Self::Outflow
+        } else {
+            Self::Inflow
+        }
+    }
 }
 
 /// What became of one statement row. Kept for every row inside the date window,
@@ -176,8 +199,16 @@ pub struct StatementRecord {
     pub disposition: Disposition,
     pub amount: String,
     pub party: String,
-    /// The ledger the voucher posts the non-bank leg to (empty when skipped).
+    /// The ledger the voucher posts the non-bank leg to. For a skipped row,
+    /// the other bank account's ledger, whose Contra carries the transfer;
+    /// empty only for a row still waiting for a cash answer.
     pub ledger: String,
+    /// The network-transfer reference the row carries (UPI, IMPS, NEFT or RTGS),
+    /// whatever became of the row.
+    pub reference: Option<BankReference>,
+    /// The cheque or transaction number the statement prints in its own column,
+    /// recorded only: nothing matches on it.
+    pub instrument: Option<String>,
     /// The row reached the suspense ledger: answered "don't know", or, by
     /// the deliberately loose fold, mapped or defaulted there.
     pub suspense: bool,
@@ -186,12 +217,209 @@ pub struct StatementRecord {
     pub cash_movement: Option<CashMovement>,
     /// The person's answer for a cash line, when given.
     pub cash_answer: Option<CashAnswer>,
+    /// Which way the row moved money on the statement's own account.
+    pub direction: Direction,
+    /// The statement holds another row, read on the same date, of an equal
+    /// amount in the opposite direction: a line that came straight back is
+    /// not half of a transfer. Read over every row of the statement, not only
+    /// those in the date window.
+    pub reversed_same_day: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Build {
     pub proposals: Vec<Proposal>,
     pub records: Vec<StatementRecord>,
+    /// The earliest and latest date any row prints, over every row before the
+    /// date window: not the first and last row in printed order, and not the
+    /// window's own edges. `None` only when there are no rows.
+    pub span: Option<(Date, Date)>,
+    /// How many rows the date window left out. Zero means the window is the
+    /// whole statement.
+    pub rows_outside_window: usize,
+    /// The date of every row the statement printed, before the date window.
+    pub dates: Vec<Date>,
+    /// The net (credits less debits) of the rows dated before the window's
+    /// `from`, and of those dated after its `to`. Zero when none is left out.
+    pub net_before_window: ExactDecimal,
+    pub net_after_window: ExactDecimal,
+}
+
+/// The days whose every row the statement read, from the date of every row it
+/// read and the `from`/`to` window the person gave (`None` for either end
+/// that was left open).
+///
+/// The balance replay closes on balances the person types, so a statement
+/// downloaded part-way through a day can miss the rest of that day. A day at
+/// the edge of the rows therefore counts only when a row exists beyond it: the
+/// window starts at `from` when it is later than the first row's date, else the
+/// day after it; it ends at `to` when that is earlier than the last row's
+/// date, else the day before it. `None` when no day is left.
+pub fn coverage(dates: &[Date], from: Option<Date>, to: Option<Date>) -> Option<(Date, Date)> {
+    let first = *dates.iter().min()?;
+    let last = *dates.iter().max()?;
+    let start = match from {
+        Some(from) if from > first => from,
+        _ => first.next_day()?,
+    };
+    let end = match to {
+        Some(to) if to < last => to,
+        _ => last.previous_day()?,
+    };
+    (start <= end).then_some((start, end))
+}
+
+/// One row read as a movement of money, or `None` when it does not read as one
+/// (the build refuses such a row if it lies in the window).
+fn movement(row: &Row, bank: Bank, number: usize) -> Option<(Date, String, bool)> {
+    let date = bank.parse_date(strip(row.get(DATE)))?;
+    let debit = money(row.get(DEBIT), DEBIT, number).ok()?;
+    let credit = money(row.get(CREDIT), CREDIT, number).ok()?;
+    match (debit, credit) {
+        (Some(amount), None) => Some((date, format_amount(&amount), true)),
+        (None, Some(amount)) => Some((date, format_amount(&amount), false)),
+        _ => None,
+    }
+}
+
+/// For each row, whether another row of the statement moved the same amount the
+/// other way on the same date.
+fn reversed_same_day(rows: &[Row], bank: Bank) -> Vec<bool> {
+    let moves: Vec<Option<(Date, String, bool)>> = rows
+        .iter()
+        .enumerate()
+        .map(|(index, row)| movement(row, bank, index + 1))
+        .collect();
+    let mut seen: BTreeMap<(Date, &str), (bool, bool)> = BTreeMap::new();
+    for (date, amount, outward) in moves.iter().flatten() {
+        let both = seen.entry((*date, amount.as_str())).or_default();
+        if *outward {
+            both.0 = true;
+        } else {
+            both.1 = true;
+        }
+    }
+    moves
+        .iter()
+        .map(|moved| {
+            moved.as_ref().is_some_and(|(date, amount, _)| {
+                seen.get(&(*date, amount.as_str())) == Some(&(true, true))
+            })
+        })
+        .collect()
+}
+
+/// Why a parse cannot be tied to the book over its window. Not a refusal of
+/// the parse: the proposals stand, and `statement_tie_out` answers
+/// `not_established` with this code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TieOutWindowRefusal {
+    /// A window that leaves rows out must run from the 1st of a month to the
+    /// last day of a month, so a tie-out shows the statement's totals per
+    /// calendar month and never a part of a month, except the part-months at
+    /// the statement's own start and end (a month edge's balance with the
+    /// supplied opening or closing gives their net); a month in which every
+    /// other row's amount is already known still shows that row's amount.
+    NotWholeCalendarMonths,
+    /// The window starts before the statement's first row or ends after its
+    /// last: the statement does not prove its balance on those days.
+    BeyondStatementRows,
+}
+
+impl TieOutWindowRefusal {
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::NotWholeCalendarMonths => "window_not_whole_calendar_months",
+            Self::BeyondStatementRows => "window_beyond_statement_rows",
+        }
+    }
+}
+
+/// The statement's balance at the start of `first` and at the end of `last`,
+/// worked out from its own rows by transaction date. Built only by
+/// [`tie_out_window`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TieOutEdges {
+    first: Date,
+    last: Date,
+    opening: ExactDecimal,
+    closing: ExactDecimal,
+}
+
+impl TieOutEdges {
+    pub fn first(&self) -> Date {
+        self.first
+    }
+    pub fn last(&self) -> Date {
+        self.last
+    }
+    pub fn opening(&self) -> &ExactDecimal {
+        &self.opening
+    }
+    pub fn closing(&self) -> &ExactDecimal {
+        &self.closing
+    }
+}
+
+/// Where a parse can be tied to the book, from the build and the balances the
+/// caller supplied (which `reconcile` proved against every row). For the whole
+/// statement that is its first and last row dates and those two balances. For
+/// a window that leaves rows out it is the window's own dates, with the
+/// opening plus the net of the rows before it and the closing less the net of
+/// the rows after it: sums by date, so the order the bank printed the rows in
+/// cannot move them. `None` when the build has no rows.
+pub fn tie_out_window(
+    build: &Build,
+    opening: &ExactDecimal,
+    closing: &ExactDecimal,
+    date_from: Option<Date>,
+    date_to: Option<Date>,
+) -> Option<Result<Result<TieOutEdges, TieOutWindowRefusal>, Refusal>> {
+    let (first_row, last_row) = build.span?;
+    if build.rows_outside_window == 0 {
+        return Some(Ok(Ok(TieOutEdges {
+            first: first_row,
+            last: last_row,
+            opening: opening.clone(),
+            closing: closing.clone(),
+        })));
+    }
+    let first = date_from.unwrap_or(first_row);
+    let last = date_to.unwrap_or(last_row);
+    if !is_whole_calendar_months(first, last) {
+        return Some(Ok(Err(TieOutWindowRefusal::NotWholeCalendarMonths)));
+    }
+    if first < first_row || last > last_row {
+        return Some(Ok(Err(TieOutWindowRefusal::BeyondStatementRows)));
+    }
+    let edges = opening
+        .checked_add(&build.net_before_window)
+        .and_then(|opening| {
+            closing
+                .checked_subtract(&build.net_after_window)
+                .map(|closing| (opening, closing))
+        })
+        .map_err(out_of_range);
+    Some(edges.map(|(opening, closing)| {
+        Ok(TieOutEdges {
+            first,
+            last,
+            opening,
+            closing,
+        })
+    }))
+}
+
+/// From the 1st of a month to the last day of a month (the same or a later one).
+pub fn is_whole_calendar_months(first: Date, last: Date) -> bool {
+    first.day == 1 && first <= last && Date::new(last.year, last.month, last.day + 1).is_none()
+}
+
+fn out_of_range(error: impl std::fmt::Debug) -> Refusal {
+    Refusal::new(
+        "arithmetic_out_of_range",
+        format!("a running total exceeded the exact-decimal bound ({error:?})"),
+    )
 }
 
 /// Everything `build` needs besides the rows and the mapping.
@@ -381,6 +609,12 @@ pub fn build(
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut statement_ids = BTreeSet::new();
     let mut window_ids = BTreeSet::new();
+    let mut dates = Vec::with_capacity(rows.len());
+    let reversed = reversed_same_day(rows, bank);
+    let mut span: Option<(Date, Date)> = None;
+    let mut rows_outside_window = 0;
+    let mut net_before_window = ExactDecimal::zero();
+    let mut net_after_window = ExactDecimal::zero();
     for (index, row) in rows.iter().enumerate() {
         let number = index + 1;
         let raw_date = strip(row.get(DATE));
@@ -394,11 +628,31 @@ pub fn build(
                 ),
             ));
         };
+        dates.push(date);
         let txn_id = transaction_id(options.account_number, date, row);
         statement_ids.insert(txn_id.clone());
-        if options.date_from.is_some_and(|from| date < from)
-            || options.date_to.is_some_and(|to| date > to)
-        {
+        span = Some(span.map_or((date, date), |(first, last)| {
+            (first.min(date), last.max(date))
+        }));
+        let before = options.date_from.is_some_and(|from| date < from);
+        if before || options.date_to.is_some_and(|to| date > to) {
+            rows_outside_window += 1;
+            let net = match (
+                money(row.get(DEBIT), DEBIT, number)?,
+                money(row.get(CREDIT), CREDIT, number)?,
+            ) {
+                (Some(debit), None) => ExactDecimal::zero().checked_subtract(&debit),
+                (None, Some(credit)) => Ok(credit),
+                // `reconcile` refused a row with both; a row with neither moved nothing.
+                _ => Ok(ExactDecimal::zero()),
+            }
+            .map_err(out_of_range)?;
+            let sum = if before {
+                &mut net_before_window
+            } else {
+                &mut net_after_window
+            };
+            *sum = sum.checked_add(&net).map_err(out_of_range)?;
             continue;
         }
         window_ids.insert(txn_id.clone());
@@ -432,6 +686,8 @@ pub fn build(
         }
         let amount_text = format_amount(&amount);
         let party = bank.party(row);
+        let transfer_reference = bank.transfer_reference(row);
+        let instrument = bank.instrument(row);
         let cash_movement = CashMovement::of_party(&party);
         let answered = options.cash_answers.get(&txn_id);
         let (ledger, voucher_type, cash_answer) = match cash_movement {
@@ -455,10 +711,14 @@ pub fn build(
                         amount: amount_text,
                         party,
                         ledger: String::new(),
+                        reference: transfer_reference,
+                        instrument,
                         suspense: false,
                         bridge_txn_id: txn_id,
                         cash_movement,
                         cash_answer: None,
+                        direction: Direction::of(outward),
+                        reversed_same_day: reversed[index],
                     });
                     continue;
                 };
@@ -491,17 +751,47 @@ pub fn build(
                     mapped_ledger
                 };
                 if treatment == Treatment::Skip {
+                    // The other account's ledger is a ledger name like any
+                    // other: the later pairing looks for the Contra under it.
+                    require_ledger(&ledger, "skipped transfer's other ledger", Some(number))?;
+                    // The other account's Contra is found under this ledger; the
+                    // statement's own bank ledger would look for the transfer in
+                    // the account it was read from.
+                    if ledger_key(&ledger) == ledger_key(options.bank_ledger) {
+                        return Err(Refusal::at_row(
+                            "skip_ledger_is_statement_bank",
+                            number,
+                            format!(
+                                "row {number} is skipped as a transfer already carried by the other bank account's Contra, but its mapped ledger is this statement's own bank ledger; name the other account's ledger"
+                            ),
+                        ));
+                    }
+                    // Suspense is where unidentified rows go, never another
+                    // account whose Contra could carry the transfer.
+                    if ledger_key(&ledger) == ledger_key(options.suspense_ledger) {
+                        return Err(Refusal::at_row(
+                            "skip_ledger_is_suspense",
+                            number,
+                            format!(
+                                "row {number} is skipped as a transfer already carried by the other bank account's Contra, but its mapped ledger is the suspense ledger; name the other account's ledger"
+                            ),
+                        ));
+                    }
                     records.push(StatementRecord {
                         row: number,
                         date: date.iso(),
                         disposition: Disposition::Skipped,
                         amount: amount_text,
                         party,
-                        ledger: String::new(),
+                        ledger,
+                        reference: transfer_reference,
+                        instrument,
                         suspense: false,
                         bridge_txn_id: txn_id,
                         cash_movement: None,
                         cash_answer: None,
+                        direction: Direction::of(outward),
+                        reversed_same_day: reversed[index],
                     });
                     continue;
                 }
@@ -599,10 +889,14 @@ pub fn build(
             amount: amount_text,
             party,
             ledger,
+            reference: transfer_reference,
+            instrument,
             suspense,
             bridge_txn_id: txn_id,
             cash_movement,
             cash_answer,
+            direction: Direction::of(outward),
+            reversed_same_day: reversed[index],
         });
     }
     if let Some(stale) = options
@@ -635,7 +929,15 @@ pub fn build(
             "no statement row falls inside the date window; the window does not overlap the statement",
         ));
     }
-    Ok(Build { proposals, records })
+    Ok(Build {
+        proposals,
+        records,
+        dates,
+        span,
+        rows_outside_window,
+        net_before_window,
+        net_after_window,
+    })
 }
 
 /// What [`selfcheck`] counted.
@@ -729,7 +1031,8 @@ pub struct CounterpartyGroup {
     /// amount decides it.
     pub party: String,
     pub also_printed_as: Vec<String>,
-    /// The ledger its non-bank leg posts to; empty when skipped.
+    /// The ledger its non-bank leg posts to; for a skipped row, the other bank
+    /// account's ledger.
     pub ledger: String,
     /// `Payment`, `Receipt`, `Contra` or `Skipped`.
     pub disposition: String,

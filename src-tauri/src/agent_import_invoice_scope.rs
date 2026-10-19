@@ -88,7 +88,7 @@ impl InvoiceLedgerScope {
                     matches!(parent, ParentObservation::Named(text) if parents.contains(text))
                 })
                 .copied(),
-            crate::tally::connection::parent_partition_limits(),
+            crate::tally::connection::parent_partition_limits(crate::tally::connection::ComplianceRead::Standard),
         )
         .map_err(|error| match error {
             ParentPartitionError::ParentOverBudget { .. }

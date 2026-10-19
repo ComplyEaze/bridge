@@ -23,6 +23,8 @@ use crate::parse::{Cells, Row};
 use crate::refusal::Refusal;
 use crate::text::{is_alnum, is_upper, remove_space, squash, strip};
 use regex::Regex;
+use serde::Serialize;
+use std::fmt;
 use std::sync::LazyLock;
 
 /// A statement layout.
@@ -331,6 +333,85 @@ impl Bank {
             Self::Ubi => ubi_reference(row),
             Self::Bob => bob_reference(row),
         }
+    }
+}
+
+/// The reference a network transfer carries on both banks' statements: a UPI or
+/// IMPS reference of twelve digits, or a NEFT or RTGS UTR. It can be built only
+/// by [`Bank::transfer_reference`], which never takes a cheque number, a bank's
+/// own transaction id or an all-zero placeholder for one. Which banks print the
+/// same value on both statements of one transfer is not yet measured.
+///
+/// Upper case and without whitespace by construction: a UPI or IMPS value is
+/// ASCII digits, and a NEFT or RTGS one passed [`looks_like_utr`], which
+/// requires alphanumeric upper case.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
+pub struct BankReference(String);
+
+impl fmt::Display for BankReference {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl BankReference {
+    /// A reference read back from a record: admitted only in a shape
+    /// [`Bank::transfer_reference`] can produce (twelve ASCII digits, or a
+    /// value that [`looks_like_utr`]) and never all zeros. Anything else is not
+    /// a value this build wrote.
+    pub fn from_recorded(text: &str) -> Option<Self> {
+        let admitted = (text.len() == 12 && text.bytes().all(|byte| byte.is_ascii_digit()))
+            || looks_like_utr(text);
+        (admitted && !text.chars().all(|character| character == '0'))
+            .then(|| Self(text.to_string()))
+    }
+}
+
+impl Bank {
+    /// The row's network-transfer reference, when it carries one, read from
+    /// what [`Bank::reference`] names. Every other mode (cheque, internal
+    /// transfer, net banking, ATM, ACH, clearing, cash, mobile banking) and any
+    /// empty or all-zero value gives `None`.
+    pub fn transfer_reference(self, row: &Row) -> Option<BankReference> {
+        let (mode, value) = self.reference(row);
+        // SBI prints a UPI reference as `<digits> (<vpa>)`
+        let value = match (self, mode.as_str()) {
+            (Self::Sbi, "UPI") => value
+                .split_once(" (")
+                .map_or(value.as_str(), |(head, _)| head),
+            _ => value.as_str(),
+        };
+        let admitted = match (self, mode.as_str()) {
+            (_, "UPI" | "IMPS") => {
+                value.len() == 12 && value.bytes().all(|byte| byte.is_ascii_digit())
+            }
+            // HDFC's NEFT value is the narration's last field, which can be a
+            // remark, or its reference column, too short for a long UTR: not
+            // admitted until a real statement shows where the UTR is printed.
+            (Self::Hdfc, "NEFT") => false,
+            (_, "NEFT" | "RTGS") => looks_like_utr(value),
+            _ => false,
+        };
+        (admitted && !value.chars().all(|character| character == '0'))
+            .then(|| BankReference(value.to_string()))
+    }
+
+    /// The cheque or transaction number the statement prints in its own column,
+    /// trimmed: `ref` for HDFC Bank and Union Bank, `chq` for Bank of Baroda.
+    /// State Bank of India's `ref` column is narrative (an account number and a
+    /// name), so only the cheque number [`Bank::reference`] reads from its end
+    /// is taken. `None` when it is empty or all zeros. Recorded only.
+    pub fn instrument(self, row: &Row) -> Option<String> {
+        let value = match self {
+            Self::Sbi => match self.reference(row) {
+                (mode, number) if mode == "CHQ" => number,
+                _ => return None,
+            },
+            Self::Hdfc | Self::Ubi => strip(row.get("ref")).to_string(),
+            Self::Bob => strip(row.get("chq")).to_string(),
+        };
+        (!value.chars().all(|character| character == '0')).then_some(value)
     }
 }
 

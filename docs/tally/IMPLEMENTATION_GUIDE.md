@@ -113,7 +113,7 @@ company lookups to produce a value that is constant for the entire request.
 > **Rule: never use `<COMPUTE>` to carry a per-request constant.** Company name, company GUID,
 > schema identifiers and record counts are all obtainable from a separate, cheap request — or
 > from the client that built the request in the first place. Bridge's existing
-> `company_book_extent_v1` profile already returns the verified company GUID in milliseconds.
+> `company_book_extent_v2` profile already returns the verified company GUID in milliseconds.
 
 This is the same category of error as the self-referential `$$NumItems` in §5.3b: a TDL
 construct that looks like free metadata and is actually per-row work. Both were inherited from
@@ -536,7 +536,7 @@ failure:
 | Numbering method | Your `<VOUCHERNUMBER>` | A failed Alter |
 | --- | --- | --- |
 | Automatic | **discarded** — Tally assigns its own | **silently duplicates** |
-| **Manual + `PREVENTDUPLICATES=Yes`** | **preserved verbatim** | **cleanly rejected** |
+| **Manual + `PREVENTDUPLICATES=Yes`** | **preserved verbatim**, except a space at its end, which did not read back (§9.8) | **cleanly rejected** |
 
 Under automatic numbering a client-supplied key is thrown away while the create still reports
 `CREATED=1, ERRORS=0`. Any dedupe built on it is silently ineffective.

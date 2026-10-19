@@ -298,8 +298,7 @@ impl Settings {
             max_bytes: MAX_SELECTED_JOURNAL_BYTES,
             redaction: Redaction::None,
             import_enabled: true,
-            writes_enabled: true,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::On,
         })
     }
 }

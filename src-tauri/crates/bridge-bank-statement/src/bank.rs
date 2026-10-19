@@ -3,8 +3,10 @@
 //! `Sbi` and `Hdfc` are a direct port of the `SBI` and `HDFC` classes in
 //! `scripts/bank_statement_import.py`. The reasoning behind each rule — why a
 //! boundary is the shape it is, and which real statement it was measured
-//! against — is written there at length and is not repeated here; where a rule
-//! looks arbitrary, read that docstring before changing it.
+//! against — is written on the item that implements it where it was recorded. An
+//! item with no such comment (the reference extractors, the SBI party patterns, the
+//! `TPT` pattern of the HDFC party) is specified by its tests, which hold each shape;
+//! read both before changing one.
 //!
 //! `Ubi` (Union Bank of India) has no Python reference. Its rules come from the
 //! text layer of one real statement, described by shape only (68 single-line
@@ -23,6 +25,8 @@ use crate::parse::{Cells, Row};
 use crate::refusal::Refusal;
 use crate::text::{is_alnum, is_upper, remove_space, squash, strip};
 use regex::Regex;
+use serde::Serialize;
+use std::fmt;
 use std::sync::LazyLock;
 
 /// A statement layout.
@@ -56,6 +60,12 @@ pub const BALANCE: &str = "bal";
 
 /// The words a party extractor returns when it could not identify a
 /// counterparty. Output, not input: a mapping row naming one is refused.
+///
+/// Every unrecognised narration shape reports the same word, so a mapping row for it
+/// would gather transactions that have nothing to do with each other under one ledger,
+/// or, with `skip`, silently drop them all. They must reach the suspense ledger, where a
+/// person sees them. A [`crate::mapping::Mapping`] can only be built by validating its
+/// rows, and that refuses a sentinel key, so a sentinel is looked up and never found.
 pub const UNRESOLVED: &str = "UNRESOLVED";
 pub const UNNAMED: &str = "UNNAMED";
 pub const PARSER_SENTINELS: [&str; 2] = [UNRESOLVED, UNNAMED];
@@ -72,6 +82,14 @@ const CARD_ANNUAL_FEE: &str = "CARD ANNUAL FEE";
 /// The digit count of an ACH bank reference — **exactly** the observed length,
 /// not a minimum. A six-digit PIN code printed with a space made a reasoned
 /// lower bound misattribute `ACME-400 001` to `ACME`.
+///
+/// The count is the only thing that separates a reference from a number inside the
+/// counterparty's own name, so it is observed, not reasoned: every ACH reference seen in
+/// a real narration is ten digits. Anything else (longer, shorter, or wrapped into
+/// another length) is `UNRESOLVED` and reaches suspense, where a person sees it. An
+/// unrecognised narration costs a look; a misattributed one announces nothing. When a
+/// reference of another length is genuinely observed, widen this and record the
+/// observation (finding S2 in `docs/tally/README.md`).
 pub const ACH_REFERENCE_DIGITS: usize = 10;
 
 macro_rules! pattern {
@@ -235,6 +253,9 @@ impl Bank {
     }
 
     /// A line whose every word is one of these is column furniture.
+    ///
+    /// SBI's header wraps onto three lines and repeats on every page, so its later lines
+    /// sit below the table anchor and would otherwise be appended to the row in progress.
     pub fn header_words(self) -> &'static [&'static str] {
         match self {
             Self::Sbi => &[
@@ -331,6 +352,85 @@ impl Bank {
             Self::Ubi => ubi_reference(row),
             Self::Bob => bob_reference(row),
         }
+    }
+}
+
+/// The reference a network transfer carries on both banks' statements: a UPI or
+/// IMPS reference of twelve digits, or a NEFT or RTGS UTR. It can be built only
+/// by [`Bank::transfer_reference`], which never takes a cheque number, a bank's
+/// own transaction id or an all-zero placeholder for one. Which banks print the
+/// same value on both statements of one transfer is not yet measured.
+///
+/// Upper case and without whitespace by construction: a UPI or IMPS value is
+/// ASCII digits, and a NEFT or RTGS one passed [`looks_like_utr`], which
+/// requires alphanumeric upper case.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
+pub struct BankReference(String);
+
+impl fmt::Display for BankReference {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl BankReference {
+    /// A reference read back from a record: admitted only in a shape
+    /// [`Bank::transfer_reference`] can produce (twelve ASCII digits, or a
+    /// value that [`looks_like_utr`]) and never all zeros. Anything else is not
+    /// a value this build wrote.
+    pub fn from_recorded(text: &str) -> Option<Self> {
+        let admitted = (text.len() == 12 && text.bytes().all(|byte| byte.is_ascii_digit()))
+            || looks_like_utr(text);
+        (admitted && !text.chars().all(|character| character == '0'))
+            .then(|| Self(text.to_string()))
+    }
+}
+
+impl Bank {
+    /// The row's network-transfer reference, when it carries one, read from
+    /// what [`Bank::reference`] names. Every other mode (cheque, internal
+    /// transfer, net banking, ATM, ACH, clearing, cash, mobile banking) and any
+    /// empty or all-zero value gives `None`.
+    pub fn transfer_reference(self, row: &Row) -> Option<BankReference> {
+        let (mode, value) = self.reference(row);
+        // SBI prints a UPI reference as `<digits> (<vpa>)`
+        let value = match (self, mode.as_str()) {
+            (Self::Sbi, "UPI") => value
+                .split_once(" (")
+                .map_or(value.as_str(), |(head, _)| head),
+            _ => value.as_str(),
+        };
+        let admitted = match (self, mode.as_str()) {
+            (_, "UPI" | "IMPS") => {
+                value.len() == 12 && value.bytes().all(|byte| byte.is_ascii_digit())
+            }
+            // HDFC's NEFT value is the narration's last field, which can be a
+            // remark, or its reference column, too short for a long UTR: not
+            // admitted until a real statement shows where the UTR is printed.
+            (Self::Hdfc, "NEFT") => false,
+            (_, "NEFT" | "RTGS") => looks_like_utr(value),
+            _ => false,
+        };
+        (admitted && !value.chars().all(|character| character == '0'))
+            .then(|| BankReference(value.to_string()))
+    }
+
+    /// The cheque or transaction number the statement prints in its own column,
+    /// trimmed: `ref` for HDFC Bank and Union Bank, `chq` for Bank of Baroda.
+    /// State Bank of India's `ref` column is narrative (an account number and a
+    /// name), so only the cheque number [`Bank::reference`] reads from its end
+    /// is taken. `None` when it is empty or all zeros. Recorded only.
+    pub fn instrument(self, row: &Row) -> Option<String> {
+        let value = match self {
+            Self::Sbi => match self.reference(row) {
+                (mode, number) if mode == "CHQ" => number,
+                _ => return None,
+            },
+            Self::Hdfc | Self::Ubi => strip(row.get("ref")).to_string(),
+            Self::Bob => strip(row.get("chq")).to_string(),
+        };
+        (!value.chars().all(|character| character == '0')).then_some(value)
     }
 }
 
@@ -559,6 +659,10 @@ fn sbi_reference(row: &Row) -> (String, String) {
 /// A bank reference: long, upper-case alphanumeric, and mostly digits
 /// (`_looks_like_utr`). The digit requirement stops `INTERNATIONAL` from
 /// terminating its own name.
+///
+/// A reference always carries digits and a company name may carry none. A shape of
+/// capitals and digits without a digit count would also match a name with one long
+/// all-capitals word, which would end its own name early and leave the party empty.
 pub fn looks_like_utr(text: &str) -> bool {
     text.chars().count() >= 10
         && is_alnum(text)
@@ -575,6 +679,22 @@ fn is_python_digit(character: char) -> bool {
 /// The name field of a hyphen-delimited narration, which may itself contain
 /// hyphens (`_bounded_party`). An empty result means the narration is not the
 /// shape the rule was written for, and the caller sends it to suspense.
+///
+/// HDFC delimits every field with `-`, so a counterparty called `ACME-INDUSTRIES`
+/// occupies two fields, and a non-greedy match stops at the first of them. That either
+/// misses a correct mapping or, worse, hits an unrelated ledger that happens to be named
+/// `ACME`. So the name runs from field `skip` up to the next structured field that
+/// `is_boundary` recognises, less `back` fields for anything that sits between the name
+/// and that marker.
+///
+/// `skip` matters as much as the boundary: an IFSC ahead of the name looks exactly like
+/// the UTR that terminates it, so scanning from field 0 finds the wrong marker and
+/// returns nothing. `is_boundary` should be a shape a name does not take (a masked
+/// account, a VPA, a 12-digit reference, a UTR), never a bare four-letter code, which is
+/// also a plausible company name. The test sees the part with its spaces removed, so a
+/// name that is mostly digits and capitals can come to satisfy a loose shape; the first
+/// part that does ends the name, and a name that is cut short that way is a wrong party,
+/// not a refusal.
 fn bounded_party(
     narration: &str,
     prefix_len: usize,
@@ -587,7 +707,10 @@ fn bounded_party(
         if index < skip {
             continue;
         }
-        // the test strips whitespace: a cell wrap also lands inside a reference
+        // the test strips whitespace: HDFC narrations are read space-joined, so a cell wrap
+        // that lands inside a reference leaves a space in it (`HDF CH12345678`), and a
+        // marker that is only recognisable when unbroken is not a marker. Names keep their
+        // spaces; only the test strips.
         if is_boundary(&remove_space(part)) {
             let end = index.saturating_sub(back).max(skip);
             return strip(&parts[skip..end].join("-")).to_string();
@@ -596,6 +719,15 @@ fn bounded_party(
     String::new()
 }
 
+/// The name field of an HDFC UPI narration:
+/// `UPI-<name>-<vpa>-<bank code>-<12-digit ref>-<remark>`.
+///
+/// The name may itself contain hyphens, so it is bounded by the next structured field,
+/// never by the first hyphen (which would turn `ACME-INDUSTRIES` into `ACME`). Two
+/// boundaries are recognised, in order of reliability: the VPA (the field holding `@`),
+/// then the reference (twelve or more digits), with the bank code sitting between it and
+/// the name. Neither found means the shape is not the one this rule was written for; the
+/// empty result sends the line to suspense rather than guessing.
 fn upi_party(narration: &str) -> String {
     pattern!(LONG_DIGITS, r"^\d{12,}$");
     let by_vpa = bounded_party(narration, "UPI-".len(), |part| part.contains('@'), 0, 0);
@@ -636,7 +768,9 @@ fn hdfc_party(row: &Row) -> String {
         .unwrap()
     });
 
-    // the space-preserving reading: de-wrapping welds `ACME INDUSTRIES`
+    // the space-preserving reading: de-wrapping welds `ACME INDUSTRIES` into one word, and
+    // on a real statement it also lost the correct spelling of a counterparty that appeared
+    // twice
     let spaced = row.get("narr_spaced");
     let narration = if spaced.is_empty() {
         row.get("narr")
@@ -651,6 +785,10 @@ fn hdfc_party(row: &Row) -> String {
         }
     };
     if IMPS.is_match(narration) {
+        // IMPS-<ref>-<name...>-<bank code>-<masked account>-...: the name ends at the bank
+        // code. The masked account after it is the marker (`back` drops the bank code
+        // itself): a name can be four capitals and so can the bank code, but neither can
+        // be `XXXXXXXX1234`.
         let Some(prefix) = prefix_through_hyphen(narration) else {
             return UNRESOLVED.to_string();
         };
@@ -663,6 +801,9 @@ fn hdfc_party(row: &Row) -> String {
         ));
     }
     if NEFT.is_match(narration) {
+        // NEFT DR-<IFSC>-<name...>-<branch>-<UTR>-...: the UTR is the marker and the
+        // branch sits between it and the name (`back`). The IFSC ahead of the name has
+        // the same shape as the UTR, so the scan starts after it (`skip`).
         let Some(prefix) = prefix_through_hyphen(narration) else {
             return UNRESOLVED.to_string();
         };
@@ -676,12 +817,26 @@ fn hdfc_party(row: &Row) -> String {
         if candidate.is_empty() {
             return UNRESOLVED.to_string();
         }
+        // `UPI-XXXXXX4230-...` is a masked account, not a payee name
         return if MASKED_UPI.is_match(&candidate) {
             UNNAMED.to_string()
         } else {
             candidate
         };
     }
+    // ACH D- TP ACH <name>-<reference> (findings S1 and S2 in `docs/tally/README.md`).
+    // Spaces may sit inside the reference and directly after the hyphen, because the cell
+    // wraps wherever the column edge falls. The whole function reads the space-joined
+    // narration, which keeps those spaces visible to the pattern.
+    //
+    // Greedy `(.+)` binds the name to the LAST qualifying reference. The digit count is
+    // part of the shape, and has to be, because "hyphen then digits" alone does not tell a
+    // bank reference from an ordinary name: `ACH D- TP ACH ACME-54` resolved to `ACME`, and
+    // so did `ACME-5 4` (a name whose number wrapped at the column edge), so a mapping for
+    // `ACME` silently posted an `ACME-54` transaction to the wrong ledger. Requiring a
+    // reference-length run leaves both `UNRESOLVED`, which routes them to suspense where a
+    // person sees them. That is the direction to fail in: an unrecognised narration costs a
+    // look, a misattributed one does not announce itself at all.
     if let Some(found) = ACH_PARTY.captures(narration) {
         return squash(&found[1]);
     }

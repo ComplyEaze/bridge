@@ -18,7 +18,8 @@ pub enum Treatment {
     /// Both legs are bank or cash ledgers: an own-account or ATM transfer.
     Contra,
     /// Emit no voucher: a transfer between two accounts that are BOTH being
-    /// imported, already carried by the other statement's Contra.
+    /// imported, already carried by the other statement's Contra. The mapping
+    /// row names the other account's ledger, so that Contra can be found.
     Skip,
 }
 
@@ -114,6 +115,17 @@ impl Mapping {
                     ),
                 ));
             }
+            // After the sentinel and cash checks, so those rows are named as
+            // such first.
+            if treatment == Treatment::Skip && ledger.is_empty() {
+                return Err(Refusal::new(
+                    "skip_without_ledger",
+                    format!(
+                        "{}: marked skip with no ledger. A skipped transfer must name the other bank account's ledger, so its Contra can be found; a transfer with no other side to find cannot be skipped.",
+                        row.origin
+                    ),
+                ));
+            }
             if let Some(existing) = mapping.get(&key) {
                 if existing != &(ledger.clone(), treatment) {
                     return Err(Refusal::new(
@@ -133,7 +145,15 @@ impl Mapping {
 
     /// `party,ledger,treatment` CSV (`load_mapping`). Headers are matched
     /// case-insensitively after trimming, and a header that appears twice under
-    /// that rule is refused: one would silently overwrite the other.
+    /// that rule is refused: reading one of two columns of the same name picks one
+    /// of them silently, and a row whose party then reads blank is skipped, so its
+    /// transactions fall to suspense while the run reports success.
+    ///
+    /// All three headers are required: a mapping without `party` silently maps nothing
+    /// and one without `ledger` silently sends everything to suspense. Rows are read by
+    /// the position of the normalised header, so a header spelled `Party` cannot pass
+    /// validation and then read as empty on every row, which would discard the whole
+    /// mapping without a word.
     pub fn from_csv(reader: impl Read) -> Result<Self, Refusal> {
         let mut csv = csv::ReaderBuilder::new()
             .has_headers(false)

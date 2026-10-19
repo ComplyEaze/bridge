@@ -286,7 +286,7 @@ pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 /// drawer select. It is one file for one named reason -- not headroom.
 ///
 /// Not pinned, and deliberately: files feature-gated out of every shipped build
-/// (`agent_lab.rs`, `india_tax_observation.rs`), operator filing
+/// (`agent_lab.rs`), operator filing
 /// labels (`client_groups.rs`, `client_group_label_migration.rs` and the
 /// `commands/all_clients.rs` commands over them, none of which reads Tally),
 /// and dead or declaration-only modules. bridge#416 records the reasoning for the rest.
@@ -507,7 +507,6 @@ pub enum LoopbackFamily {
 #[serde(rename_all = "snake_case")]
 pub enum TransportProfile {
     XmlHttp,
-    JsonExShadow,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -517,7 +516,6 @@ pub enum ReadProfileId {
     XmlSyntheticFixtureMarkerV1,
     XmlLedgerReadV1,
     XmlEducationModeProbeV1,
-    JsonExSemanticShadowV1,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1562,32 +1560,7 @@ fn validate_claim(claim: &SupportClaim) -> Result<(), CompatibilityError> {
         }
         _ => {}
     }
-    match claim.transport {
-        TransportProfile::XmlHttp => {
-            if claim
-                .required_profiles
-                .contains(&ReadProfileId::JsonExSemanticShadowV1)
-            {
-                return Err(invalid("xml_claim_contains_jsonex_profile"));
-            }
-        }
-        TransportProfile::JsonExShadow => {
-            if claim
-                .required_profiles
-                .iter()
-                .any(|profile| *profile != ReadProfileId::JsonExSemanticShadowV1)
-            {
-                return Err(invalid("jsonex_claim_contains_xml_profile"));
-            }
-            if claim.promotion_eligible || claim.level != ClaimLevel::Unknown {
-                return Err(invalid("jsonex_claim_not_qualifiable"));
-            }
-        }
-    }
     if claim.level == ClaimLevel::Supported {
-        if claim.transport != TransportProfile::XmlHttp {
-            return Err(invalid("supported_claim_transport_invalid"));
-        }
         let required: BTreeSet<_> = [
             ReadProfileId::XmlCompanyEnumerationV1,
             ReadProfileId::XmlSyntheticFixtureMarkerV1,

@@ -51,8 +51,7 @@ fn server(path: &Path) -> Server {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: Posting::On,
     })
 }
 

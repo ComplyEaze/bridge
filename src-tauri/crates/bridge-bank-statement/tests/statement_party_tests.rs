@@ -64,12 +64,12 @@ fn built(rows: &[Row], mapping: &Mapping) -> Build {
 #[test]
 fn a_mapped_payment_receipt_and_contra_name_the_statement_party_last() {
     let rows = [
-        sbi("TO TRANSFER-UPI/DR/5/RAVI KUMAR/ZZBK", "100.00", ""),
+        sbi("TO TRANSFER-UPI/DR/5/MAPLE QUILL/ZZBK", "100.00", ""),
         sbi("TO TRANSFER-UPI/CR/6/NORTH WIND/ZZBK", "", "250.00"),
         sbi("TO TRANSFER-UPI/DR/7/OWN SAVINGS/ZZBK", "75.00", ""),
     ];
     let mapped = mapping(&[
-        ("RAVI KUMAR", "Wages", None),
+        ("MAPLE QUILL", "Wages", None),
         ("NORTH WIND", "Customers", None),
         ("OWN SAVINGS", "Savings", Some("contra")),
     ]);
@@ -82,7 +82,7 @@ fn a_mapped_payment_receipt_and_contra_name_the_statement_party_last() {
     assert_eq!(
         narrations,
         [
-            "UPI 5 to Wages | ACC xx1234 | 03-Aug-2026 | Statement party: RAVI KUMAR",
+            "UPI 5 to Wages | ACC xx1234 | 03-Aug-2026 | Statement party: MAPLE QUILL",
             "UPI 6 from Customers | ACC xx1234 | 03-Aug-2026 | Statement party: NORTH WIND",
             "UPI 7 to Savings | ACC xx1234 | 03-Aug-2026 | Statement party: OWN SAVINGS",
         ]
@@ -104,17 +104,17 @@ fn a_line_sent_to_suspense_is_written_exactly_as_before() {
         "{text}"
     );
     let unknown = built(
-        &[sbi("TO TRANSFER-UPI/DR/5/RAVI KUMAR/ZZBK", "100.00", "")],
+        &[sbi("TO TRANSFER-UPI/DR/5/MAPLE QUILL/ZZBK", "100.00", "")],
         &unmapped,
     );
     assert_eq!(
         unknown.proposals[0].narration,
-        format!("UPI 5 to RAVI KUMAR | ACC xx1234 | 03-Aug-2026 | {UNIDENTIFIED} Suspense")
+        format!("UPI 5 to MAPLE QUILL | ACC xx1234 | 03-Aug-2026 | {UNIDENTIFIED} Suspense")
     );
     // a party mapped to the suspense ledger itself is still a suspense line
-    let to_suspense = mapping(&[("RAVI KUMAR", "Suspense", None)]);
+    let to_suspense = mapping(&[("MAPLE QUILL", "Suspense", None)]);
     let same = built(
-        &[sbi("TO TRANSFER-UPI/DR/5/RAVI KUMAR/ZZBK", "100.00", "")],
+        &[sbi("TO TRANSFER-UPI/DR/5/MAPLE QUILL/ZZBK", "100.00", "")],
         &to_suspense,
     );
     assert_eq!(same.proposals[0].narration, unknown.proposals[0].narration);
@@ -193,11 +193,11 @@ fn a_party_holding_the_delimiter_or_making_the_narration_too_long_is_refused() {
 
 #[test]
 fn the_transaction_id_does_not_depend_on_the_built_narration() {
-    let row = sbi("TO TRANSFER-UPI/DR/5/RAVI KUMAR/ZZBK", "100.00", "");
+    let row = sbi("TO TRANSFER-UPI/DR/5/MAPLE QUILL/ZZBK", "100.00", "");
     let to_suspense = built(std::slice::from_ref(&row), &mapping(&[]));
     let to_ledger = built(
         std::slice::from_ref(&row),
-        &mapping(&[("RAVI KUMAR", "Wages", None)]),
+        &mapping(&[("MAPLE QUILL", "Wages", None)]),
     );
     assert_ne!(
         to_suspense.proposals[0].narration,

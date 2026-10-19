@@ -24,28 +24,28 @@ fn mapping_key_survives_non_ascii_scripts() {
 fn mapping_key_keeps_punctuation_significant() {
     for (left, right) in [
         ("A & B", "AB"),
-        ("S.K. Minerals", "SK Minerals"),
-        ("M/s Mercury", "Ms Mercury"),
-        ("Shree-Ram Traders", "Shree Ram Traders"),
+        ("P.Q. Granite", "PQ Granite"),
+        ("M/s Halcyon", "Ms Halcyon"),
+        ("Blue-Fern Traders", "Blue Fern Traders"),
     ] {
         assert_ne!(mapping_key(left), mapping_key(right), "{left} / {right}");
     }
     assert_eq!(
-        mapping_key("MERCURYM ANUFACTURERS"),
-        mapping_key("MERCURYMANUFACTURERS")
+        mapping_key("HALCYONM ANUFACTURERS"),
+        mapping_key("HALCYONMANUFACTURERS")
     );
     assert_eq!(
         mapping_key("ZEPHYR MANUFACTURING"),
         mapping_key("ZEPHYRMANUFACTURING")
     );
-    assert_eq!(mapping_key("m/s mercury"), mapping_key("M/S MERCURY"));
+    assert_eq!(mapping_key("m/s halcyon"), mapping_key("M/S HALCYON"));
     assert_eq!(mapping_key("A&B"), "A&B");
 }
 
 #[test]
 fn mapping_key_ignores_wrap_spacing() {
     let mapping =
-        load("party,ledger,treatment\nZEPHYR MANUFACTURING,M/s Zephyr,auto\nOWN ACCOUNT,,skip\n")
+        load("party,ledger,treatment\nZEPHYR MANUFACTURING,M/s Zephyr,auto\nOWN ACCOUNT,Other Bank,skip\n")
             .unwrap();
     for spelling in [
         "ZEPHYRM ANUFACTURING",
@@ -88,6 +88,20 @@ fn mapping_refuses_ambiguous_input() {
     refuses(
         load("party,ledger,treatment\nOWN,,contra\n"),
         "contra_without_ledger",
+    );
+    refuses(
+        load("party,ledger,treatment\nOWN,,skip\n"),
+        "skip_without_ledger",
+    );
+    refuses(
+        load("party,ledger,treatment\nOWN,   ,SKIP\n"),
+        "skip_without_ledger",
+    );
+    assert_eq!(
+        load("party,ledger,treatment\nOWN,Other Bank,skip\n")
+            .unwrap()
+            .get("OWN"),
+        Some(&("Other Bank".to_string(), Treatment::Skip))
     );
     refuses(
         load("party,ledger,treatment\nA,L,transfer\n"),
@@ -138,6 +152,11 @@ fn a_mapping_may_not_claim_the_unresolved_sentinel() {
         load("party,ledger,treatment\nun resolved,L,skip\n"),
         "mapping_claims_a_sentinel",
     );
+    // a sentinel is named as such even when the row also lacks a ledger
+    refuses(
+        load("party,ledger,treatment\nUNRESOLVED,,skip\n"),
+        "mapping_claims_a_sentinel",
+    );
     assert!(
         !load("party,ledger,treatment\nUNRESOLVED TRADING CO,L,auto\n")
             .unwrap()
@@ -169,6 +188,10 @@ fn inline_rows_follow_the_same_rules() {
         Mapping::from_rows(rows("Own", "", Some("contra"))),
         "contra_without_ledger",
     );
+    refuses(
+        Mapping::from_rows(rows("Own", "", Some("skip"))),
+        "skip_without_ledger",
+    );
 }
 
 #[test]
@@ -184,7 +207,7 @@ fn ledger_key_folds_exactly_what_its_docstring_claims() {
     assert!(same("straße", "STRASSE"));
     assert!(same("A\tB", "A B"));
     assert!(same("A\u{a0}B", "A B"));
-    assert!(!same("ZZ Ram AND Sons", "ZZ Ram & Sons"));
+    assert!(!same("ZZ Fern AND Sons", "ZZ Fern & Sons"));
     assert!(!same("AB", "A & B"));
     assert!(!same("A_B", "A B"));
     assert!(!same("A/B", "A B"));

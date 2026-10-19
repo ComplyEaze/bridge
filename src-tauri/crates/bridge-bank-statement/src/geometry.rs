@@ -4,6 +4,15 @@
 //! and y growing downwards, which is what `pdftotext -bbox-layout` reports and
 //! what every column bound in [`crate::bank`] was calibrated against.
 //! [`crate::pdf`] converts PDFium's bottom-left page space into this one.
+//!
+//! Why rows are read from word coordinates rather than from laid-out text: a statement
+//! renders the narration into a narrow fixed-width cell, so the PDF producer wraps long
+//! tokens mid-token. A 12-digit UPI reference arrives split across two lines, and a naive
+//! join corrupts it in one of two directions: glue every line and real spaces vanish;
+//! insert a space everywhere and the reference breaks. The producer only breaks mid-token
+//! when the token itself fills the cell, so a line whose right edge reaches the cell
+//! boundary was a hard wrap and joins with no separator, and any shorter line ended at a
+//! real space. See [`dewrap`].
 
 use crate::text::{squash, strip};
 

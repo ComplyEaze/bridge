@@ -176,8 +176,7 @@ async fn egress_log_reports_byte_bounded_tail_even_below_requested_record_count(
         max_bytes: 1_000_000,
         redaction: Redaction::MaskParties,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     append_egress_line(&path, r#"{"index":0}"#).unwrap();
     let complete = server.call_tool("egress_log", json!({"limit":20})).await;
@@ -231,8 +230,7 @@ async fn egress_log_rejects_unterminated_and_malformed_receipts_in_band() {
         max_bytes: 1_000_000,
         redaction: Redaction::MaskParties,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     server
         .append_notification_refusal_egress("voucher_schema", &json!({}))
@@ -358,8 +356,7 @@ async fn egress_log_reads_back_receipts_that_carry_a_full_trail() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     // The default read (20 receipts) of receipts that each carry a full trail
     // fits the byte cap, and every line is complete.

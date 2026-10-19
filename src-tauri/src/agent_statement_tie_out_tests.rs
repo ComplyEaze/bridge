@@ -1126,8 +1126,7 @@ fn server(directory: &std::path::Path, port: Option<std::net::SocketAddr>) -> Se
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     })
 }
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Validate a pull request's pinned-path acknowledgement (compatibility surface),
-# run the privacy/PII scan, and confirm review evidence names the current head
-# SHA (and, when a pinned path is touched, the acknowledgement and those paths).
+# run the privacy/PII scan, and confirm that the owner's two machine lines (MERGE-VERDICT CLEAN and
+# MERGE-ADVERSARY RECOMMEND, bound to the head and the merge base) stand on the pull request.
+# A change of the one review tier (scripts/review-tier.mjs: docs, plain tests and read-side production code only) needs the CLEAN line alone.
 #
 # Usage: scripts/merge-gate.sh <pr-number> [--repo OWNER/NAME]
-#        [--independent-review-sha FULL_SHA] (manual attestation naming the head)
-#        [--binary-review-sha FULL_SHA] (manual binary-byte, ownership, license, and NOTICE review)
+#        [--binary-review-sha FULL_SHA] (the owner's own act: binary bytes, ownership, license, and NOTICE reviewed)
 # Exit:  0 may merge, 1 must not, 2 could not determine.
 #
 # This script intentionally does not re-derive PR/head/base identity binding,
@@ -24,7 +24,6 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || {
 
 PR=""
 REPO=""
-INDEPENDENT_REVIEW_SHA=""
 BINARY_REVIEW_SHA=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -36,16 +35,6 @@ while [ $# -gt 0 ]; do
     --repo=*)
       REPO="${1#--repo=}"
       [ -n "$REPO" ] || { echo "--repo= needs OWNER/NAME" >&2; exit 2; }
-      shift
-      ;;
-    --independent-review-sha)
-      INDEPENDENT_REVIEW_SHA="${2:-}"
-      [ -n "$INDEPENDENT_REVIEW_SHA" ] || { echo "--independent-review-sha needs a full commit SHA" >&2; exit 2; }
-      shift 2
-      ;;
-    --independent-review-sha=*)
-      INDEPENDENT_REVIEW_SHA="${1#*=}"
-      [ -n "$INDEPENDENT_REVIEW_SHA" ] || { echo "--independent-review-sha= needs a full commit SHA" >&2; exit 2; }
       shift
       ;;
     --binary-review-sha)
@@ -106,6 +95,29 @@ if [ "$REPO" != "lamemustafa/bridge" ] && [ "$REPO" != "ComplyEaze/bridge" ]; th
   exit 2
 fi
 
+# The gate is run only from origin/master's tree, never from the pull request's checkout: a pull request must not be able to
+# change the program that judges it. The gate's own files must equal the branch origin/master (as git compares, that is after any
+# .gitattributes conversion) and be committed.
+gate_tree=$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null) || gate_tree=""
+fetch_status=0
+if [ -n "$gate_tree" ]; then
+  fetch_err=$(git -C "$gate_tree" fetch -q origin +refs/heads/master:refs/merge-gate/master 2>&1 >/dev/null) || fetch_status=$?
+else
+  fetch_status=1
+  fetch_err="this gate is not inside a git checkout"
+fi
+if [ "$fetch_status" -ne 0 ]; then
+  echo "could not fetch the branch master of origin to compare this gate with it: ${fetch_err:0:300}" >&2
+  exit 2
+fi
+if [ "$(cd "$script_dir" && pwd -P)" != "$(cd "$gate_tree" && pwd -P)/scripts" ] \
+   || ! git -C "$gate_tree" rev-parse --verify -q refs/merge-gate/master >/dev/null 2>&1 \
+   || ! git -C "$gate_tree" diff --quiet refs/merge-gate/master -- scripts 2>/dev/null \
+   || [ -n "$(git -C "$gate_tree" status --porcelain --untracked-files=all -- scripts 2>/dev/null)" ]; then
+  echo "run this gate from origin/master's tree (freshly fetched; everything under scripts/ must equal it, untracked files included): a pull request must not run the program that judges it" >&2
+  exit 2
+fi
+
 fail=0
 uncertain=0
 tmpdir=$(mktemp -d)
@@ -119,7 +131,7 @@ die() { echo "$1" >&2; exit 2; }
 # outer shape before extracting fields so jq errors cannot become empty values.
 : >"$errfile"
 if ! meta=$(gh pr view "$PR" --repo "$REPO" \
-        --json headRefOid,baseRefName,title,body,changedFiles 2>"$errfile"); then
+        --json headRefOid,baseRefName,title,body,changedFiles,headRefName 2>"$errfile"); then
   die "could not read PR #$PR in $REPO"
 fi
 if ! jq -e '
@@ -132,6 +144,7 @@ if ! jq -e '
   die "PR metadata was not a valid complete JSON object"
 fi
 head=$(jq -r '.headRefOid' <<<"$meta")
+head_ref=$(jq -r '.headRefName // ""' <<<"$meta")
 base=$(jq -r '.baseRefName' <<<"$meta")
 changed_files_expected=$(jq -r '.changedFiles' <<<"$meta")
 short=${head:0:7}
@@ -139,7 +152,7 @@ title=$(jq -r '.title' <<<"$meta")
 raw_prbody=$(jq -r '.body // ""' <<<"$meta")
 prbody="$raw_prbody"
 visible_body_status=0
-prbody=$(python3 -c 'import re, sys
+prbody=$(python3 -I -c 'import re, sys
 text = sys.stdin.read()
 print(re.sub(r"<!--.*?(?:-->|\Z)", "", text, flags=re.S), end="")' <<<"$prbody") || visible_body_status=$?
 if [ "$visible_body_status" -ne 0 ]; then
@@ -147,11 +160,6 @@ if [ "$visible_body_status" -ne 0 ]; then
   prbody=""
 fi
 
-if [ -n "$INDEPENDENT_REVIEW_SHA" ] && ! [[ "$INDEPENDENT_REVIEW_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
-  bad "independent review attestation must be a full 40-hex commit SHA"
-elif [ -n "$INDEPENDENT_REVIEW_SHA" ] && [ "$INDEPENDENT_REVIEW_SHA" != "$head" ]; then
-  bad "independent review attestation names a different commit than the PR head"
-fi
 if [ -n "$BINARY_REVIEW_SHA" ] && ! [[ "$BINARY_REVIEW_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
   bad "binary review attestation must be a full 40-hex commit SHA"
 elif [ -n "$BINARY_REVIEW_SHA" ] && [ "$BINARY_REVIEW_SHA" != "$head" ]; then
@@ -221,7 +229,7 @@ else
   # name, other trailer, PR field, destination, and payload untouched.
   commit_message_json=$(jq -c '(if all(.[]; type == "array") then flatten else . end) | map(.commit.message)' <<<"$metadata_commits")
   sanitized_messages_status=0
-  sanitized_message_json=$(printf '%s' "$commit_message_json" | python3 "$script_dir/merge_gate_privacy.py" --redact-public-agent-attribution-messages) || sanitized_messages_status=$?
+  sanitized_message_json=$(printf '%s' "$commit_message_json" | python3 -I "$script_dir/merge_gate_privacy.py" --redact-public-agent-attribution-messages) || sanitized_messages_status=$?
   if [ "$sanitized_messages_status" -ne 0 ] || ! jq -e 'type == "array" and all(.[]; type == "string")' <<<"$sanitized_message_json" >/dev/null 2>&1; then
     unknown "could not classify public-agent attribution trailers in complete head-bound commit metadata"
     privacy_metadata=""
@@ -285,9 +293,9 @@ fi
 # A pinned file is not hash-checked here (CI computes the digest from live
 # bytes). Instead, a PR that touches a pinned path must ADD exactly one
 # acknowledgement file, docs/tally/compatibility/acks/pr-<PR>.txt, listing the
-# touched paths, and a review or comment by the acknowledging reviewer must name
-# the head, the acknowledgement path and every touched path (checked below,
-# beside the head-SHA review evidence).
+# touched paths. (The acknowledgement's reviewer line is still read for its shape,
+# but no review is matched against it any more: the owner's merge verdict, checked
+# below, replaces the old review-naming checks.)
 SURFACE="docs/tally/compatibility/compatibility-surface.json"
 ACK_DIR="docs/tally/compatibility/acks"
 ACK_PATH="$ACK_DIR/pr-$PR.txt"
@@ -610,7 +618,7 @@ else
   diff_stats="$tmpdir/diff-stats.tsv"
   added_payload="$tmpdir/added-payload"
   parsed_diff_status=0
-  parsed_diff=$(python3 "$script_dir/merge_gate_diff.py" <<<"$diff") || parsed_diff_status=$?
+  parsed_diff=$(python3 -I "$script_dir/merge_gate_diff.py" <<<"$diff") || parsed_diff_status=$?
   if [ "$parsed_diff_status" -ne 0 ] || ! jq -e '
     type == "object" and
     (.records | type == "array" and all(.[]; type == "object" and
@@ -642,7 +650,7 @@ else
     # the (already home-dir-redacted) filename: a coverage/metadata-only
     # example is echoed verbatim into gate output, and a filename can itself
     # carry an identifier, digest, or email shape.
-    item=$(printf '%s' "$item" | python3 "$script_dir/merge_gate_privacy.py" --redact-shapes 2>/dev/null) || item="$item"
+    item=$(printf '%s' "$item" | python3 -I "$script_dir/merge_gate_privacy.py" --redact-shapes 2>/dev/null) || item="$item"
     printf '%s' "${item:0:160}"
   }
   record_coverage_issue() {
@@ -719,10 +727,10 @@ else
     # PR body: it attests that every current binary addition/change byte and
     # its ownership, license, and NOTICE obligations were independently read.
     if [ "$binary_count" -gt 0 ]; then
-      if [ "$BINARY_REVIEW_SHA" = "$head" ] && [ "$INDEPENDENT_REVIEW_SHA" = "$head" ]; then
-        say "ok" "$binary_count binary addition/change(s) have explicit current-head binary and independent review attestations"
+      if [ "$BINARY_REVIEW_SHA" = "$head" ]; then
+        say "ok" "$binary_count binary addition/change(s) have the owner's current-head binary review attestation"
       else
-        bad "$binary_count binary addition/change(s) require matching --binary-review-sha and --independent-review-sha human attestations (first 8 at most: $binary_examples)"
+        bad "$binary_count binary addition/change(s) require the owner's own --binary-review-sha attestation (no review line can vouch for binary bytes; first 8 at most: $binary_examples)"
       fi
     fi
     [ "$gitlink_count" -eq 0 ] || unknown "$gitlink_count gitlink change(s) require explicit provenance, license, and NOTICE review"
@@ -758,7 +766,7 @@ else
                  [range(0; $d.added_payload | length) as $i |
                   {path: $d.added_locations[$i][0], line: $d.added_locations[$i][1], text: $d.added_payload[$i]}])}
       ' >"$input" 2>/dev/null \
-       || ! located=$(python3 "$script_dir/merge_gate_privacy.py" --head "$head" --explain <"$input" 2>/dev/null) \
+       || ! located=$(python3 -I "$script_dir/merge_gate_privacy.py" --head "$head" ${uuid_manifest_file:+--fixture-provenance "$uuid_manifest_file"} --explain <"$input" 2>/dev/null) \
        || ! jq -e '(.hits | type == "array") and (.truncated | type == "number")' <<<"$located" >/dev/null 2>&1; then
       say "note" "could not locate the lines that tripped the privacy scan"
       return 0
@@ -770,6 +778,48 @@ else
       [ "$(jq -r '.truncated' <<<"$located")" -eq 0 ] || say "note" "$(jq -r '.truncated' <<<"$located") more line(s) not listed"
     fi
   }
+  # The synthetic-UUID registry: UUID values the owner has listed on master as synthetic test values. It is read as a blob
+  # of the master ref fetched above, never from the checkout (a file ignored by git, or a path spelled in another case on a
+  # case-insensitive file system, would otherwise carry a pull request's own list into its own run), and only as a regular
+  # file. Anything wrong with it means no list, which is what the scan did before the registry existed: an unlisted UUID is
+  # indeterminate. A pull request cannot add or remove an entry for its own run.
+  uuid_registry_path="scripts/merge-gate-synthetic-uuids.json"
+  uuid_manifest_file=""
+  load_uuid_registry() {
+    local tip entry mode count manifest="$tmpdir/synthetic-uuid-manifest.json"
+    # One commit is resolved once and used for every read below, so a second gate run that fetches meanwhile cannot make
+    # the mode, the bytes and the printed blob come from different states of master.
+    tip=$(git -C "$gate_tree" rev-parse --verify -q "refs/merge-gate/master^{commit}" 2>/dev/null) || {
+      say "note" "synthetic-UUID registry not applied: could not resolve master"; return 0; }
+    entry=$(git -C "$gate_tree" ls-tree "$tip" -- "$uuid_registry_path" 2>/dev/null) || {
+      say "note" "synthetic-UUID registry not applied: could not look it up on master"; return 0; }
+    [ -n "$entry" ] || return 0
+    mode=${entry%% *}
+    if [ "$mode" != "100644" ]; then
+      say "note" "synthetic-UUID registry not applied: it is not a regular file on master"; return 0
+    fi
+    git -C "$gate_tree" cat-file -e "$tip:$uuid_registry_path" 2>/dev/null || {
+      say "note" "synthetic-UUID registry not applied: could not read it from master"; return 0; }
+    # The bytes go straight from git into jq: capturing them in a shell variable would drop a NUL byte (bash 3.2) and could
+    # make an invalid file valid.
+    if ! git -C "$gate_tree" cat-file blob "$tip:$uuid_registry_path" 2>/dev/null | jq -e '
+      type == "object" and (keys == ["entries", "schema_version"]) and .schema_version == 1 and
+      (.entries | type == "array" and length <= 500 and
+        all(.[]; type == "object" and (keys == ["note", "uuid"]) and
+          (.uuid | type == "string" and length == 36 and test("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$") and . != "00000000-0000-0000-0000-000000000000") and
+          (.note | type == "string" and test("[^\\s]"))) and
+        (([.[].uuid] | length) == ([.[].uuid] | unique | length)))
+    ' >/dev/null 2>&1; then
+      say "note" "synthetic-UUID registry not applied: it is not valid (schema 1, at most 500 entries, each with a lowercase non-nil uuid and a note, no duplicates)"; return 0
+    fi
+    if ! git -C "$gate_tree" cat-file blob "$tip:$uuid_registry_path" 2>/dev/null | jq --arg head "$head" '[.entries[] | {uuid: .uuid, head: ($head | ascii_downcase), source: "fixture"}]' >"$manifest" 2>/dev/null; then
+      say "note" "synthetic-UUID registry not applied: could not write the list for the scan"; return 0
+    fi
+    count=$(jq -r 'length' "$manifest")
+    uuid_manifest_file="$manifest"
+    say "note" "synthetic-UUID registry: $count listed value(s) applied (blob $(git -C "$gate_tree" rev-parse --short=12 "$tip:$uuid_registry_path" 2>/dev/null))"
+  }
+  load_uuid_registry
   scan_input_file="$tmpdir/privacy-scan-input"
   scan_input_write_status=0
   {
@@ -780,7 +830,7 @@ else
     unknown "could not assemble complete privacy scan input"
   else
     privacy_result_status=0
-    privacy_result=$(python3 "$script_dir/merge_gate_privacy.py" --head "$head" <"$scan_input_file") || privacy_result_status=$?
+    privacy_result=$(python3 -I "$script_dir/merge_gate_privacy.py" --head "$head" ${uuid_manifest_file:+--fixture-provenance "$uuid_manifest_file"} <"$scan_input_file") || privacy_result_status=$?
     if [ "$privacy_result_status" -ne 0 ] || ! jq -e '
       type == "object" and
       (.blockers | type == "array" and all(.[]; type == "string" and length > 0)) and
@@ -799,93 +849,158 @@ else
   fi
   fi
 fi
-# A review naming the exact current head SHA. Closes #317: PRs were merged
-# 2-8 minutes after opening, where "zero unresolved review threads" meant
-# "the reviewer had not started", not "reviewed clean". A clean review can
-# leave no review object at all -- only a reaction plus a summary comment --
-# so the absence of any review artifact naming this exact head is a FAIL,
-# never a silent pass.
+# The owner's merge verdict (merge-check spec v3). This replaces the old "review names the head" and "review names the pinned
+# paths" checks. Two lines count, each the WHOLE body of a pull request review or an issue comment by the owner's numeric user id
+# (scripts/merge_gate_verdict.py decides, with every rule in its header): MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND, both
+# bound to this head and to the merge base this gate computed itself. Any edit, deletion or dismissal of an owner item, a later
+# NOT-CLEAN or RETRACT line, or a token in the title, body, branch name, file names, commits, commit comments, added lines or anyone else's comment, blocks. Unreadable
+# history is indeterminate. Binary files stay the owner's own act (--binary-review-sha); a pull request that changes this gate or
+# the workflows needs the owner's own act too, because a verdict about the gate cannot clear a change to the gate.
 : >"$errfile"
-review_evidence_status=0
-head_reviews=$(gh api --paginate --slurp "repos/$REPO/pulls/$PR/reviews" 2>"$errfile") || review_evidence_status=$?
-review_names_head=false
-reviews_flat=""
-if [ "$review_evidence_status" -eq 0 ] && jq -e '
-  type == "array" and (all(.[]; type == "array") or all(.[]; type == "object"))
-' <<<"$head_reviews" >/dev/null 2>&1; then
-  review_names_head=$(jq -r --arg head "$head" '
-    (if all(.[]; type == "array") then flatten else . end) |
-    any(.[]; .commit_id == $head)
-  ' <<<"$head_reviews")
-  reviews_flat=$(jq -c 'if all(.[]; type == "array") then flatten else . end' <<<"$head_reviews")
-fi
-comment_names_head=false
-comments_flat=""
-short_marker="\`${short}\`"
-# Comments are also a place the pinned-path review may live, so they are read
-# whenever an acknowledgement is required, not only as a head-SHA fallback.
-if [ "$review_names_head" != "true" ] || [ "$ack_required" -eq 1 ]; then
-  : >"$errfile"
-  head_comments_status=0
-  head_comments=$(gh api --paginate --slurp "repos/$REPO/issues/$PR/comments" 2>"$errfile") || head_comments_status=$?
-  if [ "$head_comments_status" -eq 0 ] && jq -e '
-    type == "array" and (all(.[]; type == "array") or all(.[]; type == "object"))
-  ' <<<"$head_comments" >/dev/null 2>&1; then
-    comment_names_head=$(jq -r --arg head "$head" --arg marker "$short_marker" '
-      (if all(.[]; type == "array") then flatten else . end) |
-      any(.[]; ((.body // "") | contains($head)) or ((.body // "") | contains($marker)))
-    ' <<<"$head_comments")
-    comments_flat=$(jq -c 'if all(.[]; type == "array") then flatten else . end' <<<"$head_comments")
+verdict_status=0
+verdict_pages() {
+  gh api --paginate --slurp "$1" 2>>"$errfile" </dev/null \
+    | jq -c 'if type == "array" and all(.[]; type == "array") then flatten else error("not a list of pages") end'
+}
+verdict_reviews=$(verdict_pages "repos/$REPO/pulls/$PR/reviews?per_page=100") || verdict_status=$?
+verdict_comments=$(verdict_pages "repos/$REPO/issues/$PR/comments?per_page=100") || verdict_status=$?
+verdict_inline=$(verdict_pages "repos/$REPO/pulls/$PR/comments?per_page=100") || verdict_status=$?
+verdict_commit_comments="[]"
+# The pull request's commit comments are read once, from the repository's list of commit comments (every page), and kept when
+# they sit on one of the pull request's own commits. The commit list is the one proved complete above for the privacy scan (its
+# length equals the pull request's own count, 250 at most, no duplicate, the head among them); a list that is not proven means
+# the comments are not read, and any failed page fails the read. There is no cap on the number of commits: a pull request that
+# carries its parents' commits is judged like any other.
+if [ "$metadata_commits_proven" -ne 1 ]; then
+  verdict_status=1
+  echo "the commit list is not proven complete: commit comments are not read" >>"$errfile"
+else
+  verdict_sha_json=$(jq -c '[(if all(.[]; type == "array") then flatten else . end)[].sha | ascii_downcase]' <<<"$metadata_commits") || verdict_status=$?
+  verdict_repo_comments=$(verdict_pages "repos/$REPO/comments?per_page=100") || verdict_status=$?
+  if [ "$verdict_status" -eq 0 ] && ! jq -e 'all(.[]; (.commit_id | type) == "string")' <<<"$verdict_repo_comments" >/dev/null 2>&1; then
+    verdict_status=1
+    echo "a commit comment names no commit, so the list cannot be filtered completely" >>"$errfile"
+  fi
+  if [ "$verdict_status" -eq 0 ]; then
+    verdict_commit_comments=$(jq -c --argjson shas "$verdict_sha_json" '[.[] | select(.commit_id | type == "string") | select((.commit_id | ascii_downcase) as $c | $shas | index($c) != null)]' <<<"$verdict_repo_comments") || verdict_status=$?
   fi
 fi
-if [ "$review_names_head" = "true" ] || [ "$comment_names_head" = "true" ]; then
-  say "ok" "review evidence names the current head $short"
+verdict_query='query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
+ reviews(first:100){pageInfo{hasNextPage} nodes{databaseId lastEditedAt userContentEdits(first:1){totalCount} author{login ... on User{databaseId}}}}
+ comments(first:100){pageInfo{hasNextPage} nodes{databaseId lastEditedAt userContentEdits(first:1){totalCount} author{login ... on User{databaseId}}}}
+ timelineItems(first:100,itemTypes:[COMMENT_DELETED_EVENT,REVIEW_DISMISSED_EVENT]){pageInfo{hasNextPage} nodes{__typename ... on CommentDeletedEvent{createdAt deletedCommentAuthor{login ... on User{databaseId}}} ... on ReviewDismissedEvent{createdAt review{author{login ... on User{databaseId}}}}}}
+}}}'
+verdict_history=$(gh api graphql -F owner="$OWNER" -F name="$NAME" -F pr="$PR" -f query="$verdict_query" 2>>"$errfile" </dev/null) || verdict_status=$?
+if [ "$verdict_status" -ne 0 ] || [ -z "$merge_base" ] || [ ! -f "${added_payload:-/nonexistent}" ]; then
+  unknown "could not read the reviews, comments, edit history, merge base or added lines that the owner's merge verdict is judged on"
 else
-  bad "no review evidence (review or comment) names current head $short — see #317"
-fi
-# A PR that touches a pinned path also needs one review or comment that names
-# the head, the acknowledgement path and every touched path, written by the
-# login the acknowledgement names as reviewer. The login proves nothing when
-# several reviewers post under one account; the file list is what the reviewer must
-# have read. A review counts as naming the head when GitHub bound it to the
-# head commit or when its body names the head.
-if [ "$ack_required" -eq 1 ]; then
-  if [ -z "$reviews_flat" ] || [ -z "$comments_flat" ]; then
-    unknown "could not read the review and comment bodies that must name the pinned paths"
-  else
-    touched_json=$(printf '%s\n' "$ack_touched" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-    ack_review=""
-    ack_review_status=0
-    ack_review=$(jq -n -c --argjson reviews "$reviews_flat" --argjson comments "$comments_flat" \
-      --argjson paths "$touched_json" --arg head "$head" --arg marker "$short_marker" \
-      --arg ackpath "$ACK_PATH" --arg reviewer "$ack_reviewer" '
-      # A path is named only as a whole token: delimited by whitespace, a backtick, a quote, a
-      # parenthesis, a comma, a colon or the ends of the text, so "src/a.rs.bak" does not name
-      # "src/a.rs" and "pr-3210.txt" does not name "pr-321.txt".
-      def esc: gsub("(?<c>[\\\\.^$*+?(){}\\[\\]|])"; "\\" + .c);
-      def names($b; $p): $b | test("(^|[\\s`\"\u0027\u201c\u201d\u2018\u2019(),:])" + ($p | esc) + "($|[\\s`\"\u0027\u201c\u201d\u2018\u2019(),:])");
-      ([$reviews[] | {login: (.user.login // ""), body: (.body // ""), bound: (.commit_id == $head)}] +
-       [$comments[] | {login: (.user.login // ""), body: (.body // ""), bound: false}]) as $all |
-      [$all[] | select(.bound or (.body | contains($head)) or (.body | contains($marker))) |
-        . + {missing: (.body as $b | ([$ackpath] + $paths) | map(. as $p | select(names($b; $p) | not)))}] as $named |
-      ($named | map(select(.missing | length == 0))) as $full |
-      {named: ($named | length),
-       full: ($full | length),
-       matching: ($full | map(select($reviewer == "" or ((.login | ascii_downcase) == ($reviewer | ascii_downcase)))) | length),
-       missing: (if ($named | length) == 0 then [] else ($named | min_by(.missing | length) | .missing) end),
-       logins: ($full | map(.login) | unique)}' 2>"$errfile") || ack_review_status=$?
-    if [ "$ack_review_status" -ne 0 ] || ! jq -e 'type == "object" and (.named | type == "number")' <<<"$ack_review" >/dev/null 2>&1; then
-      unknown "could not evaluate the review and comment bodies for the pinned paths"
-    elif [ "$(jq -r '.matching' <<<"$ack_review")" -gt 0 ]; then
-      say "ok" "review by ${ack_reviewer:-the reviewer} names $short, $ACK_PATH and all pinned paths touched"
-    elif [ "$(jq -r '.full' <<<"$ack_review")" -gt 0 ]; then
-      bad "the review naming the pinned paths is by $(jq -r '.logins | join(", ")' <<<"$ack_review"), not the acknowledgement's reviewer '$ack_reviewer'"
-    elif [ "$(jq -r '.named' <<<"$ack_review")" -gt 0 ]; then
-      bad "no review or comment names every pinned path touched; the closest lacks: $(jq -r '.missing | join(", ")' <<<"$ack_review")"
+  printf '%s' "$verdict_reviews" >"$tmpdir/v-reviews.json"
+  printf '%s' "$verdict_comments" >"$tmpdir/v-comments.json"
+  printf '%s' "$verdict_inline" >"$tmpdir/v-inline.json"
+  printf '%s' "$verdict_commit_comments" >"$tmpdir/v-commit-comments.json"
+  printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)" >"$tmpdir/v-filenames.txt"
+  printf '%s' "$verdict_history" >"$tmpdir/v-history.json"
+  printf '%s' "${sanitized_message_json:-[]}" >"$tmpdir/v-commits.json"
+  # The review tier (scripts/review-tier.mjs, from the changed paths and rename sources just written, with the list in this tree,
+  # which the gate proved equal to master): only the one tier lets the MERGE-ADVERSARY RECOMMEND line be absent. Anything wrong
+  # with the tool or its answer is the full tier.
+  review_tier="full"
+  review_tier_detail="the review tier could not be computed, so both owner lines are needed"
+  tier_json=$(node "$script_dir/review-tier.mjs" --paths-file "$tmpdir/v-filenames.txt" 2>/dev/null) || tier_json=""
+  if [ -n "$tier_json" ] && jq -e 'type == "object" and (.tier | . == "one" or . == "full") and (has("error") | not) and (.files | type == "array")' <<<"$tier_json" >/dev/null 2>&1; then
+    review_tier=$(jq -r '.tier' <<<"$tier_json")
+    if [ "$review_tier" = "one" ]; then
+      review_tier_detail="$(jq -r '.files | length' <<<"$tier_json") file(s), none on the write path, in credentials, in fixtures or unclassified"
     else
-      bad "no review or comment names head $short together with $ACK_PATH and the touched pinned path(s)"
+      review_tier_detail="decided by: $(jq -r '[.files[] | select(.tier == "full")] | .[0:3] | map(.path + " (" + (.class // "unclassified") + ")") | join(", ")' <<<"$tier_json")"
     fi
   fi
+  say "note" "review tier: $review_tier ($review_tier_detail)"
+  verdict_doc_status=0
+  jq -n -c --slurpfile reviews "$tmpdir/v-reviews.json" --slurpfile comments "$tmpdir/v-comments.json" --slurpfile inline "$tmpdir/v-inline.json" \
+    --slurpfile history "$tmpdir/v-history.json" --slurpfile commits "$tmpdir/v-commits.json" --rawfile added "$added_payload" \
+    --slurpfile commitcomments "$tmpdir/v-commit-comments.json" --rawfile filenames "$tmpdir/v-filenames.txt" --arg headref "$head_ref" \
+    --arg title "$title" --arg body "$raw_prbody" --arg head "$head" --arg base "$merge_base" --arg tier "$review_tier" '
+    ($history[0].data.repository.pullRequest // null) as $pr |
+    def edits: [(.nodes // [])[] | {authorId: (.author.databaseId // null), lastEditedAt: .lastEditedAt, editCount: (.userContentEdits.totalCount // 0)}];
+    {head: $head, base: $base, tier: $tier,
+     reviews: $reviews[0], comments: $comments[0], inline_comments: $inline[0],
+     commit_comments: $commitcomments[0],
+     texts: {title: $title, body: $body, head_ref: $headref, filenames: ($filenames | split("\n") | map(select(length > 0))),
+             commit_messages: $commits[0], added_lines: ($added | split("\n"))},
+     graphql: {complete: (($history[0].errors == null) and ($pr != null)
+                          and ($pr.reviews.pageInfo.hasNextPage == false) and ($pr.comments.pageInfo.hasNextPage == false)
+                          and ($pr.timelineItems.pageInfo.hasNextPage == false)),
+               reviews: ($pr.reviews // {} | edits), comments: ($pr.comments // {} | edits),
+               events: [($pr.timelineItems.nodes // [])[] | if .__typename == "CommentDeletedEvent"
+                          then {type: .__typename, createdAt: .createdAt, authorId: (.deletedCommentAuthor.databaseId // null)}
+                          else {type: .__typename, createdAt: .createdAt, authorId: (.review.author.databaseId // null)} end]}}' \
+    >"$tmpdir/verdict-doc.json" 2>"$errfile" || verdict_doc_status=$?
+  if [ "$verdict_doc_status" -ne 0 ]; then
+    unknown "could not assemble the evidence for the owner's merge verdict"
+  else
+    verdict_exit=0
+    verdict_result=$(python3 -I "$script_dir/merge_gate_verdict.py" <"$tmpdir/verdict-doc.json" 2>/dev/null) || verdict_exit=$?
+    # A MERGE-VERDICT CLEAN line that names an older head and merge base is carried to the current pair when the pull request's
+    # own change (merge base...head) is the same at both. "The same" is exact: the whole compare diff, byte for byte, apart from
+    # the `index` lines (blob ids move with a merge of master) and the text after the hunk numbers (the enclosing function's
+    # name). Context lines and hunk numbers are part of it, so a change moved to another place in a file is not the same change,
+    # and a merge that touches the pull request's files inside a hunk's three context lines, or that shifts a hunk's numbers, is
+    # not carried: the reviewer looks again. Master's edits elsewhere are NOT looked at, in other files or in the same file (below
+    # the last hunk, or of equal length above one): they ride on master's own review and the checks at the head.
+    # (git patch-id is not used: it ignores whitespace and position.)
+    # Two GitHub compare diffs prove it. A diff that cannot be read, is empty, holds a binary change (its text hides the bytes),
+    # lists a file twice, or names other files than the pull request's current file list is never carried. What master changed
+    # in other files is not looked at: that is the checks' job at the head.
+    candidate_head=$(jq -r '.candidate_clean.head // empty' <<<"$verdict_result" 2>/dev/null)
+    candidate_base=$(jq -r '.candidate_clean.base // empty' <<<"$verdict_result" 2>/dev/null)
+    if [ "$(jq -r '.clean' <<<"$verdict_result" 2>/dev/null)" != "true" ] && [[ "$candidate_head" =~ ^[0-9a-f]{40}$ ]] && [[ "$candidate_base" =~ ^[0-9a-f]{40}$ ]]; then
+      own_change_digest() {
+        local diff_file="$tmpdir/patch-$1-$2.diff" names
+        gh api -H "Accept: application/vnd.github.diff" "repos/$REPO/compare/$1...$2" >"$diff_file" 2>>"$errfile" </dev/null || return 1
+        grep -q '[^[:space:]]' "$diff_file" || return 1
+        ! grep -Eq '^(Binary files |GIT binary patch)' "$diff_file" || return 1
+        if [ "${3:-}" = "check-files" ]; then
+          names=$(grep -E '^diff --git ' "$diff_file" | sed -E 's#^diff --git a/.* b/(.*)$#\1#') || return 1
+          [ -n "$names" ] || return 1
+          [ "$(printf '%s\n' "$names" | sort | uniq -d | wc -l | tr -d ' ')" -eq 0 ] || return 1
+          [ "$(printf '%s\n' "$names" | sort -u)" = "$(cut -f1 "$changed_records" | sort -u)" ] || return 1
+        fi
+        LC_ALL=C grep -av '^index ' "$diff_file" | LC_ALL=C sed -E 's/^(@@ [^@]* @@).*/\1/' | shasum -a 256 | cut -c1-64
+      }
+      old_digest=$(own_change_digest "$candidate_base" "$candidate_head") && new_digest=$(own_change_digest "$merge_base" "$head" check-files)
+      if [ -n "${old_digest:-}" ] && [ "${old_digest:-}" = "${new_digest:-}" ]; then
+        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is carried to head $short: the pull request's own change is byte-identical, hunk places and context included (digest ${old_digest:0:12})"
+        jq -c --arg h "$candidate_head" --arg b "$candidate_base" '. + {carried: {head: $h, base: $b}}' "$tmpdir/verdict-doc.json" >"$tmpdir/verdict-doc-carried.json" 2>/dev/null \
+          && verdict_exit=0 \
+          && verdict_result=$(python3 -I "$script_dir/merge_gate_verdict.py" <"$tmpdir/verdict-doc-carried.json" 2>/dev/null) || verdict_exit=$?
+      else
+        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is not carried: the pull request's own lines could not be shown unchanged"
+      fi
+    fi
+    if ! jq -e 'type == "object" and (.status | type == "string")' <<<"$verdict_result" >/dev/null 2>&1; then
+      unknown "could not evaluate the owner's merge verdict"
+    else
+      while IFS= read -r line; do unknown "$line"; done < <(jq -r '.unreadable[]?' <<<"$verdict_result")
+      while IFS= read -r line; do bad "$line"; done < <(jq -r '.refusals[]?' <<<"$verdict_result")
+      while IFS= read -r line; do say "note" "$line"; done < <(jq -r '.reasons[]?' <<<"$verdict_result")
+      if [ "$(jq -r '.status' <<<"$verdict_result")" = "pass" ]; then
+        if [ "$review_tier" = "one" ] && [ "$(jq -r '.recommend' <<<"$verdict_result")" != "true" ]; then
+          say "ok" "the owner's MERGE-VERDICT CLEAN stands at head $short and merge base ${merge_base:0:7} (review tier one: no MERGE-ADVERSARY RECOMMEND needed)"
+        else
+          say "ok" "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head $short and merge base ${merge_base:0:7}"
+        fi
+      elif [ "$(jq -r '.status' <<<"$verdict_result")" = "block" ]; then
+        bad "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND do not both stand at head $short and merge base ${merge_base:0:7}"
+      else
+        unknown "the owner's merge verdict came back as neither a pass nor a block, so it is not read as a pass"
+      fi
+    fi
+  fi
+fi
+gate_paths=$(printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)")
+if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|scripts/review-tier|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
+  bad "this pull request changes the merge gate or a workflow: a verdict about the gate cannot clear a change to the gate, so the merge is the owner's own act"
 fi
 echo
 if [ "$fail" -ne 0 ]; then
@@ -897,7 +1012,7 @@ if [ "$uncertain" -ne 0 ]; then
   exit 2
 fi
 
-echo "MAY MERGE — compatibility-surface acknowledgement, privacy, and head-SHA review-evidence checks passed for $short."
+echo "MAY MERGE — compatibility-surface acknowledgement, privacy, and the owner's merge verdict checks passed for $short."
 echo "Branch protection on $base enforces the remaining required status checks separately."
 printf '  [ "$(gh pr view %s --repo %s --json baseRefName -q .baseRefName)" = "%s" ] \\\n    && gh pr merge %s --repo %s --squash --match-head-commit %s\n' \
   "$PR" "$REPO" "$base" "$PR" "$REPO" "$head"

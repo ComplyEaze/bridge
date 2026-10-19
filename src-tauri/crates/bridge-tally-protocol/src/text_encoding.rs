@@ -60,7 +60,6 @@ pub struct TallyTextStreamDecoder {
     prefix: Vec<u8>,
     mode: Option<TallyTextStreamMode>,
     text: String,
-    decoded_sha256: Sha256,
 }
 
 enum TallyTextStreamMode {
@@ -94,7 +93,6 @@ impl TallyTextStreamDecoder {
             prefix: Vec::with_capacity(3),
             mode: None,
             text: String::new(),
-            decoded_sha256: Sha256::new(),
         }
     }
 
@@ -222,7 +220,9 @@ impl TallyTextStreamDecoder {
             return Err(TallyTextDecodeError::ObservedEncodingMismatch);
         }
         let decoded_bytes = self.text.len();
-        let decoded_sha256 = encode_sha256(self.decoded_sha256.finalize());
+        // The decoder keeps every decoded character in `text`, so one pass over
+        // it gives the digest the per-character updates used to build.
+        let decoded_sha256 = encode_sha256(Sha256::digest(self.text.as_bytes()));
         Ok(StreamDecodedTallyText {
             text: self.text,
             encoding,
@@ -233,13 +233,9 @@ impl TallyTextStreamDecoder {
 
     fn process_selected(&mut self, bytes: &[u8]) -> Result<(), TallyTextDecodeError> {
         match self.mode.as_mut().expect("stream mode is selected") {
-            TallyTextStreamMode::Utf8 { pending, .. } => process_utf8_chunk(
-                pending,
-                bytes,
-                self.max_decoded_bytes,
-                &mut self.text,
-                &mut self.decoded_sha256,
-            ),
+            TallyTextStreamMode::Utf8 { pending, .. } => {
+                process_utf8_chunk(pending, bytes, self.max_decoded_bytes, &mut self.text)
+            }
             TallyTextStreamMode::Utf16 {
                 encoding,
                 little_endian,
@@ -253,7 +249,6 @@ impl TallyTextStreamDecoder {
                 bytes,
                 self.max_decoded_bytes,
                 &mut self.text,
-                &mut self.decoded_sha256,
             ),
         }
     }
@@ -316,14 +311,13 @@ fn process_utf8_chunk(
     mut bytes: &[u8],
     max_decoded_bytes: usize,
     text: &mut String,
-    digest: &mut Sha256,
 ) -> Result<(), TallyTextDecodeError> {
     while !pending.is_empty() && !bytes.is_empty() {
         pending.push(bytes[0]);
         bytes = &bytes[1..];
         match std::str::from_utf8(pending) {
             Ok(decoded) => {
-                append_decoded(decoded, max_decoded_bytes, text, digest)?;
+                append_decoded(decoded, max_decoded_bytes, text)?;
                 pending.clear();
             }
             Err(error) if error.error_len().is_some() => {
@@ -336,14 +330,14 @@ fn process_utf8_chunk(
         return Ok(());
     }
     match std::str::from_utf8(bytes) {
-        Ok(decoded) => append_decoded(decoded, max_decoded_bytes, text, digest),
+        Ok(decoded) => append_decoded(decoded, max_decoded_bytes, text),
         Err(error) if error.error_len().is_some() => Err(TallyTextDecodeError::InvalidUtf8),
         Err(error) => {
             let valid = &bytes[..error.valid_up_to()];
             let tail = &bytes[error.valid_up_to()..];
             let decoded =
                 std::str::from_utf8(valid).map_err(|_| TallyTextDecodeError::InvalidUtf8)?;
-            append_decoded(decoded, max_decoded_bytes, text, digest)?;
+            append_decoded(decoded, max_decoded_bytes, text)?;
             if tail.len() > 3 {
                 return Err(TallyTextDecodeError::InvalidUtf8);
             }
@@ -353,7 +347,6 @@ fn process_utf8_chunk(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn process_utf16_chunk(
     encoding: TallyTextEncoding,
     little_endian: bool,
@@ -362,7 +355,6 @@ fn process_utf16_chunk(
     bytes: &[u8],
     max_decoded_bytes: usize,
     text: &mut String,
-    digest: &mut Sha256,
 ) -> Result<(), TallyTextDecodeError> {
     let mut offset = 0;
     if let Some(first) = pending_byte.take() {
@@ -380,7 +372,6 @@ fn process_utf16_chunk(
             pending_high_surrogate,
             max_decoded_bytes,
             text,
-            digest,
         )?;
         offset = 1;
     }
@@ -397,7 +388,6 @@ fn process_utf16_chunk(
             pending_high_surrogate,
             max_decoded_bytes,
             text,
-            digest,
         )?;
         offset += 2;
     }
@@ -413,7 +403,6 @@ fn process_utf16_unit(
     pending_high_surrogate: &mut Option<u16>,
     max_decoded_bytes: usize,
     text: &mut String,
-    digest: &mut Sha256,
 ) -> Result<(), TallyTextDecodeError> {
     if (0xD800..=0xDBFF).contains(&unit) {
         if pending_high_surrogate.replace(unit).is_some() {
@@ -434,25 +423,18 @@ fn process_utf16_unit(
     };
     let character = char::from_u32(scalar).ok_or_else(|| invalid_utf16(encoding))?;
     let mut encoded = [0_u8; 4];
-    append_decoded(
-        character.encode_utf8(&mut encoded),
-        max_decoded_bytes,
-        text,
-        digest,
-    )
+    append_decoded(character.encode_utf8(&mut encoded), max_decoded_bytes, text)
 }
 
 fn append_decoded(
     decoded: &str,
     max_decoded_bytes: usize,
     text: &mut String,
-    digest: &mut Sha256,
 ) -> Result<(), TallyTextDecodeError> {
     if text.len().saturating_add(decoded.len()) > max_decoded_bytes {
         return Err(TallyTextDecodeError::TooLarge);
     }
     text.push_str(decoded);
-    digest.update(decoded.as_bytes());
     Ok(())
 }
 

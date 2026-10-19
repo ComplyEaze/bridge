@@ -111,7 +111,10 @@ whose ledger now points to a different master.
 - **Posting is off by default in the extension.** Note that this is a new
   setting: if you turned posting on in an earlier version, turn it on again.
   When you turn posting on, each post waits for your approval in a separate
-  ComplyEaze Bridge window (for a batch, its summary). No Bridge tool lets the assistant approve
+  ComplyEaze Bridge window (for a batch, its summary). On Windows that window
+  takes the keyboard, also from a full-screen Tally: do not type in Tally while
+  it is open, because the keys go to the window and the letters Y and N answer it.
+  No Bridge tool lets the assistant approve
   it, and an approval counts only when that window returns a fresh one-time
   token. After posting, the voucher is read back from Tally so you can see what
   landed. Four known limits remain: ComplyEaze Bridge cannot undo a posted

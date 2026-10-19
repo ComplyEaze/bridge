@@ -226,7 +226,9 @@ the voucher, for a saved batch a summary:
 ![The two approval windows, drawn as a diagram. Windows: "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel. Mac: "ComplyEaze Bridge — approve one voucher" with Post voucher and Cancel.](./img/install-approval.svg)
 
 - **Windows:** the window asks "post this voucher?" with **Yes**, **No** and **Cancel**. Only **Yes** posts. **No**
-  is the button already chosen, so pressing Enter does not post.
+  is the button already chosen, so pressing Enter does not post. **While this window is open, do not type in Tally.**
+  The window takes the keyboard even when Tally fills the screen: the keys you press go to the window and are not typed
+  into Tally, and the letters **Y** and **N** answer it (**Y** posts). Answer it with the mouse, then go back to Tally.
 - **Mac:** the window says "approve one voucher" with **Post voucher** and **Cancel**. Only **Post voucher** posts; pressing Return may leave the window open.
 
 There is no tool to undo or delete a posted voucher. A wrong entry must be corrected by hand in Tally.

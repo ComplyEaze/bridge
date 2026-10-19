@@ -454,7 +454,12 @@ second copy of itself that shows the approval window.
 The approval window is a system dialog. On macOS it is titled "ComplyEaze Bridge
 — approve one voucher" with the buttons Cancel and Post voucher. On Windows it
 is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel, and
-No is the default. Only the positive button approves. The window closes by
+No is the default. Only the positive button approves. On Windows the window
+takes the keyboard, also from a full-screen Tally (measured once on 0.6.0 and
+recorded in #1780): while it is open, the keys you type for Tally go to the
+window and are not typed into Tally, and the letters Y and N answer it, Y
+approving the post. Do not type in Tally while the window is open; answer it
+with the mouse. The window closes by
 itself after two minutes without an answer, and an approval that is not used
 within fifteen minutes, or before the program restarts, is dropped. From 0.4.1 a
 clicked approval is also withdrawn when the post is refused before its checks

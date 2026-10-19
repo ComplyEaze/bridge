@@ -112,8 +112,9 @@ whose ledger now points to a different master.
   setting: if you turned posting on in an earlier version, turn it on again.
   When you turn posting on, each post waits for your approval in a separate
   ComplyEaze Bridge window (for a batch, its summary). On Windows that window
-  takes the keyboard, also from a full-screen Tally: do not type in Tally while
-  it is open, because the keys go to the window and the letters Y and N answer it.
+  also takes the keyboard: in a test of the published 0.6.0 (a full-screen Tally,
+  one screen, #1780) a typed n declined it and a typed y approved it, so when you
+  ask for a post, stop typing in Tally until you have answered it with the mouse.
   No Bridge tool lets the assistant approve
   it, and an approval counts only when that window returns a fresh one-time
   token. After posting, the voucher is read back from Tally so you can see what
@@ -252,7 +253,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   posted after one approval. Every post created what it sent, and every voucher read `posted_verified` in the post's own
   readback and again in `verify_import`. The approval window showed in front of a full-screen Tally and of Claude Desktop (one screen, one run), with No as the
   default, and took keyboard focus (a Down arrow meant for Tally moved the selection inside the window; Enter alone refuses,
-  arrow keys then Enter can reach Yes; a typed letter was not tried). Then a package built by the release
+  arrow keys then Enter can reach Yes; a typed letter was not tried in that run; later that day, on the published file, a typed n declined the window and a typed y approved it: #1780). Then a package built by the release
   workflow's own steps (rehearsal run 38885882661, `bridge_mcp.exe` SHA-256
   `10e4614f74eab975897834ec1c9750edbe9fc7ad91584b802e5cde57a8180899`) was installed over it, kept its port and posting settings (the same version, not an upgrade), and posted one more
   Journal the same way. The published file (`bridge-tally-mcp-v0.6.0-windows-x64.mcpb` SHA-256

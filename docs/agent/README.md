@@ -2415,10 +2415,11 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    Choose **Post voucher** (for a batch,
    **Post N vouchers**) on macOS or **Yes** on Windows to permit this attempt. **Cancel** or Escape
    declines on macOS; Return may leave the dialog open. Windows defaults to
-   **No**, and its window takes the keyboard, also from a full-screen Tally
-   (measured once on 0.6.0, #1780): do not type in Tally while it is open, because
-   the keys go to the window instead and the letters **Y** and **N** answer it.
-   Answer it with the mouse. Long or directionally ambiguous previews are refused; use the
+   **No**, and its window also takes the keyboard (the published 0.6.0, Windows 10,
+   a full-screen Tally, one screen, each tried once, #1780: a Down arrow moved its
+   buttons, a typed **n** declined it, a typed **y** approved it; macOS not
+   measured). When you ask for a post, stop typing in Tally until you have
+   answered the window with the mouse. Long or directionally ambiguous previews are refused; use the
    manual file workflow instead. A desktop session is required.
 4. Bridge refreshes company identity, product/mode, date admission and exact
    masters, checks the batch is absent, then records a durable dispatch intent

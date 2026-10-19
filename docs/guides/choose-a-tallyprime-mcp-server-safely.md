@@ -70,8 +70,10 @@ ComplyEaze Bridge is our TallyPrime MCP server for Claude Desktop. In short:
   or a saved batch of up to 50) waits for your approval in a separate
   ComplyEaze Bridge window. No ComplyEaze Bridge tool can
   approve it for you, but software that controls your screen could click the
-  window, so do not let it. It cannot undo a posted voucher; you correct it in
-  TallyPrime.
+  window, so do not let it. On Windows the window also takes the keyboard: in
+  one test a typed y approved it while Tally was in front (#1780). When you ask
+  for a post, stop typing in Tally until you have answered it with the mouse. It
+  cannot undo a posted voucher; you correct it in TallyPrime.
 - It connects only to a loopback address on your own computer. If you forward
   that port to a virtual machine or another machine, the traffic follows your
   forward, and ComplyEaze Bridge cannot tell.

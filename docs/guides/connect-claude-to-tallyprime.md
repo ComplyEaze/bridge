@@ -77,7 +77,10 @@ vouchers is off by default. This page is the short path; the
   voucher, or a saved batch of up to 50) waits for your approval in a separate
   ComplyEaze Bridge window. No ComplyEaze
   Bridge tool can approve it for you, but software that controls your screen
-  could click the window, so do not let it. ComplyEaze Bridge cannot
+  could click the window, so do not let it. On Windows the window also takes the
+  keyboard: in one test a typed y approved it while Tally was in front (#1780).
+  When you ask for a post, stop typing in Tally until you have answered it with
+  the mouse. ComplyEaze Bridge cannot
   undo a posted voucher; you correct it in TallyPrime. Read *Before you turn on
   posting* in the [README](../../README.md#before-you-turn-on-posting) first.
 - **Every tool call leaves a receipt** in a log on your computer.

@@ -455,11 +455,13 @@ The approval window is a system dialog. On macOS it is titled "ComplyEaze Bridge
 — approve one voucher" with the buttons Cancel and Post voucher. On Windows it
 is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel, and
 No is the default. Only the positive button approves. On Windows the window
-takes the keyboard, also from a full-screen Tally (measured once on 0.6.0 and
-recorded in #1780): while it is open, the keys you type for Tally go to the
-window and are not typed into Tally, and the letters Y and N answer it, Y
-approving the post. Do not type in Tally while the window is open; answer it
-with the mouse. The window closes by
+also takes the keyboard (#1780). In tests of the published 0.6.0, on Windows 10
+with TallyPrime 7.1 full screen and one screen, each tried once, a Down arrow
+moved its buttons, a typed n declined it and a typed y approved it, so a key
+typed for Tally can answer it. When you ask for a post, stop typing in Tally
+until you have answered the window with the mouse. The review acknowledgement
+window is built with the same flags in the code, so it is expected to behave the
+same; that was not measured, and neither was macOS. The window closes by
 itself after two minutes without an answer, and an approval that is not used
 within fifteen minutes, or before the program restarts, is dropped. From 0.4.1 a
 clicked approval is also withdrawn when the post is refused before its checks

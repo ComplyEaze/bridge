@@ -674,6 +674,8 @@ itself was sent, so this cannot keep the complement's own `NOT`-filtered master 
 part is checked against the catalogue by GUID before a row is released, and a part whose answer
 passes the response limit ends the read under its own cause.
 
+**The parent filter also works on the rates request, and `$Parent` folds letter case (PARTIAL, one synthetic licensed 7.1 Silver book of 15 ledgers under 8 parents, read only, 10 Oct 2026, #1331).** The `List of Ledgers` request that fetches the compliance fields plus `GSTDETAILS.LIST`, `RATEOFTAXCALCULATION`, `ROUNDINGMETHOD` and `ROUNDINGLIMIT` was sent unfiltered (15 rows) and with `$Parent = "Duties &amp; Taxes" OR $Parent = "Indirect Expenses" OR $Parent = "Sales Accounts" OR $Parent = "Sundry Debtors"` (11 rows). The 11 were exactly the unfiltered read's rows under those four parents, by GUID, and every filtered row had the same element paths and values as its unfiltered row, the four rate fields included (`ROUNDINGMETHOD` is absent from the same rows in both). The same filter spelled `SALES ACCOUNTS` returned the four `Sales Accounts` ledgers, each row still carrying the book's own spelling: **`$Parent` matched across letter case**, for this one parent and this one spelling. Each request answered in 0.008 to 0.012 s. The answers are in the pilot-lab fixtures (`pilot-lab-ledger-rates-scoped*`, PROVENANCE.md). Not measured: any other characters or spellings, whether the compliance master and balance collections fold the same way (the mechanism is the same), two parents of one book that differ only in case, and any book larger than 15 ledgers. Bridge therefore refuses an invoice whose ledgers' parents have a case-twin among the book's parents, before the request, and proves a scoped answer against the catalogue by GUID, name and exact parent text.
+
 **Not established:** a book above about 9,500 ledgers, any size at which Tally stops answering,
 or the cause of the empty range, prefix and span filters on the second book. The largest single latency was 1.00 s on the synthetic
 book (the whole party-ledger master) and 12.0 s on the second (the whole balance read). Do not read the 3,750-byte budget or the
@@ -1251,9 +1253,6 @@ a partition can increase total wall-clock even as it reduces peak payload.
 Deadline planning must therefore model a book-dependent fixed scan cost separately from
 serialization, and subdivision must be justified by payload, not by time.
 
-> A separate stability hazard observed during this work is recorded privately rather than
-> here, per the project's handling of crash triggers.
-
 ### 12a.9 A ledger GUID survived an observed UI rename — coverage must compare GUID to name
 
 `LedgerOpeningCoverageV1` was captured immediately before and after renaming one ledger
@@ -1580,7 +1579,7 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 
 ### 12a.19 A company's GST registration is a tax unit, with dated rows
 
-**PARTIAL: VERIFIED 2026-10-09, licensed TallyPrime 7.1 Silver**, one synthetic company (`BRIDGE PILOT LAB`) with one GST registration, read by an outside contributor. The `TaxUnit` answer described in the second bullet was read after the registration was entered and before any voucher was keyed, to the code's collection typed by hand from the text in #1342's request list and sent as UTF-8, where ComplyEaze Bridge sends UTF-16 (`pilot-lab-tax-units-typed-request.utf8.xml`, `pilot-lab/PROVENANCE.md`). Each other read is placed in the lab sitting by the bullet that uses it.
+**PARTIAL: VERIFIED 2026-10-09, licensed TallyPrime 7.1 Silver**, one synthetic company (`BRIDGE PILOT LAB`) with one GST registration, read by an outside contributor. The `TaxUnit` answer described in the second bullet was read after the registration was entered and before any voucher was keyed, to the code's collection typed by hand from the text in #1342's request list and sent as UTF-8, where ComplyEaze Bridge sends UTF-16 (that answer is not kept in this tree; `pilot-lab/PROVENANCE.md` says why). Each other read is placed in the lab sitting by the bullet that uses it.
 
 - **The company's own row holds no registration (VERIFIED, two captures).** A `Company` collection with `NATIVEMETHOD *`, read before and after the registration was entered, differed only in the `CMPINFO` counter `TAXUNIT` (0, then 1); `GSTREGISTRATIONNUMBER` and `GSTREGISTRATIONTYPE` were empty both times. GST was already on (`ISGSTON` Yes) in the first capture, so a company with GST on and no registration was read, but not one with GST off. This agrees with §12a.7's field-listed read.
 - **A `TaxUnit` collection returns the registration (VERIFIED).** With `NATIVEMETHOD *` it returned two rows: `Default Tax Unit` (attribute `TAXTYPE=""`, `ISPRIMARYUNIT` Yes, no registration) and the registration, `Rajasthan Registration` (attributes `TAXTYPE="GST"` and `TAXREGISTRATION` holding the GSTIN; `USEDFOR` GST; `GSTREGNUMBER` the GSTIN). Each row's `GUID` was the company's GUID followed by `-` and a suffix (PARTIAL: two rows of one company). The registration's history is a list of dated rows, `GSTREGISTRATIONDETAILS.LIST`, each with `FROMDATE`, `STATE`, `PLACEOFSUPPLY`, `REGISTRATIONTYPE` (`Regular`) and `ISINACTIVE` (`No`). The unit-level `GSTREGISTRATIONTYPE`, `STATENAME` and dates are empty on the registered unit.

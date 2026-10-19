@@ -6,18 +6,17 @@
 //! one, or a name two rows claim is an error, never a default.
 //!
 //! What each read was observed to return (TallyPrime 7.1 Silver, 6 Oct 2026,
-//! one real book, not a lab book; its answers are held privately and are not
+//! one real book; its answers are held privately and are not
 //! in this repository): the voucher-type collection with no field
 //! list returns every type, with the
 //! type's reserved name as an attribute, its PARENT, its GUID, a top-level
 //! NUMBERINGMETHOD and, inside `VOUCHERNUMBERSERIES.LIST`, the series-level
 //! one that decides what an import's supplied number does. A `Ledger` row
-//! returns `ISBILLWISEON` as Yes or No. The tax-unit collection was read once
-//! on a second synthetic lab company (TallyPrime 7.1 Silver, 9 Oct 2026; typed
-//! by hand, sent as UTF-8, before any voucher was keyed): the
-//! Default Tax Unit and one GST registration, each GUID the company's GUID
-//! with a suffix, the registration's dated rows under
-//! `GSTREGISTRATIONDETAILS.LIST`.
+//! returns `ISBILLWISEON` as Yes or No. The tax-unit collection was read on
+//! BRIDGE PILOT LAB (TallyPrime 7.1 Silver, 9 Oct 2026) with the code's own
+//! request, and once more with a hand-typed one: the Default Tax Unit and one
+//! GST registration, each GUID the company's GUID with a suffix, the
+//! registration's dated rows under `GSTREGISTRATIONDETAILS.LIST`.
 
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use quick_xml::events::Event;
@@ -373,11 +372,12 @@ pub(super) fn resolve_voucher_type(
     // type reads Automatic (Manual Override) on top and Manual in its series;
     // the type keyed for the rehearsal reads None on top and Manual in its
     // series).
-    // Its "prevent duplicates" flag is required as a further guard, not
-    // relied on: §9.8 measured it only for a failed Journal Alter, and an
-    // import that creates a Sales voucher under a used number is not measured
-    // (implementation guide §3.4). For a company's first invoice the post's
-    // readback (`invoice_number_not_unique`) is what catches a duplicate.
+    // Its "prevent duplicates" flag is the guard the number read's control
+    // relies on when no invoice of the company stands as sent (its first, or
+    // every one after a person's release). The protocol reference (§9.8)
+    // measured that flag on Journal and Payment vouchers only (PARTIAL); on a
+    // Sales voucher it is not measured, which ADR 0004 lists as a blocker for
+    // switching Sales on.
     match target.series.as_slice() {
         [(_, method, Some(guard))] if method == "Manual" && guard == "Yes" => {}
         [(_, method, _)] if method == "Manual" => {
@@ -661,11 +661,11 @@ pub(super) fn count_vouchers(xml: &str) -> Result<usize, &'static str> {
 }
 
 /// The company's own GST registrations: a `TaxUnit` collection with no field
-/// list. The shape was read once, on a synthetic lab company, from the same
-/// collection typed by hand and sent as UTF-8 (two units: the Default Tax Unit
-/// and one GST registration whose dated rows carry the state, the
-/// registration type and whether it is inactive). This request, sent in UTF-16,
-/// was answered on 9 Oct 2026 with the same two rows (the `pilot-lab` fixtures).
+/// list. The shape was read on a synthetic lab company, BRIDGE PILOT LAB, with
+/// this request's own bytes (two units: the Default Tax Unit and one GST
+/// registration whose dated rows carry the state, the registration type and
+/// whether it is inactive), and once from the same collection typed by hand
+/// and sent as UTF-8; the pilot-lab fixtures hold the first answer.
 pub(in crate::agent) fn render_company_registration_request(company: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Tax Units</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Tax Units\" ISMODIFY=\"No\"><TYPE>TaxUnit</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
@@ -816,16 +816,35 @@ pub(super) fn parse_company_registration(
 /// invoice date, as the request that was measured carried them (a ledger's
 /// rate rows came back whole; whether the window changes them was not tried).
 /// `None` when a date is not eight digits.
-pub(in crate::agent) fn render_ledger_rates_request(
+#[cfg(test)]
+fn render_ledger_rates_request(company: &str, window: (&str, &str)) -> Option<String> {
+    render_ledger_rates(company, window, None)
+}
+
+/// [`render_ledger_rates_request`] restricted to the ledgers under one
+/// [`ParentPart`]'s parents, through the same `SYSTEM` formula and `FILTERS`
+/// element the compliance listing's parts carry (#679, #1331). The fetch list
+/// is the unfiltered request's, unchanged.
+pub(in crate::agent) fn render_ledger_rates_request_for_parents(
     company: &str,
     window: (&str, &str),
+    part: &bridge_tally_protocol::parent_partition::ParentPart,
+) -> Option<String> {
+    render_ledger_rates(company, window, Some(part))
+}
+
+fn render_ledger_rates(
+    company: &str,
+    window: (&str, &str),
+    part: Option<&bridge_tally_protocol::parent_partition::ParentPart>,
 ) -> Option<String> {
     let digits = |date: &str| date.len() == 8 && date.bytes().all(|byte| byte.is_ascii_digit());
     if !digits(window.0) || !digits(window.1) {
         return None;
     }
+    let (formula, filters) = bridge_tally_protocol::native_outstandings::parent_filter_parts(part);
     Some(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
         from = window.0,
         to = window.1,
@@ -850,6 +869,22 @@ impl Node {
     fn text_of(&self, name: &str) -> Result<Option<String>, &'static str> {
         let mut found = self.children.iter().filter(|child| child.name == name);
         let first = found.next().map(|child| clean(&child.text));
+        if found.next().is_some() {
+            return Err("invoice_read_field_repeated");
+        }
+        Ok(first)
+    }
+
+    /// [`Self::text_of`] without the cleaning of control-character markers and
+    /// without trimming: the text a catalogue row of the same element carries
+    /// (it keeps a `PARENT` verbatim), so the two compare byte for byte.
+    /// `None` for an absent element or one holding only whitespace.
+    fn raw_text_of(&self, name: &str) -> Result<Option<String>, &'static str> {
+        let mut found = self.children.iter().filter(|child| child.name == name);
+        let first = found
+            .next()
+            .map(|child| child.text.clone())
+            .filter(|text| !text.trim().is_empty());
         if found.next().is_some() {
             return Err("invoice_read_field_repeated");
         }
@@ -1034,14 +1069,42 @@ const HEAD_RATE_CHILDREN: &[&str] = &["GSTRATE", "GSTRATEDUTYHEAD", "GSTRATEVALU
 /// The rate listing by ledger name, for the ledgers an invoice names. Every
 /// row of the answer must carry the verified company's GUID (the
 /// `BRIDGECOMPANYGUID` compute) and a name; the rows of the named ledgers are
-/// read in full, and a name two of them claim refuses the answer. The rest of
-/// any other ledger's row is not read, so one unrelated ledger's fields
-/// cannot fail an invoice.
+/// read in full, and a name two of them claim refuses the answer. Of any other
+/// ledger's row only its name, GUID and parent are read (the scope proves the
+/// rows against the catalogue), so one unrelated ledger's rate fields cannot
+/// fail an invoice.
+#[cfg(test)]
 pub(super) fn parse_ledger_rates(
     xml: &str,
     company_guid: &str,
     wanted: &[&str],
 ) -> Result<BTreeMap<String, LedgerRateRow>, &'static str> {
+    parse_ledger_rates_and_rows(xml, company_guid, wanted).map(|(rates, _)| rates)
+}
+
+/// One row of a rate listing as the scope's coverage proof reads it: the
+/// row's `NAME` attribute, its GUID and its immediate `PARENT`, the last two
+/// as the answer wrote them (no cleaning, so the reserved root compares as the
+/// catalogue carries it).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ListedLedger {
+    pub(super) name: String,
+    /// `None` when the row carries none: the coverage proof refuses it there,
+    /// and a rate read that asks for no proof is not stopped by it.
+    pub(super) guid: Option<String>,
+    pub(super) parent: Option<String>,
+}
+
+/// [`parse_ledger_rates`], and with it the identity of every row the answer
+/// holds, in answer order: a scoped read is only believed when those rows are
+/// exactly the scope's (#1331). Every row is named: a row with no name fails
+/// the read (`invoice_ledger_rates_row_unnamed`) before it is listed, so the
+/// list never holds a row the proof cannot match by name.
+pub(super) fn parse_ledger_rates_and_rows(
+    xml: &str,
+    company_guid: &str,
+    wanted: &[&str],
+) -> Result<(BTreeMap<String, LedgerRateRow>, Vec<ListedLedger>), &'static str> {
     let envelope = parse_tree(xml)?;
     let body = envelope
         .all("BODY")
@@ -1059,6 +1122,7 @@ pub(super) fn parse_ledger_rates(
         return Err("invoice_ledger_rates_listing_empty");
     }
     let mut out = BTreeMap::new();
+    let mut listed = Vec::new();
     for ledger in collection.all("LEDGER") {
         let bound = ledger.text_of("BRIDGECOMPANYGUID");
         if !bound.is_ok_and(|guid| guid.is_some_and(|guid| guid.eq_ignore_ascii_case(company_guid)))
@@ -1070,6 +1134,11 @@ pub(super) fn parse_ledger_rates(
         let Some(name) = ledger.attributes.get("NAME").cloned() else {
             return Err("invoice_ledger_rates_row_unnamed");
         };
+        listed.push(ListedLedger {
+            name: name.clone(),
+            guid: ledger.text_of("GUID")?.filter(|guid| !guid.is_empty()),
+            parent: ledger.raw_text_of("PARENT")?,
+        });
         if !wanted.contains(&name.as_str()) {
             continue;
         }
@@ -1130,7 +1199,7 @@ pub(super) fn parse_ledger_rates(
             return Err("invoice_ledger_rates_name_repeated");
         }
     }
-    Ok(out)
+    Ok((out, listed))
 }
 
 // ---- The HSN/SAC check's two other reads (#691, W16, 12 Oct 2026) ----

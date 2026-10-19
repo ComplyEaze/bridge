@@ -35,7 +35,7 @@ impl Date {
         format!("{:04}-{:02}-{:02}", self.year, self.month, self.day)
     }
 
-    /// `DD-Mon-YYYY`, as the reference writes into a narration.
+    /// `DD-Mon-YYYY`, as the removed Python tool wrote it into a narration.
     pub fn narration(self) -> String {
         format!(
             "{:02}-{}-{:04}",
@@ -43,6 +43,33 @@ impl Date {
             MONTHS[usize::from(self.month - 1)],
             self.year
         )
+    }
+
+    /// The following calendar day; `None` past the last year a date can hold.
+    pub fn next_day(self) -> Option<Self> {
+        if self.day < days_in_month(self.year, self.month) {
+            Self::new(self.year, self.month, self.day + 1)
+        } else if self.month < 12 {
+            Self::new(self.year, self.month + 1, 1)
+        } else {
+            Self::new(self.year.checked_add(1)?, 1, 1)
+        }
+    }
+
+    /// The preceding calendar day; `None` before the first year a date can hold.
+    pub fn previous_day(self) -> Option<Self> {
+        if self.day > 1 {
+            Self::new(self.year, self.month, self.day - 1)
+        } else if self.month > 1 {
+            Self::new(
+                self.year,
+                self.month - 1,
+                days_in_month(self.year, self.month - 1),
+            )
+        } else {
+            let year = self.year.checked_sub(1)?;
+            Self::new(year, 12, 31)
+        }
     }
 
     /// Strict `YYYY-MM-DD`.
@@ -117,8 +144,7 @@ pub fn parse_day_month_name_year(text: &str) -> Option<Date> {
     )
 }
 
-/// `DD-MM-YYYY`, Union Bank's form. It has no Python reference, so it is
-/// strict rather than strptime-shaped: two-digit day and month, four-digit
+/// `DD-MM-YYYY`, Union Bank's form. It is strict rather than strptime-shaped: two-digit day and month, four-digit
 /// year, nothing left over.
 pub fn parse_day_month_year_hyphenated(text: &str) -> Option<Date> {
     static PATTERN: LazyLock<Regex> =
@@ -131,8 +157,7 @@ pub fn parse_day_month_year_hyphenated(text: &str) -> Option<Date> {
     )
 }
 
-/// `DD/MM/YYYY`, the form on the measured Bank of Baroda statements. It has no Python reference, so it is
-/// strict rather than strptime-shaped: two-digit day and month, four-digit
+/// `DD/MM/YYYY`, the form on the measured Bank of Baroda statements. It is strict rather than strptime-shaped: two-digit day and month, four-digit
 /// year, nothing left over.
 pub fn parse_day_month_year_slashed(text: &str) -> Option<Date> {
     static PATTERN: LazyLock<Regex> =

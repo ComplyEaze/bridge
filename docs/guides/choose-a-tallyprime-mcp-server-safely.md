@@ -52,7 +52,7 @@ and this page does not rank them.
 | Ask Claude about a client's books | TallyPrime MCP plug-in for Claude Desktop: tools in six groups (company, master, accounting, inventory, outstanding and transaction), as described on [Tally's tools page](https://help.tallysolutions.com/tallyprime-mcp-tools/) (last updated 18 September 2026) | Read tools for companies, the trial balance, outstandings with ageing, vouchers, ledger movement, the purchase and sales registers and stock values; it changes nothing in TallyPrime unless you turn posting on |
 | Bank statements | TallyPrime's Bank Statement import, in the formats Tally lists for each bank ([Tally's list of supported banks](https://help.tallysolutions.com/list-of-banks-supported-by-tallyprime-for-e-payments-auto-brs-and-cheque-formats/)) | Reads a client's statement in a supported layout (the README lists them) into Payment, Receipt and Contra vouchers as a file you import yourself, and can read the batch back; the whole path has not yet been recorded end to end against TallyPrime |
 
-Where ComplyEaze Bridge is behind: three banks' statement layouts; no stock quantities; not yet
+Where ComplyEaze Bridge is behind: three banks' statement layouts; stock quantities only where Tally's Stock Summary shows the item on its own line; not yet
 code-signed; and a short list of runs against a real TallyPrime (the README
 lists each run).
 
@@ -65,12 +65,15 @@ ComplyEaze Bridge is our TallyPrime MCP server for Claude Desktop. In short:
   party and ledger names and bank account numbers or drop narrations; it does
   not hide amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration
   numbers, contact details or references, or the last four digits of a bank statement's account number.
-- Posting is off by default for a new install; an earlier version may have
-  saved it on, so check the setting. When it is on, each voucher waits for your
-  approval in a separate ComplyEaze Bridge window. No ComplyEaze Bridge tool can
+- Posting is off by default. It is a new setting: if you turned posting on in
+  an earlier version, turn it on again. When it is on, each post (one voucher,
+  or a saved batch of up to 50) waits for your approval in a separate
+  ComplyEaze Bridge window. No ComplyEaze Bridge tool can
   approve it for you, but software that controls your screen could click the
-  window, so do not let it. It cannot undo a posted voucher; you correct it in
-  TallyPrime.
+  window, so do not let it. On Windows the window also takes the keyboard: in
+  one test a typed y approved it while Tally was in front (#1780). When you ask
+  for a post, stop typing in Tally until you have answered it with the mouse. It
+  cannot undo a posted voucher; you correct it in TallyPrime.
 - It connects only to a loopback address on your own computer. If you forward
   that port to a virtual machine or another machine, the traffic follows your
   forward, and ComplyEaze Bridge cannot tell.

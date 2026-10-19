@@ -16,8 +16,7 @@ fn settings(data_dir: &Path) -> Settings {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: Posting::On,
     }
 }
 
@@ -332,7 +331,10 @@ fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
         format!("${{user_config.{key}}}")
     );
     // Posting keeps its own separate setting; accepting the Terms above covers the whole Terms.
-    assert_eq!(manifest["user_config"]["enable_writes"]["default"], false);
+    assert_eq!(
+        manifest["user_config"]["enable_posting_2026_10"]["default"],
+        false
+    );
     // No setting is required, the accept-terms one included. Claude Desktop builds no launch
     // command while a required setting has no stored value, and an update that renames the
     // setting for new terms leaves it with none, so the program would never run to refuse
@@ -363,7 +365,7 @@ fn the_published_terms_carry_the_version_this_build_asks_for_and_the_section_the
     );
     let manifest: Value =
         serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
-    let posting = manifest["user_config"]["enable_writes"]["description"]
+    let posting = manifest["user_config"]["enable_posting_2026_10"]["description"]
         .as_str()
         .unwrap();
     assert!(

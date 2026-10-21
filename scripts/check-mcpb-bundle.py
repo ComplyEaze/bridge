@@ -428,6 +428,16 @@ def smoke(archive, repository):
                 and set(enabled_names) == expected_tools(enabled_environment)
                 and set(enabled_names) - set(names) == POSTING_TOOLS,
                 "opt_in_tools_mismatch")
+        # The tax-audit switch, run on the packaged binary: it adds that one tool and nothing else.
+        audit_environment = dict(environment, BRIDGE_AGENT_ENABLE_TAX_AUDIT="true")
+        audit_output, _ = run_bounded([command], catalogue_payload, audit_environment)
+        audit_replies = [json.loads(line) for line in audit_output.splitlines()]
+        require([reply.get("id") for reply in audit_replies] == [1, 2], "audit_opt_in_response_ids")
+        audit_names = [tool["name"] for tool in audit_replies[1]["result"]["tools"]]
+        require(len(audit_names) == len(expected_tools(audit_environment))
+                and set(audit_names) == expected_tools(audit_environment)
+                and set(audit_names) - set(names) == AUDIT_TOOLS,
+                "audit_opt_in_tools_mismatch")
         schema = replies[2]["result"]
         require(schema.get("isError") is False
                 and schema["structuredContent"]["result"]["schema"]["type"] == "object"

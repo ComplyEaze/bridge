@@ -81,7 +81,7 @@
     "enable_tax_audit_2026_10": {
       "type": "boolean",
       "title": "Allow tax-audit test runs (audit_test_run)",
-      "description": "Off by default. When on, ComplyEaze Bridge offers one tool, audit_test_run, that reads a company's whole year of books for FY 2025-26 (many requests, one at a time) and runs one tax-audit test on them, today only the cash share against the s.44AB(a) limit. It writes nothing to Tally. Its figures go to your AI provider like any read, and it is refused while a redaction setting is on. Books only, not a tax opinion.",
+      "description": "Off by default. When on, ComplyEaze Bridge offers one tool, audit_test_run, that reads a company's books for the period you name inside FY 2025-26 (every voucher of the period, many requests, one at a time) and runs one tax-audit test on them, today only the cash share against the s.44AB(a) limit. It writes nothing to Tally. Its figures go to your AI provider like any read, and it is refused while a redaction setting is on. Books only, not a tax opinion.",
       "default": false
     }
   }

@@ -90,8 +90,7 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
         run: |
           set -euo pipefail
-          if [[ "$RUNNER_OS" == "Windows" ]]; then python_command=python; else python_command=python3; fi
-          "$python_command" scripts/fetch-pdfium.py --platform "$PLATFORM" --dest "$RUNNER_TEMP/mcpb-pdfium"
+          node scripts/fetch-pdfium.mjs --platform "$PLATFORM" --dest "$RUNNER_TEMP/mcpb-pdfium"
       # bridge#583: the released binary must not hold the test-only approval
       # seam. package-mcpb.mjs refuses it as well; this names the exact file.
       - name: Prove the release binary lacks the test-only approval seam

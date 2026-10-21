@@ -111,7 +111,7 @@ jobs:
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.py$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes\.py$|retain-macos-test-binaries\.py$))' <<< "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.mjs$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes\.py$|retain-macos-test-binaries\.py$))' <<< "$changed_files"; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
@@ -125,7 +125,7 @@ jobs:
           fi
 
           # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.
-          if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.py|capture-package-log(\.test)?\.py|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.py|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
           else
             echo 'bundle=false' >> "$GITHUB_OUTPUT"
@@ -277,7 +277,7 @@ jobs:
       - run: node --test scripts/check-conflict-markers.test.mjs
       - run: python3 scripts/collect-macos-test-crashes.test.py
       - run: python3 scripts/retain-macos-test-binaries.test.py
-      - run: python3 scripts/fetch-pdfium.test.py
+      - run: node --test scripts/fetch-pdfium.test.mjs
       - run: python3 scripts/merge-gate.test.py
       - run: python3 scripts/surface_coverage_report.test.py
 
@@ -490,7 +490,7 @@ jobs:
       - name: Fetch pinned PDFium
         shell: bash
         run: >-
-          "$(command -v python3 || command -v python)" scripts/fetch-pdfium.py
+          node scripts/fetch-pdfium.mjs
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/pdfium" --github-env "$GITHUB_ENV"
       # Nine tests, selected on the workspace build above and run on both systems: in
@@ -703,12 +703,12 @@ jobs:
           node scripts/check-macos-bundle-resources.mjs
           node scripts/check-macos-bundle-resources.mutation.mjs
       # parse_bank_statement loads PDFium from beside bridge_mcp, so the bundle
-      # carries the pinned build. fetch-pdfium.py verifies the archive, the
+      # carries the pinned build. fetch-pdfium.mjs verifies the archive, the
       # library and the licence notice it writes against the lock before use.
       - name: Fetch pinned PDFium for the MCPB
         shell: bash
         run: >-
-          "$(command -v python3 || command -v python)" scripts/fetch-pdfium.py
+          node scripts/fetch-pdfium.mjs
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/mcpb-pdfium"
       # tauri build uses --bins, including the auto-discovered bridge_mcp.

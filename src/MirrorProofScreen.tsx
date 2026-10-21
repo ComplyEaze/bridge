@@ -177,7 +177,7 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
   },
   rejected_snapshot_records: {
     title: "Source records were rejected",
-    action: "Some source records were rejected while this run was being read, so they are not in the local mirror. The proof facts and the support export keep the count. Inspect the support export for this run before relying on the mirror; an unchanged retry is not expected to help.",
+    action: "Some source records were rejected while this run was being read, so they are not in the local mirror. Do not rely on the mirror for this run's records until the cause of the rejection is understood; an unchanged retry is not expected to help.",
     retry: "not_useful",
   },
   adaptive_window_limit_reached: {
@@ -382,7 +382,7 @@ export function MirrorProofScreen({
           <h2>{latestProof ? `${formatIdentifier(latestProof.outcome)} · ${formatIdentifier(latestProof.verification_state)} ${formatIdentifier(latestProof.pack_id)} attempt` : "No durable Core Accounting run receipt yet"}</h2>
           <p>
             {latestProof
-              ? `Within this run's declared Core Accounting scope, ComplyEaze Bridge persisted ${latestProof.accepted_records} provenance-backed accepted canonical rows, ${latestProof.provenance_unavailable_records} canonical rows with an explicit provenance-unavailable gap. These are not Tally source-total counts. ${latestProof.gap_codes.length} declared gap(s) and ${latestProof.warning_codes.length} warning(s).`
+              ? `Within this run's declared Core Accounting scope, ComplyEaze Bridge persisted ${latestProof.accepted_records} provenance-backed accepted canonical rows and ${latestProof.provenance_unavailable_records} canonical rows with an explicit provenance-unavailable gap. These are not Tally source-total counts. ${latestProof.gap_codes.length} declared gap(s) and ${latestProof.warning_codes.length} warning(s).`
               : "Endpoint reachability and fetched preview rows do not establish a Verified accounting state."}
           </p>
         </div>

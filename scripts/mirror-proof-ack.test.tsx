@@ -288,7 +288,8 @@ test("the proof screen shows no rejected-row count and names the rejected-record
   const cells = [...host.querySelectorAll("td")].map((cell) => cell.textContent);
   expect(cells).toContain("7");
   expect(cells).toContain("Source records were rejected");
-  expect(text).toContain("Inspect the support export for this run before relying on the mirror");
+  expect(text).toContain("Do not rely on the mirror for this run's records until the cause of the rejection is understood");
+  expect(text).toMatch(/accepted canonical rows and \d+ canonical rows/);
   await act(async () => root.unmount());
   host.remove();
 });

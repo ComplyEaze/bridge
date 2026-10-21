@@ -4,6 +4,10 @@
     {
       "uuid": "00000000-0000-4000-8000-000000000002",
       "note": "hand-made sentinel: zero prefix with the version-4 and variant bits set, the company identifier of the Rust import-post tests' own synthetic company; already in many tracked test files"
+    },
+    {
+      "uuid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+      "note": "company identifier of the synthetic lab company BRIDGE SHAPE LAB: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-company-extent.utf16le.xml on master (added in f68c43e4b81ff87766cce0373470337497fe3830, #1185) names it BRIDGE SHAPE LAB beside this GUID; the group identifiers in captures of that company are this value with a suffix"
     }
   ]
 }

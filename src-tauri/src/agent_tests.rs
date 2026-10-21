@@ -628,6 +628,63 @@ fn a_read_deadline_is_named_rather_than_collapsed_into_the_generic_failure() {
 }
 
 #[test]
+fn a_refusal_for_a_book_that_changed_during_the_read_says_to_run_it_again() {
+    // Every code the change-during-read refusals use, as a code and as a cause (#1633). A new
+    // arm that is not on this list, or one dropped from the match, fails here by name.
+    for code in [
+        "voucher_window_changed_during_read",
+        "native_ledger_extent_changed",
+        "party_ledger_extent_changed",
+        "company_book_extent_changed",
+        "company_features_extent_changed",
+        "currency_extent_changed",
+        "currency_to_master_extent_changed",
+        "masters_extent_changed",
+        "month_register_extent_changed",
+        "stock_summary_extent_changed",
+    ] {
+        let step = refusal_remediation(code).unwrap_or_else(|| panic!("{code} has no next step"));
+        assert!(
+            step.contains("run the same request again once"),
+            "{code}: {step}"
+        );
+        assert!(step.contains("books changed in Tally"), "{code}: {step}");
+        // Through a shared operation code, the cause carries it.
+        assert_eq!(
+            remediation_for("native_outstandings_read_failed", Some(code)),
+            Some(step),
+            "{code}"
+        );
+    }
+    // The connection's own vocabulary is the source of the extent codes: each extent refusal it
+    // can raise has the advice.
+    use crate::tally::connection::PairedReadValidationError as Paired;
+    for refusal in [
+        Paired::NativeLedgerExtent,
+        Paired::PartyLedgerExtent,
+        Paired::CompanyBookExtent,
+        Paired::CompanyFeaturesExtent,
+        Paired::CurrencyExtent,
+        Paired::CurrencyToMasterExtent,
+        Paired::MastersExtent,
+        Paired::MonthRegisterExtent,
+        Paired::StockSummaryExtent,
+    ] {
+        let code = refusal.safe_code();
+        assert!(code.ends_with("_extent_changed"), "{code}");
+        assert!(
+            refusal_remediation(code).is_some(),
+            "{code} has no next step"
+        );
+    }
+    let snapshot = refusal_remediation("listing_snapshot_changed").expect("a next step");
+    assert!(
+        snapshot.contains("from the first page, without snapshot_id"),
+        "{snapshot}"
+    );
+}
+
+#[test]
 fn ledger_master_fields_reject_unknown_schema_values() {
     assert_eq!(
         ledger_master_fields("complaince"),

@@ -1,0 +1,11 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_headline.rs
+src-tauri/src/agent_statements.rs
+src-tauri/src/reports/statements.rs
+src-tauri/src/reports/statements_tests.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/runtime_trial_balance.rs
+src-tauri/src/tally/runtime_trial_balance_tests.rs
+reviewer: lamemustafa

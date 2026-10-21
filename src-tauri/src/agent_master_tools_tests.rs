@@ -1633,7 +1633,9 @@ fn the_readme_and_the_tool_description_carry_the_corrected_sentences() {
         "never retry",
         "never create the ledger in Tally by hand",
         "never rebuild or resend a sent batch",
-        "docs/agent/README.md",
+        "agent guide",
+        "make sure Tally is idle",
+        "never send the batch again",
     ] {
         assert!(description.contains(named), "description: {named}");
     }

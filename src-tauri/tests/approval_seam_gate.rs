@@ -1005,7 +1005,8 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
 const MASTERS_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
 fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
+        MB_YESNOCANCEL,
     };
     // As for the post dialog: No is the default, Escape and close are Cancel.
     if count != ONE_ITEM {
@@ -1020,7 +1021,11 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND,
+            // Topmost: a window the connector opens while Tally fills the
+            // screen is otherwise drawn behind it, since a background
+            // process may not take the foreground (#1589). It changes only
+            // the drawing order; No stays the default button.
+            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }
 }"#;

@@ -1,6 +1,5 @@
 use crate::{
-    CapabilityPackId, PackSchemaVersion, ReadWindow, SourceIdentity, TallyDate,
-    TallyError,
+    CapabilityPackId, PackSchemaVersion, ReadWindow, SourceIdentity, TallyDate, TallyError,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
@@ -10,10 +9,6 @@ const MAX_CANONICAL_TEXT_BYTES: usize = 512;
 const MAX_SOURCE_ID_BYTES: usize = 512;
 const MAX_ALTER_ID_BYTES: usize = 128;
 
-/// A structurally valid GSTIN-shaped identifier observed from Tally.
-///
-/// This type does not claim that the registration exists, is active, belongs to the company, or
-/// passed an external GST portal lookup; those are separate evidence states.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(transparent)]
 pub struct CanonicalText(String);

@@ -14,6 +14,7 @@ merge operation is used.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import importlib.util
 import json
 import os
@@ -663,6 +664,222 @@ class MergeGateControls(unittest.TestCase):
             extra_args=("--binary-review-sha", HEAD),
         )
 
+    # -- The lab-capture manifest: scripts/merge-gate-lab-captures.json on master ---------------------------------------
+    LAB_PATH = "scripts/merge-gate-lab-captures.json"
+    LAB_BLOB = "3b18e512dba79e4c8300dd08aeb37f8e728b8dad"
+    LAB_BLOB_OFF = "3b18e512dba79e4c8300dd08aeb37f8e728b8dae"
+    OTHER_BLOB = "9f2b1c4e7a6d03581e4c2b7a9d0f3e5c6b8a1d24"
+    ATTEST = "1 binary addition/change(s) require the owner's own --binary-review-sha attestation"
+    LAB_BYTES = b"lab capture bytes\n"
+    LAB_SHA256 = hashlib.sha256(LAB_BYTES).hexdigest()
+    LISTED_OK = "1 binary capture(s) are listed, path and blob, in the owner-approved lab-capture manifest on master, and their size and sha256 match: docs/new.png"
+    LAB_NOT_VALID = "lab-capture manifest not applied: it is not valid"
+
+    def lab_entry(self, path="docs/new.png", blob=None, **override):
+        entry = {"blob": blob or self.LAB_BLOB, "capture_id": "sitting-1/answer-1", "company": "Lab Co", "lab_ref": "lab/sitting-1@abc",
+                 "path": path, "seed_basis": "built from scratch in the lab", "sha256": self.LAB_SHA256, "size": len(self.LAB_BYTES)}
+        entry.update(override)
+        return entry
+
+    def lab_manifest(self, *entries, **override):
+        document = {"schema_version": 1, "entries": list(entries)}
+        document.update(override)
+        return json.dumps(document)
+
+    def test_a_listed_binary_needs_no_attestation(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn("lab-capture manifest: 1 listed capture(s) (blob ", result.stdout)
+        self.assertNotIn("--binary-review-sha attestation", result.stdout)
+
+    def test_a_listed_binary_in_a_renamed_file_is_judged_by_its_new_path(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            self.assert_pass("binary-renamed", self.LISTED_OK)
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(path="docs/old.png"))}):
+            self.assert_blocked("binary-renamed", self.ATTEST)
+
+    def test_a_blob_one_character_different_is_not_listed(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_blocked("binary-one-char-off", self.ATTEST)
+        self.assertIn("first 8 at most: docs/new.png", result.stdout)
+        self.assertNotIn("binary capture(s) are listed", result.stdout)
+
+    def test_a_listed_blob_at_a_different_path_is_not_listed(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_blocked("binary-other-path", self.ATTEST)
+        self.assertIn("first 8 at most: docs/other.png", result.stdout)
+        self.assertNotIn("binary capture(s) are listed", result.stdout)
+
+    def test_a_pointer_to_a_lab_branch_and_commit_in_the_pull_request_body_is_ignored(self):
+        # Nothing reads a lab branch at gate time; only the manifest on master lists a binary, and it does not list this one.
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest()}):
+            self.assert_blocked("binary-body-pointer", self.ATTEST)
+
+    def test_a_pull_requests_own_manifest_edit_does_not_apply_to_its_own_run(self):
+        # master lists nothing; the checkout (and so any pull request's branch) lists the capture
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest()},
+                               hidden_edits={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            self.assert_blocked("binary-and-manifest-edit", self.ATTEST)
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest()},
+                               hidden_edits={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_blocked("binary-and-manifest-edit", "the merge is the owner's own act")
+        self.assertNotIn("binary capture(s) are listed", result.stdout)
+
+    def test_a_pull_request_that_edits_the_manifest_is_the_owners_own_merge(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest()}):
+            self.assert_blocked("changes-the-lab-manifest", "the merge is the owner's own act")
+
+    def test_a_force_moved_or_deleted_lab_branch_does_not_matter_because_bytes_not_branches_are_listed(self):
+        # The owner listed the bytes (path and blob) when he merged the manifest; the gate never resolves lab_ref, so a lab
+        # branch that is moved to other history, or deleted, changes nothing.
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(lab_ref="lab/sitting-1@" + "a" * 40))}):
+            self.git_in_repo("push", "-q", "-f", "origin", "HEAD:refs/heads/lab/sitting-1")
+            self.git_in_repo("commit", "-q", "--allow-empty", "-m", "other history")
+            self.git_in_repo("push", "-q", "-f", "origin", "HEAD:refs/heads/lab/sitting-1")
+            self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+            self.git_in_repo("push", "-q", "origin", "--delete", "lab/sitting-1")
+            self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+
+    def test_a_blob_that_exists_only_locally_and_is_not_in_the_manifest_is_not_listed(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(path="docs/other.png", blob=self.OTHER_BLOB))}):
+            result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
+        self.assertIn("first 8 at most: docs/new.png", result.stdout)
+        self.assertIn("lab-capture manifest: 1 listed capture(s)", result.stdout)
+
+    def test_one_listed_and_one_unlisted_binary_block_and_name_the_unlisted_one(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_blocked("binary-listed-and-unlisted", self.ATTEST)
+        self.assertIn(self.LISTED_OK, result.stdout)
+        self.assertIn("first 8 at most: docs/extra.bin)", result.stdout)
+        self.assertNotIn("first 8 at most: docs/new.png", result.stdout)
+
+    def test_the_unlisted_one_can_still_be_attested_beside_a_listed_one(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_pass("binary-listed-and-unlisted", self.LISTED_OK, extra_args=("--binary-review-sha", HEAD))
+        self.assertIn("1 binary addition/change(s) have the owner's current-head binary review attestation", result.stdout)
+
+    def test_a_removed_binary_is_never_listed_by_the_manifest(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_blocked("binary-removed", self.ATTEST)
+        self.assertNotIn("binary capture(s) are listed", result.stdout)
+
+    def test_a_missing_or_malformed_rest_blob_id_lists_nothing(self):
+        for scenario in ("binary-no-rest-sha", "binary-malformed-rest-sha"):
+            with self.subTest(scenario=scenario), self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+                result = self.assert_blocked(scenario, self.ATTEST)
+                self.assertNotIn("binary capture(s) are listed", result.stdout)
+
+    def test_a_listed_entry_whose_sha256_differs_from_the_blobs_bytes_is_not_exempt(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(sha256="0" * 64))}):
+            result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
+        self.assertIn("listed capture 'docs/new.png' not exempt: its bytes differ from the size or sha256 in the manifest", result.stdout)
+        self.assertNotIn("binary capture(s) are listed", result.stdout)
+
+    def test_a_listed_entry_whose_size_differs_from_the_blobs_bytes_is_not_exempt(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(size=len(self.LAB_BYTES) + 1))}):
+            result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
+        self.assertIn("not exempt: its bytes differ from the size or sha256 in the manifest", result.stdout)
+
+    def test_a_failed_blob_request_is_told_apart_from_differing_bytes_and_exempts_nothing(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_blocked("binary-blob-fails", self.ATTEST)
+        self.assertIn("listed capture 'docs/new.png' not exempt: could not check its bytes (the blob request failed)", result.stdout)
+        self.assertNotIn("bytes differ", result.stdout)
+        self.assertNotIn("binary capture(s) are listed", result.stdout)
+
+    def test_a_blob_answer_that_is_malformed_not_base64_or_has_a_wrong_size_field_exempts_nothing(self):
+        for scenario in ("binary-blob-malformed", "binary-blob-not-base64", "binary-blob-size-field-differs"):
+            with self.subTest(scenario=scenario), self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+                result = self.assert_blocked(scenario, self.ATTEST)
+                self.assertIn("not exempt: could not check its bytes (the blob answer was malformed)", result.stdout)
+                self.assertNotIn("binary capture(s) are listed", result.stdout)
+
+    def test_a_path_that_looks_like_a_number_is_compared_as_text(self):
+        # awk compares number-like strings as numbers: "100" would equal "1e2"
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(path="1e2"))}):
+            self.assert_pass("binary-numeric-path", "1 binary capture(s) are listed")
+            result = self.assert_blocked("binary-numeric-path-lookalike", self.ATTEST)
+        self.assertIn("first 8 at most: 100)", result.stdout)
+        self.assertNotIn("binary capture(s) are listed", result.stdout)
+
+    def test_an_empty_manifest_lists_nothing(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest()}):
+            result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
+        self.assertIn("lab-capture manifest: 0 listed capture(s)", result.stdout)
+
+    def test_no_manifest_on_master_lists_nothing_and_says_nothing(self):
+        result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
+        self.assertNotIn("lab-capture manifest", result.stdout)
+
+    def test_an_invalid_manifest_is_not_applied_and_says_so(self):
+        good = self.lab_entry()
+        without = lambda key: {k: v for k, v in good.items() if k != key}
+        cases = [
+            ("not an object", json.dumps([good])),
+            ("wrong schema version", self.lab_manifest(good, schema_version=2)),
+            ("an extra top-level key", self.lab_manifest(good, extra=1)),
+            ("entries not an array", json.dumps({"schema_version": 1, "entries": {}})),
+            ("an entry that is not an object", self.lab_manifest("docs/new.png")),
+            ("an extra entry key", self.lab_manifest(self.lab_entry(extra="x"))),
+            ("a missing entry key", self.lab_manifest(without("seed_basis"))),
+            ("an empty path", self.lab_manifest(self.lab_entry(path=""))),
+            ("a path with a control character", self.lab_manifest(self.lab_entry(path="docs/new\u0001.png"))),
+            ("a path with a C1 control", self.lab_manifest(self.lab_entry(path="docs/new\u0085.png"))),
+            ("a path with a zero-width space", self.lab_manifest(self.lab_entry(path="docs/new\u200b.png"))),
+            ("a path with a right-to-left mark", self.lab_manifest(self.lab_entry(path="docs/new\u200f.png"))),
+            ("a path with a bidi override", self.lab_manifest(self.lab_entry(path="docs/new\u202e.png"))),
+            ("a path with a bidi isolate", self.lab_manifest(self.lab_entry(path="docs/new\u2066.png"))),
+            ("a path with a byte-order mark", self.lab_manifest(self.lab_entry(path="docs/new\ufeff.png"))),
+            ("a path with a newline", self.lab_manifest(self.lab_entry(path="docs/new.png\n"))),
+            ("an absolute path", self.lab_manifest(self.lab_entry(path="/docs/new.png"))),
+            ("a path that climbs", self.lab_manifest(self.lab_entry(path="../docs/new.png"))),
+            ("a path that is not a string", self.lab_manifest(self.lab_entry(path=5))),
+            ("an uppercase blob", self.lab_manifest(self.lab_entry(blob=self.LAB_BLOB.upper()))),
+            ("a short blob", self.lab_manifest(self.lab_entry(blob=self.LAB_BLOB[:39]))),
+            ("a blob with a trailing newline", self.lab_manifest(self.lab_entry(blob=self.LAB_BLOB + "\n"))),
+            ("an uppercase sha256", self.lab_manifest(self.lab_entry(sha256="E" * 64))),
+            ("a sha256 with a trailing newline", self.lab_manifest(self.lab_entry(sha256="e" * 64 + "\n"))),
+            ("a short sha256", self.lab_manifest(self.lab_entry(sha256="e" * 63))),
+            ("a negative size", self.lab_manifest(self.lab_entry(size=-1))),
+            ("a fractional size", self.lab_manifest(self.lab_entry(size=1.5))),
+            ("a size that is text", self.lab_manifest(self.lab_entry(size="3"))),
+            ("a blank capture_id", self.lab_manifest(self.lab_entry(capture_id="  "))),
+            ("a blank company", self.lab_manifest(self.lab_entry(company=""))),
+            ("a blank lab_ref", self.lab_manifest(self.lab_entry(lab_ref=" "))),
+            ("a blank seed_basis", self.lab_manifest(self.lab_entry(seed_basis=""))),
+            ("a company that is not text", self.lab_manifest(self.lab_entry(company=None))),
+            ("a duplicate path", self.lab_manifest(self.lab_entry(), self.lab_entry(blob=self.OTHER_BLOB))),
+            ("over 1000 entries", self.lab_manifest(*[self.lab_entry(path=f"docs/{n}.png") for n in range(1001)])),
+            ("not JSON", "{"),
+        ]
+        for name, text in cases:
+            with self.subTest(case=name), self.master_state(tracked={self.LAB_PATH: text}):
+                result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
+                self.assertIn(self.LAB_NOT_VALID, result.stdout)
+                self.assertNotIn("binary capture(s) are listed", result.stdout)
+
+    def test_a_manifest_that_is_a_symbolic_link_is_not_applied(self):
+        with self.master_state(tracked={"scripts/real-captures.json": self.lab_manifest(self.lab_entry())}, symlinks={self.LAB_PATH: "real-captures.json"}):
+            result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
+            self.assertIn("lab-capture manifest not applied: it is not a regular file", result.stdout)
+        # a link whose target text is itself a valid manifest
+        with self.master_state(symlinks={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
+            self.assertIn("lab-capture manifest not applied: it is not a regular file", result.stdout)
+
+    def test_a_manifest_that_is_only_valid_once_a_nul_byte_is_dropped_is_not_applied(self):
+        # A shell variable would drop the NUL and read this as valid; the bytes go straight into jq instead.
+        text = self.lab_manifest(self.lab_entry()).replace("built from scratch", "built\0 from scratch")
+        self.assertIn("\0", text)
+        with self.master_state(tracked={self.LAB_PATH: text}):
+            result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
+            self.assertIn(self.LAB_NOT_VALID, result.stdout)
+
+    def test_the_manifest_on_master_is_used_not_a_different_file_in_the_checkout(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())},
+                               hidden_edits={self.LAB_PATH: self.lab_manifest()}):
+            self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+
     # -- The owner's merge verdict (spec v3) ------------------------------------
 
     VERDICT_PASS = "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head"
@@ -749,7 +966,7 @@ class MergeGateControls(unittest.TestCase):
 
     def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
         for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away",
-                         "changes-the-registry", "changes-the-registry-in-another-case", "changes-the-review-tier"):
+                         "changes-the-registry", "changes-the-registry-in-another-case", "changes-the-review-tier", "changes-the-lab-manifest"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "the merge is the owner's own act")
 

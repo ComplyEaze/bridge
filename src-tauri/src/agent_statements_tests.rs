@@ -558,7 +558,7 @@ async fn a_flags_read_that_does_not_bind_to_the_company_declines_the_figure_and_
 ) {
     // The flags answer names another company: the read is not a failed
     // statement, the book is simply not shown integrated.
-    let flags = inventory_flags("Yes").replace(GUID, "00000000-0000-4000-8000-000000000001");
+    let flags = inventory_flags("Yes").replace(GUID, "00000000-0000-4000-8000-000000000002");
     let (response, sent, expected) = call("profit_and_loss", stock_plans(flags)).await;
     let result = result(&response);
     assert_eq!(sent, expected);

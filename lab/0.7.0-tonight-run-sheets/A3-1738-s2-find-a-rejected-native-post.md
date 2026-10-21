@@ -1,0 +1,15 @@
+# A3 (#1738 slice 2): is there any way, after Bridge's own checks pass, to make Tally answer a native post with CREATED=0 and one exception per voucher?
+WHY: #1738 wants a route to release the rows of a "rejected send". No trigger is known on master: numbering refusals stop the obvious one before anything is sent. Without a real trigger there is nothing to design against, and nothing may be built (P1). This run LOOKS for one; a result of "none found in these 4 tries" is a valid and useful outcome.
+COMPANY: BRIDGE REJECT LAB (new). It holds a bank ledger, a party ledger under Sundry Debtors, the Receipt voucher type on Automatic numbering with 'retain existing numbers' on. The company is NEW: if a company or a data folder of this name already exists on the PC, STOP and report it; never reuse or overwrite one. Create it with books beginning 1 April 2025, then take backup BK1 into a NEW empty folder (name, size, sha256) before the first keying; BK1 is the state to restore. Licensed mode only.
+MODE: B or A. Posting ON (owner types).
+STEPS (each is ONE post of ONE voucher; after each: `verify_import`, `vouchers` on its day, `tally_status` marks, and record the full result before the next try; stop at the first try that gives the target answer):
+1. Try T1: a Receipt whose party ledger exists, then THE COORDINATOR renames that ledger on the Tally screen between `build_import_xml` and `post_import`'s approval (the approval window must stay open while the coordinator renames; if the window blocks the screen, skip T1 and say so).
+2. Try T2: a Receipt dated on the last day of the book's financial year +1 (outside the books' period) built through the tools; if Bridge refuses it at build, record the refusal text and move on.
+3. Try T3: the voucher type is made inactive on the screen between build and post.
+4. Try T4: the bank ledger's Maintain Balances / bill-wise setting is changed on the screen between build and post (any single setting change the coordinator judges could make Tally reject an import).
+EXPECT per try: record the post result code, the Tally counters Bridge reports (CREATED, ALTERED, ERRORS, EXCEPTIONS, IGNORED as the result shows them), and whether the voucher exists afterwards.
+TARGET ANSWER = a post answered by Tally with CREATED=0 AND one exception per voucher, nothing created, no mark moved.
+If a try produces the target: re-read vouchers and marks at +10 minutes and again after the coordinator restarts Tally (restart on the run coordinator's word). PASS (for the design) = the vouchers stay absent and the marks unmoved in every read.
+If NO try produces it: report "no trigger found in T1-T4" with each try's result; do not improvise further tries.
+STOP RULES: any dialog before a call; an answer where the voucher WAS created (record whole; restore BK1 on the run coordinator's RESTORE, do not post again); any marks moved by a try that reports nothing created (report as an anomaly at once).
+Evidence delivered whole to the evidence folder the run coordinator names.

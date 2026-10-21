@@ -29,3 +29,8 @@ answers/ans-b3-company-features.xml | 5812 | 35b48831d16fe1869b9d3b2f10b22a8291f
 # The company-features answer reports ISINTEGRATED Yes (ISINVENTORYON Yes, ISACCOUNTINGON Yes, ISBILLWISEON Yes, ISBATCHWISEON No, ISGSTON Yes).
 # Parsing note: the trial balance answer carries 1 character reference &#4; and the groups answer 30 of them plus 82 raw U+0003
 # characters (in PARENTSTRUCTURE); a strict XML 1.0 parser rejects both, so they were stripped before parsing, never in the saved bytes.
+#
+# Step 2c addition: one more production request text from the same commit and fixtures folder, sent once to BRIDGE TIEOUT B loaded alone.
+answers/ans-b4-inventory-flags.xml | 4886 | c58d3ba017b17bc71120a6b0e61bdd58ad3f2181011120cd65eb06e2961b4b24 | requests/b4-inventory-flags.utf16le.xml (1638, 8f964258be6506b08782b87bb548871e3fa18b284213baf855428f71d44f210d) | company_inventory_flags_request.utf16le.xml (1640, 9af2b68b2f5373ccd685cf6bc4c9483d33bd959114012930498b1c442179a624) | BridgeCompanyBookExtentV2 (inventory flags) | - | - | company name BRIDGE SHAPE LAB -> BRIDGE TIEOUT B, and the GUID filter value -> d64eda55-da7c-4106-a171-3e3cb6cdd331
+# Finding: one COMPANY object: ISINVENTORYON Yes, ISINTEGRATED Yes, ISBATCHWISEON No, NUMSTOCKITEMS 3, NUMSTOCKCATEGORIES 0,
+# NUMGODOWNS 1, NUMUNITS 1, NUMLEDGERS 9, NUMGROUPS 28, NUMVOUCHERTYPES 33, ALTVCHID 3, ALTMSTID 218. No control characters in this answer.

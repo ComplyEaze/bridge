@@ -34,6 +34,14 @@ const RESULT_TOO_LARGE: &str = "audit_result_too_large";
 const RESULT_NOT_PROJECTABLE: &str = "audit_result_not_projectable";
 const AUDIT_TEST_REFUSED: &str = "audit_test_refused";
 const PERIOD_OUTSIDE_RULES: &str = "audit_period_outside_ay_2026_27";
+/// A group named as both cash and bank would count its ledgers twice over.
+const GROUPS_OVERLAP: &str = "audit_groups_overlap";
+/// The result's state: completed with every book check holding, or completed
+/// with at least one failed. A failed check can mean a figure leaves something
+/// out (a ledger with no master or no group chain, MAP-0 and MAP-1, counts as
+/// neither cash nor bank), so the state says so rather than `completed` alone.
+const STATE_COMPLETED: &str = "completed";
+const STATE_CHECKS_FAILED: &str = "completed_with_failed_book_checks";
 
 /// The financial year the vendored rules are for (assessment year 2026-27):
 /// the engine refuses any other year's rules, and a period outside this one
@@ -63,6 +71,14 @@ impl Server {
             cash_groups: group_list(args, "cash_groups")?,
             bank_groups: group_list(args, "bank_groups")?,
         };
+        if roles.cash_groups.iter().any(|cash| {
+            roles
+                .bank_groups
+                .iter()
+                .any(|bank| bank.trim().eq_ignore_ascii_case(cash.trim()))
+        }) {
+            return Err(GROUPS_OVERLAP.to_string().into());
+        }
         let (company, identity, prior) = self.verified_company(guid).await?;
         let config = self.tally_config();
         let audit = match read_audit_book(
@@ -220,8 +236,13 @@ fn project(dump: &Value) -> Result<Value, String> {
             *failed.entry(code.to_string()).or_default() += 1;
         }
     }
+    let state = if failed.is_empty() {
+        STATE_COMPLETED
+    } else {
+        STATE_CHECKS_FAILED
+    };
     Ok(json!({
-        "state": "completed",
+        "state": state,
         "test": pick(dump, &["test_id", "test_version", "rules_version"]),
         "population_note": dump["population_note_text"],
         "figures": figures

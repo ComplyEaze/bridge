@@ -750,16 +750,20 @@ request, and a part-year inside it is read and judged against the whole year's t
 
 The group lists are required and have no default: which groups hold cash and which hold bank accounts
 is for the user to say (`masters` with `kind=groups` lists the book's groups), and whether an overdraft
-group counts as a bank is a judgement for the user's accountant. A group left out is not counted.
+group counts as a bank is a judgement for the user's accountant. A group left out is not counted, and
+a group named in both lists is refused as `audit_groups_overlap`.
 
 The books are one read made for the call: the company's marks, the company object, the groups, the
 ledgers, the trial balance for the period, the voucher types and every voucher of the period (in as many
-parts as the period needs, at most 128), one request at a time, each between two checks that the same single company is loaded. The marks are read again at
-the end. The engine then checks the read as a whole (the company, the period, the marks, that the
+parts as the period needs, at most 128, after a census that counts the period's vouchers, sent for a
+book small enough for one request too), one request at a time, each between two checks that the same
+single company is loaded. The marks are read again at the end; a window the census did not count, such as
+a book that has never held a voucher, is refused as `audit_window_not_counted`. The engine then checks the read as a whole (the company, the period, the marks, that the
 voucher windows cover the period without a gap, that every count agrees) and refuses it by rule code if
 it does not hold. Nothing is written to disk, nothing is written to Tally, and the read is not kept.
 
-What comes back is `result.state` `completed`; `result.test`; `result.figures`, each with its `id`,
+What comes back is `result.state`: `completed`, or `completed_with_failed_book_checks` when at least one
+book check failed; `result.test`; `result.figures`, each with its `id`,
 `value` (an integer, or null when the figure has no value, such as a share of nothing), `unit` (`paise`,
 `bp`, `count` or `days`) and the test's fixed `definition_text`;
 `result.findings`, each with its `id`, `confidence` (`computed`, `indicative`, `needs_document` or
@@ -767,8 +771,9 @@ What comes back is `result.state` `completed`; `result.test`; `result.figures`, 
 fixed `title_text`, `limits_text` and `ask_client_text`; the test's `population_note`; and
 `book_checks`: the checks evaluated, and the code and count of each that failed. A failed book check
 means the books disagree with themselves somewhere (for example the vouchers do not add up to the trial
-balance for a ledger); the figures are still the books' figures, and the check is why to look before
-relying on them. No ledger, group, party or voucher name is returned, and the engine's evidence
+balance for a ledger), and a figure may then leave something out: a ledger without a master or without a
+chain of groups to a primary group (`MAP-0`, `MAP-1`) is in no group, so it counts as neither cash nor
+bank. Do not rely on the figures until the failed check is explained. No ledger, group, party or voucher name is returned, and the engine's evidence
 references and the subject and detail of a failed check are left out because they name them. A result
 past 64 figures or 32 findings is refused as `audit_result_too_large`, never cut short.
 
@@ -787,7 +792,8 @@ the engine's windows must tile the period by date), `BIND-GROUP-UNKNOWN` (a grou
 or `bank_groups` is not in the book: check the spelling against `masters` with `kind=groups`), the
 engine's other rule codes for a read it does not admit (`C1-...` to `C11-...`, `CFG-...`), and the
 tool's own: `audit_test_refused` (the test refused the book without a rule code), `audit_book_refused`,
-`audit_part_unparsable`, `audit_window_marks_missing`, `audit_window_row_count_differs` and
+`audit_part_unparsable`, `audit_window_marks_missing`, `audit_window_not_counted`,
+`audit_window_row_count_differs`, `audit_groups_overlap` and
 `audit_result_not_projectable` (the engine returned something this tool does not project). The call has
 no overall deadline: it is up to 128 parts, each between two checks, so a client that gives up early
 leaves the request it was waiting for abandoned.
@@ -2991,8 +2997,11 @@ Per tool:
   1. the company's two marks;
   2. the company object (checked against the verified GUID and books-from date);
   3. the groups, the ledgers for the period, the trial balance for the period and the voucher types;
-  4. the voucher window: its own opening marks, then a census (a voucher mark above 42, at 384 KiB a
-     voucher against the 16 MiB part budget), then the planned parts, then its closing marks.
+  4. the voucher window: its own opening marks, then a census (always, a book that fits one request
+     included; none for a book that has never held a voucher, which is then refused), then the planned
+     parts, then its closing marks. Only the parts kept for the engine are folded into the evidence: the
+     voucher parts and the closing marks, not the window's opening marks or its census. A call refused
+     during the read carries the evidence of the company read only.
 - `stock_summary`:
   1. the company read;
   2. the extent check (if a later page);

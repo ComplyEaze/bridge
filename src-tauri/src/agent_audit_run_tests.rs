@@ -194,8 +194,9 @@ async fn a_completed_run_returns_figures_and_findings_and_no_name_of_the_book() 
             "the result carries a name of the book"
         );
     }
-    // The paired company list (four requests), then nine parts, each between two company checks.
-    assert_eq!(one.simulator.unwrap().finish().unwrap().len(), 31);
+    // The paired company list (four requests), then ten parts (the window's
+    // census included), each between two company checks.
+    assert_eq!(one.simulator.unwrap().finish().unwrap().len(), 34);
 }
 
 #[tokio::test]
@@ -240,6 +241,9 @@ async fn arguments_that_cannot_be_honoured_are_refused_before_any_request() {
     let mut missing = args();
     missing.as_object_mut().unwrap().remove("bank_groups");
     cases.push(missing);
+    let mut both = args();
+    both["bank_groups"] = json!(["Bank Accounts", " cash-in-hand "]);
+    cases.push(both.clone());
     for case in cases {
         let one = serve(Vec::new(), Redaction::None);
         let response = one.server.call_tool("audit_test_run", case.clone()).await;
@@ -255,6 +259,10 @@ async fn arguments_that_cannot_be_honoured_are_refused_before_any_request() {
             "{case}: {code}"
         );
     }
+    // A group named as cash and as bank (spelt with other case and spaces).
+    let one = serve(Vec::new(), Redaction::None);
+    let response = one.server.call_tool("audit_test_run", both).await;
+    assert_eq!(error_code(&response), "audit_groups_overlap");
 }
 
 #[tokio::test]
@@ -317,6 +325,7 @@ fn dump(figures: usize, findings: usize) -> Value {
 #[test]
 fn the_projection_keeps_ids_values_and_counts_and_drops_every_name() {
     let projected = project(&dump(2, 1)).unwrap();
+    assert_eq!(projected["state"], "completed_with_failed_book_checks");
     let text = projected.to_string();
     assert!(
         !text.contains("Secret") && !text.contains("evidence"),

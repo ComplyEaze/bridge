@@ -16,7 +16,23 @@ use tally_protocol_simulator::{
     Fixture, ObservedRequest, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
 
-const FIXTURE_GUID: &str = "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c";
+/// The synthetic read's own company GUID, read from its marks part: every part of that read names
+/// it, so the replay's company must carry the same value.
+fn fixture_guid() -> &'static str {
+    static GUID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    GUID.get_or_init(|| {
+        let marks = text_of(include_bytes!(
+            "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/high_water_before.xml"
+        ));
+        let (_, rest) = marks
+            .split_once("<GUID TYPE=\"String\">")
+            .expect("the marks part names its company");
+        rest.split_once("</GUID>")
+            .expect("a closed GUID")
+            .0
+            .to_string()
+    })
+}
 const FIXTURE_NAME: &str = "Lakeview Hardware Demo";
 
 /// A fixture part as text: UTF-16LE parts are decoded, UTF-8 ones kept.
@@ -56,7 +72,7 @@ fn companies_xml(guid: &str) -> String {
 
 fn identity() -> VerifiedCompanyIdentity {
     let companies =
-        bridge_tally_protocol::parse_companies_from_collection(&companies_xml(FIXTURE_GUID))
+        bridge_tally_protocol::parse_companies_from_collection(&companies_xml(fixture_guid()))
             .unwrap();
     let observed = &companies[0];
     VerifiedCompanyIdentity::from_observed_companies(
@@ -87,9 +103,9 @@ fn company_object(guid: &str) -> String {
 /// The three legs of one audit part: identity bracket, the part, identity bracket.
 fn legs(body: String) -> Vec<ScenarioPlan> {
     vec![
-        plan(companies_xml(FIXTURE_GUID)),
+        plan(companies_xml(fixture_guid())),
         plan(body),
-        plan(companies_xml(FIXTURE_GUID)),
+        plan(companies_xml(fixture_guid())),
     ]
 }
 
@@ -118,7 +134,7 @@ impl Replay {
         ));
         Self {
             marks_before: marks.clone(),
-            company: company_object(FIXTURE_GUID),
+            company: company_object(fixture_guid()),
             marks_in_window: (marks.clone(), marks),
             census: period_vouchers(),
             vouchers: period_vouchers(),
@@ -215,7 +231,7 @@ fn cash_dump(engagement: &Engagement, book: &Book) -> serde_json::Value {
 async fn a_clean_replay_is_admitted_and_sends_only_exports() {
     let (book, observed) = read_replay(&Replay::clean()).await;
     let audit = book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
-    assert_eq!(audit.book.company_guid, FIXTURE_GUID);
+    assert_eq!(audit.book.company_guid, fixture_guid());
     assert_eq!(audit.book.vouchers.len(), 43);
     assert_eq!(audit.engagement.period.from.as_str(), "20250401");
     assert_eq!(audit.engagement.cash_groups, roles().cash_groups);
@@ -345,7 +361,7 @@ async fn a_window_no_census_counted_is_refused() {
 #[tokio::test]
 async fn a_company_object_of_another_company_is_refused_by_code() {
     let mut replay = Replay::clean();
-    replay.company = company_object(&FIXTURE_GUID.replacen("6f1c2a3e", "7f1c2a3e", 1));
+    replay.company = company_object(&format!("7{}", &fixture_guid()[1..]));
     let failure = failure_of(read_replay(&replay).await.0);
     assert_eq!(
         failure,
@@ -426,7 +442,7 @@ fn a_window_divided_by_alterid_cannot_become_a_read() {
             retained(day(spanned), "<ENVELOPE/>"),
             retained(WindowReadKind::Marks, &marks),
         ],
-        FIXTURE_GUID,
+        fixture_guid(),
         &mut parts,
     )
     .unwrap_err();
@@ -449,7 +465,7 @@ fn a_window_whose_last_read_is_not_the_marks_is_refused() {
             retained(WindowReadKind::Marks, &marks),
             retained(part, "<ENVELOPE/>"),
         ],
-        FIXTURE_GUID,
+        fixture_guid(),
         &mut parts,
     )
     .unwrap_err();
@@ -486,7 +502,7 @@ fn a_part_that_ran_past_its_deadline_is_not_retryable_wherever_it_was_read() {
 #[test]
 fn a_window_without_its_closing_marks_is_refused() {
     let mut parts = Vec::new();
-    let failure = collect_window(&[], FIXTURE_GUID, &mut parts).unwrap_err();
+    let failure = collect_window(&[], fixture_guid(), &mut parts).unwrap_err();
     assert_eq!(failure, refused(MARKS_MISSING));
 }
 
@@ -547,6 +563,6 @@ fn group_names_that_need_escaping_reach_the_engagement_whole() {
     assert_eq!(engagement.bank_groups, awkward.bank_groups);
     assert_eq!(
         engagement.company_pin.unwrap().guid,
-        FIXTURE_GUID.to_string()
+        fixture_guid().to_string()
     );
 }

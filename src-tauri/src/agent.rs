@@ -838,6 +838,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         if cause.is::<crate::tally::connection::NativeReportPairDrift>() {
             return Some(crate::tally::connection::NativeReportPairDrift::SAFE_CODE);
         }
+        // The named company is not loaded in Tally, was renamed, or was listed more than once
+        // (#1699): the read failed closed, and this says why.
+        if let Some(identity) = crate::tally::runtime::company_identity_cause(cause) {
+            return Some(identity);
+        }
         if let Some(catalogue) =
             cause.downcast_ref::<bridge_tally_protocol::StandardLedgerCatalogError>()
         {
@@ -948,6 +953,13 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// This never softens a refusal — it only says what to do about one.
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "company_identity_absent_or_ambiguous" | "company_identity_not_matched" => Some(
+            "Tally did not confirm the selected company as exactly one loaded company, so nothing \
+             was returned. The company may not be loaded in Tally, may have been renamed since \
+             list_companies, or Tally may list it more than once. Ask the user to open the company \
+             in Tally, then call list_companies again and repeat the request with the \
+             company_guid it returns.",
+        ),
         "setting_retired" => Some(
             "BRIDGE_AGENT_ENABLE_BATCH_POST was retired: batch posting now follows the posting \
              setting (BRIDGE_AGENT_ENABLE_WRITES), which covers one voucher or a saved batch of \
@@ -1643,9 +1655,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "import_voucher_numbering_not_automatic" | "import_voucher_numbering_not_retain" => {
             Some(agent_import::POST_NUMBERING_NEXT_STEP)
         }
+        // The two refusals of the numbering check in `voucher_presence` (#1691).
+        "presence_numbering_method_differs_from_book" => Some(PRESENCE_NUMBERING_REMEDIATION),
+        "presence_numbering_unreadable" => Some(PRESENCE_NUMBERING_UNREADABLE_REMEDIATION),
         _ => None,
     }
 }
+
+/// The next step of the numbering refusal of `voucher_presence` (#1691): the
+/// types it names are in the refusal's candidates, each with what the book says.
+const PRESENCE_NUMBERING_REMEDIATION: &str = "A voucher type you declared manual is not numbered Manual with exactly one series that prevents duplicate numbers in the book, or the book holds no type of that exact name; the types, and what the book says of each, are in the candidates. Correct the spelling to the book's own type name, or declare the type automatic or unknown to compare by resemblance only. The check reads the book's numbering as it is now.";
+
+/// The next step when the numbering could not be read for a manual declaration.
+const PRESENCE_NUMBERING_UNREADABLE_REMEDIATION: &str = "The book's numbering could not be read, so a manual declaration cannot be checked. Declare the types automatic or unknown to compare by resemblance only, or ask again once the numbering can be read.";
 
 /// The one next step every date refusal gives (#1268).
 const DATE_REMEDIATION: &str = "Give each date as YYYYMMDD (YYYY-MM-DD also works), a real \

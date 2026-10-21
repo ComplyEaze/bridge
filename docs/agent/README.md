@@ -36,8 +36,10 @@ Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 `BRIDGE_TALLY_PORT` (default `9000`), `BRIDGE_AGENT_DATA_DIR` (Bridge's
 platform application-data directory by default), `BRIDGE_AGENT_MAX_ROWS`
 (default `500`), `BRIDGE_AGENT_MAX_BYTES` (default `200000`), and
-`BRIDGE_AGENT_REDACTION` (`none`, `mask_parties`, or `drop_narration`). The
-host is validated by `bridge-tally-transport`; non-loopback hosts are refused.
+`BRIDGE_AGENT_REDACTION` (`none`, `mask_parties`, or `drop_narration`).
+`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer. Control replies (to
+`initialize`, `ping` and `tools/list`), which the build fixes and which carry no
+book data, are held to 1,000,000 bytes, or to it if it is larger. The host is validated by `bridge-tally-transport`; non-loopback hosts are refused.
 The resolved data path must be valid Unicode so saved artifact paths can be
 returned exactly in JSON. Invalid platform encoding is refused before state
 creation with `agent_data_dir_encoding_invalid`; no lossy path alias is used.
@@ -2489,16 +2491,35 @@ window no longer holds as `bound_not_in_window`, never `not_found`; and, for a
 company whose voucher mark reads below the mark the post left, every voucher it
 no longer holds as `book_rolled_back`, never `not_found`, with nothing bound in
 it. Such a book was rolled back (a backup restored, or another copy put in its
-place). The check sees a rollback only while the mark reads below the post's: a
-book keyed past it again after a restore is not seen as rolled back. Tally then
-gives the vouchers keyed again the MasterIDs, GUIDs and numbers the post's
-vouchers held (measured once on a synthetic company, bridge#1050), so a bound
-voucher names another voucher, which reads `posted_divergent`, or a false
-`posted_verified` when its content is the same. In plain words: after a restore, a native
-voucher keyed again with the same content before any check can read verified,
-and no identifier a read returns tells the two apart (measured once on
-TallyPrime 7.1 Silver, with Tally's security off), so
-after restoring a backup over a company, check its posted vouchers in Tally. Bridge still records those rows as posted, so a rebuilt batch holding
+place). Tally gives vouchers keyed again after a restore the MasterIDs, GUIDs and
+numbers the post's vouchers held (measured once on a synthetic company,
+bridge#1050), and no identifier a read returns tells the two apart. So a
+rollback, once seen, is recorded: when a check of a native post reads the
+company's voucher mark below the floor any native post of the company had
+proved (a mark Tally omits twice reads as a company holding no voucher), the
+import journal keeps a record of it whenever it covers a post no earlier record
+covers, so a second restore is recorded too (`post_span_binding.rollback_recorded`,
+with `other_batches_covered`: how many of the company's other native posts it
+covers, and the first ten, to verify again). A record that cannot be written
+fails the check, to be run again.
+From then on no native post of the same company (name, GUID, company number
+and books-from date) at the same Tally address reads `posted_verified` if it
+was sent before that check read the journal and the vouchers it had proved by
+then (its binding, else Tally's answer, else its mark before the post) put it
+above the mark read:
+`post_span_binding` is then `book_rolled_back` with `mark_read` and `seen_by`
+(the batch whose check saw it), its vouchers read as matching content, not as
+its own, and the plain line says to check them in Tally. The check still sees a
+rollback only while the mark reads below some post's: a book restored and then
+keyed or edited past the mark before any check is not seen, and a native voucher
+keyed again with the same content can then read verified (measured once on
+TallyPrime 7.1 Silver, with Tally's security off), so after restoring a backup
+over a company, check its posted vouchers in Tally. A record is kept for good: a
+wrong backup restored and then the right one leaves the posts it covers reading
+rolled back, and a covered Sales invoice batch stops that company's invoices
+until it is released; a repair or rewrite of the company's data that lowered the
+voucher mark (not measured) would be recorded the same way. An older build refuses a journal holding the record: do not
+downgrade after posting. Bridge still records those rows as posted, so a rebuilt batch holding
 them is refused as `import_txn_already_posted`; re-entering them in that book is
 the person's decision. The result's `post_span_binding` names the binding's
 `state`: `bound`, `refused` with its `code`, `unsettled` with its `code` (for
@@ -2574,8 +2595,8 @@ but not whether this post created it); and whether a write from another Gold
 user's process can share or skip the mark Bridge reads is unmeasured. Open
 follow-ups: the hand-import file still carries the tag (bridge#1037); re-posting
 the rows of a rolled-back batch needs the person's approval (bridge#1038);
-closing a batch whose binding was refused (bridge#1039); and detecting a restore
-keyed past the post's mark (bridge#1050).
+closing a batch whose binding was refused (bridge#1039); and seeing a restore
+keyed past the post's mark before any check (bridge#1050).
 
 Posting binds the saved batch to its loopback endpoint and full company tuple.
 Legacy batches without that endpoint binding remain readable/verifiable but
@@ -2889,9 +2910,18 @@ Per tool:
 - `voucher_presence` (`src-tauri/src/agent_presence.rs`):
   1. the company read;
   2. the ledger catalogue;
-  3. the window read;
-  4. the corroboration (if empty);
-  5. the ledger catalogue again.
+  3. only when a voucher type is declared `manual` (20 requests): the company's master mark (6),
+     then the voucher-type numbering (14: the mode probe and identity, the masters pair, the
+     numbering pair, identity and mode again); the call is refused here, before any window
+     request, when a declared-manual type is not Manual with exactly one series that prevents duplicate
+     numbers in the book, the
+     book holds no type of that exact name, or its numbering cannot be read (Education mode keeps
+     the read's own code, `masters_education_unqualified`). The check reads the numbering as it
+     is now, holds for the moment of the read, and does not know how existing vouchers were
+     numbered when they were entered;
+  4. the window read;
+  5. the corroboration (if empty);
+  6. the ledger catalogue again.
 
   Its `catalogue_evidence_sha256` hashes parsed names, not a request.
 - `ledger_movement` (`src-tauri/src/agent_movement.rs`):
@@ -3028,10 +3058,13 @@ posted.
 
 The server negotiates MCP `2025-06-18` or `2024-11-05`, returning a supported
 version when a client proposes a newer one. Initialization must precede tool
-requests. Incoming frames are limited to 5 MB. All responses obey the configured
-byte cap, including control replies, the JSON-RPC wrapper, and newline. A tool
-catalogue that cannot fit returns `agent_response_too_large`; the session remains
-usable. Text content contains the same
+requests. Incoming frames are limited to 5 MB. Every tool answer obeys the configured
+byte cap, including the JSON-RPC wrapper and newline. Control replies (to `initialize`,
+`ping` and `tools/list`, and the refusal of an unknown method) are fixed by the build and
+the request id and carry no book data, so they are held instead to a ceiling of
+1,000,000 bytes, or the configured cap if that is larger: the tool list is sent whole
+whatever the cap. A control reply that cannot fit returns `agent_response_too_large`;
+the session remains usable. Text content contains the same
 serialized, redacted JSON as `structuredContent` for older clients. The `initialize` result also
 carries `instructions`, a short text for the client to show its model: start with `list_companies`,
 use the one open company only when the user named no client (or exactly one open company matches the
@@ -3206,8 +3239,10 @@ vouchers in the window, not the party's. A named bill's window never starts befo
 The vouchers and the bills reports are two reads whose extents are not compared: a voucher posted
 between them usually shows as `trail_does_not_tie`, but two changes that compensate, or
 allocations that net to zero, can still read `tied`. Measured on one synthetic book only
-(reference 12a.14); an `as_of` earlier than the last voucher and post-dated vouchers were not
-measured.
+(reference 12a.14); a second synthetic book (captures of 9 October 2026) also showed an `as_of`
+earlier than the last voucher, a post-dated voucher and an advance later adjusted by an invoice
+reading as Tally's own screen does, bill for bill. Not measured: a client book, an opening bill with
+a credit sign, more than one opening bill.
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own
 Bills Receivable and Bills Payable reports scope them, not the type of party, and
@@ -3224,7 +3259,8 @@ of an `unallocated` amount is the sign of the party's net unallocated balance, s
 an on-account receipt and an on-account payment on one party net into one figure.
 For one party, `detail: unadjusted` separates advances, pending credit and debit notes and
 on-account amounts by their voucher's bill type (below). The book-wide `open_bills.kind` and
-`unallocated` figures do not; what is still to be measured is in #1356, the follow-up to #945.
+`unallocated` figures do not. What is still to be measured (a party term against an unfiltered
+control, a per-ledger report, the cost on a large book) is in #1356, the follow-up to #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted

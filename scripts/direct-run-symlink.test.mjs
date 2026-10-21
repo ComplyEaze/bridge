@@ -44,6 +44,7 @@ const GUARD =
 // script, arguments and environment of a harmless probe, the exit status it ends with and a pattern
 // its output (stdout and stderr) matches when `main` ran.
 const PROBES = [
+  { script: "capture-package-log.mjs", args: ["--bogus"], status: 2, pattern: /usage: corepack pnpm run tauri:build/ },
   { script: "check-conflict-markers.mjs", status: 2, pattern: /could not check for conflict markers/ },
   { script: "check-pr-milestone.mjs", env: { PR_MILESTONE: "null" }, status: 1, pattern: /A pull request needs a milestone/ },
   { script: "check-pr-type-label.mjs", env: { PR_LABELS: "[]" }, status: 1, pattern: /A pull request needs exactly one of type:/ },

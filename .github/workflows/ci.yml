@@ -125,7 +125,7 @@ jobs:
           fi
 
           # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.
-          if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.py|capture-package-log(\.test)?\.py|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.py|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
           else
             echo 'bundle=false' >> "$GITHUB_OUTPUT"
@@ -685,9 +685,9 @@ jobs:
           # Pinned Tauri CLI logs bundle_dmg.sh stdout/stderr only at debug.
           TAURI_CLI_VERBOSITY: '1'
         run: |
-          python3 scripts/capture-package-log.test.py
+          node --test scripts/capture-package-log.test.mjs
           set -o pipefail
-          corepack pnpm run tauri:build -- --timings 2>&1 | python3 scripts/capture-package-log.py
+          corepack pnpm run tauri:build -- --timings 2>&1 | node scripts/capture-package-log.mjs
       - name: Collect failed macOS bundle context
         if: ${{ failure() && runner.os == 'macOS' && steps.macos-bundle.outcome == 'failure' }}
         run: |

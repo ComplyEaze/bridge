@@ -188,7 +188,7 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "bdd80e3bf24c8f565e9f34c266bcc6db7a12708b1555109c7ec1c0d4de01ad8c"],
+  ], "513a53144ba181c8221fe3dfd3d23504e18fb45d9d401111ef09245b23a9be88"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
@@ -456,7 +456,7 @@ const expectedChanges = [
   "          fi",
   "",
   "          # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.",
-  "          if grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.py|capture-package-log(\\.test)?\\.py|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
+  "          if grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.py|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",

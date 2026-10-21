@@ -39,7 +39,7 @@ pub fn sha16(text: &str) -> String {
     hex(&Sha256::digest(nfc(text).as_bytes())[..8])
 }
 
-fn hash_ordered(items: &[String]) -> String {
+pub(crate) fn hash_ordered(items: &[String]) -> String {
     sha16(&items.join(JOIN))
 }
 

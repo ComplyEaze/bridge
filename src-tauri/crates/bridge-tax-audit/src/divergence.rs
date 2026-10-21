@@ -12,16 +12,50 @@
 //! A key is `figures[<id>]` or `findings[<id>]` (a whole entry: `null` removes it, an object adds
 //! it where the golden has none), the same with `.<field>` for one field of an entry that exists,
 //! or one of [`TOP_KEYS`]. The version fields and the test id cannot be patched: a divergence is
-//! not a new test version.
+//! not a new test version. Wording is patched by its text (`title_text`, `limits_text`, ...), and
+//! the hash the comparison reads is derived from it: a hash key itself cannot be patched, so the
+//! person who signs the answer reads the words, and a wording patch cannot pass unseen. Two records
+//! may not claim the same key, nor one an entry and the other a field of it.
+//!
+//! `ca_answer` names who worked the answer by role and where the worksheet is kept, by a private
+//! reference, never a person's or a client's name. A real-book key that names a per-book id (a
+//! ledger or party tag) belongs in a local, uncommitted registry passed to `local_parity`.
+//!
+//! Not built yet: a fix that makes a test refuse an input it used to run on (an outcome patch).
+//! Such a fix needs that first; until then it fails the comparison loudly.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value as Json;
 
+use crate::canonical::{hash_ordered, sha16};
+
+/// Each wording field and the hash the comparison reads for it.
+const TEXT_HASH: [(&str, &str); 5] = [
+    ("population_note_text", "population_note_sha256_16"),
+    ("definition_text", "definition_sha256_16"),
+    ("title_text", "title_sha256_16"),
+    ("limits_text", "limits_sha256_16"),
+    ("ask_client_text", "ask_client_sha256_16"),
+];
+
+/// The hash of a patched wording value: one text, or an ordered list of texts.
+fn wording_hash(value: &Json) -> Result<String, String> {
+    match value {
+        Json::String(text) => Ok(sha16(text)),
+        Json::Array(items) => items
+            .iter()
+            .map(|item| item.as_str().map(str::to_string))
+            .collect::<Option<Vec<String>>>()
+            .map(|items| hash_ordered(&items))
+            .ok_or_else(|| "a wording list holds a value that is not text".to_string()),
+        _ => Err("a wording value is not text".to_string()),
+    }
+}
+
 /// The top-level dump keys a patch may set.
-pub const TOP_KEYS: [&str; 8] = [
+pub const TOP_KEYS: [&str; 7] = [
     "population_note_text",
-    "population_note_sha256_16",
     "book_invariants_evaluated",
     "book_invariant_violations",
     "result_invariants_evaluated",
@@ -144,6 +178,36 @@ enum Key {
 }
 
 impl Key {
+    /// The wording field this key names, if any.
+    fn field_name(&self) -> Option<&str> {
+        match self {
+            Self::Top(key) => Some(key.as_str()),
+            Self::Entry { field, .. } => field.as_deref(),
+        }
+    }
+
+    /// The hash key the comparison reads for this key's wording, if it names wording.
+    fn hash_key(&self) -> Option<Self> {
+        let field = self.field_name()?;
+        let (_, hash) = TEXT_HASH.iter().find(|(text, _)| *text == field)?;
+        Some(match self {
+            Self::Top(_) => Self::Top((*hash).to_string()),
+            Self::Entry { list, id, .. } => Self::Entry {
+                list,
+                id: id.clone(),
+                field: Some((*hash).to_string()),
+            },
+        })
+    }
+
+    /// The entry a key belongs to (`figures[<id>]`), for claims.
+    fn entry(&self) -> Option<String> {
+        match self {
+            Self::Top(_) => None,
+            Self::Entry { list, id, .. } => Some(format!("{list}[{id}]")),
+        }
+    }
+
     fn parse(key: &str) -> Result<Self, String> {
         for list in ["figures", "findings"] {
             if let Some(rest) = key.strip_prefix(list).and_then(|r| r.strip_prefix('[')) {
@@ -163,6 +227,9 @@ impl Key {
                             .to_string(),
                     ),
                 };
+                if field.as_deref().is_some_and(|f| f.ends_with("_sha256_16")) {
+                    return Err(format!("key {key:?} is a hash: patch its text"));
+                }
                 return Ok(Self::Entry {
                     list,
                     id: id.to_string(),
@@ -207,11 +274,17 @@ impl Key {
                     .ok_or_else(|| format!("the dump has no {list} list"))?;
                 let at = entries.iter().position(|e| e["id"].as_str() == Some(id));
                 match (field, at) {
+                    (Some(f), Some(i)) if value.is_null() => {
+                        if let Some(entry) = entries[i].as_object_mut() {
+                            entry.remove(f.as_str());
+                        }
+                        Ok(())
+                    }
                     (Some(f), Some(i)) => {
                         entries[i][f.as_str()] = value;
                         Ok(())
                     }
-                    (Some(_), None) => Err(format!("{list}[{id}] is not in the golden")),
+                    (Some(_), None) => Err(format!("{list}[{id}] is not in the dump")),
                     (None, Some(i)) if value.is_null() => {
                         entries.remove(i);
                         Ok(())
@@ -235,6 +308,7 @@ impl Key {
 /// oracle's (a declaration that changes nothing is stale or mistyped).
 pub fn patched(oracle: &Json, stem: &str, divergences: &[Divergence]) -> Result<Json, String> {
     let mut doc = oracle.clone();
+    let (mut keys, mut whole, mut fielded) = (BTreeSet::new(), BTreeSet::new(), BTreeSet::new());
     for d in divergences {
         let Some(patch) = d.expect.get(stem) else {
             continue;
@@ -243,15 +317,44 @@ pub fn patched(oracle: &Json, stem: &str, divergences: &[Divergence]) -> Result<
             return Err(format!("{}: {stem} is not a golden of {}", d.id, d.test));
         }
         for (key, value) in patch {
-            let parsed = Key::parse(key)?;
+            let parsed = Key::parse(key).map_err(|e| format!("{}: {e}", d.id))?;
+            let claimed = match (parsed.entry(), parsed.field_name()) {
+                (Some(entry), None) => fielded.contains(&entry) || !whole.insert(entry),
+                (Some(entry), Some(_)) => {
+                    let clash = whole.contains(&entry);
+                    fielded.insert(entry);
+                    clash
+                }
+                (None, _) => false,
+            };
+            if claimed || !keys.insert(key.clone()) {
+                return Err(format!("{}: {stem} {key} is claimed twice", d.id));
+            }
             if parsed.get(oracle) == Some(value)
                 || (value.is_null() && parsed.get(oracle).is_none())
             {
                 return Err(format!("{}: {stem} {key} equals the oracle", d.id));
             }
+            let mut value = value.clone();
+            if let Some(entry) = value.as_object_mut() {
+                // A whole entry added: its wording hashes are derived from its texts too.
+                for (text, hash) in TEXT_HASH {
+                    if let Some(words) = entry.get(text) {
+                        let derived = wording_hash(words)
+                            .map_err(|e| format!("{}: {stem} {key}: {e}", d.id))?;
+                        entry.insert(hash.to_string(), Json::String(derived));
+                    }
+                }
+            }
             parsed
                 .set(&mut doc, value.clone())
                 .map_err(|e| format!("{}: {stem} {e}", d.id))?;
+            if let Some(hash) = parsed.hash_key() {
+                let derived =
+                    wording_hash(&value).map_err(|e| format!("{}: {stem} {key}: {e}", d.id))?;
+                hash.set(&mut doc, Json::String(derived))
+                    .map_err(|e| format!("{}: {stem} {e}", d.id))?;
+            }
         }
     }
     Ok(doc)
@@ -259,8 +362,10 @@ pub fn patched(oracle: &Json, stem: &str, divergences: &[Divergence]) -> Result<
 
 /// For a real-book parity run of `test_id`: Rust's dump with every declared real-book key of
 /// that test set back to the oracle's value, and the keys that differed. The caller then requires
-/// [`crate::compare::compare`] to find nothing; a declared key that did not differ is reported
-/// by its absence from the second value.
+/// [`crate::compare::compare`] to find nothing. A whole entry is masked only where one side lacks
+/// it (an entry both sides hold is masked field by field, so a change to its other fields still
+/// shows), and a list-valued top-level key is refused for the same reason. A masked wording field
+/// takes the oracle's hash with it.
 pub fn masked(
     rust: &Json,
     oracle: &Json,
@@ -271,19 +376,65 @@ pub fn masked(
     let mut differed = Vec::new();
     for d in divergences.iter().filter(|d| d.test == test_id) {
         for key in &d.real_book_keys {
-            let parsed = Key::parse(key)?;
+            let parsed = Key::parse(key).map_err(|e| format!("{}: {e}", d.id))?;
             let (want, got) = (parsed.get(oracle), parsed.get(rust));
+            match &parsed {
+                Key::Top(top) if top != "population_note_text" => {
+                    return Err(format!(
+                        "{}: {key} is a whole list: it cannot be masked",
+                        d.id
+                    ));
+                }
+                Key::Entry { field: None, .. } if want.is_some() && got.is_some() => {
+                    return Err(format!(
+                        "{}: {key} is on both sides: declare the fields that differ",
+                        d.id
+                    ));
+                }
+                _ => {}
+            }
             if want == got {
                 continue;
             }
             differed.push(format!("{}: {key}", d.id));
-            match want {
-                Some(value) => parsed.set(&mut doc, value.clone())?,
-                None => parsed.set(&mut doc, Json::Null)?,
+            parsed
+                .set(&mut doc, want.cloned().unwrap_or(Json::Null))
+                .map_err(|e| format!("{}: {e}", d.id))?;
+            if let (Some(hash), Some(_)) = (parsed.hash_key(), want) {
+                let oracle_hash = hash.get(oracle).cloned().unwrap_or(Json::Null);
+                hash.set(&mut doc, oracle_hash)
+                    .map_err(|e| format!("{}: {e}", d.id))?;
             }
         }
     }
     Ok((doc, differed))
+}
+
+/// The divergences named on a real-book run that did not show on it (`declared` as [`masked`]
+/// returned it). An id that is not in the registry, or names another test, is refused.
+pub fn expected_missing(
+    expected: &[String],
+    declared: &[String],
+    test_id: &str,
+    divergences: &[Divergence],
+) -> Result<Vec<String>, String> {
+    let mut missing = Vec::new();
+    for id in expected {
+        let d = divergences
+            .iter()
+            .find(|d| &d.id == id)
+            .ok_or_else(|| format!("--expect {id}: no such divergence"))?;
+        if d.test != test_id {
+            return Err(format!("--expect {id}: it is a divergence of {}", d.test));
+        }
+        if !declared
+            .iter()
+            .any(|line| line.starts_with(&format!("{id}: ")))
+        {
+            missing.push(id.clone());
+        }
+    }
+    Ok(missing)
 }
 
 #[cfg(test)]
@@ -344,7 +495,7 @@ mod tests {
         for (patch, why) in [
             (json!({"figures[t.a].value": 1}), "equals the oracle"),
             (json!({"figures[t.z]": null}), "equals the oracle"),
-            (json!({"figures[t.z].value": 1}), "is not in the golden"),
+            (json!({"figures[t.z].value": 1}), "is not in the dump"),
             (json!({"figures[t.a]": {"id": "t.a"}}), "a whole entry"),
             (json!({"figures[t.c]": {"id": "t.d"}}), "a whole entry"),
         ] {
@@ -399,15 +550,118 @@ mod tests {
 
     #[test]
     fn a_real_book_run_masks_only_the_declared_keys_and_says_which_differed() {
-        let d = one(json!({}), json!(["figures[t.a].value", "figures[t.b]"]));
+        let d = one(json!({}), json!(["figures[t.a].value", "figures[t.c]"]));
         let mut rust = dump();
         rust["figures"][0]["value"] = json!(9);
+        rust["figures"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"id": "t.c", "value": 3, "unit": "count"}));
         let (masked_rust, differed) = masked(&rust, &dump(), "t", &d).unwrap();
         assert_eq!(masked_rust, dump());
-        assert_eq!(differed, ["DV-1: figures[t.a].value"]);
+        assert_eq!(differed, ["DV-1: figures[t.a].value", "DV-1: figures[t.c]"]);
         // Another test's divergence masks nothing.
         let (other, none) = masked(&rust, &dump(), "u", &d).unwrap();
         assert_eq!(other, rust);
         assert!(none.is_empty());
+    }
+
+    #[test]
+    fn masking_cannot_hide_more_than_the_declared_fields() {
+        for (key, why) in [
+            ("figures[t.a]", "on both sides"),
+            ("book_invariant_violations", "whole list"),
+        ] {
+            let d = one(json!({}), json!([key]));
+            let err = masked(&dump(), &dump(), "t", &d).unwrap_err();
+            assert!(err.contains(why), "{key}: {err}");
+        }
+        // A field the oracle lacks is removed, not set to null.
+        let d = one(json!({}), json!(["figures[t.a].note"]));
+        let mut rust = dump();
+        rust["figures"][0]["note"] = json!("x");
+        assert_eq!(masked(&rust, &dump(), "t", &d).unwrap().0, dump());
+    }
+
+    #[test]
+    fn two_records_cannot_claim_one_key_or_an_entry_and_its_field() {
+        let record = |id: &str, patch: Json| {
+            json!({"id": id, "issue": 1, "test": "t", "why": "w", "ca_answer": "c",
+                   "expect": {"g": patch}})
+        };
+        for (a, b) in [
+            (
+                json!({"figures[t.a].value": 5}),
+                json!({"figures[t.a].value": 6}),
+            ),
+            (
+                json!({"figures[t.a]": null}),
+                json!({"figures[t.a].value": 6}),
+            ),
+            (
+                json!({"figures[t.a].value": 5}),
+                json!({"figures[t.a]": null}),
+            ),
+        ] {
+            let d = parse(&json!([record("DV-1", a), record("DV-2", b)]).to_string()).unwrap();
+            let err = patched(&dump(), "g", &d).unwrap_err();
+            assert!(err.contains("claimed twice"), "{err}");
+        }
+    }
+
+    #[test]
+    fn wording_is_patched_by_its_text_and_its_hash_follows() {
+        let mut oracle = dump();
+        oracle["findings"][0]["title_text"] = json!("old");
+        oracle["findings"][0]["title_sha256_16"] = json!(sha16("old"));
+        oracle["findings"][0]["limits_text"] = json!(["a"]);
+        oracle["findings"][0]["limits_sha256_16"] = json!(hash_ordered(&["a".to_string()]));
+        let d = one(
+            json!({"g": {
+                "findings[t/x].title_text": "new",
+                "findings[t/x].limits_text": ["a", "b"],
+                "figures[t.c]": {"id": "t.c", "value": 3, "unit": "count", "definition_text": "d"}
+            }}),
+            json!([]),
+        );
+        let p = patched(&oracle, "g", &d).unwrap();
+        assert_eq!(p["findings"][0]["title_sha256_16"], json!(sha16("new")));
+        assert_eq!(
+            p["findings"][0]["limits_sha256_16"],
+            json!(hash_ordered(&["a".to_string(), "b".to_string()]))
+        );
+        assert_eq!(p["figures"][2]["definition_sha256_16"], json!(sha16("d")));
+        // A hash cannot be patched by itself.
+        let err = parse(
+            &json!([{"id": "DV-1", "issue": 1, "test": "t", "why": "w", "ca_answer": "c",
+                     "expect": {"g": {"findings[t/x].title_sha256_16": "0"}}}])
+            .to_string(),
+        )
+        .unwrap_err();
+        assert!(err.contains("is a hash"), "{err}");
+    }
+
+    #[test]
+    fn an_expected_divergence_must_exist_belong_to_the_test_and_show() {
+        let d = one(json!({}), json!(["figures[t.a].value"]));
+        let shown = vec!["DV-1: figures[t.a].value".to_string()];
+        assert!(expected_missing(&["DV-1".into()], &shown, "t", &d)
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            expected_missing(&["DV-1".into()], &[], "t", &d).unwrap(),
+            ["DV-1"]
+        );
+        let other = vec!["DV-2: figures[t.a].value".to_string()];
+        assert_eq!(
+            expected_missing(&["DV-1".into()], &other, "t", &d).unwrap(),
+            ["DV-1"]
+        );
+        assert!(expected_missing(&["DV-9".into()], &shown, "t", &d)
+            .unwrap_err()
+            .contains("no such divergence"));
+        assert!(expected_missing(&["DV-1".into()], &shown, "u", &d)
+            .unwrap_err()
+            .contains("of t"));
     }
 }

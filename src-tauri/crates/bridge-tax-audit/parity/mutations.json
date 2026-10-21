@@ -14348,7 +14348,87 @@
   "by": "author",
   "what": "a declared real-book key is reported but not masked",
   "file": "src/divergence.rs",
-  "from": "                Some(value) => parsed.set(&mut doc, value.clone())?,\n",
-  "to": "                Some(_) => {}\n"
+  "from": "                .set(&mut doc, want.cloned().unwrap_or(Json::Null))\n",
+  "to": "                .set(&mut doc, got.cloned().unwrap_or(Json::Null))\n"
+ },
+ {
+  "id": "DV-10",
+  "by": "author",
+  "what": "a hash key may be patched by itself",
+  "file": "src/divergence.rs",
+  "from": "                if field.as_deref().is_some_and(|f| f.ends_with(\"_sha256_16\")) {\n",
+  "to": "                if false {\n"
+ },
+ {
+  "id": "DV-11",
+  "by": "author",
+  "what": "a field set to null is written as null, not removed",
+  "file": "src/divergence.rs",
+  "from": "                    (Some(f), Some(i)) if value.is_null() => {\n",
+  "to": "                    (Some(f), Some(i)) if false => {\n"
+ },
+ {
+  "id": "DV-12",
+  "by": "author",
+  "what": "an entry and its field may both be claimed",
+  "file": "src/divergence.rs",
+  "from": "                    let clash = whole.contains(&entry);\n",
+  "to": "                    let clash = false;\n"
+ },
+ {
+  "id": "DV-13",
+  "by": "author",
+  "what": "two records may claim one key",
+  "file": "src/divergence.rs",
+  "from": "            if claimed || !keys.insert(key.clone()) {\n",
+  "to": "            if claimed {\n"
+ },
+ {
+  "id": "DV-14",
+  "by": "author",
+  "what": "an added entry keeps the hashes its author wrote",
+  "file": "src/divergence.rs",
+  "from": "                        entry.insert(hash.to_string(), Json::String(derived));\n",
+  "to": "                        let _ = derived;\n"
+ },
+ {
+  "id": "DV-15",
+  "by": "author",
+  "what": "a wording patch leaves the old hash",
+  "file": "src/divergence.rs",
+  "from": "            if let Some(hash) = parsed.hash_key() {\n",
+  "to": "            if let Some(hash) = None::<Key> {\n"
+ },
+ {
+  "id": "DV-16",
+  "by": "author",
+  "what": "a whole list may be masked on a real book",
+  "file": "src/divergence.rs",
+  "from": "                Key::Top(top) if top != \"population_note_text\" => {\n",
+  "to": "                Key::Top(_) if false => {\n"
+ },
+ {
+  "id": "DV-17",
+  "by": "author",
+  "what": "a whole entry on both sides may be masked",
+  "file": "src/divergence.rs",
+  "from": "                Key::Entry { field: None, .. } if want.is_some() && got.is_some() => {\n",
+  "to": "                Key::Entry { field: None, .. } if false => {\n"
+ },
+ {
+  "id": "DV-18",
+  "by": "author",
+  "what": "an expected divergence of another test is accepted",
+  "file": "src/divergence.rs",
+  "from": "        if d.test != test_id {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "DV-19",
+  "by": "author",
+  "what": "an expected divergence counts as shown without showing",
+  "file": "src/divergence.rs",
+  "from": "            .any(|line| line.starts_with(&format!(\"{id}: \")))\n",
+  "to": "            .any(|_| true)\n"
  }
 ]

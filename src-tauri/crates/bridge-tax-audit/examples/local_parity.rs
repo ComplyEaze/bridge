@@ -280,7 +280,11 @@ fn main() -> ExitCode {
     let (mut divergence_file, mut expected_ids) = (None, Vec::new());
     loop {
         match args.as_slice() {
-            [flag, value, ..] if flag == "--divergences" => divergence_file = Some(value.clone()),
+            [flag, value, ..] if flag == "--divergences" => {
+                if divergence_file.replace(value.clone()).is_some() {
+                    return fail("--divergences is given twice");
+                }
+            }
             [flag, value, ..] if flag == "--expect" => expected_ids.push(value.clone()),
             _ => break,
         }
@@ -288,6 +292,9 @@ fn main() -> ExitCode {
     }
     if !expected_ids.is_empty() && divergence_file.is_none() {
         return fail("--expect needs --divergences");
+    }
+    if let Some(flag) = args.iter().find(|arg| arg.starts_with("--")) {
+        return fail(format!("{flag}: flags come before TEST_ID"));
     }
     let (test_id, rules_toml, client_toml, read_dir, python_dump, rust_out, report_json, eighth) =
         match args.as_slice() {
@@ -498,10 +505,11 @@ read (parity/python_golden.py --emit-bank-statement)",
         Ok(masked) => masked,
         Err(e) => return fail(format!("DIVERGENCES REFUSED: {e}")),
     };
-    let missing: Vec<&String> = expected_ids
-        .iter()
-        .filter(|id| !declared.iter().any(|d| d.starts_with(&format!("{id}: "))))
-        .collect();
+    let missing =
+        match divergence::expected_missing(&expected_ids, &declared, test_id, &divergences) {
+            Ok(missing) => missing,
+            Err(e) => return fail(format!("DIVERGENCES REFUSED: {e}")),
+        };
     for d in &declared {
         println!("  declared: {d}");
     }

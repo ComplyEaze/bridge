@@ -14,3 +14,18 @@ ans-q4-bs-h1.xml (not committed: same bytes as ans-q2-bs-fy.xml) | 1840 | fb590b
 # Finding: the Profit and Loss answer carries closing stock as a leaf, /ENVELOPE/PLAMT[5]/PLSUBAMT = -2100.00,
 # paired with /ENVELOPE/DSPACCNAME[5]/DSPDISPNAME = "Less: Closing Stock". The Balance Sheet answer holds no 2100 leaf;
 # Current Assets is one BSMAINAMT of -53000.00. There is no Gross Profit leaf in the Profit and Loss answer.
+#
+# Step 2 addition: three production request texts from origin/master 9263657bfce34e25b06ddcaabce5a901954d28dc,
+# src-tauri/crates/bridge-tally-protocol/tests/fixtures/, edited only as noted (UTF-16LE with byte-order mark kept), sent once each to BRIDGE TIEOUT B loaded alone.
+# Answers are byte-exact as received (UTF-16LE, no byte-order mark), all HTTP 200.
+# answer | bytes | sha256 | request (bytes, sha256) | source fixture (bytes, sha256) | report | from | to | edit
+answers/ans-b1-tb-fy.xml | 13476 | 7ff82ce27ed95949fae25a08a4df4268542c2bfd3c4a77fb0719a05a0281a4ec | requests/b1-tb-fy.utf16le.xml (1142, e25f2e4e5892ff497990726fb73451eda5c28fa5c8e186bcc6d92136cc0f8249) | statement_trial_balance_fy_request.utf16le.xml (1144, 2b66b57d39579ec152f6c41ff96ea98185862af7cf55efdc536813bd470bec3d) | List of Ledgers (trial balance fetch) | 20250401 | 20260331 | company name BRIDGE READS LAB -> BRIDGE TIEOUT B
+answers/ans-b2-groups.xml | 54280 | 48678d9701f6b169bc03dfb1521373eee79bce2ab949940d2252502085ea033c | requests/b2-groups.utf16le.xml (1064, 130d5ffa6295243da2751e1cc1845e31da3763e2790276b2cc0dd9dc46e51757) | statement_groups_fy_request.utf16le.xml (1066, 1eea1e25ad0a3bca798f3baf233afd7f9226dfaca253174674b7b0f15e8fe9cc) | List of Groups | - | - | company name BRIDGE READS LAB -> BRIDGE TIEOUT B
+answers/ans-b3-company-features.xml | 5812 | 35b48831d16fe1869b9d3b2f10b22a8291f69a01acc2d048f1c85c1a2cf13dae | requests/b3-company-features.utf16le.xml (1886, 213f400cbf8a895b414e103b8096a088ecf25428db40f02789d3ac7787d60f3e) | company_features_shape_lab_request.utf16le.xml (1888, 4551fc700d0d7070a39f37b812dad9a4b0a30456bedc205ddd77ed7e7bd31caa) | BridgeCompanyFeaturesV1 | - | - | company name BRIDGE SHAPE LAB -> BRIDGE TIEOUT B, and the GUID filter value -> d64eda55-da7c-4106-a171-3e3cb6cdd331 (TIEOUT B; with the fixture GUID the filter would match no company)
+#
+# Findings: the trial balance answer holds 9 LEDGER objects: Lab Capital 50000.00, Lab Supplier 3000.00, Lab Bank -49500.00,
+# Lab Customer -1400.00, Lab Sales 1400.00, Lab Purchase -3000.00, Lab Freight -500.00 (TBALCLOSING), plus Cash 0.00 and Profit & Loss A/c 0.00.
+# The groups answer holds 28 GROUP objects, each with BRIDGECOMPANYGUID d64eda55-da7c-4106-a171-3e3cb6cdd331.
+# The company-features answer reports ISINTEGRATED Yes (ISINVENTORYON Yes, ISACCOUNTINGON Yes, ISBILLWISEON Yes, ISBATCHWISEON No, ISGSTON Yes).
+# Parsing note: the trial balance answer carries 1 character reference &#4; and the groups answer 30 of them plus 82 raw U+0003
+# characters (in PARENTSTRUCTURE); a strict XML 1.0 parser rejects both, so they were stripped before parsing, never in the saved bytes.

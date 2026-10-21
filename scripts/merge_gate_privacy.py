@@ -391,14 +391,21 @@ def enclosing_token(text, start, end):
     return text[left:right]
 
 
-def synthetic_token(token):
-    """Whether a whole token is visibly synthetic: a X/Z placeholder reference, or one digit repeated.
+# A visibly synthetic token around a run of digits: three or four X or Z, then digits only, at most 24 of
+# them (#1743). Nothing may follow the digits, so an identifier glued after a prefix does not pass.
+SYNTHETIC_PREFIX_TOKEN_RE = re.compile(r"(?:X{3,4}|Z{3,4})\d{1,24}", re.I)
+DIGITS_ONLY_RE = re.compile(r"[0-9]+")
 
-    The token is judged whole, so a run beside a placeholder (``ZZZZ 123456789012``) or a repeated run inside
-    a longer token that is not itself repeated (``1111111111119876``) still counts.
+
+def synthetic_token(token):
+    """Whether a whole token of digits is visibly synthetic: a 3-4 letter X/Z prefix and digits only, or one
+    digit repeated.
+
+    The token is judged whole, so a run beside a placeholder (``ZZZZ 123456789012``), a repeated run inside
+    a longer token that is not itself repeated (``1111111111119876``), and an identifier glued after a prefix
+    (``11X9876543210``) still count.
     """
-    upper = token.upper()
-    return bool(PLACEHOLDER_RE.fullmatch(upper) or REPEATED_DIGIT_RE.fullmatch(upper))
+    return bool(SYNTHETIC_PREFIX_TOKEN_RE.fullmatch(token) or REPEATED_DIGIT_RE.fullmatch(token))
 
 
 def nonplaceholder_count(pattern, text):
@@ -408,7 +415,11 @@ def nonplaceholder_count(pattern, text):
         compact = value.replace(" ", "").replace("-", "")
         if PLACEHOLDER_RE.fullmatch(compact):
             continue
-        if synthetic_token(enclosing_token(text, match.start(), match.end())):
+        # The whole-token rule applies to a run of digits only. A match that holds letters (a PAN or GSTIN
+        # shape) keeps the earlier rule: it is exempt only when the match itself is a placeholder.
+        if DIGITS_ONLY_RE.fullmatch(value) and synthetic_token(
+            enclosing_token(text, match.start(), match.end())
+        ):
             continue
         count += 1
     return count

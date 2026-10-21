@@ -1024,6 +1024,22 @@ class PrivacyScannerSyntheticReferences1743(unittest.TestCase):
         for text in ("ref 1111111111119876", "ref 9876111111111111", "ref AB111111111111", "ref 111111111111AB"):
             self.assert_blocked(text)
 
+    def test_an_identifier_glued_after_or_around_a_prefix_still_blocks(self):
+        # Reviewer reproductions: a PAN shape and a mobile shape behind two digits and an X, and a
+        # prefix that is too short, too long, or followed by anything but digits.
+        for text in (
+            "pan 12X1ABCDE1234F",
+            "id 11X9876543210",
+            "acct X482916375204",
+            "call X9876543210",
+            "ref XX482916375204",
+            "ref ZZZZZ482916375204",
+            "ref ZZZZ482916375204A",
+            "ref ZZZZ482916375204ZZZZ",
+            "ref ZZZZ" + "1" * 25,
+        ):
+            self.assert_blocked(text)
+
     def test_the_family_stays_narrow_two_digits_and_a_leading_digit_do_not_qualify(self):
         for text in ("ref 100000000002", "ref 121212121212", "ref 111111111112", "call 9999999990"):
             self.assert_blocked(text)

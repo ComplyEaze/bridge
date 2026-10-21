@@ -1,0 +1,16 @@
+# Issue #692 step 2: raw Export Data reports from the synthetic company BRIDGE TIEOUT B,
+# loaded alone in TallyPrime release 7.1 Silver (reported by Tally itself), read-only, on 21 Oct 2026.
+# Requests: UTF-16LE with byte-order mark, POSTed as text/xml; charset=utf-16 to the loopback XML port.
+# Answers are saved byte-exact as received (UTF-16LE, no byte-order mark). All four were HTTP 200.
+# The book's last voucher is dated 1-Jun-2025, so the half-year answers (q3, q4) came back with the same bytes
+# as the full-year ones (q1, q2); only q1 and q2 are committed.
+#
+# answer | bytes | sha256 | request (bytes, sha256) | report | company | from | to | release
+answers/ans-q1-pl-fy.xml | 1920 | d5dcdea6d99839492ddbdd17a0c809f8d25d2d415f523f5db7b8897e4c736835 | requests/q1-pl-fy.xml (760, 2da98ea3fc23fea1fb121914296bb41676397306c1497b390295e1743eb9045b) | Profit and Loss | BRIDGE TIEOUT B | 20250401 | 20260331 | TallyPrime 7.1 Silver
+answers/ans-q2-bs-fy.xml | 1840 | fb590bb683df71b661ca1a203a55a1aa6952e97d591cd2cf7c94d108bcaf9ea6 | requests/q2-bs-fy.xml (756, fcc94a8a4b6bea5019d7cfb28b1469e6894e803aff8af5748d8b0c7e6117a10c) | Balance Sheet | BRIDGE TIEOUT B | 20250401 | 20260331 | TallyPrime 7.1 Silver
+ans-q3-pl-h1.xml (not committed: same bytes as ans-q1-pl-fy.xml) | 1920 | d5dcdea6d99839492ddbdd17a0c809f8d25d2d415f523f5db7b8897e4c736835 | requests/q3-pl-h1.xml (760, 9b89bc4c404274cc5068c51ca41eaeb83b5b11d2043f809e0af92563a8aa053d) | Profit and Loss | BRIDGE TIEOUT B | 20250401 | 20250930 | TallyPrime 7.1 Silver
+ans-q4-bs-h1.xml (not committed: same bytes as ans-q2-bs-fy.xml) | 1840 | fb590bb683df71b661ca1a203a55a1aa6952e97d591cd2cf7c94d108bcaf9ea6 | requests/q4-bs-h1.xml (756, 76223e34ae7ed287d1e100aaf856424e5347004b0472d5ee65771c5cf0323d87) | Balance Sheet | BRIDGE TIEOUT B | 20250401 | 20250930 | TallyPrime 7.1 Silver
+#
+# Finding: the Profit and Loss answer carries closing stock as a leaf, /ENVELOPE/PLAMT[5]/PLSUBAMT = -2100.00,
+# paired with /ENVELOPE/DSPACCNAME[5]/DSPDISPNAME = "Less: Closing Stock". The Balance Sheet answer holds no 2100 leaf;
+# Current Assets is one BSMAINAMT of -53000.00. There is no Gross Profit leaf in the Profit and Loss answer.

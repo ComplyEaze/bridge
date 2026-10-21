@@ -14,7 +14,7 @@
 //! a count per file, not a list of lines, so an edit that swaps one hand-entry text for another
 //! in the same file passes.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
@@ -25,12 +25,13 @@ const PINNED: &[(&str, usize)] = &[
     ("crates/bridge-bank-statement/src/cash.rs", 2),
     ("crates/bridge-tax-audit/src/financial_statements.rs", 1),
     ("src/agent_bank_statement.rs", 1),
-    ("src/agent_catalog.rs", 14),
-    ("src/agent_desktop_journal_review.rs", 3),
-    ("src/agent_import.rs", 8),
+    ("src/agent_catalog.rs", 22),
+    ("src/agent_desktop_journal_review.rs", 4),
+    ("src/agent_gst_status.rs", 1),
+    ("src/agent_import.rs", 11),
     ("src/agent_import_numbering.rs", 2),
-    ("src/agent_import_post.rs", 3),
-    ("src/agent_import_verification.rs", 2),
+    ("src/agent_import_post.rs", 6),
+    ("src/agent_import_verification.rs", 3),
     ("src/agent_masters.rs", 1),
 ];
 
@@ -153,22 +154,25 @@ fn production_part(source: &str) -> &str {
     source
 }
 
-/// Words that make the sentence around a phrase a prohibition or a statement of what is not done.
-const NEGATIONS: [&str; 9] = [
-    "not ",
-    "n't ",
+/// Words that make a clause a prohibition of the thing it names, or a statement that it is not done.
+const NEGATIONS: [&str; 8] = [
+    "do not ",
+    "don't ",
     "never ",
-    "no longer ",
+    "must not ",
+    "should not ",
+    "cannot ",
     "without ",
     "nobody ",
-    "cannot ",
-    "instead of ",
-    "rather than ",
 ];
 
+/// Where a clause ends: a negation governs a phrase only within its own clause.
+const CLAUSE_BREAKS: [char; 6] = ['.', '!', '?', ';', ':', ','];
+
 /// How many hand-entry phrases the string literals of `source` carry as an instruction, case and
-/// spacing aside. A phrase counts unless its sentence (from the last `.`, `!`, `?` or `;` before
-/// it) holds a negation.
+/// spacing aside. A phrase counts unless its clause (from the last `.`, `!`, `?`, `;`, `:` or `,`
+/// before it) holds a negation, so "Do not create it by hand." is not counted and "It does not get
+/// past this check: tell the user and enter it by hand." is.
 fn hand_entry_hits(source: &str) -> usize {
     string_literals(production_part(source))
         .iter()
@@ -184,11 +188,11 @@ fn hand_entry_hits(source: &str) -> usize {
                     text.match_indices(phrase)
                         .filter(|(at, _)| {
                             let before = &text[..*at];
-                            let sentence = before
-                                .rfind(['.', '!', '?', ';'])
+                            let clause = before
+                                .rfind(CLAUSE_BREAKS)
                                 .map_or(before, |end| &before[end + 1..]);
-                            let sentence = format!(" {sentence}");
-                            !NEGATIONS.iter().any(|negation| sentence.contains(negation))
+                            let clause = format!(" {clause}");
+                            !NEGATIONS.iter().any(|negation| clause.contains(negation))
                         })
                         .count()
                 })
@@ -197,7 +201,12 @@ fn hand_entry_hits(source: &str) -> usize {
         .sum()
 }
 
-fn scan(directory: &Path, relative: &str, found: &mut BTreeMap<String, usize>) {
+fn scan(
+    directory: &Path,
+    relative: &str,
+    found: &mut BTreeMap<String, usize>,
+    visited: &mut BTreeSet<String>,
+) {
     let Ok(entries) = fs::read_dir(directory) else {
         return;
     };
@@ -207,22 +216,27 @@ fn scan(directory: &Path, relative: &str, found: &mut BTreeMap<String, usize>) {
         let relative_path = format!("{relative}/{name}");
         if path.is_dir() {
             if name != "tests" {
-                scan(&path, &relative_path, found);
+                scan(&path, &relative_path, found, visited);
             }
         } else if name.ends_with(".rs") && !name.ends_with("tests.rs") {
             let source = fs::read_to_string(&path).expect("a production source file is readable");
+            let relative_path = relative_path.trim_start_matches('/').to_string();
+            visited.insert(relative_path.clone());
             let hits = hand_entry_hits(&source);
             if hits > 0 {
-                found.insert(relative_path.trim_start_matches('/').to_string(), hits);
+                found.insert(relative_path, hits);
             }
         }
     }
 }
 
-fn production_hits() -> BTreeMap<String, usize> {
+/// The hits per file, and every production file the walk read (so an unreadable or moved tree is
+/// told from a tree with no hand-entry texts).
+fn production_hits() -> (BTreeMap<String, usize>, BTreeSet<String>) {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut found = BTreeMap::new();
-    scan(&root.join("src"), "src", &mut found);
+    let mut visited = BTreeSet::new();
+    scan(&root.join("src"), "src", &mut found, &mut visited);
     let mut crates: Vec<_> = fs::read_dir(root.join("crates"))
         .expect("the crates directory is readable")
         .flatten()
@@ -234,9 +248,10 @@ fn production_hits() -> BTreeMap<String, usize> {
             &krate.path().join("src"),
             &format!("crates/{name}/src"),
             &mut found,
+            &mut visited,
         );
     }
-    found
+    (found, visited)
 }
 
 #[test]
@@ -281,7 +296,26 @@ fn the_scan_reads_string_literals_and_nothing_else() {
     );
     assert_eq!(
         hand_entry_hits("const A: &str = \"Do not post, then key it by hand or manually.\";"),
-        0
+        2,
+        "a comma ends the clause: the negation does not reach past it"
+    );
+    assert_eq!(
+        hand_entry_hits(
+            "const A: &str = \"A new number does not get past this check: tell the user and enter it in Tally by hand.\";"
+        ),
+        1,
+        "a conditional instruction after a colon is an instruction"
+    );
+    assert_eq!(
+        hand_entry_hits(
+            "const A: &str = \"It cannot post it while that batch is unconfirmed: enter it in Tally by hand.\";"
+        ),
+        1
+    );
+    assert_eq!(
+        hand_entry_hits("const A: &str = \"Never enter it by hand, and do not do it manually.\";"),
+        0,
+        "each clause holds its own negation"
     );
     assert_eq!(
         hand_entry_hits("const Q: char = '\"';\nconst A: &str = \"by hand\";"),
@@ -312,9 +346,24 @@ fn the_scan_reads_string_literals_and_nothing_else() {
 
 #[test]
 fn texts_that_send_a_person_to_key_vouchers_by_hand_only_shrink() {
-    let found = production_hits();
+    let (found, visited) = production_hits();
     let pinned: BTreeMap<&str, usize> = PINNED.iter().copied().collect();
     let mut problems = Vec::new();
+    // The floor: a scan that read nothing would find nothing. Every pinned file must have been read
+    // (it may have fewer hits than its pin, or none), and the walk must have read the tree.
+    for file in pinned.keys() {
+        if !visited.contains(*file) {
+            problems.push(format!(
+                "{file}: pinned but not read by the scan (moved, or the tree is unreadable)"
+            ));
+        }
+    }
+    if visited.len() < 100 {
+        problems.push(format!(
+            "the scan read only {} production files",
+            visited.len()
+        ));
+    }
     for (file, hits) in &found {
         match pinned.get(file.as_str()) {
             None => problems.push(format!("{file}: {hits} hand-entry text(s), none allowed")),

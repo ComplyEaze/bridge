@@ -14,6 +14,19 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
+**Added**
+
+- `gst_uncertain_vouchers` lists the vouchers of one voucher type (a Sales type is what was measured) in a window that Tally marks Uncertain in its
+  GSTR-1, and the vouchers a person accepted as they stand (Accept As Is), each with its party ledger, its invoice total
+  (without its sign, with its side) and Tally's identifiers, and the line a CA reads before filing. It counts the window's
+  vouchers with the status read first and refuses a window above 1,000 vouchers (provisional) before it reads amounts; the
+  line names the voucher type it covers, and is withheld when no voucher was read or none is uncertain, and, with the
+  result partial, when a voucher's flags or a listed voucher's party or amount were not read. Its answer carries party names and amounts
+  to the assistant; `mask_parties` masks the names and not the amounts. The reason for uncertainty is not read, and bills
+  missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one
+  Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not
+  measured.
+
 **Changed**
 
 - A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
@@ -163,17 +176,6 @@ code-signed.
   mark is above 25,000 is refused. Measured on one synthetic book of TallyPrime 7.1 Silver, for the unregistered
   buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured, and an excluded
   voucher has not been observed.
-
-- `gst_uncertain_vouchers` lists the vouchers of one voucher type (a Sales type is what was measured) in a window that Tally marks Uncertain in its
-  GSTR-1, and the vouchers a person accepted as they stand (Accept As Is), each with its party ledger, its invoice total
-  (without its sign, with its side) and Tally's identifiers, and the line a CA reads before filing. It counts the window's
-  vouchers with the status read first and refuses a window above 1,000 vouchers (provisional) before it reads amounts; the
-  line names the voucher type it covers, and is withheld when no voucher was read or none is uncertain, and, with the
-  result partial, when a voucher's flags or a listed voucher's party or amount were not read. Its answer carries party names and amounts
-  to the assistant; `mask_parties` masks the names and not the amounts. The reason for uncertainty is not read, and bills
-  missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one
-  Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not
-  measured.
 
 - `company_features` reads three settings that a company's record in Tally holds today (cost centres, GST
   and batch-wise stock) and its currency symbol (part of #1231). Each setting is yes, no or

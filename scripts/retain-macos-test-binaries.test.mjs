@@ -74,7 +74,7 @@ test("symlink, missing and byte limit are errors", (t) => {
   assert.deepEqual(collect(undefined, { maxBytes: 1 }).errors, ["binary_byte_limit"]);
 });
 
-test("fifo is rejected without waiting for a writer", (t) => {
+test("fifo is rejected without waiting for a writer", { skip: process.platform === "win32" && "no mkfifo on Windows" }, (t) => {
   const { binary, collect } = setup(t);
   unlinkSync(binary);
   assert.equal(spawnSync("mkfifo", [binary]).status, 0);

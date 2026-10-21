@@ -197,7 +197,7 @@ test("main writes the file, prints the summary and exits 1 only for a capture er
   assert.deepEqual(run("bad.json"), [1, { status: "capture_error", reports: 1, errors: ["report_read_or_parse_failed"] }]);
 });
 
-test("a diagnostics folder that cannot be listed is skipped, as the Python glob did", (t) => {
+test("a diagnostics folder that cannot be listed is skipped and counted", { skip: process.platform === "win32" && "chmod does not stop a listing on Windows" }, (t) => {
   if (process.getuid?.() === 0) return t.skip("root can list any folder");
   const root = mkdtempSync(join(tmpdir(), "crash-unreadable-"));
   t.after(() => {
@@ -205,10 +205,10 @@ test("a diagnostics folder that cannot be listed is skipped, as the Python glob 
     rmSync(root, { recursive: true, force: true });
   });
   chmodSync(root, 0o000);
-  assert.deepEqual(collect([root], 0), { status: "no_fresh_reports", reports: [], errors: [], truncated: false });
+  assert.deepEqual(collect([root], 0), { status: "no_fresh_reports", reports: [], errors: [], truncated: false, unlisted_directories: 1 });
 });
 
-test("a FIFO named like a report is an error and never blocks the read", (t) => {
+test("a FIFO named like a report is an error and never blocks the read", { skip: process.platform === "win32" && "no mkfifo on Windows" }, (t) => {
   const root = mkdtempSync(join(tmpdir(), "crash-fifo-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   execFileSync("mkfifo", [join(root, "bridge_lib-fifo.ips")]);

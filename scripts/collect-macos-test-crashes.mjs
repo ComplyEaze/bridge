@@ -106,8 +106,10 @@ export function collect(directories, since) {
       names = readdirSync(directory);
     } catch (error) {
       // As the Python glob did, a directory that is missing or cannot be listed is skipped: an
-      // unreadable diagnostics folder must not fail a native run whose tests passed.
-      if (!["ENOENT", "ENOTDIR", "EACCES", "EPERM"].includes(error.code)) result.errors.push("directory_read_failed");
+      // unreadable diagnostics folder must not fail a native run whose tests passed. One that could
+      // not be listed is counted, so "nothing found" is told apart from "could not look".
+      if (error.code === "EACCES" || error.code === "EPERM") result.unlisted_directories = (result.unlisted_directories ?? 0) + 1;
+      else if (error.code !== "ENOENT" && error.code !== "ENOTDIR") result.errors.push("directory_read_failed");
       continue;
     }
     for (const name of names.filter((entry) => /^bridge_lib.*\.ips$/.test(entry))) {
@@ -206,7 +208,7 @@ export function main(argv, env = {}) {
   const directories = env.directories ?? [join(homedir(), "Library/Logs/DiagnosticReports"), "/Library/Logs/DiagnosticReports"];
   const result = waitForReports(directories, statSync(args.sinceFile).mtimeMs, args.waitSeconds, env.clock);
   writeFileSync(args.output, encodeResult(result));
-  (env.stdout ?? process.stdout).write(`${JSON.stringify({ status: result.status, reports: result.reports.length, errors: result.errors })}\n`);
+  (env.stdout ?? process.stdout).write(`${JSON.stringify({ status: result.status, reports: result.reports.length, errors: result.errors, unlisted_directories: result.unlisted_directories })}\n`);
   return result.status === "capture_error" ? 1 : 0;
 }
 

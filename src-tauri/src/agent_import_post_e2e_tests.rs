@@ -5099,6 +5099,11 @@ async fn a_rollback_once_seen_outlasts_the_mark_rising_again() {
         first["post_span_binding"]["rollback_recorded"], true,
         "{first}"
     );
+    assert_eq!(
+        first["post_span_binding"]["other_batches_covered"],
+        json!({"count": 0, "first": []}),
+        "{first}"
+    );
     for later in &verified[1..] {
         let result = &later["structuredContent"]["result"];
         let binding = &result["post_span_binding"];
@@ -5139,6 +5144,13 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
     )
     .await;
     let result = &verified[0]["structuredContent"]["result"];
+    // An omitted mark is not a mark of zero: nothing is recorded (#1050).
+    assert!(
+        result["post_span_binding"]
+            .get("rollback_recorded")
+            .is_none(),
+        "{result}"
+    );
     assert_eq!(
         result["post_span_binding"]["state"], "book_rolled_back",
         "{result}"

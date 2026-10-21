@@ -20,7 +20,8 @@ These changes are in source and not yet in a published build.
   `verify_import` reads the company's voucher mark below a natively posted batch's, and Tally's answer carried the
   mark, the import journal records it, and from then on no natively posted batch of that company at that Tally
   address that it covers reads `posted_verified`, even after vouchers keyed again by hand raise the mark past it:
-  its vouchers read as matching content and the answer says to check them in Tally. Before, a voucher keyed again
+  a voucher it finds reads as matching content, one it does not as `book_rolled_back`, and the answer says to check
+  them in Tally. The answer that records it names the company's other native batches it covers, to verify again. Before, a voucher keyed again
   with the same content could read verified once the mark had risen. Limits: a restore that is keyed or edited past
   the mark before any check is still not seen; a wrong backup restored and then the right one leaves the batches it
   covered reading rolled back; and a covered Sales invoice batch stops that company's invoices until released.

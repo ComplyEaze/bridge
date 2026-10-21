@@ -2013,26 +2013,25 @@ impl Server {
                     }
                     // A rollback this verification saw first, on a mark Tally
                     // answered, is recorded once, so it outlasts the mark rising
-                    // again. A failed write still reports the rollback.
+                    // again. A record that cannot be written fails the call.
                     if let (true, None, Some(mark)) =
                         (decision.rolled_back, &rollback.covered_by, current)
                     {
                         if rollback.own_lowest_mark.is_none_or(|lowest| mark < lowest) {
-                            match self.record_rollback_seen(
-                                &line,
-                                mark,
-                                rollback.records,
-                                generation,
-                            ) {
-                                Ok(recorded) => {
-                                    generation = recorded;
-                                    decision.report["rollback_recorded"] = json!(true);
-                                }
-                                Err(code) => {
-                                    decision.report["rollback_recorded"] = json!(false);
-                                    decision.report["rollback_record_error"] = json!(code);
-                                }
-                            }
+                            // A record that cannot be written fails this
+                            // verification, retryably: a rollback seen and not
+                            // recorded is the false verified this guards.
+                            let (recorded, others) = self
+                                .record_rollback_seen(&line, mark, rollback.records, generation)
+                                .map_err(ToolFailure::from)?;
+                            generation = recorded;
+                            decision.report["rollback_recorded"] = json!(true);
+                            // The company's other native batches it covers keep
+                            // their status until each is verified again.
+                            decision.report["other_batches_covered"] = json!({
+                                "count": others.len(),
+                                "first": others.iter().take(10).collect::<Vec<_>>(),
+                            });
                         }
                     }
                     decision
@@ -2709,14 +2708,15 @@ impl Server {
     /// Records that `line`'s verification read the company's voucher mark at
     /// `mark` below the batch's floor, having read `records_before_read`
     /// journal records first (#1050). Under the exclusive lock, against the
-    /// generation this verification read, as a post-span verdict is.
+    /// generation this verification read, as a post-span verdict is. Returns
+    /// the new generation and the company's other native batches it covers.
     fn record_rollback_seen(
         &self,
         line: &ImportLedgerLine,
         mark: u64,
         records_before_read: u64,
         expected: ledger::VerificationGeneration,
-    ) -> Result<ledger::VerificationGeneration, String> {
+    ) -> Result<(ledger::VerificationGeneration, Vec<String>), String> {
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
@@ -2732,7 +2732,11 @@ impl Server {
         let recorded = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
             .ok_or_else(|| "import_batch_not_found".to_string())?;
-        Ok(recorded.generation)
+        let others = match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::covered_by_records_of(reader, &line.batch_id)?,
+            None => Vec::new(),
+        };
+        Ok((recorded.generation, others))
     }
 
     /// Every GUID another batch's post-span verdict bound.

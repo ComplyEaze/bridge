@@ -2494,11 +2494,15 @@ numbers the post's vouchers held (measured once on a synthetic company,
 bridge#1050), and no identifier a read returns tells the two apart. So a
 rollback, once seen, is recorded: when a check of a native post reads the
 company's voucher mark below that post's, and Tally's answer carried the mark,
-the import journal keeps a record of it (`post_span_binding.rollback_recorded`).
+the import journal keeps a record of it (`post_span_binding.rollback_recorded`,
+with `other_batches_covered`: how many of the company's other native posts it
+covers, and the first ten, to verify again). A record that cannot be written
+fails the check, to be run again.
 From then on no native post of the same company (name, GUID, company number
 and books-from date) at the same Tally address reads `posted_verified` if it
 was sent before that check read the journal and the vouchers it had proved by
-then (its binding, or Tally's answer) put it above the mark read:
+then (its binding, else Tally's answer, else its mark before the post) put it
+above the mark read:
 `post_span_binding` is then `book_rolled_back` with `mark_read` and `seen_by`
 (the batch whose check saw it), its vouchers read as matching content, not as
 its own, and the plain line says to check them in Tally. The check still sees a

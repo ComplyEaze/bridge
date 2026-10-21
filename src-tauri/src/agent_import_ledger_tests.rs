@@ -783,3 +783,79 @@ fn a_stored_date_that_is_not_yyyymmdd_refuses_the_journal() {
         }
     }
 }
+
+/// #1050: a rollback another verification recorded after this one read the
+/// journal stops this one persisting `posted_verified` (it would be a status
+/// the record covers), and lets any other status through.
+#[test]
+fn a_rollback_recorded_meanwhile_stops_a_posted_verified_persist() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path());
+    let placed = |batch_id: &str, sha: char| {
+        let mut line = batch();
+        line.batch_id = batch_id.into();
+        line.sha256 = sha.to_string().repeat(64);
+        line.company = Some(
+            serde_json::from_value(json!({
+                "name": "BRIDGE ROLLBACK LAB", "guid": GUID,
+                "company_number": "100054", "books_from": "20260401"
+            }))
+            .unwrap(),
+        );
+        line.endpoint_origin = Some("http://127.0.0.1:9".into());
+        line
+    };
+    let intent = |line: &ImportLedgerLine, pre: u64| {
+        json!({
+            "record_type": "dispatch_intent", "batch_id": line.batch_id,
+            "batch_sha256": line.sha256, "status": "dispatch_started",
+            "native_request_sha256": "c".repeat(64),
+            "native_remote_id": "00000000-0000-4000-8000-0000000010a0",
+            "pre_post_voucher_mark": pre
+        })
+    };
+    let append = |value: &Value| {
+        let mut bytes = serde_json::to_vec(value).unwrap();
+        bytes.push(b'\n');
+        let path = directory.path().join("agent-import-ledger.jsonl");
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(path)
+            .unwrap();
+        std::io::Write::write_all(&mut file, &bytes).unwrap();
+    };
+    let p = placed("bridge-00000000-0000-4000-8000-0000000010a1", 'a');
+    let q = placed("bridge-00000000-0000-4000-8000-0000000010a2", 'b');
+    append(&serde_json::to_value(&p).unwrap());
+    append(&intent(&p, 10));
+    let generation = server
+        .latest_import_snapshot(&p.batch_id)
+        .unwrap()
+        .unwrap()
+        .generation;
+    // Another batch of the company records a rollback to mark 5, below P's
+    // pre-POST mark: P is covered.
+    append(&serde_json::to_value(&q).unwrap());
+    append(&intent(&q, 1));
+    append(&json!({
+        "record_type": "rollback_seen", "batch_id": q.batch_id,
+        "batch_sha256": q.sha256, "status": "rollback_seen",
+        "mark_read": 5, "records_before_read": 4
+    }));
+    let proof = json!({"batch_id": p.batch_id, "company": {"name": "Synthetic Book"}});
+    assert_eq!(
+        server
+            .persist_import_verification(&proof, &p, VerificationStatus::PostedVerified, generation)
+            .unwrap_err(),
+        "import_verification_conflict_retry"
+    );
+    server
+        .persist_import_verification(
+            &proof,
+            &p,
+            VerificationStatus::VerificationIncomplete,
+            generation,
+        )
+        .unwrap();
+}

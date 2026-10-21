@@ -1473,6 +1473,14 @@ fn a_rollback_seen_on_one_batch_covers_an_earlier_batch_of_the_company() {
     }
     assert_eq!(cover(&journal, "p2").own_lowest_mark, Some(1));
     assert_eq!(cover(&journal, "p1").own_lowest_mark, None);
+    // The answer that recorded it names P1 as the batch to verify again.
+    assert_eq!(
+        covered_by_records_of(Cursor::new(journal.concat()), "p2").unwrap(),
+        vec!["p1".to_string()]
+    );
+    assert!(covered_by_records_of(Cursor::new(journal.concat()), "p1")
+        .unwrap()
+        .is_empty());
 }
 
 /// A record judges a batch only on what the journal held when its mark was

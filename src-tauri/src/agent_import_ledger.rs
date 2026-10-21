@@ -1480,87 +1480,151 @@ impl NativePost {
 /// that read count, so a post whose answer or binding came later is judged on
 /// its pre-POST mark alone, which a mark read after it cannot fall below.
 pub(super) fn rollback_cover(reader: impl BufRead, batch_id: &str) -> Result<RollbackScan, String> {
-    let mut places: BTreeMap<String, (Option<ImportCompanyTuple>, Option<String>)> =
-        BTreeMap::new();
-    let mut target = NativePost::default();
-    // Each rollback-seen record: the batch that wrote it, its mark and count.
-    let mut seen: Vec<(String, u64, usize)> = Vec::new();
-    let mut records = 0_usize;
-    scan_records(reader, |record, VerificationGeneration(at)| {
-        records = at + 1;
-        match record {
-            Record::Batch(batch) => {
-                places.insert(
-                    batch.batch_id.clone(),
-                    (batch.company.clone(), batch.endpoint_origin.clone()),
-                );
-            }
-            Record::Status(update) => {
-                if matches!(update.record_type, StatusKind::RollbackSeen) {
-                    if let (Some(mark), Some(count)) =
-                        (update.mark_read, update.records_before_read)
-                    {
-                        // Admission bounds the count by the record's position.
-                        let count = usize::try_from(count).unwrap_or(at);
-                        seen.push((update.batch_id.clone(), mark, count));
-                    }
-                }
-                if update.batch_id != batch_id {
-                    return;
-                }
-                match update.record_type {
-                    StatusKind::DispatchIntent => {
-                        target.intent_at = Some(at);
-                        target.pre_post_voucher_mark = update.pre_post_voucher_mark;
-                    }
-                    StatusKind::DispatchResponse => {
-                        if let Some(outcome) = update
-                            .response
-                            .as_ref()
-                            .and_then(|response| response.outcome.as_ref())
-                        {
-                            target.created_at = Some((at, outcome.counters().created));
-                        }
-                    }
-                    StatusKind::PostSpanVerdict => {
-                        if let Some(bound) = &update.bindings {
-                            target.bound_at = Some((at, bound.len() as u64));
-                        }
-                    }
-                    StatusKind::VerificationStatus
-                    | StatusKind::StopRelease
-                    | StatusKind::RollbackSeen => {}
-                }
-            }
-        }
-    })?;
-    let own_place = places
-        .get(batch_id)
-        .filter(|(company, endpoint)| company.is_some() && endpoint.is_some());
+    let facts = RollbackFacts::scan(reader)?;
+    let target = facts.posts.get(batch_id);
+    let own_place = facts.place_of(batch_id);
     let mut covered_by: Option<RollbackCover> = None;
     let mut own_lowest_mark: Option<u64> = None;
-    for (seen_by, mark_read, prefix) in seen {
+    for (seen_by, mark_read, prefix) in &facts.seen {
         if seen_by == batch_id {
-            own_lowest_mark = Some(own_lowest_mark.map_or(mark_read, |low| low.min(mark_read)));
+            own_lowest_mark = Some(own_lowest_mark.map_or(*mark_read, |low| low.min(*mark_read)));
         }
-        let same_place = own_place.is_some() && places.get(&seen_by) == own_place;
-        let covers = same_place
+        let covers = own_place.is_some()
+            && facts.place_of(seen_by) == own_place
             && target
-                .floor_within(prefix)
-                .is_some_and(|floor| floor > mark_read);
+                .and_then(|post| post.floor_within(*prefix))
+                .is_some_and(|floor| floor > *mark_read);
         if covers
             && covered_by
                 .as_ref()
-                .is_none_or(|cover| mark_read < cover.mark_read)
+                .is_none_or(|cover| *mark_read < cover.mark_read)
         {
-            covered_by = Some(RollbackCover { mark_read, seen_by });
+            covered_by = Some(RollbackCover {
+                mark_read: *mark_read,
+                seen_by: seen_by.clone(),
+            });
         }
     }
     Ok(RollbackScan {
-        records: records as u64,
+        records: facts.records as u64,
         covered_by,
         own_lowest_mark,
     })
+}
+
+/// The other native batches the rollback-seen records `seen_by` wrote cover,
+/// in journal order, for the answer that records a rollback to name: their
+/// own status is unchanged until each is verified again.
+pub(super) fn covered_by_records_of(
+    reader: impl BufRead,
+    seen_by: &str,
+) -> Result<Vec<String>, String> {
+    let facts = RollbackFacts::scan(reader)?;
+    let Some(place) = facts.place_of(seen_by) else {
+        return Ok(Vec::new());
+    };
+    let records = facts
+        .seen
+        .iter()
+        .filter(|(by, _, _)| by == seen_by)
+        .collect::<Vec<_>>();
+    Ok(facts
+        .order
+        .iter()
+        .filter(|batch_id| batch_id.as_str() != seen_by)
+        .filter(|batch_id| facts.place_of(batch_id) == Some(place))
+        .filter(|batch_id| {
+            facts.posts.get(*batch_id).is_some_and(|post| {
+                records.iter().any(|(_, mark_read, prefix)| {
+                    post.floor_within(*prefix)
+                        .is_some_and(|floor| floor > *mark_read)
+                })
+            })
+        })
+        .cloned()
+        .collect())
+}
+
+/// The batch's company and Tally address, as its full record names them.
+type Place = (Option<ImportCompanyTuple>, Option<String>);
+
+/// What one scan of the journal says about native posts and rollback-seen
+/// records, for [`rollback_cover`] and [`covered_by_records_of`].
+struct RollbackFacts {
+    places: BTreeMap<String, Place>,
+    posts: BTreeMap<String, NativePost>,
+    /// Batch ids in the order their first full record appeared.
+    order: Vec<String>,
+    /// Each rollback-seen record: the batch that wrote it, its mark and count.
+    seen: Vec<(String, u64, usize)>,
+    records: usize,
+}
+
+impl RollbackFacts {
+    fn scan(reader: impl BufRead) -> Result<Self, String> {
+        let mut facts = Self {
+            places: BTreeMap::new(),
+            posts: BTreeMap::new(),
+            order: Vec::new(),
+            seen: Vec::new(),
+            records: 0,
+        };
+        scan_records(reader, |record, VerificationGeneration(at)| {
+            facts.records = at + 1;
+            match record {
+                Record::Batch(batch) => {
+                    if !facts.places.contains_key(&batch.batch_id) {
+                        facts.order.push(batch.batch_id.clone());
+                    }
+                    facts.places.insert(
+                        batch.batch_id.clone(),
+                        (batch.company.clone(), batch.endpoint_origin.clone()),
+                    );
+                }
+                Record::Status(update) => {
+                    let post = facts.posts.entry(update.batch_id.clone()).or_default();
+                    match update.record_type {
+                        StatusKind::DispatchIntent => {
+                            post.intent_at = Some(at);
+                            post.pre_post_voucher_mark = update.pre_post_voucher_mark;
+                        }
+                        StatusKind::DispatchResponse => {
+                            if let Some(outcome) = update
+                                .response
+                                .as_ref()
+                                .and_then(|response| response.outcome.as_ref())
+                            {
+                                post.created_at = Some((at, outcome.counters().created));
+                            }
+                        }
+                        StatusKind::PostSpanVerdict => {
+                            if let Some(bound) = &update.bindings {
+                                post.bound_at = Some((at, bound.len() as u64));
+                            }
+                        }
+                        StatusKind::RollbackSeen => {
+                            if let (Some(mark), Some(count)) =
+                                (update.mark_read, update.records_before_read)
+                            {
+                                // Admission bounds the count by the record's position.
+                                let count = usize::try_from(count).unwrap_or(at);
+                                facts.seen.push((update.batch_id.clone(), mark, count));
+                            }
+                        }
+                        StatusKind::VerificationStatus | StatusKind::StopRelease => {}
+                    }
+                }
+            }
+        })?;
+        Ok(facts)
+    }
+
+    /// The batch's place, when its record names both a company and an address.
+    fn place_of(&self, batch_id: &str) -> Option<&Place> {
+        self.places
+            .get(batch_id)
+            .filter(|(company, endpoint)| company.is_some() && endpoint.is_some())
+    }
 }
 
 /// Every GUID that a batch other than `own_batch_id` has bound, the whole

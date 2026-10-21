@@ -104,6 +104,10 @@ pub(in crate::agent) struct Replay {
     pub(in crate::agent) marks_before: String,
     pub(in crate::agent) company: String,
     pub(in crate::agent) marks_in_window: (String, String),
+    /// The window's census. The census parser takes only each voucher's DATE,
+    /// ALTERID and GUID, so the voucher part itself serves as the census of
+    /// the same vouchers.
+    pub(in crate::agent) census: String,
     pub(in crate::agent) vouchers: String,
 }
 
@@ -116,6 +120,7 @@ impl Replay {
             marks_before: marks.clone(),
             company: company_object(FIXTURE_GUID),
             marks_in_window: (marks.clone(), marks),
+            census: period_vouchers(),
             vouchers: period_vouchers(),
         }
     }
@@ -149,6 +154,7 @@ impl Replay {
         let marks = replay.marks_before.replace("> 153<", "> 30<");
         replay.marks_before = marks.clone();
         replay.marks_in_window = (marks.clone(), marks);
+        replay.census = vouchers.clone();
         replay.vouchers = vouchers;
         replay
     }
@@ -170,6 +176,7 @@ impl Replay {
                 "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/vouchertypes.xml"
             )),
             self.marks_in_window.0.clone(),
+            self.census.clone(),
             self.vouchers.clone(),
             self.marks_in_window.1.clone(),
         ]
@@ -179,7 +186,8 @@ impl Replay {
     }
 }
 
-/// The whole period fits one request, so the window plans no census.
+/// The whole period fits one request: without the audit read's own rule, the
+/// window would plan no census (`SmallBooks::Skip`).
 fn one_request_window() -> WindowReadLimits {
     WindowReadLimits {
         budget_bytes: 1 << 40,
@@ -245,8 +253,13 @@ async fn a_clean_replay_is_admitted_and_sends_only_exports() {
     assert_eq!(audit.book.vouchers.len(), 43);
     assert_eq!(audit.engagement.period.from.as_str(), "20250401");
     assert_eq!(audit.engagement.cash_groups, roles().cash_groups);
-    // Nine parts, each between two company-list brackets, one at a time.
-    assert_eq!(observed.len(), 27);
+    // Ten requests (the census included, though the book fits one request),
+    // each between two company-list brackets, one at a time.
+    assert_eq!(observed.len(), 30);
+    assert!(
+        text_of(&observed[22].request_body).contains("<ID>Bridge Agent Voucher Census</ID>"),
+        "the eighth request is the window's census"
+    );
     for (index, request) in observed.iter().enumerate() {
         let body = text_of(&request.request_body);
         let is_part = index % 3 == 1;
@@ -339,6 +352,28 @@ async fn the_book_holds_what_the_crates_own_fixture_holds_of_the_same_bytes() {
             .collect::<Vec<_>>()
     };
     assert_eq!(guids(&audit.book), guids(&theirs)[..43]);
+}
+
+/// A book that has never held a voucher gets no census, so nothing outside the
+/// data says its window is whole: refused rather than run as an empty book.
+#[tokio::test]
+async fn a_window_no_census_counted_is_refused() {
+    let mut replay = Replay::clean();
+    let none = |marks: &str| marks.replace("> 153<", "> 0<");
+    replay.marks_before = none(&replay.marks_before);
+    replay.marks_in_window = (
+        none(&replay.marks_in_window.0),
+        none(&replay.marks_in_window.1),
+    );
+    // Such a window sends no census: after its opening marks come one data
+    // read (served from the census's slot, an empty collection) and its closing
+    // marks (served from the vouchers' slot).
+    replay.census = "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC>\
+                     </DESC><DATA><COLLECTION></COLLECTION></DATA></BODY></ENVELOPE>"
+        .to_string();
+    replay.vouchers = replay.marks_in_window.1.clone();
+    let failure = failure_of(read_replay(&replay).await.0);
+    assert_eq!(failure, AuditReadFailure::new(WINDOW_NOT_COUNTED, false));
 }
 
 #[tokio::test]

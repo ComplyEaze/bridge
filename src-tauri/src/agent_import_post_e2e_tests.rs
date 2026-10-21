@@ -6602,18 +6602,19 @@ macro_rules! pilot_queue_block {
 // (fixtures/agent/pilot-lab/PROVENANCE.md), except that the two voucher-numbering
 // answers (X and Y) were read on 16 Oct 2026, after the book had moved on, and
 // are served DERIVED: their rows above the master mark 223 removed
-// (`pilot_types_as_of_the_round`). Two more are from 10 Oct 2026, after the book
-// gained four ledgers: the ledger catalogue `k` and the rates read `Q`, which is
-// the read restricted to the parents of the invoice's ledgers (#1331). They are
-// one coherent pair (the scoped answer holds exactly the catalogue's ledgers
-// under those parents), paired here with the 9 Oct answers of the same book; the
-// pairing was not observed at one time. The order below is the order the
+// (`pilot_types_as_of_the_round`). Two more are from 21 Oct 2026, after the book
+// gained ledgers: the ledger catalogue `k` and the rates read `Q`, which is the
+// read restricted to the parents of the invoice's ledgers (#1331) with the
+// HSN/SAC fields (#691). They are one coherent pair read in the same minute (the
+// scoped answer holds exactly the catalogue's ledgers under those parents),
+// paired here with the 9 Oct answers of the same book; the pairing was not
+// observed at one time. The order below is the order the
 // build and then the post asked in, as observed against a replay of those
 // answers; it is not an order read off the code. Legend: s status probe, e
 // company list, m/M marks before/after the import, b book extent, c currencies,
 // L compliance listing, Q the same listing with each ledger's GST rate and
-// rounding (10 Oct 2026), restricted to the parents of the invoice's ledgers
-// and with the HSN/SAC rows (W16, 12 Oct 2026), P paired listing, g groups, T
+// rounding, restricted to the parents of the invoice's ledgers and with the
+// HSN/SAC rows (21 Oct 2026), P paired listing, g groups, T
 // voucher types, N number read, k ledger catalogue, w/W the 1-Aug window
 // before/after, C tax units, O the company object (W16, read after the
 // classification admits), X the voucher types bounded by the master mark and Y
@@ -6653,10 +6654,9 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'b' => "eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49", // r03-book-extent.xml
         'c' => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661", // r04-currencies.xml
         'L' => "c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386", // r05-ledgers-compliance.xml
-        // q1-rates-four-parents.xml (#1331) with the three HSN/SAC fields of
-        // w16-ledger-rates-hsn.xml added: the request the code renders, which
-        // the lab was not sent (the same edit turns the lab's unrestricted
-        // request into its W16 one: 2e728e00... to 03de8fa7...).
+        // The rates read restricted to the four parents (#1331) with the three
+        // HSN/SAC fields: the request the code renders, which the lab was
+        // sent on 21 Oct 2026 (req-1640-q1-hsn-rates-four-parents.xml).
         'Q' => "3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc",
         'O' => "72d8cd921a2a89aa781cbd768d013e58f167c2dc5072249fa92df5bdad301648", // w14-company-object.xml
         'G' => "237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02", // w16-groups-hsn.xml
@@ -6775,7 +6775,7 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml"),
         'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml"),
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
-        'Q' => unreachable!("DERIVED: served by pilot_plan from the lab's W16 answer"),
+        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"),
         'G' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.utf16le.xml"),
         'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
@@ -6783,7 +6783,7 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
         'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
-        'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml"),
+        'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"),
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
         'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
@@ -6794,10 +6794,6 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
 }
 
 fn pilot_plan(letter: char) -> ScenarioPlan {
-    if letter == 'Q' {
-        // DERIVED: see `pilot_scoped_rates_hsn`.
-        return pilot_answer(super::super::tests::pilot_scoped_rates_hsn());
-    }
     match pilot_bytes(letter) {
         // DERIVED: the two numbering answers as of the invoice round.
         Some(bytes) if matches!(letter, 'X' | 'Y') => {
@@ -7140,9 +7136,6 @@ fn pilot_queue_positions(letter: char) -> Vec<usize> {
 
 /// The captured answer to a kind of read, as text.
 fn pilot_text(letter: char) -> String {
-    if letter == 'Q' {
-        return super::super::tests::pilot_scoped_rates_hsn();
-    }
     captured(pilot_bytes(letter).expect("a kind with an answer"))
 }
 

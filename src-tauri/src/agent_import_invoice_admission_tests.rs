@@ -15,7 +15,7 @@
 //!   whose request is the same bytes.
 //! - The rate listing: the compliance listing with each ledger's GST rate and
 //!   rounding, restricted to the parents of the invoice's ledgers, as the lab
-//!   answered it on 10 Oct 2026 (`Q`, with the ledger catalogue of that day).
+//!   answered it on 21 Oct 2026 (`Q`, with the ledger catalogue of that day).
 //!   The derived answers of these tests are built by counted edits: the same
 //!   listing with its ledger rows removed, and with the Sundry Debtors row
 //!   removed (a party under Sales Accounts leaves that parent out of the scope).
@@ -150,10 +150,9 @@ const LAB_R09_SHA256: &str = "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc
 const LAB_R10_SHA256: &str = "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6";
 const LAB_R16_SHA256: &str = "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38";
 /// The rates read restricted to the four parents of the lab invoices' ledgers
-/// (`q1-rates-four-parents.xml`) with the HSN/SAC check's three fields added to
-/// its field list: the request the code renders, which the lab was not sent as
-/// such (the same edit turns its unrestricted request into the W16 one it
-/// answered).
+/// with the HSN/SAC check's three fields in its field list
+/// (`pilot-lab-ledger-rates-scoped-hsn.request`): the request the code renders,
+/// which the lab answered on 21 Oct 2026.
 const LAB_Q1_SHA256: &str = "3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc";
 
 /// The sha256 of each request sent where `order` has `letter`.
@@ -184,7 +183,7 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
         'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
-        'Q' => return answer(pilot_scoped_rates_hsn()),
+        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
@@ -207,7 +206,7 @@ fn pilot_catalogue() -> bridge_tally_protocol::StandardLedgerCatalogV2 {
 }
 
 fn pilot_catalogue_text() -> String {
-    utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml"))
+    utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"))
 }
 
 fn pilot_catalogue_of(text: &str) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
@@ -295,10 +294,11 @@ fn pilot_lab_with_units(units: String) -> Lab {
     pilot_lab_replacing('C', units)
 }
 
-/// The answer to the scoped rates read with the HSN/SAC fields: the lab's W16
-/// answer restricted to the scope's rows (DERIVED, `pilot_scoped_rates_hsn`).
+/// Tally's answer to the scoped rates read with the HSN/SAC fields, as the lab
+/// sent it on 21 Oct 2026 (13 rows, the catalogue's ledgers under the four
+/// parents).
 fn pilot_rate_listing() -> String {
-    pilot_scoped_rates_hsn()
+    utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"))
 }
 
 /// DERIVED, not Tally's bytes: the captured rate listing with every ledger row
@@ -935,26 +935,16 @@ async fn a_control_the_read_does_not_find_refuses_the_build_naming_its_batch() {
 
 /// The rate read of an admission is restricted to the parents of the ledgers
 /// the invoice names (#1331): both sends of it (the read and its repeat) are
-/// the request the lab was sent on 10 Oct 2026 (`q1-rates-four-parents.xml`,
-/// `pilot-lab-ledger-rates-scoped.request.utf16le.xml`) with the HSN/SAC fields
-/// added to its field list (one counted edit; the lab was not sent the result),
-/// byte for byte, and no other request of the admission is that one.
+/// the request the lab was sent on 21 Oct 2026
+/// (`pilot-lab-ledger-rates-scoped-hsn.request.utf16le.xml`: the four-parent
+/// request of 10 Oct with the HSN/SAC fields in its field list), byte for byte,
+/// and no other request of the admission is that one.
 #[tokio::test]
 async fn the_rate_read_is_restricted_to_the_parents_of_the_invoices_ledgers() {
     let (seen, _, requests) = admit("BRIDGE Walk-in", "BRIDGE Sales").await;
     assert_eq!(seen, Ok(()));
-    let lab = utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.request.utf16le.xml"));
-    let from = "ROUNDINGLIMIT</FETCH>";
-    assert_eq!(lab.matches(from).count(), 1);
-    let expected = lab.replace(
-        from,
-        "ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH>",
-    );
-    let words: Vec<u8> = expected
-        .encode_utf16()
-        .flat_map(|unit| unit.to_le_bytes())
-        .collect();
-    assert_eq!(crate::agent::sha256_hex(&words), LAB_Q1_SHA256);
+    let lab = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.request.utf16le.xml");
+    assert_eq!(crate::agent::sha256_hex(lab), LAB_Q1_SHA256);
     assert_eq!(sent_as(ADMISSION_ORDER, &requests, 'Q'), [LAB_Q1_SHA256; 2]);
     assert_eq!(
         requests
@@ -1430,8 +1420,7 @@ fn the_queue_precheck_judges_the_currency_and_the_limits_before_any_read() {
     ));
 }
 
-/// DERIVED, not Tally's bytes: the scoped rates answer (itself derived,
-/// `pilot_scoped_rates_hsn`) with the one `HSNCODE` of `BRIDGE Svc 998313 5%`
+/// DERIVED, not Tally's bytes: the lab's scoped rates answer with the one `HSNCODE` of `BRIDGE Svc 998313 5%`
 /// cut to its first four digits, which draws `hsn_warning_not_six_digits`.
 fn pilot_rate_listing_with_a_four_digit_code() -> String {
     let listing = pilot_rate_listing();

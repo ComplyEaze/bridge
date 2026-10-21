@@ -4,8 +4,8 @@ use super::*;
 #[path = "agent_company_checkpoint.rs"]
 mod company_checkpoint;
 pub(super) use company_checkpoint::{
-    company_voucher_high_water, parse_all_company_marks, parse_company_high_water,
-    parse_company_marks, LoadedCompanyMarks,
+    company_voucher_high_water, company_voucher_mark, parse_all_company_marks,
+    parse_company_high_water, parse_company_marks, LoadedCompanyMarks,
 };
 
 /// The absent-voucher-axis error, named because `pre_import_mark` matches on it

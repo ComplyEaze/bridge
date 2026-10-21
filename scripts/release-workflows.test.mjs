@@ -267,14 +267,15 @@ test("the install page snapshot step drops drafts and refuses a list with no mcp
   const page = await workflow("../.github/workflows/deploy-install-page.yml");
   const { run } = page.jobs.build.steps.find((candidate) => candidate.name === "Snapshot releases for the install page");
   const files = (tag) => ["windows-x64", "macos-arm64"].flatMap((platform) => [`bridge-tally-${tag}-${platform}.mcpb`, `bridge-tally-${tag}-${platform}.mcpb.sha256`]);
-  const release = (tag_name, draft, names = files(tag_name)) => ({ tag_name, draft, prerelease: true, published_at: "2026-09-26T11:19:29Z", body: "x", assets: names.map((name) => ({ name, browser_download_url: `https://example.invalid/${name}`, size: 1 })) });
+  const release = (tag_name, draft, names = files(tag_name)) => ({ tag_name, draft, prerelease: true, published_at: "2026-09-26T11:19:29Z", body: "x", assets: names.map((name) => ({ name, browser_download_url: `https://example.invalid/${name}`, digest: `sha256:${"a".repeat(64)}`, size: 1 })) });
 
   const ok = runSnapshotStep(run, [release("mcp-preview-0.4.0", true), release("mcp-preview-0.3.0", false), release("v0.1.0", false)]);
   assert.equal(ok.status, 0, ok.stderr);
   const snapshot = JSON.parse(ok.written);
   assert.deepEqual(snapshot.map((entry) => entry.tag_name), ["mcp-preview-0.3.0", "v0.1.0"]);
   assert.deepEqual(Object.keys(snapshot[0]).sort(), ["assets", "draft", "prerelease", "published_at", "tag_name"]);
-  assert.deepEqual(Object.keys(snapshot[0].assets[0]).sort(), ["browser_download_url", "name"]);
+  assert.deepEqual(Object.keys(snapshot[0].assets[0]).sort(), ["browser_download_url", "digest", "name"]);
+  assert.equal(snapshot[0].assets[0].digest, `sha256:${"a".repeat(64)}`);
 
   const onlyDraftPreview = runSnapshotStep(run, [release("mcp-preview-0.4.0", true), release("v0.1.0", false)]);
   assert.equal(onlyDraftPreview.status, 1);

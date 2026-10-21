@@ -617,6 +617,11 @@ pub(crate) enum UnderLockRefusal {
     /// or sent.
     #[error("invoice_company_stopped")]
     CompanyStopped,
+    /// The batch is no longer one the company's transfer records allow to be
+    /// sent: the reason is the code. The records changed after the check made
+    /// before the person was asked.
+    #[error("{0}")]
+    Transfers(&'static str),
 }
 
 impl UnderLockRefusal {
@@ -630,6 +635,7 @@ impl UnderLockRefusal {
             Self::MarkUnrecorded => "post_mark_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
             Self::CompanyStopped => "invoice_company_stopped",
+            Self::Transfers(reason) => reason,
         }
     }
 }

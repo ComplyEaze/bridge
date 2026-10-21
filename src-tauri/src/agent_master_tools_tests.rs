@@ -1182,16 +1182,18 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         ConfirmedAbsent, MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed,
         PostedIntoExistingMaster, PostedVerified, ReconciliationRequired,
     };
-    let judgement = |state: MasterVerdictState, found: bool, scope: bool, absent: bool| Judgement {
-        state,
-        guid: found.then(|| NEW_GUID.to_string()),
-        checks: Checks::none(),
-        reasons: if scope {
-            vec!["company_scope_changed"]
-        } else {
-            vec!["counters_unavailable"]
-        },
-        name_absent_in_read_book: absent,
+    let judgement = |state: MasterVerdictState, found: bool, scope: bool, absent: bool| {
+        Judgement::for_test(
+            state,
+            found.then(|| NEW_GUID.to_string()),
+            Checks::none(),
+            if scope {
+                vec!["company_scope_changed"]
+            } else {
+                vec!["counters_unavailable"]
+            },
+            absent,
+        )
     };
     let mut rows: Vec<StepRow> = Vec::new();
     let mut row = |path: &str, given: String, expected: &str, may: bool, nothing: bool| {
@@ -1531,12 +1533,12 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
     let held_batch = dispatched_batch_in(directory.path(), LEDGER, GUID);
     let open_state = state_of(directory.path(), &held_batch.batch_id);
     let settled_state = BatchState {
-        verdict: Some(MasterVerdict {
-            batch_id: held_batch.batch_id.clone(),
-            batch_sha256: held_batch.batch_sha256.clone(),
-            state: ConfirmedAbsent,
-            items: vec![],
-        }),
+        verdict: Some(MasterVerdict::for_test(
+            held_batch.batch_id.clone(),
+            held_batch.batch_sha256.clone(),
+            ConfirmedAbsent,
+            vec![],
+        )),
         ..open_state.clone()
     };
     let report_step = |state: &BatchState, code: Option<&str>| {
@@ -1855,17 +1857,17 @@ fn the_hand_key_step_appears_only_for_a_read_that_found_the_name_absent_and_did_
             for absent in [false, true] {
                 for found in [false, true] {
                     for scope_changed in [false, true] {
-                        let judgement = Judgement {
+                        let judgement = Judgement::for_test(
                             state,
-                            guid: found.then(|| NEW_GUID.to_string()),
-                            checks: Checks::none(),
-                            reasons: if scope_changed {
+                            found.then(|| NEW_GUID.to_string()),
+                            Checks::none(),
+                            if scope_changed {
                                 vec!["company_scope_changed"]
                             } else {
                                 vec!["counters_unavailable"]
                             },
-                            name_absent_in_read_book: absent,
-                        };
+                            absent,
+                        );
                         let step = judged_next_step(&judgement, moment);
                         let label =
                             format!("{state:?} {moment:?} {absent} {found} {scope_changed}");
@@ -1889,17 +1891,17 @@ fn the_hand_key_step_appears_only_for_a_read_that_found_the_name_absent_and_did_
                 absent: bool,
                 moment: Moment| {
         judged_next_step(
-            &Judgement {
+            &Judgement::for_test(
                 state,
-                guid: found.then(|| NEW_GUID.to_string()),
-                checks: Checks::none(),
-                reasons: if scope_changed {
+                found.then(|| NEW_GUID.to_string()),
+                Checks::none(),
+                if scope_changed {
                     vec!["company_scope_changed"]
                 } else {
                     vec![]
                 },
-                name_absent_in_read_book: absent,
-            },
+                absent,
+            ),
             moment,
         )
     };
@@ -2597,16 +2599,16 @@ fn settle_holder(dir: &std::path::Path, holder: &MasterBatch) {
     append(
         dir,
         &lock,
-        MasterRecord::Verdict(MasterVerdict {
-            batch_id: holder.batch_id.clone(),
-            batch_sha256: holder.batch_sha256.clone(),
-            state: MasterVerdictState::ConfirmedAbsent,
-            items: vec![VerdictItem {
+        MasterRecord::Verdict(MasterVerdict::for_test(
+            holder.batch_id.clone(),
+            holder.batch_sha256.clone(),
+            MasterVerdictState::ConfirmedAbsent,
+            vec![VerdictItem {
                 name: LEDGER.into(),
                 guid: None,
                 reason: Some("not_in_book".into()),
             }],
-        }),
+        )),
     )
     .unwrap();
 }
@@ -2886,16 +2888,16 @@ async fn a_holder_that_settles_lets_the_same_batch_post() {
         append(
             directory.path(),
             &lock,
-            MasterRecord::Verdict(MasterVerdict {
-                batch_id: holder.batch_id.clone(),
-                batch_sha256: holder.batch_sha256.clone(),
-                state: MasterVerdictState::ConfirmedAbsent,
-                items: vec![VerdictItem {
+            MasterRecord::Verdict(MasterVerdict::for_test(
+                holder.batch_id.clone(),
+                holder.batch_sha256.clone(),
+                MasterVerdictState::ConfirmedAbsent,
+                vec![VerdictItem {
                     name: LEDGER.into(),
                     guid: None,
                     reason: Some("not_in_book".into()),
                 }],
-            }),
+            )),
         )
         .unwrap();
     }
@@ -5252,16 +5254,16 @@ fn a_failed_verdict_append_is_an_error_even_when_the_state_held_the_same_words()
     let server = unit_server(directory.path());
     let (batch, _) = saved_batch(&server, LEDGER);
     record_intent_for_test(&server, &batch);
-    let open = MasterVerdict {
-        batch_id: batch.batch_id.clone(),
-        batch_sha256: batch.batch_sha256.clone(),
-        state: MasterVerdictState::MastersAfterPostUnconfirmed,
-        items: vec![VerdictItem {
+    let open = MasterVerdict::for_test(
+        batch.batch_id.clone(),
+        batch.batch_sha256.clone(),
+        MasterVerdictState::MastersAfterPostUnconfirmed,
+        vec![VerdictItem {
             name: LEDGER.into(),
             guid: None,
             reason: Some("company_marks_unavailable".into()),
         }],
-    };
+    );
     {
         let lock = ExclusiveAdmission::acquire(directory.path()).unwrap();
         append(directory.path(), &lock, MasterRecord::Verdict(open.clone())).unwrap();

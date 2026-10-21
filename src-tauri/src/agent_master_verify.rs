@@ -18,9 +18,7 @@
 //! [`judge`] decides; the verdict is appended to the masters journal (the
 //! first terminal verdict of a batch is its last: the journal refuses a later
 //! one), and the answer reports the state, the GUID when found and each check.
-use super::super::master_ledger::{
-    read_pre_image, MasterMark, MasterVerdict, MasterVerdictState, VerdictItem,
-};
+use super::super::master_ledger::{read_pre_image, MasterMark, MasterVerdict, MasterVerdictState};
 use super::verdict::{
     judge, party_read_needed, Facts, Judgement, Moment, PartyRead, PartyView, ReadBack,
 };
@@ -414,13 +412,10 @@ impl Server {
         let (judgement, status) = match pre_image {
             // Without the pre-image nothing can be said about what changed.
             Err(_) => (
-                Judgement {
-                    state: MasterVerdictState::ReconciliationRequired,
-                    guid: None,
-                    checks: super::verdict::Checks::none(),
-                    reasons: vec!["pre_image_unreadable"],
-                    name_absent_in_read_book: false,
-                },
+                Judgement::open(
+                    super::verdict::OpenVerdict::ReconciliationRequired,
+                    "pre_image_unreadable",
+                ),
                 json!({"state": "not_attempted"}),
             ),
             Ok(pre_image) => {
@@ -464,13 +459,10 @@ impl Server {
         lease_code: &str,
     ) -> Result<Value, String> {
         let item = item_from_batch(&state.batch)?;
-        let judgement = Judgement {
-            state: MasterVerdictState::MastersAfterPostUnconfirmed,
-            guid: None,
-            checks: super::verdict::Checks::none(),
-            reasons: vec!["endpoint_dispatch_busy"],
-            name_absent_in_read_book: false,
-        };
+        let judgement = Judgement::open(
+            super::verdict::OpenVerdict::MastersAfterPostUnconfirmed,
+            "endpoint_dispatch_busy",
+        );
         let recorded = self.record_master_verdict(state, &judgement, None);
         Ok(verification_result(
             state,
@@ -495,23 +487,7 @@ impl Server {
         judgement: &Judgement,
         unrecorded: Option<&MasterDispatchResponse>,
     ) -> Recording {
-        let reason = (judgement.state != MasterVerdictState::PostedVerified)
-            .then(|| judgement.reasons.join(","));
-        let verdict = MasterVerdict {
-            batch_id: state.batch.batch_id.clone(),
-            batch_sha256: state.batch.batch_sha256.clone(),
-            state: judgement.state,
-            items: state
-                .batch
-                .items
-                .iter()
-                .map(|item| VerdictItem {
-                    name: item.name.clone(),
-                    guid: judgement.guid.clone(),
-                    reason: reason.clone(),
-                })
-                .collect(),
-        };
+        let verdict = MasterVerdict::judged(&state.batch, judgement);
         let mut answer_recorded = state.response.is_some();
         let verdict = self.append_under_lock(state, verdict, unrecorded, &mut answer_recorded);
         Recording {

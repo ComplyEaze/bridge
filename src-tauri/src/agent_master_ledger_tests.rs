@@ -86,11 +86,11 @@ fn response_for(batch: &MasterBatch) -> MasterDispatchResponse {
 }
 
 fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict {
-    MasterVerdict {
-        batch_id: batch.batch_id.clone(),
-        batch_sha256: batch.batch_sha256.clone(),
+    MasterVerdict::for_test(
+        batch.batch_id.clone(),
+        batch.batch_sha256.clone(),
         state,
-        items: batch
+        batch
             .items
             .iter()
             .enumerate()
@@ -102,7 +102,7 @@ fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict 
                 reason: None,
             })
             .collect(),
-    }
+    )
 }
 
 fn lock() -> ExclusiveAdmission {
@@ -984,6 +984,8 @@ fn an_open_dispatch_blocks_a_new_batch_of_the_same_ledgers() {
         MasterLedgerError::OpenDispatchOverlaps
     );
     // A terminal verdict settles it, and the same ledgers may be sent again.
+    // A verified create rests on Tally's answer, recorded first.
+    records.push(MasterRecord::DispatchResponse(response_for(&first)));
     records.push(MasterRecord::Verdict(verdict_for(
         &first,
         MasterVerdictState::PostedVerified,
@@ -1053,6 +1055,46 @@ fn the_first_terminal_verdict_wins_and_a_later_one_is_refused() {
     assert!(!MasterVerdictState::ReconciliationRequired.is_terminal());
     assert!(!MasterVerdictState::MastersAfterPostUnconfirmed.is_terminal());
     assert!(MasterVerdictState::ConfirmedAbsent.is_terminal());
+}
+
+/// A verified create needs Tally's counters, so `posted_verified` is admitted
+/// only after the batch's answer is on record; the other terminal verdicts can
+/// rest on a read-back alone (an answer that was lost).
+#[test]
+fn posted_verified_without_an_answer_on_record_is_refused() {
+    let batch = batch(&batch_id());
+    let without_answer = journal_text(&full_records(&batch)[..2]);
+    let verdict = |state| line(&MasterRecord::Verdict(verdict_for(&batch, state)));
+    assert_eq!(
+        read(&format!(
+            "{without_answer}{}",
+            verdict(MasterVerdictState::PostedVerified)
+        ))
+        .unwrap_err(),
+        invalid(Invalid::VerifiedWithoutResponse)
+    );
+    for state in [
+        MasterVerdictState::PostedIntoExistingMaster,
+        MasterVerdictState::MasterWriteLocatedElsewhere,
+        MasterVerdictState::MastersAfterPostUnconfirmed,
+        MasterVerdictState::ReconciliationRequired,
+    ] {
+        assert!(
+            read(&format!("{without_answer}{}", verdict(state))).is_ok(),
+            "{state:?}"
+        );
+    }
+    assert!(read(&format!(
+        "{without_answer}{}",
+        line(&MasterRecord::Verdict(absent_verdict(&batch)))
+    ))
+    .is_ok());
+    let with_answer = journal_text(&full_records(&batch)[..3]);
+    assert!(read(&format!(
+        "{with_answer}{}",
+        verdict(MasterVerdictState::PostedVerified)
+    ))
+    .is_ok());
 }
 
 /// `confirmed_absent` as a journal line: no GUID, an optional reason.
@@ -1837,6 +1879,7 @@ fn the_summary_counts_open_intents() {
     records.extend(second);
     let (_, never_sent) = dispatched_batch("Synthetic Three");
     records.push(never_sent[0].clone());
+    records.push(MasterRecord::DispatchResponse(response_for(&first)));
     records.push(MasterRecord::Verdict(verdict_for(
         &first,
         MasterVerdictState::PostedVerified,

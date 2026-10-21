@@ -372,6 +372,10 @@ pub(super) struct VerdictItem {
     pub(super) reason: Option<String>,
 }
 
+/// A verdict as journaled. Read from a line or built by [`MasterVerdict::judged`]
+/// from a judgement: the private field keeps any other module from writing one
+/// by hand, so a terminal verdict, the only record that releases a held name,
+/// always rests on a read-back's judgement (P2).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct MasterVerdict {
@@ -379,6 +383,8 @@ pub(super) struct MasterVerdict {
     pub(super) batch_sha256: String,
     pub(super) state: MasterVerdictState,
     pub(super) items: Vec<VerdictItem>,
+    #[serde(skip)]
+    sealed: (),
 }
 
 /// One journal line. Every `match` on it names every variant, so a new record
@@ -511,6 +517,9 @@ pub(super) enum Invalid {
     VerdictWithoutIntent,
     /// A verdict after the batch's terminal verdict.
     VerdictAfterTerminal,
+    /// A `posted_verified` verdict with no answer from Tally on record: a
+    /// verified create needs Tally's counters, so its answer is appended first.
+    VerifiedWithoutResponse,
     /// A second response for a batch: one POST, one response.
     SecondResponse,
     /// An intent recording no company mark, or none for the batch's company.
@@ -699,6 +708,48 @@ impl MasterDispatchResponse {
 }
 
 impl MasterVerdict {
+    /// The verdict `judgement` gives on `batch`: each item carries the
+    /// judgement's GUID, and its reasons unless the batch is verified.
+    pub(super) fn judged(
+        batch: &MasterBatch,
+        judgement: &super::master_tools::verdict::Judgement,
+    ) -> Self {
+        let reason = (judgement.state != MasterVerdictState::PostedVerified)
+            .then(|| judgement.reasons.join(","));
+        Self {
+            batch_id: batch.batch_id.clone(),
+            batch_sha256: batch.batch_sha256.clone(),
+            state: judgement.state,
+            items: batch
+                .items
+                .iter()
+                .map(|item| VerdictItem {
+                    name: item.name.clone(),
+                    guid: judgement.guid.clone(),
+                    reason: reason.clone(),
+                })
+                .collect(),
+            sealed: (),
+        }
+    }
+
+    /// Any verdict, for a test of the journal's own admission.
+    #[cfg(test)]
+    pub(super) fn for_test(
+        batch_id: String,
+        batch_sha256: String,
+        state: MasterVerdictState,
+        items: Vec<VerdictItem>,
+    ) -> Self {
+        Self {
+            batch_id,
+            batch_sha256,
+            state,
+            items,
+            sealed: (),
+        }
+    }
+
     fn validate(&self) -> Result<(), Invalid> {
         check_ids(&self.batch_id, &self.batch_sha256)?;
         if self.items.is_empty() {
@@ -1000,6 +1051,9 @@ impl MasterJournal {
                 }
                 if state.is_settled() {
                     return Err(MasterLedgerError::Invalid(Invalid::VerdictAfterTerminal));
+                }
+                if verdict.state == MasterVerdictState::PostedVerified && state.response.is_none() {
+                    return Err(MasterLedgerError::Invalid(Invalid::VerifiedWithoutResponse));
                 }
                 let named = verdict
                     .items

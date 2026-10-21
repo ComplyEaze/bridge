@@ -1295,3 +1295,18 @@ fn one_ledger_matching_through_two_of_its_spellings_is_still_verified() {
     new.names.push(NAME.to_uppercase());
     assert_verified(&world, "two spellings");
 }
+
+/// The judgement a caller may give without a read-back never settles a batch,
+/// so it never releases the name the batch holds.
+#[test]
+fn an_open_judgement_is_never_terminal() {
+    for verdict in [
+        OpenVerdict::ReconciliationRequired,
+        OpenVerdict::MastersAfterPostUnconfirmed,
+    ] {
+        let judgement = Judgement::open(verdict, "a_reason");
+        assert!(!judgement.state.is_terminal(), "{verdict:?}");
+        assert_eq!(judgement.guid, None);
+        assert_eq!(judgement.reasons, vec!["a_reason"]);
+    }
+}

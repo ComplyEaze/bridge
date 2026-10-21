@@ -186,18 +186,71 @@ impl Checks {
     }
 }
 
+/// A verdict on a sent ledger Create. Only [`judge`], on what was read back,
+/// builds one in a terminal state; [`Judgement::open`] builds the two open
+/// states a caller may give without a read-back. The private field keeps any
+/// other module from writing one by hand, and the journal builds a verdict
+/// only from a `Judgement` ([`super::super::master_ledger::MasterVerdict::judged`]),
+/// so the record that releases a held name always rests on a read-back (P2).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct Judgement {
-    pub(super) state: MasterVerdictState,
+pub(in crate::agent::agent_import) struct Judgement {
+    pub(in crate::agent::agent_import) state: MasterVerdictState,
     /// The ledger's GUID, when the verdict names one.
-    pub(super) guid: Option<String>,
+    pub(in crate::agent::agent_import) guid: Option<String>,
     pub(super) checks: Checks,
     /// Static reasons, carrying no book data, for any verdict other than `posted_verified`.
-    pub(super) reasons: Vec<&'static str>,
+    pub(in crate::agent::agent_import) reasons: Vec<&'static str>,
     /// A fact about the read, not a verdict: the paired index was read and was
     /// usable, and the item name collides with no master in it under any key.
     /// False where the index was not read or not usable.
     pub(super) name_absent_in_read_book: bool,
+    sealed: (),
+}
+
+/// The verdicts a caller may give without a read-back: neither settles the
+/// batch, so neither releases the name it holds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum OpenVerdict {
+    ReconciliationRequired,
+    MastersAfterPostUnconfirmed,
+}
+
+impl Judgement {
+    /// An open verdict, with nothing read back: no GUID, no check passed.
+    pub(super) fn open(verdict: OpenVerdict, reason: &'static str) -> Self {
+        Self {
+            state: match verdict {
+                OpenVerdict::ReconciliationRequired => MasterVerdictState::ReconciliationRequired,
+                OpenVerdict::MastersAfterPostUnconfirmed => {
+                    MasterVerdictState::MastersAfterPostUnconfirmed
+                }
+            },
+            guid: None,
+            checks: Checks::none(),
+            reasons: vec![reason],
+            name_absent_in_read_book: false,
+            sealed: (),
+        }
+    }
+
+    /// Any judgement, for a test that needs one [`judge`] would not give.
+    #[cfg(test)]
+    pub(super) fn for_test(
+        state: MasterVerdictState,
+        guid: Option<String>,
+        checks: Checks,
+        reasons: Vec<&'static str>,
+        name_absent_in_read_book: bool,
+    ) -> Self {
+        Self {
+            state,
+            guid,
+            checks,
+            reasons,
+            name_absent_in_read_book,
+            sealed: (),
+        }
+    }
 }
 
 /// Where the item name stands in the paired index.
@@ -357,6 +410,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             checks,
             reasons,
             name_absent_in_read_book: false,
+            sealed: (),
         };
     };
 
@@ -400,6 +454,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             checks,
             reasons,
             name_absent_in_read_book: false,
+            sealed: (),
         };
     };
     let name_absent = located.collisions.is_empty();
@@ -449,6 +504,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             checks,
             reasons,
             name_absent_in_read_book: name_absent,
+            sealed: (),
         };
     }
 
@@ -461,6 +517,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             checks,
             reasons,
             name_absent_in_read_book: name_absent,
+            sealed: (),
         };
     }
 
@@ -483,6 +540,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             checks,
             reasons: vec!["not_in_book"],
             name_absent_in_read_book: name_absent,
+            sealed: (),
         };
     }
 
@@ -519,6 +577,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             checks,
             reasons: Vec::new(),
             name_absent_in_read_book: name_absent,
+            sealed: (),
         };
     }
 
@@ -542,6 +601,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         checks,
         reasons,
         name_absent_in_read_book: name_absent,
+        sealed: (),
     }
 }
 

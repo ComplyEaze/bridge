@@ -59,7 +59,7 @@ use bridge_tally_protocol::GstDutyHead;
 use std::sync::Mutex;
 
 #[path = "agent_master_verdict.rs"]
-mod verdict;
+pub(super) mod verdict;
 #[path = "agent_master_verify.rs"]
 mod verify;
 use verdict::Moment;

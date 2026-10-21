@@ -1,0 +1,10 @@
+B4 (c) continued (see b4a-notes.txt for 0a-0c).
+1. Alter > Ledger > Lab Supplier (~19:42-19:43 IST): before = State Not Applicable, Country Not Applicable, Registration type blank, GSTIN blank. The State list offered only "Not Applicable" while Country was Not Applicable, so "Change Country" > India was chosen first (needed to reach Maharashtra); then State Maharashtra. Registration type became "Regular" by itself (Tally default once Country India); GSTIN left empty; "Set/Alter additional GST details" No. Ctrl+A saved; Tally did NOT refuse the empty GSTIN (shot b4c-01).
+2. Vouchers: Purchase (Item Invoice, Lab Class), voucher No. 2 in this book (BK2 state holds only No. 1; it is the third B4 invoice), date D3 = 20-May-25 (Tuesday), Supplier Invoice No. LAB-B4-3, date 20-May-25. Party Lab Supplier; Receipt Details blank; Party Details showed State Maharashtra, Country India, GST Registration type Regular, GSTIN blank, Place of Supply Maharashtra; accepted unchanged. Lab Class Item 5 Nos @ 100.00 = 500.00.
+ Lab CGST and Lab SGST STILL show NO amount; total 500.00 (shot b4c-02). Ctrl+A saved, no dialog. Blank No. 3 left with Esc > Quit? Yes.
+3. vouchers 20250520: complete, total 1: Purchase 2, alter_id 2, Lab Supplier +500.00 (New Ref LAB-B4-3), Lab Purchases -500.00; no tax entries. Equals screen.
+ purchase_register 20250501-20250531: complete, items [] total 0; vouchers 1 and 2 under purchase_vouchers_without_duties_taxes_entry (total 2).
+ Marks after (vouchers 20250520 again): master 221, voucher 2 (response_sha256 5f063f63..., same as step 3).
+Outcome: still no amount with the supplier Regular -> closes it for this setup (requester's rule).
+End of B4(c): BK1 hash re-checked (24,100 B, 324bd37e... MATCH); shut 100074; Restore from BK1 (21-Oct-26 7:11 pm), Replace (~19:46 IST). After: "No Vouchers Entered"; ledger_masters basic master_alter_id 213, voucher_alter_id null, response_sha256 d93cdd8f... (identical to the first BK1 restore). BK2 and BK3 kept on disk.
+Shots: b4c-01-supplier-regular.png b7d55bea..., b4c-02-d3-totals-before-accept.png acf51590...

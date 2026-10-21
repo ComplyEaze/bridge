@@ -19,8 +19,8 @@ use super::*;
 use bridge_tally_core::ExactDecimal;
 
 /// The most vouchers a window may hold for the wide read to be made. PROVISIONAL: at the lab's
-/// largest voucher (about 9.4 KB) it is about 9.4 MB, under a third of the transport's cap; item
-/// invoices were not measured and are larger.
+/// largest voucher (about 9.7 KB of the 32 in the wide answer) it is about 9.7 MB, under a third of
+/// the transport's cap; item invoices were not measured and are larger.
 const UNCERTAIN_MAX_WINDOW_VOUCHERS: u64 = 1_000;
 
 const AMOUNT_NOT_REPORTED: &str = "gst_uncertain_amount_not_reported";
@@ -137,7 +137,8 @@ fn dashed(date: &bridge_tally_core::TallyDate) -> String {
 /// screen does not leave it out; and no export or filed return was captured, so "out of the return"
 /// is not measured either. The voucher type is named in place of "Sales" (the type's class is not
 /// read, so the line cannot say it is a Sales type, and another type in the book is not counted in
-/// it). The owner has not yet chosen the words.
+/// it). The owner left the choice of words to us (#1148, 19 Oct 2026); these are the ones the capture
+/// supports, and the decision is noted on #1692.
 fn pre_filing_line(uncertain: u64, from: &str, to: &str, type_name: &str) -> String {
     format!(
         "Tally's GSTR-1 screen lists {uncertain} vouchers of the type {type_name} dated {from} to \

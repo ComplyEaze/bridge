@@ -2346,6 +2346,11 @@ const GST_STATUS_READ: &str = "an answer of the GST status read (10, 12 and 13 O
      (src/agent_gst_status.rs, src/agent_gst_uncertain.rs), and their tests \
      (src/agent_gst_status_tests.rs, src/agent_gst_uncertain_tests.rs) pin what each parse returns; \
      agent/gst-status/PROVENANCE.md says what each file is";
+const GST_STATUS_MARKS: &str = "an answer of the company-marks read that opens the GST status \
+     reads of a call (13 Oct 2026), with no row here: the app crate's gate \
+     (src/agent_gst_status.rs) parses it, and the tests of gst_uncertain_vouchers \
+     (src/agent_gst_uncertain_tests.rs) serve it and pin what the parse returns; \
+     agent/gst-status/PROVENANCE.md says what it is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
@@ -2566,6 +2571,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-count.utf16le.xml",
         GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-marks.utf16le.xml",
+        GST_STATUS_MARKS,
     ),
     // Import request bodies named without `request`.
     ("tests/fixtures/agent/d3-batch-import.xml", IMPORT_REQUEST),

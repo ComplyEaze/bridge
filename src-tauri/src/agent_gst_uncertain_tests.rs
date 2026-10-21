@@ -2,8 +2,10 @@
 //!
 //! The answers are the lab's, read on 13 Oct 2026 from the synthetic company `BRIDGE PILOT LAB`
 //! (TallyPrime 7.1 Silver) and committed byte for byte under `agent/gst-status/` (see its
-//! PROVENANCE.md): the narrow status read that counts the window, the wide read before one
-//! Accept As Is and the wide read after it. The expected rows below were taken from those
+//! PROVENANCE.md): the company's marks, the narrow status read that counts the window, the wide
+//! read before one Accept As Is and the wide read after it. The company list the call reads first
+//! (and the health checks after each read) is NOT the lab's: it is DERIVED from another book's
+//! company list, see `companies()`. The expected rows below were taken from those
 //! bytes with a separate script (an XML tree, one direct child at a time), not from the code
 //! under test. Every failure-path control is derived in the test from those bytes, by
 //! deleting, repeating or emptying one element of one voucher, each edit asserted to match
@@ -21,6 +23,9 @@ const BEFORE: &[u8] = include_bytes!(
 const AFTER: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-after.utf16le.xml"
 );
+const MARKS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-marks.utf16le.xml"
+);
 const COUNT: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-count.utf16le.xml"
 );
@@ -33,6 +38,10 @@ const NARROW_REQUEST: &[u8] = include_bytes!(
 
 const BEFORE_SHA256: &str = "015ddda734957af2a50e0e6222c19ce9df5e1fa1607ac3567a573153362afc2a";
 const AFTER_SHA256: &str = "e73610f1e946673240dbe3c86b531addf84db6b4092199bd7cac54b620513dce";
+const MARKS_SHA256: &str = "8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6";
+/// The lab's marks request (`r02-marks.xml`): the read the call's gate sends, as the lab was sent it.
+const MARKS_REQUEST_SHA256: &str =
+    "81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c";
 const COUNT_SHA256: &str = "6b6b5e0af19d2bc6df7cfaf03a954aedc7b515b9870106e967d95e6243ee3a34";
 const WIDE_REQUEST_SHA256: &str =
     "cb037151f19053ae5810877f029b52d6a37a96e902245e424b4037bd66b9ab20";
@@ -164,6 +173,7 @@ fn the_committed_files_are_the_lab_bytes() {
     for (bytes, length, sha256) in [
         (BEFORE, 242_632, BEFORE_SHA256),
         (AFTER, 242_636, AFTER_SHA256),
+        (MARKS, 3_394, MARKS_SHA256),
         (COUNT, 108_442, COUNT_SHA256),
         (WIDE_REQUEST, 1_892, WIDE_REQUEST_SHA256),
         (NARROW_REQUEST, 1_846, NARROW_REQUEST_SHA256),
@@ -171,7 +181,7 @@ fn the_committed_files_are_the_lab_bytes() {
         assert_eq!(bytes.len(), length);
         assert_eq!(sha256_hex(bytes), sha256);
     }
-    for answer in [BEFORE, AFTER, COUNT] {
+    for answer in [BEFORE, AFTER, COUNT, MARKS] {
         assert_eq!(
             &answer[..2],
             b"<\0",
@@ -515,32 +525,38 @@ fn the_party_is_unread_when_it_is_empty_absent_or_repeated() {
 // The tool, against the simulator replaying the reads of a whole call.
 // ---------------------------------------------------------------------------------------------
 
-const GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
-const MARKS_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+/// The lab company's GUID, as its marks answer holds it.
+const GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+/// The GUID of the company of that name in the other book's company list.
+const LIST_GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
 
-/// The captured company list, with the test company's name made the lab's, so the requests the
-/// tool renders are the lab's requests.
+/// The company list the call reads first. **DERIVED, not Tally's bytes: the lab was never sent the
+/// company-list request for BRIDGE PILOT LAB.** It is the captured company list of another
+/// synthetic book (`native-licensed-release-companies`), with the name of one company made the
+/// lab's and its GUID made the lab's, each edit asserted to match the counted number of times, so
+/// the requests the tool renders are the lab's requests and the gate finds the lab's marks. A
+/// capture is owed (`CAPTURE-1692`); when it lands this goes.
 fn companies() -> String {
     let text = decode_utf16(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
     ));
     assert_eq!(text.matches("Bridge Ageing Lab").count(), 2);
+    assert_eq!(text.matches(LIST_GUID).count(), 1);
     text.replace("Bridge Ageing Lab", LAB_COMPANY)
+        .replace(LIST_GUID, GUID)
 }
 
-/// The captured company marks (voucher mark 59), with its GUID made the test company's.
+/// The lab's marks answer (voucher mark 68), the bytes as received.
 fn marks() -> String {
-    let text = decode_utf16(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-marks.utf16le.xml"
-    ));
-    assert_eq!(text.matches(MARKS_GUID).count(), 1);
-    text.replace(MARKS_GUID, GUID)
+    let text = decode_utf16(MARKS);
+    assert_eq!(text.matches(GUID).count(), 1);
+    text
 }
 
 fn marks_with_voucher_mark(vouchers: u64) -> String {
     once(
         &marks(),
-        r#"<ALTVCHID TYPE="Number"> 59</ALTVCHID>"#,
+        r#"<ALTVCHID TYPE="Number"> 68</ALTVCHID>"#,
         &format!(r#"<ALTVCHID TYPE="Number"> {vouchers}</ALTVCHID>"#),
     )
 }
@@ -634,8 +650,7 @@ fn tool_server(
         max_bytes: 200_000,
         redaction,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     })
 }
 
@@ -846,7 +861,8 @@ async fn the_tool_lists_the_five_uncertain_vouchers_and_the_five_accepted_ones_b
             "gst_status": "uncertain",
         })
     );
-    // The line the owner approved, with the product's full name; N is the five uncertain.
+    // The line as measured (the owner's own wording is not used), with the product's full name; N is
+    // the five uncertain.
     assert_eq!(result["pre_filing_line"], LINE_FOR_FIVE);
     assert!(
         result["filed_period_note"]
@@ -867,6 +883,9 @@ async fn the_tool_sends_the_count_read_and_then_the_wide_read_the_lab_sent() {
     // The sixth and eighth requests of the call are the marks; the status read inside its
     // bracket is the twelfth, read again as the fourteenth, and the wide read the eighteenth
     // and the twentieth.
+    // The marks request is the one the lab was sent for its marks answer.
+    assert_eq!(call.observed[5].request_body_sha256, MARKS_REQUEST_SHA256);
+    assert_eq!(call.observed[7].request_body_sha256, MARKS_REQUEST_SHA256);
     assert_eq!(call.observed[11].request_body_sha256, NARROW_REQUEST_SHA256);
     assert_eq!(call.observed[13].request_body_sha256, NARROW_REQUEST_SHA256);
     assert_eq!(call.observed[17].request_body_sha256, WIDE_REQUEST_SHA256);
@@ -907,6 +926,10 @@ async fn the_tool_sends_the_count_read_and_then_the_wide_read_the_lab_sent() {
         plan(count()).response_bytes(),
         plan(before()).response_bytes(),
     ];
+    assert_eq!(
+        answers[1], MARKS,
+        "the replayed marks are the committed bytes"
+    );
     assert_eq!(
         answers[2], COUNT,
         "the replayed count is the committed bytes"

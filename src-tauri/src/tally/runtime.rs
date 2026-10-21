@@ -1744,9 +1744,11 @@ pub(crate) fn observed_opening_boundary(
 /// over the master mark the precheck asks for the ledger count, which is read
 /// and the precheck asked again. Then the reads, in the order the admission
 /// makes them: the compliance listing, the rates, the voucher types, the
-/// number, the number's control, the company's registration. Each goes through
-/// the identity-bracketed paired read, and the listing through the bracketed
-/// source read.
+/// number, the number's control, the company's registration, the company
+/// object's HSN/SAC fields and the groups' (always read here, though the build
+/// reads the groups only when a ledger's own row defers to them). Each goes
+/// through the identity-bracketed paired read, and the listing through the
+/// bracketed source read.
 async fn read_invoice_plan(
     client: &TallyClient,
     identity: &VerifiedCompanyIdentity,

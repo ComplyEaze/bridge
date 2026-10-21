@@ -89,6 +89,7 @@ pub fn run_journal_confirmation_child_from_args(
     let confirmed = match args.next().as_deref() {
         Some("--confirm-journal") => agent::run_confirmation as fn() -> bool,
         Some("--confirm-review") => agent::run_review_confirmation,
+        Some("--confirm-masters") => agent::run_masters_confirmation,
         _ => return None,
     };
     if args.next().is_some() {

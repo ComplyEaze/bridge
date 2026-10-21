@@ -52,6 +52,7 @@ fn server(path: &Path) -> Server {
         redaction: Redaction::None,
         import_enabled: true,
         posting: Posting::On,
+        master_writes_enabled: false,
     })
 }
 
@@ -86,7 +87,7 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
     let (_, args) = saved_batch(&server);
     let admission = server.lock_import_admission().unwrap();
     assert_eq!(
-        post_dispatch_state(&server, &args),
+        post_dispatch_state(&server, "post_import", &args),
         PostDispatchState::AdmissionBusy
     );
     let polls = std::cell::Cell::new(0);
@@ -106,6 +107,7 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
                 }
             }),
             PostRequest {
+                tool: "post_import",
                 id: &json!(7),
                 args: &args,
                 cancellation: &cancellation,
@@ -159,7 +161,7 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
     .unwrap();
     assert!(matches!(result.unwrap(), ToolCallEnd::Withdrawn { .. }));
     assert_eq!(
-        post_dispatch_state(&server, &args),
+        post_dispatch_state(&server, "post_import", &args),
         PostDispatchState::NotDispatched
     );
 }
@@ -186,6 +188,7 @@ async fn cancellation_after_intent_keeps_answering_ping_until_post_completes() {
     let serve = await_post(
         async move { wait_for_completion.await.unwrap() },
         PostRequest {
+            tool: "post_import",
             id: &id,
             args: &args,
             cancellation: &cancellation,
@@ -246,6 +249,7 @@ async fn ping_responds_before_pending_approval_and_keeps_tools_queued() {
         let serve = await_post(
             stand_in(cancellation.clone()),
             PostRequest {
+                tool: "post_import",
                 id: &id,
                 args: &args,
                 cancellation: &cancellation,
@@ -299,6 +303,7 @@ async fn cancellation_before_intent_withdraws_the_post() {
         stops(await_post(
             future,
             PostRequest {
+                tool: "post_import",
                 id: &json!(7),
                 args: &json!({}),
                 cancellation: &cancellation,
@@ -324,6 +329,7 @@ async fn disconnect_before_intent_withdraws_the_post() {
     let result = stops(await_post(
         stand_in(cancellation.clone()),
         PostRequest {
+            tool: "post_import",
             id: &json!(7),
             args: &json!({}),
             cancellation: &cancellation,
@@ -380,6 +386,7 @@ async fn queue_overflow_is_refused_in_band_and_waits_for_cancellation() {
     let result = stops(await_post(
         stand_in(cancellation.clone()),
         PostRequest {
+            tool: "post_import",
             id: &json!(7),
             args: &json!({}),
             cancellation: &cancellation,
@@ -420,6 +427,7 @@ async fn queue_overflow_refuses_an_oversized_id_without_ending_the_post_wait() {
     let result = stops(await_post(
         stand_in(cancellation.clone()),
         PostRequest {
+            tool: "post_import",
             id: &json!(7),
             args: &json!({}),
             cancellation: &cancellation,
@@ -455,6 +463,7 @@ async fn queue_overflow_tool_request_has_a_prepared_and_completed_refusal_receip
         stops(await_post(
             stand_in(cancellation.clone()),
             PostRequest {
+                tool: "post_import",
                 id: &json!(7),
                 args: &json!({}),
                 cancellation: &cancellation,
@@ -530,6 +539,7 @@ async fn readable_queue_traffic_cannot_starve_the_pending_post() {
                 }
             },
             PostRequest {
+                tool: "post_import",
                 id: &json!(7),
                 args: &json!({}),
                 cancellation: &cancellation,
@@ -567,6 +577,7 @@ async fn a_withdrawn_post_revokes_its_approval_and_cancels_its_operations() {
         let _ = stops(await_post(
             stand_in(cancellation.clone()),
             PostRequest {
+                tool: "post_import",
                 id: &json!(7),
                 args: &args,
                 cancellation: &cancellation,

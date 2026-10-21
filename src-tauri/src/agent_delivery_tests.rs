@@ -20,6 +20,7 @@ fn server(path: &Path) -> Server {
         redaction: Redaction::MaskParties,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
     })
 }
 
@@ -440,6 +441,7 @@ mod request_trail_receipts {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
         })
     }
 

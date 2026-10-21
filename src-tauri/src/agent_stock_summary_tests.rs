@@ -264,6 +264,7 @@ impl OneServer {
             redaction,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
         });
         Self {
             simulator,

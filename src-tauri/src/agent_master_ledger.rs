@@ -27,8 +27,8 @@
 //! What a caller relies on:
 //!
 //! - An intent's items are its batch's names, and this module derives each
-//!   item's `canonical_key` and `absence_key` with the master name index's two
-//!   key functions; a caller building an intent cannot supply them. Whether two
+//!   item's `canonical_key` and `absence_key` with two of the master name
+//!   index's key functions; a caller building an intent cannot supply them. Whether two
 //!   names may be one master, inside a batch and against an open dispatch, is
 //!   computed from the names every time ([`NameKeys::may_be_one_master`]), so a
 //!   journal written before a fold widened is judged by the wider fold. Against
@@ -40,9 +40,12 @@
 //!   of open intents admitted before may now match, and the whole file is then
 //!   refused, which stops every master write until the journal is repaired. That
 //!   failure is closed and loud, and a fold change has to weigh it.
-//! - An intent with no terminal verdict blocks every overlapping batch for good.
-//!   The read-back-absent terminal state and the rules for it belong to the
-//!   dispatch slice; until then, recovering such a batch is an operator decision.
+//! - An intent with no terminal verdict blocks every overlapping batch. The
+//!   terminal verdicts are `posted_verified`, `posted_into_existing_master`,
+//!   `master_write_located_elsewhere` and `confirmed_absent`; the last is
+//!   decided only by a reconcile whose paired read-back shows the ledger absent
+//!   (`agent_master_verdict.rs`), and a new batch for the same ledger then needs
+//!   a new approval: nothing is ever sent again automatically.
 //! - After a terminal verdict the same ledgers could be sent again under a new
 //!   batch id. What stops that is the dispatch slice's absence check against the
 //!   books as they are then, made in the same queue as the send. This journal does
@@ -61,7 +64,9 @@ use super::ledger::{self, MAX_RECORD_BYTES};
 use super::persistence::{self, RecordOnce};
 use super::{append_private_import_ledger, set_private_file, valid_batch_id};
 use crate::agent::{local_file, sha256_hex};
-use bridge_tally_core::master_binding::{absence_key, canonical_master_key, twin_fold_keys};
+use bridge_tally_core::master_binding::{
+    absence_key, canonical_master_key, letters_and_digits_key, twin_fold_keys,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, Read};
@@ -336,6 +341,11 @@ pub(super) enum MasterVerdictState {
     PostedIntoExistingMaster,
     MastersAfterPostUnconfirmed,
     MasterWriteLocatedElsewhere,
+    /// After an outcome was unknown, a paired read-back showed the ledger
+    /// absent, no pre-image master changed and no loaded company's master mark
+    /// moved since the intent. Nothing was created; the batch is closed and is
+    /// never sent again. A new batch needs a new approval.
+    ConfirmedAbsent,
 }
 
 impl MasterVerdictState {
@@ -347,7 +357,8 @@ impl MasterVerdictState {
         match self {
             Self::PostedVerified
             | Self::PostedIntoExistingMaster
-            | Self::MasterWriteLocatedElsewhere => true,
+            | Self::MasterWriteLocatedElsewhere
+            | Self::ConfirmedAbsent => true,
             Self::ReconciliationRequired | Self::MastersAfterPostUnconfirmed => false,
         }
     }
@@ -361,13 +372,19 @@ pub(super) struct VerdictItem {
     pub(super) reason: Option<String>,
 }
 
+/// A verdict as journaled. Read from a line or built by [`MasterVerdict::judged`]
+/// from a judgement: the private field keeps any other module from writing one
+/// by hand, so a terminal verdict, the only record that releases a held name,
+/// always rests on a read-back's judgement (P2).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct MasterVerdict {
-    pub(super) batch_id: String,
-    pub(super) batch_sha256: String,
-    pub(super) state: MasterVerdictState,
-    pub(super) items: Vec<VerdictItem>,
+    batch_id: String,
+    batch_sha256: String,
+    state: MasterVerdictState,
+    items: Vec<VerdictItem>,
+    #[serde(skip)]
+    sealed: (),
 }
 
 /// One journal line. Every `match` on it names every variant, so a new record
@@ -441,6 +458,18 @@ impl MasterRecord {
         }
     }
 
+    /// The `record_type` this record is written under, for a test to name the
+    /// append it fails.
+    #[cfg(test)]
+    fn record_type(&self) -> &'static str {
+        match self {
+            Self::Batch(_) => "master_batch",
+            Self::DispatchIntent(_) => "master_dispatch_intent",
+            Self::DispatchResponse(_) => "master_dispatch_response",
+            Self::Verdict(_) => "master_verdict",
+        }
+    }
+
     pub(super) fn batch_id(&self) -> &str {
         match self {
             Self::Batch(record) => &record.batch_id,
@@ -488,6 +517,13 @@ pub(super) enum Invalid {
     VerdictWithoutIntent,
     /// A verdict after the batch's terminal verdict.
     VerdictAfterTerminal,
+    /// A `posted_verified` verdict with no answer from Tally on record: a
+    /// verified create needs Tally's counters, so its answer is appended first.
+    VerifiedWithoutResponse,
+    /// A `confirmed_absent` verdict against an answer on record whose counters
+    /// say Tally created or altered something: absence is never concluded
+    /// against Tally's own count of a write.
+    AbsentAgainstCounters,
     /// A second response for a batch: one POST, one response.
     SecondResponse,
     /// An intent recording no company mark, or none for the batch's company.
@@ -498,6 +534,8 @@ pub(super) enum Invalid {
     ItemsMismatch,
     /// `posted_verified` for an item with no GUID.
     VerifiedWithoutGuid,
+    /// `confirmed_absent` for an item that names a GUID.
+    AbsentWithGuid,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -521,7 +559,7 @@ pub(super) enum MasterLedgerError {
 }
 
 impl MasterLedgerError {
-    pub(super) fn code(self) -> &'static str {
+    pub(super) const fn code(self) -> &'static str {
         match self {
             Self::Unavailable => "master_ledger_unavailable",
             Self::RecordTooLarge => "master_ledger_record_too_large",
@@ -545,7 +583,7 @@ fn is_sha256_hex(value: &str) -> bool {
 
 /// A GUID as the journal and the sidecar record it: lower-case hex and
 /// hyphens, as Tally exports one.
-fn is_canonical_guid(value: &str) -> bool {
+pub(super) fn is_canonical_guid(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
         && value
@@ -674,6 +712,56 @@ impl MasterDispatchResponse {
 }
 
 impl MasterVerdict {
+    pub(super) fn state(&self) -> MasterVerdictState {
+        self.state
+    }
+
+    pub(super) fn items(&self) -> &[VerdictItem] {
+        &self.items
+    }
+
+    /// The verdict `judgement` gives on `batch`: each item carries the
+    /// judgement's GUID, and its reasons unless the batch is verified.
+    pub(super) fn judged(
+        batch: &MasterBatch,
+        judgement: &super::master_tools::verdict::Judgement,
+    ) -> Self {
+        let reason = (judgement.state() != MasterVerdictState::PostedVerified)
+            .then(|| judgement.reasons().join(","));
+        Self {
+            batch_id: batch.batch_id.clone(),
+            batch_sha256: batch.batch_sha256.clone(),
+            state: judgement.state(),
+            items: batch
+                .items
+                .iter()
+                .map(|item| VerdictItem {
+                    name: item.name.clone(),
+                    guid: judgement.guid().map(str::to_string),
+                    reason: reason.clone(),
+                })
+                .collect(),
+            sealed: (),
+        }
+    }
+
+    /// Any verdict, for a test of the journal's own admission.
+    #[cfg(test)]
+    pub(super) fn for_test(
+        batch_id: String,
+        batch_sha256: String,
+        state: MasterVerdictState,
+        items: Vec<VerdictItem>,
+    ) -> Self {
+        Self {
+            batch_id,
+            batch_sha256,
+            state,
+            items,
+            sealed: (),
+        }
+    }
+
     fn validate(&self) -> Result<(), Invalid> {
         check_ids(&self.batch_id, &self.batch_sha256)?;
         if self.items.is_empty() {
@@ -697,10 +785,17 @@ impl MasterVerdict {
             MasterVerdictState::ReconciliationRequired
             | MasterVerdictState::PostedIntoExistingMaster
             | MasterVerdictState::MastersAfterPostUnconfirmed
-            | MasterVerdictState::MasterWriteLocatedElsewhere => false,
+            | MasterVerdictState::MasterWriteLocatedElsewhere
+            | MasterVerdictState::ConfirmedAbsent => false,
         };
         if all_found && self.items.iter().any(|item| item.guid.is_none()) {
             return Err(Invalid::VerifiedWithoutGuid);
+        }
+        // A ledger confirmed absent has no GUID to name.
+        if self.state == MasterVerdictState::ConfirmedAbsent
+            && self.items.iter().any(|item| item.guid.is_some())
+        {
+            return Err(Invalid::AbsentWithGuid);
         }
         Ok(())
     }
@@ -743,6 +838,15 @@ impl BatchState {
             .as_ref()
             .is_some_and(|verdict| verdict.state.is_terminal())
     }
+}
+
+/// A dispatched batch whose outcome is not settled and whose ledger names block
+/// a new dispatch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct BlockingBatch {
+    pub(super) batch_id: String,
+    /// The company the blocking batch was prepared for.
+    pub(super) company_guid: String,
 }
 
 /// The admitted journal: per-batch state, built record by record.
@@ -801,29 +905,109 @@ impl MasterJournal {
         Ok(state)
     }
 
-    /// Whether another batch was dispatched, has no terminal verdict, and names
-    /// a ledger that may be one master with a ledger `intent` names, or that
-    /// recorded an equal key.
-    fn overlaps_open_dispatch(&self, intent: &MasterDispatchIntent) -> bool {
-        let new_items: Vec<(&IntentItem, NameKeys)> = intent
-            .items
+    /// The other batches that were dispatched, have no terminal verdict, and
+    /// name a ledger that may be one master with a ledger `items` names, or that
+    /// recorded an equal key. Every company's batches are compared: a batch is
+    /// listed whatever company it belongs to.
+    fn overlaps_open_dispatch(&self, batch_id: &str, items: &[IntentItem]) -> Vec<BlockingBatch> {
+        let new_items: Vec<(&IntentItem, NameKeys)> = items
             .iter()
             .map(|item| (item, NameKeys::of(&item.name)))
             .collect();
         self.batches
             .values()
             .filter(|state| !state.is_settled())
-            .filter_map(|state| state.intent.as_ref())
-            .filter(|open| open.batch_id != intent.batch_id)
-            .flat_map(|open| open.items.iter())
-            .any(|held| {
-                let held_keys = NameKeys::of(&held.name);
-                new_items.iter().any(|(new, new_keys)| {
-                    new.canonical_key == held.canonical_key
-                        || new.absence_key == held.absence_key
-                        || new_keys.may_be_one_master(&held_keys)
+            .filter(|state| {
+                state.intent.as_ref().is_some_and(|open| {
+                    open.batch_id != batch_id
+                        && open.items.iter().any(|held| {
+                            let held_keys = NameKeys::of(&held.name);
+                            new_items.iter().any(|(new, new_keys)| {
+                                new.canonical_key == held.canonical_key
+                                    || new.absence_key == held.absence_key
+                                    || new_keys.may_be_one_master(&held_keys)
+                            })
+                        })
                 })
             })
+            .map(|state| BlockingBatch {
+                batch_id: state.batch.batch_id.clone(),
+                company_guid: state.batch.company.guid.clone(),
+            })
+            .collect()
+    }
+
+    /// The batches that would block a dispatch of `batch` now, by the rule the
+    /// journal applies when the intent is appended. The post refuses on it
+    /// before the dialog and names the batches from it; the refusal that
+    /// decides is the one under the exclusive lock.
+    pub(super) fn open_dispatch_blockers(&self, batch: &MasterBatch) -> Vec<BlockingBatch> {
+        let items = batch
+            .items
+            .iter()
+            .map(|item| IntentItem::of(&item.name))
+            .collect::<Vec<_>>();
+        self.overlaps_open_dispatch(&batch.batch_id, &items)
+    }
+
+    /// Every refusal the journal would raise for a dispatch intent of the batch
+    /// with `batch_sha256`, naming `items` and recording `marks`, except the
+    /// ones about the pre-image sidecar. It is the one place the intent's
+    /// admission is decided: [`Self::admit`] calls it, and a caller about to
+    /// write a sidecar calls it first through [`Self::check_intent_admissible`],
+    /// so no sidecar is written for an intent the journal would refuse.
+    fn intent_refusal(
+        &self,
+        batch_id: &str,
+        batch_sha256: &str,
+        items: &[IntentItem],
+        marks: &[MasterMark],
+    ) -> Result<(), MasterLedgerError> {
+        let state = self
+            .batches
+            .get(batch_id)
+            .ok_or(MasterLedgerError::Invalid(Invalid::NoBatch))?;
+        if state.batch.batch_sha256 != batch_sha256 {
+            return Err(MasterLedgerError::Invalid(Invalid::ShaMismatch));
+        }
+        if state.intent.is_some() {
+            return Err(MasterLedgerError::DuplicateDispatch);
+        }
+        let named = items
+            .iter()
+            .map(|item| item.name.as_str())
+            .collect::<Vec<_>>();
+        if named != state.batch.names() {
+            return Err(MasterLedgerError::Invalid(Invalid::ItemsMismatch));
+        }
+        if !marks
+            .iter()
+            .any(|mark| mark.company_guid == state.batch.company.guid)
+        {
+            return Err(MasterLedgerError::Invalid(Invalid::MarksMissing));
+        }
+        if !self.overlaps_open_dispatch(batch_id, items).is_empty() {
+            return Err(MasterLedgerError::OpenDispatchOverlaps);
+        }
+        Ok(())
+    }
+
+    /// Whether a dispatch intent for this batch, recording `marks`, would be
+    /// admitted as far as the journal's own rules go. Its items are the batch's
+    /// names, as [`MasterDispatchIntent::new`] builds them. For a caller holding
+    /// the exclusive lock that is about to write the sidecar the intent must
+    /// name; the append checks again.
+    pub(super) fn check_intent_admissible(
+        &self,
+        batch: &MasterBatch,
+        marks: &[MasterMark],
+    ) -> Result<(), MasterLedgerError> {
+        let items = batch
+            .items
+            .iter()
+            .map(|item| IntentItem::of(&item.name))
+            .collect::<Vec<_>>();
+        self.intent_refusal(&batch.batch_id, &batch.batch_sha256, &items, marks)
     }
 
     /// Admit one record, or refuse it and leave the journal as it was.
@@ -848,28 +1032,12 @@ impl MasterJournal {
                 Ok(())
             }
             MasterRecord::DispatchIntent(intent) => {
-                let state = self.batch_of(&record).map_err(MasterLedgerError::Invalid)?;
-                if state.intent.is_some() {
-                    return Err(MasterLedgerError::DuplicateDispatch);
-                }
-                let named = intent
-                    .items
-                    .iter()
-                    .map(|item| item.name.as_str())
-                    .collect::<Vec<_>>();
-                if named != state.batch.names() {
-                    return Err(MasterLedgerError::Invalid(Invalid::ItemsMismatch));
-                }
-                if !intent
-                    .pre_post_master_marks
-                    .iter()
-                    .any(|mark| mark.company_guid == state.batch.company.guid)
-                {
-                    return Err(MasterLedgerError::Invalid(Invalid::MarksMissing));
-                }
-                if self.overlaps_open_dispatch(intent) {
-                    return Err(MasterLedgerError::OpenDispatchOverlaps);
-                }
+                self.intent_refusal(
+                    &intent.batch_id,
+                    &intent.batch_sha256,
+                    &intent.items,
+                    &intent.pre_post_master_marks,
+                )?;
                 if let Some(state) = self.batches.get_mut(&intent.batch_id) {
                     state.intent = Some(intent.clone());
                 }
@@ -895,6 +1063,17 @@ impl MasterJournal {
                 }
                 if state.is_settled() {
                     return Err(MasterLedgerError::Invalid(Invalid::VerdictAfterTerminal));
+                }
+                if verdict.state == MasterVerdictState::PostedVerified && state.response.is_none() {
+                    return Err(MasterLedgerError::Invalid(Invalid::VerifiedWithoutResponse));
+                }
+                let counted_a_write = state
+                    .response
+                    .as_ref()
+                    .and_then(|response| response.counters)
+                    .is_some_and(|counters| counters.created > 0 || counters.altered > 0);
+                if verdict.state == MasterVerdictState::ConfirmedAbsent && counted_a_write {
+                    return Err(MasterLedgerError::Invalid(Invalid::AbsentAgainstCounters));
                 }
                 let named = verdict
                     .items
@@ -940,6 +1119,7 @@ fn read_error(code: String) -> MasterLedgerError {
 struct NameKeys {
     canonical: String,
     twin: [String; 3],
+    letters_and_digits: String,
 }
 
 impl NameKeys {
@@ -947,6 +1127,7 @@ impl NameKeys {
         Self {
             canonical: canonical_master_key(name),
             twin: twin_fold_keys(name),
+            letters_and_digits: letters_and_digits_key(name),
         }
     }
 
@@ -954,9 +1135,13 @@ impl NameKeys {
     /// index matches on, or on any `twin_fold_keys` fold in any position. The
     /// index's `absence_key` is twin key 2, so the twin comparison covers it;
     /// the canonical key is compared on its own, because lowercasing and NFC do
-    /// not commute and a name can agree on it and on no twin key.
+    /// not commute and a name can agree on it and on no twin key. The index's
+    /// letters-and-digits key is compared too, so two names in one batch that
+    /// differ only by a space or a symbol are refused as the book check would.
     fn may_be_one_master(&self, other: &Self) -> bool {
-        self.canonical == other.canonical || self.twin.iter().any(|key| other.twin.contains(key))
+        self.canonical == other.canonical
+            || self.letters_and_digits == other.letters_and_digits
+            || self.twin.iter().any(|key| other.twin.contains(key))
     }
 }
 
@@ -1007,28 +1192,56 @@ pub(super) fn append(
     if record.is_dispatch_intent() {
         return Err(MasterLedgerError::UseAppendIntent);
     }
-    append_syncing(data_dir, lock, record, sync_directory)
-}
-
-/// An intent that is in the journal, synced, under the exclusive lock. The send
-/// it licenses takes this by value: no send is built without one. Only
-/// [`append_intent`] makes one.
-#[must_use = "the send consumes the recorded intent"]
-#[derive(Debug, PartialEq, Eq)]
-pub(super) struct RecordedIntent {
-    batch_id: String,
-    native_request_sha256: String,
-}
-
-impl RecordedIntent {
-    pub(super) fn batch_id(&self) -> &str {
-        &self.batch_id
+    #[cfg(test)]
+    if test_fault_fires(record.record_type()) {
+        return Err(MasterLedgerError::Unavailable);
     }
-
-    pub(super) fn native_request_sha256(&self) -> &str {
-        &self.native_request_sha256
+    #[cfg(test)]
+    let lost_after_write = test_fault_fires(&format!("{}_lost_after_write", record.record_type()));
+    let appended = append_syncing(data_dir, lock, record, sync_directory);
+    #[cfg(test)]
+    if lost_after_write && appended.is_ok() {
+        return Err(MasterLedgerError::Unavailable);
     }
+    appended
 }
+
+#[cfg(test)]
+tokio::task_local! {
+    /// The faults a test arms around the call under test: each entry names one
+    /// point, a `record_type` whose next [`append`] (for an intent,
+    /// [`append_intent`]) fails (or, with
+    /// `_lost_after_write`, is written and then reported as failed) or a read
+    /// the answered call makes, and is used up by the first time that point is
+    /// reached.
+    /// Absent, nothing fails.
+    pub(super) static TEST_FAULTS: std::cell::RefCell<Vec<&'static str>>;
+    /// Run by the post just before it reads the journal again for the check
+    /// that precedes the dialog, as a holder settling or a rival's send
+    /// landing in the seconds of reads before it would.
+    pub(super) static BEFORE_HOLD_CHECK: std::sync::Arc<dyn Fn() + Send + Sync>;
+    /// Run by a post refused under the journal's lock just before it reads the
+    /// journal to say why, as a holder settling or another call's send landing
+    /// in that moment would.
+    pub(super) static BEFORE_FAILURE_READ: std::sync::Arc<dyn Fn() + Send + Sync>;
+}
+
+/// Whether `point` is armed in the task running this, using the arming up.
+#[cfg(test)]
+pub(super) fn test_fault_fires(point: &str) -> bool {
+    TEST_FAULTS
+        .try_with(|armed| {
+            let mut armed = armed.borrow_mut();
+            armed
+                .iter()
+                .position(|armed| *armed == point)
+                .map(|at| armed.remove(at))
+                .is_some()
+        })
+        .unwrap_or(false)
+}
+
+pub(super) use crate::tally::approved_import::RecordedIntent;
 
 /// Append a dispatch intent and return the token for its send. An error, a
 /// failed directory sync included, returns no token: the intent may be in the
@@ -1038,7 +1251,21 @@ pub(super) fn append_intent(
     lock: &ExclusiveAdmission,
     intent: MasterDispatchIntent,
 ) -> Result<RecordedIntent, MasterLedgerError> {
-    append_intent_syncing(data_dir, lock, intent, sync_directory)
+    // The faults a test arms for [`append`] reach the intent the same way: one
+    // refused before any byte is written, and one written and then reported as
+    // a failed directory sync, which leaves the intent in the file.
+    #[cfg(test)]
+    if test_fault_fires("master_dispatch_intent") {
+        return Err(MasterLedgerError::Invalid(Invalid::BadDigest));
+    }
+    #[cfg(test)]
+    let intent_lost_after_write = test_fault_fires("master_dispatch_intent_lost_after_write");
+    let recorded = append_intent_syncing(data_dir, lock, intent, sync_directory);
+    #[cfg(test)]
+    if intent_lost_after_write && recorded.is_ok() {
+        return Err(MasterLedgerError::DirectorySyncFailed);
+    }
+    recorded
 }
 
 fn append_intent_syncing(
@@ -1047,12 +1274,12 @@ fn append_intent_syncing(
     intent: MasterDispatchIntent,
     sync: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> Result<RecordedIntent, MasterLedgerError> {
-    let recorded = RecordedIntent {
-        batch_id: intent.batch_id.clone(),
-        native_request_sha256: intent.native_request_sha256.clone(),
-    };
+    let (batch_id, native_request_sha256) = (
+        intent.batch_id.clone(),
+        intent.native_request_sha256.clone(),
+    );
     append_syncing(data_dir, lock, MasterRecord::DispatchIntent(intent), sync)?;
-    Ok(recorded)
+    Ok(RecordedIntent::issue(batch_id, native_request_sha256))
 }
 
 /// [`append`] for any record, with the directory sync given so a test can fail
@@ -1117,6 +1344,9 @@ pub(super) enum PreImageError {
     /// The sidecar is in place but its directory entry could not be made durable.
     DirectorySyncFailed,
     WriteFailed,
+    /// A sidecar written for a dispatch that was then refused could not be
+    /// removed again.
+    RemoveFailed,
 }
 
 impl PreImageError {
@@ -1132,6 +1362,7 @@ impl PreImageError {
             Self::Missing => "master_pre_image_missing",
             Self::Unreadable | Self::TooLarge => "master_pre_image_unavailable",
             Self::OtherBatch => "master_pre_image_invalid",
+            Self::RemoveFailed => "master_pre_image_remove_failed",
             Self::ExistsDifferent
             | Self::TooLargeToWrite
             | Self::DirectorySyncFailed
@@ -1258,6 +1489,23 @@ fn write_pre_image_syncing(
         sha256: sha256_hex(&bytes),
         count: pre_image.len() as u64,
     })
+}
+
+/// Remove the sidecar of `batch_id`, under the admission lock: for a dispatch
+/// the journal refused after its sidecar was written, which no intent names. An
+/// absent sidecar is already removed. Never call it for a batch that may have an
+/// intent recorded: the sidecar is what that intent's digest was taken from.
+pub(super) fn remove_pre_image(
+    data_dir: &Path,
+    _lock: &ExclusiveAdmission,
+    batch_id: &str,
+) -> Result<(), PreImageError> {
+    match std::fs::remove_file(pre_image_path(data_dir, batch_id)?) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(_) => return Err(PreImageError::RemoveFailed),
+    }
+    sync_directory(data_dir).map_err(|_| PreImageError::RemoveFailed)
 }
 
 fn read_sidecar_bytes(path: &Path) -> Result<Vec<u8>, PreImageError> {

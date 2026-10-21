@@ -740,6 +740,7 @@ fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, Import
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
     });
     let batch_id = "bridge-00000000-0000-4000-8000-000000001055";
     let vouchers = sent();

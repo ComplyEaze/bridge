@@ -32,6 +32,7 @@ use crate::tolerant_xml::{
 use crate::{PartyLedgerMasterFieldObservation, TallyNamedMaster};
 
 use super::date::{parse_native_bill_date, parse_native_due_date};
+use super::group_name_index::NameShape;
 use super::model::{LedgerSnapshotEntry, NativeBillRow, NativeOutstandingsError};
 
 struct PendingBillRow {
@@ -754,6 +755,56 @@ pub fn parse_native_group_snapshot_with_evidence(
     xml: &str,
     expected_company_guid: &str,
 ) -> Result<Vec<NativeGroupSnapshotEntry>, NativeOutstandingsError> {
+    Ok(
+        walk_group_snapshot(xml, expected_company_guid, GroupWalkMode::Snapshot)?
+            .into_iter()
+            .map(|walked| NativeGroupSnapshotEntry {
+                record: walked.row.record,
+                raw_source_sha256: walked.raw_source_sha256,
+            })
+            .collect(),
+    )
+}
+
+/// How strictly the shared group walk reads a response. The snapshot readers
+/// keep the grammar they always had: identity children and language lists are
+/// stepped over unread, and the error codes are unchanged. The name index
+/// reads them and refuses what it cannot admit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum GroupWalkMode {
+    Snapshot,
+    NameIndex,
+}
+
+/// The `InvalidResponse` code, in [`GroupWalkMode::NameIndex`] only, for a
+/// collection with no `GROUP` rows. The snapshot readers report that as
+/// [`GROUP_COMPANY_GUID_MISSING`], as they always have.
+pub(super) const GROUP_COLLECTION_EMPTY: &str = "group_collection_empty";
+/// The `InvalidResponse` code, in [`GroupWalkMode::NameIndex`] only, for a
+/// `GROUP` element outside the collection (other than the `CMPINFO` counter).
+pub(super) const GROUP_OUTSIDE_COLLECTION: &str = "group_outside_collection";
+
+/// The `InvalidResponse` code for a Group row whose request-computed
+/// `BRIDGECOMPANYGUID` is absent or empty, or for a collection with no rows.
+pub(super) const GROUP_COMPANY_GUID_MISSING: &str = "group_response_company_guid_missing";
+/// The `InvalidResponse` code for a Group row whose `BRIDGECOMPANYGUID` is not
+/// the requested company's.
+pub(super) const GROUP_COMPANY_GUID_MISMATCH: &str = "group_response_company_guid_mismatch";
+
+/// One Group row as the shared walk read it, with the hash of its exact bytes.
+pub(super) struct WalkedGroupRow {
+    pub(super) row: ParsedNativeGroupSnapshotRow,
+    pub(super) raw_source_sha256: String,
+}
+
+/// The one walk over a `List of Groups` response: envelope, `STATUS`,
+/// collection scoping and the per-row company binding live here, so the
+/// snapshot and the name index cannot read the envelope differently.
+pub(super) fn walk_group_snapshot(
+    xml: &str,
+    expected_company_guid: &str,
+    mode: GroupWalkMode,
+) -> Result<Vec<WalkedGroupRow>, NativeOutstandingsError> {
     let sanitized = sanitize_invalid_numeric_references_with_provenance(xml);
     let mut reader = Reader::from_str(sanitized.as_str());
     reader.config_mut().trim_text(true);
@@ -807,20 +858,18 @@ pub fn parse_native_group_snapshot_with_evidence(
                 if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
                     && name == b"GROUP"
                 {
-                    let row = parse_group_row(&mut reader, &element)?;
+                    let row = parse_group_row(&mut reader, &element, mode)?;
                     let response_company_guid = row.response_company_guid.as_deref().ok_or(
-                        NativeOutstandingsError::InvalidResponse(
-                            "group_response_company_guid_missing",
-                        ),
+                        NativeOutstandingsError::InvalidResponse(GROUP_COMPANY_GUID_MISSING),
                     )?;
                     if !response_company_guid.eq_ignore_ascii_case(expected_company_guid) {
                         return Err(NativeOutstandingsError::InvalidResponse(
-                            "group_response_company_guid_mismatch",
+                            GROUP_COMPANY_GUID_MISMATCH,
                         ));
                     }
                     let record_end = reader.buffer_position() as usize;
-                    entries.push(NativeGroupSnapshotEntry {
-                        record: row.record,
+                    entries.push(WalkedGroupRow {
+                        row,
                         raw_source_sha256: sha256_hex(
                             sanitized
                                 .original_fragment(event_start, record_end)
@@ -833,10 +882,20 @@ pub fn parse_native_group_snapshot_with_evidence(
                     });
                     continue;
                 }
+                if mode == GroupWalkMode::NameIndex && group_outside_collection(&path, &name) {
+                    return Err(NativeOutstandingsError::InvalidResponse(
+                        GROUP_OUTSIDE_COLLECTION,
+                    ));
+                }
                 path.push(name);
             }
             Event::Empty(element) => {
                 let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
+                if mode == GroupWalkMode::NameIndex && group_outside_collection(&path, &name) {
+                    return Err(NativeOutstandingsError::InvalidResponse(
+                        GROUP_OUTSIDE_COLLECTION,
+                    ));
+                }
                 // A self-closing STATUS is no answer, and a second STATUS of
                 // any kind is refused (bridge#717).
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
@@ -893,23 +952,175 @@ pub fn parse_native_group_snapshot_with_evidence(
     }
     if entries.is_empty() {
         return Err(NativeOutstandingsError::InvalidResponse(
-            "group_response_company_guid_missing",
+            if mode == GroupWalkMode::NameIndex {
+                GROUP_COLLECTION_EMPTY
+            } else {
+                GROUP_COMPANY_GUID_MISSING
+            },
         ));
     }
     Ok(entries)
 }
 
-struct ParsedNativeGroupSnapshotRow {
-    record: TallyNamedMaster,
+/// Whether a `GROUP` element at `path` is somewhere a row walk would step over
+/// it: anywhere but the collection, whose rows are read, and the `CMPINFO`
+/// block, whose bare `<GROUP>5</GROUP>` is a counter and not a row.
+fn group_outside_collection(path: &[Vec<u8>], name: &[u8]) -> bool {
+    name == b"GROUP"
+        && !path_is(path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
+        && !path_is(path, &[b"ENVELOPE", b"BODY", b"DESC", b"CMPINFO"])
+}
+
+/// One `GROUP` row's fields. The snapshot reads `record` and the response
+/// company; `identity` is what the name index validates, and is raw: the walk
+/// reports what Tally wrote, and the caller decides what is admissible.
+pub(super) struct ParsedNativeGroupSnapshotRow {
+    pub(super) record: TallyNamedMaster,
     response_company_guid: Option<String>,
+    pub(super) identity: GroupRowIdentity,
+}
+
+/// The identity-bearing children of one `GROUP` row, exactly as written.
+#[derive(Default)]
+pub(super) struct GroupRowIdentity {
+    /// The text of every direct `GUID` child, in document order.
+    pub(super) guids: Vec<String>,
+    /// The text of every direct `ALTERID` child, in document order.
+    pub(super) alter_ids: Vec<String>,
+    /// Every `NAME` of every `NAME.LIST` of every `LANGUAGENAME.LIST` child, in
+    /// document order, verbatim. An empty or self-closing `NAME` is an empty
+    /// string here.
+    pub(super) names: Vec<String>,
+    /// The first name-bearing shape met that the walk read around instead of
+    /// into, if any: the index refuses it so no name is dropped silently.
+    pub(super) unrecognised_name_shape: Option<NameShape>,
+    /// Whether an element outside the captured vocabulary holds a `GROUP`,
+    /// `GUID`, `NAME`, `NAME.LIST` or `LANGUAGENAME.LIST` somewhere inside it.
+    pub(super) hidden_in_unknown_element: bool,
+    /// Whether a child the captures show only as a leaf holds elements.
+    pub(super) non_leaf_captured_child: bool,
+}
+
+/// The children of a `GROUP` row, other than the ones the index reads, that the
+/// captured rows show: all leaves. Anything else in a row is searched.
+/// Derived from the six committed group captures.
+const CAPTURED_ROW_CHILDREN: [&str; 6] = [
+    "ISREVENUE",
+    "MASTERID",
+    "PARENTSTRUCTURE",
+    "PRIMARYGRPPARENT",
+    "RESERVEDNAME",
+    "RESERVENAME",
+];
+
+/// The child of a `LANGUAGENAME.LIST`, other than `NAME.LIST`, that the
+/// captures show.
+const CAPTURED_LANGUAGE_LIST_CHILDREN: [&str; 1] = ["LANGUAGEID"];
+
+/// Steps over the subtree of a child just started: unread if the capture shows
+/// it, otherwise searched for what must not hide there.
+fn skip_child(
+    reader: &mut Reader<&[u8]>,
+    child: &BytesStart<'_>,
+    captured: &[&str],
+    identity: &mut GroupRowIdentity,
+) -> Result<(), NativeOutstandingsError> {
+    let name = child.name();
+    if captured
+        .iter()
+        .any(|known| name.as_ref().eq_ignore_ascii_case(known))
+    {
+        identity.non_leaf_captured_child |= subtree_has_elements(reader)?;
+        return Ok(());
+    }
+    identity.hidden_in_unknown_element |= subtree_hides_a_name(reader)?;
+    Ok(())
+}
+
+/// Consumes the subtree of an element just started and reports whether any
+/// element is inside it.
+fn subtree_has_elements(reader: &mut Reader<&[u8]>) -> Result<bool, NativeOutstandingsError> {
+    let mut depth = 1_u32;
+    let mut found = false;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| NativeOutstandingsError::InvalidResponse("group_xml_malformed"))?
+        {
+            Event::Start(_) => {
+                depth += 1;
+                found = true;
+            }
+            Event::Empty(_) => found = true,
+            Event::End(_) => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok(found);
+                }
+            }
+            Event::Eof => {
+                return Err(NativeOutstandingsError::InvalidResponse(
+                    "group_row_unterminated",
+                ))
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Consumes the subtree of an element just started and reports whether any
+/// element inside it is one the index reads or counts.
+fn subtree_hides_a_name(reader: &mut Reader<&[u8]>) -> Result<bool, NativeOutstandingsError> {
+    const HIDDEN: [&str; 5] = ["GROUP", "GUID", "NAME", "NAME.LIST", "LANGUAGENAME.LIST"];
+    let is_hidden = |name: QName<'_>| {
+        HIDDEN
+            .iter()
+            .any(|hidden| name.as_ref().eq_ignore_ascii_case(hidden))
+    };
+    let mut depth = 1_u32;
+    let mut found = false;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| NativeOutstandingsError::InvalidResponse("group_xml_malformed"))?
+        {
+            Event::Start(inner) => {
+                depth += 1;
+                found |= is_hidden(inner.name());
+            }
+            Event::Empty(inner) => found |= is_hidden(inner.name()),
+            Event::End(_) => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok(found);
+                }
+            }
+            Event::Eof => {
+                return Err(NativeOutstandingsError::InvalidResponse(
+                    "group_row_unterminated",
+                ))
+            }
+            _ => {}
+        }
+    }
+}
+
+impl GroupRowIdentity {
+    fn note_shape(&mut self, shape: NameShape) {
+        self.unrecognised_name_shape.get_or_insert(shape);
+    }
 }
 
 /// Parses one `GROUP` row and keeps the request-computed responder identity
-/// separate from the Group object's own GUID.
+/// separate from the Group object's own GUID. Only [`GroupWalkMode::NameIndex`]
+/// reads `GUID`, `ALTERID` and `LANGUAGENAME.LIST`; in
+/// [`GroupWalkMode::Snapshot`] they are stepped over unread, as before.
 fn parse_group_row(
     reader: &mut Reader<&[u8]>,
     element: &BytesStart<'_>,
+    mode: GroupWalkMode,
 ) -> Result<ParsedNativeGroupSnapshotRow, NativeOutstandingsError> {
+    let index = mode == GroupWalkMode::NameIndex;
     validate_row_attributes(element, "group_row_malformed_attributes")?;
     let name = attribute_value(element, b"NAME").ok_or(
         NativeOutstandingsError::InvalidResponse("group_name_missing"),
@@ -925,6 +1136,7 @@ fn parse_group_row(
     let mut parent_seen = false;
     let mut response_company_guid = None;
     let mut response_company_guid_seen = false;
+    let mut identity = GroupRowIdentity::default();
     loop {
         match reader
             .read_event()
@@ -956,7 +1168,68 @@ fn parse_group_row(
                 }
                 response_company_guid = (!value.is_empty()).then_some(value);
             }
+            Event::Start(child) if index && child.name().as_ref().eq_ignore_ascii_case("GUID") => {
+                identity
+                    .guids
+                    .push(read_element_text(reader, child.name())?);
+            }
+            Event::Start(child)
+                if index && child.name().as_ref().eq_ignore_ascii_case("ALTERID") =>
+            {
+                identity
+                    .alter_ids
+                    .push(read_element_text(reader, child.name())?);
+            }
+            Event::Start(child)
+                if index
+                    && child
+                        .name()
+                        .as_ref()
+                        .eq_ignore_ascii_case("LANGUAGENAME.LIST") =>
+            {
+                read_language_name_list(reader, &mut identity)?;
+            }
+            // A name list outside any language list is a shape no capture
+            // shows; reading around it would drop its names.
+            Event::Start(child)
+                if index && child.name().as_ref().eq_ignore_ascii_case("NAME.LIST") =>
+            {
+                identity.note_shape(NameShape::NameListOutsideLanguageList);
+                skip_subtree(reader)?;
+            }
+            // A row directly inside a row is read by no walk.
+            Event::Start(child) if index && child.name().as_ref().eq_ignore_ascii_case("GROUP") => {
+                identity.hidden_in_unknown_element = true;
+                skip_subtree(reader)?;
+            }
+            Event::Empty(child) if index && child.name().as_ref().eq_ignore_ascii_case("GROUP") => {
+                identity.hidden_in_unknown_element = true;
+            }
+            // A name directly under the row belongs to no name list.
+            Event::Start(child) if index && child.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                identity.note_shape(NameShape::NameDirectlyUnderRow);
+                skip_subtree(reader)?;
+            }
+            Event::Start(child) if index => {
+                skip_child(reader, &child, &CAPTURED_ROW_CHILDREN, &mut identity)?;
+            }
             Event::Start(_) => skip_subtree(reader)?,
+            Event::Empty(child) if index && child.name().as_ref().eq_ignore_ascii_case("GUID") => {
+                identity.guids.push(String::new());
+            }
+            Event::Empty(child)
+                if index && child.name().as_ref().eq_ignore_ascii_case("ALTERID") =>
+            {
+                identity.alter_ids.push(String::new());
+            }
+            Event::Empty(child) if index && child.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                identity.note_shape(NameShape::NameDirectlyUnderRow);
+            }
+            Event::Empty(child)
+                if index && child.name().as_ref().eq_ignore_ascii_case("NAME.LIST") =>
+            {
+                identity.note_shape(NameShape::NameListOutsideLanguageList);
+            }
             Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("PARENT") => {
                 if std::mem::replace(&mut parent_seen, true) {
                     return Err(NativeOutstandingsError::InvalidResponse(
@@ -998,7 +1271,90 @@ fn parse_group_row(
             reserved_name,
         },
         response_company_guid,
+        identity,
     })
+}
+
+/// Reads one `LANGUAGENAME.LIST` whose start has been consumed, appending
+/// every `NAME` of every `NAME.LIST` inside it. `LANGUAGEID` is skipped. A
+/// `NAME` directly inside the language list is not read as a name and is
+/// noted instead, so it cannot be dropped silently. Names are kept verbatim:
+/// they are matched by exact codepoint.
+fn read_language_name_list(
+    reader: &mut Reader<&[u8]>,
+    identity: &mut GroupRowIdentity,
+) -> Result<(), NativeOutstandingsError> {
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| NativeOutstandingsError::InvalidResponse("group_xml_malformed"))?
+        {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("NAME.LIST") => {
+                read_name_list(reader, identity)?;
+            }
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                identity.note_shape(NameShape::NameDirectlyUnderLanguageList);
+                skip_subtree(reader)?;
+            }
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                identity.note_shape(NameShape::NameDirectlyUnderLanguageList);
+            }
+            Event::Start(child) => {
+                skip_child(reader, &child, &CAPTURED_LANGUAGE_LIST_CHILDREN, identity)?;
+            }
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .eq_ignore_ascii_case("LANGUAGENAME.LIST") =>
+            {
+                return Ok(())
+            }
+            Event::Eof => {
+                return Err(NativeOutstandingsError::InvalidResponse(
+                    "group_row_unterminated",
+                ))
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Reads one `NAME.LIST` whose start has been consumed. Anything inside it but
+/// a `NAME` is noted, not skipped silently.
+fn read_name_list(
+    reader: &mut Reader<&[u8]>,
+    identity: &mut GroupRowIdentity,
+) -> Result<(), NativeOutstandingsError> {
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| NativeOutstandingsError::InvalidResponse("group_xml_malformed"))?
+        {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                identity
+                    .names
+                    .push(read_element_identifier_text(reader, child.name())?);
+            }
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                identity.names.push(String::new());
+            }
+            Event::Start(_) => {
+                identity.note_shape(NameShape::ElementOtherThanNameInNameList);
+                skip_subtree(reader)?;
+            }
+            Event::Empty(_) => identity.note_shape(NameShape::ElementOtherThanNameInNameList),
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("NAME.LIST") => {
+                return Ok(())
+            }
+            Event::Eof => {
+                return Err(NativeOutstandingsError::InvalidResponse(
+                    "group_row_unterminated",
+                ))
+            }
+            _ => {}
+        }
+    }
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

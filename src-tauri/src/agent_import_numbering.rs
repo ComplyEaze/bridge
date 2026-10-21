@@ -409,6 +409,16 @@ pub(in crate::agent) fn admit_numbering<'a>(
 }
 
 impl NumberingAdmission {
+    /// An admission read under `master_mark` for `company_guid`, for a test
+    /// that never reaches the numbering check or sets its mark by hand.
+    #[cfg(test)]
+    pub(in crate::agent) fn for_test(company_guid: &str, master_mark: u64) -> Self {
+        Self {
+            company_guid: company_guid.to_string(),
+            master_mark,
+        }
+    }
+
     /// As the post is sent: the target's master mark in the snapshot the
     /// queue's binding reads began with must equal the mark the numbering was
     /// read under. The queue then holds that snapshot equal to the last one

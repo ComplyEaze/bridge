@@ -12,6 +12,8 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+These changes are in source and not yet in a published build.
+
 **Added**
 
 - `audit_test_run`, off by default behind the extension's new **Allow tax-audit test runs (audit_test_run)**
@@ -23,6 +25,22 @@ Apache-2.0 builds from current source stays unambiguous.
   1 April 2025 to 31 March 2026, the year its rules are for (`audit_period_outside_ay_2026_27`). The engine's
   test passed a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8); the tool
   is replayed from the engine's synthetic book and not yet run against a live Tally (part of #697).
+
+**Changed**
+
+- A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
+  `verify_import` reads the company's voucher mark below the floor a natively posted batch had proved (a mark Tally
+  omits twice counts as a company holding no voucher), the import journal records it, a second restore too, and from then on no natively posted batch of that company at that Tally
+  address that it covers reads `posted_verified`, even after vouchers keyed again by hand raise the mark past it:
+  a voucher it finds reads as matching content, one it does not as `book_rolled_back`, and the answer says to check
+  them in Tally. The answer that records it names the company's other native batches it covers, to verify again. Before, a voucher keyed again
+  with the same content could read verified once the mark had risen. Limits: a restore that is keyed or edited past
+  the mark before any check is still not seen; a wrong backup restored and then the right one leaves the batches it
+  covered reading rolled back (as would a repair or rewrite that lowered the mark, not measured); and a covered Sales
+  invoice batch stops that company's invoices until released.
+  **Do not go back to an earlier release after this one has seen a restore:** an earlier release refuses an import
+  journal holding the new record, and stops every build, post and verification until ComplyEaze Bridge is upgraded
+  again.
 
 ## [0.6.0] - 2026-10-16
 

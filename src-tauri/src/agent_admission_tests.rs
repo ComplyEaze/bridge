@@ -1512,3 +1512,38 @@ fn the_transfer_texts_claim_only_what_the_code_does() {
         }
     }
 }
+
+/// The most bytes the full catalogue may take in its tools/list answer. The
+/// answer is sent whole at the start of every session, so its size is a cost to
+/// every conversation; raising this is argued in the pull request that needs
+/// it. It must also stay under the control-message ceiling, or tools/list
+/// would answer `agent_response_too_large` and leave the server without tools.
+const TOOL_LIST_BUDGET: usize = 225_000;
+const _: () = assert!(TOOL_LIST_BUDGET < super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES);
+
+#[test]
+fn the_full_tool_list_stays_within_its_byte_budget() {
+    let definitions = tool_definitions(true, true);
+    let tools = definitions.as_array().expect("tool definitions");
+    // As `agent_protocol.rs` frames it, with its newline and a short request id;
+    // a longer id takes its own bytes.
+    let total = format!(
+        "{}\n",
+        json!({"jsonrpc":"2.0","id":1,"result":{"tools":definitions}})
+    )
+    .len();
+    let mut sizes = tools
+        .iter()
+        .map(|tool| (tool["name"].as_str().unwrap_or("?"), tool.to_string().len()))
+        .collect::<Vec<_>>();
+    sizes.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+    let report = sizes
+        .iter()
+        .map(|(name, bytes)| format!("{bytes:>7} {name}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        total < TOOL_LIST_BUDGET,
+        "tools/list is {total} bytes, over its budget of {TOOL_LIST_BUDGET}.\n{report}"
+    );
+}

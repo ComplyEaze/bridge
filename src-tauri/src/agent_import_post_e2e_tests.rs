@@ -4714,6 +4714,17 @@ async fn post_and_verify(
     readback: Vec<ScenarioPlan>,
     later: Vec<Vec<ScenarioPlan>>,
 ) -> (Value, Vec<Value>, Vec<Value>) {
+    post_and_verify_with_journal(marks_after, readback, later, |text| text).await
+}
+
+/// [`post_and_verify`], with `edit` applied to the journal's text before each
+/// later verification.
+async fn post_and_verify_with_journal(
+    marks_after: String,
+    readback: Vec<ScenarioPlan>,
+    later: Vec<Vec<ScenarioPlan>>,
+    edit: impl Fn(String) -> String,
+) -> (Value, Vec<Value>, Vec<Value>) {
     let mut plans = before_approval();
     plans.extend(after_approval(xml(created_one())));
     plans.push(xml(marks_after));
@@ -4741,7 +4752,7 @@ async fn post_and_verify(
         let text = String::from_utf8(journal(directory.path())).unwrap();
         fs::write(
             directory.path().join("agent-import-ledger.jsonl"),
-            text.replace(&origin, &later_origin),
+            edit(text.replace(&origin, &later_origin)),
         )
         .unwrap();
         origin = later_origin;
@@ -5070,6 +5081,136 @@ async fn a_refused_binding_matched_only_by_an_optional_voucher_keeps_the_open_li
     );
 }
 
+/// #1050: a rollback seen once is recorded, and outlasts the mark rising
+/// again. The post binds at mark 11; a verification reads the book at 10
+/// (a backup restored) and records it; a later verification reads the mark at
+/// 11 again with a voucher of the post's content in the window (keyed again by
+/// hand): the batch reads rolled back, never `posted_verified`, and no second
+/// record is written.
+#[tokio::test]
+async fn a_rollback_once_seen_outlasts_the_mark_rising_again() {
+    let (posted, verified, verdicts) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![
+            span_readback(empty_collection(), 10),
+            span_readback(untagged_posted_journal(), 11),
+            span_readback(untagged_posted_journal(), 11),
+        ],
+    )
+    .await;
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["state"], "posted_verified",
+        "{posted}"
+    );
+    let first = &verified[0]["structuredContent"]["result"];
+    assert_eq!(
+        first["post_span_binding"]["state"], "book_rolled_back",
+        "{first}"
+    );
+    assert_eq!(first["post_span_binding"]["current_mark"], 10, "{first}");
+    assert_eq!(
+        first["post_span_binding"]["rollback_recorded"], true,
+        "{first}"
+    );
+    assert_eq!(
+        first["post_span_binding"]["other_batches_covered"],
+        json!({"count": 0, "first": []}),
+        "{first}"
+    );
+    for later in &verified[1..] {
+        let result = &later["structuredContent"]["result"];
+        let binding = &result["post_span_binding"];
+        assert_eq!(binding["state"], "book_rolled_back", "{result}");
+        assert_eq!(binding["mark_read"], 10, "{result}");
+        assert!(
+            binding["seen_by"].as_str().is_some_and(|id| !id.is_empty()),
+            "{result}"
+        );
+        // Covered: nothing more is recorded.
+        assert!(binding.get("rollback_recorded").is_none(), "{result}");
+        assert_ne!(result["verification_status"], "posted_verified", "{result}");
+        assert_eq!(result["counts"]["posted_verified"], 0, "{result}");
+    }
+    assert_eq!(verdicts.len(), 1, "the post's own binding, and no other");
+}
+
+/// #1050: a check of a post that reads intact can still see a restore that
+/// reaches another post of the company: here a second post, sent after this
+/// one, had proved the mark at 12, and this post's check reads 11. The record
+/// is written, the second post is named to verify again, and this post's own
+/// summary says so; this post stays verified.
+#[tokio::test]
+async fn an_intact_posts_check_records_a_restore_that_reaches_a_later_post() {
+    let later = crate::agent::agent_import::tests::sentinel_batch_id(0x1051);
+    // A second post of the same company and address, recorded after this one:
+    // its own batch, dispatch intent (pre-POST mark 11) and Tally's answer,
+    // copied from this post's records with its own id, digest and REMOTEID.
+    let add_later_post = |text: String| {
+        if text.contains(later.as_str()) {
+            return text;
+        }
+        let records: Vec<Value> = text
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        let batch = records
+            .iter()
+            .find(|record| record.get("record_type").is_none())
+            .unwrap();
+        let of = |kind: &str| {
+            records
+                .iter()
+                .find(|record| record["record_type"] == kind)
+                .unwrap()
+                .clone()
+        };
+        let sha = "f".repeat(64);
+        let mut later_batch = batch.clone();
+        later_batch["batch_id"] = json!(later);
+        later_batch["sha256"] = json!(sha);
+        let mut intent = of("dispatch_intent");
+        intent["batch_id"] = json!(later);
+        intent["batch_sha256"] = json!(sha);
+        intent["pre_post_voucher_mark"] = json!(11);
+        intent["native_remote_id"] =
+            json!(crate::agent::agent_import::tests::sentinel_uuid(0x10b1).to_string());
+        let mut response = of("dispatch_response");
+        response["batch_id"] = json!(later);
+        response["batch_sha256"] = json!(sha);
+        let mut out = text;
+        for record in [later_batch, intent, response] {
+            out.push_str(&serde_json::to_string(&record).unwrap());
+            out.push('\n');
+        }
+        out
+    };
+    let (_, verified, _) = post_and_verify_with_journal(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![span_readback(untagged_posted_journal(), 11)],
+        add_later_post,
+    )
+    .await;
+    let result = &verified[0]["structuredContent"]["result"];
+    let binding = &result["post_span_binding"];
+    assert_eq!(binding["state"], "bound", "{result}");
+    assert_eq!(binding["rollback_recorded"], true, "{result}");
+    assert_eq!(
+        binding["other_batches_covered"],
+        json!({"count": 1, "first": [later]}),
+        "{result}"
+    );
+    assert!(
+        binding["summary"]
+            .as_str()
+            .is_some_and(|summary| summary.contains("restored from a backup")
+                && summary.contains("the other post named in other_batches_covered")),
+        "{result}"
+    );
+    assert_eq!(result["verification_status"], "posted_verified", "{result}");
+}
+
 /// A copy that holds no voucher at all (one never used, put in place of the
 /// book) omits its voucher mark: that reads as 0, so the post's vouchers are
 /// `book_rolled_back`, never a failed verification and never `not_found`.
@@ -5085,6 +5226,8 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
     later.extend(paired(marks()));
     later.extend(paired(empty_collection()));
     later.extend(paired(empty_collection()));
+    later.extend(paired(no_voucher_mark.clone()));
+    // Omitted once, the mark is read again (#1050).
     later.extend(paired(no_voucher_mark));
     let (_, verified, _) = post_and_verify(
         company_marks(11, 50, "WR2 Unicode Lab"),
@@ -5093,6 +5236,12 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
     )
     .await;
     let result = &verified[0]["structuredContent"]["result"];
+    // Omitted twice, the company holds no voucher: below the post's floor,
+    // so it is recorded (#1050), failing closed.
+    assert_eq!(
+        result["post_span_binding"]["rollback_recorded"], true,
+        "{result}"
+    );
     assert_eq!(
         result["post_span_binding"]["state"], "book_rolled_back",
         "{result}"

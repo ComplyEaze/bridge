@@ -165,6 +165,33 @@ pub(in crate::agent) fn four_types_through_the_caps(
 /// The masters answer and the numbering answer of `company_guid`'s four voucher
 /// types, the types in `manual` numbered Manual and the rest Automatic.
 pub(in crate::agent) fn numbering_answers(company_guid: &str, manual: &[&str]) -> (String, String) {
+    flipped_answers(company_guid, manual, false)
+}
+
+/// [`numbering_answers`] with each type in `manual` also preventing duplicate
+/// numbers, as the reference's rule for a voucher number that is an identity
+/// requires: the captured series flip leaves the duplicate setting as captured
+/// (No), which is the default a type switched to Manual reads.
+pub(in crate::agent) fn manual_answers_preventing_duplicates(
+    company_guid: &str,
+    manual: &[&str],
+) -> (String, String) {
+    flipped_answers(company_guid, manual, true)
+}
+
+/// The masters answer and the captured series of the four voucher types exactly
+/// as captured (Payment Manual with duplicates prevented, Receipt Manual with
+/// duplicates not prevented, Journal and Contra Automatic): the GUID of the
+/// capture's book is set to `company_guid`, nothing else is edited.
+pub(in crate::agent) fn series_as_captured(company_guid: &str) -> (String, String) {
+    let series = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_series_live.utf16le.xml"
+    ))
+    .replace(NUMBERING_CAPTURE_GUID, company_guid);
+    joined_answers(company_guid, &series, |_, row| row)
+}
+
+fn flipped_answers(company_guid: &str, manual: &[&str], prevent: bool) -> (String, String) {
     let series = decode(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_series_live.utf16le.xml"
     ))
@@ -181,7 +208,17 @@ pub(in crate::agent) fn numbering_answers(company_guid: &str, manual: &[&str]) -
                 "<NUMBERINGMETHOD>Automatic</NUMBERINGMETHOD>",
             )
         };
-        row.replace(from, to)
+        let row = row.replace(from, to);
+        if prevent && manual.contains(&name) {
+            // The series-level element, which carries no TYPE attribute; the type's
+            // own `PREVENTDUPLICATES` carries one and is not read.
+            row.replace(
+                "<PREVENTDUPLICATES>No</PREVENTDUPLICATES>",
+                "<PREVENTDUPLICATES>Yes</PREVENTDUPLICATES>",
+            )
+        } else {
+            row
+        }
     })
 }
 

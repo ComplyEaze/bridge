@@ -1126,6 +1126,12 @@ const ROWS: &[Row] = &[
         parser: "parse_native_negative_ledgers",
         parse: |_, text| typed(parse_native_negative_ledgers(text)),
     },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_ledgers_shape_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_ledgers",
+        parse: |_, text| typed(parse_native_negative_ledgers(text)),
+    },
     // Built-in Negative Stock report: src/native_negative_stock_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_negative_stock_shape_lab_fy_live.utf16le.xml",

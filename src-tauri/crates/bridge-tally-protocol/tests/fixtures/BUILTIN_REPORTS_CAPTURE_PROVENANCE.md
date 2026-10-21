@@ -78,3 +78,16 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 - **Answer:** 1,018 bytes, BOM-less UTF-16LE, `RESPSTATUS: 1`, the bytes as received. Two entries, each a `DSPACCNAME`/`DSPDISPNAME` then a `DSPACCINFO` with `DSPCLDRAMT/DSPCLDRAMTA` and `DSPCLCRAMT/DSPCLCRAMTA`: a creditor listed with a **debit** closing, carried as a negative `DSPCLDRAMTA` (`-2500.50`, the credit column empty), and a debtor with a **credit** closing, a positive `DSPCLCRAMTA` (`10000.00`, the debit column empty). The display fields are empty. A second request returned the same bytes (sha256 `b838c49f...` as above), reported by the contributor and not kept.
 - **Checked against Tally's own screen and the trial balance of the same window, by the contributor, on this one book:** both entries matched the Negative Ledgers screen and the trial balance. A ledger under Suspense A/c with a credit balance (93,700.50) is **not** listed, on the screen and in the answer alike: it is not a general rule, the book is one book.
 - **Not established:** why Tally lists a ledger (the rule behind the list), a window that is not a whole financial year, a book with GST, stock or several currencies, a large book (cost and size), optional or post-dated vouchers, any other release.
+
+## `builtin_negative_ledgers_shape_lab_fy_*`: a Negative Ledgers answer of eleven ledgers (2026-10-21)
+
+- **Host / gateway:** TallyPrime **Silver (licensed)**, 7.1, Windows, a lab instance, `education_mode=false`; one request at a time, curl, no retry, HTTP 200.
+- **Book:** the synthetic company `BRIDGE SHAPE LAB` (loaded alone for the reads of this group), window 2025-04-01 to 2026-03-31. Its request is the committed Negative Ledgers envelope with only the company and the dates changed (UTF-16LE with a BOM); a test asserts that `render_native_negative_ledgers_request` produces it.
+- **Answer:** 5,236 bytes in 0.12 s, BOM-less UTF-16LE as received (the lab's send log records sha256 `2945267f...`, equal to this file's). Eleven entries in the row shape of the first capture: `Bank of Baroda CA` with a credit closing; `Capital A/c`, `HDFC CC`, `Working Capital Loan` and the four Duties & Taxes ledgers `Cess`, `CGST`, `IGST` and `State Tax` with debit closings (negative `DSPCLDRAMTA`); and three `Shape Buyer` debtors with credit closings. Every entry has exactly one column filled, a debit negative and a credit positive, as in §12a.16's sign rule.
+- **Not checked against:** Tally's screen or this book's trial balance (neither was read in this sitting), so whether each listed ledger sits on the side opposite its group, and whether a ledger Tally did not list sits on its usual side, is not established by this capture.
+- **Not established:** why Tally lists a ledger, a window that is not a whole financial year, the cost on a large book, another release.
+
+| file | bytes | sha256 | content |
+| --- | ---: | --- | --- |
+| `builtin_negative_ledgers_shape_lab_fy_request.utf16le.xml` | 764 | `8b54a2bfa6e5c330bc86264124f4aaf316f01046e54bfaa98aff86ffaa1ede28` | request, Negative Ledgers, 2025-04-01 to 2026-03-31, on the shape lab |
+| `builtin_negative_ledgers_shape_lab_fy_live.utf16le.xml` | 5236 | `2945267f32e168ceb55a32bc569d5d6c862644870b7ccb3cb008858ed64b4f4c` | Negative Ledgers, eleven ledgers on both sides |

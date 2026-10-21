@@ -14,6 +14,11 @@ const LIVE: &[u8] =
 const REQUEST: &[u8] = include_bytes!(
     "../tests/fixtures/builtin_negative_ledgers_bridge_lab_win_fy_request.utf16le.xml"
 );
+/// The answer of 21 Oct 2026 on a book with eleven listed ledgers, both sides and several groups.
+const SHAPE_LAB: &[u8] =
+    include_bytes!("../tests/fixtures/builtin_negative_ledgers_shape_lab_fy_live.utf16le.xml");
+const SHAPE_LAB_REQUEST: &[u8] =
+    include_bytes!("../tests/fixtures/builtin_negative_ledgers_shape_lab_fy_request.utf16le.xml");
 /// The answer of 6 Oct 2026 on a book with no negative ledger: an empty envelope.
 const EMPTY_ENVELOPE: &[u8] =
     include_bytes!("../tests/fixtures/builtin_negative_ledgers_probe_b_fy_empty_live.utf16le.xml");
@@ -77,7 +82,57 @@ fn the_request_is_byte_equal_to_its_committed_capture() {
     );
 }
 
+#[test]
+fn the_second_requests_bytes_are_those_of_the_committed_capture() {
+    let period = NativeLedgerSnapshotPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20250401").unwrap(),
+        TallyDate::parse("20260331").unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        render_native_negative_ledgers_request("BRIDGE SHAPE LAB", &period),
+        decode_xml_bytes(SHAPE_LAB_REQUEST).unwrap()
+    );
+}
+
 // ---- the captured responses ----
+
+#[test]
+fn a_list_of_eleven_on_a_book_with_both_sides_keeps_each_side_and_tallys_order() {
+    // A debit is a negative number on the wire and the unsigned amount here (the side names it).
+    let parsed = parse_native_negative_ledgers(&response(SHAPE_LAB)).unwrap();
+    let side = |entry: &NativeNegativeLedger| match &entry.balance {
+        NegativeLedgerBalance::Debit(amount) => ("debit", amount.as_str().to_string()),
+        NegativeLedgerBalance::Credit(amount) => ("credit", amount.as_str().to_string()),
+    };
+    let listed: Vec<(&str, (&str, String))> = parsed
+        .entries
+        .iter()
+        .map(|entry| (entry.name.as_str(), side(entry)))
+        .collect();
+    let expected = [
+        ("Bank of Baroda CA", "credit", "24270.50"),
+        ("Capital A/c", "debit", "1000000.00"),
+        ("Cess", "debit", "200.00"),
+        ("CGST", "debit", "3600.25"),
+        ("HDFC CC", "debit", "252600.00"),
+        ("IGST", "debit", "1800.00"),
+        ("Shape Buyer 1", "credit", "1180.00"),
+        ("Shape Buyer 2", "credit", "8875.00"),
+        ("Shape Buyer 3", "credit", "9090.00"),
+        ("State Tax", "debit", "3600.25"),
+        ("Working Capital Loan", "debit", "500000.00"),
+    ];
+    assert_eq!(listed.len(), expected.len());
+    for ((name, (got_side, amount)), (want_name, want_side, want_amount)) in
+        listed.iter().zip(expected)
+    {
+        assert_eq!(*name, want_name);
+        assert_eq!(*got_side, want_side, "{want_name}");
+        assert_eq!(amount, want_amount, "{want_name}");
+    }
+}
 
 #[test]
 fn the_captured_answer_lists_a_debit_creditor_and_a_credit_debtor_in_tallys_order() {

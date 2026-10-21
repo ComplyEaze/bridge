@@ -684,6 +684,29 @@ on every voucher:
   another release, another book. `reference_date` is returned as Tally sent it (`YYYYMMDD`); a value that is not
   a date refuses the read (`voucher_reference_date_invalid`).
 
+### 8.2g Cost-centre allocations on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, one synthetic book**
+
+**Scope: TallyPrime 7.1 Silver, licensed, `education_mode: false`, synthetic company `BRIDGE SHAPE LAB` (Cost Centres setting No), one read of one day (5 Jun 2025): one Journal with two ledger entries.** Request and response
+retained with sha256 in `tests/fixtures/VOUCHER_COST_CENTRE_CAPTURE_PROVENANCE.md`; the request is the one the vouchers read
+sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
+
+- **Shape.** An entry that carries allocations holds one `CATEGORYALLOCATIONS.LIST` with `CATEGORY` (`Business Line`),
+  `ISDEEMEDPOSITIVE`, and one `COSTCENTREALLOCATIONS.LIST` per centre. Each centre carries `NAME` and a signed `AMOUNT`
+  (`Trading` -600.00 and `Assembly` -400.00, which add up to the entry's -1000.00), `PAYHEADSORTORDER` and
+  `EMPLOYEESORTORDER` (0, 0) and empty `ACTUALQTY` and `BILLEDQTY`.
+- **An entry without allocations has no `CATEGORYALLOCATIONS.LIST` element at all** in this read (the other entry of the
+  voucher; both entries carry a `BILLALLOCATIONS.LIST`, the first one empty). No empty container was observed in this read. Two captured import-verification reads (whose fetch does not ask for
+  allocation fields) hold an empty container on an entry; the parser reports that as present and not observed.
+- **What the tool returns.** An entry with allocations gains `cost_centre_allocations`, a list of
+  `{category, cost_centre, amount}` as sent (names trimmed, the amount as sent); an entry without them has no such key. An allocation list that cannot be read
+  whole (a centre with no name or no amount, an amount that is not a decimal, a centre named twice in one category, a
+  category without a name, a field sent twice, or an empty container, which is reported as present and not observed, never as
+  no allocations) is not shown in part: the entry carries `cost_centre_allocations_unreadable`
+  with a reason and the rest of the response is unchanged. An empty amount is never read as zero.
+- **Not shown.** Several categories on one entry; a centre with a parent; quantities; a foreign-currency amount; an
+  allocation on a book whose Cost Centres setting is Yes; a read of a different voucher type; another release or book;
+  that the allocations of an entry always add up to its amount (the tool does not check this).
+
 ### 8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**
 
 **Scope: TallyPrime 7.1 Silver, licensed, one company, 28 ledger masters (2026-09-12) and 36 (2026-09-30).** Captured from

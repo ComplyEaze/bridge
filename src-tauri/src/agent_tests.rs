@@ -651,7 +651,14 @@ fn ledger_movement_schema_exposes_offset_and_limit() {
 
 #[test]
 fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
-    let known_parties = ["Customer One", "Supplier Two", "PAN Holder", "Entry Ledger"];
+    let known_parties = [
+        "Customer One",
+        "Supplier Two",
+        "PAN Holder",
+        "Entry Ledger",
+        "Cost Centre One",
+        "Cost Category One",
+    ];
     let samples = [
         (
             "balance_sheet",
@@ -737,7 +744,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "vouchers",
             mark_voucher_party_names(
-                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger"}]}),
+                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger","cost_centre_allocations":[{"category":"Cost Category One","cost_centre":"Cost Centre One","amount":"-1.00"}]}]}),
             ),
         ),
     ];

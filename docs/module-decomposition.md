@@ -16,13 +16,13 @@ The parent's bytes change, the acknowledgement you add for it is accepted, and C
 is green. The pinned surface shrank by exactly what you moved.
 
 There is one net, and it is worth stating precisely because it is narrow:
-`validate_required_directory_coverage` fails closed for two directories
-(`src-tauri/src/db/migrations`, `src-tauri/src/reports`) and for four named
-`REQUIRED_SURFACE_FILES` — `agent_catalog.rs`, `agent_desktop_journal.rs`,
-`agent_ledgers.rs`, `source_draft/lifecycle.rs`. Outside those six rules nothing is
-examined at all: `validate_files` and the digest computation iterate the manifest's own
-list, so a file that ought to be pinned and is not is not a check that fails — it
-is a check nobody asked.
+the `compatibility_surface_stays_whole` test of `bridge-tally-core` fails closed for
+two directories (`src-tauri/src/db/migrations`, `src-tauri/src/reports`) and for a
+fixed list of required files (its `REQUIRED_FILES`, among them `agent_catalog.rs`,
+`agent_desktop_journal.rs`, `agent_ledgers.rs` and `source_draft/lifecycle.rs`).
+Outside those rules nothing is examined at all: its other checks iterate the
+manifest's own list, so a file that ought to be pinned and is not is not a check
+that fails — it is a check nobody asked.
 
 So:
 

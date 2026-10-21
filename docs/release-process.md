@@ -77,10 +77,9 @@ sorted, unique list:
   (at most 500 characters). There is no `sha256`, and no other key.
 - The top level has exactly `files` and `schema_version`. A schema 2 file, with
   stored hashes, is refused with a message naming the migration.
-- The surface digest that receipts and attestations bind is **computed by the
-  gate from the live bytes of every pinned file**, never stored. Change one byte
-  of a pinned file and the digest moves, so evidence bound to the old digest goes
-  stale. The matrix carries no copy of the digest (bridge#760).
+- No surface digest is stored or computed. The crate that computed one from the
+  live bytes of every pinned file, and the receipts that bound it, were removed
+  (#1745); the acknowledgement file and the review are the control.
 - Because no per-file value is stored, two pull requests that change different
   pinned files, or even the same pinned file, no longer conflict in the surface.
   Each adds its own uniquely named acknowledgement.

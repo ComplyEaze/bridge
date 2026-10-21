@@ -7,6 +7,7 @@ docs/adr/0015-tally-selected-read-qualification-authority.md
 docs/step-by-step-roadmap.md
 docs/tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md
 docs/tally/TALLY_PROTOCOL_REFERENCE_ENVIRONMENT_AND_REQUESTS.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
 docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md
 package.json
 scripts/check-ci-workflow-consistency.mjs

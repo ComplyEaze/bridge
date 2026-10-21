@@ -13,7 +13,7 @@ One Collection request, the voucher-type export with the numbering fields at bot
   - 24 `VOUCHERTYPE` rows; every row holds exactly one `VOUCHERNUMBERSERIES.LIST`, named `Default`.
   - Series level: Journal `Automatic` / duplicates `No`; Payment `Manual` / `Yes`; Receipt `Manual` / `No`; the other 21 `Automatic` / `No`. Each of the three matched the screen.
   - Type level: `NUMBERINGMETHOD` reads `None` for the three altered types and `Default` for the rest; `PREVENTDUPLICATES` reads `No` on all 24, including Payment. Neither is the method.
-  - `NUMBERINGSUBMETHOD` reads `Auto Retain` on all 24 series, including the two Manual ones; `DUPLICATECONTROL` is present and empty on all 24 series. Neither is read.
+  - `NUMBERINGSUBMETHOD` reads `Auto Retain` on all 24 series, including the two Manual ones; it is read under an Automatic series only (since 13 October 2026; `VOUCHER_TYPE_NUMBERING_M8R_CAPTURE_PROVENANCE.md` holds the captures of its other value). `DUPLICATECONTROL` is present and empty on all 24 series and is not read.
 - **Not established:** more than one series on a type; a single series not named `Default`; Automatic (Manual Override) and Multi-user Auto on a captured response (the first was seen on a real book on 28 September 2026, not committed); a voucher type created new rather than altered; other releases and editions; macOS.
 
 | file | bytes | sha256 | content |

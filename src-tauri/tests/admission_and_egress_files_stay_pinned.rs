@@ -34,11 +34,10 @@ const ADMISSION_AND_EGRESS: [&str; 12] = [
     "src-tauri/src/tally/runtime_control.rs",
 ];
 
-/// The six files pinned by the raise to 238: five on the read path, and the
-/// egress receipt's field walker. Reasons live in the same module documentation.
-const READ_PATH_AND_RECEIPT: [&str; 6] = [
+/// The five files still pinned from the raise to 238: four on the read path, and
+/// the egress receipt's field walker. Reasons live in the same module documentation.
+const READ_PATH_AND_RECEIPT: [&str; 5] = [
     "src-tauri/src/agent_change_parse.rs",
-    "src-tauri/src/agent_changes.rs",
     "src-tauri/src/agent_movement.rs",
     "src-tauri/src/agent_movement_math.rs",
     "src-tauri/src/agent_outstandings.rs",

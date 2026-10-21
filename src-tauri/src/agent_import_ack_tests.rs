@@ -506,8 +506,7 @@ async fn the_tool_needs_the_posting_opt_in() {
     let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = Server::new(crate::agent::Settings {
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
         ..server_at(simulator.address(), directory.path())
             .settings
             .clone()

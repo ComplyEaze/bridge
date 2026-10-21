@@ -463,8 +463,9 @@ so, strip the block from a merge commit message (or edit it with `git commit`) s
 carries no noise.
 
 **The owner's merge verdict.** The gate no longer reads a reviewer's comment for its name or its
-head. Two machine lines count, each the whole body of a pull request review or an issue
-comment (never an inline review comment) posted by the owner's account (a numeric user id
+head. Two machine lines count, each either the whole body of a pull request review or an issue
+comment (never an inline review comment) or the exact first line of a longer one (see "A
+verdict line that opens a longer comment" below), posted by the owner's account (a numeric user id
 the script holds, a real user, not an app; the gate fails closed if the id cannot be
 read), after CRLF becomes LF and at most one trailing newline, exactly one line of
 lowercase hex:
@@ -474,9 +475,12 @@ lowercase hex:
 
 The newest line of each kind by server time is the one that counts, and it must name the
 pull request's current head and the merge base the gate computes itself from a freshly
-fetched base tip, so merging master into the branch voids a verdict while a master that
+fetched base tip, so merging master into the branch voids a verdict (except that a CLEAN
+line is carried across when the pull request's own change is byte-identical, see "Carrying a
+CLEAN line across a merge of master" below) while a master that
 moved under an unchanged branch does not (the merge queue's own run on the merged tree
-guards that case). Both lines are needed. An edit or deletion of any review or issue
+guards that case). Both lines are needed, except at review tier one, where MERGE-VERDICT CLEAN
+alone is enough (see "Review tiers" below). An edit or deletion of any review or issue
 comment the owner's account posted, by whoever made it, a dismissal of an owner review, and
 any later owner line that is not a positive one (`MERGE-VERDICT NOT-CLEAN`, `MERGE-VERDICT
 RETRACT`, `MERGE-ADVERSARY REJECT`, `MERGE-ADVERSARY RETRACT` or any malformed line that
@@ -496,18 +500,64 @@ read three more ways: with HTML comments removed, with only the comment delimite
 hidden inside a comment is still a token), and as an HTML parser reads the text, with and without
 its comment text (tags and comment forms between the letters do not hide one). A pull request that
 quotes one in any of those places (this very section included) cannot pass the gate: its merge is the
-owner's own act. The commit comments of at most 60 commits are read; more makes the gate
-`INDETERMINATE`. Other places a person can write in (labels, the milestone, author names, comments on
+owner's own act. The commit comments are read once, from the repository's list of commit comments, and kept
+when they sit on one of the pull request's commits; the commit list must first be proven complete (250 commits
+at most). A list that is not proven, a page that cannot be read, or a comment that names no commit makes the
+gate `INDETERMINATE`. Other places a person can write in (labels, the milestone, author names, comments on
 commits no longer in the pull request) are not read. History it cannot read
 completely (more than one page of reviews, comments or timeline events included) is
 `INDETERMINATE`, never a pass.
+
+**Review tiers.** The gate asks `scripts/review-tier.mjs` for a tier before it judges the verdict
+lines, from the changed paths (a rename counts both names) and the committed list
+`scripts/review-tier-paths.json`, which the gate proves equal to master's like the rest of
+`scripts/`. The first rule of the list whose match holds decides a path. Documentation, plain
+tests and production code that does not touch the write path are tier **one**; a path on the write
+path, in credentials or security, in fixture data, or that no rule classifies is **full**, and so
+is a change with no paths, an unreadable input, an invalid list and any failure or malformed
+answer of the tool. A Rust test file is judged with the module it tests. Only the exact tier `one` lets the
+MERGE-ADVERSARY RECOMMEND line be absent: the pull request then stands on MERGE-VERDICT CLEAN
+alone. Every refusal and every void still applies at tier one, and an adversary line that voids
+(a rejection or a retraction) still voids the CLEAN line. The list is a judgement about names and
+directories, not about what a change does: an interface file edited to call a write path stays tier
+one unless its name or its neighbours say otherwise, which is what the reviewer's CLEAN is for.
+Prose (documents and site pages) is classified by the documentation rules before the name rules,
+so a document about a write-path subject is tier one. The gate prints the tier and what decided it
+("review tier: ..."). A change to the list or the tool is the owner's own act, like a change to
+the gate.
+
+**A verdict line that opens a longer comment.** An owner review or comment may open with the
+verdict line: its exact first line is the line, the rest of the body is non-blank prose, and that
+prose carries neither token (read the same way as everywhere else). A review that opens with the
+line is then the one thing the reviewer posts. Prose before the line, a line with spaces around
+it, a token anywhere else in the body, or a rest that is empty makes it a malformed owner line,
+which voids as before.
+
+**Carrying a CLEAN line across a merge of master.** When the newest MERGE-VERDICT CLEAN line is
+not voided and names an older head and merge base, the gate compares two GitHub compare diffs,
+one at that pair and one at the current merge base and head. The line is carried to the current
+pair only when they are byte-identical apart from the `index` lines and the text after the hunk
+numbers (context lines and hunk numbers are part of the comparison, so a change moved in a file is
+not the same change), neither is empty or holds a binary change, the new one lists no file twice
+and names exactly the pull request's current file list. Only CLEAN is carried, never MERGE-ADVERSARY
+RECOMMEND, which must name the current pair, and every void still applies to a carried line. What
+master changed in other files, or in the same file outside the pull request's hunks, is not looked
+at: the required checks at the head cover it, not the reviewer. When the pull request's own lines
+cannot be shown unchanged the gate says so and the reviewer looks again.
+
+**Merging as the gate judged.** `scripts/merge-gate-merge.sh <pr>` runs the gate, and merges only
+if it passed with exactly one MAY MERGE line, one merge command and one base-branch check for that
+pull request. It reads the pull request, marks a draft ready, reads it again, and runs
+`gh pr merge --squash --match-head-commit` with the head the gate printed, returning a draft it
+made ready to draft when the merge does not happen. It refuses any mismatch of state, base or head,
+and an interrupt while `gh` runs leaves the pull request as it is.
 
 The gate is run only from origin/master's tree, never from the pull request's checkout: it
 fetches the branch `master` of `origin` itself into a ref of its own and refuses to run (exit 2) unless
 the directory the script itself lives in is this tree's `scripts/` and everything under `scripts/`
 equals it, untracked files included, and its helpers run with an isolated Python interpreter
 so that a file placed beside them cannot replace a standard-library module. A pull request
-that changes or renames away `scripts/merge-gate*`, `scripts/merge_gate*.py` or anything
+that changes or renames away `scripts/merge-gate*`, `scripts/merge_gate*.py`, `scripts/review-tier*` or anything
 under `.github/` is the owner's own act: a verdict about the gate cannot clear a change to
 the gate. For a pull request that the owner did not author, the two lines must
 come from separately run reviewers, and each reviewer records in its own log which line it posted;
@@ -778,10 +828,15 @@ disagree.
   `## [X.Y.Z] - date` (a dash or en dash also works); a fence that is never
   closed, or another level-two heading, is reported as a warning in the run.
   In the same pull request, reread every answer on the Questions page (`site/faq.html`)
-  against the new release and move its check stamp (the release and the day, in the
-  hero and in the structured data). `scripts/site-pages.test.mjs` fails until the stamp
-  names the version in `packaging/mcpb/manifest.json`, so a version bump cannot merge
-  with answers nobody has reread.
+  and every tool row on the capabilities page (`site/capabilities.html`) against the new
+  release and move each page's check stamp (the release and the day; on the Questions page
+  also in the structured data), and the release named by "release X offers" or "installs" in the
+  capabilities page and in `site/llms.txt`. The tools the catalog serves that no published build installs
+  are listed in `scripts/site-pages.test.mjs` under the release the page is stamped for;
+  once that release publishes them they belong on the page. `scripts/site-pages.test.mjs`
+  fails until each stamp names the version in `packaging/mcpb/manifest.json` and the page
+  names the tools the catalog serves, so a version bump cannot merge with answers nobody
+  has reread.
 - The install page shows this file's headings, paragraphs and bullets, so a
   claim added here is a claim on the public site. Fenced code is left out, and
   tables and quotes show as plain text. Escape nothing by hand: the renderer

@@ -622,8 +622,7 @@ mod through_the_tool {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         let mut args = json!({"company_guid": COMPANY, "from": "20250701", "to": "20250731"});
         for (key, value) in filter.as_object().unwrap() {

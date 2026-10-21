@@ -114,3 +114,106 @@ fn invalid_endpoint_settings_fail_before_creating_state_or_advertising_tools() {
         assert!(!data.exists());
     }
 }
+
+/// The tools a started `bridge_mcp` lists for these environment settings, read
+/// over its own stdio. Listing needs no Terms acceptance, so none is set.
+fn listed_tools(settings: &[(&str, &str)]) -> Vec<String> {
+    use std::io::Write;
+    let directory = tempfile::tempdir().unwrap();
+    let mut command = startup_command();
+    command
+        .env("BRIDGE_AGENT_DATA_DIR", directory.path().join("data"))
+        .env_remove("BRIDGE_AGENT_ENABLE_IMPORT")
+        .env_remove("BRIDGE_AGENT_ENABLE_WRITES")
+        .env_remove("BRIDGE_AGENT_ENABLE_BATCH_POST")
+        .env_remove("BRIDGE_TERMS_ACCEPTED")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (name, value) in settings {
+        command.env(name, value);
+    }
+    let mut child = command.spawn().unwrap();
+    let requests = concat!(
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"startup","version":"1"}}}"#,
+        "\n",
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#,
+        "\n"
+    );
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(requests.as_bytes())
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success(), "{settings:?}: {output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let listing = stdout
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .find(|response| response["id"] == 2)
+        .unwrap_or_else(|| panic!("no tools/list answer: {stdout}"));
+    listing["result"]["tools"]
+        .as_array()
+        .expect("tools/list result")
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// The started program reads posting and preparation from its environment
+/// (#1090): posting on lists both posting tools and the preparation tools,
+/// the extension's placeholder or an empty value lists neither posting tool,
+/// and with no switch set nothing is prepared or posted.
+#[test]
+fn the_started_program_lists_tools_by_its_posting_and_import_settings() {
+    let posting = ["post_import", "acknowledge_post_review"];
+    let preparing = ["build_import_xml", "parse_bank_statement"];
+    let on = listed_tools(&[("BRIDGE_AGENT_ENABLE_WRITES", "true")]);
+    for name in posting.iter().chain(&preparing) {
+        assert!(on.iter().any(|tool| tool == name), "{name}: {on:?}");
+    }
+    for value in ["", "${user_config.enable_posting_2026_10}", "false"] {
+        let off = listed_tools(&[("BRIDGE_AGENT_ENABLE_WRITES", value)]);
+        for name in posting {
+            assert!(
+                !off.iter().any(|tool| tool == name),
+                "{value:?} {name}: {off:?}"
+            );
+        }
+    }
+    let unset = listed_tools(&[]);
+    for name in posting.iter().chain(&preparing) {
+        assert!(!unset.iter().any(|tool| tool == name), "{name}: {unset:?}");
+    }
+    let import = listed_tools(&[("BRIDGE_AGENT_ENABLE_IMPORT", "true")]);
+    for name in preparing {
+        assert!(import.iter().any(|tool| tool == name), "{name}: {import:?}");
+    }
+}
+
+/// A posting value that is not a boolean, or that is not Unicode, stops the
+/// program before it creates any state, as every invalid setting does.
+#[test]
+fn an_invalid_posting_value_stops_the_program() {
+    let mut values = vec![std::ffi::OsString::from("yes")];
+    #[cfg(any(unix, windows))]
+    values.push(non_unicode_component());
+    for value in values {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("not-created");
+        let output = startup_command()
+            .env("BRIDGE_AGENT_DATA_DIR", &data)
+            .env("BRIDGE_AGENT_ENABLE_WRITES", &value)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(1), "{value:?}");
+        assert!(output.stdout.is_empty());
+        assert_eq!(
+            String::from_utf8(output.stderr).unwrap().trim(),
+            "bridge-mcp: boolean_setting_invalid",
+            "{value:?}"
+        );
+    }
+}

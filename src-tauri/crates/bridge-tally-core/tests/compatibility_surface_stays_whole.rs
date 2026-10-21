@@ -149,10 +149,9 @@
 //! - `agent_change_parse.rs` -- `checkpoint_advanceable`: true when a page was
 //!   not truncated and its highest returned alter id, or the requested
 //!   checkpoint when it returned none, reaches the company's high-water mark.
-//! - `agent_changes.rs` -- the changed-since tool, which applies that predicate
-//!   to vouchers and masters separately, reports `checkpoint_advanceable` only
-//!   when both hold, chooses each axis's next alter id from its own result, and
-//!   refuses a checkpoint past the company snapshot.
+//!
+//! The fifth, `agent_changes.rs` (the changed-since tool), left the list when
+//! that tool was removed (#1769).
 //!
 //! And the egress record:
 //! - `agent_receipt_fields.rs` -- `released_fields`, which the egress receipt in

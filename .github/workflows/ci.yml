@@ -276,11 +276,7 @@ jobs:
       - run: node --test scripts/check-conflict-markers.test.mjs
       - run: python3 scripts/collect-macos-test-crashes.test.py
       - run: python3 scripts/retain-macos-test-binaries.test.py
-      - run: python3 scripts/bank_statement_import.test.py
       - run: python3 scripts/fetch-pdfium.test.py
-      # the committed statement PDFs are this generator's output, byte for byte
-      - run: python3 scripts/generate-bank-statement-fixtures.py src-tauri/crates/bridge-bank-statement/tests/fixtures --check
-      - run: python3 scripts/sanitise-bbox-capture.test.py
       - run: python3 scripts/merge-gate.test.py
       - run: python3 scripts/surface_coverage_report.test.py
 

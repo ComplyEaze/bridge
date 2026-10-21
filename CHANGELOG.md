@@ -30,6 +30,16 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- The approval window, and the review window, now open with a line that says what each answer does, before any
+  detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
+  voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N
+  vouchers"; the review window says "record that you reviewed" and "recorded"); on a Mac it names the buttons to click.
+  The invoice-stop release, which shares the review window, says that Yes releases the stop, under its own
+  statement. The text is wrapped under 100 characters a line, so the window's caps grew by its size (3 lines and
+  150 characters at most) and every text that fitted before still fits. The `post_import` tool text carries the same
+  sentence, with a note to say it before calling. The keys are unchanged: Y and N still answer the Windows window.
+  Not yet run by us on Windows or in a real box at the new size; on a non-English Windows the box's own button
+  letters may differ, which was not measured.
 - A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
   `verify_import` reads the company's voucher mark below the floor a natively posted batch had proved (a mark Tally
   omits twice counts as a company holding no voucher), the import journal records it, a second restore too, and from then on no natively posted batch of that company at that Tally

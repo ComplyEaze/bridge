@@ -1,0 +1,13 @@
+docs/adr/0004-tally-write-safety.md
+src-tauri/crates/tally-protocol-simulator/src/server.rs
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_import.rs
+src-tauri/src/agent_import_post.rs
+src-tauri/src/agent_import_post_location.rs
+src-tauri/src/agent_masters.rs
+src-tauri/src/tally/approved_import.rs
+src-tauri/src/tally/runtime.rs
+src-tauri/src/tally/runtime_masters.rs
+src-tauri/src/tally/runtime_masters_tests.rs
+reviewer: lamemustafa

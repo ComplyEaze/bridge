@@ -286,7 +286,7 @@ pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 /// drawer select. It is one file for one named reason -- not headroom.
 ///
 /// Not pinned, and deliberately: files feature-gated out of every shipped build
-/// (`agent_lab.rs`, `india_tax_observation.rs`), operator filing
+/// (`agent_lab.rs`), operator filing
 /// labels (`client_groups.rs`, `client_group_label_migration.rs` and the
 /// `commands/all_clients.rs` commands over them, none of which reads Tally),
 /// and dead or declaration-only modules. bridge#416 records the reasoning for the rest.

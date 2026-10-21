@@ -49,7 +49,8 @@ vouchers is off by default. This page is the short path; the
    settings, then tick **I accept the ComplyEaze Bridge Terms of Use (version
    2026-10.1)**:
    until you do, every tool call is refused and nothing is read from
-   TallyPrime. Check that **Allow voucher posting** is as you want it.
+   TallyPrime. Check that **Allow voucher posting, one voucher or a batch of up to 50** is as you want it: it is a new setting, so if you turned
+   posting on in an earlier version, turn it on again.
 6. **Restart Claude Desktop.** Save the settings, quit Claude Desktop
    completely and reopen it. In a new chat, use **Connectors** to confirm
    ComplyEaze Bridge is connected.
@@ -71,11 +72,15 @@ vouchers is off by default. This page is the short path; the
   references, or the last four digits of a bank
   statement's account number, and a shortened name can still be identified, not least from the
   GSTIN or PAN sent beside it. It starts at `none`.
-- **Posting is off by default** for a new install; an earlier version may
-  have saved it on, so check the setting. If you turn it on, each voucher waits
-  for your approval in a separate ComplyEaze Bridge window. No ComplyEaze
+- **Posting is off by default.** It is a new setting: if you turned posting on
+  in an earlier version, turn it on again. If you turn it on, each post (one
+  voucher, or a saved batch of up to 50) waits for your approval in a separate
+  ComplyEaze Bridge window. No ComplyEaze
   Bridge tool can approve it for you, but software that controls your screen
-  could click the window, so do not let it. ComplyEaze Bridge cannot
+  could click the window, so do not let it. On Windows the window also takes the
+  keyboard: in one test a typed y approved it while Tally was in front (#1780).
+  When you ask for a post, stop typing in Tally until you have answered it with
+  the mouse. ComplyEaze Bridge cannot
   undo a posted voucher; you correct it in TallyPrime. Read *Before you turn on
   posting* in the [README](../../README.md#before-you-turn-on-posting) first.
 - **Every tool call leaves a receipt** in a log on your computer.

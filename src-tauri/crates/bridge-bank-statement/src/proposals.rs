@@ -4,7 +4,7 @@
 //! **No REMOTEID, no XML, no identity.** Bridge's writer owns all three: it
 //! mints a batch, derives each voucher's REMOTEID from that batch and the
 //! `bridge_txn_id`, renders the envelope, and corrects an imported batch only
-//! through `amends_batch_id` under compare-and-swap. The reference script
+//! through `amends_batch_id` under compare-and-swap. The removed Python script
 //! derived its own content-addressed REMOTEID and upserted on re-import; that
 //! correction path deliberately does not survive the move.
 //!
@@ -14,7 +14,8 @@
 //! to name. It never reaches Tally except through Bridge's own derivation.
 
 use crate::bank::{
-    Bank, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES, PARSER_SENTINELS,
+    Bank, BankReference, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES,
+    PARSER_SENTINELS,
 };
 use crate::cash::{CashAnswer, CashAnswers, CashMovement, PURPOSE_NOT_CONFIRMED};
 use crate::date::Date;
@@ -24,7 +25,7 @@ use crate::parse::Row;
 use crate::refusal::Refusal;
 use crate::text::{ledger_key, mapping_key, squash, strip};
 use bridge_tally_primitives::ExactDecimal;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -46,6 +47,10 @@ pub const STATEMENT_PARTY_LABEL: &str = "Statement party:";
 /// a voucher posted to a mapped ledger. It cannot be built from a parser
 /// sentinel, a cash movement or a parser category such as bank charges (none
 /// is a counterparty the statement printed), nor from a name holding the segment delimiter `|` (it would end the segment early).
+///
+/// A party holding `|` is refused only when it would actually be written: this is checked
+/// before the narration is built, and a line sent to suspense (which names its party where
+/// the ledger would be) or skipped never writes the segment, so it carries a `|` harmlessly.
 struct StatementPayee<'a>(&'a str);
 
 impl<'a> StatementPayee<'a> {
@@ -104,15 +109,17 @@ pub fn suspense_tag<'a>(
     ledgers: impl IntoIterator<Item = &'a str>,
 ) -> Option<SuspenseTag> {
     if narration.ends_with(&format!(" | {PURPOSE_NOT_CONFIRMED}")) {
-        Some(SuspenseTag::PurposeNotConfirmed)
-    } else if ledgers
-        .into_iter()
-        .any(|ledger| narration.ends_with(&format!(" | {UNIDENTIFIED} {ledger}")))
-    {
-        Some(SuspenseTag::Unidentified)
-    } else {
-        None
+        return Some(SuspenseTag::PurposeNotConfirmed);
     }
+    // The loose fold `build` decided "unidentified" by (`ledger_key`), applied to both
+    // sides: a book that reads the ledger back in another case or spacing must still
+    // match the tag written for it.
+    let folded = ledger_key(narration);
+    ledgers
+        .into_iter()
+        .filter(|ledger| !ledger_key(ledger).is_empty())
+        .any(|ledger| folded.ends_with(&ledger_key(&format!(" | {UNIDENTIFIED} {ledger}"))))
+        .then_some(SuspenseTag::Unidentified)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -121,7 +128,7 @@ pub enum Side {
     Cr,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VoucherType {
     Payment,
     Receipt,
@@ -156,7 +163,7 @@ pub struct Proposal {
     pub entries: Vec<Entry>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Disposition {
     Voucher(VoucherType),
@@ -165,6 +172,26 @@ pub enum Disposition {
     /// A cash withdrawal or deposit nobody has answered yet. No voucher is
     /// proposed, and `build_import_xml` refuses the proposals until it is.
     NeedsAnswer,
+}
+
+/// Which way money moved on the statement's own account.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Direction {
+    /// A debit-column row: money left the account.
+    Outflow,
+    /// A credit-column row: money arrived.
+    Inflow,
+}
+
+impl Direction {
+    fn of(outward: bool) -> Self {
+        if outward {
+            Self::Outflow
+        } else {
+            Self::Inflow
+        }
+    }
 }
 
 /// What became of one statement row. Kept for every row inside the date window,
@@ -176,8 +203,16 @@ pub struct StatementRecord {
     pub disposition: Disposition,
     pub amount: String,
     pub party: String,
-    /// The ledger the voucher posts the non-bank leg to (empty when skipped).
+    /// The ledger the voucher posts the non-bank leg to. For a skipped row,
+    /// the other bank account's ledger, whose Contra carries the transfer;
+    /// empty only for a row still waiting for a cash answer.
     pub ledger: String,
+    /// The network-transfer reference the row carries (UPI, IMPS, NEFT or RTGS),
+    /// whatever became of the row.
+    pub reference: Option<BankReference>,
+    /// The cheque or transaction number the statement prints in its own column,
+    /// recorded only: nothing matches on it.
+    pub instrument: Option<String>,
     /// The row reached the suspense ledger: answered "don't know", or, by
     /// the deliberately loose fold, mapped or defaulted there.
     pub suspense: bool,
@@ -186,6 +221,13 @@ pub struct StatementRecord {
     pub cash_movement: Option<CashMovement>,
     /// The person's answer for a cash line, when given.
     pub cash_answer: Option<CashAnswer>,
+    /// Which way the row moved money on the statement's own account.
+    pub direction: Direction,
+    /// The statement holds another row, read on the same date, of an equal
+    /// amount in the opposite direction: a line that came straight back is
+    /// not half of a transfer. Read over every row of the statement, not only
+    /// those in the date window.
+    pub reversed_same_day: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -199,10 +241,76 @@ pub struct Build {
     /// How many rows the date window left out. Zero means the window is the
     /// whole statement.
     pub rows_outside_window: usize,
+    /// The date of every row the statement printed, before the date window.
+    pub dates: Vec<Date>,
     /// The net (credits less debits) of the rows dated before the window's
     /// `from`, and of those dated after its `to`. Zero when none is left out.
     pub net_before_window: ExactDecimal,
     pub net_after_window: ExactDecimal,
+}
+
+/// The days whose every row the statement read, from the date of every row it
+/// read and the `from`/`to` window the person gave (`None` for either end
+/// that was left open).
+///
+/// The balance replay closes on balances the person types, so a statement
+/// downloaded part-way through a day can miss the rest of that day. A day at
+/// the edge of the rows therefore counts only when a row exists beyond it: the
+/// window starts at `from` when it is later than the first row's date, else the
+/// day after it; it ends at `to` when that is earlier than the last row's
+/// date, else the day before it. `None` when no day is left.
+pub fn coverage(dates: &[Date], from: Option<Date>, to: Option<Date>) -> Option<(Date, Date)> {
+    let first = *dates.iter().min()?;
+    let last = *dates.iter().max()?;
+    let start = match from {
+        Some(from) if from > first => from,
+        _ => first.next_day()?,
+    };
+    let end = match to {
+        Some(to) if to < last => to,
+        _ => last.previous_day()?,
+    };
+    (start <= end).then_some((start, end))
+}
+
+/// One row read as a movement of money, or `None` when it does not read as one
+/// (the build refuses such a row if it lies in the window).
+fn movement(row: &Row, bank: Bank, number: usize) -> Option<(Date, String, bool)> {
+    let date = bank.parse_date(strip(row.get(DATE)))?;
+    let debit = money(row.get(DEBIT), DEBIT, number).ok()?;
+    let credit = money(row.get(CREDIT), CREDIT, number).ok()?;
+    match (debit, credit) {
+        (Some(amount), None) => Some((date, format_amount(&amount), true)),
+        (None, Some(amount)) => Some((date, format_amount(&amount), false)),
+        _ => None,
+    }
+}
+
+/// For each row, whether another row of the statement moved the same amount the
+/// other way on the same date.
+fn reversed_same_day(rows: &[Row], bank: Bank) -> Vec<bool> {
+    let moves: Vec<Option<(Date, String, bool)>> = rows
+        .iter()
+        .enumerate()
+        .map(|(index, row)| movement(row, bank, index + 1))
+        .collect();
+    let mut seen: BTreeMap<(Date, &str), (bool, bool)> = BTreeMap::new();
+    for (date, amount, outward) in moves.iter().flatten() {
+        let both = seen.entry((*date, amount.as_str())).or_default();
+        if *outward {
+            both.0 = true;
+        } else {
+            both.1 = true;
+        }
+    }
+    moves
+        .iter()
+        .map(|moved| {
+            moved.as_ref().is_some_and(|(date, amount, _)| {
+                seen.get(&(*date, amount.as_str())) == Some(&(true, true))
+            })
+        })
+        .collect()
 }
 
 /// Why a parse cannot be tied to the book over its window. Not a refusal of
@@ -347,6 +455,21 @@ pub fn format_amount(value: &ExactDecimal) -> String {
     two_places(value.as_str())
 }
 
+/// The label of one statement row, derived from the transaction and not from its position.
+///
+/// Keyed on the row ordinal, a second download of the same account would give two
+/// different transactions one label, and an overlapping export that shifts a
+/// transaction's ordinal would give it a new one; an amendment of an earlier batch, and a
+/// person's cash answer, are both named by this label, so it has to follow the
+/// transaction. So the label is a digest of what the bank itself printed on the line: the
+/// date, both amount columns, the running balance and the narration. The balance
+/// in particular makes two genuinely identical same-day payments distinguishable, because
+/// the second lands on a different balance.
+///
+/// Nothing the operator controls may enter it. The account identity is the number the
+/// statement prints, not the label typed for the account: `HDFC CA xx1234`, `HDFC xx1234`
+/// and `xx001234` all name one account but are three different strings, and any of them
+/// would give every row a new label on a corrected re-parse.
 fn transaction_id(account_number: &str, date: Date, row: &Row) -> String {
     let material = [
         account_number,
@@ -380,6 +503,12 @@ pub fn is_statement_txn_id(id: &str) -> bool {
             .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
+/// The check this crate makes early on a narration or a ledger name: within `limit`
+/// characters, no control character (C0, DEL or C1), and not the reserved `[BRIDGE:`
+/// marker in any ASCII case. Passing is necessary and not sufficient: Bridge's builder
+/// checks what it is handed after unescaping it, and also refuses text that would read
+/// back rewritten or draws nothing. The point of checking here is that a refusal for a
+/// narration or a party can name the statement row.
 fn admissible_text(text: &str, limit: usize) -> bool {
     text.chars().count() <= limit
         && !text
@@ -505,6 +634,8 @@ pub fn build(
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut statement_ids = BTreeSet::new();
     let mut window_ids = BTreeSet::new();
+    let mut dates = Vec::with_capacity(rows.len());
+    let reversed = reversed_same_day(rows, bank);
     let mut span: Option<(Date, Date)> = None;
     let mut rows_outside_window = 0;
     let mut net_before_window = ExactDecimal::zero();
@@ -512,6 +643,10 @@ pub fn build(
     for (index, row) in rows.iter().enumerate() {
         let number = index + 1;
         let raw_date = strip(row.get(DATE));
+        // A cell that matched the row-start shape but is not a real calendar date (a
+        // `31/02/26`) is a layout or extraction fault: it is refused with a typed
+        // category, never guessed at. Every row is read, including rows the window leaves
+        // out, so a shifted date column refuses the run wherever it falls.
         let Some(date) = bank.parse_date(raw_date) else {
             return Err(Refusal::at_row(
                 "unparseable_date",
@@ -522,6 +657,7 @@ pub fn build(
                 ),
             ));
         };
+        dates.push(date);
         let txn_id = transaction_id(options.account_number, date, row);
         statement_ids.insert(txn_id.clone());
         span = Some(span.map_or((date, date), |(first, last)| {
@@ -579,6 +715,8 @@ pub fn build(
         }
         let amount_text = format_amount(&amount);
         let party = bank.party(row);
+        let transfer_reference = bank.transfer_reference(row);
+        let instrument = bank.instrument(row);
         let cash_movement = CashMovement::of_party(&party);
         let answered = options.cash_answers.get(&txn_id);
         let (ledger, voucher_type, cash_answer) = match cash_movement {
@@ -602,10 +740,14 @@ pub fn build(
                         amount: amount_text,
                         party,
                         ledger: String::new(),
+                        reference: transfer_reference,
+                        instrument,
                         suspense: false,
                         bridge_txn_id: txn_id,
                         cash_movement,
                         cash_answer: None,
+                        direction: Direction::of(outward),
+                        reversed_same_day: reversed[index],
                     });
                     continue;
                 };
@@ -638,17 +780,47 @@ pub fn build(
                     mapped_ledger
                 };
                 if treatment == Treatment::Skip {
+                    // The other account's ledger is a ledger name like any
+                    // other: the later pairing looks for the Contra under it.
+                    require_ledger(&ledger, "skipped transfer's other ledger", Some(number))?;
+                    // The other account's Contra is found under this ledger; the
+                    // statement's own bank ledger would look for the transfer in
+                    // the account it was read from.
+                    if ledger_key(&ledger) == ledger_key(options.bank_ledger) {
+                        return Err(Refusal::at_row(
+                            "skip_ledger_is_statement_bank",
+                            number,
+                            format!(
+                                "row {number} is skipped as a transfer already carried by the other bank account's Contra, but its mapped ledger is this statement's own bank ledger; name the other account's ledger"
+                            ),
+                        ));
+                    }
+                    // Suspense is where unidentified rows go, never another
+                    // account whose Contra could carry the transfer.
+                    if ledger_key(&ledger) == ledger_key(options.suspense_ledger) {
+                        return Err(Refusal::at_row(
+                            "skip_ledger_is_suspense",
+                            number,
+                            format!(
+                                "row {number} is skipped as a transfer already carried by the other bank account's Contra, but its mapped ledger is the suspense ledger; name the other account's ledger"
+                            ),
+                        ));
+                    }
                     records.push(StatementRecord {
                         row: number,
                         date: date.iso(),
                         disposition: Disposition::Skipped,
                         amount: amount_text,
                         party,
-                        ledger: String::new(),
+                        ledger,
+                        reference: transfer_reference,
+                        instrument,
                         suspense: false,
                         bridge_txn_id: txn_id,
                         cash_movement: None,
                         cash_answer: None,
+                        direction: Direction::of(outward),
+                        reversed_same_day: reversed[index],
                     });
                     continue;
                 }
@@ -665,6 +837,16 @@ pub fn build(
         let dont_know = cash_answer == Some(CashAnswer::DontKnow);
         // Deliberately the LOOSE fold: over-flagging costs a look. The message
         // names the ledger actually written, never the word "Suspense".
+        //
+        // Under-flagging would post an unidentified row and say nothing. This is not a
+        // claim that Tally treats the two names as one master: that direction is
+        // unverified (protocol reference section 9.4b), and `ledger_key` is looser than the
+        // measurement in several ways besides. Nothing here can know what Tally would
+        // match. Naming the real destination matters because the fold can over-flag (a
+        // mapping to `A-B` against a suspense ledger named `A B`): a message naming the
+        // wrong ledger would tell the person to reallocate from a ledger the voucher was
+        // never posted to, an instruction that cannot be followed, so a false positive
+        // costs a look instead of a wrong search.
         let unidentified = !dont_know && ledger_key(&ledger) == ledger_key(options.suspense_ledger);
         let suspense = dont_know || unidentified;
         let shown = if suspense { &party } else { &ledger };
@@ -674,6 +856,10 @@ pub fn build(
         } else {
             StatementPayee::new(&party, number)?
         };
+        // The narration opens with the mode and the bank's own reference. Under automatic numbering Tally
+        // silently discards a supplied voucher number (protocol reference section 9.8), so
+        // the reference is put where it survives. A row can have none (the statement
+        // printed no reference), and the narration then carries the mode alone.
         let mut narration = squash(&format!(
             "{mode} {reference} {} {shown} | {} | {}",
             if outward { "to" } else { "from" },
@@ -746,10 +932,14 @@ pub fn build(
             amount: amount_text,
             party,
             ledger,
+            reference: transfer_reference,
+            instrument,
             suspense,
             bridge_txn_id: txn_id,
             cash_movement,
             cash_answer,
+            direction: Direction::of(outward),
+            reversed_same_day: reversed[index],
         });
     }
     if let Some(stale) = options
@@ -776,6 +966,8 @@ pub fn build(
             ),
         ));
     }
+    // A window that is ordered but does not overlap the statement would otherwise yield an
+    // empty proposal set and be reported as a successful zero-voucher import.
     if records.is_empty() {
         return Err(Refusal::new(
             "empty_selection",
@@ -785,6 +977,7 @@ pub fn build(
     Ok(Build {
         proposals,
         records,
+        dates,
         span,
         rows_outside_window,
         net_before_window,
@@ -804,7 +997,7 @@ pub struct Selfcheck {
 ///
 /// A transcription check, not a correctness proof: proposals and records come
 /// from the same parse. [`crate::money::reconcile`] is the correctness proof.
-/// The reference also checked XML sign convention and DATE/EFFECTIVEDATE; those
+/// The removed Python tool also checked XML sign convention and DATE/EFFECTIVEDATE; those
 /// belong to Bridge's writer now and are not re-checked here.
 pub fn selfcheck(build: &Build, bank_ledger: &str) -> Result<Selfcheck, Refusal> {
     let bank = ledger_key(bank_ledger);
@@ -883,7 +1076,8 @@ pub struct CounterpartyGroup {
     /// amount decides it.
     pub party: String,
     pub also_printed_as: Vec<String>,
-    /// The ledger its non-bank leg posts to; empty when skipped.
+    /// The ledger its non-bank leg posts to; for a skipped row, the other bank
+    /// account's ledger.
     pub ledger: String,
     /// `Payment`, `Receipt`, `Contra` or `Skipped`.
     pub disposition: String,
@@ -895,6 +1089,13 @@ pub struct CounterpartyGroup {
 /// mapping key, so two wrap spellings of one payee are one line. No amount is
 /// kept: groups come in the order each first appears, and the parse summary
 /// sorts them.
+///
+/// One payee can reach the list under two spellings, because the wrap heuristic decides
+/// per line whether a space survives. Listing them as two invites writing two mapping
+/// rows and then wondering why the second never fires. Spellings that differ only in
+/// spacing are one counterparty; punctuation is significant (`A & B` and `AB` are two
+/// rows, and a variant left unmapped falls to suspense). The other spellings are named
+/// beside the one shown, so a person searching the statement for a variant still finds it.
 pub fn group_counterparties(
     records: &[StatementRecord],
 ) -> Result<Vec<CounterpartyGroup>, Refusal> {
@@ -980,8 +1181,8 @@ mod statement_payee_tests {
                 "{not_a_counterparty:?}"
             );
         }
-        let payee = StatementPayee::new("RAVI KUMAR", 2).unwrap().unwrap();
-        assert_eq!(payee.segment(), " | Statement party: RAVI KUMAR");
+        let payee = StatementPayee::new("MAPLE QUILL", 2).unwrap().unwrap();
+        assert_eq!(payee.segment(), " | Statement party: MAPLE QUILL");
         let refusal = StatementPayee::new("A|B", 2).err().unwrap();
         assert_eq!(refusal.category, "party_not_admissible");
     }

@@ -536,7 +536,7 @@ failure:
 | Numbering method | Your `<VOUCHERNUMBER>` | A failed Alter |
 | --- | --- | --- |
 | Automatic | **discarded** — Tally assigns its own | **silently duplicates** |
-| **Manual + `PREVENTDUPLICATES=Yes`** | **preserved verbatim** | **cleanly rejected** |
+| **Manual + `PREVENTDUPLICATES=Yes`** | **preserved verbatim**, except a space at its end, which did not read back (§9.8) | **cleanly rejected** |
 
 Under automatic numbering a client-supplied key is thrown away while the create still reports
 `CREATED=1, ERRORS=0`. Any dedupe built on it is silently ineffective.
@@ -1109,6 +1109,18 @@ model — start, act, exit — not a long-running server.
 logged-in user. Its documentation does not mention the XML gateway or port 9000, so it is not
 established as a solution for headless XML integration. Worth investigating only if the hosted
 topology is revived.
+
+### 5.5 A real statement's layout is never committed as a capture
+
+A bank statement's text layer places every word, and the width or position of a word that has
+been masked can still identify the word. Do not commit a sanitised capture of a new statement
+or layout; measure the layout on the statement where it lives and commit only what describes its
+shape (see `src-tauri/crates/bridge-bank-statement/examples/layout_probe.rs`, which prints no
+position of a masked word on its line). The two captures in `scripts/fixtures/` are the last ones, and
+`scripts/fixtures/README.md` says so. `tests/committed_captures_tests.rs` in the bank crate is a
+tripwire for non-ASCII text in them, not a gate.
+
+---
 
 ## 6. Parsing
 

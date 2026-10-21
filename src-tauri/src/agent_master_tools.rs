@@ -1107,7 +1107,7 @@ impl Server {
     ) -> ToolOutcome {
         let verdict = state.verdict.as_ref();
         let reported = if let Some(verdict) = verdict {
-            verdict_state_code(verdict.state)
+            verdict_state_code(verdict.state())
         } else if state.response.is_some() {
             "posted_unverified"
         } else {
@@ -1123,18 +1123,18 @@ impl Server {
                 "counters": counters_json(
                     state.response.as_ref().and_then(|response| response.counters.as_ref())
                 ),
-                "verdict": verdict.map(|verdict| verdict_state_code(verdict.state)),
+                "verdict": verdict.map(|verdict| verdict_state_code(verdict.state())),
             },
             // The verdict first: it is what the read-back concluded, and a
             // verdict with no answer on file is not "may have been sent".
             "note": match (verdict, &state.response) {
-                (Some(verdict), _) => settled_note(verdict.state),
+                (Some(verdict), _) => settled_note(verdict.state()),
                 (None, Some(_)) => ALREADY_SENT_NOTE,
                 (None, None) => MAY_HAVE_BEEN_SENT_NOTE,
             },
         });
         if let Some(verdict) = verdict {
-            if let Some(alert) = settled_alert(verdict.state) {
+            if let Some(alert) = settled_alert(verdict.state()) {
                 result["alert"] = json!(alert);
             }
         }
@@ -1145,7 +1145,9 @@ impl Server {
                 result["next_step"] = json!(not_read_back_next_step(code));
                 result["verification"] = json!({"attempted": false, "error": {"code": code}});
             }
-            (None, Some(verdict)) => result["next_step"] = json!(settled_next_step(verdict.state)),
+            (None, Some(verdict)) => {
+                result["next_step"] = json!(settled_next_step(verdict.state()))
+            }
             (None, None) => {}
         }
         ToolOutcome {

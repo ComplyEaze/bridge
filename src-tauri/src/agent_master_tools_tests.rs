@@ -1028,9 +1028,9 @@ async fn an_approved_post_sends_exactly_the_bytes_its_intent_recorded() {
         ]
     );
     let verdict = state.verdict.expect("the verdict is recorded");
-    assert_eq!(verdict.state, MasterVerdictState::PostedVerified);
-    assert_eq!(verdict.items[0].guid.as_deref(), Some(NEW_GUID));
-    assert_eq!(verdict.items[0].reason, None);
+    assert_eq!(verdict.state(), MasterVerdictState::PostedVerified);
+    assert_eq!(verdict.items()[0].guid.as_deref(), Some(NEW_GUID));
+    assert_eq!(verdict.items()[0].reason, None);
     // The approval was spent under the lock, not left to lapse unspent.
     assert!(server.post_approvals.lapse_note(&batch.batch_id).is_none());
     assert!(!server.post_approvals.holds(&batch.batch_id));
@@ -4196,7 +4196,7 @@ async fn a_name_found_on_an_existing_guid_is_posted_into_existing_master_and_is_
         .any(|reason| reason == "name_resolves_to_existing_master"));
     let state = state_of(directory.path(), &batch.batch_id);
     assert_eq!(
-        state.verdict.as_ref().map(|verdict| verdict.state),
+        state.verdict.as_ref().map(|verdict| verdict.state()),
         Some(MasterVerdictState::PostedIntoExistingMaster)
     );
     assert!(state.is_settled());
@@ -4265,7 +4265,7 @@ async fn another_companys_mark_moving_is_located_elsewhere_and_is_loud() {
     assert_eq!(
         state_of(directory.path(), &batch.batch_id)
             .verdict
-            .map(|verdict| verdict.state),
+            .map(|verdict| verdict.state()),
         Some(MasterVerdictState::MasterWriteLocatedElsewhere)
     );
     assert_no_private_value("answer", &response.to_string());
@@ -4877,7 +4877,7 @@ async fn a_failed_first_append_of_the_answer_is_recorded_under_the_verdicts_lock
     let state = state_of(done.directory.path(), &done.batch.batch_id);
     assert_eq!(state.response.unwrap().counters.unwrap().created, 1);
     assert_eq!(
-        state.verdict.unwrap().state,
+        state.verdict.unwrap().state(),
         MasterVerdictState::PostedVerified
     );
 }
@@ -5340,7 +5340,7 @@ async fn a_loud_answer_under_a_small_cap_is_withheld_and_the_journal_still_has_i
     let state = state_of(directory.path(), &batch_capped.batch_id);
     assert_eq!(state.response.unwrap().counters.unwrap().altered, 1);
     assert_eq!(
-        state.verdict.unwrap().state,
+        state.verdict.unwrap().state(),
         MasterVerdictState::PostedIntoExistingMaster
     );
     // A later call under a cap that fits reports the alert.

@@ -139,6 +139,26 @@ fn invalid(reason: Invalid) -> MasterLedgerError {
     MasterLedgerError::Invalid(reason)
 }
 
+/// A batch, its intent and an answer that counted nothing created or altered:
+/// what a terminal `confirmed_absent` may follow.
+fn quiet_prefix(batch: &MasterBatch) -> String {
+    let mut response = response_for(batch);
+    response.counters = Some(MasterCounters {
+        created: 0,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 0,
+    });
+    journal_text(&[
+        MasterRecord::Batch(batch.clone()),
+        MasterRecord::DispatchIntent(intent_for(batch)),
+        MasterRecord::DispatchResponse(response),
+    ])
+}
+
 fn journal_text(records: &[MasterRecord]) -> String {
     records.iter().map(line).collect()
 }
@@ -1017,7 +1037,7 @@ fn append_refuses_an_overlapping_intent_and_writes_nothing() {
 #[test]
 fn the_first_terminal_verdict_wins_and_a_later_one_is_refused() {
     let batch = batch(&batch_id());
-    let prefix = journal_text(&full_records(&batch)[..3]);
+    let prefix = quiet_prefix(&batch);
     let verdict = |state| line(&MasterRecord::Verdict(verdict_for(&batch, state)));
     // Verdicts that settle nothing may repeat and may be followed by a terminal one.
     let open = [
@@ -1097,6 +1117,39 @@ fn posted_verified_without_an_answer_on_record_is_refused() {
     .is_ok());
 }
 
+/// Absence is never concluded against Tally's own count of a write: a
+/// `confirmed_absent` verdict after an answer counting a create or an
+/// alteration is refused; after an answer counting none, or none on record,
+/// it is admitted.
+#[test]
+fn confirmed_absent_against_counters_that_show_a_write_is_refused() {
+    let batch = batch(&batch_id());
+    let intent = journal_text(&full_records(&batch)[..2]);
+    let absent = line(&MasterRecord::Verdict(absent_verdict(&batch)));
+    assert!(read(&format!("{intent}{absent}")).is_ok());
+    let answered = |created: u64, altered: u64| {
+        let mut response = response_for(&batch);
+        response.counters = Some(MasterCounters {
+            created,
+            altered,
+            deleted: 0,
+            ignored: 0,
+            errors: 0,
+            cancelled: 0,
+            exceptions: 0,
+        });
+        line(&MasterRecord::DispatchResponse(response))
+    };
+    assert!(read(&format!("{intent}{}{absent}", answered(0, 0))).is_ok());
+    for (created, altered) in [(1, 0), (0, 1)] {
+        assert_eq!(
+            read(&format!("{intent}{}{absent}", answered(created, altered))).unwrap_err(),
+            invalid(Invalid::AbsentAgainstCounters),
+            "{created} {altered}"
+        );
+    }
+}
+
 /// `confirmed_absent` as a journal line: no GUID, an optional reason.
 fn absent_verdict(batch: &MasterBatch) -> MasterVerdict {
     let mut verdict = verdict_for(batch, MasterVerdictState::ConfirmedAbsent);
@@ -1109,7 +1162,7 @@ fn absent_verdict(batch: &MasterBatch) -> MasterVerdict {
 #[test]
 fn confirmed_absent_is_a_snake_case_terminal_verdict_without_a_guid() {
     let batch = batch(&batch_id());
-    let prefix = journal_text(&full_records(&batch)[..3]);
+    let prefix = quiet_prefix(&batch);
     let encoded = serde_json::to_string(&MasterVerdictState::ConfirmedAbsent).unwrap();
     assert_eq!(encoded, "\"confirmed_absent\"");
     let text = format!(

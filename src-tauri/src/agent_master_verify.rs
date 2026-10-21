@@ -92,14 +92,14 @@ pub(super) fn settled_next_step(state: MasterVerdictState) -> &'static str {
 /// What a caller does next, by what the read-back judged. No step tells the
 /// person to create the ledger in Tally by hand.
 pub(super) fn judged_next_step(judgement: &Judgement, moment: Moment) -> &'static str {
-    if judgement.state != MasterVerdictState::ReconciliationRequired {
-        return settled_next_step(judgement.state);
+    if judgement.state() != MasterVerdictState::ReconciliationRequired {
+        return settled_next_step(judgement.state());
     }
-    if judgement.reasons.contains(&"company_scope_changed") {
+    if judgement.reasons().contains(&"company_scope_changed") {
         NEXT_LOAD_SAME_COMPANIES
-    } else if moment == Moment::Reconcile && judgement.name_absent_in_read_book {
+    } else if moment == Moment::Reconcile && judgement.name_absent_in_read_book() {
         NEXT_ABSENT_NOT_SETTLED
-    } else if judgement.guid.is_some() {
+    } else if judgement.guid().is_some() {
         NEXT_PRESENT_NOT_VERIFIED
     } else {
         NEXT_RECONCILE
@@ -142,7 +142,7 @@ pub(super) fn unrecorded_next_step(
     // A state that is open, or loud, has a step of its own that is true whether
     // or not its verdict was written: the check to make in Tally. A quiet final
     // state (verified, absent) has none that is true while unsettled.
-    let own = !judgement.state.is_terminal() || settled_alert(judgement.state).is_some();
+    let own = !judgement.state().is_terminal() || settled_alert(judgement.state()).is_some();
     let mut step = if own {
         format!(
             "{} {NEXT_VERDICT_NOT_RECORDED}",
@@ -559,7 +559,7 @@ fn verification_result(
     moment: Moment,
     counters: Option<MasterCounters>,
 ) -> Value {
-    let alert = settled_alert(judgement.state);
+    let alert = settled_alert(judgement.state());
     let counters = counters.as_ref();
     let verdict_recorded = recorded.verdict.is_ok();
     let next_step = if verdict_recorded {
@@ -569,7 +569,7 @@ fn verification_result(
     };
     let mut result = json!({
         "batch_id": state.batch.batch_id,
-        "state": verdict_state_code(judgement.state),
+        "state": verdict_state_code(judgement.state()),
         "attempt_recorded": true,
         // Whether the journal holds Tally's answer for this batch.
         "answer_recorded": recorded.answer_recorded,
@@ -581,10 +581,10 @@ fn verification_result(
             },
             // Settled is the journal's word: a terminal state whose verdict is
             // not recorded is judged, and not yet settled.
-            "settled": judgement.state.is_terminal() && verdict_recorded,
-            "guid": judgement.guid,
-            "checks": judgement.checks,
-            "reasons": judgement.reasons,
+            "settled": judgement.state().is_terminal() && verdict_recorded,
+            "guid": judgement.guid(),
+            "checks": judgement.checks(),
+            "reasons": judgement.reasons(),
             "read_back": read_back,
             // Recorded: the journal holds this verdict. Written: this call
             // appended it (an open verdict already held in the same words is not
@@ -594,7 +594,7 @@ fn verification_result(
         },
         "counters": counters_json(counters),
         "next_step": next_step,
-        "note": settled_note(judgement.state),
+        "note": settled_note(judgement.state()),
     });
     if let Err(code) = &recorded.verdict {
         result["verification"]["verdict_record_error"] = json!(code);

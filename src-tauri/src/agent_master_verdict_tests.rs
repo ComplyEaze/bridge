@@ -420,8 +420,12 @@ fn a_name_that_resolves_to_a_pre_image_master_through_an_alias_is_into_an_existi
     );
 }
 
+/// A pre-image master that changed while nothing ties the change to this
+/// create (no altered count, the name not resolving to it) is not called a
+/// write into it: the batch is left to a person, holding its name, and is
+/// never verified.
 #[test]
-fn a_changed_pre_image_alter_id_is_into_an_existing_master_even_beside_a_new_ledger() {
+fn a_changed_pre_image_alter_id_alone_is_for_a_person_never_verified() {
     for changed in [CASH, DEBTORS_GROUP] {
         let mut world = World::clean(suspense());
         for entry in world.masters().iter_mut() {
@@ -432,9 +436,10 @@ fn a_changed_pre_image_alter_id_is_into_an_existing_master_even_beside_a_new_led
         let judgement = world.judge();
         assert_eq!(
             judgement.state,
-            MasterVerdictState::PostedIntoExistingMaster,
+            MasterVerdictState::ReconciliationRequired,
             "{changed}"
         );
+        assert!(!judgement.state.is_terminal());
         assert_eq!(judgement.checks.pre_image_unchanged, Check::Failed);
         assert!(judgement.reasons.contains(&"pre_image_master_changed"));
     }
@@ -832,7 +837,7 @@ fn a_changed_or_missing_pre_image_master_forbids_confirmed_absent() {
     changed.masters()[0].alter_id += 1;
     assert_eq!(
         changed.judge().state,
-        MasterVerdictState::PostedIntoExistingMaster
+        MasterVerdictState::ReconciliationRequired
     );
     let mut missing = World::untouched(suspense());
     missing.masters().remove(0);

@@ -379,10 +379,10 @@ pub(super) struct VerdictItem {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct MasterVerdict {
-    pub(super) batch_id: String,
-    pub(super) batch_sha256: String,
-    pub(super) state: MasterVerdictState,
-    pub(super) items: Vec<VerdictItem>,
+    batch_id: String,
+    batch_sha256: String,
+    state: MasterVerdictState,
+    items: Vec<VerdictItem>,
     #[serde(skip)]
     sealed: (),
 }
@@ -520,6 +520,10 @@ pub(super) enum Invalid {
     /// A `posted_verified` verdict with no answer from Tally on record: a
     /// verified create needs Tally's counters, so its answer is appended first.
     VerifiedWithoutResponse,
+    /// A `confirmed_absent` verdict against an answer on record whose counters
+    /// say Tally created or altered something: absence is never concluded
+    /// against Tally's own count of a write.
+    AbsentAgainstCounters,
     /// A second response for a batch: one POST, one response.
     SecondResponse,
     /// An intent recording no company mark, or none for the batch's company.
@@ -708,24 +712,32 @@ impl MasterDispatchResponse {
 }
 
 impl MasterVerdict {
+    pub(super) fn state(&self) -> MasterVerdictState {
+        self.state
+    }
+
+    pub(super) fn items(&self) -> &[VerdictItem] {
+        &self.items
+    }
+
     /// The verdict `judgement` gives on `batch`: each item carries the
     /// judgement's GUID, and its reasons unless the batch is verified.
     pub(super) fn judged(
         batch: &MasterBatch,
         judgement: &super::master_tools::verdict::Judgement,
     ) -> Self {
-        let reason = (judgement.state != MasterVerdictState::PostedVerified)
-            .then(|| judgement.reasons.join(","));
+        let reason = (judgement.state() != MasterVerdictState::PostedVerified)
+            .then(|| judgement.reasons().join(","));
         Self {
             batch_id: batch.batch_id.clone(),
             batch_sha256: batch.batch_sha256.clone(),
-            state: judgement.state,
+            state: judgement.state(),
             items: batch
                 .items
                 .iter()
                 .map(|item| VerdictItem {
                     name: item.name.clone(),
-                    guid: judgement.guid.clone(),
+                    guid: judgement.guid().map(str::to_string),
                     reason: reason.clone(),
                 })
                 .collect(),
@@ -1054,6 +1066,14 @@ impl MasterJournal {
                 }
                 if verdict.state == MasterVerdictState::PostedVerified && state.response.is_none() {
                     return Err(MasterLedgerError::Invalid(Invalid::VerifiedWithoutResponse));
+                }
+                let counted_a_write = state
+                    .response
+                    .as_ref()
+                    .and_then(|response| response.counters)
+                    .is_some_and(|counters| counters.created > 0 || counters.altered > 0);
+                if verdict.state == MasterVerdictState::ConfirmedAbsent && counted_a_write {
+                    return Err(MasterLedgerError::Invalid(Invalid::AbsentAgainstCounters));
                 }
                 let named = verdict
                     .items

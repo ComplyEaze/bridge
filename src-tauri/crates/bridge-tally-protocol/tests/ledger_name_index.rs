@@ -299,3 +299,27 @@ fn a_renamed_reserved_ledgers_built_in_name_is_kept() {
         Some("Synthetic Reserved")
     );
 }
+
+/// A `LEDGER` outside the collection (beside it under `DATA`, or under
+/// `DESC`) is a row the walk would step over: it would read as absent and a
+/// Create of its name would alter it, so the answer is refused. Edited
+/// captures: no answer of this shape has been seen.
+#[test]
+fn a_ledger_outside_the_collection_refuses_the_answer() {
+    for (from, to) in [
+        (
+            "</COLLECTION>",
+            "</COLLECTION><LEDGER NAME=\"Stray\"><NAME>Stray</NAME></LEDGER>",
+        ),
+        ("</COLLECTION>", "</COLLECTION><LEDGER/>"),
+        ("<DESC>", "<DESC><LEDGER NAME=\"Stray\"></LEDGER>"),
+    ] {
+        assert_eq!(
+            refusal(&changed(BASELINE, from, to)),
+            StandardLedgerCatalogError::MalformedResponse,
+            "{to}"
+        );
+    }
+    // The CMPINFO counter is not a row, and the capture still parses.
+    assert!(!parsed(BASELINE).is_empty());
+}

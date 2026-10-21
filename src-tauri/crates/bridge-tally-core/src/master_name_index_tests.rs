@@ -549,3 +549,19 @@ fn a_dotless_i_or_long_s_meets_its_ascii_spelling() {
     assert_eq!(hits(&single("K\u{131}ran Traders"), "KIRAN TRADERS"), 1);
     assert_eq!(hits(&single("A\u{17f}hok"), "Ashok"), 1);
 }
+
+/// A stored name holding Tally's illegal character reference (`&#4;`, read
+/// as U+FFFD `#4;`) meets its plain spelling: the reference is dropped whole,
+/// digit and all. A U+FFFD that opens no whole marker is only a symbol, and
+/// the digits of a name stay.
+#[test]
+fn a_stored_reference_marker_meets_the_plain_spelling() {
+    assert_eq!(
+        hits(&single("\u{fffd}#4; Not Applicable"), "Not Applicable"),
+        1
+    );
+    assert_eq!(hits(&single("Primary\u{fffd}#65533;"), "Primary"), 1);
+    assert_eq!(hits(&single("Godown \u{fffd}# 4"), "Godown 4"), 1);
+    assert_eq!(hits(&single("\u{fffd}#4; Branch 7"), "Branch 4"), 0);
+    assert_eq!(hits(&single("\u{fffd}#4; Branch 7"), "Branch 7"), 1);
+}

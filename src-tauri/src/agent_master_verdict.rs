@@ -194,16 +194,16 @@ impl Checks {
 /// so the record that releases a held name always rests on a read-back (P2).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(in crate::agent::agent_import) struct Judgement {
-    pub(in crate::agent::agent_import) state: MasterVerdictState,
+    state: MasterVerdictState,
     /// The ledger's GUID, when the verdict names one.
-    pub(in crate::agent::agent_import) guid: Option<String>,
-    pub(super) checks: Checks,
+    guid: Option<String>,
+    checks: Checks,
     /// Static reasons, carrying no book data, for any verdict other than `posted_verified`.
-    pub(in crate::agent::agent_import) reasons: Vec<&'static str>,
+    reasons: Vec<&'static str>,
     /// A fact about the read, not a verdict: the paired index was read and was
     /// usable, and the item name collides with no master in it under any key.
     /// False where the index was not read or not usable.
-    pub(super) name_absent_in_read_book: bool,
+    name_absent_in_read_book: bool,
     sealed: (),
 }
 
@@ -216,6 +216,26 @@ pub(super) enum OpenVerdict {
 }
 
 impl Judgement {
+    pub(in crate::agent::agent_import) fn state(&self) -> MasterVerdictState {
+        self.state
+    }
+
+    pub(in crate::agent::agent_import) fn guid(&self) -> Option<&str> {
+        self.guid.as_deref()
+    }
+
+    pub(super) fn checks(&self) -> &Checks {
+        &self.checks
+    }
+
+    pub(in crate::agent::agent_import) fn reasons(&self) -> &[&'static str] {
+        &self.reasons
+    }
+
+    pub(super) fn name_absent_in_read_book(&self) -> bool {
+        self.name_absent_in_read_book
+    }
+
     /// An open verdict, with nothing read back: no GUID, no check passed.
     pub(super) fn open(verdict: OpenVerdict, reason: &'static str) -> Self {
         Self {
@@ -488,8 +508,13 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         .find(|hit| facts.pre_image.contains_key(&hit.guid.to_ascii_lowercase()));
     let altered = facts.counters.is_some_and(|counters| counters.altered > 0);
 
-    // 2. Something that existed before was written to.
-    if changed || altered || into_pre_image.is_some() {
+    // 2. Something that existed before was written to, by this create: Tally
+    // counted an alteration, or the name resolves to a master that existed
+    // before. A pre-image master that changed while nothing ties the change
+    // to this create (another person's edit during the window) is not called
+    // a write into it: it fails the pre-image check and is left to a person
+    // below, holding the name, and it never reads absent (step 4).
+    if altered || into_pre_image.is_some() {
         if altered {
             reasons.push("tally_reported_altered");
         }

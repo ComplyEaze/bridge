@@ -2226,7 +2226,9 @@ company (`invoice_company_stopped`), after the person has checked Tally, in the
 same dialog the model cannot answer.
 
 `prepare_ledger_creates` and `post_ledger_creates` are in the source and are not in
-a published build yet.
+a published build yet. The create path and the rule that refuses a near name were
+measured on TallyPrime 7.1 Silver, on one synthetic book; other releases and
+editions are not measured.
 
 `BRIDGE_AGENT_ENABLE_MASTER_WRITES=true`, together with
 `BRIDGE_AGENT_ENABLE_WRITES=true`, lists two more tools, which are not among the

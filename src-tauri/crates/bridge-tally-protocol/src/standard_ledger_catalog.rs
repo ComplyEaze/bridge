@@ -793,9 +793,22 @@ fn parse_standard_ledger_catalog_rows(
                 });
             }
             Event::Start(element) => {
-                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
+                if shape == RowShape::NameIndex && ledger_outside_collection(&path, &name) {
+                    return Err(StandardLedgerCatalogError::MalformedResponse);
+                }
+                path.push(name)
             }
             Event::Empty(_) if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) => {
+                return Err(StandardLedgerCatalogError::MalformedResponse);
+            }
+            Event::Empty(element)
+                if shape == RowShape::NameIndex
+                    && ledger_outside_collection(
+                        &path,
+                        &element.name().as_ref().as_bytes().to_ascii_uppercase(),
+                    ) =>
+            {
                 return Err(StandardLedgerCatalogError::MalformedResponse);
             }
             Event::End(element) => pop_expected_path(&mut path, element.name().as_ref().as_bytes())
@@ -809,6 +822,18 @@ fn parse_standard_ledger_catalog_rows(
     } else {
         Err(StandardLedgerCatalogError::MalformedResponse)
     }
+}
+
+/// Whether a `LEDGER` element at `path` is somewhere the name-index walk would
+/// step over it: anywhere but the collection, whose rows are read, and the
+/// `CMPINFO` block, whose bare `<LEDGER>` figure is a counter and not a row. A
+/// ledger the walk skipped would read as absent, and a Create of its name would
+/// alter it, so the answer is refused instead, as the group index refuses a
+/// stray `GROUP`.
+fn ledger_outside_collection(path: &[Vec<u8>], name: &[u8]) -> bool {
+    name == b"LEDGER"
+        && !path_eq(path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
+        && !path_eq(path, &[b"ENVELOPE", b"BODY", b"DESC", b"CMPINFO"])
 }
 
 struct StandardLedgerIdentityRow {

@@ -775,18 +775,44 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         .iter()
         .map(|tool| tool["name"].as_str().expect("tool name").to_string())
         .collect::<BTreeSet<_>>();
-    // The lab-only tools, compiled in with the `lab-writes` feature, are not
-    // sampled yet: `lab_read_inventory` returns party-bearing fields and the two
-    // import tools were not examined (#999). Exempt those this read registered.
+    // The lab-only tools are compiled in with the `lab-writes` feature (#999), and registered
+    // only while this read of the catalogue has them. `lab_read_inventory` is sampled: it marks a
+    // unit's and a stock item's name and a voucher's party with `party_name`, which the tests in
+    // `agent_lab.rs` pin on the real parsers. The sample is built in this test like the others.
+    #[allow(unused_mut)] // only pushed to when the `lab-writes` feature is compiled in
+    let mut lab_samples: Vec<(&str, Value)> = Vec::new();
+    #[cfg(feature = "lab-writes")]
+    if registered.contains("lab_read_inventory") {
+        lab_samples.push((
+            "lab_read_inventory",
+            json!({
+                "units": [{"name": party_name("Customer One"), "decimal_places": "3"}],
+                "stock_items": [{
+                    "name": party_name("Supplier Two"),
+                    "parent": "Primary",
+                    "hsn_code": "2836",
+                }],
+                "vouchers": {
+                    "items": [{
+                        "party": party_name("Customer One"),
+                        "inventory_entries": [{"stock_item": "Widget", "amount": "-8000.00"}],
+                    }],
+                    "offset": 0,
+                },
+            }),
+        ));
+    }
+    // The two lab import tools stay without a sample, on purpose. Their results echo the names of
+    // the masters and vouchers the caller itself sent (as `Kind:Name` strings, a ledger's name
+    // among them) as plain strings, which no marking reaches, so a sample would show a name that
+    // the walk cannot mask. The tools write only to a target admitted by `admit_lab_target`,
+    // whose guard today is a deny list of other companies (#972); a client's ledger names could
+    // appear unmasked only if that guard failed. Marking those names is a separate change.
     #[cfg(feature = "lab-writes")]
     without_a_sample.extend(
-        [
-            "lab_import_masters",
-            "lab_import_vouchers",
-            "lab_read_inventory",
-        ]
-        .into_iter()
-        .filter(|name| registered.contains(*name)),
+        ["lab_import_masters", "lab_import_vouchers"]
+            .into_iter()
+            .filter(|name| registered.contains(*name)),
     );
     let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
     assert_eq!(
@@ -804,6 +830,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         .iter()
         .chain(&without_a_sample)
         .copied()
+        .chain(lab_samples.iter().map(|(tool, _)| *tool))
         .collect::<Vec<_>>();
     assert_eq!(
         covered.len(),
@@ -824,7 +851,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         Vec::<&String>::new(),
         "a sample or exemption names a tool that is not registered"
     );
-    for (tool, sample) in samples {
+    for (tool, sample) in samples.into_iter().chain(lab_samples) {
         let redacted = redact_value(sample, Redaction::MaskParties);
         assert_no_known_party_name(&redacted, &known_parties, tool);
     }

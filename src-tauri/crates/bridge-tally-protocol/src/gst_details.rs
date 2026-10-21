@@ -52,7 +52,7 @@ pub struct GstDetailsEntry {
     /// absent and `No` as `Yes` (#1741; PARTIAL: one synthetic book, one
     /// release, one ledger kind). On Tally's own default entry (source `As per
     /// Company/Group`) a `Yes` was seen with no keyed No, so it says nothing
-    /// there.
+    /// there. Protocol reference §12a.20.
     pub ineligible_itc: Option<bool>,
     pub states: Vec<GstStateDetails>,
     /// True when the element held content this parser does not model, at the

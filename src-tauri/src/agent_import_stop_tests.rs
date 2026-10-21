@@ -380,7 +380,7 @@ fn what_was_seen_is_placed_for_every_status_the_verification_writes() {
         ("not_attributable", Some("observed_voucher_already_attributed"), "not_established", "a matching voucher was found, but it is already matched to another voucher"),
         ("not_attributable", Some("bound_master_id_changed"), "not_established", "a voucher carrying the identity of the one posted is in the book, but with another internal number; how is not established, for example the company's data were rewritten or copied"),
         ("bound_not_in_window", None, "not_established", "the voucher posted for this invoice is not in the book for these dates now"),
-        ("book_rolled_back", None, "not_established", "the company's books are older than this post"),
+        ("book_rolled_back", None, "not_established", "the company's books were restored after this post"),
         ("not_found", None, "not_established", "not established: no voucher of it was found"),
         ("tally_reported_not_created", None, "not_established", "Tally reported it not created"),
     ];

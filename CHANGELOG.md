@@ -12,6 +12,22 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+These changes are in source and not yet in a published build.
+
+**Changed**
+
+- A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
+  `verify_import` reads the company's voucher mark below a natively posted batch's, and Tally's answer carried the
+  mark, the import journal records it, and from then on no natively posted batch of that company at that Tally
+  address that it covers reads `posted_verified`, even after vouchers keyed again by hand raise the mark past it:
+  its vouchers read as matching content and the answer says to check them in Tally. Before, a voucher keyed again
+  with the same content could read verified once the mark had risen. Limits: a restore that is keyed or edited past
+  the mark before any check is still not seen; a wrong backup restored and then the right one leaves the batches it
+  covered reading rolled back; and a covered Sales invoice batch stops that company's invoices until released.
+  **Do not go back to an earlier release after this one has seen a restore:** an earlier release refuses an import
+  journal holding the new record, and stops every build, post and verification until ComplyEaze Bridge is upgraded
+  again.
+
 ## [0.6.0] - 2026-10-16
 
 ### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)

@@ -2489,16 +2489,29 @@ window no longer holds as `bound_not_in_window`, never `not_found`; and, for a
 company whose voucher mark reads below the mark the post left, every voucher it
 no longer holds as `book_rolled_back`, never `not_found`, with nothing bound in
 it. Such a book was rolled back (a backup restored, or another copy put in its
-place). The check sees a rollback only while the mark reads below the post's: a
-book keyed past it again after a restore is not seen as rolled back. Tally then
-gives the vouchers keyed again the MasterIDs, GUIDs and numbers the post's
-vouchers held (measured once on a synthetic company, bridge#1050), so a bound
-voucher names another voucher, which reads `posted_divergent`, or a false
-`posted_verified` when its content is the same. In plain words: after a restore, a native
-voucher keyed again with the same content before any check can read verified,
-and no identifier a read returns tells the two apart (measured once on
-TallyPrime 7.1 Silver, with Tally's security off), so
-after restoring a backup over a company, check its posted vouchers in Tally. Bridge still records those rows as posted, so a rebuilt batch holding
+place). Tally gives vouchers keyed again after a restore the MasterIDs, GUIDs and
+numbers the post's vouchers held (measured once on a synthetic company,
+bridge#1050), and no identifier a read returns tells the two apart. So a
+rollback, once seen, is recorded: when a check of a native post reads the
+company's voucher mark below that post's, and Tally's answer carried the mark,
+the import journal keeps a record of it (`post_span_binding.rollback_recorded`).
+From then on no native post of the same company (name, GUID, company number
+and books-from date) at the same Tally address reads `posted_verified` if it
+was sent before that check read the journal and the vouchers it had proved by
+then (its binding, or Tally's answer) put it above the mark read:
+`post_span_binding` is then `book_rolled_back` with `mark_read` and `seen_by`
+(the batch whose check saw it), its vouchers read as matching content, not as
+its own, and the plain line says to check them in Tally. The check still sees a
+rollback only while the mark reads below some post's: a book restored and then
+keyed or edited past the mark before any check is not seen, and a native voucher
+keyed again with the same content can then read verified (measured once on
+TallyPrime 7.1 Silver, with Tally's security off), so after restoring a backup
+over a company, check its posted vouchers in Tally. A record is kept for good: a
+wrong backup restored and then the right one leaves the posts it covers reading
+rolled back, and a covered Sales invoice batch stops that company's invoices
+until it is released. A company copy holding no voucher omits the mark, and
+records nothing. An older build refuses a journal holding the record: do not
+downgrade after posting. Bridge still records those rows as posted, so a rebuilt batch holding
 them is refused as `import_txn_already_posted`; re-entering them in that book is
 the person's decision. The result's `post_span_binding` names the binding's
 `state`: `bound`, `refused` with its `code`, `unsettled` with its `code` (for
@@ -2574,8 +2587,8 @@ but not whether this post created it); and whether a write from another Gold
 user's process can share or skip the mark Bridge reads is unmeasured. Open
 follow-ups: the hand-import file still carries the tag (bridge#1037); re-posting
 the rows of a rolled-back batch needs the person's approval (bridge#1038);
-closing a batch whose binding was refused (bridge#1039); and detecting a restore
-keyed past the post's mark (bridge#1050).
+closing a batch whose binding was refused (bridge#1039); and seeing a restore
+keyed past the post's mark before any check (bridge#1050).
 
 Posting binds the saved batch to its loopback endpoint and full company tuple.
 Legacy batches without that endpoint binding remain readable/verifiable but

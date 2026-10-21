@@ -5067,6 +5067,55 @@ async fn a_refused_binding_matched_only_by_an_optional_voucher_keeps_the_open_li
     );
 }
 
+/// #1050: a rollback seen once is recorded, and outlasts the mark rising
+/// again. The post binds at mark 11; a verification reads the book at 10
+/// (a backup restored) and records it; a later verification reads the mark at
+/// 11 again with a voucher of the post's content in the window (keyed again by
+/// hand): the batch reads rolled back, never `posted_verified`, and no second
+/// record is written.
+#[tokio::test]
+async fn a_rollback_once_seen_outlasts_the_mark_rising_again() {
+    let (posted, verified, verdicts) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![
+            span_readback(empty_collection(), 10),
+            span_readback(untagged_posted_journal(), 11),
+            span_readback(untagged_posted_journal(), 11),
+        ],
+    )
+    .await;
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["state"], "posted_verified",
+        "{posted}"
+    );
+    let first = &verified[0]["structuredContent"]["result"];
+    assert_eq!(
+        first["post_span_binding"]["state"], "book_rolled_back",
+        "{first}"
+    );
+    assert_eq!(first["post_span_binding"]["current_mark"], 10, "{first}");
+    assert_eq!(
+        first["post_span_binding"]["rollback_recorded"], true,
+        "{first}"
+    );
+    for later in &verified[1..] {
+        let result = &later["structuredContent"]["result"];
+        let binding = &result["post_span_binding"];
+        assert_eq!(binding["state"], "book_rolled_back", "{result}");
+        assert_eq!(binding["mark_read"], 10, "{result}");
+        assert!(
+            binding["seen_by"].as_str().is_some_and(|id| !id.is_empty()),
+            "{result}"
+        );
+        // Covered: nothing more is recorded.
+        assert!(binding.get("rollback_recorded").is_none(), "{result}");
+        assert_ne!(result["verification_status"], "posted_verified", "{result}");
+        assert_eq!(result["counts"]["posted_verified"], 0, "{result}");
+    }
+    assert_eq!(verdicts.len(), 1, "the post's own binding, and no other");
+}
+
 /// A copy that holds no voucher at all (one never used, put in place of the
 /// book) omits its voucher mark: that reads as 0, so the post's vouchers are
 /// `book_rolled_back`, never a failed verification and never `not_found`.

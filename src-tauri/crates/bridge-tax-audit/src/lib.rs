@@ -43,6 +43,7 @@ pub mod compare;
 pub mod counter_cheques_40a3;
 pub mod creditor_ageing_43bh;
 pub mod depreciation;
+pub mod divergence;
 pub mod documents;
 pub mod entity_269st_gap;
 pub mod error;

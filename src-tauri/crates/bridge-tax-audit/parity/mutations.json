@@ -14278,5 +14278,77 @@
   "file": "src/book.rs",
   "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
   "to": ""
+ },
+ {
+  "id": "DV-1",
+  "by": "author",
+  "what": "a repeated divergence id is admitted",
+  "file": "src/divergence.rs",
+  "from": "        if !seen.insert(id.clone()) {\n",
+  "to": "        if false && !seen.insert(id.clone()) {\n"
+ },
+ {
+  "id": "DV-2",
+  "by": "author",
+  "what": "issue 0 is admitted",
+  "file": "src/divergence.rs",
+  "from": "            .filter(|n| *n > 0)\n",
+  "to": "            .filter(|_| true)\n"
+ },
+ {
+  "id": "DV-3",
+  "by": "author",
+  "what": "a record that declares nothing is admitted",
+  "file": "src/divergence.rs",
+  "from": "        if expect.is_empty() && real_book_keys.is_empty() {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "DV-4",
+  "by": "author",
+  "what": "any top-level key may be patched",
+  "file": "src/divergence.rs",
+  "from": "        if TOP_KEYS.contains(&key) {\n",
+  "to": "        if true {\n"
+ },
+ {
+  "id": "DV-5",
+  "by": "author",
+  "what": "a whole entry is added under another id",
+  "file": "src/divergence.rs",
+  "from": "                    (None, None) if value[\"id\"].as_str() == Some(id) => {\n",
+  "to": "                    (None, None) => {\n"
+ },
+ {
+  "id": "DV-6",
+  "by": "author",
+  "what": "a patch on another test's golden applies",
+  "file": "src/divergence.rs",
+  "from": "        if oracle[\"test_id\"].as_str() != Some(d.test.as_str()) {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "DV-7",
+  "by": "author",
+  "what": "a patch equal to the oracle applies",
+  "file": "src/divergence.rs",
+  "from": "            if parsed.get(oracle) == Some(value)\n",
+  "to": "            if false\n"
+ },
+ {
+  "id": "DV-8",
+  "by": "author",
+  "what": "a real-book run masks another test's keys",
+  "file": "src/divergence.rs",
+  "from": "    for d in divergences.iter().filter(|d| d.test == test_id) {\n",
+  "to": "    for d in divergences.iter() {\n"
+ },
+ {
+  "id": "DV-9",
+  "by": "author",
+  "what": "a declared real-book key is reported but not masked",
+  "file": "src/divergence.rs",
+  "from": "                Some(value) => parsed.set(&mut doc, value.clone())?,\n",
+  "to": "                Some(_) => {}\n"
  }
 ]

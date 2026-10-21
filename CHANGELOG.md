@@ -16,6 +16,20 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
+  `verify_import` reads the company's voucher mark below the floor a natively posted batch had proved (a mark Tally
+  omits twice counts as a company holding no voucher), the import journal records it, a second restore too, and from then on no natively posted batch of that company at that Tally
+  address that it covers reads `posted_verified`, even after vouchers keyed again by hand raise the mark past it:
+  a voucher it finds reads as matching content, one it does not as `book_rolled_back`, and the answer says to check
+  them in Tally. The answer that records it names the company's other native batches it covers, to verify again. Before, a voucher keyed again
+  with the same content could read verified once the mark had risen. Limits: a restore that is keyed or edited past
+  the mark before any check is still not seen; a wrong backup restored and then the right one leaves the batches it
+  covered reading rolled back (as would a repair or rewrite that lowered the mark, not measured); and a covered Sales
+  invoice batch stops that company's invoices until released.
+  **Do not go back to an earlier release after this one has seen a restore:** an earlier release refuses an import
+  journal holding the new record, and stops every build, post and verification until ComplyEaze Bridge is upgraded
+  again.
+
 - `profit_and_loss` and `balance_sheet` can now be established on a book with stock items (part of #692), using
   Tally's own `Less: Closing Stock` figure from its Profit and Loss, shown as `closing_stock` (`applied`, with its
   value and source, or `declined`, with the reason) and not derived or taken from `stock_summary`. It is used only when

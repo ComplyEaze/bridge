@@ -1053,7 +1053,7 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
         } else {
             assert_eq!(
                 step,
-                "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row. If that batch was never sent to Tally and will not be, build that statement again, post it and verify it. If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet.",
+                "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row. Build that statement again only if that batch was never sent to Tally, verify_import listed every one of its vouchers as not_found, and the person confirms its file was never imported into Tally; then post the new build, verify it, and never import the old batch's file. If any of its vouchers was found, or its file was imported, do not build that statement again: check in Tally which of its vouchers are there. If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet.",
                 "{case}"
             );
         }
@@ -1300,7 +1300,7 @@ async fn a_skip_is_not_withdrawn_while_a_contra_of_its_day_and_amount_with_anoth
     );
     assert_eq!(
         refused["next_step"],
-        "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row. If that batch was never sent to Tally and will not be, build that statement again, post it and verify it. If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet."
+        "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row. Build that statement again only if that batch was never sent to Tally, verify_import listed every one of its vouchers as not_found, and the person confirms its file was never imported into Tally; then post the new build, verify it, and never import the old batch's file. If any of its vouchers was found, or its file was imported, do not build that statement again: check in Tally which of its vouchers are there. If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet."
     );
     rig.finish();
     // what the other statement's build said of the row: listed with that
@@ -1522,7 +1522,7 @@ async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_s
         assert_eq!(refused["paired_rows"], json!(expected), "{case}");
         assert_eq!(
             refused["next_step"],
-            "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row. If that batch was never sent to Tally and will not be, build that statement again, post it and verify it. If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet.",
+            "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row. Build that statement again only if that batch was never sent to Tally, verify_import listed every one of its vouchers as not_found, and the person confirms its file was never imported into Tally; then post the new build, verify it, and never import the old batch's file. If any of its vouchers was found, or its file was imported, do not build that statement again: check in Tally which of its vouchers are there. If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet.",
             "{case}"
         );
     }

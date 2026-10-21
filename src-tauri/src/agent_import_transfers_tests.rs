@@ -847,13 +847,13 @@ fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
     assert!(!waiting.contains("already carries"));
     assert_eq!(
         both,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: that skip is judged alone, and another skipped row could share that Contra): if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; if that batch was never sent to Tally and will not be, build that statement again, post it and verify it; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: that skip is judged alone, and another skipped row could share that Contra): if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; build that statement again only if that batch was never sent to Tally, verify_import listed every one of its vouchers as not_found, and the person confirms its file was never imported into Tally; then post the new build, verify it, and never import the old batch's file; if any of its vouchers was found, or its file was imported, do not build that statement again: check in Tally which of its vouchers are there; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. Do not post these rows."
     );
     // a mix says what each state among the rows needs, and one state alone is
     // told in its own words
     assert_eq!(
         all,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: that skip is judged alone, and another skipped row could share that Contra): if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; if that batch was never sent to Tally and will not be, build that statement again, post it and verify it; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: that skip is judged alone, and another skipped row could share that Contra): if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; build that statement again only if that batch was never sent to Tally, verify_import listed every one of its vouchers as not_found, and the person confirms its file was never imported into Tally; then post the new build, verify it, and never import the old batch's file; if any of its vouchers was found, or its file was imported, do not build that statement again: check in Tally which of its vouchers are there; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is. Do not post these rows."
     );
     let texts = [&paired, &waiting, &matched, &both, &all];
     assert_eq!(texts.iter().collect::<BTreeSet<_>>().len(), texts.len());
@@ -941,19 +941,21 @@ fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read
         "Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not",
         "This build skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended",
     ];
-    const NEGATIONS_AND_DISCLOSURES: [&str; 12] = [
+    const NEGATIONS_AND_DISCLOSURES: [&str; 14] = [
         "A Contra in a batch not yet verified is not in Tally until that batch is imported and verified",
         "A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked",
         "A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet",
+        "Build that statement again only if that batch was never sent to Tally, verify_import listed every one of its vouchers as not_found, and the person confirms its file was never imported into Tally",
         "ComplyEaze Bridge does not compare the two, and no step inside ComplyEaze Bridge removes or changes a voucher already in Tally",
         "Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice",
         "If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet",
         "If Tally rejected that batch's send, no step inside ComplyEaze Bridge clears this row yet",
+        "If any of its vouchers was found, or its file was imported, do not build that statement again: check in Tally which of its vouchers are there",
         "If either batch named has not been sent to Tally, do not send it, and do not build or post anything further for this transfer",
-        "If that batch was never sent to Tally and will not be, build that statement again, post it and verify it",
         "No step inside ComplyEaze Bridge removes or changes a voucher already in Tally yet",
+        "build that statement again only if that batch was never sent to Tally, verify_import listed every one of its vouchers as not_found, and the person confirms its file was never imported into Tally",
         "if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet",
-        "if that batch was never sent to Tally and will not be, build that statement again, post it and verify it",
+        "if any of its vouchers was found, or its file was imported, do not build that statement again: check in Tally which of its vouchers are there",
     ];
     let mut used = BTreeSet::new();
     for sentence in every_sentence_to_follow() {
@@ -1034,6 +1036,41 @@ fn a_state_with_no_way_out_inside_the_product_says_so() {
     assert!(lower(matched).contains(none) && matched.contains("abandoned"));
     let carried = Carrier::refusal_step(&BTreeSet::from([Carrier::MatchedUnconfirmed]));
     assert!(lower(&carried).contains(none) && carried.contains("abandoned"));
+}
+
+/// A batch imported by hand was never sent by ComplyEaze Bridge, and a partial
+/// or edited import reads verification_incomplete: building that statement
+/// again would book what is already in Tally a second time. The rebuild is
+/// offered only when no voucher of the batch was found and its file was never
+/// imported.
+#[test]
+fn a_rebuild_of_the_other_statement_is_offered_only_when_none_of_its_batch_is_in_tally() {
+    let alone = Carrier::refusal_step(&BTreeSet::from([Carrier::OtherSideUnverified]));
+    let among = Carrier::refusal_step(&BTreeSet::from([
+        Carrier::OtherSideUnverified,
+        Carrier::Paired,
+    ]));
+    for text in [&alone, &among] {
+        let lower = text.to_lowercase();
+        let offer = lower
+            .find("build that statement again only if")
+            .unwrap_or_else(|| panic!("{text}"));
+        for condition in [
+            "was never sent to tally",
+            "listed every one of its vouchers as not_found",
+            "confirms its file was never imported into tally",
+            "never import the old batch's file",
+        ] {
+            assert!(lower[offer..].contains(condition), "{condition}: {text}");
+        }
+        assert!(
+            lower.contains(
+                "if any of its vouchers was found, or its file was imported, do not build that statement again"
+            ),
+            "{text}"
+        );
+        assert!(!lower.contains("will not be, build"), "{text}");
+    }
 }
 
 #[test]

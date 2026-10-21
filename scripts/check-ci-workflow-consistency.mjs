@@ -138,6 +138,29 @@ if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
 // over its exact committed UTF-8 text from its key through that step (line endings included, so
 // even a whitespace or CRLF change trips it). Change a step and its copy, or a job and its digest, together
 // and deliberately; the failure prints the new digest for a reviewed change.
+// The per-test timings artifact is public for 7 days and what it carries is set in nextest.toml, outside the pinned
+// upload step: one JUnit table with the output stores off, and no setup scripts (their command, arguments and
+// environment names would join the report). TOML has many spellings of the same table (a bracketed header, a dotted
+// key, an inline table, a key written with an escape), and no TOML parser is a dependency of this repository, so the
+// file is pinned by its lines instead: every line that is not blank and not a full-line comment must equal the list
+// below, in order. A change to the file's settings is then a change to this list, made on purpose. A failing test's
+// panic text still reaches the report, which is why the upload runs only after a passing test step.
+const nextestConfig = readFileSync(resolve(repositoryRoot, "src-tauri/.config/nextest.toml"), "utf8").replace(/\r\n/g, "\n");
+const nextestLines = [
+  "[profile.default]",
+  'slow-timeout = { period = "60s", terminate-after = 6 }',
+  "[[profile.default.overrides]]",
+  "filter = 'test(/access::tests::on_windows::/)'",
+  'success-output = "immediate"',
+  "[profile.default.junit]",
+  'path = "junit.xml"',
+  "store-success-output = false",
+  "store-failure-output = false",
+];
+const nextestEffective = nextestConfig.split("\n").filter((line) => !/^\s*(?:#.*)?$/.test(line));
+if (nextestEffective.length !== nextestLines.length || nextestEffective.some((line, index) => line !== nextestLines[index])) {
+  failures.push("src-tauri/.config/nextest.toml must hold exactly one JUnit report table, the pinned one with both output stores off, and no setup scripts: every line that is not a blank or a full-line comment must equal nextestLines in scripts/check-ci-workflow-consistency.mjs");
+}
 const releaseWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/release-mcpb-preview.yml"), "utf8");
 // The release workflow's jobs are pinned by name: a job block is read up to the next `  name:` line, so an
 // unexpected job key would cut the previous job's block short.
@@ -154,7 +177,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "85a5931340b14fe923fe2a9e7a79e1ea06684bb91ed941e4940ebc4f699e2c81"],
+  ], "34a5f27cbf362aceafb42eabd9a288c2aef2b8c0844875a863a3649a61530e06"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -213,7 +236,7 @@ if (reuseScriptDigest !== "1cf4382fc71ab7339022544962a5ce55fd8128269fe7bf9f269b0
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
-// `continue-on-error` is refused everywhere (a failure would report success) except on these four
+// `continue-on-error` is refused everywhere (a failure would report success) except on these five
 // diagnostics-only artifact uploads. Each runs under `always()`, has no `id`, and nothing in this
 // repository downloads or reads its outcome; a GitHub service timeout in one of them (a merge-queue
 // entry was dropped on 3 Oct 2026 by `CreateArtifact ETIMEDOUT`) is not a failure of the code under
@@ -241,6 +264,17 @@ const diagnosticUploads = [
     "        with:",
     "          name: native-compiler-timings-${{ matrix.os }}",
     "          path: src-tauri/target/cargo-timings/*.html",
+    "          if-no-files-found: warn",
+    "          retention-days: 7",
+  ]],
+  ["native", [
+    "      - name: Retain macOS per-test timings",
+    "        if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'success' }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: native-test-timings-macos",
+    "          path: src-tauri/target/nextest/default/junit.xml",
     "          if-no-files-found: warn",
     "          retention-days: 7",
   ]],

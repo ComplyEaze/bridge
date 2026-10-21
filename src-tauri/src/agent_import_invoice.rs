@@ -335,7 +335,9 @@ fn paise(amount: &str) -> Option<i128> {
 
 /// The largest company master mark (an upper bound on its ledgers) a v0
 /// invoice is built or posted on. Each invoice reads the whole compliance
-/// listing three times; above this the read is refused rather than risk a
+/// listing at least four times (the build, before the dialog, after it, and in
+/// the endpoint queue, #1337; a redeemed approval enters again from the top and
+/// repeats the two re-reads); above this the read is refused rather than risk a
 /// large book's gateway. The bound is provisional: no read of a book near it
 /// has been measured.
 const INVOICE_MAX_MASTER_MARK: u64 = 5_000;
@@ -1112,7 +1114,9 @@ impl super::super::Server {
 /// Whether the queue's reads and the batch agree on there being an invoice: a
 /// batch with none carries no reads and no control, and a batch with exactly
 /// one invoice carries its reads and its control. Anything else is a wiring
-/// fault, refused before any request is sent and never skipped (#1337).
+/// fault, refused before the intent and never skipped (#1337). The queue sends
+/// a carried plan's read-only reads before this check, so reads without an
+/// invoice are refused after them; an invoice without reads sends none.
 pub(super) fn queued_invoice_for<'a>(
     vouchers: &'a [ImportVoucher],
     invoice: Option<crate::tally::approved_import::QueuedInvoice<'a>>,
@@ -1144,9 +1148,11 @@ pub(super) fn queued_invoice_for<'a>(
 /// rates request, which is also a function of the catalogue: it names the
 /// parents of the ledgers the invoice names (#1331). A plan that differs in the
 /// company or in any other request is a wiring fault. A listing date that is
-/// not the queue's day is not a fault but a clock that moved since the plan (a
-/// post whose approval spans midnight), a control that moved since the plan is
-/// a change, and so is a rates request that differs when every request the
+/// not the queue's day is not a fault but a clock that moved since the plan
+/// (midnight fell between the last re-read before the queue, which made the
+/// plan, and the queue's judgement; midnight while the dialog was open does
+/// not), a control that moved since the plan is a change,
+/// and so is a rates request that differs when every request the
 /// invoice alone decides is equal (a named ledger regrouped, or its group
 /// renamed, since the plan's catalogue was read): each is named by its own
 /// cause. The precheck is the invoice module's own function; the judge decides
@@ -1991,8 +1997,10 @@ fn size_gate(
     let mark = super::pre_import_mark_of(marks, company_guid).map_err(Verdict::Failed)?;
     // The duplicate-number read and the read-back each walk the book's
     // vouchers (a formula decides the rows, so Tally evaluates every
-    // voucher): at the build, at both re-reads, after the post and at
-    // every later verification. The voucher mark bounds that walk.
+    // voucher): at the build, at both re-reads (a redeemed approval repeats
+    // them), in the endpoint queue, after the post and at every later
+    // verification. The voucher mark
+    // bounds that walk.
     if let Some(refusal) = voucher_mark_refusal(mark.value) {
         return Err(refusing(refusal));
     }
@@ -2191,7 +2199,9 @@ impl InvoiceJudge<'_> {
         let scope = self.scope()?;
 
         // 0. Refuse large books: the whole ledger compliance listing is read
-        // three times for one invoice (build, before the dialog, after it).
+        // at least four times for one invoice (build, before the dialog, after
+        // it, and in the endpoint queue; a redeemed approval repeats the two
+        // re-reads).
         let Some(marks) = answers.marks.as_deref() else {
             return Err(Verdict::Need(Need::Marks));
         };

@@ -60,6 +60,16 @@ These changes are in source and not yet in a published build.
   `numbering_read` `not_read`; a call that does read it returns what the book said for each declared type, or
   only their counts when the rows would not fit the response budget.
 
+- `ledger_masters` with `include_gst_details` now names Tally's `GSTINELIGIBLEITC` as `ineligible_itc` (true for Yes,
+  false for No, null when the element is absent), where 0.6.0 named it `itc_eligible` and so told an assistant that
+  an entry with a keyed "Eligible for Input Tax Credit: No" was eligible. Measured on one ledger created
+  under Purchase Accounts in a synthetic book (TallyPrime 7.1): the screen's Yes read as the element absent and
+  its No as Yes, so the element is an ineligibility flag (PARTIAL: one book, one release, one ledger, one dated
+  entry; part of #1741). A Yes on any other ledger says nothing either way: the Sales ledgers of one captured book
+  carry a Yes on their keyed entries, and Tally's own default entry (source `As per Company/Group`) carries one with
+  no keyed No; neither was read against the screen. The value
+  mapping is unchanged: do not read `true` as eligible.
+
 ## [0.6.0] - 2026-10-16
 
 ### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)

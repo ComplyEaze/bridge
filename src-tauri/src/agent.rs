@@ -49,6 +49,8 @@ mod cash_flow;
 mod company_features;
 #[path = "agent_gst_status.rs"]
 mod gst_status;
+#[path = "agent_gst_uncertain.rs"]
+mod gst_uncertain;
 #[path = "agent_headline.rs"]
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
@@ -2500,6 +2502,7 @@ impl Server {
             "company_features" => self.company_features(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
             "gst_status" => self.gst_status(args).await,
+            "gst_uncertain_vouchers" => self.gst_uncertain_vouchers(args).await,
             "ledger_masters" => self.ledger_masters(args).await,
             "ledger_movement" => self.ledger_movement(args).await,
             "list_companies" => {

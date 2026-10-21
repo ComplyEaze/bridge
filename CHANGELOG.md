@@ -12,6 +12,16 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+These changes are in source and not yet in a published build.
+
+- `ledger_masters` with `include_gst_details` now names Tally's `GSTINELIGIBLEITC` as `ineligible_itc` (true for Yes,
+  false for No, null when the element is absent), where 0.6.0 named it `itc_eligible` and so told an assistant that
+  an entry with a keyed "Eligible for Input Tax Credit: No" was eligible. Measured on a ledger created in a
+  synthetic book (TallyPrime 7.1): the screen's Yes read as the element absent and its No as Yes, so the
+  element is an ineligibility flag; one book, one release, one ledger kind (PARTIAL; part of #1741). On Tally's own
+  default entry (source `As per Company/Group`) a Yes was seen with no keyed No, and says nothing there. The value
+  mapping is unchanged: do not read `true` as eligible.
+
 ## [0.6.0] - 2026-10-16
 
 ### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)

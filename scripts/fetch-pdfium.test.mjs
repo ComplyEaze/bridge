@@ -20,7 +20,7 @@ function header(name, size, type = "0", { prefix = "", corrupt = false } = {}) {
   block.write("0000000\0", 108, "latin1");
   block.write("0000000\0", 116, "latin1");
   block.write(`${size.toString(8).padStart(11, "0")}\0`, 124, "latin1");
-  block.write("00000000000\0", 136, "latin1");
+  block.write(`${"0".repeat(11)}\0`, 136, "latin1"); // mtime: eleven octal zeros
   block.write(type, 156, "latin1");
   block.write("ustar\0", 257, "latin1");
   block.write("00", 263, "latin1");

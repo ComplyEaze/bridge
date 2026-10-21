@@ -276,8 +276,7 @@ async fn movement_read_preserves_observed_count_after_accounting_exclusions() {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         // A caller-held high-water mark small enough to bound the window, so
         // the pre-flight (protocol reference §11c) sends nothing of its own.

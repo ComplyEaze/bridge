@@ -11,10 +11,11 @@
 //!
 //! Foreign-currency amounts are refused, as the reference refuses them (FX-1): the ledgers, trial
 //! balance and voucher parts are each scanned before any amount in them is read. The refusal's
-//! text differs in one place: the part is labelled by its id, as every other error here is, where
-//! the reference names its file. Which refusal a book gets first can also differ, as it did
-//! before: a duplicate ledger GUID is checked here straight after the ledgers are read, and by the
-//! reference once every part has loaded.
+//! text differs in one place: the part is labelled by its id, as most errors here are (C11's names
+//! the part by its file name, as the reference does), where the reference names its file. Which
+//! refusal a book gets first can also differ, as it did before: a duplicate ledger GUID is
+//! checked here straight after the ledgers are read, and by the reference once every part has
+//! loaded.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -1128,7 +1129,53 @@ fn required<'a>(read: &'a Read, kind: &str) -> Result<&'a Part> {
         .ok_or_else(|| AuditError::refused("C4-required", format!("no part of kind {kind:?}")))
 }
 
-/// Build the book from a verified read: C5 identity, C8 and C9 are checked here.
+/// C11. Every voucher of the read has a GUID, and no two share one (trimmed, compared without
+/// case), whatever their status: Tally cancels a voucher in place under its GUID, so a cancelled,
+/// optional or postdated copy counts too. A voucher read twice (two parts, or one re-dated between
+/// two part reads) would otherwise be counted twice by every test, and a voucher with no GUID
+/// cannot be cited. `parts` pairs each vouchers part's name with the vouchers read from it, in
+/// read order.
+///
+/// This is the reference reader's `check_voucher_identity`. It guards a read, not a [`Book`]:
+/// a Book built directly may hold either, and POP-5 reports it for the vouchers in the population.
+fn check_voucher_identity(parts: &[(&str, Vec<Voucher>)]) -> Result<()> {
+    let all = || {
+        parts
+            .iter()
+            .flat_map(|(name, vouchers)| vouchers.iter().map(move |v| (*name, v)))
+    };
+    let blank: Vec<(&str, &Voucher)> = all()
+        .filter(|(_, v)| crate::support::py_strip(&v.guid).is_empty())
+        .collect();
+    if let Some((name, first)) = blank.first() {
+        return Err(AuditError::refused(
+            "C11-blank-guid",
+            format!(
+                "{} voucher(s) have no GUID, first dated {} in {name}",
+                blank.len(),
+                iso(&first.date)
+            ),
+        ));
+    }
+    let mut seen: BTreeMap<String, &str> = BTreeMap::new();
+    for (name, v) in all() {
+        let key = crate::support::py_lower(crate::support::py_strip(&v.guid));
+        if let Some(earlier) = seen.get(&key) {
+            return Err(AuditError::refused(
+                "C11-repeated-guid",
+                format!(
+                    "GUID {} is held by two vouchers, in {earlier} and {name}",
+                    v.guid
+                ),
+            ));
+        }
+        seen.insert(key, name);
+    }
+    Ok(())
+}
+
+/// Build the book from a verified read: C2 (stored file name), C5 identity, C8, C9 and C11 are
+/// checked here.
 pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
     let gp = required(read, "groups")?;
     let gp_root = xml::read(&gp.content, &gp.id)?;
@@ -1152,7 +1199,7 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
         .transpose()?;
 
     let after_voucher_high_water = read.after.as_ref().and_then(|a| a.alter_voucher_id);
-    let mut vouchers = Vec::new();
+    let mut parts: Vec<(&str, Vec<Voucher>)> = Vec::new(); // each vouchers part's name and vouchers
     for vp in read.voucher_parts() {
         let parsed = load_vouchers(
             &xml::read(&vp.content, &vp.id)?,
@@ -1208,8 +1255,13 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
                 ),
             ));
         }
-        vouchers.extend(parsed.vouchers);
+        parts.push((vp.name.as_str(), parsed.vouchers));
     }
+    check_voucher_identity(&parts)?; // C11, over every part together
+    let vouchers: Vec<Voucher> = parts
+        .into_iter()
+        .flat_map(|(_, vouchers)| vouchers)
+        .collect();
 
     let cp = required(read, "company")?;
     let company = xml::read(&cp.content, &cp.id)?;

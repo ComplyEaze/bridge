@@ -342,7 +342,7 @@ fn content_differences(voucher: &ImportVoucher, row: &ReadVoucher) -> Vec<&'stat
     {
         fields.push("effective_date");
     }
-    if row.voucher_type.as_deref() != Some(voucher.voucher_type.as_str()) {
+    if row.voucher_type.as_deref() != Some(voucher.filed_type_name()) {
         fields.push("voucher_type");
     }
     let sent = voucher

@@ -1,9 +1,18 @@
 //! The fail-closed order of operations, in one place.
 //!
 //! Every stage refuses the whole run; nothing downstream sees a statement an
-//! earlier stage could not prove. The order is the reference's: bind the
+//! earlier stage could not prove. The order is the one the removed Python tool used: bind the
 //! account before trusting the arithmetic, prove the arithmetic before mapping,
 //! and re-read what was built.
+//!
+//! Why that order: the running-balance proof validates the statement's own arithmetic and
+//! nothing else, so it is equally happy to certify the wrong account's statement. The
+//! account check is the one thing that ties the document in hand to the ledger it will be
+//! posted against, so it runs before the arithmetic is trusted and before any proposal
+//! exists. The balance replay runs before mapping because a misread amount or a dropped
+//! row must stop the run before it is turned into vouchers. The design rule throughout: a
+//! malformed input, an ambiguous mapping or an unproven extent stops the run, because
+//! every proposal is posted to a real book.
 
 use crate::bank::Bank;
 use crate::cash::CashAnswers;
@@ -14,7 +23,8 @@ use crate::money::{reconcile, statement_totals, verify_against_statement, Contro
 use crate::parse::{parse_statement, require_account_match};
 use crate::pdf::{no_readable_text, StatementText};
 use crate::proposals::{
-    build, group_counterparties, selfcheck, Build, BuildOptions, CounterpartyGroup, Selfcheck,
+    build, coverage, group_counterparties, selfcheck, Build, BuildOptions, CounterpartyGroup,
+    Selfcheck,
 };
 use crate::refusal::Refusal;
 use bridge_tally_primitives::ExactDecimal;
@@ -44,6 +54,8 @@ pub struct ParsedStatement {
     pub build: Build,
     pub check: Selfcheck,
     pub counterparties: Vec<CounterpartyGroup>,
+    /// The days whose every row the statement read (see [`coverage`]).
+    pub coverage: Option<(Date, Date)>,
 }
 
 /// [`prepare`] over the words read from a statement PDF.
@@ -112,6 +124,7 @@ pub fn prepare(pages: &[Page], request: &StatementRequest<'_>) -> Result<ParsedS
     )?;
     let check = selfcheck(&build, request.bank_ledger)?;
     let counterparties = group_counterparties(&build.records)?;
+    let coverage = coverage(&build.dates, request.date_from, request.date_to);
     Ok(ParsedStatement {
         account_number,
         statement_rows: rows.len(),
@@ -120,6 +133,7 @@ pub fn prepare(pages: &[Page], request: &StatementRequest<'_>) -> Result<ParsedS
         build,
         check,
         counterparties,
+        coverage,
     })
 }
 

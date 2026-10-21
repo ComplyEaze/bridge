@@ -2,16 +2,19 @@
 # SPDX-License-Identifier: Apache-2.0
 """Verify and launch a trusted, locally built MCPB archive without contacting Tally."""
 import argparse
+import contextlib
 import platform
 import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import shutil
 import stat
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import zipfile
 
 RESOURCES = ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt", "THIRD_PARTY_LICENSES_RUST.txt")
@@ -26,6 +29,7 @@ DEFAULT_TOOLS = {
     "list_companies",
     "local_data_report",
     "masters",
+    "month_register",
     "negative_ledgers",
     "outstandings",
     "profit_and_loss",
@@ -255,12 +259,14 @@ def resolve_environment(manifest):
     require(mappings["BRIDGE_TERMS_ACCEPTED"] == "${user_config.accept_terms_2026_10_1}",
             "terms_environment_mapping_mismatch")
     require(mappings["BRIDGE_AGENT_ENABLE_IMPORT"] == "true", "import_environment_mapping_mismatch")
-    writes = manifest["user_config"].get("enable_writes", {})
+    writes = manifest["user_config"].get("enable_posting_2026_10", {})
     require(writes.get("type") == "boolean" and isinstance(writes.get("default"), bool),
             "writes_default_must_be_boolean")
     # Posting stays off by default while the limits recorded on bridge#574 and bridge#579 remain.
     require(writes["default"] is False, "posting_must_default_off")
-    require(mappings["BRIDGE_AGENT_ENABLE_WRITES"] == "${user_config.enable_writes}",
+    # The key is versioned (bridge#1090): a value stored under the released enable_writes, whose
+    # text offered one voucher at a time, must not turn on batch posting, so it is mapped to nothing.
+    require(mappings["BRIDGE_AGENT_ENABLE_WRITES"] == "${user_config.enable_posting_2026_10}",
             "writes_environment_mapping_mismatch")
     # Supply isolated client settings through the manifest itself. Overwriting
     # the resulting environment would hide broken host/port substitutions.
@@ -306,8 +312,41 @@ def validate_server_version(reply, manifest):
     return version
 
 
+REMOVE_ATTEMPTS = 8
+REMOVE_PAUSE_SECONDS = 0.5
+
+
+@contextlib.contextmanager
+def scratch_directory(prefix):
+    """A folder that is removed on exit, waiting a bounded time for the server binary inside it.
+
+    Windows can keep the binary of a process that has just exited locked for a moment. On Python 3.10
+    ``tempfile.TemporaryDirectory`` then fails its cleanup with a bare ``NotADirectoryError`` (its
+    handler recurses into the locked file), after the smoke run has finished and before its result
+    is written. The folder is retried; if it stays locked the run still reports what it verified
+    and says on stderr which folder was left behind and the last error, which names the locked file.
+    Which file is locked, and by what, is not established: the stderr line is how it will be.
+    """
+    path = tempfile.mkdtemp(prefix=prefix)
+    try:
+        yield path
+    finally:
+        for attempt in range(REMOVE_ATTEMPTS):
+            try:
+                shutil.rmtree(path)
+                break
+            except FileNotFoundError:
+                break
+            except OSError as error:
+                if attempt + 1 == REMOVE_ATTEMPTS:
+                    print("MCPB smoke could not remove its scratch folder %s after %d attempts (last error: %r); "
+                          "it was left in place" % (path, REMOVE_ATTEMPTS, error), file=sys.stderr)
+                else:
+                    time.sleep(REMOVE_PAUSE_SECONDS)
+
+
 def smoke(archive, repository):
-    with tempfile.TemporaryDirectory(prefix="bridge-mcpb-smoke-") as temporary:
+    with scratch_directory("bridge-mcpb-smoke-") as temporary:
         destination = Path(temporary) / "bundle"
         manifest, binary = unpack_bundle(archive, destination, repository)
         environment = {key: value for key, value in os.environ.items()

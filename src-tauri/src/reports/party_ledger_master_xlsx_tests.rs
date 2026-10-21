@@ -429,12 +429,16 @@ fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
     let mut parts = Vec::new();
     for index in 0..archive.len() {
         let mut part = archive.by_index(index).unwrap();
-        if part.name() == "docProps/core.xml" {
+        let name = part
+            .name()
+            .expect("package part names are UTF-8")
+            .into_owned();
+        if name == "docProps/core.xml" {
             continue;
         }
         let mut contents = Vec::new();
         std::io::Read::read_to_end(&mut part, &mut contents).unwrap();
-        parts.push((part.name().to_owned(), contents));
+        parts.push((name, contents));
     }
     parts.sort();
     let mut hasher = Sha256::new();

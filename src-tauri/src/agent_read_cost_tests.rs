@@ -395,8 +395,7 @@ fn server_with_budget(max_bytes: usize) -> (crate::agent::Server, tempfile::Temp
         max_bytes,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     (server, directory)
 }

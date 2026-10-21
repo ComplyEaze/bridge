@@ -1643,9 +1643,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "import_voucher_numbering_not_automatic" | "import_voucher_numbering_not_retain" => {
             Some(agent_import::POST_NUMBERING_NEXT_STEP)
         }
+        // The two refusals of the numbering check in `voucher_presence` (#1691).
+        "presence_numbering_method_differs_from_book" => Some(PRESENCE_NUMBERING_REMEDIATION),
+        "presence_numbering_unreadable" => Some(PRESENCE_NUMBERING_UNREADABLE_REMEDIATION),
         _ => None,
     }
 }
+
+/// The next step of the numbering refusal of `voucher_presence` (#1691): the
+/// types it names are in the refusal's candidates, each with what the book says.
+const PRESENCE_NUMBERING_REMEDIATION: &str = "A voucher type you declared manual is not numbered Manual with exactly one series that prevents duplicate numbers in the book, or the book holds no type of that exact name; the types, and what the book says of each, are in the candidates. Correct the spelling to the book's own type name, or declare the type automatic or unknown to compare by resemblance only. The check reads the book's numbering as it is now.";
+
+/// The next step when the numbering could not be read for a manual declaration.
+const PRESENCE_NUMBERING_UNREADABLE_REMEDIATION: &str = "The book's numbering could not be read, so a manual declaration cannot be checked. Declare the types automatic or unknown to compare by resemblance only, or ask again once the numbering can be read.";
 
 /// The one next step every date refusal gives (#1268).
 const DATE_REMEDIATION: &str = "Give each date as YYYYMMDD (YYYY-MM-DD also works), a real \

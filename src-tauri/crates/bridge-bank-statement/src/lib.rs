@@ -23,6 +23,7 @@
 pub mod bank;
 pub mod bbox;
 pub mod cash;
+pub mod csv_edge;
 pub mod date;
 pub mod geometry;
 pub mod mapping;

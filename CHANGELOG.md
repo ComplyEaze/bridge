@@ -12,6 +12,15 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+**Added**
+
+- `audit_test_run` runs one tax-audit test on a company's own books for a date range, today only `cash_44ab`:
+  figure and finding ids with their values, confidence and clauses, and the count of any failed book check,
+  with no ledger, party or voucher name; you name the cash and bank groups. Books only, not a tax opinion;
+  refused while a redaction setting is on (`audit_redaction_unsupported`), and for a period outside
+  1 April 2025 to 31 March 2026, the year its rules are for (`audit_period_outside_ay_2026_27`). Replayed from the engine's synthetic
+  book only: not yet run against a live Tally or a real book (part of #697).
+
 ## [0.6.0] - 2026-10-16
 
 ### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)
@@ -89,13 +98,6 @@ code-signed.
   defaults and not checked on screen, read Automatic (part of #724). `sub_method` was measured on a second
   synthetic book of the same release and edition, on one voucher type (Receipt, set to "Renumber Vouchers" and
   back); any other wording, a series that prints none, Gold and other releases are not measured.
-
-- `audit_test_run` runs one tax-audit test on a company's own books for a date range, today only `cash_44ab`:
-  figure and finding ids with their values, confidence and clauses, and the count of any failed book check,
-  with no ledger, party or voucher name; you name the cash and bank groups. Books only, not a tax opinion;
-  refused while a redaction setting is on (`audit_redaction_unsupported`), and for a period outside
-  1 April 2025 to 31 March 2026, the year its rules are for (`audit_period_outside_ay_2026_27`). Replayed from the engine's synthetic
-  book only: not yet run against a live Tally or a real book (part of #697).
 
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then

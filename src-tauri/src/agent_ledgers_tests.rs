@@ -2976,8 +2976,7 @@ mod through_the_tool {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
             bridge_tally_transport::TransportPolicy {
@@ -3454,8 +3453,7 @@ mod through_the_tool {
                 max_bytes: 200_000,
                 redaction: Redaction::None,
                 import_enabled: false,
-                writes_enabled: false,
-                batch_post_enabled: false,
+                posting: Posting::Off,
             });
             Self {
                 simulator,
@@ -3966,8 +3964,7 @@ mod through_the_tool {
             max_bytes,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         let response = server.call_tool("ledger_masters", args).await;
         simulator.cancel();
@@ -4585,8 +4582,7 @@ mod through_the_tool {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         let (client, source) = tokio::io::duplex(1 << 20);
         let (client_read, mut client_write) = tokio::io::split(client);
@@ -4766,8 +4762,7 @@ mod through_the_tool {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         let frames = format!(
             "{}\n{}\n",
@@ -5061,8 +5056,7 @@ mod through_the_tool {
                 max_bytes,
                 redaction,
                 import_enabled: false,
-                writes_enabled: false,
-                batch_post_enabled: false,
+                posting: crate::agent::Posting::Off,
             });
             let response = server.call_tool("ledger_masters", args).await;
             simulator.cancel();

@@ -1,6 +1,6 @@
 //! Word boxes from a password-protected PDF, through a bundled PDFium.
 //!
-//! Replaces the reference's `pdftotext -bbox-layout -upw/-opw`. Two differences
+//! Replaces the `pdftotext -bbox-layout -upw/-opw` that the removed Python tool used. Two differences
 //! matter:
 //!
 //! * **One password attempt covers both passwords.** PDFium's standard security

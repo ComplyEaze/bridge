@@ -29,15 +29,11 @@ use sha2::{Digest, Sha256};
 pub mod audit_company_part;
 #[cfg(feature = "bills-native-outstandings-probe")]
 pub mod bills_native_outstandings_probe;
-#[cfg(feature = "bills-payments-observation-parser")]
-pub mod bills_payments_observation;
 pub mod currency_composite;
 pub mod group_ancestry;
 pub mod gst_details;
 pub mod gst_registration;
 mod import_outcome;
-#[cfg(feature = "india-tax-observation-parser")]
-pub mod india_tax_observation;
 pub mod ledger_census;
 /// One ledger `Create` message. Its one caller today is the lab rebuild;
 /// this crate runs its goldens in every build.
@@ -48,6 +44,7 @@ pub mod native_company_features;
 pub mod native_funds_flow;
 mod native_ledger_collection;
 pub mod native_masters;
+pub mod native_month_register;
 pub mod native_negative_stock;
 pub mod native_outstandings;
 pub mod native_statement_reports;

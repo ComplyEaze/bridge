@@ -28,48 +28,26 @@ capability from assumption, and a completed request from a verified snapshot.
 
 ## Operator tools
 
-- [`scripts/bank_statement_import.py`](../../scripts/bank_statement_import.py) turns a
-  password-protected bank-statement PDF into TallyPrime import XML (Payment / Receipt /
-  Contra), for hand-import through Gateway of Tally > Import > Vouchers. Offline; it never
-  contacts Tally. SBI and HDFC statement layouts are supported.
-
-  What it proves before it writes anything: every row reproduces its printed running
-  balance; the chain lands on the closing balance the statement prints **and** reproduces
-  its printed debit and credit totals (the closing balance alone is the net, so a dropped
-  tail whose two sides cancel would still pass); and the account's own digits appear in the
-  statement header, so the wrong statement cannot be posted to the ledger you named. It then
-  re-parses its own output.
-
-  What it *cannot* prove is which company Tally has open — see §9.11d — so
-  `--confirm-open-company` makes that an explicit operator step rather than a silent one.
-  Contract tests run in CI: `python3 scripts/bank_statement_import.test.py`.
-
-  It was written when Bridge's own writer could express only a Journal, while money out is a
-  Payment, money in a Receipt, and an own-account or ATM movement a Contra. The writer now
-  qualifies all four voucher types (`LIVE_QUALIFIED_VOUCHER_TYPES` in
-  `src-tauri/src/agent_import.rs`), so that is no longer the gap it was written for; this
-  tool remains as the standalone route.
-
-  This tool covers a part Bridge does not: it reads the **statement
-  PDF**, whereas `build_import_xml` takes an already-structured payload. It also covers books
-  the writer refuses, such as one whose bank ledger sits under a money group Bridge has not
-  yet observed a captured ledger beneath.
-
-  No statement, password, ledger name or account number lives in this repository — all are
-  supplied at run time.
+- A standalone command-line tool that turned a statement PDF into import XML without Tally running
+  was removed; `parse_bank_statement` and `build_import_xml` do its work inside Bridge. What is
+  lost with it: the standalone command line, its dry run and CSV manifest, overwrite-with-rollback of
+  a named output, the password prompt and environment variable, `--confirm-open-company` (Bridge checks
+  the company by GUID against Tally), and re-import by REMOTEID. It also had no group gate, so a book whose
+  bank ledger sits under a money group the writer has not observed (for example `Bank OCC A/c`), or whose
+  group ancestry cannot be resolved, could be imported through it and is refused by Bridge; such a book has
+  no Payment, Receipt or Contra route until the group is captured and admitted in Rust.
 
   > **Scoped update, 2026-09-16.** A Bridge-built batch is corrected through
   > `build_import_xml(..., amends_batch_id)` (`agent_import_amend.rs`), never by a
   > rebuild.
 
 - `parse_bank_statement` (MCP tool, [`src-tauri/crates/bridge-bank-statement`](../../src-tauri/crates/bridge-bank-statement))
-  is the parsing half of the script above, ported to Rust. It reads the PDF through a bundled
-  PDFium rather than `pdftotext`, runs the same geometry, SBI/HDFC profiles, account binding,
-  balance replay and control totals, and proposes Payment / Receipt / Contra vouchers in
-  `build_import_xml`'s input shape. It mints no REMOTEID and writes no XML: Bridge's writer owns
+  reads a bank-statement PDF through a bundled PDFium, applies the SBI and HDFC geometry profiles,
+  account binding, balance replay and control totals, and proposes Payment / Receipt / Contra
+  vouchers in `build_import_xml`'s input shape. It mints no REMOTEID and writes no XML: Bridge's writer owns
   identity and rendering. Listed only when imports are enabled.
 
-  It also reads **Union Bank of India** statements (`bank: "ubi"`), which the script does not.
+  It also reads **Union Bank of India** statements (`bank: "ubi"`).
   That layout prints one line per row with `(Cr)`/`(Dr)`-suffixed figures, so the profile reads
   rows as text rather than by column bounds. It prints no debit or credit totals, so for `ubi`
   both may be omitted. The proof is then weaker, and stated as such: the balance replay from the
@@ -83,7 +61,7 @@ capability from assumption, and a completed request from a verified snapshot.
   real run should be compared row by row against `pdftotext`. `MOBFT` transfers go to suspense,
   because the observed shape does not say which field names the counterparty.
 
-  It also reads **Bank of Baroda** statements in one measured layout (`bank: "bob"`). A statement is read as Bank of Baroda only if page 1's `IFSC Code:` line carries the bank's prefix (the statements print the bank's name only in an image); otherwise it is refused as `statement_bank_not_recognised`. That layout is a column table like
+  It also reads **Bank of Baroda** statements in one measured layout (`bank: "bob"`; in source, not in a published build). A statement is read as Bank of Baroda only if page 1's `IFSC Code:` line carries the bank's prefix (the statements print the bank's name only in an image); otherwise it is refused as `statement_bank_not_recognised`. That layout is a column table like
   HDFC's, with these differences, each measured on two real statements, held privately
   (read through PDFium; the rules are described by shape and geometry only): the column header is printed on page 1 only; a row's amount sits on
   its own visual line, up to 12 points below its date; the newest row is printed first, so the
@@ -107,7 +85,9 @@ capability from assumption, and a completed request from a verified snapshot.
   the masked number as printed, so the same statement gives the same ids whatever label digits
   were typed. IMPS, `MBK`,
   `EBANK`, interest, disbursement, `BY <name>`, cheque-clearing rows and every other wording
-  go to suspense. Not measured: other account types and branches, a statement printed
+  go to suspense. Such a row names no party, so no mapping row can match it and the mapping can neither book it
+  as a Contra nor skip it: its proposal is a Payment or Receipt on the suspense ledger, also when it
+  is a transfer between the firm's own accounts. Not measured: other account types and branches, a statement printed
   oldest first (refused as `rows_not_newest_first` when the dates show it; a statement whose
   rows all share one date is caught by the balance replay instead), other wordings, and statements fetched another
   way.

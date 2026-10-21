@@ -63,6 +63,7 @@ fn sent() -> Vec<ImportVoucher> {
         narration: Some(narration.into()),
         reference: None,
         voucher_number: None,
+        invoice: None,
         entries,
     };
     vec![
@@ -632,6 +633,7 @@ fn sent_journals() -> Vec<ImportVoucher> {
         narration: Some(narration.into()),
         reference: None,
         voucher_number: None,
+        invoice: None,
         entries,
     };
     vec![
@@ -737,8 +739,7 @@ fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, Import
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: true,
+        posting: crate::agent::Posting::On,
     });
     let batch_id = "bridge-00000000-0000-4000-8000-000000001055";
     let vouchers = sent();

@@ -95,16 +95,13 @@ disagree, and inferring gave me wrong numbers the first time.
 
 | ratio | lines | fns | median | longest | file :: function |
 |---:|---:|---:|---:|---:|---|
-| 67x | 1231 | 61 | 3 | 202 | `bridge-tally-protocol/src/bills_payments_observation.rs :: parse_unbound_party_outstanding_observation` |
-| 59x | 1028 | 56 | 3 | 178 | `bridge-tally-protocol/src/india_tax_observation.rs :: parse_unbound_india_tax_observation` |
 | 49x | 443 | 19 | 6 | 295 | `agent_voucher_parse.rs :: parse_agent_rows_with_accounting_state` |
 | 45x | 3669 | 83 | 18 | **811** | `sync/snapshot.rs :: run` |
 | 34x | 2278 | 66 | 9 | 307 | `bridge-tally-core/src/book_presence.rs :: decide` |
 
 `snapshot.rs::run` is **811 lines in one function** and its file ranks only eighth
 by size — a size-ranked list never surfaces it. `agent_voucher_parse.rs` is 443
-lines and would never be looked at at all. Both top entries are 1,000-line parser
-files nobody would call large.
+lines and would never be looked at at all.
 
 The converse also holds, and is why size stays on the list. The biggest files:
 

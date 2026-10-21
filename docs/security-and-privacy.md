@@ -3,13 +3,16 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Four
+page was not read again at it, except as said below). Release 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) was
+published after the pull requests named here; this page was not read again at that tag. Six
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
 `ledger_movement` read took, in section 2 (#1366), where a program built
-from this repository loads the PDF library from, in section 5 (#1422), and the
-statement party written into a bank voucher's narration, in section 2 (#1430). It was written from a reading
+from this repository loads the PDF library from, in section 5 (#1422), the
+statement party written into a bank voucher's narration, in section 2 (#1430), the
+file of skipped bank-statement rows, in section 4 (#1625), and the
+location shown for an import file on a Microsoft Store install of Claude Desktop, in section 4 (#1569). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
@@ -49,12 +52,13 @@ Four tools read nothing from Tally. They read ComplyEaze Bridge's own files on
 this computer: its receipt log, the evidence it kept for a read, the voucher
 format it accepts, and a report of what it has stored (section 4).
 
-It writes to Tally only if you turn posting on, and then only one voucher at a
-time (a Journal, Payment, Receipt or Contra it prepared and saved), after you
-approve that voucher in a separate ComplyEaze Bridge window. No ComplyEaze
-Bridge tool can approve it. The server program also has a setting for posting 2
-to 50 vouchers of one saved batch after one approval; the published extension
-neither offers nor sets it, so it applies only if someone sets it by hand.
+It writes to Tally only if you turn posting on, and then only a Journal,
+Payment, Receipt or Contra it prepared and saved: one voucher at a time, or a
+saved batch of 2 to 50, each post after you approve it in a separate ComplyEaze
+Bridge window (for a batch, its summary). No ComplyEaze Bridge tool can approve
+it. From 0.6.0, one setting covers both. It is a new setting:
+if you turned posting on in an earlier version, turn it on again. In 0.5.1 and
+earlier, posting through the extension is one voucher at a time.
 
 Every tool refuses until the Terms of Use (version 2026-10.1 since 0.5.0) are
 accepted in the extension settings. In 0.5.0 the setting was marked required, and
@@ -135,8 +139,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     party or voucher, and it is refused while `mask_parties` or `drop_narration` is on, because
     those settings mask only marked values and would not hide what is returned here. The books it
     reads for the test are held in memory for the call and are not written to disk.
-  - A bank-statement check over whole calendar months (`statement_tie_out`, in
-    source and not yet in a published build) can show, with the book's figures,
+  - A bank-statement check over whole calendar months (`statement_tie_out`,
+    added in release 0.6.0) can show, with the book's figures,
     the statement's balance at the month ends and its net over those months,
     under every setting: never a part of a month except the part-months at the
     statement's own start and end (whose net a month-end balance gives together
@@ -193,6 +197,11 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       and batch-wise settings as yes, no or not reported, and the currency
       symbol. It holds no amounts and no narrations, and `mask_parties` has
       nothing to shorten in it.
+    - The month-wise register read (`month_register`) sends the company name,
+      its identifier, company number and books-from date, the register you
+      chose (`kind`) and the report's name, the window's dates, and for each
+      month, Tally's debit, credit and closing amounts. It holds no
+      party, ledger or narration, and `mask_parties` has nothing to shorten in it.
     - The GSTR-1 status read (`gst_status`) sends the company name and its
       identifier, the voucher type name you gave and the dates, and for each
       voucher its number, date, voucher type name, Tally's identifier and
@@ -278,7 +287,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - *What still passes.* A drive letter mapped to a network share, a link or
     junction partway along a path, and on a Mac a mounted network volume.
   - *What to do.* Keep statements and password files on a local disk. From
-    the release after 0.5.1 the tool refuses, on Windows too, a password file
+    0.6.0 the tool refuses, on Windows too, a password file
     owned by neither you nor Administrators, or that anyone but you, SYSTEM
     and Administrators can read or change; with 0.5.1 or earlier, restrict its
     access yourself.
@@ -291,6 +300,24 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
 | --- | --- |
 | Windows: `%LOCALAPPDATA%\Bridge\agent` | the files below |
 | macOS: `~/Library/Application Support/Bridge` | the files below |
+
+On a Microsoft Store install of Claude Desktop, Windows may keep some of these
+files under `%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`,
+and a given file can be in either place (seen on one computer, #1459;
+**Not measured:** when Windows puts a file in which place). For the import file
+that the `build_import_xml` tool reports, ComplyEaze Bridge shows the location
+Windows reports for that file, with a `path_state` beside it that says whether
+Windows reported it. The command-line report (`bridge_mcp --local-data-report --show-paths`)
+still prints the folder as built (the Windows location in the table above,
+unless you set another data folder), whichever place the files are in. On that
+one computer (#1459) the second folder held a receipt log, the terms record,
+the import journal, the saved batch files (`imports/`), the bank-statement
+proposals, a lock file and the lock folder (`native-dispatch-leases/`).
+Microsoft's documentation says that uninstalling or resetting a Store app
+(here Claude Desktop itself; this is not the removal of the extension that
+section 8 describes) removes that second folder and everything in it.
+**Not measured:** any other computer, where the proof files of a verification
+go, and what an uninstall or reset really removes.
 
 - **A receipt log** (`agent-egress.jsonl`): two lines for each tool call. The
   first has the tool name, the time, the company's Tally GUID, fingerprints of
@@ -326,9 +353,25 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   being used.
 - **Bank-statement proposals** (`bank-statements/`): every row of a statement
   you asked it to read, with date, amount, bank reference and narration.
+- **Skipped statement rows** (`agent-import-statement-skips.jsonl`): written
+  when you build a statement in which every row is mapped `skip` (recorded
+  from the other bank account's statement), so that there is no voucher batch
+  to save. Each record holds an identifier of its own, the company's
+  identifier (GUID), the Tally address, the time, the bank ledger's GUID and,
+  when the statement covers any day in full, those dates; and for each skipped
+  row an identifier (the row's date and a short fingerprint of the row), its
+  date, amount, direction, the other ledger's GUID, the UPI, IMPS, NEFT or
+  RTGS reference if the row has one, the cheque or instrument number as the
+  statement prints it, and a mark when an equal amount goes the other way on
+  the same day. It has no field for a narration or a ledger name. A statement
+  that also has rows to post keeps the same facts for its skipped rows, and
+  the reference and instrument of each of its Contra rows, in its record in
+  the import journal: unlike the ledger records described above, these hold
+  the dates and amounts of rows that are not posted.
 - **Lock files** with no content, a lock folder (`native-dispatch-leases/`,
-  kept in ComplyEaze Bridge's per-user folder) that keeps two copies of the
-  program from sending to Tally at the same time, and a small record written
+  kept in ComplyEaze Bridge's per-user folder and, on Windows, also in
+  `.complyeaze-bridge\coordination` under your user profile) that keeps two
+  copies of the program from sending to Tally at the same time, and a small record written
   when you record a review of a posted voucher, including your
   operating-system account name.
 
@@ -352,7 +395,11 @@ any batch in them has been posted or is waiting to be verified: they are the
 record ComplyEaze Bridge uses to reconcile a post, and without them
 `verify_import` cannot find the batch. The journal is also how it remembers
 which batches and which bank-statement rows it has already sent to Tally, so
-that it can refuse to send one twice. Once 0.5.0 has built a batch in this
+that it can refuse to send one twice. Do not delete
+`agent-import-statement-skips.jsonl` either: a missing file reads as no
+skipped rows, so those rows are no longer shown in the `transfers` section,
+and a later build that posts one of them as its own voucher is no longer
+refused for that reason: a transfer may then be booked twice. Once 0.5.0 has built a batch in this
 folder, do not run 0.4.2 or earlier over it: they refuse to post that batch. The
 [Privacy Policy](./legal/privacy.md) (section 7) describes archiving the whole
 folder instead of deleting it, and what ComplyEaze Bridge no longer remembers
@@ -405,7 +452,7 @@ accepts such a path only when its text starts with a drive letter, a colon and a
 separator (Windows) or a single slash (a Mac) (section 3). It refuses a password
 file that someone else can read: on macOS one that is not yours or has any group
 or other permission set (it does not read macOS access-control lists), and, from
-the release after 0.5.1, on Windows one owned by neither you nor Administrators,
+0.6.0, on Windows one owned by neither you nor Administrators,
 or whose access list lets anyone but you, SYSTEM and Administrators read or
 change it. Its one extra process is a
 second copy of itself that shows the approval window.
@@ -413,7 +460,14 @@ second copy of itself that shows the approval window.
 The approval window is a system dialog. On macOS it is titled "ComplyEaze Bridge
 — approve one voucher" with the buttons Cancel and Post voucher. On Windows it
 is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel, and
-No is the default. Only the positive button approves. The window closes by
+No is the default. Only the positive button approves. On Windows the window
+also takes the keyboard (#1780). In tests on Windows 10 with TallyPrime 7.1 full
+screen and one screen, each tried once, a Down arrow moved its buttons on the
+0.6.0 release candidate, and on the published 0.6.0 a typed n declined it and a
+typed y approved it, so a key typed for Tally can answer it. When you ask for a post, stop typing in Tally
+until you have answered the window with the mouse. The review acknowledgement
+window is built with the same flags in the code, so it is expected to behave the
+same; that was not measured, and neither was macOS. The window closes by
 itself after two minutes without an answer, and an approval that is not used
 within fifteen minutes, or before the program restarts, is dropped. From 0.4.1 a
 clicked approval is also withdrawn when the post is refused before its checks
@@ -421,7 +475,12 @@ begin (for example when the batch is not found or the journal is busy); a
 refusal inside the checks already withdrew it. In 0.5.0 a window for one voucher
 puts "On Account" before the name of each ledger you approved for it and shows
 the voucher's own reference and narration as its last two lines; if they hold
-characters it cannot show safely, or do not fit, it refuses. A window for a
+characters it cannot show safely, or do not fit, it refuses. In the next build,
+a narration too long for one line is shown instead in numbered parts, each
+quoted and split only at a space, under a line that counts them; one that
+cannot be split so, and a reference too long for one line, are still refused.
+The review window for a posted voucher shows its narration last, under the
+same heading (#1535). A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
 and up to 40 characters of its narration, with no reference; from the next
 build a Journal's line names its first debit and first credit ledger and up to
@@ -442,9 +501,9 @@ and a check of a machine before and after installing and running it.
 
 ## 8. How do I turn it off, or remove it?
 
-- **Turn posting off:** switch "Allow voucher posting" off in the extension
-  settings (off is the default for a new install; an earlier version may have
-  saved it on), then quit Claude Desktop completely and reopen it.
+- **Turn posting off:** switch "Allow voucher posting, one voucher or a batch of up to 50" off in the extension
+  settings (off is the default; it is a new setting, so check it after you
+  update from an earlier version), then quit Claude Desktop completely and reopen it.
   `post_import` and `acknowledge_post_review` are then absent from the tool
   list and refuse if called. Preparing voucher files and reading bank
   statements stay available, and still write to the folder in section 4.

@@ -1,6 +1,6 @@
 //! The Bank of Baroda layout: columns, one visual line per amount, the newest row first.
 //!
-//! There is no Python reference for this profile. Its geometry and shapes were
+//! Its geometry and shapes were
 //! measured on two real statements, held privately; every line here is synthetic, laid out at the measured
 //! column positions.
 
@@ -879,6 +879,14 @@ fn a_bob_statement_proves_itself_from_the_callers_opening_and_closing_balances()
     let parsed = prepare(&pages(), &request(&controls, &mapping)).unwrap();
     assert_eq!(parsed.account_number, "123XXXXXXXX456");
     assert_eq!(parsed.statement_rows, 5);
+    // rows run from 3 to 7 August: the days between were read in full
+    assert_eq!(
+        parsed.coverage,
+        Some((
+            Date::new(2026, 8, 4).unwrap(),
+            Date::new(2026, 8, 6).unwrap()
+        ))
+    );
     assert_eq!(format_amount(&parsed.totals.debits), "32262.30");
     assert_eq!(format_amount(&parsed.totals.credits), "10627.04");
     // the BY CASH deposit is a cash line nobody has answered: no voucher yet

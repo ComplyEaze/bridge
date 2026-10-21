@@ -111,8 +111,7 @@ async fn call(plans: Vec<ScenarioPlan>, args: Value) -> (Value, usize, usize) {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let response = server.call_tool("company_features", args).await;
     (response, simulator.finish().unwrap().len(), expected)
@@ -312,8 +311,7 @@ async fn the_company_is_required_and_no_other_argument_is_admitted() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     for (args, code) in [
         (json!({}), "company_guid_required"),

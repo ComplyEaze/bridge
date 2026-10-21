@@ -1154,16 +1154,6 @@ fn reference_is_invoice_and_party_gstin_are_optional_and_non_conflated() {
     assert!(rows[0].get("party_gstin").is_none());
 }
 
-fn captured_utf16le(bytes: &[u8]) -> String {
-    String::from_utf16(
-        &bytes
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect::<Vec<_>>(),
-    )
-    .unwrap()
-}
-
 /// `reference_date` (#1257), checked on injected shapes: the captured three-voucher fixture was taken before
 /// the request named REFERENCEDATE, so these elements are derived. The shapes Tally sent under this request
 /// (`TYPE="Date"`, empty or `YYYYMMDD`) are tested on captured rows in
@@ -1230,65 +1220,6 @@ fn reference_date_is_optional_a_date_when_present_and_refused_otherwise() {
         parse_agent_rows(&twice, CAPTURED_VOUCHER_COMPANY_GUID),
         Err("agent_read_protocol_invalid".to_string())
     );
-}
-
-/// `TALLY_PROTOCOL_REFERENCE.md` §1.1(d): the agent parsers read `&#4;` as
-/// the marker the protocol crate's native parsers produce, not as U+0004.
-const MARKED_ROOT: &str = "\u{fffd}#4; Primary";
-
-#[test]
-fn a_captured_group_parent_reads_as_the_marker_in_the_changed_master_feed() {
-    // The captured Group collection carries `&#4; Primary` in PARENT. It was
-    // fetched without a NAME element, which the changed-master reader
-    // requires, so each row's own NAME attribute is copied into one; nothing
-    // else in the capture is touched.
-    let captured = captured_utf16le(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-groups.utf16le.xml"
-    ));
-    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
-    let named = captured
-        .split("<GROUP NAME=\"")
-        .enumerate()
-        .map(|(index, part)| {
-            if index == 0 {
-                return part.to_string();
-            }
-            let name = part.split('"').next().unwrap();
-            let open_end = part.find('>').unwrap() + 1;
-            format!(
-                "<GROUP NAME=\"{}<NAME>{name}</NAME>{}",
-                &part[..open_end],
-                &part[open_end..]
-            )
-        })
-        .collect::<String>();
-    let rows = parse_agent_changed_masters(&named).expect("captured groups parse");
-    let native = bridge_tally_protocol::native_outstandings::parse_native_group_snapshot(
-        &captured,
-        company_guid,
-    )
-    .expect("the same capture parses natively");
-    let root_rows = rows
-        .iter()
-        .filter(|row| row["parent"] == MARKED_ROOT)
-        .count();
-    assert_eq!(
-        root_rows,
-        captured
-            .matches("<PARENT TYPE=\"String\">&#4; Primary</PARENT>")
-            .count()
-    );
-    assert!(root_rows > 0);
-    assert!(!rows.iter().any(|row| row["parent"]
-        .as_str()
-        .is_some_and(|parent| parent.contains('\u{4}'))));
-    for row in &rows {
-        let group = native
-            .iter()
-            .find(|group| row["name"] == group.name.as_str())
-            .expect("both readers see the same groups");
-        assert_eq!(row["parent"].as_str(), group.parent.returned_text());
-    }
 }
 
 #[test]

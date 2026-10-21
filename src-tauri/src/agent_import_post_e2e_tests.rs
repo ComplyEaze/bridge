@@ -5139,12 +5139,12 @@ async fn a_rollback_once_seen_outlasts_the_mark_rising_again() {
 /// summary says so; this post stays verified.
 #[tokio::test]
 async fn an_intact_posts_check_records_a_restore_that_reaches_a_later_post() {
-    const LATER: &str = "bridge-00000000-0000-4000-8000-000000001051";
+    let later = crate::agent::agent_import::tests::sentinel_batch_id(0x1051);
     // A second post of the same company and address, recorded after this one:
     // its own batch, dispatch intent (pre-POST mark 11) and Tally's answer,
     // copied from this post's records with its own id, digest and REMOTEID.
     let add_later_post = |text: String| {
-        if text.contains(LATER) {
+        if text.contains(later.as_str()) {
             return text;
         }
         let records: Vec<Value> = text
@@ -5164,15 +5164,16 @@ async fn an_intact_posts_check_records_a_restore_that_reaches_a_later_post() {
         };
         let sha = "f".repeat(64);
         let mut later_batch = batch.clone();
-        later_batch["batch_id"] = json!(LATER);
+        later_batch["batch_id"] = json!(later);
         later_batch["sha256"] = json!(sha);
         let mut intent = of("dispatch_intent");
-        intent["batch_id"] = json!(LATER);
+        intent["batch_id"] = json!(later);
         intent["batch_sha256"] = json!(sha);
         intent["pre_post_voucher_mark"] = json!(11);
-        intent["native_remote_id"] = json!("00000000-0000-4000-8000-0000000010b1");
+        intent["native_remote_id"] =
+            json!(crate::agent::agent_import::tests::sentinel_uuid(0x10b1).to_string());
         let mut response = of("dispatch_response");
-        response["batch_id"] = json!(LATER);
+        response["batch_id"] = json!(later);
         response["batch_sha256"] = json!(sha);
         let mut out = text;
         for record in [later_batch, intent, response] {
@@ -5194,7 +5195,7 @@ async fn an_intact_posts_check_records_a_restore_that_reaches_a_later_post() {
     assert_eq!(binding["rollback_recorded"], true, "{result}");
     assert_eq!(
         binding["other_batches_covered"],
-        json!({"count": 1, "first": [LATER]}),
+        json!({"count": 1, "first": [later]}),
         "{result}"
     );
     assert!(

@@ -1394,7 +1394,7 @@ fn placed(id: &str, company_name: &str, endpoint: Option<&str>) -> ImportLedgerL
     let mut line = batch(id, id);
     line.company = Some(
         serde_json::from_value(json!({
-            "name": company_name, "guid": "00000000-0000-4000-8000-000000001050",
+            "name": company_name, "guid": "00000000-0000-4000-8000-000000000002",
             "company_number": "100054", "books_from": "20260401"
         }))
         .unwrap(),

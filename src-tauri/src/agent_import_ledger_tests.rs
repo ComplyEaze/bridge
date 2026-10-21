@@ -810,7 +810,7 @@ fn a_rollback_recorded_meanwhile_stops_a_posted_verified_persist() {
             "record_type": "dispatch_intent", "batch_id": line.batch_id,
             "batch_sha256": line.sha256, "status": "dispatch_started",
             "native_request_sha256": "c".repeat(64),
-            "native_remote_id": "00000000-0000-4000-8000-0000000010a0",
+            "native_remote_id": crate::agent::agent_import::tests::sentinel_uuid(0x10a0).to_string(),
             "pre_post_voucher_mark": pre
         })
     };
@@ -825,8 +825,14 @@ fn a_rollback_recorded_meanwhile_stops_a_posted_verified_persist() {
             .unwrap();
         std::io::Write::write_all(&mut file, &bytes).unwrap();
     };
-    let p = placed("bridge-00000000-0000-4000-8000-0000000010a1", 'a');
-    let q = placed("bridge-00000000-0000-4000-8000-0000000010a2", 'b');
+    let p = placed(
+        &crate::agent::agent_import::tests::sentinel_batch_id(0x10a1),
+        'a',
+    );
+    let q = placed(
+        &crate::agent::agent_import::tests::sentinel_batch_id(0x10a2),
+        'b',
+    );
     append(&serde_json::to_value(&p).unwrap());
     append(&intent(&p, 10));
     let generation = server

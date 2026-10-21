@@ -966,8 +966,10 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
     Balance is read (measured once on the lab's multi-currency book), so an
     unadjusted forex difference (#683) never reaches the gate.
   - A Tally line the derivation has no counterpart for, such as a heading with
-    an amount or a difference in opening balances, refuses the results rather
-    than being guessed at.
+    an amount, refuses the results rather than being guessed at. A difference
+    in opening balances is such a line when Tally shows it; the inventory
+    book's Balance Sheet export did not carry it (§12a.21), which is why the
+    derived lines must also sum to zero before the closing stock is used.
   - Tally's own statements carry no company identity; the company, mode and
     book-extent checks around the read are what bind them.
   - The gate has been measured over one full year on one book and one month on
@@ -1001,6 +1003,9 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
   - the company's own flags (`ISINTEGRATED` and `ISINVENTORYON`, read only
     when the Profit and Loss offers the figure) are both `Yes`;
   - no Stock-in-Hand ledger carries an amount;
+  - the derived Balance Sheet lines sum to zero (a Trial Balance that does not
+    balance leaves Tally's `Difference in opening balances` out of this book's
+    Balance Sheet export, so the statement would not balance);
   - that one figure closes every gap at once: Current Assets (compared with
     the derived group plus the figure), the Balance Sheet's Profit & Loss A/c
     line and the trading result (moved by the figure), and the `Cost of Sales :`
@@ -1010,16 +1015,19 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
   `closing_stock` is `{"state": "applied", "value", "source":
   "tally_profit_and_loss_less_closing_stock"}`, `{"state": "declined", "why",
   "lines"}` (`why` is `shape_not_as_seen`, `not_a_debit`,
-  `opening_stock_not_shown_empty`, `book_not_shown_integrated` or
+  `opening_stock_not_shown_empty`, `book_not_shown_integrated`,
+  `inventory_flags_not_read`, `balance_sheet_does_not_balance` or
   `does_not_close_every_gap`), or null when no closing stock was considered:
   the Profit and Loss offered none, or the statement was refused for another
   reason first (an unclassified ledger, a Stock-in-Hand balance, no Profit &
   Loss A/c ledger). The derived `lines` leave the figure out (the Trial Balance
   holds no closing stock), so they do not add up to the result: the figure is
   the separate line `closing_stock`. A flags read that fails is a declined
-  figure (`book_not_shown_integrated`), not a failed statement. The figure is Tally's, not derived or taken from
+  figure (`inventory_flags_not_read`), not a failed statement; so is a
+  `balance_sheet` whose Profit and Loss cannot be read (no closing stock is
+  considered and the sheet is the one it always was). The figure is Tally's, not derived or taken from
   `stock_summary`, and the derived Current Assets line keeps the Trial
-  Balance's sum. Measured on one synthetic book: opening stock, a costing
+  Balance's sum. Measured on one synthetic book (three items, TallyPrime 7.1 Silver): opening stock, a costing
   method, a non-integrated book, a window spanning two years and more than one
   item or purchase rate are not.
 

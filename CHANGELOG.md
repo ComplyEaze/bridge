@@ -22,8 +22,9 @@ These changes are in source and not yet in a published build.
   that one figure closes every gap at once (Current Assets, the Balance Sheet's Profit & Loss A/c line and the
   trading result, and the `Cost of Sales :` heading), the company's own flags show inventory on and integrated, the
   `Opening Stock` line is shown empty and no Stock-in-Hand ledger carries an amount; otherwise the read refuses as it
-  did. Both tools now read Tally's own Profit and Loss (one more pair of requests for `balance_sheet`), and a book that
-  offers a closing stock also has its inventory flags read. Measured on one synthetic book; opening stock, a costing
+  did. Both tools now read Tally's own Profit and Loss (one more pair of requests for `balance_sheet`, which stays the
+  sheet it was if that read fails), and a book that offers a closing stock also has its inventory flags read (a failed
+  read declines the figure as `inventory_flags_not_read`). The derived lines must also sum to zero. Measured on one synthetic book; opening stock, a costing
   method, a book that is not integrated and a window spanning two years are not measured.
 
 ## [0.6.0] - 2026-10-16

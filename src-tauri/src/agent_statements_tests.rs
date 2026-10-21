@@ -562,6 +562,40 @@ async fn a_flags_read_that_does_not_bind_to_the_company_declines_the_figure_and_
     let (response, sent, expected) = call("profit_and_loss", stock_plans(flags)).await;
     let result = result(&response);
     assert_eq!(sent, expected);
-    assert_eq!(result["closing_stock"]["why"], "book_not_shown_integrated");
+    assert_eq!(result["closing_stock"]["why"], "inventory_flags_not_read");
     assert_eq!(result["state"], "not_established");
+}
+
+fn unreadable_profit_and_loss() -> String {
+    // A bare RESPONSE is Tally not recognising the report (§12a.1).
+    "<RESPONSE></RESPONSE>".to_string()
+}
+
+#[tokio::test]
+async fn a_balance_sheet_whose_profit_and_loss_cannot_be_read_is_the_sheet_it_always_was() {
+    let plans = plans_full(
+        balance_sheet("-11027.00"),
+        unreadable_profit_and_loss(),
+        None,
+    );
+    let (response, sent, expected) = call("balance_sheet", plans).await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert!(value(&result["result"]["profit_and_loss"]["carried"])
+        .numeric_eq(&bridge_tally_core::ExactDecimal::parse("11027.00").unwrap()));
+    assert!(result["closing_stock"].is_null());
+    assert!(result["tie_out"].is_null());
+}
+
+#[tokio::test]
+async fn a_profit_and_loss_whose_own_statement_cannot_be_read_is_refused() {
+    // Its gross and net are gated on Tally's Profit and Loss: no answer without it.
+    let mut plans = plans_full(
+        balance_sheet("-11027.00"),
+        unreadable_profit_and_loss(),
+        None,
+    );
+    plans.truncate(plans.len() - 8);
+    let (response, _, _) = call("profit_and_loss", plans).await;
+    assert_eq!(response["isError"], true, "{response}");
 }

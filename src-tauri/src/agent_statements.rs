@@ -32,7 +32,7 @@ impl Server {
         let (company, identity, prior) = self.verified_company(guid).await?;
         let read = self
             .runtime
-            .fetch_statements(self.tally_config(), &identity, period)
+            .fetch_statements(self.tally_config(), &identity, period, kind)
             .await
             .map_err(|error| {
                 ToolFailure::from_runtime(&format!("{tool}_read_failed"), error)
@@ -121,8 +121,8 @@ impl Server {
             })
             .collect::<Vec<_>>();
         // A balance sheet shows how Tally's Profit and Loss compared only when a
-        // closing stock was considered (offered, and the statement not refused for
-        // another reason first), the one thing it reads it for.
+        // closing stock was considered: offered, and the statement not refused
+        // for another reason first (then `closing_stock` is null as well).
         let show_profit_and_loss_tie = kind == NativeStatementKind::ProfitAndLoss
             || !matches!(derived.closing_stock, ClosingStockUse::NotApplicable);
         let mut result = json!({

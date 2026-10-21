@@ -16,8 +16,10 @@
 //!   not derivable from the Trial Balance;
 //! - Tally's own Balance Sheet for the same window does not tie, line for
 //!   line, to the derived one. This is the gate for what the Trial Balance
-//!   cannot see as at `to`, such as stock valued from stock items (expected,
-//!   not yet measured on an inventory book).
+//!   cannot see as at `to`, such as stock valued from stock items. One
+//!   integrated inventory book has been measured; there Tally's own closing
+//!   stock, if it closes every gap at once, is used (see
+//!   [`TallyClosingStock`]).
 //!
 //! Gross and net are the window's movement, which the Balance Sheet does not
 //! pin: stock held at `from` and gone by `to` could pass it. So where Tally's
@@ -307,10 +309,23 @@ impl TallyClosingStock {
 pub struct IntegratedInventory(());
 
 impl IntegratedInventory {
-    pub fn from_flags(flags: &NativeInventoryFlags) -> Option<Self> {
-        (flags.integrated == NativeFlag::Yes && flags.inventory_on == NativeFlag::Yes)
-            .then_some(Self(()))
+    pub fn from_flags(flags: &NativeInventoryFlags) -> InventoryFlags {
+        if flags.integrated == NativeFlag::Yes && flags.inventory_on == NativeFlag::Yes {
+            InventoryFlags::Integrated(Self(()))
+        } else {
+            InventoryFlags::NotShownIntegrated
+        }
     }
+}
+
+/// What the company's own flags showed. `NotRead` is a flags read that was not
+/// made or did not succeed (a transport error, an unstable pair, an answer
+/// that is not this company's), which is not the same as flags that say no.
+#[derive(Debug, Clone, Copy)]
+pub enum InventoryFlags {
+    Integrated(IntegratedInventory),
+    NotShownIntegrated,
+    NotRead,
 }
 
 /// Why Tally's closing-stock figure was offered and not used. A refusal keeps
@@ -324,8 +339,14 @@ pub enum ClosingStockDeclined {
     NotADebit,
     /// The `Opening Stock` line is missing, repeated or carries an amount.
     OpeningStockNotShownEmpty,
-    /// The book's flags do not show inventory on and integrated.
+    /// The book's flags were read and do not show inventory on and integrated.
     BookNotShownIntegrated,
+    /// The book's flags could not be read.
+    InventoryFlagsNotRead,
+    /// The derived Balance Sheet lines, with the figure, do not sum to zero:
+    /// the Trial Balance does not balance (Tally's `Difference in opening
+    /// balances` is a line this book's Balance Sheet export does not carry).
+    BalanceSheetDoesNotBalance,
     /// With the figure, a line of Tally's Balance Sheet or Profit and Loss
     /// still does not tie.
     DoesNotCloseEveryGap,
@@ -338,6 +359,8 @@ impl ClosingStockDeclined {
             Self::NotADebit => "not_a_debit",
             Self::OpeningStockNotShownEmpty => "opening_stock_not_shown_empty",
             Self::BookNotShownIntegrated => "book_not_shown_integrated",
+            Self::InventoryFlagsNotRead => "inventory_flags_not_read",
+            Self::BalanceSheetDoesNotBalance => "balance_sheet_does_not_balance",
             Self::DoesNotCloseEveryGap => "does_not_close_every_gap",
         }
     }
@@ -418,7 +441,7 @@ pub fn derive_statements(
     groups: &[TallyNamedMaster],
     tally_balance_sheet: &NativeStatement,
     tally_profit_and_loss: Option<&NativeStatement>,
-    inventory: Option<IntegratedInventory>,
+    inventory: InventoryFlags,
 ) -> Result<DerivedStatements, StatementsError> {
     if tally_balance_sheet.kind != NativeStatementKind::BalanceSheet {
         return Err(StatementsError::GateNotABalanceSheet);
@@ -656,16 +679,46 @@ pub fn derive_statements(
                 lines: Vec::new(),
             },
         ),
-        Ok(Some(_)) if inventory.is_none() => (
+        Ok(Some(_)) if !matches!(inventory, InventoryFlags::Integrated(_)) => (
             evaluate(None)?,
             ClosingStockUse::Declined {
-                why: ClosingStockDeclined::BookNotShownIntegrated,
+                why: match inventory {
+                    InventoryFlags::NotRead => ClosingStockDeclined::InventoryFlagsNotRead,
+                    _ => ClosingStockDeclined::BookNotShownIntegrated,
+                },
                 lines: Vec::new(),
             },
         ),
         Ok(Some(stock)) => {
             let with_stock = evaluate(Some(&stock))?;
-            if with_stock.unmet.is_empty() {
+            // The figure moves Current Assets and the carried line by opposite
+            // amounts, so a book whose derived lines balanced before still does.
+            // A Trial Balance that does not balance leaves Tally's `Difference in
+            // opening balances` out of this book's Balance Sheet export, and the
+            // statement would not balance.
+            let balanced = {
+                let mut total = StatementSum::new();
+                for line in &balance_sheet {
+                    total.merge(&line.amount)?;
+                }
+                match &carried {
+                    Established::Established { value } => total
+                        .sum
+                        .checked_add(value)
+                        .map_err(|_| StatementsError::Arithmetic)?
+                        .is_zero(),
+                    _ => false,
+                }
+            };
+            if with_stock.unmet.is_empty() && !balanced {
+                (
+                    evaluate(None)?,
+                    ClosingStockUse::Declined {
+                        why: ClosingStockDeclined::BalanceSheetDoesNotBalance,
+                        lines: Vec::new(),
+                    },
+                )
+            } else if with_stock.unmet.is_empty() {
                 let value = stock.amount.clone();
                 (with_stock, ClosingStockUse::Applied { value })
             } else {

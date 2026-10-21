@@ -85,7 +85,14 @@ fn known_lab_balance_sheet() -> NativeStatement {
 }
 
 fn derive(report: NativeTrialBalance, tally: &NativeStatement) -> DerivedStatements {
-    derive_statements(&admitted(report), &groups(), tally, None, None).unwrap()
+    derive_statements(
+        &admitted(report),
+        &groups(),
+        tally,
+        None,
+        InventoryFlags::NotRead,
+    )
+    .unwrap()
 }
 
 fn assert_sum(sum: &StatementSum, value: &str, present: usize, empty: usize) {
@@ -279,7 +286,7 @@ fn a_ledger_under_a_user_created_primary_group_blocks_every_result() {
         &groups,
         &known_lab_balance_sheet(),
         None,
-        None,
+        InventoryFlags::NotRead,
     )
     .unwrap();
     assert_eq!(
@@ -406,7 +413,7 @@ fn a_row_whose_columns_do_not_add_up_is_refused() {
             &groups(),
             &known_lab_balance_sheet(),
             None,
-            None
+            InventoryFlags::NotRead
         )
         .unwrap_err(),
         StatementsError::RowInconsistent
@@ -425,7 +432,7 @@ fn a_closing_that_no_movement_explains_is_refused_even_with_empty_columns() {
             &groups(),
             &known_lab_balance_sheet(),
             None,
-            None
+            InventoryFlags::NotRead
         )
         .unwrap_err(),
         StatementsError::RowInconsistent
@@ -444,7 +451,7 @@ fn a_second_root_ledger_is_refused() {
             &groups(),
             &known_lab_balance_sheet(),
             None,
-            None
+            InventoryFlags::NotRead
         )
         .unwrap_err(),
         StatementsError::RootLedgerRepeated
@@ -463,7 +470,7 @@ fn each_gate_takes_only_its_own_statement() {
             &groups(),
             &profit_and_loss,
             None,
-            None
+            InventoryFlags::NotRead
         )
         .unwrap_err(),
         StatementsError::GateNotABalanceSheet
@@ -474,7 +481,7 @@ fn each_gate_takes_only_its_own_statement() {
             &groups(),
             &known_lab_balance_sheet(),
             Some(&known_lab_balance_sheet()),
-            None
+            InventoryFlags::NotRead
         )
         .unwrap_err(),
         StatementsError::GateNotAProfitAndLoss
@@ -495,7 +502,7 @@ fn derive_with_profit_and_loss(
         &groups(),
         &known_lab_balance_sheet(),
         Some(tally),
-        None,
+        InventoryFlags::NotRead,
     )
     .unwrap()
 }
@@ -612,7 +619,7 @@ impl Capture {
             &groups,
             &balance_sheet,
             Some(&profit_and_loss),
-            None,
+            InventoryFlags::NotRead,
         )
         .unwrap();
         let tie = derived.profit_and_loss_tie.clone().unwrap();
@@ -645,7 +652,7 @@ fn reads_lab_with_profit_and_loss(lines: &[(&str, &str, &str)]) -> DerivedStatem
         &groups,
         &balance_sheet,
         Some(&profit_and_loss(lines)),
-        None,
+        InventoryFlags::NotRead,
     )
     .unwrap()
 }
@@ -951,7 +958,7 @@ const TIEOUT_B: Capture = Capture {
 
 /// The flags Tally gave for the book (its captured answer), as
 /// `IntegratedInventory` reads them.
-fn integrated() -> Option<IntegratedInventory> {
+fn integrated() -> InventoryFlags {
     let flags = parse_company_inventory_flags(
         &utf16(include_bytes!(
             "../../crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_stock_book_live.utf16le.xml"
@@ -966,7 +973,7 @@ fn integrated() -> Option<IntegratedInventory> {
 /// The inventory book with `profit_and_loss` as Tally's own P&L (`None`: not read).
 fn tieout_b_with(
     profit_and_loss: Option<&NativeStatement>,
-    inventory: Option<IntegratedInventory>,
+    inventory: InventoryFlags,
 ) -> DerivedStatements {
     let (report, groups, balance_sheet, _) = TIEOUT_B.parts();
     derive_statements(
@@ -993,7 +1000,7 @@ fn captured_stock_lines() -> Vec<(&'static str, &'static str, &'static str)> {
 
 fn tieout_b_edited(
     edit: impl FnOnce(&mut Vec<(&'static str, &'static str, &'static str)>),
-    inventory: Option<IntegratedInventory>,
+    inventory: InventoryFlags,
 ) -> DerivedStatements {
     let mut lines = captured_stock_lines();
     edit(&mut lines);
@@ -1067,7 +1074,7 @@ fn tallys_closing_stock_closes_every_gap_on_the_inventory_book() {
 #[test]
 fn without_the_flags_the_inventory_book_keeps_todays_refusal() {
     let (_, _, _, tally) = TIEOUT_B.parts();
-    let derived = tieout_b_with(Some(&tally), None);
+    let derived = tieout_b_with(Some(&tally), InventoryFlags::NotShownIntegrated);
     assert_eq!(
         declined(&derived),
         ClosingStockDeclined::BookNotShownIntegrated
@@ -1233,7 +1240,7 @@ fn a_book_with_no_stock_is_untouched_by_the_flags() {
         &groups,
         &balance_sheet,
         Some(&tally),
-        None,
+        InventoryFlags::NotRead,
     )
     .unwrap();
     assert_eq!(with, without);
@@ -1266,7 +1273,10 @@ fn only_both_flags_yes_show_an_integrated_inventory() {
         inventory_on,
         batchwise: NativeFlag::No,
     };
-    assert!(IntegratedInventory::from_flags(&flags(NativeFlag::Yes, NativeFlag::Yes)).is_some());
+    assert!(matches!(
+        IntegratedInventory::from_flags(&flags(NativeFlag::Yes, NativeFlag::Yes)),
+        InventoryFlags::Integrated(_)
+    ));
     for (integrated, inventory_on) in [
         (NativeFlag::No, NativeFlag::Yes),
         (NativeFlag::Unknown, NativeFlag::Yes),
@@ -1274,7 +1284,10 @@ fn only_both_flags_yes_show_an_integrated_inventory() {
         (NativeFlag::Yes, NativeFlag::Unknown),
     ] {
         assert!(
-            IntegratedInventory::from_flags(&flags(integrated, inventory_on)).is_none(),
+            matches!(
+                IntegratedInventory::from_flags(&flags(integrated, inventory_on)),
+                InventoryFlags::NotShownIntegrated
+            ),
             "{integrated:?} {inventory_on:?}"
         );
     }
@@ -1288,4 +1301,45 @@ fn a_closing_stock_without_the_cost_of_sales_heading_is_declined() {
         integrated(),
     );
     assert_eq!(declined(&derived), ClosingStockDeclined::ShapeNotAsSeen);
+}
+
+#[test]
+fn flags_that_could_not_be_read_are_their_own_reason() {
+    let (_, _, _, tally) = TIEOUT_B.parts();
+    let derived = tieout_b_with(Some(&tally), InventoryFlags::NotRead);
+    assert_eq!(
+        declined(&derived),
+        ClosingStockDeclined::InventoryFlagsNotRead
+    );
+    assert_every_result(&derived, &differs(&["Profit & Loss A/c", "Current Assets"]));
+}
+
+#[test]
+fn a_book_whose_trial_balance_does_not_balance_does_not_use_the_figure() {
+    // synthetic mutation: the Bank ledger opens 1,000 higher and Tally's Current
+    // Assets are made to tie to it, so every compared line ties with the figure
+    // while the derived lines no longer sum to zero: a difference in opening
+    // balances this book's Balance Sheet export would not show.
+    let (mut report, groups, mut balance_sheet, tally) = TIEOUT_B.parts();
+    let bank = row(&mut report, "Lab Bank");
+    bank.opening = NativeTrialBalanceAmount::Present(decimal("-49000.00"));
+    bank.closing = NativeTrialBalanceAmount::Present(decimal("-48500.00"));
+    let current_assets = balance_sheet
+        .lines
+        .iter_mut()
+        .find(|line| line.name == "Current Assets")
+        .unwrap();
+    current_assets.main = NativeStatementAmount::Present(decimal("-52000.00"));
+    let derived = derive_statements(
+        &admitted(report),
+        &groups,
+        &balance_sheet,
+        Some(&tally),
+        integrated(),
+    )
+    .unwrap();
+    assert_eq!(
+        declined(&derived),
+        ClosingStockDeclined::BalanceSheetDoesNotBalance
+    );
 }

@@ -1,0 +1,51 @@
+# Issue #1358 Negative Stock, N1-N3. Windows lab, 21 Oct 2026, TallyPrime 7.1 Silver (no Education mode seen).
+# Request texts from origin/master 3dfd5cf082c5ac87bb0dc3a3f926e3c985b7b713, src-tauri/crates/bridge-tally-protocol/tests/fixtures/:
+#   builtin_negative_stock_shape_lab_fy_request.utf16le.xml (760 B, f054cc20c12679f65c6daaf29abb00a03ce665252bc60758fe95741fe99e5ecc), header ID "Negative Stock";
+#   stock_summary_report_fy_request.utf16le.xml (758 B, 17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8).
+#   Only SVCURRENTCOMPANY and SVTODATE were changed (SVFROMDATE stays 20250401); UTF-16LE with byte-order mark kept.
+# Company for N1/N3: BRIDGE NEGSTOCK LAB 2 (folder 100071), made for this item: keyed company, financial year and books from
+#   1-Apr-2025, Tally's default features (inventory on and integrated with accounts). Its masters and three vouchers were raw imports
+#   (requests/i1-i6, each answer CREATED as expected, every other counter 0, no LINEERROR):
+#   unit Nos; ledgers Lab Sales, Lab Purchases, Lab Customer, Lab Supplier; items Lab Short Item and Lab Plain Item, no opening stock;
+#   Sales 10-May-2025 Lab Short Item 5 Nos @ 200; Purchase 15-May-2025 Lab Plain Item 10 Nos @ 100; Purchase 20-Jun-2025 Lab Short Item 2 Nos @ 120.
+#   It is NOT the older company "BRIDGE NEGSTOCK LAB" (folder 100034, GUID 78b74010-4f17-4faa-9a8c-d70a838d0a30), which was left untouched.
+#   Backup BKN-A after the vouchers: TDBK1800_100071.001 | 31893 | 58e643f57323ad364fee9869f20fae1ba06b724732d3f2631d6856f29d5aec22 (kept on the lab PC).
+# Company for N2: BRIDGE TIEOUT C (folder 100069), as captured for #692, read only.
+# Answers are byte-exact as received, HTTP 200.
+#
+# Results:
+# N1 (ans-n1, NEGSTOCK LAB 2, 20250401-20260331): one row, Lab Short Item, DSPCLQTY "-3 Nos", DSPCLRATE "120.00", DSPCLAMTA "360.00".
+#   Stock Summary (ans-n1b, same window): Lab Plain Item 10 Nos @ 100.00 = -1000.00; Lab Short Item -3 Nos @ 120.00 = 360.00.
+# N3 (ans-n3, NEGSTOCK LAB 2, 20250401-20250531): one row, Lab Short Item, DSPCLQTY "-5 Nos", DSPCLRATE and DSPCLAMTA empty:
+#   quantities are as of the window's end (31-May), not the book's end.
+# N2 (ans-n2, TIEOUT C, 20250401-20260331): an empty envelope, exactly <ENVELOPE></ENVELOPE> (no rows, no list element).
+#
+# file | bytes | sha256
+answers/ans-i1-unit.xml | 538 | 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010
+answers/ans-i2-ledgers.xml | 538 | ffc14cedba19841d110a550729c935a520f5dfda3944320b4daf5ea9c55a8d0b
+answers/ans-i3-items.xml | 538 | 9cca0f382ec8c2448cdebb3b2fafb9f6d1aaad12600867ddec73a36a401b7320
+answers/ans-i4-sale-20250510.xml | 538 | 13de4a8d33308a0a0925681a6eb6eac34b7066ad8cbeb5050c03de4c157ef28c
+answers/ans-i5-purchase-20250515.xml | 538 | 7dfa985585b2ffd0ea1b464bb96affaeee828212127d475f9df63441a7f1cb3e
+answers/ans-i6-purchase-20250620.xml | 538 | 6a11e687b89315a279ef776fe3cee5a0bcb264418a8ea23b4499a52279e37af2
+answers/ans-n1b-stock-summary-negstock-fy.xml | 982 | d5216aa026d597c15d55ac365279aaba6f0233bd90b402e85ba73f2f000185e4
+answers/ans-n1-negative-stock-negstock-fy.xml | 514 | 0b6fdf155016e065f669dff7e221108789c52d1900528c443f66ad608b1fc20e
+answers/ans-n2-negative-stock-tieout-c-fy.xml | 46 | 8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+answers/ans-n3-negative-stock-negstock-to-20250531.xml | 490 | 720cd2f5ecb09138b675d399df3dcca90fafb416a0709738d391ad44161a65c2
+requests/i1-unit.xml | 1016 | 55d528060685a98d54a7c5706ac81bdf2ff8a64a275c665b183f1299f3f52c3c
+requests/i2-ledgers.xml | 2134 | de4edf16fbf12c0676f3d9a116c4052000bb324c1b7981f7ce5c31c453456560
+requests/i3-items.xml | 1492 | 10e6996fe8cd0abfa37701f858020df7d124e1a392cbbcbaa6c9736c73540513
+requests/i4-sale-20250510.xml | 2538 | cc4a70b9f841f77a8fac6195862a9cd81df88ddd8193a43c468ba1c366426749
+requests/i5-purchase-20250515.xml | 2572 | f712fb4408469f54c2384d3c96fefbe5a7f4f2d21b2f1e00f2c1694ee62dcaa6
+requests/i6-purchase-20250620.xml | 2562 | 596622e3d32d843ffd5c935c0dbd2b277fa1b556dfe0f7e18e5d2f019ce909e3
+requests/n1b-stock-summary-negstock-fy.utf16le.xml | 768 | 8fa15ddff4a02067b2017ba2dd4a645fc9c44817cd7968a78c84a60122a3d975
+requests/n1-negative-stock-negstock-fy.utf16le.xml | 770 | 4e29535d9d740e7ed89fbecad799c47f3ce0d35a59ad62b5830ae6366a12623e
+requests/n2-negative-stock-tieout-c-fy.utf16le.xml | 758 | 6f9ed321654680017caaf3f49fbaa88f3491f9d283ba768579474c95d7017495
+requests/n3-negative-stock-negstock-to-20250531.utf16le.xml | 770 | 5e6811cef1ce108f736c17b420e6ae6ac42362f230161a54705d71640371b0d4
+#
+# Screenshots kept on the lab PC (name | bytes | sha256):
+# s00-found-state.png | 59855 | 9279e1af7fc1c05b1e7d76c8ad77e672d9131f295ae05e62dc913b82bce1e0f7
+# s01-after-imports.png | 60142 | 4ab36e21812fadb63046654cd61a3b15fdffbb762544b5ab441842e4f389f824
+# s02-company-created-features.jpg | 53908 | 498267f730c48f8546108157561afef4fd2361c5588107d9138089dd2e5f0145
+# s03-gateway-negstock-lab-2.jpg | 43218 | e497d647a68604c34a87027755317295c85afbc534c3535bdfe7922b09c6a575
+# s04-after-BKN-A.jpg | 42553 | ffa30c22672e9227812b12f40c617dd54d0a2e72e353aa58d421b9bd827b4b43
+# s05-gateway-tieout-c.jpg | 42602 | a6547110ab92826dc8848ff8c28992bb1c49ce8e63558b937b6e2c0a617be6f2

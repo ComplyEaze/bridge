@@ -1,0 +1,12 @@
+.github/workflows/ci.yml
+src-tauri/Cargo.lock
+src-tauri/crates/bridge-bank-statement/Cargo.toml
+src-tauri/crates/bridge-bank-statement/src/bank.rs
+src-tauri/crates/bridge-bank-statement/src/date.rs
+src-tauri/crates/bridge-bank-statement/src/geometry.rs
+src-tauri/crates/bridge-bank-statement/src/mapping.rs
+src-tauri/crates/bridge-bank-statement/src/pdf.rs
+src-tauri/crates/bridge-bank-statement/src/pipeline.rs
+src-tauri/crates/bridge-bank-statement/src/proposals.rs
+src-tauri/crates/bridge-bank-statement/src/text.rs
+reviewer: lamemustafa

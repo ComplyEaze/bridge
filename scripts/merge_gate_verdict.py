@@ -10,6 +10,20 @@ time is the one that counts, and it must name the current head and base; any edi
 every verdict that is not strictly newer. A pull request that carries either token in its title, body, branch name, changed file
 names, commit messages, commit comments, added lines or anyone else's review or comment is refused. Unreadable evidence is indeterminate, never a pass.
 
+The line may also open a longer comment or review: its first line is the verdict line exactly, and the rest of the body (a reviewer's
+written review) carries neither token, read the same way as everywhere else; a review that opens with the line is then the one thing the
+reviewer posts. Prose before the line, a line with spaces around it or a token anywhere else in the body is a malformed owner line and voids.
+
+The document may carry `carried`, {"head": H, "base": B}, which only the gate sets, after proving that the pull request's own diff is
+byte-identical (apart from index lines and the text after the hunk numbers) at H and B and at the current head and merge base: a MERGE-VERDICT CLEAN line that names exactly that pair then stands
+as if it named the current pair. It carries the CLEAN line only; MERGE-ADVERSARY RECOMMEND must name the current pair. The result's
+`candidate_clean` names the pair of the newest standing-but-for-its-pair CLEAN line, which is what the gate asks about.
+
+The document may carry `tier`. Only the exact string "one" (the review tier scripts/review-tier.mjs computes from the changed
+paths) lets the MERGE-ADVERSARY RECOMMEND line be absent: a pull request of the one tier stands on MERGE-VERDICT CLEAN alone. Any
+other value, or none, is the full tier and needs both lines. Every refusal and every void still applies at the one tier, and a
+MERGE-ADVERSARY line that voids (a rejection or retraction) still voids the CLEAN line.
+
 Usage: merge_gate_verdict.py < DOC.json   (prints one JSON object; exit 0 pass, 1 block, 2 indeterminate)
 """
 import html
@@ -46,6 +60,23 @@ def one_line(body):
     if text.endswith("\n"):
         text = text[:-1]
     return None if "\n" in text or "\r" in text else text
+
+
+def verdict_line(body):
+    """The verdict line of an owner item: the whole body (as one_line) or, when more follows, its exact first line over prose with no token."""
+    if not isinstance(body, str):
+        return None
+    text = body.replace("\r\n", "\n")
+    if text.endswith("\n"):
+        text = text[:-1]
+    if "\r" in text:
+        return None
+    if "\n" not in text:
+        return text
+    first, rest = text.split("\n", 1)
+    if (CLEAN_RE.fullmatch(first) or RECOMMEND_RE.fullmatch(first)) and rest.strip() and not has_token(rest):
+        return first
+    return None
 
 
 DASHES = dict.fromkeys(list(range(0x2010, 0x2016)) + [0x2212, 0xFE58, 0xFE63, 0xFF0D], "-")
@@ -137,7 +168,7 @@ def evaluate(doc):
             except Unreadable as error:
                 unreadable.append(str(error))
                 continue
-            line = one_line(body)
+            line = verdict_line(body)
             if kind == "inline":
                 voids.append(FOREVER)  # never a verdict; its time (a draft's) and its history are not read, so it voids everything
                 continue
@@ -195,11 +226,28 @@ def evaluate(doc):
             unreadable.append("the edit, deletion and dismissal history was malformed (%s)" % type(error).__name__)
 
     newest_void = max(voids) if voids else None
+    recommend_required = doc.get("tier") != "one"
+    carried = doc.get("carried")
+    carried_pair = None
+    if (isinstance(carried, dict) and set(carried) == {"head", "base"}
+            and all(isinstance(carried[k], str) and re.fullmatch(r"[0-9a-f]{40}", carried[k]) for k in carried)):
+        carried_pair = (carried["head"], carried["base"])
+    candidate_clean = None
     stands = {}
     for name, found in positives.items():
         newest = max(found, key=lambda entry: entry[0]) if found else None
         ambiguous = bool(found) and len({entry[1] for entry in found if entry[0] == newest[0]}) > 1
-        if newest is None or ambiguous or newest[1] != (head, base):
+        if name == "recommend" and not recommend_required:
+            stands[name] = bool(newest is not None and not ambiguous and newest[1] == (head, base)
+                                and (newest_void is None or newest[0] > newest_void))
+            reasons.append("review tier one: MERGE-ADVERSARY RECOMMEND is not required")
+        elif name == "clean" and newest is not None and not ambiguous and carried_pair is not None and newest[1] == carried_pair \
+                and (newest_void is None or newest[0] > newest_void):
+            stands[name] = True
+            reasons.append("the newest owner MERGE-VERDICT CLEAN line names an older head and merge base and is carried: the gate proved the pull request's own patch unchanged")
+        elif newest is None or ambiguous or newest[1] != (head, base):
+            if name == "clean" and newest is not None and not ambiguous and (newest_void is None or newest[0] > newest_void):
+                candidate_clean = {"head": newest[1][0], "base": newest[1][1]}
             stands[name] = False
             reasons.append("the newest owner %s line is missing or names another head or merge base" % ("MERGE-VERDICT CLEAN" if name == "clean" else "MERGE-ADVERSARY RECOMMEND"))
         elif newest_void is not None and not newest[0] > newest_void:
@@ -210,11 +258,11 @@ def evaluate(doc):
             stands[name] = True
     if unreadable:
         status = "indeterminate"
-    elif refusals or not (stands["clean"] and stands["recommend"]):
+    elif refusals or not (stands["clean"] and (stands["recommend"] or not recommend_required)):
         status = "block"
     else:
         status = "pass"
-    return {"status": status, "clean": stands["clean"], "recommend": stands["recommend"],
+    return {"status": status, "clean": stands["clean"], "recommend": stands["recommend"], "recommend_required": recommend_required, "candidate_clean": candidate_clean,
             "reasons": reasons, "refusals": sorted(set(refusals)), "unreadable": unreadable}
 
 

@@ -28,6 +28,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
         narration: None,
         reference: None,
         voucher_number: row.voucher_number.clone(),
+        invoice: None,
         entries: row
             .entries
             .iter()
@@ -150,8 +151,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             max_bytes: 200_000,
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         });
         let company =
             bridge_tally_protocol::parse_companies_from_collection(&cycle[0].fixture.body())
@@ -168,6 +168,8 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             ledger_identities: None,
             cash_in_hand_ledgers: Some(Vec::new()),
             on_account_approved: Some(Vec::new()),
+            statement: None,
+            withdrawn_skips: None,
             endpoint_origin: None,
             identity_scheme: None,
             amends_batch_id: None,
@@ -301,30 +303,36 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
         assert_eq!(content["evidence"]["bytes"], bytes, "{case}");
     }
 
-    // Every case is joined, and a panic in any of them is passed on after the
-    // others have finished, with the case named (several cases share a name,
-    // so its place in the list is given too).
+    // A few cases at a time, not all 28: one thread serves every running case,
+    // and a simulator gives up on a request that has not reached it within 30
+    // seconds, so on a starved runner too many cases at once made some of them
+    // time out (queue run 38732818063). Every case is joined, and a panic in any
+    // of them is passed on after the others have finished, with the case named
+    // (several cases share a name, so its place in the list is given too).
+    const CASES_AT_ONCE: usize = 4;
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async {
-            let running = cases
-                .into_iter()
-                .enumerate()
-                .map(|(index, case)| {
-                    let running = tokio::task::spawn_local(verified_case(
-                        case,
-                        positive.clone(),
-                        empty.clone(),
-                        expected.clone(),
-                    ));
-                    (index, case.0, running)
-                })
-                .collect::<Vec<_>>();
             let mut panicked = None;
-            for (index, name, case) in running {
-                if let Err(error) = case.await {
-                    eprintln!("case {name} (number {index} in the list) failed");
-                    panicked.get_or_insert(error);
+            for (group_index, group) in cases.chunks(CASES_AT_ONCE).enumerate() {
+                let running = group
+                    .iter()
+                    .enumerate()
+                    .map(|(offset, &case)| {
+                        let running = tokio::task::spawn_local(verified_case(
+                            case,
+                            positive.clone(),
+                            empty.clone(),
+                            expected.clone(),
+                        ));
+                        (group_index * CASES_AT_ONCE + offset, case.0, running)
+                    })
+                    .collect::<Vec<_>>();
+                for (index, name, case) in running {
+                    if let Err(error) = case.await {
+                        eprintln!("case {name} (number {index} in the list) failed");
+                        panicked.get_or_insert(error);
+                    }
                 }
             }
             if let Some(error) = panicked {

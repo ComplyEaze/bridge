@@ -1367,3 +1367,282 @@ fn the_batch_size_the_texts_state_is_the_batch_post_limit() {
         "the README does not say {sentence:?}"
     );
 }
+
+// --- #1050: a rollback seen once covers the company's earlier native posts ---
+
+const ROLLBACK_RESPONSE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-import-response.utf16le.xml"
+);
+
+/// The captured answer to a native post, as the journal records it.
+fn captured_outcome() -> bridge_tally_protocol::TallyImportOutcome {
+    let xml = bridge_tally_protocol::decode_tally_xml_response_bytes_limited(
+        ROLLBACK_RESPONSE,
+        "text/xml; charset=utf-16",
+        bridge_tally_protocol::ExpectedTallyTextEncoding::Utf16Le,
+        ROLLBACK_RESPONSE.len(),
+    )
+    .unwrap()
+    .text;
+    bridge_tally_protocol::parse_import_outcome(&xml).unwrap()
+}
+
+const PLACE_ENDPOINT: &str = "http://127.0.0.1:9001";
+
+/// A native batch of one company at one Tally address.
+fn placed(id: &str, company_name: &str, endpoint: Option<&str>) -> ImportLedgerLine {
+    let mut line = batch(id, id);
+    line.company = Some(
+        serde_json::from_value(json!({
+            "name": company_name, "guid": "00000000-0000-4000-8000-000000000002",
+            "company_number": "100054", "books_from": "20260401"
+        }))
+        .unwrap(),
+    );
+    line.endpoint_origin = endpoint.map(str::to_string);
+    line
+}
+
+/// Its native dispatch intent, recording `pre` as the pre-POST mark.
+fn intent(line: &ImportLedgerLine, pre: Option<u64>) -> Vec<u8> {
+    let mut update = StatusRecord::dispatch_native(line, "c".repeat(64), Uuid::new_v4());
+    update.pre_post_voucher_mark = pre;
+    record(&update)
+}
+
+/// Its recorded answer, with the captured outcome.
+fn answered(line: &ImportLedgerLine) -> Vec<u8> {
+    record(&StatusRecord::response(
+        line,
+        DispatchResponse {
+            request_sha256: "c".repeat(64),
+            response_sha256: "d".repeat(64),
+            bytes: ROLLBACK_RESPONSE.len(),
+            outcome: Some(captured_outcome()),
+        },
+    ))
+}
+
+fn seen(line: &ImportLedgerLine, mark: u64, records_before_read: u64) -> Vec<u8> {
+    record(&StatusRecord::rollback_seen(
+        line,
+        mark,
+        records_before_read,
+    ))
+}
+
+fn cover(journal: &[Vec<u8>], batch_id: &str) -> RollbackScan {
+    rollback_cover(Cursor::new(journal.concat()), batch_id).unwrap()
+}
+
+fn invalid(journal: &[Vec<u8>]) -> bool {
+    rollback_cover(Cursor::new(journal.concat()), "p1").is_err()
+}
+
+/// The 12 Oct shape: P1 and P2 posted natively, a backup restored below both,
+/// P2's verification sees the mark below its floor and records it. P1, whose
+/// own verification would read the mark above P1's floor once a voucher is
+/// keyed again, is covered by that record.
+#[test]
+fn a_rollback_seen_on_one_batch_covers_an_earlier_batch_of_the_company() {
+    let created = captured_outcome().counters().created;
+    assert!(created > 0);
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        record(&p2),
+        intent(&p2, Some(1 + created)),
+        answered(&p2),
+    ];
+    let read = journal.len() as u64;
+    journal.push(seen(&p2, 1, read));
+    for id in ["p1", "p2"] {
+        let scan = cover(&journal, id);
+        assert_eq!(
+            scan.covered_by,
+            Some(RollbackCover {
+                mark_read: 1,
+                seen_by: "p2".into()
+            }),
+            "{id}"
+        );
+        assert_eq!(scan.records, journal.len() as u64);
+    }
+    // The answer that recorded it names P1 as the batch to verify again.
+    assert_eq!(
+        covered_by_records_of(Cursor::new(journal.concat()), "p2").unwrap(),
+        vec!["p1".to_string()]
+    );
+    assert!(covered_by_records_of(Cursor::new(journal.concat()), "p1")
+        .unwrap()
+        .is_empty());
+}
+
+/// A record judges a batch only on what the journal held when its mark was
+/// read: a post written after that point, or answered after it, is not
+/// covered by a mark its own vouchers had not yet raised.
+#[test]
+fn a_record_covers_only_what_the_journal_held_before_its_mark_was_read() {
+    let created = captured_outcome().counters().created;
+    let seer = placed("seer", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let early = placed("early", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let late = placed("late", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![
+        record(&seer),
+        intent(&seer, Some(20)),
+        answered(&seer),
+        // Dispatched before the read at the mark, answered only after it.
+        record(&early),
+        intent(&early, Some(5)),
+    ];
+    let read = journal.len() as u64;
+    journal.push(answered(&early));
+    journal.push(record(&late));
+    journal.push(intent(&late, Some(5)));
+    journal.push(answered(&late));
+    journal.push(seen(&seer, 5, read));
+    assert!(cover(&journal, "seer").covered_by.is_some());
+    // Within the prefix `early` had proved only its pre-POST mark, 5, which is
+    // not above the mark read: its answer came after.
+    assert_eq!(cover(&journal, "early").covered_by, None);
+    // `late` was dispatched after the read.
+    assert_eq!(cover(&journal, "late").covered_by, None);
+    // Had the read come after `early`'s answer, its floor 5 + created is
+    // above 5, and it is covered.
+    assert!(created > 0);
+    let last = journal.len() - 1;
+    let mut read_after_answer = journal.clone();
+    read_after_answer[last] = seen(&seer, 5, read + 1);
+    assert_eq!(
+        cover(&read_after_answer, "early")
+            .covered_by
+            .map(|cover| cover.mark_read),
+        Some(5)
+    );
+}
+
+/// Only the same company, by all four fields, at the same Tally address.
+#[test]
+fn a_record_covers_no_batch_of_another_company_or_address() {
+    let seer = placed("seer", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let renamed = placed("renamed", "BRIDGE ROLLBACK LAB COPY", Some(PLACE_ENDPOINT));
+    let elsewhere = placed(
+        "elsewhere",
+        "BRIDGE ROLLBACK LAB",
+        Some("http://127.0.0.1:9002"),
+    );
+    let mut other_number = placed("number", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    other_number.company.as_mut().unwrap().company_number = "100055".into();
+    let unplaced = placed("unplaced", "BRIDGE ROLLBACK LAB", None);
+    let mut journal = vec![record(&seer), intent(&seer, Some(9))];
+    for line in [&renamed, &elsewhere, &other_number, &unplaced] {
+        journal.push(record(line));
+        journal.push(intent(line, Some(9)));
+    }
+    let read = journal.len() as u64;
+    journal.push(seen(&seer, 3, read));
+    assert!(cover(&journal, "seer").covered_by.is_some());
+    for id in ["renamed", "elsewhere", "number", "unplaced"] {
+        assert_eq!(cover(&journal, id).covered_by, None, "{id}");
+    }
+}
+
+/// A post with no pre-POST mark (a hand import, or one the journal never
+/// recorded a mark for) is never covered, and never carries a record.
+#[test]
+fn a_batch_without_a_pre_post_mark_is_never_covered_and_carries_no_record() {
+    let seer = placed("seer", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let hand = placed("hand", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let journal = vec![
+        record(&seer),
+        intent(&seer, Some(9)),
+        record(&hand),
+        intent(&hand, None),
+        seen(&seer, 3, 4),
+    ];
+    assert_eq!(cover(&journal, "hand").covered_by, None);
+    let mut on_hand = journal.clone();
+    on_hand.push(seen(&hand, 3, 4));
+    assert!(rollback_cover(Cursor::new(on_hand.concat()), "hand").is_err());
+}
+
+/// What the journal admits of a rollback-seen record: after a native intent
+/// with a pre-POST mark, a count no larger than its own position, and nothing
+/// else; and no other record carries its fields.
+#[test]
+fn a_rollback_seen_record_is_admitted_only_in_its_one_shape() {
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let base = vec![record(&p1), intent(&p1, Some(4))];
+    let mut fine = base.clone();
+    fine.push(seen(&p1, 2, 2));
+    assert!(!invalid(&fine));
+    // Before the intent.
+    assert!(invalid(&[record(&p1), seen(&p1, 2, 1)]));
+    // A count beyond its own position.
+    let mut beyond = base.clone();
+    beyond.push(seen(&p1, 2, 3));
+    assert!(invalid(&beyond));
+    // Its fields on another record, or another field on it.
+    let mut stray = StatusRecord::stop_release(&p1, ReleaseSeen::Found);
+    stray.mark_read = Some(2);
+    let mut with_stray = base.clone();
+    with_stray.push(record(&stray));
+    assert!(invalid(&with_stray));
+    let mut extra = StatusRecord::rollback_seen(&p1, 2, 2);
+    extra.pre_post_voucher_mark = Some(4);
+    let mut with_extra = base.clone();
+    with_extra.push(record(&extra));
+    assert!(invalid(&with_extra));
+    // It sets no status: the batch keeps the status it had.
+    let snapshot = read_snapshot(Cursor::new(fine.concat()), Some("p1"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.batch.status, "dispatch_started");
+}
+
+fn extends(journal: &[Vec<u8>], seen_by: &str, mark: u64, read: u64) -> bool {
+    rollback_record_extends(Cursor::new(journal.concat()), seen_by, mark, read).unwrap()
+}
+
+/// A record is written only when it would cover a post no record covers yet.
+/// A post already covered by its own record still records a second restore
+/// that reaches a post sent since (the second restore would otherwise be lost
+/// and that post could read verified against a voucher keyed by hand); a
+/// record that would cover nothing new is not written.
+#[test]
+fn a_covered_posts_check_still_records_a_second_restore_that_reaches_a_later_post() {
+    let created = captured_outcome().counters().created;
+    let a = placed("a", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let c = placed("c", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![record(&a), intent(&a, Some(10)), answered(&a)];
+    // A's check sees the first restore, below A's floor.
+    let read = journal.len() as u64;
+    assert!(extends(&journal, "a", 10, read));
+    journal.push(seen(&a, 10, read));
+    assert!(cover(&journal, "a").covered_by.is_some());
+    // The same restore again: nothing new to cover, nothing written.
+    assert!(!extends(&journal, "a", 10, journal.len() as u64));
+    // C is posted after the record (its floor above 10), then a second restore
+    // to 10 is read by A's check: it reaches C, so it is written.
+    journal.push(record(&c));
+    journal.push(intent(&c, Some(10 + created)));
+    journal.push(answered(&c));
+    assert_eq!(cover(&journal, "c").covered_by, None);
+    let read = journal.len() as u64;
+    assert!(extends(&journal, "a", 10, read));
+    journal.push(seen(&a, 10, read));
+    assert_eq!(
+        cover(&journal, "c").covered_by.map(|cover| cover.seen_by),
+        Some("a".to_string())
+    );
+    // A mark at or above every proved floor is no rollback.
+    assert!(!extends(
+        &journal,
+        "a",
+        10 + 2 * created,
+        journal.len() as u64
+    ));
+}

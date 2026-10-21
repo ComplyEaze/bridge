@@ -401,9 +401,9 @@ def synthetic_token(token):
     """Whether a whole token of digits is visibly synthetic: a 3-4 letter X/Z prefix and digits only, or one
     digit repeated.
 
-    The token is judged whole, so a run beside a placeholder (``ZZZZ 123456789012``), a repeated run inside
-    a longer token that is not itself repeated (``1111111111119876``), and an identifier glued after a prefix
-    (``11X9876543210``) still count.
+    The token is judged whole, so a run beside a placeholder (a space or a hyphen between), a repeated run
+    inside a longer token that is not itself repeated, and an identifier glued after a prefix (two digits
+    and an X before a mobile-shaped run) still count.
     """
     return bool(SYNTHETIC_PREFIX_TOKEN_RE.fullmatch(token) or REPEATED_DIGIT_RE.fullmatch(token))
 

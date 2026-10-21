@@ -978,13 +978,27 @@ class PrivacySpacedPanWordBoundary(unittest.TestCase):
             self.assertIsNotNone(self.privacy.IDENTIFIER_RE.search(text), text)
             self.assertTrue(self.blocked(text), text)
 
+def run_of(length, step=7, start=3):
+    """A run of digits that is not one repeated digit and not a placeholder, built at run time so that the
+    test source holds no digit run of its own (the merge check's privacy scan reads test source too)."""
+    return "".join(str((start + step * index) % 10) for index in range(length))
+
+
+def repeated(digit, length):
+    """One digit repeated, built at run time."""
+    return str(digit) * length
+
+
 class PrivacyScannerSyntheticReferences1743(unittest.TestCase):
-    """A reference that is visibly synthetic is admitted (#1743): a token whose letters mark it as a
-    placeholder (judged as the whole token, not the bare digits), or one digit repeated and nothing
-    else. Each admitted family has a positive case; every neighbouring real-looking shape still blocks."""
+    """A reference that is visibly synthetic is admitted (#1743): a token made of a three or four letter X/Z
+    prefix and digits only, or one digit repeated and nothing else. Each admitted family has a positive
+    case; every neighbouring real-looking shape still blocks. Every value is built at run time."""
 
     def setUp(self):
         self.privacy = load_privacy_module()
+        self.twelve = run_of(12)
+        self.mobile = "".join(str(9 - index) for index in range(10))  # a ten-digit run led by a 9
+        self.pan_letters = "".join(chr(ord("A") + index) for index in range(5))
 
     def blockers(self, text):
         return self.privacy.scan(text, HEAD)["blockers"]
@@ -998,61 +1012,83 @@ class PrivacyScannerSyntheticReferences1743(unittest.TestCase):
 
     def test_a_digit_run_inside_a_placeholder_token_is_admitted(self):
         for text in (
-            "utr ZZZZ123456789012",
-            "utr zzzz123456789012",
-            "utr XXXX0000123456789",
-            'let utr = "ZZZZ000011112222";',
+            f"utr ZZZZ{self.twelve}",
+            f"utr zzzz{self.twelve}",
+            f"utr XXXX{run_of(17)}",
+            f'let utr = "ZZZZ{run_of(16)}";',
         ):
             self.assert_admitted(text)
 
     def test_one_digit_repeated_is_admitted_at_each_length_the_scan_reads(self):
-        for text in ("ref 11111111111", "ref 222222222222", "ref 00000000000000", "ref 999999999999999999",
-                     "call 9999999999", "call 6666666666"):
+        for text in (
+            f"ref {repeated(1, 11)}",
+            f"ref {repeated(2, 12)}",
+            f"ref {repeated(0, 14)}",
+            f"ref {repeated(9, 18)}",
+            f"call {repeated(9, 10)}",
+            f"call {repeated(6, 10)}",
+        ):
             self.assert_admitted(text)
 
     def test_a_random_looking_run_a_mobile_shape_and_a_long_tail_still_block(self):
-        for text in ("ref 482916375204", "call 9876543210", "utr 482916375204917360", "ref 123456789012"):
+        counting = "".join(str((index + 1) % 10) for index in range(12))
+        for text in (f"ref {self.twelve}", f"call {self.mobile}", f"utr {run_of(18)}", f"ref {counting}"):
             self.assert_blocked(text)
 
     def test_a_run_beside_but_not_inside_a_placeholder_token_still_blocks(self):
-        for text in ("ZZZZ 482916375204", "ZZZZ-482916375204", "ZZZZ: 482916375204", "482916375204 ZZZZ"):
+        for text in (
+            f"ZZZZ {self.twelve}",
+            f"ZZZZ-{self.twelve}",
+            f"ZZZZ: {self.twelve}",
+            f"{self.twelve} ZZZZ",
+        ):
             self.assert_blocked(text)
 
     def test_a_repeated_run_that_is_only_part_of_a_longer_token_still_blocks(self):
         # The token is judged whole: a run of one digit inside digits that are not all that digit,
         # or glued to letters that do not make a placeholder, is not the admitted family.
-        for text in ("ref 1111111111119876", "ref 9876111111111111", "ref AB111111111111", "ref 111111111111AB"):
+        for text in (
+            f"ref {repeated(1, 12)}{run_of(4)}",
+            f"ref {run_of(4)}{repeated(1, 12)}",
+            f"ref AB{repeated(1, 12)}",
+            f"ref {repeated(1, 12)}AB",
+        ):
             self.assert_blocked(text)
 
     def test_an_identifier_glued_after_or_around_a_prefix_still_blocks(self):
-        # Reviewer reproductions: a PAN shape and a mobile shape behind two digits and an X, and a
-        # prefix that is too short, too long, or followed by anything but digits.
+        # A PAN shape and a mobile shape behind two digits and an X, and a prefix that is too short, too
+        # long, or followed by anything but digits.
         for text in (
-            "pan 12X1ABCDE1234F",
-            "id 11X9876543210",
-            "acct X482916375204",
-            "call X9876543210",
-            "ref XX482916375204",
-            "ref ZZZZZ482916375204",
-            "ref ZZZZ482916375204A",
-            "ref ZZZZ482916375204ZZZZ",
-            "ref ZZZZ" + "1" * 25,
+            f"pan 12X1{self.pan_letters}{run_of(4)}F",
+            f"id 11X{self.mobile}",
+            f"acct X{self.twelve}",
+            f"call X{self.mobile}",
+            f"ref XX{self.twelve}",
+            f"ref ZZZZZ{self.twelve}",
+            f"ref ZZZZ{self.twelve}A",
+            f"ref ZZZZ{self.twelve}ZZZZ",
+            f"ref ZZZZ{repeated(1, 25)}",
         ):
             self.assert_blocked(text)
 
     def test_the_family_stays_narrow_two_digits_and_a_leading_digit_do_not_qualify(self):
-        for text in ("ref 100000000002", "ref 121212121212", "ref 111111111112", "call 9999999990"):
+        for text in (
+            f"ref 1{repeated(0, 10)}2",
+            f"ref {'12' * 6}",
+            f"ref {repeated(1, 11)}2",
+            f"call {repeated(9, 9)}0",
+        ):
             self.assert_blocked(text)
 
     def test_the_enclosing_token_is_the_run_of_ascii_letters_and_digits(self):
         token = self.privacy.enclosing_token
-        text = "x ZZZZ123456789012 y"
-        start = text.index("123")
-        self.assertEqual(token(text, start, start + 12), "ZZZZ123456789012")
-        text = "ZZZZ-123456789012"
-        start = text.index("123")
-        self.assertEqual(token(text, start, start + 12), "123456789012")
-        self.assertEqual(token("123456789012", 0, 12), "123456789012")
+        text = f"x ZZZZ{self.twelve} y"
+        start = text.index(self.twelve)
+        self.assertEqual(token(text, start, start + 12), f"ZZZZ{self.twelve}")
+        text = f"ZZZZ-{self.twelve}"
+        start = text.index(self.twelve)
+        self.assertEqual(token(text, start, start + 12), self.twelve)
+        self.assertEqual(token(self.twelve, 0, 12), self.twelve)
 
 
 class PrivacyScannerFindingsPR335(unittest.TestCase):

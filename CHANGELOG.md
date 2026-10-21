@@ -14,6 +14,20 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
+**Added**
+
+- `gst_uncertain_vouchers` lists the vouchers of one voucher type (a Sales type is what was measured) in a window that Tally marks Uncertain in its
+  GSTR-1, and the vouchers a person accepted as they stand (Accept As Is), each with its party ledger, its invoice total
+  (without its sign, with its side) and Tally's identifiers, and the line a CA reads before filing. It counts the window's
+  vouchers with the status read first and refuses a window above 1,000 vouchers (provisional) before it reads amounts,
+  and refuses an amounts read that returns fewer vouchers than the count found; the
+  line names the voucher type it covers, and is withheld when no voucher was read or none is uncertain, and, with the
+  result partial, when a voucher's flags or a listed voucher's party or amount were not read. Its answer carries party names and amounts
+  to the assistant; `mask_parties` masks the names and not the amounts. The reason for uncertainty is not read, and bills
+  missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one
+  Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not
+  measured.
+
 **Changed**
 
 - A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
@@ -29,6 +43,22 @@ These changes are in source and not yet in a published build.
   **Do not go back to an earlier release after this one has seen a restore:** an earlier release refuses an import
   journal holding the new record, and stops every build, post and verification until ComplyEaze Bridge is upgraded
   again.
+
+- `voucher_presence` now checks a voucher type declared `manual` against the book's own numbering before it
+  reads the window, because a voucher number is an identity only where the book's series for the type says
+  Manual and prevents duplicate numbers. A call that declares a type manual now makes 20 more requests (34 become 54 on a small book: the
+  company's master mark, then the voucher-type numbering) and is refused as a whole, with
+  `presence_numbering_method_differs_from_book` and the types in `candidates`, when the book does not number a
+  declared-manual type Manual with exactly one series that prevents duplicate numbers (the check now also reads the
+  duplicate setting, and shows it in `book`) or holds no type of that exact name; a numbering that
+  cannot be read refuses with the read's own code (`masters_education_unqualified` in Education mode, for
+  example) or `presence_numbering_unreadable`. Calls that were answered before are refused in those cases.
+  A sub-method printed on a Manual series is ignored (a sub-method printed twice still refuses the read as
+  `field_invalid`). Names match exactly. Every type declared manual is
+  checked, whether or not a proposal names it. The check reads the book's numbering as it is now and holds for
+  the moment of the read. A call that declares no type manual reads no numbering and its result says
+  `numbering_read` `not_read`; a call that does read it returns what the book said for each declared type, or
+  only their counts when the rows would not fit the response budget.
 
 ## [0.6.0] - 2026-10-16
 

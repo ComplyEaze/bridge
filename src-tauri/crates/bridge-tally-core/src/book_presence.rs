@@ -1018,6 +1018,15 @@ impl NumberingDeclaration {
         self.methods.contains_key(voucher_type)
     }
 
+    /// Every declared voucher type with its declared method, in name order.
+    /// A consumer that checks a declaration against the book's own numbering
+    /// reads the types here instead of re-parsing the caller's arguments.
+    pub fn declarations(&self) -> impl Iterator<Item = (&str, NumberingMethod)> + '_ {
+        self.methods
+            .iter()
+            .map(|(voucher_type, method)| (voucher_type.as_str(), *method))
+    }
+
     fn method(&self, type_key: &str) -> Option<NumberingMethod> {
         self.methods.get(type_key).copied()
     }

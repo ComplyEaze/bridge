@@ -45,8 +45,8 @@ Not yet code-signed; your computer may warn you before opening it.
 
 **Get it:** the [Download page](https://bridge.complyeaze.com/download.html)
 offers the file for your computer; compare it with its `.sha256` file as
-[the install guide](./docs/agent/INSTALL.md#for-it-staff) says. It does not
-update itself: look for a newer version on the
+[the install guide](./docs/agent/INSTALL.md#for-it-staff) says. ComplyEaze Bridge does not
+update itself, so look for a newer version on the
 [releases page](https://github.com/ComplyEaze/bridge/releases).
 
 **Try asking** (on a test company first):

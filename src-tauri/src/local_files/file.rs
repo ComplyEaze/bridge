@@ -4,6 +4,21 @@ use std::io;
 use std::path::Path;
 
 pub(crate) fn open_local_file(path: &Path, writable: bool) -> io::Result<File> {
+    open_leaf(path, writable, false)
+}
+
+/// Open, creating it if needed, a lock file that is taken with a file lock. On
+/// Windows it is shared for reading and writing only: a lock file another
+/// process holds cannot then be deleted or renamed and made again under the
+/// same name, which would give that name a second holder. Opens that share
+/// everything, as earlier builds make, are compatible with it either way.
+pub(crate) fn open_lock_file(path: &Path) -> io::Result<File> {
+    open_leaf(path, true, true)
+}
+
+fn open_leaf(path: &Path, writable: bool, lock: bool) -> io::Result<File> {
+    #[cfg(not(windows))]
+    let _ = lock;
     let mut options = OpenOptions::new();
     options
         .read(true)
@@ -21,8 +36,13 @@ pub(crate) fn open_local_file(path: &Path, writable: bool) -> io::Result<File> {
     #[cfg(windows)]
     {
         use std::os::windows::fs::OpenOptionsExt;
-        use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ, FILE_SHARE_WRITE,
+        };
         options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+        if lock {
+            options.share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE);
+        }
     }
     let file = options.open(path)?;
     let metadata = file.metadata()?;

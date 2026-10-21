@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "uuid": "00000000-0000-4000-8000-000000000002",
+      "note": "hand-made sentinel: zero prefix with the version-4 and variant bits set, the company identifier of the Rust import-post tests' own synthetic company; already in many tracked test files"
+    }
+  ]
+}

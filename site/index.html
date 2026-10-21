@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>ComplyEaze Bridge: local TallyPrime MCP server for Claude</title>
-<meta name="description" content="ComplyEaze Bridge is a local MCP server that lets Claude read your TallyPrime books, and post only what you approve. For Indian CAs, in Claude Desktop." />
+<meta name="description" content="MCP server connecting Claude Desktop to TallyPrime: reads your books, proposes vouchers from SBI, HDFC or Union Bank of India statement PDFs for you to import; posts only what you approve." />
 <link rel="canonical" href="https://bridge.complyeaze.com/" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="ComplyEaze Bridge" />
 <meta property="og:locale" content="en_IN" />
 <meta property="og:title" content="ComplyEaze Bridge: local TallyPrime MCP server for Claude" />
-<meta property="og:description" content="ComplyEaze Bridge is a local MCP server that lets Claude read your TallyPrime books, and post only what you approve. For Indian CAs, in Claude Desktop." />
+<meta property="og:description" content="MCP server connecting Claude Desktop to TallyPrime: reads your books, proposes vouchers from SBI, HDFC or Union Bank of India statement PDFs for you to import; posts only what you approve." />
 <meta property="og:url" content="https://bridge.complyeaze.com/" />
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"ComplyEaze Bridge","description":"An MCP server, packaged as a Claude Desktop extension, that lets Claude read the TallyPrime books on your own computer. Posting is off by default in a new install, and each voucher is posted only after you approve it. Still being developed and not yet code-signed.","applicationCategory":"BusinessApplication","operatingSystem":"Windows x64, macOS on Apple silicon","url":"https://bridge.complyeaze.com/","license":"https://www.apache.org/licenses/LICENSE-2.0","publisher":{"@type":"Organization","name":"SPMS Comply Eaze Solutions LLP"},"sameAs":["https://github.com/ComplyEaze/bridge"]}</script>
 <link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
@@ -142,7 +142,7 @@ ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, r
               <span class="dbtn dbtn-default">Cancel</span>
             </div>
           </div>
-          <p class="dialog-cap">A replica of the approval window&rsquo;s text as release 0.4.2 words it, taken from the program&rsquo;s code, not from a screenshot of that release. Release 0.5.0 words the one-voucher window differently, and no replica of that wording has been made; the 0.5.0 section of the changelog says what changed. The frame is that of the Mac window in release 0.3.0. On Windows the same text sits under its own title with Yes, No and Cancel; that window was run once, on a candidate build of 0.4.0: one decline and one approved post.</p>
+          <p class="dialog-cap">A replica of the approval window&rsquo;s text as release 0.4.2 words it, taken from the program&rsquo;s code, not from a screenshot of that release. Release 0.5.0 words the one-voucher window differently, and no replica of that wording has been made; the 0.5.0 section of the changelog says what changed. The frame is that of the Mac window in release 0.3.0. On Windows the same text sits under its own title with Yes, No and Cancel; that window was run once, on a candidate build of 0.4.0: one decline and one approved post. On Windows the window also takes the keyboard: in one test of the published 0.6.0 a typed y approved it while Tally was in front (#1780), so when you ask for a post, stop typing in Tally until you have answered it with the mouse.</p>
         </div>
 
         <p class="demo-caption">Demo book: Demo Traders Pvt Ltd (synthetic), <span class="nw">FY 2025-26</span>.</p>
@@ -179,10 +179,10 @@ ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, r
 
         <article class="panel" data-chapter="4">
           <h2>Nothing posts until you approve it.</h2>
-          <p class="proof">One voucher per approval, one attempt, no automatic retry.</p>
+          <p class="proof">One approval for each post, of one voucher or a saved batch; one attempt, no automatic retry.</p>
           <p class="proof-sub cap-wide">Here one receipt is prepared as its own one-voucher file and posted. Posting is off by default in a new install. A voucher is posted this way or imported in a file, never both.</p>
-          <p class="proof-sub cap-wide">The published 0.5.1 package itself has not been run by us against a live TallyPrime; an earlier CI build of 0.5.1 was run against TallyPrime 7.1 Silver on one Windows&nbsp;10 computer on 9&nbsp;October&nbsp;2026 (the company list and one import file read back); a candidate build of 0.4.0 posted one approved Journal on Windows&nbsp;11 on 1&nbsp;October&nbsp;2026.</p>
-          <p class="proof-sub cap-phone">One receipt, prepared as its own file, is posted. Shown: a replica of the approval window&rsquo;s text as release 0.4.2 words it (release 0.5.0 words it differently), in the frame of release 0.3.0&rsquo;s window on a Mac. Windows asks Yes, No or Cancel; that window was run once, on a candidate build of 0.4.0. The published package itself has not been run by us against a live TallyPrime.</p>
+          <p class="proof-sub cap-wide">The published 0.6.0 package itself has not been run by us against a live TallyPrime; a candidate build of 0.6.0, made by our checks, posted a Journal, a Receipt, a Contra and a Payment and then a batch of three to TallyPrime 7.1 Silver on one Windows&nbsp;10 computer on 16&nbsp;October&nbsp;2026, and a package from the release workflow, from the same source, posted one more Journal there; each read back as posted; a candidate build of 0.4.0 posted one approved Journal on Windows&nbsp;11 on 1&nbsp;October&nbsp;2026.</p>
+          <p class="proof-sub cap-phone">One receipt, prepared as its own file, is posted. Shown: a replica of the approval window&rsquo;s text as release 0.4.2 words it (release 0.5.0 words it differently), in the frame of release 0.3.0&rsquo;s window on a Mac. Windows asks Yes, No or Cancel; that window was run for each of the six posts of 16&nbsp;October&nbsp;2026, on one computer, with builds of 0.6.0 made by our checks, and once on a candidate build of 0.4.0. That window also takes the keyboard: in one test of the published 0.6.0 a typed y approved it while Tally was in front (#1780), so when you ask for a post, stop typing in Tally until you have answered it with the mouse. The published package itself has not been run by us against a live TallyPrime.</p>
         </article>
 
         <article class="panel" data-chapter="5">
@@ -234,6 +234,17 @@ ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, r
         <a class="btn btn-primary" href="./download.html">Download for Claude&nbsp;Desktop</a>
       </div>
       <p class="fineprint"><span class="fp-line">Windows&nbsp;x64 and Apple&nbsp;Silicon Macs &middot; Claude&nbsp;Desktop extension</span><span class="fp-line">Not yet <span class="nw">code-signed</span>; your computer may warn you.</span></p>
+      <nav class="read-on" aria-label="Read more">
+        <h3>Read more</h3>
+        <ul>
+          <li><a href="./capabilities.html">What it can do</a>: every tool it installs, which of them are read-only, and the two that appear only with posting on.</li>
+          <li><a href="./blog-where-does-client-data-go.html">Where your client&rsquo;s data goes when Claude reads Tally</a>: what Claude reads goes to your AI provider, and nothing hides the amounts.</li>
+          <li><a href="./blog-ten-questions.html">Ten questions before you connect Claude to Tally</a>.</li>
+          <li><a href="./blog-bank-statement-ledger-names.html">Bank statement to Tally vouchers: check the ledger names first</a>.</li>
+          <li><a href="./blog-who-approves-a-post.html">Who approves a post to TallyPrime, and what is still weak</a>.</li>
+          <li><a href="./faq.html">Questions, answered plainly</a> and <a href="./blog.html">all posts</a>.</li>
+        </ul>
+      </nav>
       <p class="next-line"><span class="tag">In development, not in the download</span><span>Flagging findings by clause.</span></p>
     </div>
   </section>

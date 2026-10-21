@@ -9,7 +9,6 @@ use crate::cash::CashMovement;
 use crate::refusal::Refusal;
 use crate::text::{mapping_key, squash, strip};
 use std::collections::BTreeMap;
-use std::io::Read;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Treatment {
@@ -18,7 +17,8 @@ pub enum Treatment {
     /// Both legs are bank or cash ledgers: an own-account or ATM transfer.
     Contra,
     /// Emit no voucher: a transfer between two accounts that are BOTH being
-    /// imported, already carried by the other statement's Contra.
+    /// imported, already carried by the other statement's Contra. The mapping
+    /// row names the other account's ledger, so that Contra can be found.
     Skip,
 }
 
@@ -114,6 +114,17 @@ impl Mapping {
                     ),
                 ));
             }
+            // After the sentinel and cash checks, so those rows are named as
+            // such first.
+            if treatment == Treatment::Skip && ledger.is_empty() {
+                return Err(Refusal::new(
+                    "skip_without_ledger",
+                    format!(
+                        "{}: marked skip with no ledger. A skipped transfer must name the other bank account's ledger, so its Contra can be found; a transfer with no other side to find cannot be skipped.",
+                        row.origin
+                    ),
+                ));
+            }
             if let Some(existing) = mapping.get(&key) {
                 if existing != &(ledger.clone(), treatment) {
                     return Err(Refusal::new(
@@ -129,80 +140,5 @@ impl Mapping {
             mapping.insert(key, (ledger, treatment));
         }
         Ok(Self(mapping))
-    }
-
-    /// `party,ledger,treatment` CSV (`load_mapping`). Headers are matched
-    /// case-insensitively after trimming, and a header that appears twice under
-    /// that rule is refused: one would silently overwrite the other.
-    pub fn from_csv(reader: impl Read) -> Result<Self, Refusal> {
-        let mut csv = csv::ReaderBuilder::new()
-            .has_headers(false)
-            .flexible(true)
-            .from_reader(reader);
-        let mut records = csv.records();
-        let malformed = |error: csv::Error| {
-            Refusal::new(
-                "mapping_unreadable",
-                format!("the mapping is not readable UTF-8 CSV ({error})"),
-            )
-        };
-        let headers: Vec<String> = match records.next() {
-            Some(record) => record
-                .map_err(malformed)?
-                .iter()
-                .map(|name| strip(name).to_lowercase())
-                .collect(),
-            None => Vec::new(),
-        };
-        let mut repeated: Vec<&str> = headers
-            .iter()
-            .filter(|name| headers.iter().filter(|other| other == name).count() > 1)
-            .map(String::as_str)
-            .collect();
-        repeated.sort_unstable();
-        repeated.dedup();
-        if !repeated.is_empty() {
-            return Err(Refusal::new(
-                "mapping_headers_duplicated",
-                format!(
-                    "column(s) {} appear more than once once case and surrounding space are ignored",
-                    repeated.join(", ")
-                ),
-            ));
-        }
-        let missing: Vec<&str> = ["party", "ledger", "treatment"]
-            .into_iter()
-            .filter(|name| !headers.iter().any(|header| header == name))
-            .collect();
-        if !missing.is_empty() {
-            return Err(Refusal::new(
-                "mapping_headers_missing",
-                format!(
-                    "missing column(s) {}; the header row must be party,ledger,treatment",
-                    missing.join(", ")
-                ),
-            ));
-        }
-        let position = |name: &str| headers.iter().position(|header| header == name);
-        let (party, ledger, treatment) = (
-            position("party").unwrap_or_default(),
-            position("ledger").unwrap_or_default(),
-            position("treatment").unwrap_or_default(),
-        );
-        let mut rows = Vec::new();
-        for (index, record) in records.enumerate() {
-            let record = record.map_err(malformed)?;
-            // Python's DictReader skips a wholly empty line
-            if record.iter().all(str::is_empty) && record.len() <= 1 {
-                continue;
-            }
-            rows.push(MappingRow {
-                origin: format!("mapping record {}", index + 2),
-                party: record.get(party).unwrap_or_default().to_string(),
-                ledger: record.get(ledger).unwrap_or_default().to_string(),
-                treatment: record.get(treatment).map(str::to_string),
-            });
-        }
-        Self::from_rows(rows)
     }
 }

@@ -70,13 +70,16 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
     // `ReviewAcknowledged`, and nothing converts one into the other.
     for call_site in [
         "approve(count, preview).await?;\n        Ok(Self {",
-        "approve_review(count, preview).await?;\n        Ok(Self(()))",
+        "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
     ] {
         if source.matches(call_site).count() != 1 {
             problems.push(format!("expected exactly one call site `{call_site}`"));
         }
     }
-    for call in ["approve(count, preview)", "approve_review(count, preview)"] {
+    for call in [
+        "approve(count, preview)",
+        "approve_review(kind, count, preview)",
+    ] {
         if source.matches(call).count() != 1 {
             problems.push(format!("`{call}` must be called exactly once"));
         }
@@ -560,7 +563,7 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "confirm(count, preview).await?;",
         ),
         source.replace(
-            "approve_review(count, preview).await?;",
+            "approve_review(kind, count, preview).await?;",
             "confirm_review(count, preview).await?;",
         ),
         source.replace(
@@ -573,7 +576,7 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
         ),
         // A review answer must never build a post approval.
         source.replace(
-            "approve_review(count, preview).await?;\n        Ok(Self(()))",
+            "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
             "approve(count, preview).await?;\n        Ok(Self(()))",
         ),
         format!(
@@ -858,7 +861,7 @@ const REVIEW_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     rfd::MessageDialog::new()
         .set_title(review_title(count))
-        .set_description(format!("{}\n\n{preview}", review_answer_line(count)))
+        .set_description(preview)
         .set_level(rfd::MessageLevel::Warning)
         .set_buttons(rfd::MessageButtons::OkCancelCustom(
             "Cancel".into(),
@@ -874,10 +877,7 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
         MB_YESNOCANCEL,
     };
-    let text: Vec<u16> = format!("{}\n\n{preview}", review_answer_line(count))
-        .encode_utf16()
-        .chain(Some(0))
-        .collect();
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = review_question(count)
         .encode_utf16()
         .chain(Some(0))
@@ -893,8 +893,9 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
             // screen is otherwise drawn behind it, since a background
             // process may not take the foreground (#1589). With
             // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the first line of its text says
-            // what Y and N do (#1780). No stays the default button.
+            // typed for Tally answers it; the parent puts a first line on
+            // its text that says what Y and N do (#1780). No stays the
+            // default button.
             MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }
@@ -905,7 +906,7 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     let (title, button) = post_words(count);
     rfd::MessageDialog::new()
         .set_title(title)
-        .set_description(format!("{}\n\n{preview}", post_answer_line(count)))
+        .set_description(preview)
         .set_level(rfd::MessageLevel::Warning)
         // The Cancel label supplies the native Escape action. Posting requires
         // the explicitly matched positive button; Return may leave this dialog open.
@@ -925,10 +926,7 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     };
     // rfd without common-controls-v6 discards custom labels. Use the existing
     // Win32 dependency so No is the default and Escape/close remain Cancel.
-    let text: Vec<u16> = format!("{}\n\n{preview}", post_answer_line(count))
-        .encode_utf16()
-        .chain(Some(0))
-        .collect();
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
     // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
     // no parent HWND is borrowed. No application state is exposed to callbacks.
@@ -941,8 +939,9 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
             // screen is otherwise drawn behind it, since a background
             // process may not take the foreground (#1589). With
             // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the first line of its text says
-            // what Y and N do (#1780). No stays the default button.
+            // typed for Tally answers it; the parent puts a first line on
+            // its text that says what Y and N do (#1780). No stays the
+            // default button.
             MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }
@@ -992,43 +991,69 @@ fn post_question(count: VoucherCount) -> String {
     }
 }"#;
 
-/// The first line of each dialog (#1780): what its answers do, in its own
-/// buttons' words. On Windows Y and N answer a box that has the keyboard.
-const POST_ANSWER_LINE: &str = r#"#[cfg(not(windows))]
-fn post_answer_line(count: VoucherCount) -> String {
-    format!(
-        "Click \"{}\" to post {} into Tally. Click Cancel to cancel. Nothing is posted until \
-         you answer.",
-        post_words(count).1,
-        these_vouchers(count)
-    )
+/// What the parent writes above a dialog's text (#1780): the answer text, in
+/// the words of that platform's buttons, and the check that what the box will
+/// show is within its caps. The child shows what it is sent, so these decide
+/// what a person reads before the details.
+const ANSWER_EFFECT: &str = r#"fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
+    match shown {
+        Shown::Post => (
+            format!("post {} into Tally", these_vouchers(count)),
+            "Nothing is posted until you answer.",
+        ),
+        Shown::Review => (
+            format!("record that you reviewed {}", these_vouchers(count)),
+            "Nothing is recorded until you answer.",
+        ),
+        Shown::StopRelease => (
+            "release the invoice stop for this company, so that ComplyEaze Bridge builds and \
+             posts invoices for it again"
+                .into(),
+            "Nothing is released until you answer.",
+        ),
+    }
 }"#;
 
-const POST_ANSWER_LINE_WINDOWS: &str = r#"#[cfg(windows)]
-fn post_answer_line(count: VoucherCount) -> String {
-    format!(
-        "Press Y (or click Yes) to post {} into Tally. Press N (or click No) to cancel. \
-         Nothing is posted until you answer.",
-        these_vouchers(count)
-    )
+const ANSWER_TEXT: &str = r#"#[cfg(not(windows))]
+fn answer_text(shown: Shown, count: VoucherCount) -> String {
+    let (yes, nothing) = answer_effect(shown, count);
+    let button = match shown {
+        Shown::Post => post_words(count).1,
+        Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
+    };
+    format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}")
 }"#;
 
-const REVIEW_ANSWER_LINE: &str = r#"#[cfg(not(windows))]
-fn review_answer_line(count: VoucherCount) -> String {
-    format!(
-        "Click \"{REVIEW_BUTTON}\" to record that you reviewed {}. Click Cancel to cancel. \
-         Nothing is recorded until you answer.",
-        these_vouchers(count)
-    )
+const ANSWER_TEXT_WINDOWS: &str = r#"#[cfg(windows)]
+fn answer_text(shown: Shown, count: VoucherCount) -> String {
+    let (yes, nothing) = answer_effect(shown, count);
+    format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}")
 }"#;
 
-const REVIEW_ANSWER_LINE_WINDOWS: &str = r#"#[cfg(windows)]
-fn review_answer_line(count: VoucherCount) -> String {
-    format!(
-        "Press Y (or click Yes) to record that you reviewed {}. Press N (or click No) to \
-         cancel. Nothing is recorded until you answer.",
-        these_vouchers(count)
-    )
+const DISPLAYED_TEXT: &str = r#"fn displayed_text(shown: Shown, count: VoucherCount, preview: &str) -> String {
+    let answer = wrapped(&answer_text(shown, count));
+    match (shown, preview.split_once("\n\n")) {
+        (Shown::StopRelease, Some((statement, rest))) => {
+            format!("{statement}\n\n{answer}\n\n{rest}")
+        }
+        _ => format!("{answer}\n\n{preview}"),
+    }
+}"#;
+
+const FITS_THE_BOX: &str = r#"fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
+    if shown == Shown::StopRelease {
+        return true;
+    }
+    let (lines, chars) = match count.batch() {
+        None => (ONE_VOUCHER_LINES, ONE_VOUCHER_CHARS),
+        Some(_) => (BATCH_LINES, BATCH_CHARS),
+    };
+    let (extra_lines, extra_chars) = answer_reserve();
+    displayed.lines().count() <= lines + extra_lines
+        && displayed.chars().count() <= chars + extra_chars
+        && displayed
+            .lines()
+            .all(|line| line.chars().count() <= ANSWER_WIDTH)
 }"#;
 
 const CONFIRM_WITH: &str = r#"async fn confirm_with(
@@ -1089,7 +1114,7 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 19] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 20] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -1100,24 +1125,37 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 19] = [
     (POST_QUESTION, 1),
     (REVIEW_TITLE, 1),
     (REVIEW_QUESTION, 1),
-    (POST_ANSWER_LINE, 1),
-    (POST_ANSWER_LINE_WINDOWS, 1),
-    (REVIEW_ANSWER_LINE, 1),
-    (REVIEW_ANSWER_LINE_WINDOWS, 1),
+    (ANSWER_EFFECT, 1),
+    (ANSWER_TEXT, 1),
+    (ANSWER_TEXT_WINDOWS, 1),
+    (DISPLAYED_TEXT, 1),
+    (FITS_THE_BOX, 1),
     (POST_DIALOG_WINDOWS, 1),
     (REVIEW_ACK_DIALOG, 1),
     (REVIEW_ACK_DIALOG_WINDOWS, 1),
     (
         "async fn confirm(count: VoucherCount, preview: &str) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| \"import_approval_unavailable\")?;
-    confirm_with(&executable, count, preview).await
+    let shown = displayed_text(Shown::Post, count, preview);
+    if !fits_the_box(Shown::Post, count, &shown) {
+        return Err(\"import_review_too_large\".into());
+    }
+    confirm_with(&executable, count, &shown).await
 }",
         1,
     ),
     (
-        "async fn confirm_review(count: VoucherCount, preview: &str) -> Result<(), String> {
+        "async fn confirm_review(
+    kind: ReviewKind,
+    count: VoucherCount,
+    preview: &str,
+) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| \"ack_review_unavailable\")?;
-    confirm_review_with(&executable, count, preview).await
+    let shown = displayed_text(kind.shown(), count, preview);
+    if !fits_the_box(kind.shown(), count, &shown) {
+        return Err(\"ack_review_too_large\".into());
+    }
+    confirm_review_with(&executable, count, &shown).await
 }",
         1,
     ),
@@ -1132,13 +1170,14 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 19] = [
 const CFG_CENSUS: [(&str, usize); 6] = [
     // #725 added one of each seam arm for the dialog task's scope, and the
     // non-test arm's identity function.
-    ("#[cfg(test)]", 6),
+    // #1780 added one more, the test-only accessor for what a review shows.
+    ("#[cfg(test)]", 7),
     ("#[cfg(not(test))]", 4),
     // #702 ran the parent's seven unix-only test items on every platform.
     ("#[cfg(unix)]", 0),
-    ("#[cfg(windows)]", 8),
-    ("#[cfg(not(windows))]", 9),
-    ("cfg", 28),
+    ("#[cfg(windows)]", 7),
+    ("#[cfg(not(windows))]", 8),
+    ("cfg", 27),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -1197,16 +1236,29 @@ fn each_dialog_answers_only_on_its_positive_button() {
             "MB_YESNOCANCEL | MB_DEFBUTTON1",
             1,
         ),
-        source.replacen("\"Post voucher\"", "\"Cancel\"", 1),
-        source.replacen("\"I reviewed it\"", "\"Cancel\"", 1),
+        // The parent shows the preview without the answer text, or shows the
+        // release with the review's words (#1780).
         source.replacen(
-            "confirm_with(&executable, count, preview).await\n}",
-            "let _ = (executable, count, preview);\n    Ok(())\n}",
+            "displayed_text(Shown::Post, count, preview)",
+            "preview.to_string()",
             1,
         ),
         source.replacen(
-            "confirm_review_with(&executable, count, preview).await\n}",
-            "let _ = (executable, count, preview);\n    Ok(())\n}",
+            "let shown = displayed_text(kind.shown(), count, preview);",
+            "let shown = displayed_text(Shown::Review, count, preview);",
+            1,
+        ),
+        source.replacen("let (extra_lines, extra_chars) = answer_reserve();", "let (extra_lines, extra_chars) = (0, 0);", 1),
+        source.replacen("\"Post voucher\"", "\"Cancel\"", 1),
+        source.replacen("\"I reviewed it\"", "\"Cancel\"", 1),
+        source.replacen(
+            "confirm_with(&executable, count, &shown).await\n}",
+            "let _ = (executable, count, shown);\n    Ok(())\n}",
+            1,
+        ),
+        source.replacen(
+            "confirm_review_with(&executable, count, &shown).await\n}",
+            "let _ = (executable, count, shown);\n    Ok(())\n}",
             1,
         ),
         source.replacen(

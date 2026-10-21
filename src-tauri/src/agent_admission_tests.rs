@@ -1507,8 +1507,9 @@ fn the_transfer_texts_claim_only_what_the_code_does() {
     }
 }
 
-/// The post tool says what the Windows approval window's first line says, so
-/// the assistant tells the person the same thing when the window opens (#1780).
+/// The post tool says what the Windows approval window's first lines say for one
+/// voucher, so the assistant tells the person the same thing before the window
+/// opens (#1780).
 #[test]
 fn the_post_tool_says_what_the_approval_window_says() {
     let definitions = registered_tool_definitions(true, true);
@@ -1519,7 +1520,7 @@ fn the_post_tool_says_what_the_approval_window_says() {
         .expect("post_import is registered");
     assert!(
         description.contains(
-            "Press Y (or click Yes) to post these vouchers into Tally. Press N (or click No) to \
+            "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to \
              cancel. Nothing is posted until you answer."
         ),
         "{description}"

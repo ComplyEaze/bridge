@@ -1,6 +1,6 @@
 //! String folds, ported with Python's semantics rather than Rust's defaults.
 //!
-//! The Python reference (`scripts/bank_statement_import.py`) uses `str.strip`,
+//! The rules were first written against Python's `str.strip`,
 //! `str.isspace`, `str.upper` and `re.sub(r"\s+", ...)`. Rust's
 //! `char::is_whitespace` is the Unicode `White_Space` property, which omits
 //! the four information separators U+001C..U+001F that Python's `isspace`
@@ -46,9 +46,30 @@ pub fn remove_space(text: &str) -> String {
 /// as Python's `str.upper` does).
 ///
 /// Whitespace is folded because a PDF cell wrap splits one counterparty's name
-/// two ways in one statement (`MERCURYM ANUFACTURERS` / `MERCURYMANUFACTURERS`).
+/// two ways in one statement (`NORTHWINDT RADERS` / `NORTHWINDTRADERS`).
 /// Punctuation is kept: dropping it collapsed `A & B` with `AB` and posted two
-/// payees to one ledger. See the Python docstring for the measurement.
+/// payees to one ledger.
+///
+/// Dropping punctuation also collapsed `S.K. ACME` with `SK ACME`, `M/S ACME` with
+/// `MS ACME` and `ACME-RAM TRADERS` with `ACME RAM TRADERS`: different names, silently
+/// posted to one ledger. The mapping loader refuses two mapping rows that collide, but
+/// nothing refuses a statement party colliding with a row written for somebody else:
+/// there is exactly one candidate, so no ambiguity to reject, and the write goes to a
+/// ledger the person never chose for it. A sole candidate under a loose fold is not a
+/// resolution (protocol reference section 9.4b). Removing the punctuation fold cost
+/// nothing measurable: party fields in the measured statements are upper-case
+/// alphanumeric, so none carried punctuation the old key dropped, and the one real merge,
+/// the wrap case above, survives.
+///
+/// The fold is done on characters, not by a category filter, so a name written in
+/// Devanagari, Tamil or Bengali keeps every character instead of reducing toward the
+/// empty string, and combining marks stay with the letters they modify (a filter on
+/// alphanumerics would drop some of them).
+///
+/// There is no "empty key" refusal, deliberately: removing only whitespace makes an empty
+/// key unreachable, because [`squash`] has already dropped a name that is entirely
+/// whitespace and every other name keeps at least one character. An unreachable guard
+/// reads as protection and is not.
 pub fn mapping_key(text: &str) -> String {
     text.to_uppercase()
         .chars()
@@ -59,10 +80,35 @@ pub fn mapping_key(text: &str) -> String {
 /// `_ledger_key`: a fold deliberately **looser** than Tally's measured
 /// master-name identity (protocol reference §9.4b).
 ///
-/// Used only where looseness fails safe: refusing a voucher whose two legs
-/// collapse together, and flagging a row as landing in suspense. **Never use it
+/// Used only where looseness fails safe (the uses are listed under "Why a loose fold is
+/// safe here" below). It agrees with Tally's measured identity on ASCII case folding, one
+/// trailing space and a space supplied where the master stores a hyphen. **Never use it
 /// to bind a name to a master** — that is `validate_masters`' job, and a sole
 /// candidate under a loose fold is not a resolution.
+///
+/// It is looser than the measurement in several ways, and each is a transformation Tally
+/// has not been shown to make: a hyphen supplied for a stored space, an internal
+/// whitespace run collapsed, leading whitespace ignored, two or more trailing spaces
+/// ignored, a tab or no-break space read as a space, and non-ASCII case folding
+/// (`to_uppercase` applies full Unicode case mapping, so a German sharp s (U+00DF) and
+/// `SS` collide, and the length changes, which no rule in section 9.4b contemplates).
+/// Kept apart: `&`
+/// against `AND`, a deleted `&`, an en dash, an underscore and `/`.
+///
+/// The measurement is also directional (a space was supplied where the master carried a
+/// hyphen; the reverse was never sent) and a fold is symmetric by construction, so it
+/// cannot express that. When the question is "will Tally match these?", use the
+/// asymmetric predicate section 9.4b gives, not this.
+///
+/// Why a loose fold is safe here: nothing in this crate resolves a name against Tally's
+/// masters. The ledger name comes from the person's own mapping and is carried into the
+/// proposal as given (whitespace squashed), and Tally does its own matching at import.
+/// The fold feeds only internal comparisons, and being loose fails safe in each: refusing
+/// a voucher whose legs collapse together (looser refuses more), refusing a cash answer
+/// that names the suspense ledger (looser refuses more), flagging a row as unidentified
+/// for a person to look at (looser flags more), and matching the bank leg when the
+/// proposals are re-read, where both sides came from the same bank-ledger value so the
+/// fold changes nothing.
 pub fn ledger_key(name: &str) -> String {
     squash(&name.replace('-', " ")).to_uppercase()
 }

@@ -8,8 +8,8 @@
 //! The strongest claim here is row equality: PDFium's words, fed through the
 //! parser, produce exactly the rows that `pdftotext -bbox-layout` words of the
 //! same file produce. The `.pdftotext.xml` beside each PDF is poppler's output
-//! for it (see fixtures/PROVENANCE.md), and the pinned digests were computed by
-//! the Python reference over that same capture.
+//! for it (see fixtures/PROVENANCE.md), and the pinned digests were computed once by
+//! the removed Python tool over that same capture.
 
 mod common;
 

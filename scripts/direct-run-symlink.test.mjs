@@ -58,6 +58,7 @@ const PROBES = [
   { script: "check-registry-server-json.mjs", args: ["--bogus"], status: 1, pattern: /registry\/server\.json refused: usage: unknown argument --bogus/ },
   { script: "next-version.mjs", args: ["--bogus"], status: 1, pattern: /next-version: unknown flag --bogus/ },
   { script: "package-mcpb.mjs", status: 1, pattern: /usage: node scripts\/package-mcpb\.mjs/ },
+  { script: "review-tier.mjs", status: 2, pattern: /give --paths-file FILE or --pr N/ },
 ];
 
 function environment(extra = {}) {

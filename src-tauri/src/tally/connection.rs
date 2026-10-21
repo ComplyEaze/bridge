@@ -761,12 +761,21 @@ pub(crate) enum PairedReadValidationError {
     CurrencyToMasterExtent,
     #[error("Tally masters collection changed between paired reads")]
     MastersCollection,
+    /// The voucher-type numbering collection, the second read of a
+    /// `voucher_types` masters read: its own variant, so a refusal says which
+    /// of the two reads drifted.
+    #[error("Tally voucher-type numbering collection changed between paired reads")]
+    MastersNumberingCollection,
     #[error("Tally company book changed during masters read")]
     MastersExtent,
     #[error("Tally stock collection changed between paired reads")]
     StockSummaryCollection,
     #[error("Tally company book changed during stock summary read")]
     StockSummaryExtent,
+    #[error("Tally's own month-wise register changed between paired reads")]
+    MonthRegister,
+    #[error("Tally company book changed during the month-wise register read")]
+    MonthRegisterExtent,
 }
 
 impl PairedReadValidationError {
@@ -791,7 +800,10 @@ impl PairedReadValidationError {
             Self::CurrencyExtent => "currency_extent_changed",
             Self::CurrencyToMasterExtent => "currency_to_master_extent_changed",
             Self::MastersCollection => "masters_collection_changed",
+            Self::MastersNumberingCollection => "masters_numbering_collection_changed",
             Self::MastersExtent => "masters_extent_changed",
+            Self::MonthRegister => "month_register_changed",
+            Self::MonthRegisterExtent => "month_register_extent_changed",
             Self::StockSummaryCollection => "stock_summary_collection_changed",
             Self::StockSummaryExtent => "stock_summary_extent_changed",
         }

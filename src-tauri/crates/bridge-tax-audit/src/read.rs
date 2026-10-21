@@ -6,7 +6,8 @@
 //! (C3, for every part, consumed or not) and the part table is consistent (C4). [`Read::check`]
 //! then applies the rules that need the engagement: company pin and books-from (C5), period
 //! (C5), high-water bracket (C6), voucher windows (C7) and Education-mode dates (C10). The
-//! remaining rules (C5 identity, C8, C9) need parsed parts and live in `book.rs`.
+//! remaining rules (the stored name of C2, voucher-type resolution of C4, C5 identity, C8, C9 and
+//! C11) need parsed parts and live in `book.rs`.
 //!
 //! Company identity is (GUID, books_from), never the name: a Tally split company keeps its
 //! parent's GUID (one measured pair also differed only in books_from), so the GUID alone lets a

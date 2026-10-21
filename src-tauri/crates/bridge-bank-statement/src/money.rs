@@ -41,7 +41,9 @@ fn decimal(
 
 /// A transaction amount: unsigned, at most two decimal places. Blank is `None`;
 /// anything else that does not parse is a refusal, never a zero — a misread
-/// cell read as zero lets the balance replay "prove" a row it never read.
+/// cell read as zero lets the balance replay "prove" a row it never read. A third decimal
+/// place is refused here rather than rounded later, where the rounded leg would no longer
+/// be the one the replay reconciled.
 pub fn money(text: &str, field: &str, row: usize) -> Result<Option<ExactDecimal>, Refusal> {
     decimal(text, &AMOUNT, field, row, "malformed_amount")
 }
@@ -53,7 +55,8 @@ pub fn balance(text: &str, field: &str, row: usize) -> Result<Option<ExactDecima
 
 /// An operator-supplied control total read off the printed statement.
 /// Thousands separators are accepted (`1,00,000.00`); a total of withdrawals
-/// or deposits may not be negative.
+/// or deposits may not be negative. It is parsed through the same boundary as a statement
+/// cell, because it is compared against one.
 pub fn control_value(text: &str, name: &str, signed: bool) -> Result<ExactDecimal, Refusal> {
     let cleaned = text.replace(',', "");
     let cleaned = strip(&cleaned);
@@ -143,6 +146,15 @@ impl Controls {
 /// parse, so the replay must also land on the printed closing balance — and
 /// that is still not sufficient, which is why [`verify_against_statement`]
 /// exists.
+///
+/// The chain proves only that the rows that were read are internally consistent, not
+/// that they are all of them: a layout change, a missed page anchor or a false footer
+/// match truncates the parse after a perfectly self-consistent prefix, and an empty parse
+/// would satisfy the chain vacuously (it is refused before the chain is tried). The
+/// printed closing balance is the first piece of independent evidence, but it is the NET
+/// of the transactions, so a dropped suffix whose
+/// debits and credits cancel (an omitted 50 debit followed by an omitted 50 credit) still
+/// closes on it: two vouchers vanish and every check here passes.
 pub fn reconcile(
     rows: &[Row],
     opening: &ExactDecimal,

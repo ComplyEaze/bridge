@@ -518,6 +518,22 @@ test("the release footer states what the release check covers, the true limits, 
   assert.doesNotMatch(claims, /\b(?:code-)?signed\b|\bnotarized\b|\bnotarised\b/i, "the footer may not claim signing or notarization");
 });
 
+test("the release header tells a person how to install and check a download, and does not claim signing", async () => {
+  const header = (await readFile(new URL("../packaging/mcpb/INSTALL_AND_CHECK_RELEASE.md", import.meta.url), "utf8")).replace(/\s+/g, " ");
+  assert.match(header, /certutil -hashfile <file> SHA256/);
+  assert.match(header, /shasum -a 256 <file>/);
+  assert.match(header, /64-character code it prints must match the code at the start of the `\.sha256` file/);
+  assert.match(header, /docs\/agent\/INSTALL\.md/);
+  assert.equal(header.match(/type `cd Downloads` and then run/g)?.length, 2, "both commands follow a change to the Downloads folder");
+  // the header names every platform the publish workflow packages
+  const platforms = /for platform in ((?:[a-z0-9-]+ ?)+); do/.exec(await readFile(new URL("../.github/workflows/release-mcpb-preview.yml", import.meta.url), "utf8"));
+  assert.ok(platforms, "the workflow has no platform loop to compare");
+  for (const platform of platforms[1].trim().split(" ")) assert.ok(header.includes(`${platform}.mcpb`), `the header does not name ${platform}.mcpb`);
+  assert.match(header, /not yet code-signed or notarized, so your computer may warn you/);
+  const claims = header.replace(/not yet code-signed or notarized/g, "");
+  assert.doesNotMatch(claims, /\bpreviews?\b|\bfree\b|\b(?:code-)?signed\b|\bnotarized\b|for evaluation|production/i);
+});
+
 test("the install guide does not call a release a preview or say it is for evaluation", async () => {
   const guide = await readFile(new URL("../docs/agent/INSTALL.md", import.meta.url), "utf8");
   const prose = guide.replaceAll("mcp-preview", "");

@@ -817,8 +817,11 @@ disagree.
    labels through `.github/release.yml`. The publish workflow appends it; do
    not paste it by hand.
 
-   On the release page the written parts come first, then the standard
-   release-notes footer, then this generated list.
+   On the release page the install-and-check header
+   (`packaging/mcpb/INSTALL_AND_CHECK_RELEASE.md`) comes first, then the written
+   parts, then the standard release-notes footer, then this generated list.
+   If the notes cannot be composed at all, the release carries the footer and
+   the generated list without the header.
 
 **`CHANGELOG.md`**
 

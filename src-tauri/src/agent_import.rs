@@ -706,6 +706,23 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     } else {
         "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
     };
+    // A check that recorded a restore while its own post reads intact names
+    // it: the restore reaches other posts of the company, and the posts it
+    // covers keep their status until each is verified again (#1050).
+    let mut summary = summary.to_string();
+    if report["rollback_recorded"] == true && report["state"] != "book_rolled_back" {
+        let count = report["other_batches_covered"]["count"]
+            .as_u64()
+            .unwrap_or(0);
+        let posts = if count == 1 {
+            "the other post named in other_batches_covered".to_string()
+        } else {
+            format!("the {count} other posts named in other_batches_covered")
+        };
+        summary.push_str(&format!(
+            " This check also found the company's books restored from a backup after other posts of it, and recorded that: verify {posts} again, and check their vouchers in Tally."
+        ));
+    }
     report["summary"] = json!(summary);
     report
 }

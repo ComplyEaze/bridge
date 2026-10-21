@@ -4711,6 +4711,17 @@ async fn post_and_verify(
     readback: Vec<ScenarioPlan>,
     later: Vec<Vec<ScenarioPlan>>,
 ) -> (Value, Vec<Value>, Vec<Value>) {
+    post_and_verify_with_journal(marks_after, readback, later, |text| text).await
+}
+
+/// [`post_and_verify`], with `edit` applied to the journal's text before each
+/// later verification.
+async fn post_and_verify_with_journal(
+    marks_after: String,
+    readback: Vec<ScenarioPlan>,
+    later: Vec<Vec<ScenarioPlan>>,
+    edit: impl Fn(String) -> String,
+) -> (Value, Vec<Value>, Vec<Value>) {
     let mut plans = before_approval();
     plans.extend(after_approval(xml(created_one())));
     plans.push(xml(marks_after));
@@ -4738,7 +4749,7 @@ async fn post_and_verify(
         let text = String::from_utf8(journal(directory.path())).unwrap();
         fs::write(
             directory.path().join("agent-import-ledger.jsonl"),
-            text.replace(&origin, &later_origin),
+            edit(text.replace(&origin, &later_origin)),
         )
         .unwrap();
         origin = later_origin;
@@ -5119,6 +5130,81 @@ async fn a_rollback_once_seen_outlasts_the_mark_rising_again() {
         assert_eq!(result["counts"]["posted_verified"], 0, "{result}");
     }
     assert_eq!(verdicts.len(), 1, "the post's own binding, and no other");
+}
+
+/// #1050: a check of a post that reads intact can still see a restore that
+/// reaches another post of the company: here a second post, sent after this
+/// one, had proved the mark at 12, and this post's check reads 11. The record
+/// is written, the second post is named to verify again, and this post's own
+/// summary says so; this post stays verified.
+#[tokio::test]
+async fn an_intact_posts_check_records_a_restore_that_reaches_a_later_post() {
+    const LATER: &str = "bridge-00000000-0000-4000-8000-000000001051";
+    // A second post of the same company and address, recorded after this one:
+    // its own batch, dispatch intent (pre-POST mark 11) and Tally's answer,
+    // copied from this post's records with its own id, digest and REMOTEID.
+    let add_later_post = |text: String| {
+        if text.contains(LATER) {
+            return text;
+        }
+        let records: Vec<Value> = text
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        let batch = records
+            .iter()
+            .find(|record| record.get("record_type").is_none())
+            .unwrap();
+        let of = |kind: &str| {
+            records
+                .iter()
+                .find(|record| record["record_type"] == kind)
+                .unwrap()
+                .clone()
+        };
+        let sha = "f".repeat(64);
+        let mut later_batch = batch.clone();
+        later_batch["batch_id"] = json!(LATER);
+        later_batch["sha256"] = json!(sha);
+        let mut intent = of("dispatch_intent");
+        intent["batch_id"] = json!(LATER);
+        intent["batch_sha256"] = json!(sha);
+        intent["pre_post_voucher_mark"] = json!(11);
+        intent["native_remote_id"] = json!("00000000-0000-4000-8000-0000000010b1");
+        let mut response = of("dispatch_response");
+        response["batch_id"] = json!(LATER);
+        response["batch_sha256"] = json!(sha);
+        let mut out = text;
+        for record in [later_batch, intent, response] {
+            out.push_str(&serde_json::to_string(&record).unwrap());
+            out.push('\n');
+        }
+        out
+    };
+    let (_, verified, _) = post_and_verify_with_journal(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![span_readback(untagged_posted_journal(), 11)],
+        add_later_post,
+    )
+    .await;
+    let result = &verified[0]["structuredContent"]["result"];
+    let binding = &result["post_span_binding"];
+    assert_eq!(binding["state"], "bound", "{result}");
+    assert_eq!(binding["rollback_recorded"], true, "{result}");
+    assert_eq!(
+        binding["other_batches_covered"],
+        json!({"count": 1, "first": [LATER]}),
+        "{result}"
+    );
+    assert!(
+        binding["summary"]
+            .as_str()
+            .is_some_and(|summary| summary.contains("restored from a backup")
+                && summary.contains("the other post named in other_batches_covered")),
+        "{result}"
+    );
+    assert_eq!(result["verification_status"], "posted_verified", "{result}");
 }
 
 /// A copy that holds no voucher at all (one never used, put in place of the

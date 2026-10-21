@@ -177,7 +177,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "93d7b306369ff93beeb693c48d2cedad7f12fe61cb5474ac3243872468599b38"],
+  ], "a85d2389329ebdaf17998859b9e41c8491b9bdbda649466e79472cda4468a595"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -245,6 +245,11 @@ const shardRows = nativeJob.match(/^ {8}shard:.*$/gm) ?? [];
 if (shardRows.length !== 1 || shardRows[0] !== "        shard: [1, 2]") {
   failures.push("native must split its tests into exactly two shards: one matrix row `shard: [1, 2]`");
 }
+// An `exclude:` or `include:` entry under the matrix would drop or add a leg without touching the `shard:` row above
+// (for example `exclude: [{os: macos-latest, shard: 2}]` silently runs half the macOS tests), so neither is allowed.
+if (/^ {8}(?:include|exclude)\s*:/m.test(nativeJob)) {
+  failures.push("native: the matrix must not use include: or exclude: (a leg dropped or added there changes which tests run)");
+}
 const nativeTestStep = [
   "      - name: Test native workspace",
   "        id: native-tests",
@@ -276,6 +281,7 @@ const allowedShardLines = new Set([
   "    name: Native checks (${{ matrix.os }}, shard ${{ matrix.shard }} of 2)",
   "          save-if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && matrix.shard == 1 }}",
   "          --partition count:${{ matrix.shard }}/2",
+  "          save-cache: ${{ matrix.shard == 1 }}",
   "          name: native-test-timings-macos-shard-${{ matrix.shard }}",
   "          name: native-crash-stacks-macos-shard-${{ matrix.shard }}",
   "          name: native-crash-binaries-macos-shard-${{ matrix.shard }}",

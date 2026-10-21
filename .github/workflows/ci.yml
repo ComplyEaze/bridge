@@ -400,8 +400,10 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
         # The workspace tests are split in two halves by nextest's own partitioning (the test step below), each half on
-        # its own runner. Each shard compiles the whole workspace for itself, so the two jobs share nothing. Shard 1 also
-        # runs the PDFium tests, the doctests and the tools tests; shard 2 also runs clippy and the egress census.
+        # its own runner. Each shard compiles the whole workspace for itself and the two share one Rust cache key, which
+        # shard 1 alone saves (so a freshly saved cache holds no clippy-only dependency builds, and shard 2 may check those
+        # once from cold). Shard 1 also runs the PDFium tests, the doctests and the tools tests; shard 2 also runs clippy,
+        # the egress census and the tools lints. The matrix takes no include: or exclude: entries.
         # scripts/check-ci-workflow-consistency.mjs pins the list, the partition flag and each step's shard.
         shard: [1, 2]
     steps:
@@ -422,7 +424,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: ./.github/actions/setup-windows-native
         with:
-          save-cache: true
+          save-cache: ${{ matrix.shard == 1 }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         id: native-cache
         with:

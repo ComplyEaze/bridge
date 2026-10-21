@@ -274,6 +274,19 @@ for (const [name, change, message] of [
   });
 }
 
+for (const [name, change] of [
+  ["an exclude entry that drops half the macOS tests", (text) => text.replace(SHARD_ROW, `${SHARD_ROW}\n        exclude:\n          - os: macos-latest\n            shard: 2`)],
+  ["an include entry that adds a leg", (text) => text.replace(SHARD_ROW, `${SHARD_ROW}\n        include:\n          - os: macos-latest\n            shard: 3`)],
+]) {
+  test(`native shards: ${name} is refused`, () => {
+    refused(withChange(CI_FILE, change), "native: the matrix must not use include: or exclude:");
+  });
+}
+
+test("native shards: the Windows prerequisites cache saved by both shards (the shard condition dropped) is refused", () => {
+  refused(withChange(CI_FILE, (text) => text.replace("          save-cache: ${{ matrix.shard == 1 }}", "          save-cache: true")), "native: the pinned shard line must appear exactly once: save-cache: ${{ matrix.shard == 1 }}");
+});
+
 test("native shards: both shards uploading one artifact name (a name without the shard) is refused", () => {
   refused(withChange(CI_FILE, (text) => text.replace("          name: native-crash-binaries-macos-shard-${{ matrix.shard }}", "          name: native-crash-binaries-macos")), "native: the pinned shard line must appear exactly once: name: native-crash-binaries-macos-shard-${{ matrix.shard }}");
 });

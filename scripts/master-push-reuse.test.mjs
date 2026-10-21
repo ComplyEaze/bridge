@@ -27,7 +27,7 @@ const everyJob = [...FAMILIES.native, ...FAMILIES.bundle];
 const ranEverything = jobsOf([...ALWAYS, ...everyJob, "Tax-audit mutation records", "Required checks"].map((name) => job(name)));
 const skippedHeavyJobs = jobsOf([
   ...ALWAYS.map((name) => job(name)),
-  ...["Native checks (${{ matrix.os }})", "Bundle smoke (${{ matrix.os }})",
+  ...["Native checks (${{ matrix.os }}, shard ${{ matrix.shard }} of 2)", "Bundle smoke (${{ matrix.os }})",
     "Tax-audit mutation records", "Seam positive control (${{ matrix.os }})"].map((name) => job(name, "skipped")),
   job("Required checks"),
 ]);

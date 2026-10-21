@@ -1,0 +1,39 @@
+# Read answers for the 21 Oct 2026 request set (origin lab/tonight-read-requests-2026-10-21 at 1e65ddc7b83138ccce90ecd1207a8da9dac007fb;
+# its MANIFEST.sha256 (1b00afc5...) verified file by file: 27 of 27 equal in size and sha256). Windows lab, TallyPrime 7.1 Silver,
+# Education No on every company list. Read only: no setup step (S1-S6) was run. One company loaded alone for each group of reads;
+# one request at a time with curl.exe, no time limit; answers byte-exact (UTF-16), headers in *.headers.txt, one line per send in send-log.txt.
+# TEMPLATE files were filled with the company name (and, for R01, the GUID from the company list) and saved under new names.
+# Run grouped by company (PILOT LAB, TIEOUT B, TIEOUT C, SHAPE LAB) to load each book once.
+# SKIPPED: R09-negative-ledgers-lab-win-h1, R09-negative-ledgers-lab-win-apr, R13-party-masters-lab-win (not a BRIDGE book here);
+#   R13 for BRIDGE MAILING LAB (no such company on this PC). R01/R08 ran on the four books loaded tonight only, not every BRIDGE book.
+#
+# Findings:
+# R01 (inventory flags): PILOT LAB ISINTEGRATED Yes, ISINVENTORYON Yes, NUMSTOCKITEMS 0; TIEOUT B Yes/Yes, 3 items; TIEOUT C Yes/Yes, 1 item;
+#   SHAPE LAB Yes/Yes, batches Yes, 11 items, 2 godowns. None of the four is NOT integrated.
+# R02: SHAPE LAB ISCOSTCENTRESON No (ISINTEGRATED Yes).
+# R03a (SHAPE LAB, June 2025): 19 vouchers; one (Journal 3, 20250605) carries CATEGORYALLOCATIONS.LIST with one category "Business Line"
+#   and two COSTCENTREALLOCATIONS (Trading -600.00, Assembly -400.00, each with ACTUALQTY and BILLEDQTY elements); no cost-centre
+#   parent in the voucher, no foreign amount. Allocations exist although ISCOSTCENTRESON reads No. R03b (Jul-Aug 2025): 4 vouchers, none with allocations.
+# R04-R06 stock items: SHAPE LAB 11 items (slab rates on Soda Ash Light), TIEOUT C 1 item, TIEOUT B 3 items (slab rates on all three);
+#   no item with more than 2 dated HSN or GST entries, no state row other than Any.
+# R07 Negative Stock FY 2025-26: TIEOUT B and TIEOUT C each an empty envelope, exactly <ENVELOPE></ENVELOPE> (46 B).
+# R08 numbering: methods seen PILOT LAB Default 24 + None 4; SHAPE LAB Default 24 + Automatic 1 + Manual 1; TIEOUT B/C Default 24.
+#   No "Automatic (Manual Override)", no type with several series, no Multi-user Auto.
+# R09 Negative Ledgers FY: PILOT LAB, TIEOUT B, TIEOUT C empty envelopes (46 B); SHAPE LAB 11 rows (5,236 B, 0.118 s).
+# R10 (TIEOUT C, 1 Apr 2025 - 31 Mar 2027): answered, not refused. P&L and Balance Sheet byte-identical to the FY 2025-26 answers on
+#   lab/692-tieout-c-answers (closing stock -2640.00 unchanged); trial balance lists the year's movement.
+# R11 (TIEOUT C, 1 Jul - 30 Sep 2025): P&L Opening Stock -2640.00 and Less: Closing Stock -2640.00, Sales, Purchases and Cost of Sales empty;
+#   Balance Sheet byte-identical to the FY answer; trial balance carries the earlier movement in openings (Profit & Loss A/c 640.00).
+#   Tally's own screens for the window agree (P&L: Opening Stock 2,640.00, Closing Stock 2,640.00; BS: Current Assets 4,240.00, Difference in
+#   opening balances 1,000.00, Profit & Loss A/c 640.00 as opening balance); screenshots kept on the lab PC.
+# R12 Stock Summary as of 31 Mar 2026: TIEOUT B 6+10+5 Nos = 600.00+500.00+1000.00 = 2100.00 (equals its P&L closing stock);
+#   TIEOUT C 22 Nos = 2640.00 (equals its P&L closing stock); SHAPE LAB three stock groups 18750.00, 14500.00, -30249.99.
+# R13 (SHAPE LAB, 1 Apr - 31 Aug 2026): 45 ledgers, each with a LEDMAILINGDETAILS.LIST; none with two dated mailing entries;
+#   mailing-ledger elements 910 to 987 B (re-serialised).
+#
+# answer | bytes | sha256 | request (bytes, sha256) | company | window | release | HTTP, seconds
+
+#
+# Screenshots kept on the lab PC:
+# s-R11-BS-screen-asat-30Sep25.jpg | 45538 | cbea3dfee181c9d2c16d31491ed6fac48ba20c0dbde7b874be1c9d5164bb986c
+# s-R11-PL-screen-1Jul25-30Sep25.jpg | 45106 | 2e29ab2b1fecdd37fef00f10f6f308253556337ea3edb4cd3c5407d56de17771

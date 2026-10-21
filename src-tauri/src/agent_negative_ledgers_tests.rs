@@ -117,8 +117,7 @@ async fn call_observed(
         max_bytes: 200_000,
         redaction,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let response = server
         .call_tool(
@@ -319,8 +318,7 @@ async fn a_reversed_window_is_refused_before_any_request() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let response = server
         .call_tool(

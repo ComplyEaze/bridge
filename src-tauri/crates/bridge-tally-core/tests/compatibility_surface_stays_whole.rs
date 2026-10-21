@@ -146,9 +146,9 @@
 //! - `agent_outstandings.rs` -- the outstandings tool's receivable and payable
 //!   totals over open bills, and its ageing buckets (0-30, 31-60, 61-90, over 90
 //!   days, and unaged).
-//! - `agent_change_parse.rs` -- `checkpoint_advanceable`: true when a page was
-//!   not truncated and its highest returned alter id, or the requested
-//!   checkpoint when it returned none, reaches the company's high-water mark.
+//! - `agent_change_parse.rs` -- `observed_checkpoint`, and the company
+//!   high-water marks it re-exports, which the pre-import mark uses to tell an
+//!   empty book from a response it could not read.
 //!
 //! The fifth, `agent_changes.rs` (the changed-since tool), left the list when
 //! that tool was removed (#1769).

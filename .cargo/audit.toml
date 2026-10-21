@@ -107,8 +107,8 @@ ignore = [
   # other two). Confirmed not reachable on the shipped targets: for each of the
   # three crates, `cargo tree --locked -p bridge -i <crate> --target
   # aarch64-apple-darwin` and `--target x86_64-pc-windows-msvc` print nothing
-  # ("nothing to print"), checked against src-tauri/Cargo.lock on 2026-10-18;
-  # none of them appears in tools/Cargo.lock. This project ships only macOS and
+  # ("nothing to print"), checked against src-tauri/Cargo.lock (the only
+  # lockfile) on 2026-10-18. This project ships only macOS and
   # Windows builds (docs/release-process.md), which use the Apple and Windows
   # credential stores. There is no in-range fix: `cargo update --dry-run -p
   # zbus` and `-p keyring` lock nothing new, because the move to `zbus` 6 is

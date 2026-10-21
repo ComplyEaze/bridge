@@ -1,0 +1,23 @@
+# Issue #692 step 3: raw Export Data reports from the synthetic company BRIDGE TIEOUT C (TallyPrime 7.1 Silver),
+# loaded alone, read-only, on 21 Oct 2026. The company was made for this item: books from 1-Apr-2025, inventory on and
+# integrated with accounts, batches off, one unit Nos; stock item Lab Gadget under Primary, opening 10 Nos @ 100;
+# Purchase 5-May-2025 10 @ 120, Purchase 5-Jun-2025 10 @ 140, Sales 20-Jun-2025 8 @ 200 (ledgers Lab Purchases,
+# Lab Sales, Lab Supplier, Lab Customer). Costing method shown on the item screen: Avg. Cost.
+# Requests: UTF-16LE with byte-order mark, POSTed as text/xml; charset=utf-16 to the loopback XML port.
+# Answers are byte-exact as received (UTF-16LE, no byte-order mark), all HTTP 200. The same reports for
+# 1-Apr-2025 to 30-Jun-2025 came back with the same bytes (the last voucher is 20-Jun-2025) and are not committed.
+#
+# answer | bytes | sha256 | request (bytes, sha256) | report | from | to | same-bytes request for 20250401-20250630 (bytes, sha256)
+answers/ans-e1-pl-fy.xml | 1622 | f6ccb220551af3ccc25e9d579f8521b932b9da9737bdbeeca8ca9afc3161be66 | requests/e1-pl-fy.xml (760, 87d83a10f1dad80e6289fbcb7cac233f89019ab29d2d6b78237d946913df08bd) | Profit and Loss | 20250401 | 20260331 | requests/e2-pl-q1.xml (760, 74e22e4122bfc9c766ff9c086f8ae4e22c01139c65259f61c7e7c67a5bc40d90)
+answers/ans-e3-bs-fy.xml | 1834 | 3ca54b18005f6ae025fc9152c96608b43da5f10b99da01284e86b2b0d60aad51 | requests/e3-bs-fy.xml (756, e2674d786b1f81dde0d9d74f810c83d0ef245aec1fd67b070ee69e7642a39fd3) | Balance Sheet | 20250401 | 20260331 | requests/e4-bs-q1.xml (756, 1f3af61dccd355d5e5a2744a4de8edaf22ed2e1d8956c518c4b04847149ea666)
+answers/ans-e5-stock-fy.xml | 510 | 6ea369d19adb9d08bf3883d186744d6d705e625e21516d876df131f0881516a7 | requests/e5-stock-fy.xml (756, 5cb91de01d4f2497371be865d1e3cd6d8c290de2562854e014af9d3dae150ee7) | Stock Summary | 20250401 | 20260331 | requests/e6-stock-q1.xml (756, 5b96240bda50f47bfbd1a1e86b68b7117a8af866fb726d87d3c7bb99da2ad3c6)
+answers/ans-e7-tb-fy.xml | 1974 | 87a3b0c18acdd031db64908a8d646204ba56faa07cc04f5e24f47d6959ed3daa | requests/e7-tb-fy.xml (756, 1d99dc2c17f5c9c3aa863165c28078a411df5e338114d09e2ef73aeacfd77b23) | Trial Balance | 20250401 | 20260331 | requests/e8-tb-q1.xml (756, c41bdaead5c0e54fe801650ef070d5767822a23a50da0f053502b64e0b869adb)
+#
+# Findings:
+# Profit and Loss: /ENVELOPE/PLAMT[3]/PLSUBAMT = -1000.00 beside DSPACCNAME[3] "Opening Stock"; /ENVELOPE/PLAMT[5]/PLSUBAMT = -2640.00
+# beside DSPACCNAME[5] "Less: Closing Stock"; Purchase -2600.00, Sales 1600.00, Cost of Sales -960.00; no Gross Profit leaf.
+# Stock Summary: Lab Gadget DSPCLQTY 22 Nos, DSPCLRATE 120.00, DSPCLAMTA -2640.00 (weighted average of 30 units received, 3600 / 30).
+# Balance Sheet: Current Liabilities 2600.00, Profit & Loss A/c 640.00, Current Assets -4240.00; the export has no leaf for the
+# "Difference in opening balances 1,000.00" that Tally's own Balance Sheet screen shows (opening stock with no matching credit).
+# Trial Balance: Current Assets -2600.00 (debtor 1600 plus opening stock 1000, no closing stock), Current Liabilities 2600.00,
+# Sales Accounts 1600.00, Purchase Accounts -2600.00.

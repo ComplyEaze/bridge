@@ -26,6 +26,7 @@ UUID_OR_DIGEST_RE = re.compile(
     r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{12}|[0-9A-Fa-f]{32,}"
 )
+ASCII_ALNUM = frozenset("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 PLACEHOLDER_RE = re.compile(r"^(X+|Z+)\d+(X|Z)?$|^\d{2}(X+|Z+)\d+[0-9A-Z]*$", re.I)
 # Boundaries include ordinary words plus snake/kebab field names and the first
 # capital of camelCase.  A UUID cannot evade the credential rule by changing
@@ -375,13 +376,41 @@ def redact_public_agent_attribution_messages(messages):
     return [redact_public_agent_attribution_trailer(message) for message in messages]
 
 
+# One digit repeated, and nothing else: the narrow family a test uses for a made-up reference (#1743).
+REPEATED_DIGIT_RE = re.compile(r"(\d)\1+")
+
+
+def enclosing_token(text, start, end):
+    """The run of ASCII letters and digits that contains text[start:end]."""
+    left = start
+    while left > 0 and text[left - 1] in ASCII_ALNUM:
+        left -= 1
+    right = end
+    while right < len(text) and text[right] in ASCII_ALNUM:
+        right += 1
+    return text[left:right]
+
+
+def synthetic_token(token):
+    """Whether a whole token is visibly synthetic: a X/Z placeholder reference, or one digit repeated.
+
+    The token is judged whole, so a run beside a placeholder (``ZZZZ 123456789012``) or a repeated run inside
+    a longer token that is not itself repeated (``1111111111119876``) still counts.
+    """
+    upper = token.upper()
+    return bool(PLACEHOLDER_RE.fullmatch(upper) or REPEATED_DIGIT_RE.fullmatch(upper))
+
+
 def nonplaceholder_count(pattern, text):
     count = 0
     for match in pattern.finditer(text):
         value = match.group(0).upper()
         compact = value.replace(" ", "").replace("-", "")
-        if not PLACEHOLDER_RE.fullmatch(compact):
-            count += 1
+        if PLACEHOLDER_RE.fullmatch(compact):
+            continue
+        if synthetic_token(enclosing_token(text, match.start(), match.end())):
+            continue
+        count += 1
     return count
 
 

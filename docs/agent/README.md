@@ -3281,8 +3281,10 @@ vouchers in the window, not the party's. A named bill's window never starts befo
 The vouchers and the bills reports are two reads whose extents are not compared: a voucher posted
 between them usually shows as `trail_does_not_tie`, but two changes that compensate, or
 allocations that net to zero, can still read `tied`. Measured on one synthetic book only
-(reference 12a.14); an `as_of` earlier than the last voucher and post-dated vouchers were not
-measured.
+(reference 12a.14); a second synthetic book (captures of 9 October 2026) also showed an `as_of`
+earlier than the last voucher, a post-dated voucher and an advance later adjusted by an invoice
+reading as Tally's own screen does, bill for bill. Not measured: a client book, an opening bill with
+a credit sign, more than one opening bill.
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own
 Bills Receivable and Bills Payable reports scope them, not the type of party, and
@@ -3299,7 +3301,8 @@ of an `unallocated` amount is the sign of the party's net unallocated balance, s
 an on-account receipt and an on-account payment on one party net into one figure.
 For one party, `detail: unadjusted` separates advances, pending credit and debit notes and
 on-account amounts by their voucher's bill type (below). The book-wide `open_bills.kind` and
-`unallocated` figures do not; what is still to be measured is in #1356, the follow-up to #945.
+`unallocated` figures do not. What is still to be measured (a party term against an unfiltered
+control, a per-ledger report, the cost on a large book) is in #1356, the follow-up to #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted

@@ -1501,11 +1501,45 @@ on a read-back through ComplyEaze Bridge that is not captured as a fixture:
 | A referenced opening balance | it is a bill, with no voucher; an unreferenced opening is residual only |
 | An advance or a pending note with a reference | listed as a named bill in the report of the opposite direction, with no type label (12a.1) |
 
-**Not shown:** any client book; a multi-currency book; cost centres; an as-of date earlier than the last
-voucher; post-dated vouchers; whether a `PARTYLEDGERNAME`
+**Not shown:** any client book; a multi-currency book; cost centres; whether a `PARTYLEDGERNAME`
 term in the request would be lossless for the journal above (it was not tried, which is why the
 party detail reads the whole window and filters by each entry's own ledger); the cost of that
 whole-window read on a large book.
+
+**Captures of 9 October 2026 (capture 4 of #1356): VERIFIED on one synthetic party of one book.** TallyPrime Silver 7.1
+(licensed), Windows 10, the synthetic company `BRIDGE BILLTRAIL LAB` (books from 1 April 2025, bill-wise on, inventory off,
+the only company loaded), through the published 0.5.1 `outstandings` tool with `party` and `detail`. Every result was
+compared, bill for bill, with Tally's Ledger Outstandings (Pending Bills) screen for the same date; the screen was compared
+by screenshot, and the screenshots are kept, not committed. The ledgers and five vouchers were created through the lab
+import tool and read back; the Credit Note and the post-dated receipt were keyed by hand in Tally's screens. The answers
+are kept unchanged with these sizes and hashes:
+
+| As of | Detail | State | Bytes | SHA-256 |
+| --- | --- | --- | --- | --- |
+| 31-Jul-2025 | `bill_trail` | `bills_listed`, 4 vouchers read | 8,096 | `86e89c3bd7318035b7240dec759e12ccc32d22969f138f27fc0f5aa47bb6673e` |
+| 31-Jul-2025 | `unadjusted` | `residual_not_explained_by_vouchers` | 6,412 | `4bf23b2c00d5dbaa81232241362deaae2237c2d9efdc90cef179c38252f432b8` |
+| 31-Mar-2026 | `bill_trail` | `bills_listed`, 7 vouchers read | 9,608 | `da006110f4722b4923e7fad910457c8b7bbc0286d0c8c0bedef980045d762800` |
+| 31-Mar-2026 | `unadjusted` | `residual_not_explained_by_vouchers` | 7,494 | `9b4a3291acdc5d7dfdb258bf2919ef9a080944953d9bbe19e27477f7cb00d6d6` |
+| 28-Feb-2026 | `bill_trail` | `bills_listed`, 6 vouchers read | 9,196 | `fea009bb902258c552e686594c5b53354f481bac9d87a667315689e4bbc2d0b2` |
+| 28-Feb-2026 | `unadjusted` | `residual_not_explained_by_vouchers` | 7,494 | `8eb81d86757ec1e816fe7a0df10d5c544a7dfb045c513bfefa1042bc44230ca3` |
+| 31-Mar-2026, after a hand-keyed opening bill | `unadjusted` | `residual_not_explained_by_vouchers`, 7 vouchers read | 7,794 | `106e92ded3552b74e42fd712414d3894dc680a34a5b70ec39e18dd3815e17060` |
+
+| What was measured | Result |
+| --- | --- |
+| An `as_of` earlier than the last voucher | the window ends at the `as_of` (4 vouchers read of 7 at 31-Jul-2025, 6 at 28-Feb-2026); bills and balances equal the screen for that date. VERIFIED |
+| An advance later adjusted by an invoice | the bill trail lists both allocations as made and marks the bill closed; the unadjusted detail still lists the advance as an `advance` row at the amount allocated (4,000), with `native_balance` null and `native_rows` 0 in all four unadjusted reads at 31-Jul-2025, 28-Feb-2026, 31-Mar-2026 and 31-Mar-2026 after the opening bill; the screen does not list it. VERIFIED, as "no netting is built on a later adjustment". Whether a closed advance should be hidden is a choice not yet taken; it needs a second book showing a later invoice adjusting an advance |
+| A post-dated receipt dated before the `as_of` | listed as an `Agst Ref` allocation on its invoice at 31-Mar-2026 (3,000 left) and counted by the screen too. VERIFIED for this case |
+| The same post-dated receipt, with an `as_of` before its date (28-Feb-2026) | left out of the tool's window and of the screen (6 vouchers, the invoice stays at 5,000). VERIFIED. The screenshot for 28-Feb was taken after the opening bill below was added, so its On Account line (4,600) differs from the unadjusted residual read before it (-14,600) by exactly that bill's 10,000; the 28-Feb reads were not repeated after the change |
+| A note with a reference and a note without one | the first is a named bill of the opposite sign (`pending_note_with_reference`); the second is `on_account` and its 400 is in `on_account_sum`. VERIFIED |
+| The unadjusted `residual` | equals the screen's On Account line on both dates (-15,000 at 31-Jul-2025, -14,600 at 31-Mar-2026). VERIFIED |
+| An opening bill with a reference, keyed by hand (10,000 Dr; Tally rejected 1-Apr-2025 as its date and kept 31-Mar-2025) | the unadjusted detail does not list it as a row; its `difference` falls from -15,000 to -5,000 and `difference_equals_opening_balance` becomes false; the `residual` (-4,600) equals the screen's On Account line; `totals.receivable` (scope `open_bills_only`) rises from 15,000 to 25,000, which includes the opening bill. VERIFIED on this book |
+| `totals` with scope `open_bills_only` before the opening bill | receivable 25,000 at 31-Jul-2025 and 15,000 at 31-Mar-2026, the open debit bills only; the screen's totals (37,000 and 26,000 Dr) also include On Account and the credit bills. Recorded as observed |
+
+The lab import tool did not create the opening bills it was given (Tally showed no bill and the whole 15,000 as On Account);
+its read-back checked only the opening balance. That is a defect of the lab tool, not of the shipped reads (#1500; the lab
+tool now refuses a ledger's opening bills before any request, #1508). **Not measured:** `bill_trail` with an opening bill; an
+opening bill with a credit sign; more than one opening bill; narrowing by `reference`; the three captures of #1356 that are
+still open (a party term against an unfiltered control, a per-ledger or per-bill native report, the cost on a large book).
 
 **What the tie-out does not prove.** The voucher read and the bills reports are two reads whose
 extents are not compared, so a voucher posted between them usually breaks a bill's tie, but two
@@ -1514,9 +1548,9 @@ means the on-account sum equals the residual, not that the residual's compositio
 unadjusted tie-out is captured whole (the on-account debtor above); the other residuals in the
 tests are typed from the seeded vouchers, not captured ledger rows. A ledger the snapshot lists no residual for is reported as
 having no residual row, never as a residual of zero, and an empty voucher read is reported as
-such, never corroborated. No captured book shows a later invoice adjusting an advance, so the
+such, never corroborated. One captured party shows a later invoice adjusting an advance (above), and the
 unadjusted detail lists each advance and note at its amount as allocated and puts Tally's own open
-balance for its reference beside it, rather than netting allocations on an unverified rule.
+balance for its reference beside it, rather than netting allocations on a rule shown by one party only.
 
 ---
 
@@ -1664,4 +1698,5 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 | 2026-10-02 | §12a.13: `NUMSTOCKITEMS` against the item rows after create, create-on-existing, rename, alias, move to another group, an inventory purchase and two bulk imports of 20 items on one synthetic licensed 7.1 Silver company: equal at every point; this alias was not counted as an item and added a name entry to the row; a Create on an existing item changed no field of those read; a parent-only Alter changed, of the fields read, only the parent. For a ledger, §9.4g records (one run, PARTIAL) that a Create on an existing name with a changed parent, bill-wise flag and opening balance replaced all three, also answering `CREATED=0, ALTERED=1`: the two master types gave different results here, and neither result is generalised to the other. PARTIAL, one item each, once; not measured: screen-created items, delete with vouchers, merge, a reload. |
 | 2026-10-03 | §12a.3: a whole `outstandings` call (release build from master 7b994e65) on the book of the 1-Dec-2108 due date: state `complete`, 52 requests with none refused, 4.0 s, 1,498 open bills in a page of 500 and a 181,044-byte result. PARTIAL, one run, one book; not measured: the 2108 bill's row in a live response (not on the page: the page runs oldest-due first and the bill is not yet due), the later pages, other books or directions. |
 | 2026-10-06 | §12a.15: the ledger catalogue request with one more native method (`IsBillWiseOn`) returned exactly one `Yes` or `No` `ISBILLWISEON` on every ledger of five synthetic licensed 7.1 Silver books, equal, on the two books where it was compared, to the outstandings snapshot's flags, with the cash, bank and duty ledgers answering `No` and four CR LF ledger names answering a flag (three `No`, one `Yes`). VERIFIED for those books (the captures of four are committed; the GST RECON LAB answer is not); no large book |
+| 2026-10-09 | §12a.14: capture 4 of #1356 on one synthetic licensed 7.1 Silver party (`BRIDGE BILLTRAIL LAB`, the published 0.5.1 tool): an `as_of` earlier than the last voucher, a post-dated receipt before and after its date, an advance later adjusted by an invoice (listed as allocated in the unadjusted detail, closed in the bill trail), a note with and without a reference, and a hand-keyed opening bill, each compared with Tally's Pending Bills screen. VERIFIED for this party; what was not measured is listed in the section |
 | 2026-10-21 | §12a.21: the Profit and Loss of an integrated inventory book with `Less: Closing Stock` as a `PLSUBAMT` leaf, the Balance Sheet without a stock leaf, no Gross Profit leaf, on four committed captures of one synthetic licensed 7.1 Silver book; a second book with opening stock reported by the lab, not committed. |

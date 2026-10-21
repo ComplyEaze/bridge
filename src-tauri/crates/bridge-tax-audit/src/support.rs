@@ -424,7 +424,7 @@ pub(crate) fn py_repr_str(text: &str) -> String {
 }
 
 /// An amount in paise written as rupees for a figure definition, as the reference's
-/// `tae/rupees.py` writes it: Indian grouping (the last three digits, then pairs), no decimals for
+/// rupee formatter writes it: Indian grouping (the last three digits, then pairs), no decimals for
 /// whole rupees and exactly two otherwise, and a negative amount led by "−" (U+2212) before "₹".
 pub(crate) fn rupees(paise: i128) -> String {
     let sign = if paise < 0 { "−" } else { "" };
@@ -660,7 +660,7 @@ mod tests {
 
     #[test]
     fn rupees_groups_as_the_reference_does() {
-        // tae/rupees.py's own cases (selftest/test_rupees.py).
+        // The reference rupee formatter's own cases.
         let cases: [(i128, &str); 11] = [
             (0, "₹0"),
             (5, "₹0.05"),

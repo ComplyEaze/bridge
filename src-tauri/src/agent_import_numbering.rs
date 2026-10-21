@@ -11,23 +11,33 @@
 //! by hand, and again when one was sent by import without a number: no
 //! voucher's AlterID moved, the company's voucher mark rose by one only, and
 //! the import's answer read CREATED 1, ALTERED 0 (one book, one voucher type,
-//! `TallyPrime` 7.1 Silver: `VOUCHER_TYPE_NUMBERING_M8R_CAPTURE_PROVENANCE.md`
-//! in the protocol crate's fixtures says where each run is kept). Not
-//! measured: a batch of several vouchers, other voucher types, Gold, other
-//! releases, and the same through this crate's own post (the imports were sent
-//! raw, in the shape its builder sends).
+//! `TallyPrime` 7.1 Silver: protocol reference §9.8 records both runs, and
+//! `VOUCHER_TYPE_NUMBERING_M8R_CAPTURE_PROVENANCE.md` in the protocol crate's
+//! fixtures says where each is kept). A file of two such Receipts was numbered
+//! by date and changed the numbers of four, and a Journal imported without a
+//! number and dated between two others was numbered by its date and moved the
+//! later one (§9.8). Not measured on such a type: a file of more than two
+//! vouchers, a mixed file, a Journal that carries a number or is dated after
+//! every other, Payment and Contra, Gold, other releases, and the same through
+//! this crate's own post (the imports were sent raw, in the shape its builder
+//! sends).
 //!
 //! So a voucher without a number is admitted only into a voucher type whose
 //! one series reads Automatic with the sub-method `Auto Retain`, whatever its
 //! duplicate setting. A voucher that carries its own number (a build's
-//! Journal can) is admitted there too, since under Automatic numbering Tally
-//! discards a supplied number and assigns its own (protocol reference, voucher
-//! writes), which leaves it a voucher without one; and into a type that reads
-//! Manual, where Tally keeps the number and the type's duplicate setting then
-//! decides. That a numbered voucher changes existing numbers on a type set to
-//! "Renumber Vouchers" is not measured: it is refused there because under
-//! Automatic numbering Tally was seen to discard a supplied number (measured
-//! with `Auto Retain`), which would leave it a voucher without one. Every other
+//! Journal can) is admitted there too, since there Tally discards a supplied
+//! number and assigns its own (protocol reference §9.8),
+//! which leaves it a voucher without one; and into a type that reads Manual
+//! with duplicate numbers prevented, where Tally kept the number a Journal
+//! carried and refused whole a Journal carrying a number that a Journal
+//! already held, with no reason in its answer (§9.8). Under Manual with
+//! duplicates allowed a Payment carrying a held number was created as a second
+//! voucher with it (§9.8; not measured for a Journal), which nothing here or in
+//! `verify_import` would notice, so a numbered voucher is refused there. A numbered voucher is refused on a type set to "Renumber Vouchers":
+//! there Tally discarded the number a Receipt carried and gave it the number
+//! of its place in date order, and the later-dated Receipts' numbers went up
+//! by one (§9.8), as for a voucher sent without one.
+//! Every other
 //! reading, and a type the read does not hold, refuses: a type that does not
 //! read Automatic as `import_voucher_numbering_not_automatic`, and an
 //! Automatic one whose sub-method reads `Auto Renumber`, is missing or is not
@@ -71,7 +81,7 @@ macro_rules! written_into {
         concat!(
             "ComplyEaze Bridge writes a voucher into a voucher type ",
             admitted!(),
-            " A voucher that carries its own number is also written into one read as Manual; no voucher is written into any other."
+            " A voucher that carries its own number is also written into one read as Manual with duplicate numbers prevented; no voucher is written into any other."
         )
     };
 }
@@ -80,7 +90,7 @@ macro_rules! written_into {
 /// text for the three next steps, so a new measurement is written once.
 macro_rules! observed_and_seen {
     () => {
-        "observed says what was read, and under automatic its sub_method is auto_renumber, absent (Tally printed none) or unrecognised. Under Manual voucher numbering, a voucher sent without a number was seen to take a number already used, or to be refused. Under Automatic set to Renumber Vouchers, a voucher sent by import without a number and dated before existing vouchers was seen to change the numbers of vouchers already in the book, while the import's answer reported nothing altered; a voucher entered by hand with an earlier date did the same (one book, one voucher type, TallyPrime 7.1 Silver)."
+        "observed says what was read, and under automatic its sub_method is auto_renumber, absent (Tally printed none) or unrecognised. Under Manual voucher numbering, a voucher sent without a number was seen to take a number already used, or to be refused. Under Automatic set to Renumber Vouchers, a voucher sent by import without a number and dated before existing vouchers was seen to change the numbers of vouchers already in the book, while the import's answer reported nothing altered; a voucher entered by hand with an earlier date did the same (one book, TallyPrime 7.1 Silver: by import on a Receipt and a Journal, by hand on a Receipt)."
     };
 }
 
@@ -98,7 +108,7 @@ pub(in crate::agent) const POST_NEXT_STEP: &str = concat!(
     admitted!(),
     " The voucher types in error.refused_types did not read so; ",
     observed_and_seen!(),
-    " Ask the user to enter the vouchers of those voucher types in Tally's voucher entry screen (under Renumber Vouchers a hand entry was seen to change existing numbers too, so that is the user's to decide), and build the other vouchers again without them. Do not have this batch's written file imported through Tally's Import menu either. ",
+    " ComplyEaze Bridge does not yet number vouchers itself, so it cannot post them into those voucher types. Leave the vouchers of those voucher types out: build the other vouchers again without them and post that batch, or build them again once ComplyEaze Bridge supports their numbering. A voucher type that was not among those Tally returned, or whose numbering settings could not be read, is not cured by that: check its name and settings with a masters read of voucher_types. Do not have this batch's written file imported through Tally's Import menu. ",
     never_to_get_past!()
 );
 
@@ -109,7 +119,7 @@ pub(in crate::agent) const BUILD_NEXT_STEP: &str = concat!(
     written_into!(),
     " The voucher types in refused_types did not read so; ",
     observed_and_seen!(),
-    " Ask the user to enter the vouchers of those voucher types in Tally's voucher entry screen (under Renumber Vouchers a hand entry was seen to change existing numbers too, so that is the user's to decide), and build the other vouchers again without them (from a parse_bank_statement proposals file, parse the statement again with from and to that leave out the days holding them; never rename a statement row). ",
+    " ComplyEaze Bridge does not yet number vouchers itself, so it cannot write them for those voucher types. Leave the vouchers of those voucher types out and build the other vouchers again without them (from a parse_bank_statement proposals file, parse the statement again with from and to that leave out the days holding them; never rename a statement row), or build them again once ComplyEaze Bridge supports their numbering. A voucher type that was not among those Tally returned, or whose numbering settings could not be read, is not cured by that: check its name and settings with a masters read of voucher_types. ",
     never_to_get_past!()
 );
 
@@ -118,14 +128,14 @@ pub(in crate::agent) const BUILD_NEXT_STEP: &str = concat!(
 /// not measured, so the step does not say how Tally numbers them. The refusal
 /// comes before the amendment's own check of the book, so whether the earlier
 /// batch's vouchers are in the book is not known here: the step says so and
-/// sends the caller to `verify_import`, which decides between correcting a
-/// voucher and entering it.
+/// sends the caller to `verify_import`, which says which of them are in the
+/// book; neither is entered again by hand.
 pub(in crate::agent) const BUILD_AMENDMENT_NEXT_STEP: &str = concat!(
     "No file was written. This build amends an earlier batch (amends_batch_id), and whether that batch's vouchers are in the book was not checked before this refusal. The vouchers of this amendment that carry no number are written without one. ",
     written_into!(),
     " The voucher types in refused_types did not read so; ",
     observed_and_seen!(),
-    " Call verify_import for the batch this build amends. A voucher it finds in the book is corrected in Tally by the user and is never entered again: a second entry duplicates it. A voucher it does not find may still be in the book (its narration edited in Tally, for one): the user looks for it in Tally before deciding to enter it. ",
+    " Call verify_import for the batch this build amends. A voucher it finds in the book is never entered again: a second entry duplicates it. A voucher it does not find may still be in the book (its narration edited in Tally, for one), so it is not built as a new voucher either. ComplyEaze Bridge does not yet number vouchers itself: leave the vouchers of those voucher types out of this amendment, or build it again once ComplyEaze Bridge supports their numbering. A voucher type that was not among those Tally returned, or whose numbering settings could not be read, is not cured by that: check its name and settings with a masters read of voucher_types. ",
     never_to_get_past!()
 );
 
@@ -178,28 +188,13 @@ pub(in crate::agent) enum RefusalReason {
 /// One refused voucher type and what the read said of it. `observed` states
 /// the reading, never a cause; `reason` decides the refusal's code and is not
 /// returned, since `observed` already says it. `in_words` is the same reading
-/// for a person, to follow the voucher type's name, and `by_hand` is what the
-/// message tells that person of a hand entry into the type.
+/// for a person, to follow the voucher type's name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::agent) struct RefusedType {
     pub(in crate::agent) voucher_type: String,
     pub(in crate::agent) reason: RefusalReason,
     pub(in crate::agent) observed: Value,
     pub(in crate::agent) in_words: &'static str,
-    pub(in crate::agent) by_hand: HandEntry,
-}
-
-/// What is known of a hand entry into a refused voucher type, which the
-/// message offers: whether it changes numbers already in the book.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::agent) enum HandEntry {
-    /// The type is set to "Renumber Vouchers": a hand entry was seen to.
-    SeenToRenumber,
-    /// The type reads Automatic and its setting for existing numbers was not
-    /// read (missing, or not recognised): it may.
-    NotKnown,
-    /// The message has nothing to add.
-    NothingToAdd,
 }
 
 /// The voucher types that were not admitted, in batch order; never empty.
@@ -223,12 +218,10 @@ impl NumberingRefusal {
 
     /// The refusal for a person who is shown only a message (the desktop's
     /// Journal screen): each refused voucher type with what was read of it,
-    /// then what the person does. It is said of a post, which sends no
-    /// voucher number. Where a refused type is set to "Renumber
-    /// Vouchers" it also says what a hand entry was seen to do there, and
-    /// where a type's setting for existing numbers was not read it says a
-    /// hand entry may do the same, since a hand entry is what it offers. The
-    /// next steps above say the same to an assistant, at length.
+    /// then what the person can do inside ComplyEaze Bridge: it never sends
+    /// the person to Tally's voucher entry screen. It is said of a post,
+    /// which sends no voucher number. The next steps above say the same to an
+    /// assistant, at length.
     pub(in crate::agent) fn message(&self) -> String {
         let read = self
             .0
@@ -236,29 +229,14 @@ impl NumberingRefusal {
             .map(|row| format!("{} {}", row.voucher_type, row.in_words))
             .collect::<Vec<_>>()
             .join("; ");
-        let said_of = |by_hand: HandEntry, sentence: &'static str| {
-            if self.0.iter().any(|row| row.by_hand == by_hand) {
-                sentence
-            } else {
-                ""
-            }
-        };
-        let seen_by_hand = said_of(
-            HandEntry::SeenToRenumber,
-            " On a voucher type set to Renumber Vouchers, a voucher entered by hand with an \
-             earlier date was seen to change existing voucher numbers too.",
-        );
-        let not_known = said_of(
-            HandEntry::NotKnown,
-            " Where Tally's setting for existing numbers is not known, a hand entry may change \
-             existing voucher numbers.",
-        );
         format!(
             "Nothing was posted. ComplyEaze Bridge sends a voucher without a voucher number, so it \
              posts only into a voucher type numbered Automatic with Retain Original Voucher No. \
-             Read from Tally: {read}. If you decide to, enter these vouchers in Tally's voucher \
-             entry screen yourself.{seen_by_hand}{not_known} Do not change a voucher type's voucher \
-             numbering only to post them: that can change the numbers of vouchers already entered."
+             Read from Tally: {read}. ComplyEaze Bridge does not yet number vouchers itself, so \
+             these were not posted: leave them out of this batch and post the others, if any, or \
+             post them once ComplyEaze Bridge supports their numbering. Do not change a voucher type's \
+             voucher numbering only to post them: that can change the numbers of vouchers already \
+             entered."
         )
     }
 
@@ -273,8 +251,7 @@ impl NumberingRefusal {
     }
 }
 
-/// One reading in the three forms a refusal needs, with what a person is
-/// told about entering the voucher by hand.
+/// One reading in the three forms a refusal needs.
 struct Reading {
     /// Why the reading refuses the voucher, or `None` where it admits it.
     reason: Option<RefusalReason>,
@@ -282,16 +259,16 @@ struct Reading {
     observed: Value,
     /// The same for a person, to follow the voucher type's name.
     in_words: &'static str,
-    by_hand: HandEntry,
 }
 
 /// What one voucher type's reading means for a voucher that does or does not
 /// carry its own number: its verdict, what a result says of it and what a
 /// person is told. Every reading is named here once, so a reading added to
 /// the read's types does not compile until it is given all three, and none
-/// admits by default. The number decides under Manual only, where Tally keeps
-/// it: a voucher without one is refused there. The duplicate setting does not
-/// decide.
+/// admits by default. The number decides under Manual only: a voucher without
+/// one is refused there, and one with a number is admitted only where
+/// duplicate numbers are prevented. Under any other method the duplicate
+/// setting does not decide.
 /// A method or sub-method Tally printed outside the measured set is named
 /// only as unrecognised: its raw text is Tally's, and nothing is read from
 /// it. `sub_method` is given under `automatic` only, the one method it is
@@ -301,7 +278,6 @@ fn reading(numbering: Option<&VoucherTypeNumbering>, number: OwnNumber) -> Readi
         reason: Some(RefusalReason::NotAutomatic),
         observed,
         in_words,
-        by_hand: HandEntry::NothingToAdd,
     };
     match numbering {
         None => not_automatic(
@@ -309,6 +285,7 @@ fn reading(numbering: Option<&VoucherTypeNumbering>, number: OwnNumber) -> Readi
             "was not among the voucher types Tally returned",
         ),
         Some(VoucherTypeNumbering::Observed { method, duplicates }) => {
+            let prevented = matches!(duplicates, DuplicateSetting::Prevented);
             let duplicates = match duplicates {
                 DuplicateSetting::Prevented => "prevented",
                 DuplicateSetting::NotPrevented => "not_prevented",
@@ -317,30 +294,26 @@ fn reading(numbering: Option<&VoucherTypeNumbering>, number: OwnNumber) -> Readi
             match method {
                 SeriesNumberingMethod::Automatic(sub_method) => {
                     let not_retain = Some(RefusalReason::NotRetain);
-                    let (reason, sub_method, in_words, by_hand) = match sub_method {
+                    let (reason, sub_method, in_words) = match sub_method {
                         NumberingSubMethod::AutoRetain => (
                             None,
                             "auto_retain",
                             "is numbered Automatic with Retain Original Voucher No",
-                            HandEntry::NothingToAdd,
                         ),
                         NumberingSubMethod::AutoRenumber => (
                             not_retain,
                             "auto_renumber",
                             "is numbered Automatic with Renumber Vouchers",
-                            HandEntry::SeenToRenumber,
                         ),
                         NumberingSubMethod::Unrecognised(_) => (
                             not_retain,
                             "unrecognised",
                             "is numbered Automatic, with a setting for existing numbers that ComplyEaze Bridge does not recognise",
-                            HandEntry::NotKnown,
                         ),
                         NumberingSubMethod::Absent => (
                             not_retain,
                             "absent",
                             "is numbered Automatic, and Tally did not say what it does with existing numbers",
-                            HandEntry::NotKnown,
                         ),
                     };
                     let mut said = observed("automatic");
@@ -349,17 +322,21 @@ fn reading(numbering: Option<&VoucherTypeNumbering>, number: OwnNumber) -> Readi
                         reason,
                         observed: said,
                         in_words,
-                        by_hand,
                     }
                 }
-                SeriesNumberingMethod::Manual => match number {
-                    OwnNumber::Carried => Reading {
+                SeriesNumberingMethod::Manual => match (number, prevented) {
+                    (OwnNumber::Carried, true) => Reading {
                         reason: None,
                         observed: observed("manual"),
                         in_words: "is numbered Manual",
-                        by_hand: HandEntry::NothingToAdd,
                     },
-                    OwnNumber::Absent => not_automatic(observed("manual"), "is numbered Manual"),
+                    (OwnNumber::Carried, false) => not_automatic(
+                        observed("manual"),
+                        "is numbered Manual and does not prevent duplicate voucher numbers",
+                    ),
+                    (OwnNumber::Absent, _) => {
+                        not_automatic(observed("manual"), "is numbered Manual")
+                    }
                 },
                 SeriesNumberingMethod::AutomaticManualOverride => not_automatic(
                     observed("automatic_manual_override"),
@@ -385,7 +362,8 @@ fn reading(numbering: Option<&VoucherTypeNumbering>, number: OwnNumber) -> Readi
 /// Admits `vouchers`, each voucher's voucher type and whether it carries its
 /// own number, in batch order, against `read`: each type must be held by the
 /// read (by ASCII case fold, as the read keys its names) and read Automatic
-/// with `Auto Retain`, or Manual for a voucher that carries a number. Every
+/// with `Auto Retain`, or Manual with duplicate numbers prevented for a voucher
+/// that carries a number. Every
 /// refused type is named once, in the order it first appears.
 pub(in crate::agent) fn admit_numbering<'a>(
     read: VoucherNumberingRead,
@@ -418,7 +396,6 @@ pub(in crate::agent) fn admit_numbering<'a>(
                 reason,
                 observed: reading.observed,
                 in_words: reading.in_words,
-                by_hand: reading.by_hand,
             });
         }
     }
@@ -500,9 +477,9 @@ impl Server {
     }
 
     /// Before the approval: the company's master mark first, then the voucher
-    /// numbering under it, for every voucher of a native post. A post sends
-    /// no voucher number (one that carries a number is refused under the
-    /// post's own code), so every voucher is admitted as one without.
+    /// numbering under it, for every voucher of a native post, each under the
+    /// type it is filed in: without a number, except an invoice, which is
+    /// posted with its own (`ImportVoucher::numbering_at_post`).
     pub(super) async fn admit_numbering_for_post(
         &self,
         company: &bridge_tally_protocol::TallyCompany,
@@ -524,7 +501,7 @@ impl Server {
             payload
                 .vouchers
                 .iter()
-                .map(|voucher| (voucher.voucher_type.as_str(), OwnNumber::Absent)),
+                .map(|voucher| voucher.numbering_at_post()),
             accumulated,
         )
         .await

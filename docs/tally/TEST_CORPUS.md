@@ -183,27 +183,19 @@ each month occupies a **contiguous, non-overlapping band of ~18 IDs** (`202404` 
 >
 > Criterion: **worst month's `AlterID` span ≤ 40% of the book's ID range.** Aarav fails this by
 > orders of magnitude — one *day* spans the whole range.
+>
+> The criterion's limits: it is **inconclusive** with fewer than three month bands (two dense,
+> correctly ordered bands each take at least half the ID range, which the 40% test cannot tell from
+> scattering), and a month holding a single voucher ID has a span of one and cannot test locality.
+> Check locality while a corpus is being generated, not only at the end: it cannot be repaired
+> afterwards, and finding it at 50 vouchers is far cheaper than at 500. No script in this
+> repository applies it now.
 
 The corpus is currently **unqualified**. Do not treat a single voucher response,
 a hand-maintained fixture label, or gateway reachability as acceptance evidence.
 Qualification requires independently captured paired responses for every narrow
 date partition, paired ledger-opening coverage, and an extent-bound full-book
-scan. Until those captures are available, [`scripts/verify-tally-test-corpus.py`](../../scripts/verify-tally-test-corpus.py)
-fails closed and cannot emit an acceptance token.
-
-**Check locality during generation, not only at the end** — it is a non-accepting diagnostic
-because it cannot be repaired afterwards, and catching it at 50 vouchers is far cheaper than at
-500. Run it only against an already captured response; it does not contact Tally or qualify the
-corpus. It repairs observed XML-1.0-illegal numeric references before strict parsing, but requires
-the production success envelope (`HEADER/STATUS = 1`) and canonical eight-ASCII-digit voucher dates.
-It is **inconclusive** until at least three
-month bands are present: two dense, correctly ordered bands each occupy at least half the ID range,
-which cannot be distinguished from scattering by the 40% criterion. Each observed month must also
-contain at least two voucher IDs; singleton bands have a trivial span of one and cannot test locality:
-
-```bash
-python3 scripts/verify-tally-test-corpus.py --locality-xml /safe/local/vouchers.xml
-```
+scan. Until those captures are available, nothing in this repository accepts the corpus.
 
 > Capture remains an **operator-only live Tally activity**. It must never be imported or invoked
 > from an automated test — no test in this repository contacts a live Tally, a government portal,
@@ -518,3 +510,4 @@ outranks an exact name.
 | 2026-07-30 | Created. Records the missing-bill-reference defect and the verified fix. |
 | 2026-09-10 | Added §8: the derived voucher-import candidate fixture, its transcribed structure, its synthetic values, the leak and shape checks, and the explicit limit that it is format evidence and not proof of an accepted import. |
 | 2026-07-31 | `Bridge Billwise Lab` created and historically reconciled: GUID, extents, reconciliation target, and locality measurement. It is now explicitly unqualified pending paired partitions, opening coverage, and extent-bound proof. Added §0 (which corpus for what) and §7 (three traps found while validating). Recorded that the first acceptance script used the wrong criterion and would have condemned a good corpus. |
+| 2026-10-15 | Removed the paragraph that described the locality verifier script and its command, after the script was deleted; the criterion and its limits stay above. |

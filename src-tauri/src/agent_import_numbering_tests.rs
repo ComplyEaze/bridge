@@ -452,25 +452,64 @@ fn the_captured_book_refuses_payment_and_receipt_and_admits_journal_and_contra()
     );
 }
 
+/// The committed live capture again, for a voucher that carries its own
+/// number: Payment (Manual, duplicates prevented) admits it, and Receipt
+/// (Manual, duplicates allowed) refuses it, saying so.
+#[test]
+fn the_captured_book_admits_a_numbered_voucher_only_where_duplicates_are_prevented() {
+    let rows = captured_types(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_series_live.utf16le.xml"
+    ));
+    let read = || VoucherNumberingRead::for_test(GUID, 7, rows.clone());
+    assert!(admit_vouchers(read(), [("Payment", OwnNumber::Carried)]).is_ok());
+    let refusal = admit_vouchers(read(), [("Receipt", OwnNumber::Carried)]).unwrap_err();
+    assert_eq!(refusal.code(), NUMBERING_NOT_AUTOMATIC);
+    assert_eq!(
+        refusal.refused_types(),
+        json!([{"voucher_type": "Receipt", "observed": {"observation":"observed","method":"manual","duplicates":"not_prevented"}}])
+    );
+    assert!(refusal
+        .message()
+        .contains("Receipt is numbered Manual and does not prevent duplicate voucher numbers"));
+}
+
 /// A voucher that carries its own number: admitted into a type read as Manual
-/// (Tally keeps the number) or as Automatic with `Auto Retain` (Tally discards
-/// it and assigns the next), under either duplicate setting, and refused for
+/// with duplicates prevented (Tally keeps the number), or as Automatic with
+/// `Auto Retain` (Tally discards it and assigns the next) under either
+/// duplicate setting; refused into Manual with duplicates allowed, and for
 /// every other reading exactly as a voucher without one is, row for row.
 #[test]
 fn a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only() {
     let automatic = |sub_method| SeriesNumberingMethod::Automatic(sub_method);
+    let read = read_with_journal(observed(
+        SeriesNumberingMethod::Manual,
+        DuplicateSetting::Prevented,
+    ));
+    assert!(admit_vouchers(read, [("Journal", OwnNumber::Carried)]).is_ok());
+    let retain = automatic(NumberingSubMethod::AutoRetain);
     for duplicates in [DuplicateSetting::Prevented, DuplicateSetting::NotPrevented] {
-        for method in [
-            SeriesNumberingMethod::Manual,
-            automatic(NumberingSubMethod::AutoRetain),
-        ] {
-            let read = read_with_journal(observed(method.clone(), duplicates));
-            assert!(
-                admit_vouchers(read, [("Journal", OwnNumber::Carried)]).is_ok(),
-                "{method:?} {duplicates:?}"
-            );
-        }
+        let read = read_with_journal(observed(retain.clone(), duplicates));
+        assert!(
+            admit_vouchers(read, [("Journal", OwnNumber::Carried)]).is_ok(),
+            "{duplicates:?}"
+        );
     }
+    // Manual with duplicates allowed refuses a numbered voucher, and says
+    // why in its own words; a numberless one is refused there as before.
+    let allowing = || {
+        read_with_journal(observed(
+            SeriesNumberingMethod::Manual,
+            DuplicateSetting::NotPrevented,
+        ))
+    };
+    let numbered = admit_vouchers(allowing(), [("Journal", OwnNumber::Carried)]).unwrap_err();
+    assert_eq!(numbered.0[0].reason, RefusalReason::NotAutomatic);
+    assert_eq!(
+        numbered.0[0].in_words,
+        "is numbered Manual and does not prevent duplicate voucher numbers"
+    );
+    let numberless = admit_numbering(allowing(), ["Journal"]).unwrap_err();
+    assert_eq!(numberless.0[0].in_words, "is numbered Manual");
     let refusing = [
         (
             Some(observed(
@@ -606,8 +645,8 @@ fn a_type_holding_numbered_and_numberless_vouchers_is_named_once() {
 /// What a person is shown where only the message is shown: each refused
 /// voucher type by name with what was read of it, every reading in its own
 /// words, and never Tally's own text for a reading that was not recognised;
-/// then what the person does. Where a refused type is set to renumber it also
-/// says what a hand entry was seen to do there, and not otherwise.
+/// then what the person can do inside ComplyEaze Bridge, never a hand entry
+/// in Tally.
 #[test]
 fn the_message_names_each_refused_voucher_type_and_what_was_read_of_it() {
     let automatic = |sub_method| {
@@ -688,10 +727,9 @@ fn the_message_names_each_refused_voucher_type_and_what_was_read_of_it() {
     assert!(!message.contains("<z>"), "{message}");
 
     const DOES_NEXT: [&str; 2] = [
-        "enter these vouchers in Tally's voucher entry screen yourself",
+        "leave them out of this batch and post the others",
         "Do not change a voucher type's voucher numbering only to post them",
     ];
-    const SEEN_BY_HAND: &str = "a voucher entered by hand with an earlier date was seen to change";
     let manual_only = admit_numbering(
         read_with_journal(observed(
             SeriesNumberingMethod::Manual,
@@ -705,32 +743,18 @@ fn the_message_names_each_refused_voucher_type_and_what_was_read_of_it() {
         assert!(message.contains(closing), "{closing}: {message}");
         assert!(manual_only.contains(closing), "{closing}: {manual_only}");
     }
-    assert!(message.contains(SEEN_BY_HAND), "{message}");
-    assert!(!manual_only.contains(SEEN_BY_HAND), "{manual_only}");
-
-    // Where the type's setting for existing numbers was not read, missing or
-    // not recognised, the message says a hand entry may change them; it says
-    // so of no other reading, and what was seen under renumber stays its own
-    // sentence.
-    const NOT_KNOWN: &str = "a hand entry may change existing voucher numbers";
-    assert!(message.contains(NOT_KNOWN), "{message}");
-    assert!(!manual_only.contains(NOT_KNOWN), "{manual_only}");
-    let only = |sub_method| {
-        admit_numbering(read_with_journal(automatic(sub_method)), ["Journal"])
-            .unwrap_err()
-            .message()
-    };
-    for not_read in [
-        NumberingSubMethod::Absent,
-        NumberingSubMethod::Unrecognised("x".to_string()),
-    ] {
-        let said = only(not_read.clone());
-        assert!(said.contains(NOT_KNOWN), "{not_read:?}: {said}");
-        assert!(!said.contains(SEEN_BY_HAND), "{not_read:?}: {said}");
+    // No refusal sends the person to Tally's own entry screen.
+    for said in [&message, &manual_only] {
+        for hand_entry in [
+            "entry screen",
+            "by hand",
+            "enter it",
+            "enter these",
+            "to enter",
+        ] {
+            assert!(!said.contains(hand_entry), "{hand_entry}: {said}");
+        }
     }
-    let renumber = only(NumberingSubMethod::AutoRenumber);
-    assert!(renumber.contains(SEEN_BY_HAND), "{renumber}");
-    assert!(!renumber.contains(NOT_KNOWN), "{renumber}");
 }
 
 /// The three next steps share what they say was read and seen, and differ in
@@ -742,7 +766,7 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
             "Auto Retain",
             "sent by import without a number",
             "the import's answer reported nothing altered",
-            "one book, one voucher type, TallyPrime 7.1 Silver",
+            "one book, TallyPrime 7.1 Silver: by import on a Receipt and a Journal, by hand on a Receipt",
             "do not add a voucher number to it",
             "do not change a voucher type's voucher numbering to get past this",
         ] {
@@ -755,8 +779,29 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
         post,
         crate::agent::refusal_remediation(NUMBERING_NOT_AUTOMATIC)
     );
-    for asks_for_a_hand_entry in [POST_NEXT_STEP, BUILD_NEXT_STEP] {
-        assert!(asks_for_a_hand_entry.contains("Ask the user to enter the vouchers"));
+    for step in [POST_NEXT_STEP, BUILD_NEXT_STEP, BUILD_AMENDMENT_NEXT_STEP] {
+        assert!(
+            step.contains("leave the vouchers of those voucher types out")
+                || step.contains("Leave the vouchers of those voucher types out"),
+            "{step}"
+        );
+        assert!(
+            step.contains("does not yet number vouchers itself"),
+            "{step}"
+        );
+        assert!(step.contains("a masters read of voucher_types"), "{step}");
+        // A step may record what a hand entry was seen to do (a measurement);
+        // none asks for one.
+        for hand_entry in [
+            "entry screen",
+            "enter it",
+            "enter these",
+            "to enter",
+            "Ask the user to enter",
+            "corrected in Tally",
+        ] {
+            assert!(!step.contains(hand_entry), "{hand_entry}: {step}");
+        }
     }
     // An amendment is refused before its book check: its step claims nothing
     // of the book and sends the caller to verify_import.
@@ -766,9 +811,9 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
         assert!(!build.contains("without a voucher number"), "{build}");
         assert!(build.contains("is also written into one read as Manual"));
     }
-    // A written file of a refused post is not to be imported by hand either;
-    // only the post's step can speak of one.
-    const NOT_BY_THE_MENU: &str = "imported through Tally's Import menu either";
+    // A written file of a refused post is not to be imported through the
+    // menu; only the post's step can speak of one.
+    const NOT_BY_THE_MENU: &str = "imported through Tally's Import menu";
     assert!(POST_NEXT_STEP.contains(NOT_BY_THE_MENU));
     assert!(!BUILD_NEXT_STEP.contains(NOT_BY_THE_MENU));
     // An amendment alters vouchers in place: its step says they are written
@@ -776,7 +821,6 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
     // numbers them. The build of new vouchers says what was measured.
     assert!(!BUILD_AMENDMENT_NEXT_STEP.contains("Tally numbers"));
     assert!(BUILD_NEXT_STEP.contains("Tally numbers a voucher that carries no number"));
-    assert!(!BUILD_AMENDMENT_NEXT_STEP.contains("Ask the user to enter"));
     for stated in [
         "was not checked before this refusal",
         "Call verify_import",
@@ -802,7 +846,7 @@ fn the_build_and_post_descriptions_name_both_refusals_and_what_was_not_measured(
         for stated in [
             NUMBERING_NOT_AUTOMATIC,
             NUMBERING_NOT_RETAIN,
-            "one book, one voucher type, TallyPrime 7.1 Silver",
+            "one book, TallyPrime 7.1 Silver: by import on a Receipt and a Journal, by hand on a Receipt",
             "sent by import without a number",
             "the import's answer reported nothing altered",
             "the same through ComplyEaze Bridge's own post are not measured",
@@ -877,4 +921,99 @@ fn an_admission_of_another_company_cannot_be_compared() {
         admission.admit_at_binding(&rows, "another-guid", "Other Lab"),
         Err(ApprovedImportAdmissionError::MastersUnconfirmed)
     );
+}
+
+/// One synthetic invoice filed under the voucher type `filed`, with its own
+/// number, and one Journal that carries a number, as a caller sends them.
+fn invoice_and_journal(filed: &str) -> super::super::ImportPayload {
+    serde_json::from_value(json!({
+        "company_guid": GUID,
+        "vouchers": [
+            {
+                "bridge_txn_id":"t1", "date":"20260801", "voucher_type":"Sales", "voucher_number":"INV/1",
+                "invoice":{"voucher_type_name":filed,"place_of_supply":"Rajasthan","round_off_ledger":"Round Off"},
+                "entries":[
+                    {"ledger":"Party","amount":"105.00","side":"Dr"},
+                    {"ledger":"Sales 5%","amount":"100.00","side":"Cr"},
+                    {"ledger":"CGST 2.5%","amount":"2.50","side":"Cr"},
+                    {"ledger":"SGST 2.5%","amount":"2.50","side":"Cr"}
+                ]
+            },
+            {
+                "bridge_txn_id":"t2", "date":"20260801", "voucher_type":"Journal", "voucher_number":"J/1",
+                "entries":[
+                    {"ledger":"Rent","amount":"10.00","side":"Dr"},
+                    {"ledger":"Cash","amount":"10.00","side":"Cr"}
+                ]
+            }
+        ]
+    }))
+    .unwrap()
+}
+
+/// An invoice is filed under its caller-named type with its own number, so
+/// both admissions read that type's numbering as for a voucher that carries a
+/// number, never the class "Sales". `admit_numbering` admits such a voucher
+/// under Automatic numbering with Auto Retain or under Manual numbering with
+/// duplicates prevented; it is the invoice build's own type check that holds
+/// an invoice to Manual with duplicates prevented. Every other voucher keeps
+/// its class, and a post sends it without a number.
+#[test]
+fn an_invoice_is_admitted_under_the_type_it_is_filed_in_with_its_number() {
+    let payload = invoice_and_journal("Tax Invoice");
+    let at_build: Vec<_> = payload
+        .vouchers
+        .iter()
+        .map(|v| v.numbering_at_build())
+        .collect();
+    let at_post: Vec<_> = payload
+        .vouchers
+        .iter()
+        .map(|v| v.numbering_at_post())
+        .collect();
+    assert_eq!(
+        at_build,
+        [
+            ("Tax Invoice", OwnNumber::Carried),
+            ("Journal", OwnNumber::Carried)
+        ]
+    );
+    assert_eq!(
+        at_post,
+        [
+            ("Tax Invoice", OwnNumber::Carried),
+            ("Journal", OwnNumber::Absent)
+        ]
+    );
+    let manual = |duplicates| observed(SeriesNumberingMethod::Manual, duplicates);
+    let read = |sales, filed| {
+        VoucherNumberingRead::for_test(
+            GUID,
+            7,
+            vec![
+                ("Sales".to_string(), sales),
+                ("Tax Invoice".to_string(), filed),
+                ("Journal".to_string(), manual(DuplicateSetting::Prevented)),
+            ],
+        )
+    };
+    for subjects in [&at_build, &at_post] {
+        // The class reads Manual allowing duplicates, the filed type Manual
+        // preventing them: admitted, as the filed type decides.
+        let admitted = read(
+            manual(DuplicateSetting::NotPrevented),
+            manual(DuplicateSetting::Prevented),
+        );
+        assert!(admit_vouchers(admitted, subjects[..1].iter().copied()).is_ok());
+        // The class reads Automatic retained, the filed type Manual allowing
+        // duplicates: refused, naming the filed type.
+        let refused_read = read(automatic(), manual(DuplicateSetting::NotPrevented));
+        assert_eq!(
+            refused(admit_vouchers(refused_read, subjects[..1].iter().copied()))
+                .into_iter()
+                .map(|(voucher_type, _)| voucher_type)
+                .collect::<Vec<_>>(),
+            ["Tax Invoice"]
+        );
+    }
 }

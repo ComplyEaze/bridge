@@ -77,8 +77,7 @@ async fn batch_total_overflow_is_refused_before_dispatch_or_persistence() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let mut input = payload();
     for entry in input
@@ -114,8 +113,7 @@ async fn a_narration_that_would_read_back_rewritten_is_refused_at_build() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let mut input = payload();
     input.vouchers[0].narration = Some("Paid \u{fffd}#5; settled".into());
@@ -146,8 +144,7 @@ async fn a_batch_with_several_defects_reports_the_validation_defect_before_the_n
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let build = |input: &ImportPayload<String>| {
         let args = serde_json::to_value(input).unwrap();
@@ -432,8 +429,7 @@ fn external_import_ledger_read_refuses_busy_admission_without_waiting() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     };
     let server = Server::new(settings.clone());
     let append_admission = server
@@ -471,14 +467,15 @@ fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     };
     let server = Server::new(settings.clone());
     let initial = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -595,13 +592,14 @@ fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -730,13 +728,14 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -841,6 +840,8 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -931,6 +932,8 @@ fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1098,14 +1101,15 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let input = admitted_payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1142,6 +1146,8 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1365,6 +1371,8 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1459,6 +1467,8 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1530,6 +1540,8 @@ fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1595,6 +1607,8 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1667,6 +1681,8 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1735,6 +1751,8 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1797,6 +1815,8 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -2039,7 +2059,7 @@ fn voucher_number_length_counts_unicode_characters_and_preserves_safety_checks()
     assert_eq!(eleven.chars().count(), 11);
     assert_eq!(eleven.len(), 33);
     let mut input = captured_catalogue_payload();
-    for number in [eleven, "क".repeat(32), "A".repeat(32)] {
+    for number in [eleven, "क".repeat(32), "A".repeat(32), "PV 1".to_string()] {
         input.vouchers[0].voucher_number = Some(number);
         assert_eq!(payload_verdict(&input), Ok(()));
     }
@@ -2047,6 +2067,10 @@ fn voucher_number_length_counts_unicode_characters_and_preserves_safety_checks()
         ("क".repeat(33), "voucher_number_invalid"),
         ("A".repeat(33), "voucher_number_invalid"),
         ("bad$number".into(), "voucher_number_invalid"),
+        ("PV-1 ".into(), "voucher_number_invalid"),
+        (" PV-1".into(), "voucher_number_invalid"),
+        ("PV-1\u{a0}".into(), "voucher_number_invalid"),
+        (" ".into(), "voucher_number_invalid"),
         ("bad\nnumber".into(), "voucher_text_invalid"),
         ("bad\u{007f}number".into(), "voucher_text_invalid"),
         (String::new(), "voucher_text_invalid"),
@@ -2054,6 +2078,45 @@ fn voucher_number_length_counts_unicode_characters_and_preserves_safety_checks()
         input.vouchers[0].voucher_number = Some(number);
         assert_eq!(payload_verdict(&input), Err(code.to_string()));
     }
+}
+
+#[test]
+fn a_number_read_back_without_its_end_space_is_a_voucher_number_diff() {
+    // Tally read a Journal numbered "M9P-S1 " back as "M9P-S1" (§9.8,
+    // 2026-10-15). Verification compares the number verbatim, so such a
+    // voucher reads as diverged even when Tally created it as sent: the
+    // reason a carried number with an end space is refused before any file.
+    let mut expected = admitted_payload().vouchers[0].clone();
+    expected.voucher_type = VoucherType::Journal;
+    expected.narration = None;
+    expected.voucher_number = Some("PV-1 ".into());
+    let read = |number: &str| ReadVoucher {
+        remote_id: None,
+        guid: Some("synthetic-guid-1".into()),
+        master_id: None,
+        alter_id: Some(11),
+        date: expected.date.clone(),
+        voucher_type: Some("Journal".into()),
+        narration: None,
+        voucher_number: Some(number.into()),
+        cancelled: Some(false),
+        optional: Some(false),
+        effective_date: None,
+        entries: Vec::new(),
+    };
+    let diffs = |number: &str| {
+        verification::voucher_diffs(
+            &expected,
+            &read(number),
+            true,
+            verification::WrittenNarration::Untagged,
+        )
+    };
+    assert!(
+        diffs("PV-1 ").is_empty(),
+        "read back as sent, nothing differs"
+    );
+    assert_eq!(diffs("PV-1"), vec![json!("voucher_number")]);
 }
 
 #[test]
@@ -2222,8 +2285,7 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
             max_bytes: 200_000,
             redaction: super::super::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -2319,6 +2381,210 @@ pub(super) fn with_bill_wise_flags(catalogue: &str, bill_wise: &[&str]) -> Strin
     }
     out.push_str(rest);
     out
+}
+
+/// A test's own UUID: version 4, the RFC 4122 variant, and `serial` in the
+/// low bits, every other bit zero. Built rather than written, so the import
+/// tests carry no UUID literal for the merge gate's privacy scan to classify.
+pub(super) fn sentinel_uuid(serial: u16) -> Uuid {
+    Uuid::from_u128(0x4000_8000_0000_0000_0000 | u128::from(serial))
+}
+
+/// A batch id of the build's own shape (`bridge-` and a UUID) on
+/// [`sentinel_uuid`].
+pub(super) fn sentinel_batch_id(serial: u16) -> String {
+    format!("bridge-{}", sentinel_uuid(serial))
+}
+
+/// The GUID Tally gave the one company named `name` in a captured company
+/// list, read from the capture so that no test types a lab book's GUID.
+pub(super) fn captured_company_guid(company_list: &str, name: &str) -> String {
+    let companies = bridge_tally_protocol::parse_companies_from_collection(company_list).unwrap();
+    let mut named = companies.iter().filter(|row| row.name == name);
+    let company = named.next().expect("a company of that name");
+    assert!(named.next().is_none(), "one company named {name}");
+    company.guid.clone().expect("the company's GUID")
+}
+
+fn utf16le(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// DERIVED, not Tally's bytes: the answer to the rates read the code sends now
+/// (restricted to the parents of the invoice's ledgers, #1331, with the three
+/// HSN/SAC fields added to its field list, #691), which the lab was not sent.
+/// It is the lab's answer to the unrestricted read with those three fields
+/// (`pilot-lab-ledger-rates-hsn`, 12 Oct 2026) with every ledger row removed
+/// that the lab's answer to the restricted read (`pilot-lab-ledger-rates-scoped`,
+/// 10 Oct 2026) does not hold: that read held exactly the unrestricted read's
+/// rows under the four parents (PROVENANCE; PARTIAL: one book, one spelling),
+/// and the book gained two ledgers (`BRIDGE Svc 4D 5%`, `BRIDGE Svc INH 5%`)
+/// between the two days, which the 10 Oct catalogue the replay pairs with does
+/// not hold. The removal is counted, and the rows left must be the scoped read's
+/// rows, name for name, each under one of the four parents.
+pub(super) fn pilot_scoped_rates_hsn() -> String {
+    let scoped = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml"));
+    derived_scoped_rates_hsn(&ledger_row_names(&scoped))
+}
+
+/// DERIVED, not Tally's bytes: as [`pilot_scoped_rates_hsn`], for the book of
+/// the lab's W18 sittings (`pilot-lab-w18`), which the lab was not asked the
+/// scoped rates request on either. The rows are the lab's W16 answer's rows of
+/// the ledgers that the W18 catalogue holds under the four parents (the two
+/// books hold the same 18 ledgers), counted and asserted equal, name for name.
+pub(super) fn w18_scoped_rates_hsn() -> String {
+    let catalogue = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"));
+    let mut wanted = Vec::new();
+    let mut rest = catalogue.as_str();
+    while let Some(at) = rest.find("<LEDGER NAME=\"") {
+        let from = at + "<LEDGER NAME=\"".len();
+        let end = from + rest[from..].find("</LEDGER>").unwrap();
+        let row = &rest[from..end];
+        if SCOPE_PARENTS
+            .iter()
+            .any(|parent| row.contains(&format!(">{parent}</PARENT>")))
+        {
+            wanted.push(row[..row.find('"').unwrap()].to_string());
+        }
+        rest = &rest[end..];
+    }
+    derived_scoped_rates_hsn(&wanted)
+}
+
+/// The four parents of the lab invoices' ledgers.
+const SCOPE_PARENTS: [&str; 4] = [
+    "Duties &amp; Taxes",
+    "Indirect Expenses",
+    "Sales Accounts",
+    "Sundry Debtors",
+];
+
+/// The names of the `<LEDGER NAME="…">` rows of an answer, in answer order.
+fn ledger_row_names(xml: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = xml;
+    while let Some(at) = rest.find("<LEDGER NAME=\"") {
+        let from = at + "<LEDGER NAME=\"".len();
+        out.push(rest[from..from + rest[from..].find('"').unwrap()].to_string());
+        rest = &rest[from..];
+    }
+    out
+}
+
+/// The lab's W16 answer (the unrestricted rates read with the HSN/SAC fields)
+/// with every ledger row removed whose name is not in `wanted`; the removal is
+/// counted, each row left is under one of the four parents, and the rows left
+/// are `wanted`, name for name.
+fn derived_scoped_rates_hsn(wanted: &[String]) -> String {
+    let whole = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml"));
+    let mut kept = whole.clone();
+    let mut removed = 0;
+    let mut at = 0;
+    while let Some(start) = kept[at..].find("<LEDGER NAME=\"").map(|found| found + at) {
+        let end = start + kept[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
+        let name = ledger_row_names(&kept[start..end]).remove(0);
+        if wanted.contains(&name) {
+            assert!(
+                SCOPE_PARENTS
+                    .iter()
+                    .any(|parent| kept[start..end].contains(&format!(">{parent}</PARENT>"))),
+                "{name} is under none of the four parents"
+            );
+            at = end;
+        } else {
+            kept.replace_range(start..end, "");
+            removed += 1;
+            at = start;
+        }
+    }
+    assert_eq!(
+        removed,
+        ledger_row_names(&whole).len() - wanted.len(),
+        "rows removed"
+    );
+    assert_eq!(&ledger_row_names(&kept), wanted, "the rows left are wanted");
+    kept
+}
+
+/// BRIDGE PILOT LAB's GUID, from its captured company list.
+pub(super) fn pilot_lab_guid() -> String {
+    captured_company_guid(
+        &utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml")),
+        "BRIDGE PILOT LAB",
+    )
+}
+
+/// WR2 Unicode Lab's GUID, from its captured company list.
+pub(super) fn wr2_lab_guid() -> String {
+    captured_company_guid(
+        include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/company_list_after_split.utf8.xml"
+        ),
+        "WR2 Unicode Lab",
+    )
+}
+
+#[test]
+fn a_sentinel_uuid_is_a_version_4_uuid_carrying_only_its_serial() {
+    let id = sentinel_uuid(0x1a);
+    assert_eq!(id.get_version_num(), 4);
+    assert_eq!(id.get_variant(), uuid::Variant::RFC4122);
+    assert_eq!(id.as_u128() & 0xffff, 0x1a);
+    assert_eq!(id.as_u128() & !0xffff, sentinel_uuid(0).as_u128());
+    assert_ne!(sentinel_uuid(0xa), sentinel_uuid(0xb));
+    assert_eq!(
+        sentinel_batch_id(0x1a),
+        format!("bridge-{}", id.hyphenated())
+    );
+    assert!(valid_batch_id(&sentinel_batch_id(0x1a)));
+}
+
+/// The pilot lab's GUID read from the new capture is the company every object
+/// of an older capture of the same book belongs to: Tally names each object
+/// `<company GUID>-<serial>`.
+#[test]
+fn the_pilot_labs_captured_guid_is_the_company_of_an_older_pilot_capture() {
+    let guid = pilot_lab_guid();
+    let older = utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/ledger_gst_details_live.utf16le.xml"
+    ));
+    let objects = older.matches("<GUID TYPE=\"String\">").count();
+    let of_this_company = older
+        .matches(&format!("<GUID TYPE=\"String\">{guid}-"))
+        .count();
+    assert_eq!((objects, of_this_company), (14, 14));
+    assert_ne!(wr2_lab_guid(), guid);
+}
+
+/// The captured list with the lab's own row repeated: two companies of one
+/// name give no GUID rather than the first one's.
+#[test]
+#[should_panic(expected = "one company named WR2 Unicode Lab")]
+fn a_name_two_companies_carry_has_no_guid() {
+    let list = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/company_list_after_split.utf8.xml"
+    );
+    let start = list.find("<COMPANY NAME=\"WR2 Unicode Lab\"").unwrap();
+    let end = start + list[start..].find("</COMPANY>").unwrap() + "</COMPANY>".len();
+    let doubled = format!("{}{}", &list[..end], &list[start..]);
+    captured_company_guid(&doubled, "WR2 Unicode Lab");
+}
+
+#[test]
+#[should_panic(expected = "a company of that name")]
+fn a_company_absent_from_the_captured_list_has_no_guid() {
+    captured_company_guid(
+        include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/company_list_after_split.utf8.xml"
+        ),
+        "BRIDGE PILOT LAB",
+    );
 }
 
 /// The import cycle with its two ledger catalogue answers (offsets 5 and 7) the
@@ -2706,8 +2972,7 @@ async fn import_bounds_distinct_ledger_names_before_tally_without_reducing_vouch
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let response = server
         .call_tool_response("build_import_xml", serde_json::to_value(unique).unwrap())
@@ -2974,9 +3239,10 @@ fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Resul
 
 #[tokio::test]
 async fn built_batch_guidance_matches_the_saved_native_admission() {
+    // Posting on admits a batch of 2 under the same setting (#1090).
     for (writes_enabled, voucher_count, numbered, native) in [
         (true, 1, false, true),
-        (true, 2, false, false),
+        (true, 2, false, true),
         (true, 1, true, false),
         (false, 1, false, false),
     ] {
@@ -2993,8 +3259,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
             max_bytes: 200_000,
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
-            writes_enabled,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::from_enabled(writes_enabled),
         });
         let mut input = captured_catalogue_payload();
         input.vouchers.truncate(voucher_count);
@@ -3077,29 +3342,27 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
 }
 
 /// bridge#866: the build's warning names the refusal `post_import` returns for
-/// that saved batch, not one fixed reason, and reflects the batch-posting
-/// setting. Each case is a different admission family.
+/// that saved batch, not one fixed reason. Each case is a different admission
+/// family. Posting on admits a batch of 2 (one setting governs every post,
+/// #1090), so a 2-voucher batch is no refusal.
 #[tokio::test]
 async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
-    // (batch posting, vouchers, edit, refusal the build must name)
+    // (vouchers, edit, refusal the build must name)
     type Edit = fn(&mut ImportPayload<String>);
-    let cases: [(bool, usize, Edit, Option<&str>); 4] = [
-        (false, 2, |_| {}, Some("import_post_requires_one_voucher")),
-        (true, 2, |_| {}, None),
+    let cases: [(usize, Edit, Option<&str>); 3] = [
+        (2, |_| {}, None),
         (
-            false,
             1,
             |input| input.vouchers[0].voucher_number = Some("TEST-1".into()),
             Some("import_post_numbered_journal_unsupported"),
         ),
         (
-            false,
             1,
             |input| input.vouchers[0].narration = Some("line one\u{2028}line two".into()),
             Some("import_review_layout_text"),
         ),
     ];
-    for (batch_post_enabled, voucher_count, edit, refusal) in cases {
+    for (voucher_count, edit, refusal) in cases {
         let mut input = captured_catalogue_payload();
         input.vouchers.truncate(voucher_count);
         edit(&mut input);
@@ -3116,8 +3379,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
             max_bytes: 200_000,
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
-            writes_enabled: true,
-            batch_post_enabled,
+            posting: crate::agent::Posting::On,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(input).unwrap())
@@ -3153,22 +3415,6 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
                 );
             }
         }
-        if refusal == Some("import_post_requires_one_voucher") {
-            assert!(first.contains("batch posting is off"), "{first}");
-            // Refused before any Tally request, with the same code.
-            let response = server
-                .call_tool_response(
-                    "post_import",
-                    json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id}),
-                )
-                .await;
-            assert_eq!(
-                response.value["structuredContent"]["result"]["error"]["code"],
-                "import_post_requires_one_voucher",
-                "{}",
-                response.value
-            );
-        }
         assert_eq!(
             simulator.finish().unwrap().len(),
             whole_build(build_numbering_plans(&[])).len()
@@ -3176,41 +3422,45 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
     }
 }
 
-/// The count rule in the warning follows the batch-posting setting (#866).
+/// The count rule in the warning is the batch cap: the build asks only while
+/// posting is on, and posting on admits a batch (#866, #1090).
 #[test]
 fn refusal_reason_states_the_current_voucher_limit() {
-    let off = native_post_refusal_reason("import_post_requires_one_voucher", 1);
+    let on = native_post_refusal_reason("import_post_requires_one_voucher");
     assert!(
-        off.contains("one voucher (the limit while batch posting is off)"),
-        "{off}"
+        on.contains("native posting takes 1 to 50 vouchers,"),
+        "{on}"
     );
-    let on = native_post_refusal_reason("import_post_requires_one_voucher", 50);
-    assert!(on.contains("1 to 50 vouchers"), "{on}");
-    assert!(!on.contains("batch posting is off"), "{on}");
-    let numbered = native_post_refusal_reason("import_post_numbered_journal_unsupported", 1);
+    let numbered = native_post_refusal_reason("import_post_numbered_journal_unsupported");
     assert!(numbered.contains("carries its own number"), "{numbered}");
     for code in ["import_review_layout_text", "import_review_format_text"] {
         assert_eq!(
-            native_post_refusal_reason(code, 1),
-            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name)",
+            native_post_refusal_reason(code),
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name), or a narration too long for one line holds a run of four or more dashes or a number in brackets, which the dialog keeps for its own dashed line and part labels",
             "{code}"
         );
     }
-    let dialog = native_post_refusal_reason("import_review_too_large", 1);
+    let dialog = native_post_refusal_reason("import_review_too_large");
     assert!(
         dialog.contains("does not fit in one native dialog"),
         "{dialog}"
     );
-    let too_large = native_post_refusal_reason("import_post_batch_too_large", 50);
+    let too_large = native_post_refusal_reason("import_post_batch_too_large");
     assert!(too_large.contains("(50)"), "{too_large}");
-    let unmarked = native_post_refusal_reason("import_review_on_account_unmarked", 1);
+    let unmarked = native_post_refusal_reason("import_review_on_account_unmarked");
     assert!(
         unmarked.contains("without its On Account mark"),
         "{unmarked}"
     );
     // An unlisted code keeps its own name in the warning and a neutral reason.
-    let (warnings, _) =
-        build_import_guidance(true, Some("import_something_new"), 1, false, false, false);
+    let (warnings, _) = build_import_guidance(
+        true,
+        Some("import_something_new"),
+        false,
+        false,
+        false,
+        false,
+    );
     assert!(warnings[0]
         .as_str()
         .unwrap()
@@ -3237,6 +3487,9 @@ mod source_tests;
 #[path = "agent_import_index_tests.rs"]
 mod index_tests;
 
+#[path = "agent_import_number_identity_tests.rs"]
+mod number_identity_tests;
+
 fn test_duplicates(observed: &[ReadVoucher]) -> Result<Vec<Value>, String> {
     let identities = observed
         .iter()
@@ -3244,7 +3497,7 @@ fn test_duplicates(observed: &[ReadVoucher]) -> Result<Vec<Value>, String> {
         .collect::<Result<Vec<_>, _>>()?;
     let fingerprints = observed
         .iter()
-        .map(|voucher| sha256_json(&observed_fingerprint(voucher)))
+        .map(|voucher| sha256_json(&observed_fingerprint(voucher, None)))
         .collect::<Vec<_>>();
     Ok(duplicates(observed, &identities, &fingerprints))
 }
@@ -3254,6 +3507,9 @@ mod qualification_tests;
 
 #[path = "agent_import_bank_tests.rs"]
 mod bank_tests;
+
+#[path = "agent_import_transfer_flow_tests.rs"]
+mod transfer_flow_tests;
 
 #[path = "agent_import_bill_wise_build_tests.rs"]
 mod bill_wise_build_tests;
@@ -3392,6 +3648,9 @@ mod preflight_tests;
 #[path = "agent_import_mode_tests.rs"]
 mod mode_tests;
 
+#[path = "agent_import_invoice_admission_tests.rs"]
+mod invoice_admission_tests;
+
 #[test]
 fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_periods() {
     // The recorded Education refusal affected ##SVFromDate/##SVToDate predicates.
@@ -3475,13 +3734,14 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         batch_id: "batch-dispatched-endpoint".into(),
         identity_scheme: Some(ImportIdentityScheme::BatchV1),
         amends_batch_id: None,
@@ -3606,8 +3866,7 @@ fn line_error_text_does_not_count_against_a_pages_never_cut_part() {
             max_bytes,
             redaction: super::super::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         })
     };
     let page = json!({"items": [], "dispatch": {"response": {"outcome": {
@@ -3652,8 +3911,7 @@ async fn a_hand_imported_batchs_alter_id_delta_is_measured_from_its_build_mark()
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -3696,8 +3954,7 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
             max_bytes,
             redaction: super::super::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         })
     };
     let server = server_with(200_000);
@@ -3772,6 +4029,17 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
         "no Tally request for a later page"
     );
 
+    // This batch was built and never posted by ComplyEaze Bridge, so no page
+    // states an outcome: it can still be posted.
+    assert!(
+        first["structuredContent"].get("headline").is_none(),
+        "{first}"
+    );
+    assert!(
+        later["structuredContent"].get("headline").is_none(),
+        "{later}"
+    );
+
     // Never cut to fit: the parts that must stay whole refuse, typed.
     // Room for the refusal itself, not for the proof's never-cut part.
     let small = server_with(2_048);
@@ -3822,6 +4090,158 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
     );
 }
 
+/// Every page of a dispatched batch's verification states the same outcome,
+/// from its proof: a later page reads no Tally and says what the first said.
+#[tokio::test]
+async fn a_later_page_of_a_dispatched_batch_states_the_headline_of_the_first() {
+    let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()).expect("simulator");
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        posting: crate::agent::Posting::Off,
+    });
+    let built = server
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
+        .await
+        .expect("build");
+    let batch_id = built.payload["result"]["batch_id"]
+        .as_str()
+        .expect("batch id")
+        .to_string();
+    let saved = server
+        .latest_import_snapshot(&batch_id)
+        .expect("saved snapshot")
+        .expect("batch");
+    {
+        let _admission = server.lock_import_admission().expect("admission lock");
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch(&saved.batch))
+            .expect("dispatch intent");
+    }
+    let args = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
+    let first = server
+        .call_tool_response("verify_import", args.clone())
+        .await
+        .value;
+    let page = &first["structuredContent"]["result"];
+    let [proof_path, _] = server.current_proof_paths(&batch_id);
+    let proof: Value = serde_json::from_slice(&fs::read(proof_path).unwrap()).unwrap();
+    let rows = proof["vouchers"].as_array().unwrap();
+    let verified = rows
+        .iter()
+        .filter(|row| row["status"] == "posted_verified")
+        .count();
+    let headline = &first["structuredContent"]["headline"];
+    assert_eq!(headline["batch"]["vouchers"], rows.len(), "{first}");
+    assert_eq!(headline["batch"]["confirmed"], verified, "{first}");
+    assert_eq!(
+        headline["batch"]["verdict"], proof["verification_status"],
+        "{first}"
+    );
+    assert!(headline["lead"].is_string(), "{first}");
+    let mut next = args;
+    next["proof_sha256"] = page["proof"]["sha256"].clone();
+    next["offset"] = json!(verified);
+    let later = server.call_tool_response("verify_import", next).await.value;
+    // The batch is unreconciled, so the page is an error, as the first was;
+    // its headline is still the same.
+    assert_eq!(later["isError"], first["isError"], "{later}");
+    assert_eq!(later["structuredContent"]["headline"], *headline, "{later}");
+}
+
+/// The lead promises a next step only where a row has one: of the ten statuses
+/// a voucher can be left in, four carry a next step and six do not, and the
+/// lead is the same for both. Each status is counted in its own field, a
+/// result that sent nothing has no headline, and a result with no row has none.
+#[test]
+fn the_batch_lead_claims_a_next_step_only_where_a_row_has_one() {
+    let result = |state: Value, statuses: &[&str]| {
+        json!({
+            "dispatch": {"state": state},
+            "verification_status": "verification_incomplete",
+            "vouchers": statuses
+                .iter()
+                .map(|status| json!({"status": status}))
+                .collect::<Vec<_>>(),
+        })
+    };
+    let with_next_step = [
+        "bound_not_in_window",
+        "book_rolled_back",
+        "sent_not_attributed",
+        "tally_reported_not_created",
+    ];
+    let without_next_step = [
+        "matching_content_observed",
+        "posted_divergent",
+        "posted_not_effective",
+        "not_found",
+        "not_attributable",
+        "duplicate_fingerprint",
+    ];
+    // Every status the headline counts is in one of the two lists: a status
+    // added to the counter must be sorted here before this test passes.
+    let counted = serde_json::to_value(super::super::headline::NotConfirmed::default()).unwrap();
+    let mut counted = counted
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .filter(|status| *status != "unrecognised")
+        .collect::<Vec<_>>();
+    let mut listed = with_next_step
+        .into_iter()
+        .chain(without_next_step)
+        .collect::<Vec<_>>();
+    counted.sort_unstable();
+    listed.sort_unstable();
+    assert_eq!(counted, listed);
+    for status in with_next_step {
+        assert!(verification::plain_next_step(status).is_some(), "{status}");
+    }
+    for status in without_next_step {
+        assert_eq!(verification::plain_next_step(status), None, "{status}");
+    }
+    for status in with_next_step.into_iter().chain(without_next_step) {
+        let headline =
+            verification::batch_headline(&result(json!("reconciliation_required"), &[status]))
+                .map(|headline| serde_json::to_value(headline).unwrap())
+                .expect("a dispatched batch states how it ended");
+        assert_eq!(
+            headline["lead"],
+            "The voucher of this batch is not confirmed in Tally: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.",
+            "{status}"
+        );
+        // Only the status's own count is one: no other field takes it.
+        assert_eq!(headline["batch"]["not_confirmed"][status], 1, "{status}");
+        let others = headline["batch"]["not_confirmed"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(name, _)| name.as_str() != status)
+            .map(|(_, count)| count.as_u64().unwrap())
+            .sum::<u64>();
+        assert_eq!(others, 0, "{status}");
+    }
+    // A result that sent nothing, or lists no voucher, states no outcome.
+    assert!(
+        verification::batch_headline(&result(json!("not_dispatched"), &["not_found"])).is_none()
+    );
+    assert!(verification::batch_headline(&json!({
+        "vouchers": [{"status": "not_found"}],
+    }))
+    .is_none());
+    assert!(verification::batch_headline(&result(json!("posted_verified"), &[])).is_none());
+}
+
 async fn verify_saved_batch_after_dispatch(
     dispatched: bool,
     dispatch_response: Option<ledger::DispatchResponse>,
@@ -3838,8 +4258,7 @@ async fn verify_saved_batch_after_dispatch(
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -3917,8 +4336,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::On,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -4078,8 +4496,7 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
             max_bytes: 200_000,
             redaction: super::super::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -4193,8 +4610,7 @@ async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -4570,6 +4986,8 @@ fn divergent_verification() -> Value {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -4640,6 +5058,47 @@ fn marked_paths(value: &Value, path: &str, found: &mut std::collections::BTreeSe
 fn the_name_field_list_covers_every_name_a_verification_marks() {
     let mut result = divergent_verification();
     result["masters_after_post"] = json!({"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Private Changed Ledger"]});
+    // An invoice row with the HSN/SAC evidence of its sales line, made by the
+    // read-back's own code from the lab's read-back of BP/26-27/0010, edited
+    // in one place (DERIVED, not Tally's bytes; the value is invented): its
+    // first sales line names a group source, which no capture fills.
+    let readback = String::from_utf16(
+        &include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+        )
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let group =
+        "<HSNLEDGERSOURCE>BRIDGE Svc 998313 5%</HSNLEDGERSOURCE>\r\n      <HSNGROUPSOURCE/>";
+    assert_eq!(readback.matches(group).count(), 1);
+    let readback = readback.replacen(
+        group,
+        "<HSNLEDGERSOURCE>BRIDGE Svc 998313 5%</HSNLEDGERSOURCE>\r\n      <HSNGROUPSOURCE>Private Group</HSNGROUPSOURCE>",
+        1,
+    );
+    let invoice: ImportVoucher = serde_json::from_value(json!({
+        "bridge_txn_id":"invoice-1","date":"20260801","voucher_type":"Sales",
+        "voucher_number":"BP/26-27/0010",
+        "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan",
+            "observed":{"voucher_type_guid":"g","party_state":"Rajasthan",
+                "party_registration_type":"Unregistered/Consumer","party_bill_wise":false,
+                "company_state":"Rajasthan","sales_ledgers":["BRIDGE Svc 998313 5%"],
+                "hsn_warnings":[{"code":"hsn_warning_not_six_digits","ledger":"BRIDGE Svc 998313 5%",
+                    "level":{"group":"Private Group"},"characters":4}]}},
+        "entries":[{"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"}]
+    }))
+    .unwrap();
+    let lines = super::invoice::sales_line_evidence_of(&invoice, &readback);
+    assert_eq!(lines.len(), 1);
+    result["vouchers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"bridge_txn_id":"invoice-1","status":"posted_verified"}));
+    verification::mark_invoice_readback(&mut result, "invoice-1", &[], &lines);
+    result["hsn_warnings"] = json!(super::invoice::hsn_warnings_json(&invoice));
     let mut marked = std::collections::BTreeSet::new();
     marked_paths(&result, "", &mut marked);
     assert!(!marked.is_empty(), "the verifier marks its names");
@@ -4678,8 +5137,7 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
             max_bytes: 200_000,
             redaction,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         })
     };
     let masked = server_with(super::super::Redaction::MaskParties);
@@ -4934,6 +5392,62 @@ fn a_masters_record_past_the_record_bound_reads_as_a_pending_check() {
     );
 }
 
+/// A saved invoice's HSN/SAC warnings are listed with the ledger and the group
+/// marked as party names, and the plain warning goes last, after the warnings
+/// the invoice and amendment guidance rewrite; an invoice with none adds
+/// nothing.
+#[test]
+fn a_saved_invoices_hsn_warnings_are_listed_and_the_plain_warning_goes_last() {
+    let invoice = |warnings: Value| -> ImportVoucher {
+        serde_json::from_value(json!({
+            "bridge_txn_id":"invoice-1","date":"20260801","voucher_type":"Sales",
+            "voucher_number":"BP/26-27/0010",
+            "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan",
+                "observed":{"voucher_type_guid":"g","party_state":"Rajasthan",
+                    "party_registration_type":"Unregistered/Consumer","party_bill_wise":false,
+                    "company_state":"Rajasthan","sales_ledgers":["Sales A","Sales B"],
+                    "hsn_warnings":warnings}},
+            "entries":[{"ledger":"Walk-in","amount":"1051.00","side":"Dr"}]
+        }))
+        .unwrap()
+    };
+    let marked = |name: &str| json!({ super::super::PARTY_NAME_MARKER: name });
+    let mut warnings = json!(["first", "second"]);
+    let listed = hsn_warnings_of(
+        &[invoice(json!([
+            {"code":"hsn_warning_not_six_digits","ledger":"Sales A","level":{"group":"Sub"},"characters":4},
+            {"code":"hsn_warning_sac_for_goods","ledger":"Sales B","level":"company","characters":6}
+        ]))],
+        &mut warnings,
+    );
+    assert_eq!(
+        serde_json::to_value(&listed).unwrap(),
+        json!([
+            {"code":"hsn_warning_not_six_digits","ledger":marked("Sales A"),"source":"group",
+             "group":marked("Sub"),"characters":4},
+            {"code":"hsn_warning_sac_for_goods","ledger":marked("Sales B"),"source":"company",
+             "group":null,"characters":6}
+        ])
+    );
+    assert_eq!(warnings, json!(["first", "second", INVOICE_HSN_WARNING]));
+    let mut untouched = json!(["first"]);
+    assert!(hsn_warnings_of(&[invoice(json!([]))], &mut untouched).is_empty());
+    assert_eq!(untouched, json!(["first"]));
+    // A verification result carries the same list, and no key without one.
+    let warned = invoice(json!([
+        {"code":"hsn_warning_sac_for_goods","ledger":"Sales B","level":"company","characters":6}
+    ]));
+    let mut proof = json!({"counts":{}});
+    with_hsn_warnings(&mut proof, std::slice::from_ref(&warned));
+    assert_eq!(
+        serde_json::to_value(&proof["hsn_warnings"]).unwrap(),
+        serde_json::to_value(super::invoice::hsn_warnings_json(&warned)).unwrap()
+    );
+    let mut plain = json!({"counts":{}});
+    with_hsn_warnings(&mut plain, &[invoice(json!([]))]);
+    assert_eq!(plain, json!({"counts":{}}));
+}
+
 // bridge#724: a voucher written without a number is numbered by its voucher
 // type, so the build reads each such voucher's type after its mark and writes
 // nothing unless every one reads Automatic with existing numbers retained.
@@ -4978,8 +5492,7 @@ fn numbering_server(directory: &std::path::Path, port: u16) -> Server {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::On,
     })
 }
 
@@ -5177,16 +5690,48 @@ async fn numbered_journal_built_against(plans: Vec<ScenarioPlan>) -> (Value, usi
     )
 }
 
+/// The numbering read with the Journal type numbered Manual and its series'
+/// duplicate setting read as prevented (the capture reads it as not).
+fn manual_journal_preventing_duplicates() -> Vec<ScenarioPlan> {
+    super::numbering_fixtures::with_series_text(
+        build_numbering_plans(&["Journal"]),
+        "Journal",
+        "<PREVENTDUPLICATES>No</PREVENTDUPLICATES>",
+        "<PREVENTDUPLICATES>Yes</PREVENTDUPLICATES>",
+    )
+}
+
 /// A Journal that carries its own number, into a Journal type numbered
-/// Manual: Tally keeps the number there, so it is built, after the numbering
-/// read like every other voucher.
+/// Manual with duplicate numbers prevented: Tally keeps the number there, so
+/// it is built, after the numbering read like every other voucher.
 #[tokio::test]
 async fn a_journal_carrying_its_own_number_is_built_into_a_manual_type_after_the_numbering_read() {
     let (result, requests, files) =
-        numbered_journal_built_against(whole_build(build_numbering_plans(&["Journal"]))).await;
+        numbered_journal_built_against(whole_build(manual_journal_preventing_duplicates())).await;
     assert_eq!(result["voucher_count"], 1, "{result}");
     assert_eq!(requests, QUALIFIED_BUILD_REQUESTS);
     assert_eq!(files, 1);
+}
+
+/// The same Journal into a Manual type that allows duplicate numbers: a held
+/// number would make a second voucher that nothing notices, so it is refused,
+/// saying what was read, and nothing is written.
+#[tokio::test]
+async fn a_journal_carrying_its_own_number_is_refused_by_a_manual_type_that_allows_duplicates() {
+    // The captured Journal series prevents no duplicates.
+    let (result, _, files) =
+        numbered_journal_built_against(through_build_numbering(&["Journal"])).await;
+    assert_eq!(result["state"], "refused", "{result}");
+    assert_eq!(
+        result["reason"], "import_voucher_numbering_not_automatic",
+        "{result}"
+    );
+    assert_eq!(
+        result["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"manual","duplicates":"not_prevented"}}]),
+        "{result}"
+    );
+    assert_eq!(files, 0);
 }
 
 /// The same numbered Journal into an Automatic type. Under Automatic
@@ -5306,25 +5851,30 @@ async fn a_build_in_education_mode_is_refused_by_the_numbering_read() {
     assert_eq!(written_files(directory.path()), 0);
 }
 
+/// A voucher number that is empty, or has white space at either end, is
+/// refused before the numbering is read (an empty one as invalid text, one
+/// with white space as an invalid number): nothing reaches the numbering
+/// check and no file is written.
 #[tokio::test]
-async fn a_blank_voucher_number_counts_as_none_for_the_numbering_check() {
-    let plans = through_build_numbering(&["Journal"]);
-    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
-    let directory = tempfile::tempdir().unwrap();
-    let server = numbering_server(directory.path(), simulator.address().port());
-    let mut input = captured_catalogue_payload();
-    input.vouchers.truncate(1);
-    input.vouchers[0].voucher_number = Some("  ".into());
-    let Ok(built) = server
-        .build_import_xml(&serde_json::to_value(input).unwrap())
-        .await
-    else {
-        panic!("the build reaches the numbering read")
-    };
-    assert_eq!(
-        built.payload["result"]["reason"], "import_voucher_numbering_not_automatic",
-        "{}",
-        built.payload
-    );
-    assert_eq!(written_files(directory.path()), 0);
+async fn a_blank_voucher_number_is_refused_before_the_numbering_read() {
+    for (blank, code) in [
+        ("", "voucher_text_invalid"),
+        ("  ", "voucher_number_invalid"),
+    ] {
+        let plans = through_build_numbering(&["Journal"]);
+        let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+        let directory = tempfile::tempdir().unwrap();
+        let server = numbering_server(directory.path(), simulator.address().port());
+        let mut input = captured_catalogue_payload();
+        input.vouchers.truncate(1);
+        input.vouchers[0].voucher_number = Some(blank.into());
+        let Err(failure) = server
+            .build_import_xml(&serde_json::to_value(input).unwrap())
+            .await
+        else {
+            panic!("a blank number is refused: {blank:?}")
+        };
+        assert_eq!(failure.code, code, "{blank:?}");
+        assert_eq!(written_files(directory.path()), 0, "{blank:?}");
+    }
 }

@@ -15,8 +15,7 @@ async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let legacy: ImportLedgerLine = serde_json::from_value(legacy_record()).unwrap();
     server.append_import_ledger(&legacy).unwrap();
@@ -33,6 +32,21 @@ async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
         let snapshot = server.latest_import_snapshot(batch_id).unwrap().unwrap();
         let xml = fs::read(result["path"].as_str().unwrap()).unwrap();
         assert_eq!(sha256_hex(&xml), result["sha256"]);
+        // The reported path went through `user_visible_path`: the state says
+        // how it was obtained, and it names the file stored under `imports`.
+        assert_eq!(
+            result["path_state"],
+            if cfg!(windows) { "resolved" } else { "as_is" }
+        );
+        let logical = directory
+            .path()
+            .join("imports")
+            .join(format!("{batch_id}.xml"));
+        assert_eq!(
+            fs::canonicalize(result["path"].as_str().unwrap()).unwrap(),
+            fs::canonicalize(&logical).unwrap()
+        );
+        assert!(!result["path"].as_str().unwrap().starts_with(r"\\?\"));
         assert_eq!(snapshot.batch.txn_ids, ["txn-001", "txn-002"]);
         assert_eq!(
             snapshot.batch.identity_scheme,

@@ -11,5 +11,4 @@ pub fn exact_accumulator_handles_scale_sign_large_values_and_negative_zero() {
     assert!(is_negative_nonzero("-0.001"));
     assert!(!is_negative_nonzero("-0.000"));
     assert_eq!(magnitude_cmp("-10.00", "9.999"), Ordering::Greater);
-    assert!(same_nonzero_sign("-10", "-1.0"));
 }

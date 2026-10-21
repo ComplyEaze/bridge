@@ -10,10 +10,11 @@
 //! `PREVENTDUPLICATES` read `No` on all 24 types, so neither is the method: this
 //! module never reads them. All 24 types held exactly one series, named
 //! `Default`; three of them (Journal, Payment, Receipt) were checked against
-//! Tally's screen. Not measured: Automatic (Manual Override), seen once on a real
-//! book on 28 September 2026 and on no captured response, Multi-user Auto, more
-//! than one series, a single series not named `Default`, a type created new,
-//! other releases, macOS.
+//! Tally's screen. Automatic (Manual Override) is mapped from the series text
+//! measured on a synthetic book on 13 October 2026
+//! (`docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md` §9.8) and is on no
+//! committed test fixture. Not measured: Multi-user Auto, more than one series, a
+//! single series not named `Default`, a type created new, other releases, macOS.
 //!
 //! The sub-method (`NUMBERINGSUBMETHOD`, a direct child of the series list) is
 //! evidence of a second synthetic book on the same release and edition,
@@ -90,8 +91,8 @@ pub enum NumberingSubMethod {
 pub enum SeriesNumberingMethod {
     Automatic(NumberingSubMethod),
     Manual,
-    /// Seen on a real book on 28 September 2026 (bridge#724), not on the
-    /// committed capture.
+    /// Its series text was measured on a synthetic book on 13 October 2026
+    /// (reference §9.8, bridge#724); it is on no committed test fixture.
     AutomaticManualOverride,
     Unrecognised(String),
 }

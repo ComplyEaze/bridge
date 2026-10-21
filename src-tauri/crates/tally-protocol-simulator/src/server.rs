@@ -24,8 +24,14 @@ const MAX_REQUEST_BYTES: usize = 128 * 1024;
 /// A divided agent read replayed end to end (bridge#520) is about ninety legs:
 /// six per paired read, plus the identity and ledger legs around them. A post
 /// held across two calls and then sent is about 170: each pass reads its voucher
-/// numbering before the approval (bridge#724).
-pub const MAX_SEQUENCE_REQUESTS: usize = 192;
+/// numbering before the approval (bridge#724). An invoice built and then posted
+/// is about 496: each read is bracketed by status probes and company lists, the
+/// build and the post each read the voucher numbering, each of the three
+/// admissions reads the company object for the HSN/SAC check, the post reads
+/// the book again, and the endpoint queue reads the invoice's masters, the
+/// company object and the groups once more under its lock; a replay that then
+/// starts a second build runs to about 510.
+pub const MAX_SEQUENCE_REQUESTS: usize = 576;
 
 /// The payload of the `TimedOut` error returned when no request reached a plan
 /// within the accept deadline: `plan` is its zero-based place in a sequence of
@@ -806,11 +812,6 @@ fn response_headers(plan: &ScenarioPlan, body_len: usize) -> String {
     let charset = match plan.encoding {
         WireEncoding::Utf16Le | WireEncoding::Utf16LeNoBom | WireEncoding::Utf16Be => {
             "; charset=utf-16"
-        }
-        WireEncoding::Utf8 | WireEncoding::Utf8Bom
-            if plan.fixture.content_type() == "application/json" =>
-        {
-            "; charset=utf-8"
         }
         WireEncoding::Utf8 | WireEncoding::Utf8Bom => "; charset=utf-8",
     };

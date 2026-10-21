@@ -37,7 +37,6 @@ bytes only.
 | `import_partial.xml` | mixed import counters with an exception |
 | `malformed.xml` | an unclosed element |
 | `truncated.xml` | a body cut off mid-element |
-| `synthetic_json_semantic_reference.json` | Bridge-shaped JSON restating `normal_export.xml`'s values; not a Tally JSONEX envelope and not a parity fixture |
 
 ## Integrity digests
 
@@ -65,4 +64,3 @@ repeats only what this note says above.
 | `import_partial.xml` | 230 | `85a26867af5f969a6e5d916c1d4a1a830a9c8ad66fbbc86230299cbac62136df` | not a capture: authored, as above |
 | `malformed.xml` | 78 | `26ef82c65fda0aed3af2291947a812a3a3fb1ffdac08c1c0625de227c9a902f5` | not a capture: authored, as above |
 | `truncated.xml` | 113 | `b836e44596b6fe4a8d9045d9c32fb42b3aa951b1e2ade25138479130b138372d` | not a capture: authored, as above |
-| `synthetic_json_semantic_reference.json` | 247 | `8eb242d02538e4b4af98401860e969ac9d8691bb1e733d5595a7c832be97c9c2` | not a capture: authored, as above |

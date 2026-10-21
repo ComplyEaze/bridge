@@ -322,13 +322,13 @@ request is predicted over a budget well below the cap.
   the voucher read, and skipping the replay would leave the second catalogue outside the marks
   bracket.
 - **An abandoned call is withdrawn before its next Tally operation, never during one.** The stdio
-  server keeps reading input while any tool but a `lab_import_*` write runs (#554). A
-  `notifications/cancelled` naming the call stops its queued operations before the next one starts
-  and the call is answered as withdrawn; a request already sent to Tally is not abandoned, because
-  abandoning a request does not stop Tally. A closed input is not a withdrawal: the call runs to
-  completion and the session ends after it. `post_import` has its own withdrawal (#725), before its
-  dispatch intent only. This is from reading the code (`agent_protocol.rs`); no Tally was involved,
-  and what a host sends is in section 11f.
+  server keeps reading input while any tool runs (#554). A `notifications/cancelled` naming the call
+  stops its queued operations before the next one starts and the call is answered as withdrawn; a
+  request already sent to Tally is not abandoned, because abandoning a request does not stop Tally.
+  A `lab_import_*` write is never withdrawn, so its mandatory read-back runs. A closed input is not
+  a withdrawal: the call runs to completion and the session ends after it. `post_import` has its own
+  withdrawal (#725), before its dispatch intent only. This is from reading the code
+  (`agent_protocol.rs`); no Tally was involved, and what a host sends is in section 11f.
 - **`ALTVCHID` and `ALTMSTID` moving on every change** was observed only for changes made through
   the XML gateway, once each, on one release (§11c.5). Changes made in the Tally UI, the Edit Log
   SKU and Education mode were not tested.

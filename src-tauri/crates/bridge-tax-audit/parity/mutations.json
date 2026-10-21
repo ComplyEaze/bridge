@@ -14332,7 +14332,7 @@
   "by": "author",
   "what": "a patch equal to the oracle applies",
   "file": "src/divergence.rs",
-  "from": "            if parsed.get(oracle) == Some(value)\n",
+  "from": "            if parsed.get(oracle) == Some(&value)\n",
   "to": "            if false\n"
  },
  {
@@ -14340,8 +14340,8 @@
   "by": "author",
   "what": "a real-book run masks another test's keys",
   "file": "src/divergence.rs",
-  "from": "    for d in divergences.iter().filter(|d| d.test == test_id) {\n",
-  "to": "    for d in divergences.iter() {\n"
+  "from": "        .filter(|d| d.test == test_id && only.contains(&d.id))\n",
+  "to": "        .filter(|d| only.contains(&d.id))\n"
  },
  {
   "id": "DV-9",
@@ -14445,6 +14445,30 @@
   "what": "two records may declare one real-book key",
   "file": "src/divergence.rs",
   "from": "                    if !real_keys.insert((text_of(\"test\")?, k.to_string())) {\n",
+  "to": "                    if false {\n"
+ },
+ {
+  "id": "DV-22",
+  "by": "author",
+  "what": "a real-book run masks divergences it did not name",
+  "file": "src/divergence.rs",
+  "from": "        .filter(|d| d.test == test_id && only.contains(&d.id))\n",
+  "to": "        .filter(|d| d.test == test_id)\n"
+ },
+ {
+  "id": "DV-23",
+  "by": "author",
+  "what": "a record with real-book keys and no patch is admitted",
+  "file": "src/divergence.rs",
+  "from": "        if expect.is_empty() {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "DV-24",
+  "by": "author",
+  "what": "a whole list may be declared as a real-book key",
+  "file": "src/divergence.rs",
+  "from": "                    if matches!(&parsed, Key::Top(top) if top != \"population_note_text\") {\n",
   "to": "                    if false {\n"
  }
 ]

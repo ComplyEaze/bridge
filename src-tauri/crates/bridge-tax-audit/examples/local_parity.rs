@@ -61,9 +61,10 @@
 //! crate may change a test's output only as a declared divergence (`tests/fixtures/divergences.json`,
 //! `src/divergence.rs`). Leading flags `--divergences FILE` and `--expect ID` (repeatable) take
 //! them into account: Rust's dump is set back to the oracle's value at each declared
-//! `real_book_keys` entry of the test before the comparison, which must then find nothing, and the
-//! declared keys that differed are printed. A divergence named by `--expect` that did not differ on
-//! this read fails the run (a read that holds the case it fixes must show it). The dump written to
+//! `real_book_keys` entry of each divergence named by `--expect` (the two go together) before the
+//! comparison, which must then find nothing, and the declared keys that differed are printed. A
+//! divergence not named stays strict, and one named that did not differ on this read fails the run
+//! (a read that holds the case it fixes must show it). The registry's sha256 is printed. The dump written to
 //! `RUST_DUMP_OUT` is Rust's own, unmasked.
 //!
 //! Prints one summary line, and every difference if there are any; exits non-zero on any
@@ -290,8 +291,10 @@ fn main() -> ExitCode {
         }
         args.drain(..2);
     }
-    if !expected_ids.is_empty() && divergence_file.is_none() {
-        return fail("--expect needs --divergences");
+    if expected_ids.is_empty() != divergence_file.is_none() {
+        return fail(
+            "--divergences and --expect go together: name the divergences this read must show",
+        );
     }
     if let Some(flag) = args.iter().find(|arg| arg.starts_with("--")) {
         return fail(format!("{flag}: flags come before TEST_ID"));
@@ -495,16 +498,23 @@ read (parity/python_golden.py --emit-bank-statement)",
     let divergences = match divergence_file.map(|path| {
         std::fs::read_to_string(&path)
             .map_err(|e| format!("{path}: {e}"))
-            .and_then(|text| divergence::parse(&text))
+            .and_then(|text| {
+                println!(
+                    "divergences: {path} sha256={}",
+                    bridge_tax_audit::canonical::hex(&Sha256::digest(text.as_bytes()))
+                );
+                divergence::parse(&text)
+            })
     }) {
         None => Vec::new(),
         Some(Ok(d)) => d,
         Some(Err(e)) => return fail(e),
     };
-    let (compared, declared) = match divergence::masked(&rust, &python, test_id, &divergences) {
-        Ok(masked) => masked,
-        Err(e) => return fail(format!("DIVERGENCES REFUSED: {e}")),
-    };
+    let (compared, declared) =
+        match divergence::masked(&rust, &python, test_id, &divergences, &expected_ids) {
+            Ok(masked) => masked,
+            Err(e) => return fail(format!("DIVERGENCES REFUSED: {e}")),
+        };
     let missing =
         match divergence::expected_missing(&expected_ids, &declared, test_id, &divergences) {
             Ok(missing) => missing,

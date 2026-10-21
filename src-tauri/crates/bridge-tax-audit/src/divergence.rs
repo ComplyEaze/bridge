@@ -155,7 +155,12 @@ pub fn parse(text: &str) -> Result<Vec<Divergence>, String> {
                     let k = k
                         .as_str()
                         .ok_or_else(|| format!("divergences: {id}: a real-book key is not text"))?;
-                    Key::parse(k).map_err(|e| format!("divergences: {id}: {e}"))?;
+                    let parsed = Key::parse(k).map_err(|e| format!("divergences: {id}: {e}"))?;
+                    if matches!(&parsed, Key::Top(top) if top != "population_note_text") {
+                        return Err(format!(
+                            "divergences: {id}: real-book key {k} is a whole list"
+                        ));
+                    }
                     if !real_keys.insert((text_of("test")?, k.to_string())) {
                         return Err(format!(
                             "divergences: {id}: real-book key {k} is declared twice"
@@ -167,6 +172,11 @@ pub fn parse(text: &str) -> Result<Vec<Divergence>, String> {
         };
         if expect.is_empty() && real_book_keys.is_empty() {
             return Err(format!("divergences: {id} declares nothing"));
+        }
+        if expect.is_empty() {
+            return Err(format!(
+                "divergences: {id} declares real-book keys with no hand-worked patch"
+            ));
         }
         out.push(Divergence {
             test: text_of("test")?,
@@ -345,16 +355,16 @@ pub fn patched(oracle: &Json, stem: &str, divergences: &[Divergence]) -> Result<
             if claimed || !keys.insert(key.clone()) {
                 return Err(format!("{}: {stem} {key} is claimed twice", d.id));
             }
-            if parsed.get(oracle) == Some(value)
-                || (value.is_null() && parsed.get(oracle).is_none())
-            {
-                return Err(format!("{}: {stem} {key} equals the oracle", d.id));
-            }
             let mut value = if parsed.hash_key().is_some() {
                 nfc_wording(value)
             } else {
                 value.clone()
             };
+            if parsed.get(oracle) == Some(&value)
+                || (value.is_null() && parsed.get(oracle).is_none())
+            {
+                return Err(format!("{}: {stem} {key} equals the oracle", d.id));
+            }
             if let Some(entry) = value.as_object_mut() {
                 // A whole entry added: its wording hashes are derived from its texts too, and it
                 // may not carry a hash of its own.
@@ -386,8 +396,9 @@ pub fn patched(oracle: &Json, stem: &str, divergences: &[Divergence]) -> Result<
     Ok(doc)
 }
 
-/// For a real-book parity run of `test_id`: Rust's dump with every declared real-book key of
-/// that test set back to the oracle's value, and the keys that differed. The caller then requires
+/// For a real-book parity run of `test_id`: Rust's dump with the declared real-book keys of the
+/// divergences named in `only` (the run's `--expect`) set back to the oracle's value, and the keys
+/// that differed. A divergence not named stays strict: a difference at its keys is a difference. The caller then requires
 /// [`crate::compare::compare`] to find nothing. A whole entry is masked only where one side lacks
 /// it (an entry both sides hold is masked field by field, so a change to its other fields still
 /// shows), and a list-valued top-level key is refused for the same reason. A masked wording field
@@ -397,10 +408,14 @@ pub fn masked(
     oracle: &Json,
     test_id: &str,
     divergences: &[Divergence],
+    only: &[String],
 ) -> Result<(Json, Vec<String>), String> {
     let mut doc = rust.clone();
     let mut differed = Vec::new();
-    for d in divergences.iter().filter(|d| d.test == test_id) {
+    for d in divergences
+        .iter()
+        .filter(|d| d.test == test_id && only.contains(&d.id))
+    {
         for key in &d.real_book_keys {
             let parsed = Key::parse(key).map_err(|e| format!("{}: {e}", d.id))?;
             let (want, got) = (parsed.get(oracle), parsed.get(rust));
@@ -560,6 +575,14 @@ mod tests {
                 json!({"real_book_keys": ["rules_version"]}),
                 "cannot be patched",
             ),
+            (
+                json!({"real_book_keys": ["book_invariant_violations"]}),
+                "whole list",
+            ),
+            (
+                json!({"expect": {}, "real_book_keys": ["figures[t.a].value"]}),
+                "no hand-worked patch",
+            ),
         ];
         for (change, why) in cases {
             let mut record = base.clone();
@@ -583,37 +606,57 @@ mod tests {
 
     #[test]
     fn a_real_book_run_masks_only_the_declared_keys_and_says_which_differed() {
-        let d = one(json!({}), json!(["figures[t.a].value", "figures[t.c]"]));
+        let d = one(
+            json!({"g": {"figures[t.a].value": 5}}),
+            json!(["figures[t.a].value", "figures[t.c]"]),
+        );
         let mut rust = dump();
         rust["figures"][0]["value"] = json!(9);
         rust["figures"]
             .as_array_mut()
             .unwrap()
             .push(json!({"id": "t.c", "value": 3, "unit": "count"}));
-        let (masked_rust, differed) = masked(&rust, &dump(), "t", &d).unwrap();
+        let (masked_rust, differed) =
+            masked(&rust, &dump(), "t", &d, &["DV-1".to_string()]).unwrap();
         assert_eq!(masked_rust, dump());
         assert_eq!(differed, ["DV-1: figures[t.a].value", "DV-1: figures[t.c]"]);
         // Another test's divergence masks nothing.
-        let (other, none) = masked(&rust, &dump(), "u", &d).unwrap();
+        let (other, none) = masked(&rust, &dump(), "u", &d, &["DV-1".to_string()]).unwrap();
         assert_eq!(other, rust);
         assert!(none.is_empty());
     }
 
     #[test]
     fn masking_cannot_hide_more_than_the_declared_fields() {
-        for (key, why) in [
-            ("figures[t.a]", "on both sides"),
-            ("book_invariant_violations", "whole list"),
-        ] {
-            let d = one(json!({}), json!([key]));
-            let err = masked(&dump(), &dump(), "t", &d).unwrap_err();
-            assert!(err.contains(why), "{key}: {err}");
-        }
+        let d = one(
+            json!({"g": {"figures[t.a].value": 5}}),
+            json!(["figures[t.a]"]),
+        );
+        let err = masked(&dump(), &dump(), "t", &d, &["DV-1".to_string()]).unwrap_err();
+        assert!(err.contains("on both sides"), "{err}");
+        // Only the divergences a run names are masked; the others stay strict.
+        let d = one(
+            json!({"g": {"figures[t.a].value": 5}}),
+            json!(["figures[t.a].value"]),
+        );
+        let mut rust = dump();
+        rust["figures"][0]["value"] = json!(9);
+        let (unmasked, none) = masked(&rust, &dump(), "t", &d, &[]).unwrap();
+        assert_eq!(unmasked, rust);
+        assert!(none.is_empty());
         // A field the oracle lacks is removed, not set to null.
-        let d = one(json!({}), json!(["figures[t.a].note"]));
+        let d = one(
+            json!({"g": {"figures[t.a].value": 5}}),
+            json!(["figures[t.a].note"]),
+        );
         let mut rust = dump();
         rust["figures"][0]["note"] = json!("x");
-        assert_eq!(masked(&rust, &dump(), "t", &d).unwrap().0, dump());
+        assert_eq!(
+            masked(&rust, &dump(), "t", &d, &["DV-1".to_string()])
+                .unwrap()
+                .0,
+            dump()
+        );
     }
 
     #[test]
@@ -685,7 +728,10 @@ mod tests {
 
     #[test]
     fn an_expected_divergence_must_exist_belong_to_the_test_and_show() {
-        let d = one(json!({}), json!(["figures[t.a].value"]));
+        let d = one(
+            json!({"g": {"figures[t.a].value": 5}}),
+            json!(["figures[t.a].value"]),
+        );
         let shown = vec!["DV-1: figures[t.a].value".to_string()];
         assert!(expected_missing(&["DV-1".into()], &shown, "t", &d)
             .unwrap()

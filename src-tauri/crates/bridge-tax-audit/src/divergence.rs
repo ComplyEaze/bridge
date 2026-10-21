@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value as Json;
 
-use crate::canonical::{hash_ordered, sha16};
+use crate::canonical::{hash_ordered, nfc, sha16};
 
 /// Each wording field and the hash the comparison reads for it.
 const TEXT_HASH: [(&str, &str); 5] = [
@@ -38,6 +38,15 @@ const TEXT_HASH: [(&str, &str); 5] = [
     ("limits_text", "limits_sha256_16"),
     ("ask_client_text", "ask_client_sha256_16"),
 ];
+
+/// A wording value as the canonical dump writes it: NFC-normalised, one text or a list.
+fn nfc_wording(value: &Json) -> Json {
+    match value {
+        Json::String(text) => Json::String(nfc(text)),
+        Json::Array(items) => Json::Array(items.iter().map(nfc_wording).collect()),
+        other => other.clone(),
+    }
+}
 
 /// The hash of a patched wording value: one text, or an ordered list of texts.
 fn wording_hash(value: &Json) -> Result<String, String> {
@@ -96,6 +105,7 @@ pub fn parse(text: &str) -> Result<Vec<Divergence>, String> {
         .as_array()
         .ok_or("divergences: the registry is not a list")?;
     let mut seen = BTreeSet::new();
+    let mut real_keys = BTreeSet::new();
     let mut out = Vec::new();
     for record in records {
         let fields = record
@@ -146,6 +156,11 @@ pub fn parse(text: &str) -> Result<Vec<Divergence>, String> {
                         .as_str()
                         .ok_or_else(|| format!("divergences: {id}: a real-book key is not text"))?;
                     Key::parse(k).map_err(|e| format!("divergences: {id}: {e}"))?;
+                    if !real_keys.insert((text_of("test")?, k.to_string())) {
+                        return Err(format!(
+                            "divergences: {id}: real-book key {k} is declared twice"
+                        ));
+                    }
                     Ok(k.to_string())
                 })
                 .collect::<Result<_, String>>()?,
@@ -335,9 +350,20 @@ pub fn patched(oracle: &Json, stem: &str, divergences: &[Divergence]) -> Result<
             {
                 return Err(format!("{}: {stem} {key} equals the oracle", d.id));
             }
-            let mut value = value.clone();
+            let mut value = if parsed.hash_key().is_some() {
+                nfc_wording(value)
+            } else {
+                value.clone()
+            };
             if let Some(entry) = value.as_object_mut() {
-                // A whole entry added: its wording hashes are derived from its texts too.
+                // A whole entry added: its wording hashes are derived from its texts too, and it
+                // may not carry a hash of its own.
+                if let Some(hash) = entry.keys().find(|k| k.ends_with("_sha256_16")) {
+                    return Err(format!(
+                        "{}: {stem} {key} carries {hash}: give its text",
+                        d.id
+                    ));
+                }
                 for (text, hash) in TEXT_HASH {
                     if let Some(words) = entry.get(text) {
                         let derived = wording_hash(words)
@@ -400,7 +426,7 @@ pub fn masked(
             parsed
                 .set(&mut doc, want.cloned().unwrap_or(Json::Null))
                 .map_err(|e| format!("{}: {e}", d.id))?;
-            if let (Some(hash), Some(_)) = (parsed.hash_key(), want) {
+            if let Some(hash) = parsed.hash_key() {
                 let oracle_hash = hash.get(oracle).cloned().unwrap_or(Json::Null);
                 hash.set(&mut doc, oracle_hash)
                     .map_err(|e| format!("{}: {e}", d.id))?;
@@ -543,8 +569,15 @@ mod tests {
             let err = parse(&json!([record]).to_string()).unwrap_err();
             assert!(err.contains(why), "{change}: {err}");
         }
-        let twice = json!([base.clone(), base]).to_string();
+        let twice = json!([base.clone(), base.clone()]).to_string();
         assert!(parse(&twice).unwrap_err().contains("appears twice"));
+        let mut a = base.clone();
+        a["real_book_keys"] = json!(["figures[t.a].value"]);
+        let mut b = a.clone();
+        b["id"] = json!("DV-2");
+        assert!(parse(&json!([a, b]).to_string())
+            .unwrap_err()
+            .contains("declared twice"));
         assert_eq!(parse("[]").unwrap(), Vec::new());
     }
 
@@ -631,6 +664,15 @@ mod tests {
             json!(hash_ordered(&["a".to_string(), "b".to_string()]))
         );
         assert_eq!(p["figures"][2]["definition_sha256_16"], json!(sha16("d")));
+        // An added entry may not carry a hash of its own.
+        let d = one(
+            json!({"g": {"figures[t.c]": {"id": "t.c", "value": 3, "unit": "count",
+                                          "definition_sha256_16": "0"}}}),
+            json!([]),
+        );
+        assert!(patched(&oracle, "g", &d)
+            .unwrap_err()
+            .contains("carries definition_sha256_16"));
         // A hash cannot be patched by itself.
         let err = parse(
             &json!([{"id": "DV-1", "issue": 1, "test": "t", "why": "w", "ca_answer": "c",

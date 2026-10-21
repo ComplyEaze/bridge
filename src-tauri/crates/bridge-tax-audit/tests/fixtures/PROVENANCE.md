@@ -430,7 +430,8 @@ uv run -q --python 3.13 --with openpyxl==3.1.5 --with xlrd==2.0.2 --with python-
     python parity/python_golden.py ENGINE ...   (or parity/edge_golden.py ENGINE BOOK OUT_DIR)
 ```
 
-The goldens are its output and are never regenerated from this crate. A fix that changes a test's output declares the change in `divergences.json`
+The goldens are its output and are never regenerated from this crate. A fix that changes a test's
+output declares the change in `divergences.json`
 (`src/divergence.rs` says what a record holds): the tests compare Rust's output with each golden
 with its declared patches applied, so a change on any undeclared input, or a declared patch that
 does not show, fails the comparison.

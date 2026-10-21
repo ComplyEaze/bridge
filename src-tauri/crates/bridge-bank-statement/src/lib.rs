@@ -1,6 +1,6 @@
 //! Bank-statement PDF → voucher proposals for Bridge's import builder.
 //!
-//! A port of the parsing half of `scripts/bank_statement_import.py`. The
+//! The parsing half of what was a standalone Python tool (removed, #1748). The
 //! pipeline, every stage of which fails closed:
 //!
 //! 1. [`pdf::extract_pages`] — word boxes of the text not in render mode 3, through

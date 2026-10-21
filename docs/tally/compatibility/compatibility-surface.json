@@ -152,10 +152,6 @@
       "path": "src-tauri/crates/bridge-bank-statement/src/cash.rs"
     },
     {
-      "path": "src-tauri/crates/bridge-bank-statement/src/csv_edge.rs",
-      "reason": "decides what is read from a customer's CSV export and what is refused, before any amount reaches a proposal"
-    },
-    {
       "path": "src-tauri/crates/bridge-bank-statement/src/date.rs"
     },
     {
@@ -184,9 +180,6 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-core/Cargo.toml"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-core/src/bills_reconciliation.rs"
     },
     {
       "path": "src-tauri/crates/bridge-tally-core/src/book_presence.rs"
@@ -220,9 +213,6 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/bills_native_outstandings_probe.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/bills_payments_observation.rs"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/currency_composite.rs"
@@ -406,9 +396,6 @@
       "path": "src-tauri/src/agent_change_parse.rs"
     },
     {
-      "path": "src-tauri/src/agent_changes.rs"
-    },
-    {
       "path": "src-tauri/src/agent_company.rs"
     },
     {
@@ -473,6 +460,10 @@
     {
       "path": "src-tauri/src/agent_import_span_identity.rs",
       "reason": "binds a native post's vouchers to the Tally vouchers its own POST created; a change there can attribute a posted voucher to the wrong Tally object, which is a false posted_verified"
+    },
+    {
+      "path": "src-tauri/src/agent_import_stop.rs",
+      "reason": "decides when a person's release lifts the stop a sent Sales invoice puts on its company, and what it records about the invoice; a defect there lets a second invoice post behind an unverified one, or lets a released invoice stand as sent or as the number control"
     },
     {
       "path": "src-tauri/src/agent_import_verification.rs"

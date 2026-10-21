@@ -1,404 +1,401 @@
-//! The CSV edge, on a layout invented for these tests. No shipped layout
-//! exists yet: a real one takes its header from a real export.
+//! The CSV edge on a private bank's export layout. Every file here is
+//! SYNTHETIC: rows invented for these tests in the layout a real export has
+//! (a preamble, nine columns, a closing-balance trailer); no value of
+//! the real file the layout was measured on is kept. The people, accounts and
+//! references below do not exist.
 
 mod common;
 
 use bridge_bank_statement::bank::{BALANCE, CREDIT, DATE, DEBIT, NARRATION};
-use bridge_bank_statement::csv_edge::{read_rows, CsvLayout, DateFormat, Grouping, RowOrder};
+use bridge_bank_statement::csv_edge::{read_statement, CHQ_REF};
 use bridge_bank_statement::money::reconcile;
-use bridge_tally_primitives::ExactDecimal;
 use common::refuses;
 
-const HEADER: &str = "Date,Narration,Withdrawal,Deposit,Balance";
+const HEADER: &str = "\"Sl. No.\",\"Transaction Date\",\"Value Date\",\"Description\",\"Chq /Ref No.\",\"Amount\",\"Dr / Cr\",\"Balance\",\"Dr / Cr\"";
 
-const OLDEST_FIRST: CsvLayout = CsvLayout {
-    id: "test_oldest_first",
-    header: &["Date", "Narration", "Withdrawal", "Deposit", "Balance"],
-    date: 0,
-    date_format: DateFormat::DayMonthYearHyphen,
-    order: RowOrder::OldestFirst,
-    narration: 1,
-    debit: 2,
-    credit: 3,
-    balance: 4,
-    grouping: Grouping::Western,
-};
-
-fn file(lines: &[&str]) -> Vec<u8> {
-    let mut text = String::from(HEADER);
-    for line in lines {
-        text.push('\n');
-        text.push_str(line);
-    }
-    text.into_bytes()
+/// The preamble of an export: ragged rows, key/value pairs beside the address.
+fn preamble() -> Vec<String> {
+    vec![
+        "\"\",\"\",\"Account Statement\"".to_string(),
+        "\"SYNTHETIC LAB CUSTOMER\",\"\",\"\",\"\",\"Cust. Reln. No.\",\"000000000\"".to_string(),
+        "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"Account No.\",\"000000000000\"".to_string(),
+        "\"SYNTHETIC CITY 000000\",\"\",\"\",\"\",\"Period\",\"From 01/04/2025 To 31/03/2026\""
+            .to_string(),
+        "\"\",\"\",\"\",\"\",\"Currency\",\"INR\"".to_string(),
+        String::new(),
+    ]
 }
 
-const TWO_ROWS: [&str; 2] = [
-    "01-08-2026,UPI/SYNTHETIC PAYEE,,\"1,500.00\",\"11,500.00\"",
-    "02-08-2026,NEFT/SYNTHETIC SUPPLIER,250.5,,\"11,249.50\"",
-];
+type Txn<'a> = (
+    &'a str,
+    &'a str,
+    &'a str,
+    &'a str,
+    &'a str,
+    &'a str,
+    &'a str,
+);
+
+/// `(transaction date, value date, description, ref, amount, amount side, balance, balance side)`
+/// without the serial: it is added in order.
+fn transaction(serial: usize, t: &Txn<'_>, balance_side: &str) -> String {
+    format!(
+        "\"{serial}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{balance_side}\"",
+        t.0, t.1, t.2, t.3, t.4, t.5, t.6
+    )
+}
+
+fn trailer(closing: &str) -> Vec<String> {
+    vec![
+        format!("\"Closing Balance\",\"as on 31/03/2026 INR {closing}\""),
+        String::new(),
+        "\"Important Note:\"".to_string(),
+        "\"The transaction date is the posting time.\"".to_string(),
+        String::new(),
+    ]
+}
+
+const FIRST: Txn<'static> = (
+    "02-04-2025 10:15:00",
+    "02-04-2025",
+    "UPI/SYNTHETIC PAYER/lab",
+    "SYN 000001  A",
+    "1,500.00",
+    "CR",
+    "11,500.00",
+);
+const SECOND: Txn<'static> = (
+    "03-04-2025 09:00:01",
+    "03-04-2025",
+    "NEFT/SYNTHETIC, SUPPLIER/lab",
+    "",
+    "250.50",
+    "DR",
+    "11,249.50",
+);
+/// Interest posted after midnight takes the previous day as its value date.
+const THIRD: Txn<'static> = (
+    "01-07-2025 00:00:05",
+    "30-06-2025",
+    "INT.PD SYNTHETIC",
+    "SYN 000003",
+    "99,999.50",
+    "CR",
+    "1,11,249.00",
+);
+
+fn file(rows: &[(Txn<'_>, &str)], closing: &str) -> Vec<u8> {
+    let mut lines = preamble();
+    lines.push(HEADER.to_string());
+    for (index, (row, balance_side)) in rows.iter().enumerate() {
+        lines.push(transaction(index + 1, row, balance_side));
+    }
+    lines.extend(trailer(closing));
+    lines.join("\n").into_bytes()
+}
+
+fn good() -> Vec<u8> {
+    file(
+        &[(FIRST, "CR"), (SECOND, "CR"), (THIRD, "CR")],
+        "1,11,249.00",
+    )
+}
+
+fn decimal(text: &str) -> bridge_tally_primitives::ExactDecimal {
+    bridge_tally_primitives::ExactDecimal::parse(text.to_string()).unwrap()
+}
 
 #[test]
-fn a_matching_file_becomes_rows_with_iso_dates_and_plain_two_place_amounts() {
-    let rows = read_rows(&file(&TWO_ROWS), &OLDEST_FIRST).unwrap();
-    assert_eq!(rows.len(), 2);
-    assert_eq!(rows[0].get(DATE), "2026-08-01");
-    assert_eq!(rows[0].get(NARRATION), "UPI/SYNTHETIC PAYEE");
+fn a_matching_file_becomes_rows_on_the_value_date_with_plain_two_place_amounts() {
+    let statement = read_statement(&good()).unwrap();
+    assert_eq!(statement.rows.len(), 3);
+    let first = &statement.rows[0];
+    assert_eq!(first.get(DATE), "2025-04-02");
+    assert_eq!(first.get(NARRATION), "UPI/SYNTHETIC PAYER/lab");
+    // The reference keeps its internal run of spaces, apart from the description.
+    assert_eq!(first.get(CHQ_REF), "SYN 000001  A");
     assert_eq!(
-        (
-            rows[0].get(DEBIT),
-            rows[0].get(CREDIT),
-            rows[0].get(BALANCE)
-        ),
+        (first.get(DEBIT), first.get(CREDIT), first.get(BALANCE)),
         ("", "1500.00", "11500.00")
     );
-    // 250.5 is read as 250.50
-    assert_eq!(rows[1].get(DEBIT), "250.50");
-    // the rows run through the existing running-balance proof unchanged
-    let opening = ExactDecimal::parse("10000.00".to_string()).unwrap();
-    let closing = ExactDecimal::parse("11249.50".to_string()).unwrap();
-    reconcile(&rows, &opening, &closing).unwrap();
+    let second = &statement.rows[1];
+    // A comma inside a quoted description is part of it; an empty reference is empty.
+    assert_eq!(second.get(NARRATION), "NEFT/SYNTHETIC, SUPPLIER/lab");
+    assert_eq!(second.get(CHQ_REF), "");
+    assert_eq!((second.get(DEBIT), second.get(CREDIT)), ("250.50", ""));
+    // The value date, not the posting date, is the row's date.
+    assert_eq!(statement.rows[2].get(DATE), "2025-06-30");
+    assert_eq!(statement.rows[2].get(BALANCE), "111249.00");
+    assert!(statement.opening.numeric_eq(&decimal("10000.00")));
+    assert!(statement.closing.numeric_eq(&decimal("111249.00")));
 }
 
 #[test]
-fn a_header_that_is_not_the_layouts_is_refused_and_never_guessed() {
-    for header in [
-        "Date,Narration,Withdrawal,Deposit",
-        "Narration,Date,Withdrawal,Deposit,Balance",
-        "Date,Narration,Withdrawal,Deposit,Balance ",
-        "date,narration,withdrawal,deposit,balance",
-        "",
-    ] {
-        let bytes = format!("{header}\n{}\n", TWO_ROWS[0]).into_bytes();
-        refuses(read_rows(&bytes, &OLDEST_FIRST), "layout_unknown");
-    }
-}
-
-#[test]
-fn a_utf8_byte_order_mark_is_stripped_and_anything_else_that_is_not_utf8_is_refused() {
-    let mut with_mark = b"\xef\xbb\xbf".to_vec();
-    with_mark.extend(file(&TWO_ROWS));
-    assert_eq!(read_rows(&with_mark, &OLDEST_FIRST).unwrap().len(), 2);
-
-    let text = String::from_utf8(file(&TWO_ROWS)).unwrap();
-    let mut le = b"\xff\xfe".to_vec();
-    le.extend(text.encode_utf16().flat_map(u16::to_le_bytes));
-    let mut be = b"\xfe\xff".to_vec();
-    be.extend(text.encode_utf16().flat_map(u16::to_be_bytes));
-    let mut nul = file(&TWO_ROWS);
-    nul.insert(10, 0);
-    let invalid = [file(&TWO_ROWS), vec![0xc3, 0x28]].concat();
-    for bytes in [le, be, nul, invalid] {
-        refuses(read_rows(&bytes, &OLDEST_FIRST), "encoding_unsupported");
-    }
-}
-
-#[test]
-fn a_ragged_or_stray_line_is_refused_at_its_row() {
-    for stray in ["TOTAL,5", "02-08-2026,A,B,C,D,E"] {
-        let refusal = refuses(
-            read_rows(&file(&[TWO_ROWS[0], stray]), &OLDEST_FIRST),
-            "malformed_row",
-        );
-        assert_eq!(refusal.row, Some(2));
-    }
-}
-
-#[test]
-fn a_quoted_narration_with_a_comma_and_a_line_break_is_one_narration() {
-    let rows = read_rows(
-        &file(&["01-08-2026,\"PAID, TO\nSYNTHETIC PAYEE\",,\"1,500.00\",\"11,500.00\""]),
-        &OLDEST_FIRST,
-    )
-    .unwrap();
-    assert_eq!(rows[0].get(NARRATION), "PAID, TO\nSYNTHETIC PAYEE");
-}
-
-#[test]
-fn a_date_outside_the_layouts_format_is_refused_including_a_spreadsheets_rewrite() {
-    let slash = CsvLayout {
-        date_format: DateFormat::DayMonthYearSlash,
-        ..OLDEST_FIRST
-    };
-    for (layout, date) in [
-        (&OLDEST_FIRST, "5-8-2026"),
-        (&OLDEST_FIRST, "01/08/2026"),
-        (&OLDEST_FIRST, "31-02-2026"),
-        (&OLDEST_FIRST, "01-08-26"),
-        (&slash, "5/9/2026"),
-        (&slash, "01-08-2026"),
-    ] {
-        let line = format!("{date},A,,\"1.00\",\"2.00\"");
-        let refusal = refuses(read_rows(&file(&[&line]), layout), "unparseable_date");
-        assert_eq!(refusal.row, Some(1), "{date}");
-    }
-    let line = "01/08/2026,A,,\"1.00\",\"2.00\"";
-    assert_eq!(
-        read_rows(&file(&[line]), &slash).unwrap()[0].get(DATE),
-        "2026-08-01"
+fn the_rows_run_through_the_running_balance_proof_unchanged() {
+    let statement = read_statement(&good()).unwrap();
+    reconcile(&statement.rows, &statement.opening, &statement.closing).unwrap();
+    // A balance one paisa off breaks the chain the proof replays.
+    let bytes = String::from_utf8(good())
+        .unwrap()
+        .replace("\"11,249.50\"", "\"11,249.51\"");
+    let broken = read_statement(bytes.as_bytes()).unwrap();
+    refuses(
+        reconcile(&broken.rows, &broken.opening, &broken.closing),
+        "balance_chain_broken",
     );
 }
 
 #[test]
-fn rows_out_of_the_declared_order_are_refused_and_a_newest_first_file_is_returned_oldest_first() {
-    let reversed = [TWO_ROWS[1], TWO_ROWS[0]];
-    let refusal = refuses(
-        read_rows(&file(&reversed), &OLDEST_FIRST),
-        "date_order_broken",
+fn a_debit_balance_is_negative_by_its_own_indicator() {
+    // synthetic: an overdrawn account after the second row.
+    let overdrawn: Txn<'static> = (
+        "04-04-2025 10:00:00",
+        "04-04-2025",
+        "CHQ CLEARING SYNTHETIC",
+        "000123",
+        "12,000.00",
+        "DR",
+        "750.50",
     );
-    assert_eq!(refusal.row, Some(2));
-
-    let newest_first = CsvLayout {
-        order: RowOrder::NewestFirst,
-        ..OLDEST_FIRST
-    };
-    let refusal = refuses(
-        read_rows(&file(&TWO_ROWS), &newest_first),
-        "date_order_broken",
+    let recovered: Txn<'static> = (
+        "05-04-2025 10:00:00",
+        "05-04-2025",
+        "NEFT/SYNTHETIC PAYER/lab",
+        "SYN 000002",
+        "1,00,000.00",
+        "CR",
+        "99,249.50",
     );
-    assert_eq!(refusal.row, Some(2));
-    let rows = read_rows(&file(&reversed), &newest_first).unwrap();
-    assert_eq!(rows[0].get(DATE), "2026-08-01");
-    assert_eq!(rows[1].get(DATE), "2026-08-02");
-
-    // equal dates are in order either way (a newest-first file reverses same-day rows)
-    let same_day = [TWO_ROWS[0], TWO_ROWS[0]];
-    assert_eq!(read_rows(&file(&same_day), &OLDEST_FIRST).unwrap().len(), 2);
-    assert_eq!(read_rows(&file(&same_day), &newest_first).unwrap().len(), 2);
+    let bytes = file(
+        &[
+            (FIRST, "CR"),
+            (SECOND, "CR"),
+            (overdrawn, "DR"),
+            (recovered, "CR"),
+        ],
+        "99,249.50",
+    );
+    let statement = read_statement(&bytes).unwrap();
+    // The debit balance is negative; the credit balance after it is positive again.
+    assert_eq!(statement.rows[2].get(BALANCE), "-750.50");
+    assert_eq!(statement.rows[3].get(BALANCE), "99249.50");
+    reconcile(&statement.rows, &statement.opening, &statement.closing).unwrap();
+    // A file that ends on a debit balance has a closing line of a spelling that
+    // has not been seen: its plain positive form does not equal the balance, so
+    // it is refused, not guessed at.
+    let overdrawn_end = file(
+        &[(FIRST, "CR"), (SECOND, "CR"), (overdrawn, "DR")],
+        "750.50",
+    );
+    refuses(read_statement(&overdrawn_end), "closing_balance_differs");
 }
 
 #[test]
-fn an_amount_outside_the_declared_grouping_is_refused() {
-    let indian = CsvLayout {
-        grouping: Grouping::Indian,
-        ..OLDEST_FIRST
-    };
-    let plain = CsvLayout {
-        grouping: Grouping::None,
-        ..OLDEST_FIRST
-    };
-    let amount = |layout: &CsvLayout, cell: &str| {
-        let line = format!("01-08-2026,A,,\"{cell}\",\"1.00\"");
-        read_rows(&file(&[&line]), layout)
-    };
-    // the declared grouping reads, to two places
-    assert_eq!(
-        amount(&OLDEST_FIRST, "1,234,567.5").unwrap()[0].get(CREDIT),
-        "1234567.50"
-    );
-    assert_eq!(
-        amount(&indian, "12,34,567.50").unwrap()[0].get(CREDIT),
-        "1234567.50"
-    );
-    assert_eq!(
-        amount(&plain, "1234567").unwrap()[0].get(CREDIT),
-        "1234567.00"
-    );
-    // anything else is refused, including an ungrouped or regrouped cell
-    for (layout, cell) in [
-        (&OLDEST_FIRST, "1000.00"),
-        (&OLDEST_FIRST, "12,34,567.50"),
-        (&OLDEST_FIRST, "1,0000.00"),
-        (&OLDEST_FIRST, "1E+03"),
-        (&OLDEST_FIRST, "1.234"),
-        (&OLDEST_FIRST, "-5.00"),
-        (&indian, "1,234,567.50"),
-        (&plain, "1,000.00"),
-        (&plain, "1.234"),
-        (&indian, "1.234"),
-    ] {
-        let refusal = refuses(amount(layout, cell), "malformed_amount");
-        assert_eq!(refusal.row, Some(1), "{cell}");
-    }
-}
-
-#[test]
-fn a_negative_amount_is_refused_on_either_side() {
-    for line in [
-        "01-08-2026,A,\"-5.00\",,\"1.00\"",
-        "01-08-2026,A,,\"-5.00\",\"1.00\"",
-    ] {
-        let refusal = refuses(read_rows(&file(&[line]), &OLDEST_FIRST), "malformed_amount");
-        assert_eq!(refusal.row, Some(1));
-    }
-}
-
-#[test]
-fn a_balance_may_be_negative_but_not_blank() {
-    let negative = "01-08-2026,A,\"5.00\",,\"-5.00\"";
-    assert_eq!(
-        read_rows(&file(&[negative]), &OLDEST_FIRST).unwrap()[0].get(BALANCE),
-        "-5.00"
-    );
-    let blank = "01-08-2026,A,\"5.00\",,";
-    let refusal = refuses(
-        read_rows(&file(&[blank]), &OLDEST_FIRST),
-        "malformed_balance",
-    );
-    assert_eq!(refusal.row, Some(1));
-    let bad = "01-08-2026,A,\"5.00\",,\"1,00.00\"";
-    let refusal = refuses(
-        read_rows(&file(&[TWO_ROWS[0], bad]), &OLDEST_FIRST),
-        "malformed_balance",
-    );
-    assert_eq!(refusal.row, Some(2));
-}
-
-#[test]
-fn the_same_figures_in_two_groupings_read_to_identical_rows() {
-    // the transaction id hashes the row's text, so it must not depend on how
-    // the bank grouped the digits
-    let western = read_rows(
-        &file(&["01-08-2026,A,,\"1,234,567.50\",\"2,000,000.00\""]),
-        &OLDEST_FIRST,
-    )
-    .unwrap();
-    let indian = CsvLayout {
-        grouping: Grouping::Indian,
-        ..OLDEST_FIRST
-    };
-    let lakh = read_rows(
-        &file(&["01-08-2026,A,,\"12,34,567.50\",\"20,00,000.00\""]),
-        &indian,
-    )
-    .unwrap();
-    assert_eq!(western, lakh);
-}
-
-#[test]
-fn each_column_is_read_from_the_layouts_own_index() {
-    // balance first, then date, credit, narration, debit
-    let permuted = CsvLayout {
-        header: &["Balance", "Date", "Deposit", "Narration", "Withdrawal"],
-        date: 1,
-        narration: 3,
-        debit: 4,
-        credit: 2,
-        balance: 0,
-        ..OLDEST_FIRST
-    };
-    let bytes = "Balance,Date,Deposit,Narration,Withdrawal\n\"11,500.00\",01-08-2026,\"1,500.00\",PAYEE,\n\"11,249.50\",02-08-2026,,SUPPLIER,250.5\n"
-        .as_bytes();
-    let rows = read_rows(bytes, &permuted).unwrap();
-    let read: Vec<[&str; 5]> = rows
-        .iter()
-        .map(|row| {
-            [
-                row.get(DATE),
-                row.get(NARRATION),
-                row.get(DEBIT),
-                row.get(CREDIT),
-                row.get(BALANCE),
-            ]
-        })
+fn encodings_the_export_does_not_use_are_refused() {
+    let utf16: Vec<u8> = "\"Sl. No.\"\n"
+        .encode_utf16()
+        .flat_map(|unit| unit.to_le_bytes())
         .collect();
+    refuses(read_statement(&utf16), "encoding_unsupported");
+    let mut with_bom = vec![0xEF, 0xBB, 0xBF];
+    with_bom.extend(good());
+    refuses(read_statement(&with_bom), "encoding_unsupported");
+    let crlf = String::from_utf8(good()).unwrap().replace('\n', "\r\n");
+    refuses(read_statement(crlf.as_bytes()), "encoding_unsupported");
+    let mut nul = good();
+    nul.push(0);
+    refuses(read_statement(&nul), "encoding_unsupported");
+}
+
+#[test]
+fn a_header_that_is_not_exactly_the_exports_is_layout_unknown() {
+    let text = String::from_utf8(good()).unwrap();
+    // A renamed cell.
+    let renamed = text.replace("\"Chq /Ref No.\"", "\"Cheque No.\"");
+    refuses(read_statement(renamed.as_bytes()), "layout_unknown");
+    // A space-padded cell.
+    let padded = text.replace("\"Balance\"", "\"Balance \"");
+    refuses(read_statement(padded.as_bytes()), "layout_unknown");
+    // No header at all.
+    let missing = text.replace(HEADER, "\"x\"");
+    refuses(read_statement(missing.as_bytes()), "layout_unknown");
+    // The header twice.
+    let twice = text.replace(HEADER, &format!("{HEADER}\n{HEADER}"));
+    refuses(read_statement(twice.as_bytes()), "layout_unknown");
+    // A preamble line that is not quoted fields.
+    let loose = text.replace("\"Account Statement\"", "Account Statement");
+    refuses(read_statement(loose.as_bytes()), "layout_unknown");
+}
+
+#[test]
+fn the_header_is_found_by_content_whatever_the_length_of_the_address_block() {
+    let text = String::from_utf8(good()).unwrap();
+    let longer = text.replace(
+        "\"1 SYNTHETIC ROAD\"",
+        "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"x\",\"y\"\n\"2 SYNTHETIC LANE\",\"\",\"\"\n\"1 SYNTHETIC ROAD\"",
+    );
+    let statement = read_statement(longer.as_bytes()).unwrap();
+    assert_eq!(statement.rows.len(), 3);
+}
+
+#[test]
+fn a_line_that_is_not_the_exports_quoting_is_a_malformed_row() {
+    let text = String::from_utf8(good()).unwrap();
+    // An unquoted field.
+    let unquoted = text.replace("\"250.50\"", "250.50");
+    refuses(read_statement(unquoted.as_bytes()), "malformed_row");
+    // A column short.
+    let short = text.replace(",\"DR\",\"11,249.50\",\"CR\"", ",\"DR\",\"11,249.50\"");
+    refuses(read_statement(short.as_bytes()), "malformed_row");
+    // A quoted line break.
+    let broken = text.replace("SYNTHETIC, SUPPLIER", "SYNTHETIC,\nSUPPLIER");
+    refuses(read_statement(broken.as_bytes()), "malformed_row");
+    // A blank line between transactions.
+    let blank = text.replace("\n\"2\",", "\n\n\"2\",");
+    refuses(read_statement(blank.as_bytes()), "malformed_row");
+    // Text after a closing quote.
+    let trailing = text.replace("\"250.50\"", "\"250.50\"x");
+    refuses(read_statement(trailing.as_bytes()), "malformed_row");
+}
+
+#[test]
+fn a_doubled_quote_inside_a_description_is_one_quote() {
+    let text = String::from_utf8(good()).unwrap();
+    let quoted = text.replace("UPI/SYNTHETIC PAYER/lab", "UPI/SYNTHETIC \"\"PAYER\"\"/lab");
+    let statement = read_statement(quoted.as_bytes()).unwrap();
     assert_eq!(
-        read,
-        [
-            ["2026-08-01", "PAYEE", "", "1500.00", "11500.00"],
-            ["2026-08-02", "SUPPLIER", "250.50", "", "11249.50"],
-        ]
+        statement.rows[0].get(NARRATION),
+        "UPI/SYNTHETIC \"PAYER\"/lab"
     );
 }
 
 #[test]
-fn a_layout_whose_columns_are_not_distinct_columns_of_its_header_is_refused() {
-    for broken in [
-        CsvLayout {
-            balance: 5,
-            ..OLDEST_FIRST
-        },
-        CsvLayout {
-            credit: 2,
-            ..OLDEST_FIRST
-        },
-        CsvLayout {
-            narration: 0,
-            ..OLDEST_FIRST
-        },
+fn the_serial_must_run_one_two_three() {
+    let text = String::from_utf8(good()).unwrap();
+    let skipped = text.replace("\n\"3\",", "\n\"4\",");
+    refuses(read_statement(skipped.as_bytes()), "serial_broken");
+    let repeated = text.replace("\n\"2\",", "\n\"1\",");
+    let refusal = refuses(read_statement(repeated.as_bytes()), "serial_broken");
+    assert_eq!(refusal.row, Some(2));
+}
+
+#[test]
+fn dates_are_checked_for_shape_validity_and_order() {
+    let text = String::from_utf8(good()).unwrap();
+    // No time on the transaction date.
+    let no_time = text.replace("03-04-2025 09:00:01", "03-04-2025");
+    refuses(read_statement(no_time.as_bytes()), "unparseable_date");
+    // A time that is not a time.
+    let hour = text.replace("03-04-2025 09:00:01", "03-04-2025 24:00:01");
+    refuses(read_statement(hour.as_bytes()), "unparseable_date");
+    // A date that is not a date.
+    let day = text.replace("03-04-2025 09:00:01", "31-04-2025 09:00:01");
+    refuses(read_statement(day.as_bytes()), "unparseable_date");
+    // A value date a spreadsheet rewrote.
+    let value = text.replace("\"03-04-2025\"", "\"3/4/2025\"");
+    refuses(read_statement(value.as_bytes()), "unparseable_date");
+    // Posting order broken by one second.
+    let order = text.replace("03-04-2025 09:00:01", "02-04-2025 10:14:59");
+    refuses(read_statement(order.as_bytes()), "date_order_broken");
+}
+
+#[test]
+fn amounts_and_balances_are_only_the_exports_spelling() {
+    let text = String::from_utf8(good()).unwrap();
+    for (from, to) in [
+        // One decimal.
+        ("\"99,999.50\"", "\"99,999.5\""),
+        // No grouping, Western grouping.
+        ("\"1,500.00\"", "\"1500.00\""),
+        ("\"1,500.00\"", "\"1,234,567.00\""),
+        ("\"1,500.00\"", "\"1,500.000\""),
+        ("\"1,500.00\"", "\"-1,500.00\""),
+        ("\"1,500.00\"", "\"01,500.00\""),
+        ("\"1,500.00\"", "\"1,50.00\""),
+        ("\"1,500.00\"", "\"\""),
+        ("\"1,500.00\"", "\"1,500.00 \""),
     ] {
-        refuses(read_rows(&file(&TWO_ROWS), &broken), "layout_invalid");
+        let edited = text.replace(from, to);
+        refuses(read_statement(edited.as_bytes()), "malformed_amount");
     }
+    let balance = text.replace("\"11,249.50\"", "\"11249.50\"");
+    refuses(read_statement(balance.as_bytes()), "malformed_balance");
+    let blank = text.replace("\"11,249.50\"", "\"\"");
+    refuses(read_statement(blank.as_bytes()), "malformed_balance");
 }
 
 #[test]
-fn a_leading_zero_is_refused_so_one_value_has_one_spelling() {
-    let plain = CsvLayout {
-        grouping: Grouping::None,
-        ..OLDEST_FIRST
-    };
-    let indian = CsvLayout {
-        grouping: Grouping::Indian,
-        ..OLDEST_FIRST
-    };
-    let amount = |layout: &CsvLayout, cell: &str| {
-        read_rows(
-            &file(&[&format!("01-08-2026,A,,\"{cell}\",\"1.00\"")]),
-            layout,
-        )
-    };
-    for (layout, cell) in [
-        (&OLDEST_FIRST, "0,100.00"),
-        (&OLDEST_FIRST, "01.50"),
-        (&plain, "007.50"),
-        (&indian, "0,100.00"),
-        (&indian, "01,234.00"),
+fn a_direction_other_than_dr_or_cr_is_refused_on_either_side() {
+    let text = String::from_utf8(good()).unwrap();
+    let amount_side = text.replace("\"250.50\",\"DR\"", "\"250.50\",\"Dr\"");
+    refuses(read_statement(amount_side.as_bytes()), "direction_unknown");
+    let balance_side = text.replace("\"11,249.50\",\"CR\"", "\"11,249.50\",\"\"");
+    refuses(read_statement(balance_side.as_bytes()), "direction_unknown");
+}
+
+#[test]
+fn the_trailer_must_be_there_close_the_chain_and_hold_no_rows() {
+    let text = String::from_utf8(good()).unwrap();
+    // No closing line.
+    let cut = text.split("\"Closing Balance\"").next().unwrap();
+    refuses(read_statement(cut.as_bytes()), "trailer_missing");
+    // A closing line that is not the last balance.
+    let differs = text.replace("INR 1,11,249.00", "INR 1,11,249.01");
+    refuses(
+        read_statement(differs.as_bytes()),
+        "closing_balance_differs",
+    );
+    // A closing line in another spelling.
+    let spelled = text.replace("as on 31/03/2026 INR 1,11,249.00", "INR 111249.00");
+    refuses(
+        read_statement(spelled.as_bytes()),
+        "closing_balance_unreadable",
+    );
+    // A row after the closing line.
+    let mut after = text.clone();
+    after.push_str(&format!("{}\n", transaction(4, &FIRST, "CR")));
+    refuses(read_statement(after.as_bytes()), "trailer_unexpected");
+    // Nothing between the header and the closing line.
+    let empty = file(&[], "0.00");
+    refuses(read_statement(&empty), "empty_statement");
+}
+
+#[test]
+fn a_cell_too_long_to_be_an_amount_is_refused_not_a_panic() {
+    // synthetic: a grouping-valid amount of about 270 bytes.
+    let long = format!("1{},000.00", ",00".repeat(90));
+    let text = String::from_utf8(good()).unwrap();
+    let amount = text.replace("\"1,500.00\"", &format!("\"{long}\""));
+    refuses(read_statement(amount.as_bytes()), "malformed_amount");
+    let balance = text.replace("\"11,249.50\"", &format!("\"{long}\""));
+    refuses(read_statement(balance.as_bytes()), "malformed_balance");
+    let closing = text.replace("INR 1,11,249.00", &format!("INR {long}"));
+    refuses(
+        read_statement(closing.as_bytes()),
+        "closing_balance_unreadable",
+    );
+}
+
+#[test]
+fn a_closing_line_with_an_impossible_date_is_unreadable() {
+    let text = String::from_utf8(good()).unwrap();
+    let date = text.replace("as on 31/03/2026", "as on 99/99/9999");
+    refuses(
+        read_statement(date.as_bytes()),
+        "closing_balance_unreadable",
+    );
+}
+
+#[test]
+fn stray_quotes_are_a_malformed_row() {
+    let text = String::from_utf8(good()).unwrap();
+    // An unterminated quote, a lone quote, and a quote inside a quoted cell.
+    for (from, to) in [
+        ("\"SYN 000001  A\"", "\"SYN 000001  A"),
+        ("\"250.50\"", "\""),
+        ("\"250.50\"", "\"250\"50\""),
     ] {
-        let refusal = refuses(amount(layout, cell), "malformed_amount");
-        assert_eq!(refusal.row, Some(1), "{cell}");
+        let edited = text.replace(from, to);
+        refuses(read_statement(edited.as_bytes()), "malformed_row");
     }
-    // zero itself, and a fraction below one, are fine
-    assert_eq!(amount(&plain, "0").unwrap()[0].get(CREDIT), "0.00");
-    assert_eq!(
-        amount(&OLDEST_FIRST, "0.50").unwrap()[0].get(CREDIT),
-        "0.50"
-    );
-}
-
-#[test]
-fn a_file_with_no_rows_is_not_an_error_at_the_edge_and_an_empty_file_is_no_layout() {
-    // the running-balance proof refuses an empty statement; the edge does not decide that
-    assert!(read_rows(&file(&[]), &OLDEST_FIRST).unwrap().is_empty());
-    refuses(read_rows(b"", &OLDEST_FIRST), "layout_unknown");
-}
-
-#[test]
-fn whitespace_around_a_date_or_an_amount_cell_is_trimmed() {
-    let line = "01-08-2026,  A  ,,\" 5.00 \",\"1.00\"";
-    let rows = read_rows(&file(&[line]), &OLDEST_FIRST).unwrap();
-    assert_eq!(rows[0].get(CREDIT), "5.00");
-    assert_eq!(rows[0].get(NARRATION), "A");
-    let padded_date = " 01-08-2026,A,,\"5.00\",\"1.00\"";
-    assert_eq!(
-        read_rows(&file(&[padded_date]), &OLDEST_FIRST).unwrap()[0].get(DATE),
-        "2026-08-01"
-    );
-}
-
-#[test]
-fn which_amount_cells_a_row_fills_is_left_to_the_later_stages() {
-    // both filled: read here, refused by the running-balance proof
-    let both = "01-08-2026,A,\"5.00\",\"5.00\",\"10,000.00\"";
-    let rows = read_rows(&file(&[both]), &OLDEST_FIRST).unwrap();
-    assert_eq!((rows[0].get(DEBIT), rows[0].get(CREDIT)), ("5.00", "5.00"));
-    let opening = ExactDecimal::parse("10000.00".to_string()).unwrap();
-    let refusal = refuses(reconcile(&rows, &opening, &opening), "two_sided_row");
-    assert_eq!(refusal.row, Some(1));
-    // neither filled: read here, and the proof accepts a row that moves nothing
-    let neither = "01-08-2026,A,,,\"10,000.00\"";
-    let rows = read_rows(&file(&[neither]), &OLDEST_FIRST).unwrap();
-    assert_eq!((rows[0].get(DEBIT), rows[0].get(CREDIT)), ("", ""));
-    reconcile(&rows, &opening, &opening).unwrap();
-}
-
-#[test]
-fn a_narration_is_kept_as_written_after_trimming() {
-    for narration in ["=1+2", "+91 PAYEE", "-PAYEE", "@PAYEE", "A\u{1b}B"] {
-        let line = format!("01-08-2026,{narration},,\"5.00\",\"1.00\"");
-        let rows = read_rows(&file(&[&line]), &OLDEST_FIRST).unwrap();
-        assert_eq!(rows[0].get(NARRATION), narration);
-    }
-    let spanning = "01-08-2026,\"A\nB\",,\"5.00\",\"1.00\"";
-    let rows = read_rows(&file(&[spanning]), &OLDEST_FIRST).unwrap();
-    assert_eq!(rows[0].get(NARRATION), "A\nB");
 }

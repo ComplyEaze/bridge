@@ -14,7 +14,9 @@ Apache-2.0 builds from current source stays unambiguous.
 
 **Added**
 
-- `audit_test_run` runs one tax-audit test on a company's own books for a date range, today only `cash_44ab`:
+- `audit_test_run`, off by default behind the extension's new **Allow tax-audit test runs (audit_test_run)**
+  setting (`BRIDGE_AGENT_ENABLE_TAX_AUDIT`; off, it is not listed and a call is refused as `audit_tool_disabled`),
+  runs one tax-audit test on a company's own books for a date range, today only `cash_44ab`:
   figure and finding ids with their values, confidence and clauses, and the count of any failed book check,
   with no ledger, party or voucher name; you name the cash and bank groups. Books only, not a tax opinion;
   refused while a redaction setting is on (`audit_redaction_unsupported`), and for a period outside

@@ -292,6 +292,20 @@ pub(super) fn tool_definitions(import_enabled: bool, writes_enabled: bool) -> Va
     registered_tool_definitions(import_enabled, writes_enabled)
 }
 
+/// What `tools/list` advertises: the tools the settings enable. The tax-audit tool is listed only
+/// when its setting is on (off by default), so the default catalogue does not carry it.
+pub(super) fn listed_tool_definitions(
+    import_enabled: bool,
+    writes_enabled: bool,
+    audit_enabled: bool,
+) -> Value {
+    let mut tools = tool_definitions(import_enabled, writes_enabled);
+    if let Some(list) = tools.as_array_mut() {
+        list.retain(|tool| audit_enabled || tool["name"] != "audit_test_run");
+    }
+    tools
+}
+
 #[cfg(feature = "lab-writes")]
 fn lab_tools_env_enabled() -> bool {
     super::lab::env_lab_writes_enabled()

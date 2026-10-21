@@ -87,7 +87,6 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 
 The ordinary default tools, in name order:
 
-- `audit_test_run`
 - `balance_sheet`
 - `cash_flow`
 - `company_features`
@@ -118,7 +117,8 @@ The ordinary default tools, in name order:
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
-release 0.6.0. `audit_test_run` is in the source after release 0.6.0 and is not in a published build yet. `local_data_report` (also
+release 0.6.0. `audit_test_run` is in the source after release 0.6.0 and is not in a published build yet; it is
+not a default tool: it is listed only when its setting is on (below). `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -158,7 +158,12 @@ bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
 that import workflow and exposes `post_import` and `acknowledge_post_review`. The MCPB extension always
 sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting, one
 voucher or a batch of up to 50** setting (`enable_posting_2026_10`), off by
-default, to `BRIDGE_AGENT_ENABLE_WRITES`.
+default, to `BRIDGE_AGENT_ENABLE_WRITES`. `BRIDGE_AGENT_ENABLE_TAX_AUDIT=true` lists `audit_test_run`;
+the extension maps its **Allow tax-audit test runs (audit_test_run)** setting
+(`enable_tax_audit_2026_10`), off by default, to it. Off, the tool is absent from `tools/list` and a
+call naming it is refused as `audit_tool_disabled` before any request. The setting takes
+`true`/`false` or `1`/`0`; empty, or the extension's unresolved placeholder, reads as off, and any other
+value stops startup.
 This is a source-configuration inventory, not a claim that an installed client
 uses a particular setting or that a tool is qualified for every runtime. Each
 call returns compact JSON with the
@@ -738,6 +743,9 @@ synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales
 §9.17 holds the Sales flags and Accept As Is; the by-name selection and the narrow field list are in the fixtures' PROVENANCE.md); a registered buyer, other releases and Gold are not measured, and `excluded` has not been observed.
 
 ### Tax-audit test run (`audit_test_run`)
+
+Off by default: the tool is listed only when **Allow tax-audit test runs (audit_test_run)**
+(`BRIDGE_AGENT_ENABLE_TAX_AUDIT`) is on, and refused as `audit_tool_disabled` otherwise.
 
 Use `audit_test_run` with `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD), `test` and the
 two group lists `cash_groups` and `bank_groups` to run one test of ComplyEaze Bridge's tax-audit

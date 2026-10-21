@@ -15,6 +15,15 @@ struct OneServer {
 }
 
 fn serve(plans: Vec<tally_protocol_simulator::ScenarioPlan>, redaction: Redaction) -> OneServer {
+    serve_with(plans, redaction, true)
+}
+
+/// A server with the tax-audit setting as given (the tool's own tests turn it on).
+fn serve_with(
+    plans: Vec<tally_protocol_simulator::ScenarioPlan>,
+    redaction: Redaction,
+    audit_enabled: bool,
+) -> OneServer {
     let simulator = (!plans.is_empty()).then(|| SequenceSimulator::spawn(plans).unwrap());
     // With no plan the port is one nothing listens on: a request sent would
     // fail as a refused connection, not as the refusal a test looks for.
@@ -33,6 +42,7 @@ fn serve(plans: Vec<tally_protocol_simulator::ScenarioPlan>, redaction: Redactio
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled,
     });
     OneServer {
         simulator,
@@ -407,4 +417,23 @@ fn a_result_past_the_bounds_is_refused_and_never_cut_short() {
         project(&json!({"figures": 1})).unwrap_err(),
         RESULT_NOT_PROJECTABLE
     );
+}
+
+/// Off by default: with the setting off the tool is not listed, and a call naming it is refused
+/// in band before any request; with it on it is listed.
+#[tokio::test]
+async fn the_tool_is_absent_and_refused_while_its_setting_is_off() {
+    let listed = |audit| {
+        catalog::listed_tool_definitions(false, false, audit)
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == "audit_test_run")
+    };
+    assert!(!listed(false));
+    assert!(listed(true));
+    let one = serve_with(Vec::new(), Redaction::None, false);
+    let response = one.server.call_tool("audit_test_run", args()).await;
+    assert_eq!(error_code(&response), "audit_tool_disabled");
+    assert_eq!(response["structuredContent"]["evidence"]["bytes"], 0);
 }

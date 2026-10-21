@@ -2,5 +2,8 @@ src-tauri/src/agent.rs
 src-tauri/src/agent_audit_read.rs
 src-tauri/src/agent_audit_run.rs
 src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_desktop_journal.rs
+src-tauri/src/agent_presence_tests.rs
+src-tauri/src/agent_protocol.rs
 src-tauri/src/agent_tests.rs
 reviewer: lamemustafa

@@ -19,7 +19,6 @@ import zipfile
 
 RESOURCES = ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt", "THIRD_PARTY_LICENSES_RUST.txt")
 DEFAULT_TOOLS = {
-    "audit_test_run",
     "balance_sheet",
     "cash_flow",
     "company_features",
@@ -59,6 +58,10 @@ POSTING_TOOLS = {
     "acknowledge_post_review",
     "post_import",
 }
+# The tax-audit tool is behind its own switch, off by default.
+AUDIT_TOOLS = {
+    "audit_test_run",
+}
 
 
 def expected_tools(environment):
@@ -68,6 +71,8 @@ def expected_tools(environment):
         tools |= IMPORT_TOOLS
     if environment.get("BRIDGE_AGENT_ENABLE_WRITES") == "true":
         tools |= POSTING_TOOLS
+    if environment.get("BRIDGE_AGENT_ENABLE_TAX_AUDIT") == "true":
+        tools |= AUDIT_TOOLS
     return tools
 # The bundled PDFium: beside the binary, where parse_bank_statement loads it,
 # with the licence notice scripts/fetch-pdfium.py generated at the root. Both are
@@ -244,7 +249,7 @@ def resolve_environment(manifest):
     mappings = manifest["server"]["mcp_config"]["env"]
     require(set(mappings) == {"BRIDGE_TERMS_ACCEPTED", "BRIDGE_TALLY_HOST", "BRIDGE_TALLY_PORT",
                               "BRIDGE_AGENT_REDACTION", "BRIDGE_AGENT_ENABLE_IMPORT",
-                              "BRIDGE_AGENT_ENABLE_WRITES"},
+                              "BRIDGE_AGENT_ENABLE_WRITES", "BRIDGE_AGENT_ENABLE_TAX_AUDIT"},
             "unexpected_environment_mapping")
     # No setting may be required. Claude Desktop builds no launch command while a required setting
     # has no stored value, and an update that renames the Terms setting leaves it with none, so
@@ -268,6 +273,12 @@ def resolve_environment(manifest):
     # text offered one voucher at a time, must not turn on batch posting, so it is mapped to nothing.
     require(mappings["BRIDGE_AGENT_ENABLE_WRITES"] == "${user_config.enable_posting_2026_10}",
             "writes_environment_mapping_mismatch")
+    # The tax-audit tool ships off by default behind its own versioned switch.
+    audit = manifest["user_config"].get("enable_tax_audit_2026_10", {})
+    require(audit.get("type") == "boolean" and audit.get("default") is False,
+            "tax_audit_setting_must_be_boolean_and_off")
+    require(mappings["BRIDGE_AGENT_ENABLE_TAX_AUDIT"] == "${user_config.enable_tax_audit_2026_10}",
+            "tax_audit_environment_mapping_mismatch")
     # Supply isolated client settings through the manifest itself. Overwriting
     # the resulting environment would hide broken host/port substitutions.
     values = {name: option["default"] for name, option in manifest["user_config"].items()}
@@ -404,6 +415,7 @@ def smoke(archive, repository):
         require(len(names) == len(expected) and set(names) == expected, "default_tools_mismatch")
         require(not POSTING_TOOLS & set(names) and IMPORT_TOOLS <= set(names),
                 "default_bundle_must_prepare_but_not_post")
+        require(not AUDIT_TOOLS & set(names), "default_bundle_must_not_list_the_tax_audit_tool")
         # The user's opt-in adds the posting tools and nothing else; verify_import stays
         # available either way for safe recovery of saved batches.
         enabled_environment = dict(environment, BRIDGE_AGENT_ENABLE_WRITES="true")

@@ -297,6 +297,9 @@ struct Settings {
     redaction: Redaction,
     import_enabled: bool,
     posting: Posting,
+    /// Whether the tax-audit tool (`audit_test_run`) is listed and callable. Off by default:
+    /// the extension's setting turns it on.
+    audit_enabled: bool,
 }
 
 /// Whether this server may post to Tally. One setting governs every post: one
@@ -382,6 +385,7 @@ impl Settings {
             redaction,
             import_enabled: enabled_setting("BRIDGE_AGENT_ENABLE_IMPORT")? || writes_enabled,
             posting,
+            audit_enabled: audit_from_env(process_variable)?,
         })
     }
 }
@@ -423,6 +427,30 @@ const RETIRED_BATCH_POST_SETTING: &str = "BRIDGE_AGENT_ENABLE_BATCH_POST";
 fn posting_setting(value: Option<&str>) -> Result<bool, String> {
     match value {
         Some("" | POSTING_PLACEHOLDER) => Ok(false),
+        other => boolean_setting(other),
+    }
+}
+
+/// The extension's tax-audit setting, named after the version of what it offers, as the posting
+/// one is. A test ties the key and its placeholder to `packaging/mcpb/manifest.json`.
+#[cfg(test)]
+pub(super) const AUDIT_SETTING_KEY: &str = "enable_tax_audit_2026_10";
+const AUDIT_PLACEHOLDER: &str = "${user_config.enable_tax_audit_2026_10}";
+/// The environment variable the setting is mapped to.
+pub(super) const AUDIT_SETTING_VARIABLE: &str = "BRIDGE_AGENT_ENABLE_TAX_AUDIT";
+
+/// The tax-audit setting, read through `var` as [`posting_from_env`] reads posting: absent,
+/// empty or the unresolved placeholder is off; anything but a plain boolean fails loud.
+fn audit_from_env(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<bool, String> {
+    let value = var(AUDIT_SETTING_VARIABLE)
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| "boolean_setting_invalid".to_string())
+        })
+        .transpose()?;
+    match value.as_deref() {
+        Some("" | AUDIT_PLACEHOLDER) => Ok(false),
         other => boolean_setting(other),
     }
 }
@@ -2463,6 +2491,9 @@ impl Server {
         if name == "post_import" && self.settings.posting == Posting::RetiredSettingPresent {
             return Err("setting_retired".to_string().into());
         }
+        if name == "audit_test_run" && !self.settings.audit_enabled {
+            return Err("audit_tool_disabled".to_string().into());
+        }
         #[cfg(feature = "lab-writes")]
         if matches!(
             name,
@@ -2668,6 +2699,7 @@ pub(crate) async fn desktop_selected_vouchers(
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         },
         runtime.clone(),
     );

@@ -36,8 +36,10 @@ Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 `BRIDGE_TALLY_PORT` (default `9000`), `BRIDGE_AGENT_DATA_DIR` (Bridge's
 platform application-data directory by default), `BRIDGE_AGENT_MAX_ROWS`
 (default `500`), `BRIDGE_AGENT_MAX_BYTES` (default `200000`), and
-`BRIDGE_AGENT_REDACTION` (`none`, `mask_parties`, or `drop_narration`). The
-host is validated by `bridge-tally-transport`; non-loopback hosts are refused.
+`BRIDGE_AGENT_REDACTION` (`none`, `mask_parties`, or `drop_narration`).
+`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer. Control replies (to
+`initialize`, `ping` and `tools/list`), which the build fixes and which carry no
+book data, are held to 1,000,000 bytes, or to it if it is larger. The host is validated by `bridge-tally-transport`; non-loopback hosts are refused.
 The resolved data path must be valid Unicode so saved artifact paths can be
 returned exactly in JSON. Invalid platform encoding is refused before state
 creation with `agent_data_dir_encoding_invalid`; no lossy path alias is used.
@@ -3028,10 +3030,13 @@ posted.
 
 The server negotiates MCP `2025-06-18` or `2024-11-05`, returning a supported
 version when a client proposes a newer one. Initialization must precede tool
-requests. Incoming frames are limited to 5 MB. All responses obey the configured
-byte cap, including control replies, the JSON-RPC wrapper, and newline. A tool
-catalogue that cannot fit returns `agent_response_too_large`; the session remains
-usable. Text content contains the same
+requests. Incoming frames are limited to 5 MB. Every tool answer obeys the configured
+byte cap, including the JSON-RPC wrapper and newline. Control replies (to `initialize`,
+`ping` and `tools/list`, and the refusal of an unknown method) are fixed by the build and
+the request id and carry no book data, so they are held instead to a ceiling of
+1,000,000 bytes, or the configured cap if that is larger: the tool list is sent whole
+whatever the cap. A control reply that cannot fit returns `agent_response_too_large`;
+the session remains usable. Text content contains the same
 serialized, redacted JSON as `structuredContent` for older clients. The `initialize` result also
 carries `instructions`, a short text for the client to show its model: start with `list_companies`,
 use the one open company only when the user named no client (or exactly one open company matches the

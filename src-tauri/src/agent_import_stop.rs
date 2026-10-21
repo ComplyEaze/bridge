@@ -145,7 +145,7 @@ impl Seen {
                 "the voucher posted for this invoice is not in the book for these dates now",
             )),
             ("book_rolled_back", _) => {
-                Self::NotEstablished(why("the company's books are older than this post"))
+                Self::NotEstablished(why("the company's books were restored after this post"))
             }
             // The release cannot tell absence: these say only what the row
             // says, never a bare "not found".

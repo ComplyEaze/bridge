@@ -7,9 +7,9 @@
 mod common;
 
 use bridge_bank_statement::bank::{BALANCE, CREDIT, DATE, DEBIT, NARRATION};
-use bridge_bank_statement::csv_edge::{read_statement, CHQ_REF};
+use bridge_bank_statement::csv_edge::{read_statement, CHQ_REF, MAX_FILE_BYTES};
 use bridge_bank_statement::money::reconcile;
-use common::refuses;
+use common::{refuses, rep};
 
 const HEADER: &str = "\"Sl. No.\",\"Transaction Date\",\"Value Date\",\"Description\",\"Chq /Ref No.\",\"Amount\",\"Dr / Cr\",\"Balance\",\"Dr / Cr\"";
 
@@ -17,8 +17,14 @@ const HEADER: &str = "\"Sl. No.\",\"Transaction Date\",\"Value Date\",\"Descript
 fn preamble() -> Vec<String> {
     vec![
         "\"\",\"\",\"Account Statement\"".to_string(),
-        "\"SYNTHETIC LAB CUSTOMER\",\"\",\"\",\"\",\"Cust. Reln. No.\",\"000000000\"".to_string(),
-        "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"Account No.\",\"000000000000\"".to_string(),
+        format!(
+            "\"SYNTHETIC LAB CUSTOMER\",\"\",\"\",\"\",\"Cust. Reln. No.\",\"{}\"",
+            rep('0', 9)
+        ),
+        format!(
+            "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"Account No.\",\"{}\"",
+            rep('0', 12)
+        ),
         "\"SYNTHETIC CITY 000000\",\"\",\"\",\"\",\"Period\",\"From 01/04/2025 To 31/03/2026\""
             .to_string(),
         "\"\",\"\",\"\",\"\",\"Currency\",\"INR\"".to_string(),
@@ -243,19 +249,34 @@ fn a_line_that_is_not_the_exports_quoting_is_a_malformed_row() {
     let text = String::from_utf8(good()).unwrap();
     // An unquoted field.
     let unquoted = text.replace("\"250.50\"", "250.50");
-    refuses(read_statement(unquoted.as_bytes()), "malformed_row");
+    assert_eq!(
+        refuses(read_statement(unquoted.as_bytes()), "malformed_row").row,
+        Some(2)
+    );
     // A column short.
     let short = text.replace(",\"DR\",\"11,249.50\",\"CR\"", ",\"DR\",\"11,249.50\"");
-    refuses(read_statement(short.as_bytes()), "malformed_row");
+    assert_eq!(
+        refuses(read_statement(short.as_bytes()), "malformed_row").row,
+        Some(2)
+    );
     // A quoted line break.
     let broken = text.replace("SYNTHETIC, SUPPLIER", "SYNTHETIC,\nSUPPLIER");
-    refuses(read_statement(broken.as_bytes()), "malformed_row");
+    assert_eq!(
+        refuses(read_statement(broken.as_bytes()), "malformed_row").row,
+        Some(2)
+    );
     // A blank line between transactions.
     let blank = text.replace("\n\"2\",", "\n\n\"2\",");
-    refuses(read_statement(blank.as_bytes()), "malformed_row");
+    assert_eq!(
+        refuses(read_statement(blank.as_bytes()), "malformed_row").row,
+        Some(2)
+    );
     // Text after a closing quote.
     let trailing = text.replace("\"250.50\"", "\"250.50\"x");
-    refuses(read_statement(trailing.as_bytes()), "malformed_row");
+    assert_eq!(
+        refuses(read_statement(trailing.as_bytes()), "malformed_row").row,
+        Some(2)
+    );
 }
 
 #[test]
@@ -273,7 +294,10 @@ fn a_doubled_quote_inside_a_description_is_one_quote() {
 fn the_serial_must_run_one_two_three() {
     let text = String::from_utf8(good()).unwrap();
     let skipped = text.replace("\n\"3\",", "\n\"4\",");
-    refuses(read_statement(skipped.as_bytes()), "serial_broken");
+    assert_eq!(
+        refuses(read_statement(skipped.as_bytes()), "serial_broken").row,
+        Some(3)
+    );
     let repeated = text.replace("\n\"2\",", "\n\"1\",");
     let refusal = refuses(read_statement(repeated.as_bytes()), "serial_broken");
     assert_eq!(refusal.row, Some(2));
@@ -284,19 +308,34 @@ fn dates_are_checked_for_shape_validity_and_order() {
     let text = String::from_utf8(good()).unwrap();
     // No time on the transaction date.
     let no_time = text.replace("03-04-2025 09:00:01", "03-04-2025");
-    refuses(read_statement(no_time.as_bytes()), "unparseable_date");
+    assert_eq!(
+        refuses(read_statement(no_time.as_bytes()), "unparseable_date").row,
+        Some(2)
+    );
     // A time that is not a time.
     let hour = text.replace("03-04-2025 09:00:01", "03-04-2025 24:00:01");
-    refuses(read_statement(hour.as_bytes()), "unparseable_date");
+    assert_eq!(
+        refuses(read_statement(hour.as_bytes()), "unparseable_date").row,
+        Some(2)
+    );
     // A date that is not a date.
     let day = text.replace("03-04-2025 09:00:01", "31-04-2025 09:00:01");
-    refuses(read_statement(day.as_bytes()), "unparseable_date");
+    assert_eq!(
+        refuses(read_statement(day.as_bytes()), "unparseable_date").row,
+        Some(2)
+    );
     // A value date a spreadsheet rewrote.
     let value = text.replace("\"03-04-2025\"", "\"3/4/2025\"");
-    refuses(read_statement(value.as_bytes()), "unparseable_date");
+    assert_eq!(
+        refuses(read_statement(value.as_bytes()), "unparseable_date").row,
+        Some(2)
+    );
     // Posting order broken by one second.
     let order = text.replace("03-04-2025 09:00:01", "02-04-2025 10:14:59");
-    refuses(read_statement(order.as_bytes()), "date_order_broken");
+    assert_eq!(
+        refuses(read_statement(order.as_bytes()), "date_order_broken").row,
+        Some(2)
+    );
 }
 
 #[test]
@@ -316,21 +355,38 @@ fn amounts_and_balances_are_only_the_exports_spelling() {
         ("\"1,500.00\"", "\"1,500.00 \""),
     ] {
         let edited = text.replace(from, to);
-        refuses(read_statement(edited.as_bytes()), "malformed_amount");
+        let row = if from.contains("99,999.50") { 3 } else { 1 };
+        assert_eq!(
+            refuses(read_statement(edited.as_bytes()), "malformed_amount").row,
+            Some(row),
+            "{from} -> {to}"
+        );
     }
     let balance = text.replace("\"11,249.50\"", "\"11249.50\"");
-    refuses(read_statement(balance.as_bytes()), "malformed_balance");
+    assert_eq!(
+        refuses(read_statement(balance.as_bytes()), "malformed_balance").row,
+        Some(2)
+    );
     let blank = text.replace("\"11,249.50\"", "\"\"");
-    refuses(read_statement(blank.as_bytes()), "malformed_balance");
+    assert_eq!(
+        refuses(read_statement(blank.as_bytes()), "malformed_balance").row,
+        Some(2)
+    );
 }
 
 #[test]
 fn a_direction_other_than_dr_or_cr_is_refused_on_either_side() {
     let text = String::from_utf8(good()).unwrap();
     let amount_side = text.replace("\"250.50\",\"DR\"", "\"250.50\",\"Dr\"");
-    refuses(read_statement(amount_side.as_bytes()), "direction_unknown");
+    assert_eq!(
+        refuses(read_statement(amount_side.as_bytes()), "direction_unknown").row,
+        Some(2)
+    );
     let balance_side = text.replace("\"11,249.50\",\"CR\"", "\"11,249.50\",\"\"");
-    refuses(read_statement(balance_side.as_bytes()), "direction_unknown");
+    assert_eq!(
+        refuses(read_statement(balance_side.as_bytes()), "direction_unknown").row,
+        Some(2)
+    );
 }
 
 #[test]
@@ -366,9 +422,15 @@ fn a_cell_too_long_to_be_an_amount_is_refused_not_a_panic() {
     let long = format!("1{},000.00", ",00".repeat(90));
     let text = String::from_utf8(good()).unwrap();
     let amount = text.replace("\"1,500.00\"", &format!("\"{long}\""));
-    refuses(read_statement(amount.as_bytes()), "malformed_amount");
+    assert_eq!(
+        refuses(read_statement(amount.as_bytes()), "malformed_amount").row,
+        Some(1)
+    );
     let balance = text.replace("\"11,249.50\"", &format!("\"{long}\""));
-    refuses(read_statement(balance.as_bytes()), "malformed_balance");
+    assert_eq!(
+        refuses(read_statement(balance.as_bytes()), "malformed_balance").row,
+        Some(2)
+    );
     let closing = text.replace("INR 1,11,249.00", &format!("INR {long}"));
     refuses(
         read_statement(closing.as_bytes()),
@@ -396,6 +458,18 @@ fn stray_quotes_are_a_malformed_row() {
         ("\"250.50\"", "\"250\"50\""),
     ] {
         let edited = text.replace(from, to);
-        refuses(read_statement(edited.as_bytes()), "malformed_row");
+        let row = if from.contains("SYN 000001") { 1 } else { 2 };
+        assert_eq!(
+            refuses(read_statement(edited.as_bytes()), "malformed_row").row,
+            Some(row),
+            "{from}"
+        );
     }
+}
+
+#[test]
+fn a_file_larger_than_any_statement_is_refused_before_it_is_read() {
+    let mut big = good();
+    big.extend(vec![b' '; MAX_FILE_BYTES]);
+    refuses(read_statement(&big), "file_too_large");
 }

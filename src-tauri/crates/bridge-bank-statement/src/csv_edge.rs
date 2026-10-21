@@ -12,7 +12,8 @@
 //! `Closing Balance` line. Two columns share the name `Dr / Cr` (the direction
 //! of the amount, then of the balance), so cells are read by position.
 //!
-//! Nothing downstream re-checks the shapes this reads. A file either matches
+//! The shapes this reads are checked here, once (`reconcile` later re-reads the
+//! amounts it is handed as plain decimals). A file either matches
 //! the layout exactly and becomes rows whose dates are `YYYY-MM-DD` and whose
 //! amounts are plain two-place decimals (a debit and a credit unsigned, in
 //! their own columns; a balance signed, a debit balance negative), or it is
@@ -39,7 +40,9 @@
 //!   the replay cannot fault row 1: its amount and direction are proven by
 //!   nothing here, and a file of one row proves only itself.
 //! - Value dates are checked for shape and validity, not for order or
-//!   against the transaction date; the preamble's `Period` is not read.
+//!   against the transaction date; the preamble's `Period` is not read, and
+//!   the closing line's date is checked for validity only. A nine-cell
+//!   line above the header is preamble (the header is found by content).
 //!
 //! Not measured: a balance marked `DR` (an overdrawn account) is read as a
 //! negative balance by the layout's own indicator, but the closing balance
@@ -75,13 +78,18 @@ pub const HEADER_CELLS: [&str; 9] = [
 const CLOSING_BALANCE: &str = "Closing Balance";
 /// The longest amount cell read, in bytes.
 const MAX_AMOUNT_CELL: usize = 32;
+/// The largest file read, in bytes: the one export measured was 38,804 bytes
+/// for a year of 267 transactions, so this is about a hundred times that.
+pub const MAX_FILE_BYTES: usize = 4 * 1024 * 1024;
 
 /// What the file holds once it has been read whole.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CsvStatement {
     /// In file order, which is the bank's posting order.
     pub rows: Vec<Row>,
-    /// The first row's balance before its own amount.
+    /// The first row's balance before its own amount: derived from row 1, so
+    /// the replay cannot fault row 1 (see the module doc), not a figure the
+    /// bank printed.
     pub opening: ExactDecimal,
     /// The `Closing Balance` line, equal to the last row's balance.
     pub closing: ExactDecimal,
@@ -180,6 +188,12 @@ fn signed_balance(plain: &str, indicator: &str, row: usize) -> Result<String, Re
 
 /// The whole file as a statement, or the first refusal.
 pub fn read_statement(bytes: &[u8]) -> Result<CsvStatement, Refusal> {
+    if bytes.len() > MAX_FILE_BYTES {
+        return Err(Refusal::new(
+            "file_too_large",
+            "the file is larger than any statement export read so far",
+        ));
+    }
     let text = match std::str::from_utf8(bytes) {
         Ok(text) if !bytes.contains(&0) && !text.starts_with('\u{feff}') => text,
         _ => {
@@ -349,10 +363,9 @@ pub fn read_statement(bytes: &[u8]) -> Result<CsvStatement, Refusal> {
         match cells {
             Some(cells) if cells.len() <= 1 => {}
             _ => {
-                return Err(refuse(
+                return Err(Refusal::new(
                     "trailer_unexpected",
-                    rows.len(),
-                    &format!(
+                    format!(
                         "line {} after the closing balance is not a note",
                         offset + 1
                     ),

@@ -168,7 +168,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       and alteration number of each. Names, parents and categories are
       shortened under `mask_parties`; the flags are not names. In the answers
       captured they carry no amounts and no narrations. How a voucher was
-      allocated to a cost centre is not returned in 0.5.0 and 0.5.1 (Tally's
+      allocated to a cost centre is not returned in 0.5.0, 0.5.1 and 0.6.0 (Tally's
       answer to the vouchers read carries it, and those releases drop it); in
       source and not yet in a published build, the voucher reads return it (see
       "What the reads added since 0.5.0 send").

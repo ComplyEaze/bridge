@@ -5136,6 +5136,8 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
     later.extend(paired(marks()));
     later.extend(paired(empty_collection()));
     later.extend(paired(empty_collection()));
+    later.extend(paired(no_voucher_mark.clone()));
+    // Omitted once, the mark is read again (#1050).
     later.extend(paired(no_voucher_mark));
     let (_, verified, _) = post_and_verify(
         company_marks(11, 50, "WR2 Unicode Lab"),
@@ -5144,11 +5146,10 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
     )
     .await;
     let result = &verified[0]["structuredContent"]["result"];
-    // An omitted mark is not a mark of zero: nothing is recorded (#1050).
-    assert!(
-        result["post_span_binding"]
-            .get("rollback_recorded")
-            .is_none(),
+    // Omitted twice, the company holds no voucher: below the post's floor,
+    // so it is recorded (#1050), failing closed.
+    assert_eq!(
+        result["post_span_binding"]["rollback_recorded"], true,
         "{result}"
     );
     assert_eq!(

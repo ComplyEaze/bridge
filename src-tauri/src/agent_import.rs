@@ -1993,6 +1993,18 @@ impl Server {
                     let (current, mark_evidence) =
                         self.current_voucher_mark(&company, &identity).await?;
                     accumulated = combine_evidence(accumulated.clone(), mark_evidence);
+                    // An omitted mark is read once more (AGENTS.md P5): omitted
+                    // twice, the company holds no voucher, which is below every
+                    // post's floor, and it is recorded as such (fail closed).
+                    let mark = match current {
+                        Some(mark) => mark,
+                        None => {
+                            let (again, again_evidence) =
+                                self.current_voucher_mark(&company, &identity).await?;
+                            accumulated = combine_evidence(accumulated.clone(), again_evidence);
+                            again.unwrap_or(0)
+                        }
+                    };
                     let mut decision = match &rollback.covered_by {
                         Some(cover) => PostSpanDecision::covered_by(cover),
                         None => self.decide_post_span(
@@ -2002,7 +2014,7 @@ impl Server {
                             dispatch_response.as_ref(),
                             &observed,
                             after_post_mark,
-                            current.unwrap_or(0),
+                            mark,
                             generation,
                         ),
                     };
@@ -2011,19 +2023,19 @@ impl Server {
                     if let Some(recorded) = decision.recorded_at {
                         generation = recorded;
                     }
-                    // A rollback this verification saw first, on a mark Tally
-                    // answered, is recorded once, so it outlasts the mark rising
-                    // again. A record that cannot be written fails the call.
-                    if let (true, None, Some(mark)) =
-                        (decision.rolled_back, &rollback.covered_by, current)
-                    {
-                        if rollback.own_lowest_mark.is_none_or(|lowest| mark < lowest) {
-                            // A record that cannot be written fails this
-                            // verification, retryably: a rollback seen and not
-                            // recorded is the false verified this guards.
-                            let (recorded, others) = self
-                                .record_rollback_seen(&line, mark, rollback.records, generation)
-                                .map_err(ToolFailure::from)?;
+                    // A mark below a floor some native post of the company had
+                    // proved is a rollback, whichever post's check reads it. It
+                    // is recorded whenever the record would cover a post no
+                    // record covers yet, so it outlasts the mark rising again,
+                    // a covered post's check still records a second restore,
+                    // and nothing is written twice. A record that cannot be
+                    // written fails this verification, retryably: a rollback
+                    // seen and not recorded is the false verified this guards.
+                    if self.rollback_would_extend(&line.batch_id, mark, rollback.records)? {
+                        if let Some((recorded, others)) = self
+                            .record_rollback_seen(&line, mark, rollback.records, generation)
+                            .map_err(ToolFailure::from)?
+                        {
                             generation = recorded;
                             decision.report["rollback_recorded"] = json!(true);
                             // The company's other native batches it covers keep
@@ -2709,20 +2721,33 @@ impl Server {
     /// `mark` below the batch's floor, having read `records_before_read`
     /// journal records first (#1050). Under the exclusive lock, against the
     /// generation this verification read, as a post-span verdict is. Returns
-    /// the new generation and the company's other native batches it covers.
+    /// the new generation and the company's other native batches it covers,
+    /// or `None` when, judged under the lock, the record would cover no post
+    /// that a record on file does not.
     fn record_rollback_seen(
         &self,
         line: &ImportLedgerLine,
         mark: u64,
         records_before_read: u64,
         expected: ledger::VerificationGeneration,
-    ) -> Result<(ledger::VerificationGeneration, Vec<String>), String> {
+    ) -> Result<Option<(ledger::VerificationGeneration, Vec<String>)>, String> {
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
             .ok_or_else(|| "import_batch_not_found".to_string())?;
         if current.batch.sha256 != line.sha256 || current.generation != expected {
             return Err("import_verification_conflict_retry".into());
+        }
+        // Judged again where no other writer can: a record another check wrote
+        // since may already cover what this one would.
+        let extends = match self.import_journal_while_admitted()? {
+            Some(reader) => {
+                ledger::rollback_record_extends(reader, &line.batch_id, mark, records_before_read)?
+            }
+            None => false,
+        };
+        if !extends {
+            return Ok(None);
         }
         self.append_import_record_while_admitted(&ledger::StatusRecord::rollback_seen(
             line,
@@ -2736,7 +2761,25 @@ impl Server {
             Some(reader) => ledger::covered_by_records_of(reader, &line.batch_id)?,
             None => Vec::new(),
         };
-        Ok((recorded.generation, others))
+        Ok(Some((recorded.generation, others)))
+    }
+
+    /// Whether a record of `mark`, read after `records_before_read` journal
+    /// records, would cover a post no record covers yet; read under the shared
+    /// lock, so a check that would record nothing takes no exclusive lock.
+    fn rollback_would_extend(
+        &self,
+        batch_id: &str,
+        mark: u64,
+        records_before_read: u64,
+    ) -> Result<bool, String> {
+        let _lock = self.lock_import_admission_shared()?;
+        match self.import_journal_while_admitted()? {
+            Some(reader) => {
+                ledger::rollback_record_extends(reader, batch_id, mark, records_before_read)
+            }
+            None => Ok(false),
+        }
     }
 
     /// Every GUID another batch's post-span verdict bound.

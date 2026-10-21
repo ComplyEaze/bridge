@@ -1471,8 +1471,6 @@ fn a_rollback_seen_on_one_batch_covers_an_earlier_batch_of_the_company() {
         );
         assert_eq!(scan.records, journal.len() as u64);
     }
-    assert_eq!(cover(&journal, "p2").own_lowest_mark, Some(1));
-    assert_eq!(cover(&journal, "p1").own_lowest_mark, None);
     // The answer that recorded it names P1 as the batch to verify again.
     assert_eq!(
         covered_by_records_of(Cursor::new(journal.concat()), "p2").unwrap(),
@@ -1603,4 +1601,48 @@ fn a_rollback_seen_record_is_admitted_only_in_its_one_shape() {
         .unwrap()
         .unwrap();
     assert_eq!(snapshot.batch.status, "dispatch_started");
+}
+
+fn extends(journal: &[Vec<u8>], seen_by: &str, mark: u64, read: u64) -> bool {
+    rollback_record_extends(Cursor::new(journal.concat()), seen_by, mark, read).unwrap()
+}
+
+/// A record is written only when it would cover a post no record covers yet.
+/// A post already covered by its own record still records a second restore
+/// that reaches a post sent since (the second restore would otherwise be lost
+/// and that post could read verified against a voucher keyed by hand); a
+/// record that would cover nothing new is not written.
+#[test]
+fn a_covered_posts_check_still_records_a_second_restore_that_reaches_a_later_post() {
+    let created = captured_outcome().counters().created;
+    let a = placed("a", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let c = placed("c", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![record(&a), intent(&a, Some(10)), answered(&a)];
+    // A's check sees the first restore, below A's floor.
+    let read = journal.len() as u64;
+    assert!(extends(&journal, "a", 10, read));
+    journal.push(seen(&a, 10, read));
+    assert!(cover(&journal, "a").covered_by.is_some());
+    // The same restore again: nothing new to cover, nothing written.
+    assert!(!extends(&journal, "a", 10, journal.len() as u64));
+    // C is posted after the record (its floor above 10), then a second restore
+    // to 10 is read by A's check: it reaches C, so it is written.
+    journal.push(record(&c));
+    journal.push(intent(&c, Some(10 + created)));
+    journal.push(answered(&c));
+    assert_eq!(cover(&journal, "c").covered_by, None);
+    let read = journal.len() as u64;
+    assert!(extends(&journal, "a", 10, read));
+    journal.push(seen(&a, 10, read));
+    assert_eq!(
+        cover(&journal, "c").covered_by.map(|cover| cover.seen_by),
+        Some("a".to_string())
+    );
+    // A mark at or above every proved floor is no rollback.
+    assert!(!extends(
+        &journal,
+        "a",
+        10 + 2 * created,
+        journal.len() as u64
+    ));
 }

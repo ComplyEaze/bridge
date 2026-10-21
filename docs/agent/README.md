@@ -2493,8 +2493,10 @@ place). Tally gives vouchers keyed again after a restore the MasterIDs, GUIDs an
 numbers the post's vouchers held (measured once on a synthetic company,
 bridge#1050), and no identifier a read returns tells the two apart. So a
 rollback, once seen, is recorded: when a check of a native post reads the
-company's voucher mark below that post's, and Tally's answer carried the mark,
-the import journal keeps a record of it (`post_span_binding.rollback_recorded`,
+company's voucher mark below the floor any native post of the company had
+proved (a mark Tally omits twice reads as a company holding no voucher), the
+import journal keeps a record of it whenever it covers a post no earlier record
+covers, so a second restore is recorded too (`post_span_binding.rollback_recorded`,
 with `other_batches_covered`: how many of the company's other native posts it
 covers, and the first ten, to verify again). A record that cannot be written
 fails the check, to be run again.
@@ -2513,8 +2515,8 @@ TallyPrime 7.1 Silver, with Tally's security off), so after restoring a backup
 over a company, check its posted vouchers in Tally. A record is kept for good: a
 wrong backup restored and then the right one leaves the posts it covers reading
 rolled back, and a covered Sales invoice batch stops that company's invoices
-until it is released. A company copy holding no voucher omits the mark, and
-records nothing. An older build refuses a journal holding the record: do not
+until it is released; a repair or rewrite of the company's data that lowered the
+voucher mark (not measured) would be recorded the same way. An older build refuses a journal holding the record: do not
 downgrade after posting. Bridge still records those rows as posted, so a rebuilt batch holding
 them is refused as `import_txn_already_posted`; re-entering them in that book is
 the person's decision. The result's `post_span_binding` names the binding's

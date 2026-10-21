@@ -1427,8 +1427,6 @@ pub(super) struct RollbackScan {
     pub(super) records: u64,
     /// The record that covers the batch, if any (the lowest mark among them).
     pub(super) covered_by: Option<RollbackCover>,
-    /// The lowest mark a rollback-seen record on this batch itself names.
-    pub(super) own_lowest_mark: Option<u64>,
 }
 
 /// A rollback-seen record that covers a batch.
@@ -1481,35 +1479,38 @@ impl NativePost {
 /// its pre-POST mark alone, which a mark read after it cannot fall below.
 pub(super) fn rollback_cover(reader: impl BufRead, batch_id: &str) -> Result<RollbackScan, String> {
     let facts = RollbackFacts::scan(reader)?;
-    let target = facts.posts.get(batch_id);
-    let own_place = facts.place_of(batch_id);
-    let mut covered_by: Option<RollbackCover> = None;
-    let mut own_lowest_mark: Option<u64> = None;
-    for (seen_by, mark_read, prefix) in &facts.seen {
-        if seen_by == batch_id {
-            own_lowest_mark = Some(own_lowest_mark.map_or(*mark_read, |low| low.min(*mark_read)));
-        }
-        let covers = own_place.is_some()
-            && facts.place_of(seen_by) == own_place
-            && target
-                .and_then(|post| post.floor_within(*prefix))
-                .is_some_and(|floor| floor > *mark_read);
-        if covers
-            && covered_by
-                .as_ref()
-                .is_none_or(|cover| *mark_read < cover.mark_read)
-        {
-            covered_by = Some(RollbackCover {
-                mark_read: *mark_read,
-                seen_by: seen_by.clone(),
-            });
-        }
-    }
     Ok(RollbackScan {
         records: facts.records as u64,
-        covered_by,
-        own_lowest_mark,
+        covered_by: facts.cover_of(batch_id),
     })
+}
+
+/// Whether a rollback-seen record that `seen_by`'s verification would write,
+/// for a mark read at `mark_read` after reading `records_before_read` records,
+/// covers a native batch of its company and address that no record on file
+/// covers (#1050). Only such a record is written: a check of a batch already
+/// covered still records a second restore that reaches a batch posted since,
+/// and a record that would cover nothing new is not written.
+pub(super) fn rollback_record_extends(
+    reader: impl BufRead,
+    seen_by: &str,
+    mark_read: u64,
+    records_before_read: u64,
+) -> Result<bool, String> {
+    let facts = RollbackFacts::scan(reader)?;
+    let Some(place) = facts.place_of(seen_by) else {
+        return Ok(false);
+    };
+    let prefix = usize::try_from(records_before_read).unwrap_or(usize::MAX);
+    Ok(facts.order.iter().any(|batch_id| {
+        facts.place_of(batch_id) == Some(place)
+            && facts
+                .posts
+                .get(batch_id)
+                .and_then(|post| post.floor_within(prefix))
+                .is_some_and(|floor| floor > mark_read)
+            && facts.cover_of(batch_id).is_none()
+    }))
 }
 
 /// The other native batches the rollback-seen records `seen_by` wrote cover,
@@ -1617,6 +1618,27 @@ impl RollbackFacts {
             }
         })?;
         Ok(facts)
+    }
+
+    /// The record that covers `batch_id`, if any (the lowest mark among them):
+    /// one written by a batch of the same place, within whose prefix the batch
+    /// was dispatched and had proved a floor above the mark read.
+    fn cover_of(&self, batch_id: &str) -> Option<RollbackCover> {
+        let own_place = self.place_of(batch_id)?;
+        let post = self.posts.get(batch_id)?;
+        self.seen
+            .iter()
+            .filter(|(seen_by, mark_read, prefix)| {
+                self.place_of(seen_by) == Some(own_place)
+                    && post
+                        .floor_within(*prefix)
+                        .is_some_and(|floor| floor > *mark_read)
+            })
+            .min_by_key(|(_, mark_read, _)| *mark_read)
+            .map(|(seen_by, mark_read, _)| RollbackCover {
+                mark_read: *mark_read,
+                seen_by: seen_by.clone(),
+            })
     }
 
     /// The batch's place, when its record names both a company and an address.

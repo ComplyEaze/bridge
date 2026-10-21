@@ -1,0 +1,49 @@
+# Issue #1688 B1 (ledger alias test), Windows lab, 21 Oct 2026, TallyPrime 7.1 Silver.
+# Company: BRIDGE ALIAS LAB, made for this test (keyed; financial year and books from 1-Apr-2025; Tally's default features),
+# company GUID 021bda0c-b1b1-44c8-8279-5212ce87c9c7. Ledgers keyed: L1 "Lab Plain Ledger" and L2 "Lab Other Ledger" under
+# Sundry Debtors, "Lab Sales" under Sales Accounts. No opening balances. No voucher was entered.
+# Backup BK1 (after the three ledgers, before any alias try): TDBK1800_100070.001 | 24104 | 5c1d904f3fb3abb67e096a98c796f091eb9627f28b13b29d728d7a30a53488df (kept on the lab PC).
+# Bridge tools: the installed MCP client extension (.mcpb) bridge-tally 0.6.0, bridge_mcp.exe 26503168 B sha256 1e41e039fbf3daaf6be5a3c8e2f5e0bd1245a745abc5e78349fd83ce678224c1.
+# Bridge answers (answers/bridge-*.json) are the tool results as returned to the assistant, saved as text; the U+FFFD in the
+# Primary marker is written as the JSON escape \ufffd. They are not Tally's raw bytes.
+# Raw read: requests/r1-ledger-catalogue.utf16le.xml is the production standard ledger catalogue request from origin/master
+# 9263657bfce34e25b06ddcaabce5a901954d28dc, src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/shape-lab-standard-ledger-catalogue.request.utf16le.xml
+# (1974 B, sha256 827f126cefc90cdaf4e15f41208bb5361458a87c3d8facfe3075bc6285c3dc28), with only SVCURRENTCOMPANY changed (BRIDGE SHAPE LAB -> BRIDGE ALIAS LAB);
+# the fixture has no GUID filter. Its header ID equals its COLLECTION NAME ("List of Ledgers"). It is not byte-identical to the
+# request ledger_masters fields=basic sent (that request's sha256 was 42716c6b9cbf71ce4008717635ad0d28fc5b16785f3a8939890c6816cc9a82a3).
+# Raw answers are byte-exact as received (UTF-16LE, no byte-order mark), HTTP 200.
+#
+# Results:
+# Step 1: list_companies -> BRIDGE ALIAS LAB, 021bda0c-b1b1-44c8-8279-5212ce87c9c7, company number 100070. ledger_masters basic lists
+#   L1 and L2 (no GUIDs in fields=basic); the ledger catalogue read gives L1 GUID 021bda0c-b1b1-44c8-8279-5212ce87c9c7-000000ce,
+#   L2 GUID 021bda0c-b1b1-44c8-8279-5212ce87c9c7-000000cf, each with one NAME element.
+# Step 2: on L1's Ledger Alteration, alias "LAB OTHER LEDGER" -> refused on leaving the alias field, error box "Oops! Name already
+#   exists. Enter a different name."; alias "Lab  Other Ledger" (two spaces) -> refused with the same words. The refusal repeated,
+#   so "lab other ledger" was not keyed. No alias was accepted.
+# Steps 3-5: not run (no alias accepted).
+# Step 6: alias "Lab Other Ledger" (L2's own text) -> refused, same words.
+# The screen was left with Ctrl+Q (no prompt, nothing saved). After the tries the ledger catalogue answer is byte-identical to the
+#   one before, and ledger_masters basic returns the same response sha256 and master_alter_id 210.
+#
+# file | bytes | sha256
+alias-texts-tried.txt | 225 | 3e0ae28bc1544b48a2f64359b0783b1ab54e6e618996b147a0049000e8b2e894
+requests/r1-ledger-catalogue.utf16le.xml | 1974 | 0bbd9e0c2a353697b35ddb044c14d1db32cc0f363c2dd53c3f030163466023e6
+answers/ans-s1-ledger-catalogue-before.xml | 8516 | 3b3dab36824005bc90c0d8bed6744a620a71dbb0a3264273051239ea5066f88d
+answers/ans-s2-ledger-catalogue-after-tries.xml | 8516 | 3b3dab36824005bc90c0d8bed6744a620a71dbb0a3264273051239ea5066f88d
+answers/bridge-s1-list_companies.json | 570 | 11f4c324737ab02b27c78ff89011dc85f9e7bfd6482db67ae7a467e7fb5926e1
+answers/bridge-s1-ledger_masters-basic-before.json | 1309 | 2057c8dab3e95da4475450fc3c7692e122b24399184479f2ffe6668864ba2799
+answers/bridge-s6-ledger_masters-basic-after.json | 1309 | 9f79e40eaf663fc8650aadc88f7f3041c3d16e546ddd0f04dd7d2bc7381b634b
+#
+# Screenshots kept on the lab PC (name | bytes | sha256):
+# s01-company-created-features.jpg | 53592 | 828e1e12391eb76e3cb9ec218e5bc4baeea08b191f9efd47e6274d91c44fac47
+# s02-gateway-alias-lab.jpg | 43159 | 591dbf230f3c1b634a956d622bd1292ca93f801929ed39c5910fe9665bc8bfb2
+# s03-L1-saved.jpg | 45757 | de25e143968da76fef0fcfb0aabd0f9726ff528842aa82b2c6f9fd1704ade581
+# s04-L2-saved.jpg | 45307 | 541dd1be8610ae1680779ec1f8b0255ad00b8c4d1904f59b2f734c723b114b5f
+# s05-lab-sales-saved.jpg | 47441 | 1791fbd6e2b1f8380ce3ddc50f36a3b67eadc5dcafabf2a310d254c8753243fc
+# s06-alter-filter-lab-plain.jpg | 37536 | deb988a5ebf1b6b76110804befcb0d7d9bd749661df46de00c08961b23b7163d
+# s07-L1-alteration-open.jpg | 45689 | 3d76968b8f4dc2ab2de312b85989add3d0d6054527404a0f9b405b357ec4f8c9
+# s08-try1-LAB-OTHER-LEDGER-refused.jpg | 112854 | 936a9d2e1b76377c9f77dbab2d3a0054ec404a134b64fc066d4413c314f3714a
+# s09-try2-two-spaces-refused.jpg | 112927 | 1f1ee5245c529020fdab53e6a82aa24f0008db3ef3a336f053e40255ff83fc3a
+# s10-step6-Lab-Other-Ledger-refused.jpg | 112928 | 109baff34d155da3a541545d55a7bfdd93f2cee65f123510cfa8db4930a0c1c2
+# s11-after-ctrlq-master-alteration.jpg | 41479 | 580e5b53dbc3b3f7b6044daa7e6b919c1a26c9c7447d4d1cefbb7239680e4f93
+# s12-final-gateway-RC-GATE.jpg | 42602 | bb018365555eca7977d6b837fa358b5071a21533e995635b7a476e5b435b2003

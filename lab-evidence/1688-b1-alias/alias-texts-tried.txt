@@ -1,0 +1,4 @@
+try1 step2	LAB OTHER LEDGER	refused
+try2 step2	Lab  Other Ledger	refused (two spaces between Lab and Other)
+not keyed	lab other ledger	not tried: the step-2 refusal repeated at try2 (stop rule)
+step6	Lab Other Ledger	refused

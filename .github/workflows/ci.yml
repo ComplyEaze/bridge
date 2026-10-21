@@ -111,7 +111,7 @@ jobs:
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.py$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes\.py$|retain-macos-test-binaries\.py$))' <<< "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.py$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes(\.test)?\.mjs$|retain-macos-test-binaries(\.test)?\.mjs$))' <<< "$changed_files"; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
@@ -284,8 +284,7 @@ jobs:
       # A committed merge-conflict marker passes every other check and ships as text.
       - run: node scripts/check-conflict-markers.mjs
       - run: node --test scripts/check-conflict-markers.test.mjs
-      - run: python3 scripts/collect-macos-test-crashes.test.py
-      - run: python3 scripts/retain-macos-test-binaries.test.py
+      - run: node --test scripts/collect-macos-test-crashes.test.mjs scripts/retain-macos-test-binaries.test.mjs
       - run: python3 scripts/fetch-pdfium.test.py
       - run: python3 scripts/merge-gate.test.py
       - run: python3 scripts/surface_coverage_report.test.py
@@ -474,7 +473,7 @@ jobs:
       - name: Collect minimized macOS test crash stacks
         if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}
         run: >-
-          python3 scripts/collect-macos-test-crashes.py
+          node scripts/collect-macos-test-crashes.mjs
           --since-file "$RUNNER_TEMP/bridge-native-start"
           --output "$RUNNER_TEMP/bridge-native-crashes.json"
           --wait-seconds ${{ steps.native-tests.outcome == 'failure' && '30' || '0' }}
@@ -492,7 +491,7 @@ jobs:
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: >-
-          python3 scripts/retain-macos-test-binaries.py
+          node scripts/retain-macos-test-binaries.mjs
           --crash-json "$RUNNER_TEMP/bridge-native-crashes.json"
           --target src-tauri/target/debug/deps
           --output "$RUNNER_TEMP/bridge-native-binaries"
@@ -964,7 +963,7 @@ jobs:
           printf '%s\n' "$NEEDS_JSON"
           failed="$(
             printf '%s' "$NEEDS_JSON" \
-              | python3 -c "import json,sys; d=json.load(sys.stdin); failed=[k for k,v in d.items() if v.get('result') in ('failure','cancelled')]; failed += [] if d.get('workflow-consistency', {}).get('result') == 'success' else ['workflow-consistency']; print(' '.join(dict.fromkeys(failed)))"
+              | node -e 'const d = JSON.parse(require("fs").readFileSync(0, "utf8")); const failed = Object.keys(d).filter((k) => ["failure", "cancelled"].includes(d[k].result)); if (d["workflow-consistency"]?.result !== "success") failed.push("workflow-consistency"); console.log([...new Set(failed)].join(" "))'
           )"
           if [[ -n "$failed" ]]; then
             echo "Required jobs did not pass: $failed"

@@ -14,8 +14,6 @@ use tally_protocol_simulator::{
     Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
 
-const GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
-
 fn decode(bytes: &[u8]) -> String {
     String::from_utf16(
         &bytes
@@ -30,6 +28,19 @@ fn companies() -> String {
     decode(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
     ))
+}
+
+/// The company's identifier, read from the captured company list by its name,
+/// never written out.
+fn guid() -> String {
+    let list = companies();
+    let at = list
+        .find("<COMPANY NAME=\"Bridge Ageing Lab\"")
+        .expect("the captured list holds the company");
+    let tag = "<GUID TYPE=\"String\">";
+    let start = at + list[at..].find(tag).expect("with its identifier") + tag.len();
+    let end = start + list[start..].find("</GUID>").expect("closed");
+    list[start..end].to_string()
 }
 
 fn extents() -> String {
@@ -122,7 +133,7 @@ async fn call_observed(
     let response = server
         .call_tool(
             "negative_ledgers",
-            json!({"company_guid": GUID, "from": from, "to": to}),
+            json!({"company_guid": guid(), "from": from, "to": to}),
         )
         .await;
     (response, simulator.finish().unwrap())
@@ -323,7 +334,7 @@ async fn a_reversed_window_is_refused_before_any_request() {
     let response = server
         .call_tool(
             "negative_ledgers",
-            json!({"company_guid": GUID, "from": "2027-03-31", "to": "2026-04-01"}),
+            json!({"company_guid": guid(), "from": "2027-03-31", "to": "2026-04-01"}),
         )
         .await;
     assert_eq!(response["isError"], true, "{response}");

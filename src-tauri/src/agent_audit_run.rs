@@ -20,7 +20,7 @@ use bridge_tax_audit::registry::{self, CallerData};
 /// test's values, clauses and fixed wording whole, so a test whose ids or text
 /// are built from the book would leak through it. `cash_44ab`: a real-book
 /// parity check passed on 21 Oct 2026 at reference pin 6168aeaa (crate tree
-/// 53938eb8).
+/// 53938eb8), on one book with no cash payments: that side was checked at zero.
 pub(super) const ADMITTED: &[&str] = &["cash_44ab"];
 
 /// Refused rather than cut short: a result past these is not one a caller

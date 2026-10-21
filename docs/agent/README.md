@@ -799,7 +799,8 @@ no overall deadline: it is up to 128 parts, each between two checks, so a client
 leaves the request it was waiting for abandoned.
 
 Measured on the engine's synthetic book replayed through the simulator. The engine's `cash_44ab` passed
-a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8). The tool itself
+a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8), on one book
+whose cash payments were zero, so its payments side was checked only at zero. The tool itself
 has not yet run against a live Tally: the lab comparison comes first.
 
 ### Stock Summary

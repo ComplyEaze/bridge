@@ -227,10 +227,12 @@ pub(super) fn gst_status_type_name_literal_safe(name: &str) -> bool {
 /// The GST status of the vouchers of one type in a date window (R7, 10 Oct
 /// 2026): the narrow field list and the by-name voucher-type filter the lab
 /// answered on a synthetic TallyPrime 7.1 Silver book, over two days holding
-/// Sales vouchers, Receipts and a second Sales-class type. The request is, character
-/// for character, the lab's file `w8-status-narrow-window-sales-byname.xml`
-/// (the identifiers are the ones it carried). The type is named, never
-/// classed: a type of the same class under another name is not selected.
+/// Sales vouchers, Receipts and a second Sales-class type. Since 12 Oct 2026 it
+/// fetches `ISCANCELLED` and `ISOPTIONAL` (#1655) and `ISPOSTDATED` (#1664) as
+/// well, and the request is, character for character, the lab's file
+/// `w21-status-window-aug-postdated.xml` (the identifiers are the ones it
+/// carried). The type is named, never classed: a type of the same class under
+/// another name is not selected.
 pub(super) fn render_gst_status_window(
     company: &str,
     from: &TallyDate,
@@ -245,7 +247,7 @@ pub(super) fn render_gst_status_window(
     // A quoted `$$Date:"…"` literal takes only a date (#861).
     let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN,ISCANCELLED,ISOPTIONAL,ISPOSTDATED</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str()),
         xml_escape(type_name)
     ))
@@ -258,66 +260,6 @@ pub(super) fn gst_status_read(
     type_name: &str,
 ) -> Result<ReadRequest, String> {
     render_gst_status_window(company, from, to, type_name).map(ReadRequest)
-}
-
-pub(super) fn render_agent_changed_vouchers(
-    company: &str,
-    checkpoint: u64,
-    snapshot: u64,
-) -> String {
-    format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Changed Vouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentChangedVoucher\">$AlterID &gt; {checkpoint} AND $AlterID &lt;= {snapshot}</SYSTEM><COLLECTION NAME=\"Bridge Agent Changed Vouchers\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{AGENT_VOUCHER_FETCH}</FETCH><FILTERS>BridgeAgentChangedVoucher</FILTERS><SORT>Default: $AlterID</SORT></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company)
-    )
-}
-
-#[derive(Clone, Copy)]
-pub(super) enum MasterKind {
-    Ledger,
-    Group,
-}
-
-impl MasterKind {
-    pub(super) const ALL: [Self; 2] = [Self::Ledger, Self::Group];
-
-    fn tally_type(self) -> &'static str {
-        match self {
-            Self::Ledger => "Ledger",
-            Self::Group => "Group",
-        }
-    }
-}
-
-pub(super) fn render_agent_changed_masters(
-    company: &str,
-    checkpoint: u64,
-    snapshot: u64,
-    kind: MasterKind,
-) -> String {
-    render_master_collection(company, kind, Some((checkpoint, snapshot)))
-}
-
-pub(super) fn render_agent_master_domain_high_water(company: &str, kind: MasterKind) -> String {
-    render_master_collection(company, kind, None)
-}
-
-fn render_master_collection(company: &str, kind: MasterKind, window: Option<(u64, u64)>) -> String {
-    let object_type = kind.tally_type();
-    let name = format!("Bridge Agent {object_type} Changes");
-    let (formula, filter, fields) = match window {
-        Some((checkpoint, snapshot)) => (
-            format!(
-                r#"<SYSTEM TYPE="Formulae" NAME="BridgeAgentChangedMaster">$AlterID &gt; {checkpoint} AND $AlterID &lt;= {snapshot}</SYSTEM>"#
-            ),
-            "<FILTERS>BridgeAgentChangedMaster</FILTERS><SORT>Default: $AlterID</SORT>",
-            "NAME,PARENT,ALTERID,GUID,MASTERID",
-        ),
-        None => (String::new(), "", "ALTERID"),
-    };
-    format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{name}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME="{name}" ISMODIFY="No"><TYPE>{object_type}</TYPE><FETCH>{fields}</FETCH>{filter}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        xml_escape(company)
-    )
 }
 
 pub(super) fn render_agent_company_high_water(company: &str) -> String {
@@ -368,25 +310,6 @@ pub(super) fn company_high_water_read(company: &str) -> ReadRequest {
     ReadRequest(render_agent_company_high_water(company))
 }
 
-pub(super) fn master_domain_high_water_read(company: &str, kind: MasterKind) -> ReadRequest {
-    ReadRequest(render_agent_master_domain_high_water(company, kind))
-}
-
-pub(super) fn changed_vouchers_read(company: &str, checkpoint: u64, snapshot: u64) -> ReadRequest {
-    ReadRequest(render_agent_changed_vouchers(company, checkpoint, snapshot))
-}
-
-pub(super) fn changed_masters_read(
-    company: &str,
-    checkpoint: u64,
-    snapshot: u64,
-    kind: MasterKind,
-) -> ReadRequest {
-    ReadRequest(render_agent_changed_masters(
-        company, checkpoint, snapshot, kind,
-    ))
-}
-
 pub(super) fn standard_ledger_catalog_read(company: &str) -> anyhow::Result<ReadRequest> {
     crate::tally::standard_ledger_catalog::render_standard_ledger_catalog_request(company)
         .map(ReadRequest)
@@ -403,6 +326,68 @@ pub(super) fn native_group_snapshot_read(company: &str) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(company),
     )
+}
+
+/// The voucher types of the book, every field, for an invoice build: the named
+/// type, its parent chain to a reserved class and its series-level numbering.
+pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_voucher_types_request(company))
+}
+
+/// The company's own count of its ledgers, to size an invoice build on a book
+/// whose master mark is high.
+pub(super) fn invoice_ledger_count_read(company: &str) -> ReadRequest {
+    ReadRequest(
+        bridge_tally_protocol::outstandings_shared::render_company_ledger_count_request(company),
+    )
+}
+
+/// The vouchers carrying one invoice number in one financial year, with the
+/// measured per-row Sales-class compute, for the duplicate-number check.
+pub(super) fn invoice_number_read(
+    company: &str,
+    number: &str,
+    window: (&str, &str),
+) -> Option<ReadRequest> {
+    agent_import::invoice::render_invoice_number_request(company, number, window).map(ReadRequest)
+}
+
+/// A posted invoice read back by type and number, every field the build wrote.
+pub(super) fn invoice_readback_read(
+    company: &str,
+    type_guid: &str,
+    number: &str,
+    window: (&str, &str),
+) -> Option<ReadRequest> {
+    agent_import::invoice::render_invoice_readback_request(company, type_guid, number, window)
+        .map(ReadRequest)
+}
+
+/// The ledger listing with each ledger's GST rate and rounding, for the tax
+/// check of an invoice, restricted to the ledgers under one scope's parents
+/// (#1331). Its window is the invoice's financial year start and the invoice
+/// date.
+pub(super) fn invoice_ledger_rates_scoped_read(
+    company: &str,
+    window: (&str, &str),
+    part: &bridge_tally_protocol::parent_partition::ParentPart,
+) -> Option<ReadRequest> {
+    agent_import::invoice::render_ledger_rates_request_for_parents(company, window, part)
+        .map(ReadRequest)
+}
+
+/// The group listing with each group's HSN/SAC rows, for the HSN/SAC check
+/// of an invoice (rows bound to the company by GUID).
+pub(super) fn invoice_group_hsn_read(company: &str) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_group_hsn_request(company))
+}
+
+/// The company's GST registrations, for an invoice build (rows bound to the
+/// company by GUID).
+pub(super) fn invoice_company_registration_read(company: &str) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_company_registration_request(
+        company,
+    ))
 }
 
 /// The company's Currency masters: the request the outstandings paths send,
@@ -487,10 +472,6 @@ mod sealed_read_tests {
         let (from, to) = (tally_date("20260401"), tally_date("20260430"));
         let mut reads = vec![
             company_high_water_read(company),
-            master_domain_high_water_read(company, MasterKind::Ledger),
-            master_domain_high_water_read(company, MasterKind::Group),
-            changed_vouchers_read(company, 1, 2),
-            changed_masters_read(company, 1, 2, MasterKind::Ledger),
             standard_ledger_catalog_read(company).unwrap(),
             native_group_snapshot_read(company),
             voucher_census_read(company, &from, &to, span).unwrap(),

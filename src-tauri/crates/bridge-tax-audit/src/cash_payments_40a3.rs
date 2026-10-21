@@ -33,7 +33,7 @@ use sha2::Sha256;
 use crate::book::{Book, Ledger, Voucher};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
-use crate::high_value_register::{cash_269st_rows, Direction, Row};
+use crate::high_value_register::{cash_269st_rows, Direction, Row, UNIDENTIFIED_PARTY};
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::iso;
 use crate::rules::Rules;
@@ -44,10 +44,6 @@ pub const VERSION: &str = "1";
 
 const POPULATION: &str = "Books population (optional, cancelled and post-dated vouchers \
 excluded); Contra excluded throughout.";
-
-/// Not a real ledger name: the sentinel for a cash leg with a tax/round-off line but no
-/// identified real party (module docstring).
-const UNIDENTIFIED_PARTY: &str = "\u{2039}cash leg with no identified party\u{203a}";
 
 /// How an s.269ST finding on that bucket cites it: a "row" ref, never a "ledger" one -- the
 /// placeholder names no ledger in the books (EVID-1; the reference's `UNIDENTIFIED_PARTY_ROW`).

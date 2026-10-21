@@ -29,15 +29,11 @@ use sha2::{Digest, Sha256};
 pub mod audit_company_part;
 #[cfg(feature = "bills-native-outstandings-probe")]
 pub mod bills_native_outstandings_probe;
-#[cfg(feature = "bills-payments-observation-parser")]
-pub mod bills_payments_observation;
 pub mod currency_composite;
 pub mod group_ancestry;
 pub mod gst_details;
 pub mod gst_registration;
 mod import_outcome;
-#[cfg(feature = "india-tax-observation-parser")]
-pub mod india_tax_observation;
 pub mod ledger_census;
 /// One ledger `Create` message. Its one caller today is the lab rebuild;
 /// this crate runs its goldens in every build.
@@ -47,6 +43,7 @@ pub mod native_company_features;
 pub mod native_funds_flow;
 mod native_ledger_collection;
 pub mod native_masters;
+pub mod native_month_register;
 pub mod native_negative_stock;
 pub mod native_outstandings;
 pub mod native_statement_reports;
@@ -96,7 +93,6 @@ pub use text_encoding::{
 pub use tolerant_xml::mark_forbidden_numeric_references;
 
 pub const BRIDGE_LEDGER_EXPORT_SCHEMA: &str = "bridge.tally.ledgers/1";
-pub const BRIDGE_LEDGER_PERIOD_BALANCE_SCHEMA: &str = "bridge.tally.ledger-period-balances/1";
 pub const MAX_INTERACTIVE_DISCOVERY_COMPANIES: usize = 100;
 
 /// The sanitized representation of Tally's U+0004 metadata prefix.
@@ -183,29 +179,6 @@ impl PartyLedgerMasterFieldObservation {
     pub fn nonempty_returned_text(&self) -> Option<&str> {
         self.returned_text().filter(|value| !value.is_empty())
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct TallyLedgerPeriodBalance {
-    pub opening_balance: String,
-    pub closing_balance: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct LedgerPeriodBalanceContext {
-    pub company_guid: String,
-    pub from_yyyymmdd: String,
-    pub to_yyyymmdd: String,
-    /// Bridge's requested comparison profile echoed by the custom report.
-    /// This is request binding, not source-observed proof of Tally semantics.
-    pub ordinary_books_requested: bool,
-    pub source_record_count: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ParsedLedgerPeriodBalanceReport {
-    pub context: LedgerPeriodBalanceContext,
-    pub records: Vec<ParsedSourceRecord<TallyLedgerPeriodBalance>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -1875,179 +1848,6 @@ fn parse_ledger_source_records_for_schema(
     Ok(ParsedExport { records, evidence })
 }
 
-pub fn parse_ledger_period_balance_report(
-    xml: &str,
-) -> anyhow::Result<ParsedLedgerPeriodBalanceReport> {
-    validate_export_response(xml)?;
-    let mut reader = configured_reader(xml);
-    let mut context = None;
-    let mut records = Vec::new();
-    loop {
-        let record_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("COMPANYCONTEXT") =>
-            {
-                let parsed = parse_ledger_period_context(&mut reader, &element, false)?;
-                if context.replace(parsed).is_some() {
-                    anyhow::bail!("Tally period report repeated its context");
-                }
-            }
-            Event::Empty(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("COMPANYCONTEXT") =>
-            {
-                let parsed = parse_ledger_period_context(&mut reader, &element, true)?;
-                if context.replace(parsed).is_some() {
-                    anyhow::bail!("Tally period report repeated its context");
-                }
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("LEDGERPERIODBALANCE") =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&element, b"ALTERID");
-                let record = parse_ledger_period_balance(&mut reader)?;
-                records.push(ParsedSourceRecord {
-                    record,
-                    source_id,
-                    identity_kind,
-                    identities,
-                    alter_id,
-                    raw_source_sha256: source_fragment_sha256(
-                        xml,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    let context = context.ok_or_else(|| anyhow::anyhow!("Tally period report omitted context"))?;
-    if context.source_record_count != records.len() as u64 {
-        anyhow::bail!("Tally period report count did not match parsed rows");
-    }
-    let mut identities = HashMap::new();
-    for record in &records {
-        let source_id = record
-            .source_id
-            .as_deref()
-            .ok_or_else(|| anyhow::anyhow!("Tally period report row omitted stable identity"))?;
-        if identities.insert(source_id, ()).is_some() {
-            anyhow::bail!("Tally period report repeated a stable identity");
-        }
-    }
-    Ok(ParsedLedgerPeriodBalanceReport { context, records })
-}
-
-fn parse_ledger_period_context(
-    reader: &mut Reader<&[u8]>,
-    element: &quick_xml::events::BytesStart<'_>,
-    is_empty: bool,
-) -> anyhow::Result<LedgerPeriodBalanceContext> {
-    let mut fields = HashMap::<&'static str, String>::new();
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|_| anyhow::anyhow!("Tally period context contained malformed attributes"))?;
-        let key = period_context_field(attribute.key.as_ref().as_bytes())
-            .ok_or_else(|| anyhow::anyhow!("Tally period context contained an unexpected field"))?;
-        let value = attribute
-            .normalized_value(quick_xml::XmlVersion::Implicit1_0)
-            .map_err(|_| anyhow::anyhow!("Tally period context contained invalid text"))?;
-        insert_period_context_field(&mut fields, key, value.trim())?;
-    }
-    if !is_empty {
-        loop {
-            match reader.read_event()? {
-                Event::Start(child) => {
-                    let key = period_context_field(child.name().as_ref().as_bytes()).ok_or_else(
-                        || anyhow::anyhow!("Tally period context contained an unexpected field"),
-                    )?;
-                    let value = read_required_text(reader, child.name()).map_err(|_| {
-                        anyhow::anyhow!("Tally period context contained an empty or invalid value")
-                    })?;
-                    insert_period_context_field(&mut fields, key, &value)?;
-                }
-                Event::Empty(_) => {
-                    anyhow::bail!("Tally period context contained an empty field");
-                }
-                Event::Text(text) if !text.trim().is_empty() => {
-                    anyhow::bail!("Tally period context contained unexpected text");
-                }
-                Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("COMPANYCONTEXT") => {
-                    break;
-                }
-                Event::Eof => anyhow::bail!("Tally period context ended before closing"),
-                _ => {}
-            }
-        }
-    }
-
-    let required = |key: &'static str| {
-        fields
-            .get(key)
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("Tally period context omitted {key}"))
-    };
-    let schema = required("SCHEMA")?;
-    let object_type = required("OBJECTTYPE")?;
-    if schema != BRIDGE_LEDGER_PERIOD_BALANCE_SCHEMA || object_type != "LEDGERPERIODBALANCE" {
-        anyhow::bail!("Tally period report scope was invalid");
-    }
-    Ok(LedgerPeriodBalanceContext {
-        company_guid: required("GUID")?,
-        from_yyyymmdd: required("FROMDATE")?,
-        to_yyyymmdd: required("TODATE")?,
-        ordinary_books_requested: parse_tally_boolean(&required("ORDINARYBOOKSREQUESTED")?)?,
-        source_record_count: required("RECORDCOUNT")?
-            .parse::<u64>()
-            .map_err(|_| anyhow::anyhow!("Tally period report count was invalid"))?,
-    })
-}
-
-fn period_context_field(name: &[u8]) -> Option<&'static str> {
-    [
-        "SCHEMA",
-        "OBJECTTYPE",
-        "GUID",
-        "FROMDATE",
-        "TODATE",
-        "ORDINARYBOOKSREQUESTED",
-        "RECORDCOUNT",
-    ]
-    .into_iter()
-    .find(|field| name.eq_ignore_ascii_case(field.as_bytes()))
-}
-
-fn insert_period_context_field(
-    fields: &mut HashMap<&'static str, String>,
-    key: &'static str,
-    value: &str,
-) -> anyhow::Result<()> {
-    if value.is_empty() {
-        anyhow::bail!("Tally period context contained an empty field");
-    }
-    if fields.insert(key, value.to_string()).is_some() {
-        anyhow::bail!("Tally period context repeated {key}");
-    }
-    Ok(())
-}
-
 pub fn verify_company_context(
     evidence: &ExportEvidence,
     expected_guid: &str,
@@ -2557,7 +2357,6 @@ fn is_primary_export_row(name: &[u8]) -> bool {
         b"VOUCHERTYPE".as_slice(),
         b"LEDGER".as_slice(),
         b"VOUCHER".as_slice(),
-        b"LEDGERPERIODBALANCE".as_slice(),
     ]
     .into_iter()
     .any(|candidate| name.eq_ignore_ascii_case(candidate))
@@ -2972,77 +2771,6 @@ fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Res
     Ok(ledger)
 }
 
-fn parse_ledger_period_balance(
-    reader: &mut Reader<&[u8]>,
-) -> anyhow::Result<TallyLedgerPeriodBalance> {
-    let mut opening_balance = None;
-    let mut closing_balance = None;
-    loop {
-        match reader.read_event()? {
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("OPENINGBALANCE") =>
-            {
-                if opening_balance.is_some() {
-                    anyhow::bail!("Tally period-balance row repeated opening amount");
-                }
-                opening_balance = Some(read_required_text(reader, element.name())?);
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("CLOSINGBALANCE") =>
-            {
-                if closing_balance.is_some() {
-                    anyhow::bail!("Tally period-balance row repeated closing amount");
-                }
-                closing_balance = Some(read_required_text(reader, element.name())?);
-            }
-            Event::Empty(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("OPENINGBALANCE") =>
-            {
-                anyhow::bail!("Tally period-balance row contained an empty opening amount");
-            }
-            Event::Empty(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("CLOSINGBALANCE") =>
-            {
-                anyhow::bail!("Tally period-balance row contained an empty closing amount");
-            }
-            Event::End(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("LEDGERPERIODBALANCE") =>
-            {
-                break;
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally period-balance row contained an unexpected field");
-            }
-            Event::Text(text) if !text.trim().is_empty() => {
-                anyhow::bail!("Tally period-balance row contained unexpected text");
-            }
-            Event::Eof => anyhow::bail!("Tally period-balance row ended before closing"),
-            _ => {}
-        }
-    }
-    Ok(TallyLedgerPeriodBalance {
-        opening_balance: opening_balance
-            .ok_or_else(|| anyhow::anyhow!("Tally period-balance row omitted opening amount"))?,
-        closing_balance: closing_balance
-            .ok_or_else(|| anyhow::anyhow!("Tally period-balance row omitted closing amount"))?,
-    })
-}
-
 fn mark_unique_field(
     seen: &mut HashSet<&'static str>,
     field: &'static str,
@@ -3103,13 +2831,13 @@ fn validate_only_attributes(
 ) -> anyhow::Result<()> {
     let mut seen = HashSet::new();
     for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|_| anyhow::anyhow!("Tally period report attributes were malformed"))?;
+        let attribute =
+            attribute.map_err(|_| anyhow::anyhow!("Tally record attributes were malformed"))?;
         if !allowed
             .iter()
             .any(|key| attribute.key.as_ref().as_bytes().eq_ignore_ascii_case(key))
         {
-            anyhow::bail!("Tally period report contained an unexpected attribute");
+            anyhow::bail!("Tally record contained an unexpected attribute");
         }
         if !seen.insert(attribute.key.as_ref().as_bytes().to_ascii_lowercase()) {
             anyhow::bail!("Tally response repeated a case-insensitive attribute");

@@ -117,7 +117,85 @@ pub(super) fn canonical_verification_amount(value: &str) -> Result<String, Strin
         .map_err(|_| "import_verification_amount_invalid".to_string())
 }
 
-type VerificationFingerprint = (Option<String>, Option<String>, Vec<String>);
+/// What a batch voucher and a book row are matched by. Every voucher but a
+/// numbered invoice is matched by its content (date, type, entries) and
+/// serialises as that triple always has, so the duplicate report's hash of
+/// such a row does not change. An invoice is matched by its date, type and
+/// number (owner decision of 7 Oct 2026, ADR 0004): two invoices that differ
+/// only by number are two documents.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum VerificationFingerprint {
+    Content(Option<String>, Option<String>, Vec<String>),
+    Numbered(Option<String>, Option<String>, String),
+}
+
+impl Serialize for VerificationFingerprint {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Content(date, voucher_type, entries) => {
+                (date, voucher_type, entries).serialize(serializer)
+            }
+            Self::Numbered(date, voucher_type, number) => {
+                json!({"numbered": [date, voucher_type, number]}).serialize(serializer)
+            }
+        }
+    }
+}
+
+/// How a batch's invoice is recognised among the rows of its voucher type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum InvoiceIdentity {
+    /// By its number: a row with another number is another document, even
+    /// with the same figures.
+    ByNumber,
+    /// By its number, and by its figures whatever the number. Used while this
+    /// machine's journal holds another batch with the same figures that was
+    /// sent and has not been read back as posted: a post whose answer was lost
+    /// may be this invoice under the number it was first given.
+    ByNumberOrFigures,
+}
+
+impl InvoiceIdentity {
+    /// The identity to use beside `unsettled_twin`, the batch of this machine
+    /// with the invoice's figures that was sent and whose latest status is not
+    /// a verified post.
+    pub(super) fn beside(unsettled_twin: Option<&str>) -> Self {
+        match unsettled_twin {
+            Some(_) => Self::ByNumberOrFigures,
+            None => Self::ByNumber,
+        }
+    }
+}
+
+/// The batch's one invoice, as the rows of its type are compared with it.
+pub(super) struct InvoiceKey<'a> {
+    voucher_type: &'a str,
+    key: VerificationFingerprint,
+    content: VerificationFingerprint,
+    identity: InvoiceIdentity,
+}
+
+/// A voucher number as two numbers are compared for absence: trimmed, ASCII
+/// case ignored. `None` for a number that is absent, empty or blank. Looser
+/// than the comparison after a post (`voucher_diffs`), so it refuses more.
+fn folded_number(number: &str) -> Option<String> {
+    let number = number.trim();
+    (!number.is_empty()).then(|| number.to_ascii_uppercase())
+}
+
+/// The number an invoice is matched by; `None` for every other voucher and for
+/// an invoice that carries none, which is then matched by content like them.
+fn invoice_number(voucher: &ImportVoucher) -> Option<String> {
+    voucher
+        .voucher_type
+        .is_invoice()
+        .then(|| voucher.voucher_number.as_deref().and_then(folded_number))
+        .flatten()
+}
+
+fn entries_match(expected: &ImportVoucher, matched: &ReadVoucher) -> bool {
+    expected_entry_fingerprint(expected) == actual_entry_fingerprint(matched)
+}
 
 #[derive(Default)]
 struct VerificationCandidates {
@@ -139,28 +217,73 @@ impl VerificationCandidates {
     }
 }
 
-/// The fingerprint a batch voucher is matched by: its date, type and entries.
-/// `voucher` must carry canonical amounts, as `verify_batch`'s comparison copy
-/// does. One function, so the copy search for a cancelled voucher (#806) and
-/// the matching use the same key.
-pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFingerprint {
-    (
+/// A batch voucher's date, type and entries. `voucher` must carry canonical
+/// amounts, as `verify_batch_as`'s comparison copy does.
+fn expected_content(voucher: &ImportVoucher) -> VerificationFingerprint {
+    VerificationFingerprint::Content(
         Some(voucher.date.as_str().to_owned()),
-        Some(voucher.voucher_type.as_str().to_string()),
+        Some(voucher.filed_type_name().to_string()),
         expected_entry_fingerprint(voucher),
     )
+}
+
+/// The fingerprint a batch voucher is matched by: an invoice's date, type and
+/// number, every other voucher's date, type and entries. One function, so the
+/// copy search for a cancelled voucher (#806) and the matching use the same
+/// key.
+pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFingerprint {
+    match invoice_number(voucher) {
+        Some(number) => VerificationFingerprint::Numbered(
+            Some(voucher.date.as_str().to_owned()),
+            Some(voucher.filed_type_name().to_string()),
+            number,
+        ),
+        None => expected_content(voucher),
+    }
 }
 
 /// At most this many effective copies of one cancelled voucher are listed;
 /// the count is exact (#806).
 const MAX_EFFECTIVE_COPIES_LISTED: usize = 5;
 
-pub(super) fn observed_fingerprint(voucher: &ReadVoucher) -> VerificationFingerprint {
-    (
+fn observed_content(voucher: &ReadVoucher) -> VerificationFingerprint {
+    VerificationFingerprint::Content(
         Some(voucher.date.as_str().to_owned()),
         voucher.voucher_type.clone(),
         actual_entry_fingerprint(voucher),
     )
+}
+
+/// The fingerprint a book row is matched by. A row of the batch invoice's
+/// voucher type takes the invoice's own key when it is the same document: it
+/// carries no number and has the invoice's figures (so a read that dropped the
+/// number never makes an invoice look absent), or, under
+/// `InvoiceIdentity::ByNumberOrFigures`, it has the invoice's figures whatever
+/// its number. Otherwise such a row is keyed by its own number. Every other
+/// row, and every row when the batch holds no invoice, is keyed by content.
+pub(super) fn observed_fingerprint(
+    voucher: &ReadVoucher,
+    invoice: Option<&InvoiceKey<'_>>,
+) -> VerificationFingerprint {
+    let content = observed_content(voucher);
+    let Some(invoice) =
+        invoice.filter(|invoice| voucher.voucher_type.as_deref() == Some(invoice.voucher_type))
+    else {
+        return content;
+    };
+    let same_figures = content == invoice.content;
+    match voucher.voucher_number.as_deref().and_then(folded_number) {
+        None if same_figures => invoice.key.clone(),
+        None => content,
+        Some(_) if same_figures && invoice.identity == InvoiceIdentity::ByNumberOrFigures => {
+            invoice.key.clone()
+        }
+        Some(number) => VerificationFingerprint::Numbered(
+            Some(voucher.date.as_str().to_owned()),
+            voucher.voucher_type.clone(),
+            number,
+        ),
+    }
 }
 
 /// How a batch's vouchers can be attributed to rows of the book.
@@ -183,10 +306,23 @@ pub(super) enum Attribution<'a> {
 /// A bound voucher the window does not hold is `bound_not_in_window`, never
 /// `not_found`: it was posted, so its absence here is not evidence that it is
 /// absent.
+#[cfg(test)]
 pub(super) fn verify_batch(
     line: &ImportLedgerLine,
     observed: &ImportReadSource,
     attribution: Attribution<'_>,
+) -> Result<Value, String> {
+    verify_batch_as(line, observed, attribution, InvoiceIdentity::ByNumber)
+}
+
+/// [`verify_batch`], with how the batch's invoice is recognised. Production
+/// callers choose it from the journal (`unsettled_invoice_twin`); a batch
+/// with no invoice reads the same either way.
+pub(super) fn verify_batch_as(
+    line: &ImportLedgerLine,
+    observed: &ImportReadSource,
+    attribution: Attribution<'_>,
+    invoice_identity: InvoiceIdentity,
 ) -> Result<Value, String> {
     let (bindings, tags_attribute) = match attribution {
         Attribution::Tag => (None, true),
@@ -214,14 +350,34 @@ pub(super) fn verify_batch(
         .collect::<Result<Vec<_>, _>>()?;
     let mut fully_verified_identities = BTreeSet::new();
     let mut rows = Vec::new();
+    // An invoice is built alone, so a batch holds at most one. A batch that
+    // held more than one numbered invoice is matched as every other voucher
+    // is, by content: the stricter rule.
+    let numbered = line
+        .vouchers
+        .iter()
+        .filter(|voucher| invoice_number(voucher).is_some())
+        .collect::<Vec<_>>();
+    let invoice = match numbered.as_slice() {
+        [voucher] => Some(InvoiceKey {
+            voucher_type: voucher.filed_type_name(),
+            key: expected_fingerprint(voucher),
+            content: expected_content(voucher),
+            identity: invoice_identity,
+        }),
+        _ => None,
+    };
     let expected_fingerprints = line
         .vouchers
         .iter()
-        .map(expected_fingerprint)
+        .map(|voucher| match invoice {
+            Some(_) => expected_fingerprint(voucher),
+            None => expected_content(voucher),
+        })
         .collect::<Vec<VerificationFingerprint>>();
     let observed_fingerprints = observed
         .iter()
-        .map(observed_fingerprint)
+        .map(|row| observed_fingerprint(row, invoice.as_ref()))
         .collect::<Vec<_>>();
     let mut expected_fingerprint_counts = BTreeMap::new();
     for fingerprint in &expected_fingerprints {
@@ -332,7 +488,7 @@ pub(super) fn verify_batch(
                             expected,
                             matched,
                             "post_span_binding",
-                            expected_key.2 == observed_fingerprints[*index].2,
+                            entries_match(expected, matched),
                             WrittenNarration::Untagged,
                             &mut counts,
                         )?;
@@ -402,18 +558,13 @@ pub(super) fn verify_batch(
             } else {
                 WrittenNarration::Untagged
             };
-            let diffs = voucher_diffs(
-                expected,
-                matched,
-                expected_key.2 == observed_fingerprints[matched_index].2,
-                written,
-            );
+            let diffs = voucher_diffs(expected, matched, entries_match(expected, matched), written);
             let mut matched_value = if !fingerprint_fallback {
                 let value = attributed_status(
                     expected,
                     matched,
                     marker,
-                    expected_key.2 == observed_fingerprints[matched_index].2,
+                    entries_match(expected, matched),
                     written,
                     &mut counts,
                 )?;
@@ -488,6 +639,43 @@ pub(super) fn verify_batch(
             observed_copies["ambiguous_within_batch"] = Value::Bool(true);
         }
         row["effective_copies_observed"] = observed_copies;
+    }
+    // An invoice that its number does not find, or that reads cancelled: the
+    // effective rows of its type with its figures and another number, as #806
+    // lists a cancelled voucher's copies. Report-only: equal figures under
+    // another number are another invoice unless a person says otherwise, so
+    // nothing is attributed through them and no verdict changes.
+    if let Some(invoice) = &invoice {
+        for (row, expected) in rows.iter_mut().zip(&line.vouchers) {
+            let cancelled =
+                row["status"] == "posted_not_effective" && row["reason"] == "voucher_cancelled";
+            if invoice_number(expected).is_none() || !(row["status"] == "not_found" || cancelled) {
+                continue;
+            }
+            let mut others = (0..observed.len())
+                .filter(|&index| {
+                    !bound_indexes.contains(&index)
+                        && observed_fingerprints[index] != invoice.key
+                        && observed_content(&observed[index]) == invoice.content
+                        && observed[index].cancelled != Some(true)
+                        && observed[index].optional != Some(true)
+                })
+                .collect::<Vec<_>>();
+            if others.is_empty() {
+                continue;
+            }
+            others.sort_by_key(|&index| observed[index].alter_id);
+            let entries = others
+                .iter()
+                .take(MAX_EFFECTIVE_COPIES_LISTED)
+                .map(|&index| {
+                    let other = &observed[index];
+                    json!({"guid":other.guid,"master_id":other.master_id,"alter_id":other.alter_id,"voucher_number":other.voucher_number})
+                })
+                .collect::<Vec<_>>();
+            row["same_figures_other_number"] =
+                json!({"count":others.len(),"entries":entries,"attribution":"not_established"});
+        }
     }
     let (batch_duplicates, unrelated_duplicates_in_window) = batch_duplicate_sets(
         observed,
@@ -573,6 +761,16 @@ pub(super) enum UnmatchedCause {
     /// voucher Tally rejected, and twins in one batch defeat matching by
     /// content.
     ReportedNotCreated,
+    /// A later verification, reading the saved answer of the batch's own
+    /// post: it reported every counter, `CREATED 0`, `EXCEPTIONS` equal to
+    /// the vouchers sent and every other counter zero; for a batch of two
+    /// or more, the post itself also recorded that the company's voucher
+    /// mark moved by what Tally reported creating. That is all that is
+    /// claimed. The voucher may since have been entered by hand in another
+    /// form, so it is never read as not created: it stays
+    /// `sent_not_attributed`, and its next step says what Tally reported
+    /// when it was sent (bridge#1108).
+    ReportedNotCreatedWhenSent,
     /// Anything else, including no recorded answer: an edit in Tally is as
     /// likely as absence, so the voucher is `sent_not_attributed`.
     NotEstablished,
@@ -597,8 +795,21 @@ pub(super) fn unmatched_cause(
         return UnmatchedCause::NotEstablished;
     };
     let step_confirms = sent == 1 || voucher_step == Some(0);
-    if sent >= 1
-        && step_confirms
+    if step_confirms && answer_reported_none_created(counters, sent) && unmatched == sent {
+        UnmatchedCause::ReportedNotCreated
+    } else {
+        UnmatchedCause::NotEstablished
+    }
+}
+
+/// Whether a post's answer has the captured shape of a post Tally rejected
+/// whole: every counter reported, `CREATED 0`, `EXCEPTIONS` equal to the
+/// `sent` vouchers and every other counter zero (§9.2; bridge#1108).
+fn answer_reported_none_created(
+    counters: &bridge_tally_protocol::TallyImportResult,
+    sent: u64,
+) -> bool {
+    sent >= 1
         && counters.counter_presence.all_reported()
         && counters.created == 0
         && counters.altered == 0
@@ -607,11 +818,27 @@ pub(super) fn unmatched_cause(
         && counters.errors == 0
         && counters.cancelled == 0
         && counters.exceptions == sent
-        && unmatched == sent
-    {
-        UnmatchedCause::ReportedNotCreated
-    } else {
-        UnmatchedCause::NotEstablished
+}
+
+/// The cause for vouchers a LATER verification of a post of `sent` cannot
+/// find, from what that post left on record: the saved answer's shape and,
+/// for a batch of two or more, `step_matched`, the post's own verdict that
+/// the company's voucher mark moved by what Tally reported creating (the
+/// same guard the post's own readback applies, read from its record because
+/// the mark may have moved since for other reasons). A voucher may have been
+/// entered by hand since, so nothing here is read as not created.
+pub(super) fn later_unmatched_cause(
+    counters: Option<&bridge_tally_protocol::TallyImportResult>,
+    sent: usize,
+    step_matched: bool,
+) -> UnmatchedCause {
+    match (counters, u64::try_from(sent)) {
+        (Some(counters), Ok(sent))
+            if (sent == 1 || step_matched) && answer_reported_none_created(counters, sent) =>
+        {
+            UnmatchedCause::ReportedNotCreatedWhenSent
+        }
+        _ => UnmatchedCause::NotEstablished,
     }
 }
 
@@ -651,13 +878,130 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
     }
 }
 
+/// What a person does about an invoice that is in the book and did not read
+/// back as built.
+pub(super) const INVOICE_DIVERGENT_NEXT_STEP: &str = "This invoice is in Tally, but it is not confirmed as built. `diffs` says why: a GST field, the reference, the entries (`legs`) or the bill allocation differs; or the invoice was not read back, because the read failed, the company is now over the size limit for that read, or this version does not read invoices of this type back; or another voucher of its type carries the same number; or the voucher found under that number is not the one this post created (`guid`, `alter_id`); or Tally's GSTR-1 does not list it as included (`gst_status_uncertain`, `gst_status_excluded`, `gst_status_not_in_return`; `gst_status_not_reported` or `gst_status_unreadable` when its status did not come back or does not read), or a person accepted it there as it stands (`gst_status_overridden`); or Tally did not fill in the HSN/SAC of a sales line (`invoice_line_hsn_unresolved`: `invoice_lines` shows, for every sales line, the code Tally used and the ledger or group it took it from). Open the invoice in Tally and check it against the source document before relying on it. For `invoice_line_hsn_unresolved`, that line's ledger, its group or the company has no HSN/SAC for the invoice date: set it in Tally, then open the invoice and save it again, because correcting the master alone did not change an invoice already saved. For a GSTR-1 status, open GSTR-1 for the invoice's month in Tally and read the reason there: none comes back with the status. Correcting a ledger or another master does not by itself change the status of an invoice already saved: on a test company an invoice stayed uncertain after its sales ledger's HSN/SAC was set, until the invoice itself was saved again. Accepting it as it stands in GSTR-1 leaves it not confirmed here until a person releases it in ComplyEaze Bridge's own dialog. These statuses were seen only on invoices to an unregistered buyer. Do not post it again.";
+
+/// An invoice the standard readback matched, whose own fields did not read back
+/// as built (party, GST header, reference, allocation, or the voucher could not
+/// be read), is divergent: "posted_verified" means every field was checked.
+/// What Tally used as each sales line's HSN/SAC is shown beside it either way
+/// (`invoice_lines`), when the invoice was read back.
+pub(super) fn mark_invoice_readback(
+    result: &mut Value,
+    bridge_txn_id: &str,
+    differences: &[String],
+    lines: &[Value],
+) {
+    let mut moved = 0_u64;
+    if let Some(vouchers) = result["vouchers"].as_array_mut() {
+        for voucher in vouchers {
+            if voucher["bridge_txn_id"] != bridge_txn_id || voucher["status"] != "posted_verified" {
+                continue;
+            }
+            if !lines.is_empty() {
+                voucher["invoice_lines"] = json!(lines);
+            }
+            if !differences.is_empty() {
+                voucher["status"] = json!("posted_divergent");
+                voucher["diffs"] = json!([{ "invoice_fields": differences }]);
+                voucher["next_step"] = json!(INVOICE_DIVERGENT_NEXT_STEP);
+                moved += 1;
+            }
+        }
+    }
+    if differences.is_empty() {
+        return;
+    }
+    let counts = &mut result["counts"];
+    counts["posted_verified"] = json!(counts["posted_verified"]
+        .as_u64()
+        .unwrap_or(0)
+        .saturating_sub(moved));
+    counts["posted_divergent"] = json!(counts["posted_divergent"].as_u64().unwrap_or(0) + moved);
+}
+
+/// The invoice of a batch whose own read-back is due: the one the standard
+/// readback matched, with its matched row. An invoice of a type this build
+/// does not qualify (a line another build saved) is never read back by a
+/// request that is not qualified either: it is marked not confirmed here
+/// (`invoice_type_unqualified`) and nothing is due.
+pub(super) fn invoice_readback_due<'a>(
+    result: &mut Value,
+    vouchers: &'a [ImportVoucher],
+    qualified: &[super::VoucherType],
+) -> Option<(&'a ImportVoucher, Value)> {
+    let voucher = vouchers
+        .iter()
+        .find(|voucher| voucher.voucher_type.is_invoice())?;
+    let matched = result["vouchers"]
+        .as_array()?
+        .iter()
+        .find(|row| {
+            row["bridge_txn_id"] == voucher.bridge_txn_id.as_str()
+                && row["status"] == "posted_verified"
+        })
+        .cloned()?;
+    if !qualified.contains(&voucher.voucher_type) {
+        mark_invoice_readback(
+            result,
+            &voucher.bridge_txn_id,
+            &["invoice_type_unqualified".to_string()],
+            &[],
+        );
+        return None;
+    }
+    Some((voucher, matched))
+}
+
+/// The next step of a voucher a later verification cannot find when the saved
+/// answer of its post reported it as not created
+/// (`UnmatchedCause::ReportedNotCreatedWhenSent`).
+pub(super) const REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP: &str = "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered by hand with a different date, voucher type, ledger or amount: look for it in Tally first, and enter it in Tally's voucher entry screen only if it is not there; do not import its file through Tally's Import menu. ComplyEaze Bridge will not send this saved voucher again.";
+
+/// The next step of an unbound post's voucher that its content cannot find when
+/// the post's own answer from Tally is on record and was not clean (it did not
+/// parse, created fewer or more than were sent, or reported an exception or an
+/// error): the
+/// shared line without its edit example, because that answer makes an edit no
+/// likelier than a voucher Tally did not create (bridge#1108). Which voucher a
+/// partly created post left out is not claimed: a count does not say.
+pub(super) const SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP: &str = "This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now. Check in Tally before posting it again.";
+
+/// Rewrites a verification of an unbound post whose answer was not clean: a
+/// voucher not found by its content is `sent_not_attributed`, with
+/// [`SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP`].
+pub(super) fn mark_sent_not_attributed_after_unclean_answer(result: &mut Value) {
+    mark_not_found_with(
+        result,
+        "sent_not_attributed",
+        Some(SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP),
+    );
+}
+
+/// Rewrites a later verification of a post whose saved answer reported its
+/// vouchers as not created: a voucher not found by its content stays
+/// `sent_not_attributed`, never `not_found`, with the next step that says
+/// what Tally reported when it was sent.
+pub(super) fn mark_sent_after_reported_not_created(result: &mut Value) {
+    mark_not_found_with(
+        result,
+        "sent_not_attributed",
+        Some(REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP),
+    );
+}
+
 fn mark_not_found_as(result: &mut Value, status: &str) {
+    mark_not_found_with(result, status, plain_next_step(status));
+}
+
+fn mark_not_found_with(result: &mut Value, status: &str, next_step: Option<&str>) {
     let mut moved = 0_u64;
     if let Some(vouchers) = result["vouchers"].as_array_mut() {
         for voucher in vouchers {
             if voucher["status"] == "not_found" || voucher["status"] == "bound_not_in_window" {
                 voucher["status"] = json!(status);
-                voucher["next_step"] = json!(plain_next_step(status));
+                voucher["next_step"] = json!(next_step);
                 moved += 1;
             }
         }
@@ -680,13 +1024,18 @@ pub(super) fn voucher_is_accounting_effective(voucher: &ReadVoucher) -> Result<b
 /// Every place a verification result names a ledger, as a path from the
 /// result (`*` for each element of an array). The one list that marking reads,
 /// and that its test holds against the names the verifier marks.
-pub(super) const VERIFICATION_NAME_FIELDS: [&[&str]; 3] = [
+pub(super) const VERIFICATION_NAME_FIELDS: [&[&str]; 8] = [
     &[
         "vouchers", "*", "diffs", "*", "entries", "expected", "*", "ledger",
     ],
     &[
         "vouchers", "*", "diffs", "*", "entries", "observed", "*", "ledger",
     ],
+    &["vouchers", "*", "invoice_lines", "*", "ledger"],
+    &["vouchers", "*", "invoice_lines", "*", "hsn_ledger_source"],
+    &["vouchers", "*", "invoice_lines", "*", "hsn_group_source"],
+    &["hsn_warnings", "*", "ledger"],
+    &["hsn_warnings", "*", "group"],
     &["masters_after_post", "ledgers", "*"],
 ];
 
@@ -757,6 +1106,36 @@ pub(super) fn verification_response_page(
     page["items"] = json!(verified.into_iter().skip(offset).collect::<Vec<_>>());
     page["proof"] = json!({"batch_id": proof["batch_id"], "sha256": proof_sha256});
     page
+}
+
+/// The headline that says how a batch ended, voucher by voucher, from a
+/// verification result's own rows and verdict (never from a tool argument).
+/// `None` when the result lists no voucher row or shows no native dispatch.
+pub(super) fn batch_headline(result: &Value) -> Option<super::super::headline::Headline> {
+    // Only a batch that was dispatched natively has an outcome to state. A
+    // built batch not yet posted, or a file not yet imported by hand, reads
+    // every row as not found, and "will not send this saved batch again" would
+    // be false: it can still be posted. Every dispatch state counts (`posted_verified`,
+    // `reconciliation_required`, `previous_attempt_reconciled`); a refusal
+    // that sent nothing says `not_dispatched`.
+    match result["dispatch"]["state"].as_str() {
+        None | Some("not_dispatched") => return None,
+        Some(_) => {}
+    }
+    let rows = result["vouchers"].as_array()?;
+    let outcome = super::super::headline::BatchOutcome::from_statuses(
+        rows.iter()
+            .map(|row| row["status"].as_str().unwrap_or_default()),
+        super::super::headline::BatchVerdict::from_status(result["verification_status"].as_str()),
+    )?;
+    Some(outcome.headline())
+}
+
+/// Puts the batch headline of `result` beside the result in `payload`.
+pub(super) fn attach_batch_headline(payload: &mut Value, result: &Value) {
+    if let Some(headline) = batch_headline(result) {
+        payload["headline"] = json!(headline);
+    }
 }
 
 /// A verdict of `verify_import`: the only statuses a proof may carry. The
@@ -931,7 +1310,7 @@ pub(super) fn voucher_diffs(
     {
         diffs.push(json!("effective_date"));
     }
-    if actual.voucher_type.as_deref() != Some(expected.voucher_type.as_str()) {
+    if actual.voucher_type.as_deref() != Some(expected.filed_type_name()) {
         diffs.push(json!("voucher_type"));
     }
     if expected.voucher_number.is_some()

@@ -4,7 +4,7 @@
 // no outcomes, a different set of test files from scripts/*.test.mjs, or a non-zero exit of node
 // with no failed test to explain it. A run that cannot be trusted is never reported as a pass.
 // Use: node scripts/check-node-windows-outcomes.mjs --outcomes FILE --baseline FILE --node-exit N [--summary FILE]
-import { appendFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const EXIT = { ok: 0, newFailures: 1, untrusted: 2 };
@@ -142,4 +142,4 @@ function main(argv) {
   return result.code;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) process.exitCode = main(process.argv.slice(2));

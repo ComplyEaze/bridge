@@ -10,8 +10,6 @@ rust-version = "1.96"
 
 [features]
 default = []
-india-tax-observation-parser = []
-bills-payments-observation-parser = []
 bills-native-outstandings-probe = []
 
 [lints]

@@ -47,6 +47,11 @@ const BOOK_UNUSABLE: &str = "audit_book_refused";
 const PART_UNPARSABLE: &str = "audit_part_unparsable";
 /// The window admitted a different number of vouchers than its parts hold.
 const ROW_COUNT_DIFFERS: &str = "audit_window_row_count_differs";
+/// The window's rows were not admitted against a census of it, so nothing
+/// outside the data read says the window is whole (the completeness rule of
+/// `window_read`, ADR 0017). A book that has never held a voucher has no
+/// census and is refused here too.
+const WINDOW_NOT_COUNTED: &str = "audit_window_not_counted";
 
 /// The groups whose ledgers a cash test reads, supplied by the caller: there is
 /// no default for what a firm calls its cash and bank groups.
@@ -351,7 +356,9 @@ fn memory_read(
 /// Requests go one at a time, each between two identity brackets, and none is
 /// anything but an Export. The marks are read first; the window reads them
 /// again after the last voucher part; if they differ, or any part could not be
-/// read, nothing is returned.
+/// read, nothing is returned. The window is always counted by a census, a book
+/// that fits one request included, and a window the census did not count is
+/// refused (`audit_window_not_counted`).
 pub(super) async fn read_audit_book(
     runtime: &TallyRuntime,
     config: &TallyConfig,
@@ -470,6 +477,8 @@ async fn collect_parts(
         voucher_types,
     ));
 
+    // A book small enough for one request is counted too: the census is the
+    // only count of the window from outside its own data (ADR 0017).
     let read = AuditWindowReader::new(runtime, config.clone())
         .read_window(
             identity,
@@ -477,18 +486,18 @@ async fn collect_parts(
             period.0,
             period.1,
             VoucherReadShape::EntryWildcard,
-            limits,
+            limits.counting_small_books(),
             |xml| parse_agent_rows(xml, guid),
         )
         .await;
     if let Some(failure) = read.failure {
         return Err(failure.into());
     }
-    let admitted_rows = read
-        .outcome
-        .map_err(|failure| refused(&failure.code))?
-        .rows
-        .len();
+    let outcome = read.outcome.map_err(|failure| refused(&failure.code))?;
+    if !outcome.counted() {
+        return Err(refused(WINDOW_NOT_COUNTED));
+    }
+    let admitted_rows = outcome.rows.len();
     let retained = read.retained.ok_or_else(|| refused(MARKS_MISSING))?;
     let first_voucher_part = parts.len();
     let closing = collect_window(&retained, guid, &mut parts)?;

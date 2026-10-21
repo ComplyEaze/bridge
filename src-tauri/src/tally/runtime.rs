@@ -894,6 +894,40 @@ pub(crate) enum CompanyIdentityBracketError {
     AbsentOrAmbiguous,
 }
 
+impl CompanyIdentityBracketError {
+    /// The cause a refused read names; it holds no data (#1699).
+    pub(crate) const fn safe_code(&self) -> &'static str {
+        match self {
+            Self::PresentationCollision => "company_identity_presentation_collision",
+            Self::AbsentOrAmbiguous => "company_identity_absent_or_ambiguous",
+        }
+    }
+}
+
+/// The company-identity cause of one error in a chain, if it is one of the two identity checks:
+/// the bracket around a scoped read, or the outstandings parse that found another company's
+/// identity in the answer (#1699). Every other error is `None`, so a caller falls back to its own
+/// code. The cause carries no company name or other data.
+pub(crate) fn company_identity_cause(
+    cause: &(dyn std::error::Error + 'static),
+) -> Option<&'static str> {
+    if let Some(bracket) = cause.downcast_ref::<CompanyIdentityBracketError>() {
+        return Some(bracket.safe_code());
+    }
+    matches!(
+        cause.downcast_ref::<bridge_tally_protocol::outstandings_shared::OutstandingsError>(),
+        Some(
+            bridge_tally_protocol::outstandings_shared::OutstandingsError::CompanyIdentityMismatch
+        )
+    )
+    .then_some("company_identity_not_matched")
+}
+
+/// The first company-identity cause in a refused read's error chain.
+pub(crate) fn company_identity_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
+    error.chain().find_map(company_identity_cause)
+}
+
 /// Re-enumerate the complete identity immediately before or after a scoped
 /// read. Tally accepts a company name as the scope selector, so the GUID alone
 /// is not a sufficient witness when company names differ only by presentation.

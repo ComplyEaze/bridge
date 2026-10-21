@@ -628,6 +628,74 @@ fn a_read_deadline_is_named_rather_than_collapsed_into_the_generic_failure() {
 }
 
 #[test]
+fn a_read_refused_for_the_company_identity_names_that_cause_and_the_next_step() {
+    use crate::tally::runtime::CompanyIdentityBracketError;
+    use bridge_tally_protocol::outstandings_shared::OutstandingsError;
+
+    let cases: [(anyhow::Error, &str, bool); 3] = [
+        (
+            CompanyIdentityBracketError::AbsentOrAmbiguous.into(),
+            "company_identity_absent_or_ambiguous",
+            true,
+        ),
+        (
+            OutstandingsError::CompanyIdentityMismatch.into(),
+            "company_identity_not_matched",
+            true,
+        ),
+        // Named, but no next step: nothing measured says what a person should do about it.
+        (
+            CompanyIdentityBracketError::PresentationCollision.into(),
+            "company_identity_presentation_collision",
+            false,
+        ),
+    ];
+    for (error, cause, has_next_step) in cases {
+        // Wrapped as production wraps a read failure, so the chain walk is what is tested.
+        let failure = ToolFailure::from_runtime(
+            "ledger_movement_read_failed",
+            crate::tally::runtime::with_read_evidence(
+                error.context("reading the ledger movement"),
+                crate::tally::runtime::RuntimeReadEvidence::empty(),
+            ),
+        );
+        assert_eq!(failure.code, "ledger_movement_read_failed", "{cause}");
+        assert_eq!(failure.cause, Some(cause));
+        let step = remediation_for(&failure.code, failure.cause);
+        assert_eq!(step.is_some(), has_next_step, "{cause}");
+        if let Some(step) = step {
+            assert!(
+                step.contains("open the company in Tally"),
+                "{cause}: {step}"
+            );
+            assert!(step.contains("list_companies"), "{cause}: {step}");
+        }
+    }
+
+    // `company_identity_mismatch` is already the CODE verify_import and post_import answer with
+    // when a saved batch's company no longer matches after Tally confirmed the company. Advice to
+    // "repeat the request" would loop there, so it is not keyed on that code.
+    assert_eq!(refusal_remediation("company_identity_mismatch"), None);
+
+    // The invalid-identity outstandings error is a different fault and keeps no identity cause,
+    // and so does a parse fault: only the two identity checks are named.
+    for other in [
+        OutstandingsError::InvalidCompanyIdentity,
+        OutstandingsError::InvalidResponse("synthetic_parse_fault"),
+        OutstandingsError::MasterWitnessAbsent,
+    ] {
+        let failure = ToolFailure::from_runtime("ledger_movement_read_failed", other.into());
+        assert!(
+            failure
+                .cause
+                .is_none_or(|cause| !cause.starts_with("company_identity")),
+            "{:?}",
+            failure.cause
+        );
+    }
+}
+
+#[test]
 fn ledger_master_fields_reject_unknown_schema_values() {
     assert_eq!(
         ledger_master_fields("complaince"),

@@ -3,9 +3,9 @@
 //! The answers are the lab's, read on 13 Oct 2026 from the synthetic company `BRIDGE PILOT LAB`
 //! (TallyPrime 7.1 Silver) and committed byte for byte under `agent/gst-status/` (see its
 //! PROVENANCE.md): the company's marks, the narrow status read that counts the window, the wide
-//! read before one Accept As Is and the wide read after it. The company list the call reads first
-//! (and the health checks after each read) is NOT the lab's: it is DERIVED from another book's
-//! company list, see `companies()`. The expected rows below were taken from those
+//! read before one Accept As Is and the wide read after it; the company list the call reads first
+//! is the lab's answer of 9 Oct 2026 (`pilot-lab/`). The health checks after each read are the
+//! simulator's own page, not a capture. The expected rows below were taken from those
 //! bytes with a separate script (an XML tree, one direct child at a time), not from the code
 //! under test. Every failure-path control is derived in the test from those bytes, by
 //! deleting, repeating or emptying one element of one voucher, each edit asserted to match
@@ -525,25 +525,20 @@ fn the_party_is_unread_when_it_is_empty_absent_or_repeated() {
 // The tool, against the simulator replaying the reads of a whole call.
 // ---------------------------------------------------------------------------------------------
 
-/// The lab company's GUID, as its marks answer holds it.
+/// The lab company's GUID, as its marks answer and its company list hold it.
 const GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
-/// The GUID of the company of that name in the other book's company list.
-const LIST_GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
 
-/// The company list the call reads first. **DERIVED, not Tally's bytes: the lab was never sent the
-/// company-list request for BRIDGE PILOT LAB.** It is the captured company list of another
-/// synthetic book (`native-licensed-release-companies`), with the name of one company made the
-/// lab's and its GUID made the lab's, each edit asserted to match the counted number of times, so
-/// the requests the tool renders are the lab's requests and the gate finds the lab's marks. A
-/// capture is owed (`CAPTURE-1692`); when it lands this goes.
+/// The lab's company-list request (`r01-company-extent.xml`), the first read of every call.
+const COMPANY_LIST_REQUEST_SHA256: &str =
+    "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8";
+
+/// The company list the call reads first: the lab's own answer of 9 Oct 2026 (the pilot-lab
+/// fixtures) to that request, one company, `BRIDGE PILOT LAB`. It is four days older than the
+/// answers of 13 Oct; the lab did not read the list again in the 13 Oct run.
 fn companies() -> String {
-    let text = decode_utf16(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
-    ));
-    assert_eq!(text.matches("Bridge Ageing Lab").count(), 2);
-    assert_eq!(text.matches(LIST_GUID).count(), 1);
-    text.replace("Bridge Ageing Lab", LAB_COMPANY)
-        .replace(LIST_GUID, GUID)
+    decode_utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml"
+    ))
 }
 
 /// The lab's marks answer (voucher mark 68), the bytes as received.
@@ -883,7 +878,11 @@ async fn the_tool_sends_the_count_read_and_then_the_wide_read_the_lab_sent() {
     // The sixth and eighth requests of the call are the marks; the status read inside its
     // bracket is the twelfth, read again as the fourteenth, and the wide read the eighteenth
     // and the twentieth.
-    // The marks request is the one the lab was sent for its marks answer.
+    // The company list and the marks requests are the ones the lab was sent for its answers.
+    assert_eq!(
+        call.observed[0].request_body_sha256,
+        COMPANY_LIST_REQUEST_SHA256
+    );
     assert_eq!(call.observed[5].request_body_sha256, MARKS_REQUEST_SHA256);
     assert_eq!(call.observed[7].request_body_sha256, MARKS_REQUEST_SHA256);
     assert_eq!(call.observed[11].request_body_sha256, NARROW_REQUEST_SHA256);

@@ -754,9 +754,8 @@ fn a_master_journal_with_an_open_intent_is_shown_apart_from_the_voucher_journal(
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
     let path = root.join("agent-master-ledger.jsonl");
-    let master = |root: &Path| {
-        to_json(&build(root, None), SystemTime::now(), None)["master_journal"].clone()
-    };
+    let master =
+        |root: &Path| to_json(&build(root, &[]), SystemTime::now(), None)["master_journal"].clone();
     assert_eq!(master(root)["state"], "absent");
     write(&path, master_journal_text(false, false).as_bytes());
     let open = master(root);
@@ -766,7 +765,7 @@ fn a_master_journal_with_an_open_intent_is_shown_apart_from_the_voucher_journal(
     assert_eq!(open["not_settled"], 1);
     // The voucher journal's own account is untouched by it.
     assert_eq!(
-        to_json(&build(root, None), SystemTime::now(), None)["journal"]["state"],
+        to_json(&build(root, &[]), SystemTime::now(), None)["journal"]["state"],
         "absent"
     );
     fs::remove_file(&path).unwrap();
@@ -782,7 +781,7 @@ fn an_unreadable_master_journal_makes_the_report_incomplete() {
         &root.join("agent-master-ledger.jsonl"),
         master_journal_text(false, true).as_bytes(),
     );
-    let report = build(root, None);
+    let report = build(root, &[]);
     assert_eq!(
         report.master_journal,
         MasterJournal::NotRead(JOURNAL_INVALID)
@@ -801,7 +800,7 @@ fn a_stage_left_beside_a_sidecar_is_counted_with_the_journal() {
         )),
         b"123",
     );
-    let report = build(root, None);
+    let report = build(root, &[]);
     assert_eq!(*class(&report, "journal"), Class { files: 1, bytes: 3 });
     assert_eq!(*class(&report, "other"), Class { files: 0, bytes: 0 });
 }

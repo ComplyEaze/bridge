@@ -978,6 +978,119 @@ class PrivacySpacedPanWordBoundary(unittest.TestCase):
             self.assertIsNotNone(self.privacy.IDENTIFIER_RE.search(text), text)
             self.assertTrue(self.blocked(text), text)
 
+def run_of(length, step=7, start=3):
+    """A run of digits that is not one repeated digit and not a placeholder, built at run time so that the
+    test source holds no digit run of its own (the merge check's privacy scan reads test source too)."""
+    return "".join(str((start + step * index) % 10) for index in range(length))
+
+
+def repeated(digit, length):
+    """One digit repeated, built at run time."""
+    return str(digit) * length
+
+
+class PrivacyScannerSyntheticReferences1743(unittest.TestCase):
+    """A reference that is visibly synthetic is admitted (#1743): a token made of a three or four letter X/Z
+    prefix and digits only, or one digit repeated and nothing else. Each admitted family has a positive
+    case; every neighbouring real-looking shape still blocks. Every value is built at run time."""
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+        self.twelve = run_of(12)
+        self.mobile = "".join(str(9 - index) for index in range(10))  # a ten-digit run led by a 9
+        self.pan_letters = "".join(chr(ord("A") + index) for index in range(5))
+
+    def blockers(self, text):
+        return self.privacy.scan(text, HEAD)["blockers"]
+
+    def assert_admitted(self, text):
+        self.assertEqual(self.blockers(text), [], text)
+
+    def assert_blocked(self, text):
+        blockers = self.blockers(text)
+        self.assertTrue(any("long digit run" in b or "identifier shape" in b for b in blockers), (text, blockers))
+
+    def test_a_digit_run_inside_a_placeholder_token_is_admitted(self):
+        for text in (
+            f"utr ZZZZ{self.twelve}",
+            f"utr zzzz{self.twelve}",
+            f"utr XXXX{run_of(17)}",
+            f'let utr = "ZZZZ{run_of(16)}";',
+        ):
+            self.assert_admitted(text)
+
+    def test_one_digit_repeated_is_admitted_at_each_length_the_scan_reads(self):
+        for text in (
+            f"ref {repeated(1, 11)}",
+            f"ref {repeated(2, 12)}",
+            f"ref {repeated(0, 14)}",
+            f"ref {repeated(9, 18)}",
+            f"call {repeated(9, 10)}",
+            f"call {repeated(6, 10)}",
+        ):
+            self.assert_admitted(text)
+
+    def test_a_random_looking_run_a_mobile_shape_and_a_long_tail_still_block(self):
+        counting = "".join(str((index + 1) % 10) for index in range(12))
+        for text in (f"ref {self.twelve}", f"call {self.mobile}", f"utr {run_of(18)}", f"ref {counting}"):
+            self.assert_blocked(text)
+
+    def test_a_run_beside_but_not_inside_a_placeholder_token_still_blocks(self):
+        for text in (
+            f"ZZZZ {self.twelve}",
+            f"ZZZZ-{self.twelve}",
+            f"ZZZZ: {self.twelve}",
+            f"{self.twelve} ZZZZ",
+        ):
+            self.assert_blocked(text)
+
+    def test_a_repeated_run_that_is_only_part_of_a_longer_token_still_blocks(self):
+        # The token is judged whole: a run of one digit inside digits that are not all that digit,
+        # or glued to letters that do not make a placeholder, is not the admitted family.
+        for text in (
+            f"ref {repeated(1, 12)}{run_of(4)}",
+            f"ref {run_of(4)}{repeated(1, 12)}",
+            f"ref AB{repeated(1, 12)}",
+            f"ref {repeated(1, 12)}AB",
+        ):
+            self.assert_blocked(text)
+
+    def test_an_identifier_glued_after_or_around_a_prefix_still_blocks(self):
+        # A PAN shape and a mobile shape behind two digits and an X, and a prefix that is too short, too
+        # long, or followed by anything but digits.
+        for text in (
+            f"pan 12X1{self.pan_letters}{run_of(4)}F",
+            f"id 11X{self.mobile}",
+            f"acct X{self.twelve}",
+            f"call X{self.mobile}",
+            f"ref XX{self.twelve}",
+            f"ref ZZZZZ{self.twelve}",
+            f"ref ZZZZ{self.twelve}A",
+            f"ref ZZZZ{self.twelve}ZZZZ",
+            f"ref ZZZZ{repeated(1, 25)}",
+        ):
+            self.assert_blocked(text)
+
+    def test_the_family_stays_narrow_two_digits_and_a_leading_digit_do_not_qualify(self):
+        for text in (
+            f"ref 1{repeated(0, 10)}2",
+            f"ref {'12' * 6}",
+            f"ref {repeated(1, 11)}2",
+            f"call {repeated(9, 9)}0",
+        ):
+            self.assert_blocked(text)
+
+    def test_the_enclosing_token_is_the_run_of_ascii_letters_and_digits(self):
+        token = self.privacy.enclosing_token
+        text = f"x ZZZZ{self.twelve} y"
+        start = text.index(self.twelve)
+        self.assertEqual(token(text, start, start + 12), f"ZZZZ{self.twelve}")
+        text = f"ZZZZ-{self.twelve}"
+        start = text.index(self.twelve)
+        self.assertEqual(token(text, start, start + 12), self.twelve)
+        self.assertEqual(token(self.twelve, 0, 12), self.twelve)
+
+
 class PrivacyScannerFindingsPR335(unittest.TestCase):
     """Direct unit coverage of scripts/merge_gate_privacy.py, one pair of
     tests (positive + negative) per surviving PR #335 review finding against

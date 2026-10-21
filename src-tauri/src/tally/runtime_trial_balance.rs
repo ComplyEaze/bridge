@@ -7,6 +7,9 @@ use bridge_tally_protocol::native_cash_flow::{
 use bridge_tally_protocol::native_statement_reports::{
     parse_native_statement, render_native_statement_request, NativeStatement, NativeStatementKind,
 };
+use bridge_tally_protocol::native_stock_summary::{
+    parse_company_inventory_flags, render_company_inventory_flags_request,
+};
 use bridge_tally_protocol::native_trial_balance::{
     parse_native_trial_balance, parse_native_trial_balance_with_currency,
     render_native_trial_balance_request, render_native_trial_balance_request_with_currency,
@@ -173,7 +176,10 @@ struct StatementSources {
     trial_balance: SingleCurrencyTrialBalance,
     groups: Vec<TallyNamedMaster>,
     balance_sheet: NativeStatement,
-    profit_and_loss: Option<NativeStatement>,
+    /// Read for both tools: it is where Tally's own closing stock sits.
+    profit_and_loss: NativeStatement,
+    /// Read only when that Profit and Loss offers a closing stock to use.
+    inventory: Option<crate::reports::statements::IntegratedInventory>,
 }
 
 /// What a Cash Flow read adds to a Trial Balance read: the group tree that
@@ -194,7 +200,7 @@ enum ExtraSources {
 #[derive(Clone, Copy)]
 enum TrialBalanceExtras {
     Nothing,
-    Statement(NativeStatementKind),
+    Statement,
     /// Tally's Cash Flow over whole months. The window is built inside the
     /// bracket, once the mode's date boundary profile is known.
     CashFlow,
@@ -289,7 +295,6 @@ impl TallyRuntime {
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         period: TrialBalancePeriod,
-        kind: NativeStatementKind,
     ) -> anyhow::Result<StatementsRead> {
         let (trial_balance, sources, _) = self
             .fetch_trial_balance_sources(
@@ -297,7 +302,7 @@ impl TallyRuntime {
                 identity,
                 period,
                 TrialBalanceCurrencyScope::SingleCurrency,
-                TrialBalanceExtras::Statement(kind),
+                TrialBalanceExtras::Statement,
             )
             .await?;
         let Some(ExtraSources::Statement(sources)) = sources else {
@@ -307,7 +312,8 @@ impl TallyRuntime {
             &sources.trial_balance,
             &sources.groups,
             &sources.balance_sheet,
-            sources.profit_and_loss.as_ref(),
+            Some(&sources.profit_and_loss),
+            sources.inventory,
         )?;
         Ok(StatementsRead {
             trial_balance,
@@ -522,7 +528,7 @@ impl TallyRuntime {
                                 cash_flow,
                             }))
                         }
-                        TrialBalanceExtras::Statement(kind) => {
+                        TrialBalanceExtras::Statement => {
                             let request =
                                 render_native_group_snapshot_request(identity.display_name());
                             let (xml, bytes, hash) = client
@@ -534,8 +540,9 @@ impl TallyRuntime {
                                 .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
                             let groups =
                                 parse_native_group_snapshot(&xml, identity.company_guid())?;
-                            // Tally's own Balance Sheet gates both tools; its own
-                            // Profit and Loss is read only for a P&L's report.
+                            // Tally's own Balance Sheet gates both tools. Its own
+                            // Profit and Loss is read for both: it is where Tally's
+                            // closing stock sits, and it gates a P&L's gross and net.
                             let request = render_native_statement_request(
                                 NativeStatementKind::BalanceSheet,
                                 identity.display_name(),
@@ -550,20 +557,46 @@ impl TallyRuntime {
                                 .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
                             let balance_sheet =
                                 parse_native_statement(NativeStatementKind::BalanceSheet, &xml)?;
-                            let profit_and_loss = if kind == NativeStatementKind::ProfitAndLoss {
-                                let request = render_native_statement_request(
-                                    kind,
+                            let request = render_native_statement_request(
+                                NativeStatementKind::ProfitAndLoss,
+                                identity.display_name(),
+                                &period,
+                            );
+                            let (xml, bytes, hash) = client
+                                .fetch_native_report_paired(request.clone())
+                                .await?
+                                .require_stable(PairedReadValidationError::NativeStatement)?;
+                            evidence = evidence
+                                .clone()
+                                .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                            let profit_and_loss =
+                                parse_native_statement(NativeStatementKind::ProfitAndLoss, &xml)?;
+                            // The company's inventory flags are read only when that
+                            // Profit and Loss offers a closing stock to use, so a
+                            // book without one sends nothing more.
+                            let inventory = if matches!(
+                                crate::reports::statements::TallyClosingStock::from_profit_and_loss(
+                                    &profit_and_loss
+                                ),
+                                Ok(Some(_))
+                            ) {
+                                let request = render_company_inventory_flags_request(
                                     identity.display_name(),
-                                    &period,
-                                );
+                                    identity.company_guid(),
+                                )?;
                                 let (xml, bytes, hash) = client
                                     .fetch_native_report_paired(request.clone())
                                     .await?
-                                    .require_stable(PairedReadValidationError::NativeStatement)?;
+                                    .require_stable(
+                                        PairedReadValidationError::StatementInventoryFlags,
+                                    )?;
                                 evidence = evidence
                                     .clone()
                                     .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                                Some(parse_native_statement(kind, &xml)?)
+                                let flags =
+                                    parse_company_inventory_flags(&xml, identity.company_guid())?
+                                        .flags;
+                                crate::reports::statements::IntegratedInventory::from_flags(&flags)
                             } else {
                                 None
                             };
@@ -584,6 +617,7 @@ impl TallyRuntime {
                                 groups,
                                 balance_sheet,
                                 profit_and_loss,
+                                inventory,
                             }))
                         }
                     };

@@ -375,10 +375,7 @@ async fn a_statement_read_refuses_a_several_currency_book_after_its_currency_rea
     let currency = decode(include_bytes!(
         "../../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
     ));
-    for kind in [
-        bridge_tally_protocol::native_statement_reports::NativeStatementKind::BalanceSheet,
-        bridge_tally_protocol::native_statement_reports::NativeStatementKind::ProfitAndLoss,
-    ] {
+    {
         let plans = opening_plans(currency.clone());
         let total = plans.len();
         let simulator = SequenceSimulator::spawn(plans).unwrap();
@@ -391,7 +388,6 @@ async fn a_statement_read_refuses_a_several_currency_book_after_its_currency_rea
                     TallyDate::parse("20260902").unwrap(),
                 )
                 .unwrap(),
-                kind,
             )
             .await
             .unwrap_err();

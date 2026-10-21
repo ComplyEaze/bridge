@@ -922,8 +922,7 @@ as it is. `guid` is not masked and is the identity the `items` filter uses.
 `profit_and_loss` and `balance_sheet` take the same `company_guid`, `from` and
 `to` as `trial_balance`, and read that Trial Balance under the same checks.
 Inside the same bracket they also read the group tree and Tally's own Balance
-Sheet for the window, and `profit_and_loss` reads Tally's own Profit and Loss
-too (#692).
+Sheet for the window, and both read Tally's own Profit and Loss too (#692).
 
 - **Lines.** Each ledger is classified by the reserved identity of its primary
   group, the last group in its chain. That identity survives renaming.
@@ -960,8 +959,9 @@ too (#692).
   or withheld line changes.
 - **Limits.**
   - The gates are what catch what the Trial Balance cannot see, such as stock
-    valued from stock items. No inventory book has been measured; one is
-    expected to refuse.
+    valued from stock items. One integrated inventory book has been measured
+    (see Tally's own closing stock below); every other book with stock items
+    is expected to refuse.
   - A book with more than one currency master is refused before the Trial
     Balance is read (measured once on the lab's multi-currency book), so an
     unadjusted forex difference (#683) never reaches the gate.
@@ -987,7 +987,36 @@ too (#692).
     That allowance was observed once, on one book. The heading is compared
     even when it reads zero or empty, as any line is: over a non-zero cost of
     sales it refuses, and over a zero one it ties (#1070).
-  - An Opening or Closing Stock line that carries an amount refuses.
+  - An Opening or Closing Stock line that carries an amount refuses, except
+    the one case below.
+- **Tally's own closing stock (#692).** On an integrated inventory book,
+  Tally's Profit and Loss carries its closing stock as a `Less: Closing Stock`
+  line (protocol reference §12a.21; the report's shape is §12a.11). Both tools read that Profit
+  and Loss, and use the figure only when all of these hold; otherwise the
+  result is the one a book without the figure would get, and `closing_stock`
+  says why it was declined:
+  - the line is spelled exactly so, appears once, carries a debit in its sub
+    column alone, and the `Opening Stock` line is shown empty (opening stock
+    is not measured);
+  - the company's own flags (`ISINTEGRATED` and `ISINVENTORYON`, read only
+    when the Profit and Loss offers the figure) are both `Yes`;
+  - no Stock-in-Hand ledger carries an amount;
+  - that one figure closes every gap at once: Current Assets (compared with
+    the derived group plus the figure), the Balance Sheet's Profit & Loss A/c
+    line and the trading result (moved by the figure), and the `Cost of Sales :`
+    heading (the derived Purchase Accounts plus Direct Expenses, less the
+    figure). `Add: Purchase Accounts`, Tally's name for the purchase line on
+    such a book, then ties to Purchase Accounts.
+  `closing_stock` is `{"state": "applied", "value", "source":
+  "tally_profit_and_loss_less_closing_stock"}`, `{"state": "declined", "why",
+  "lines"}` (`why` is `shape_not_as_seen`, `not_a_debit`,
+  `opening_stock_not_shown_empty`, `book_not_shown_integrated` or
+  `does_not_close_every_gap`), or null when the Profit and Loss offered no
+  closing stock. The figure is Tally's, not derived or taken from
+  `stock_summary`, and the derived Current Assets line keeps the Trial
+  Balance's sum. Measured on one synthetic book: opening stock, a costing
+  method, a non-integrated book, a window spanning two years and more than one
+  item or purchase rate are not.
 
 ### Ledger-movement opening decision
 

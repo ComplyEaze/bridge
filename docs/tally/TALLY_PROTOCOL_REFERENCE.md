@@ -432,6 +432,9 @@ base revision.
 <a id="12a19-a-companys-gst-registration-is-a-tax-unit-with-dated-rows"></a>
 
 [12a.19 A company's GST registration is a tax unit, with dated rows](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a19-a-companys-gst-registration-is-a-tax-unit-with-dated-rows)
+<a id="12a21-tallys-own-profit-and-loss-carries-closing-stock-as-a-line-of-its-own-on-an-integrated-inventory-book"></a>
+
+[12a.21 Tally's own Profit and Loss carries closing stock as a line of its own on an integrated inventory book](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a21-tallys-own-profit-and-loss-carries-closing-stock-as-a-line-of-its-own-on-an-integrated-inventory-book)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

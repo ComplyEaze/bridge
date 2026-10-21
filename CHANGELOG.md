@@ -60,6 +60,16 @@ These changes are in source and not yet in a published build.
   `numbering_read` `not_read`; a call that does read it returns what the book said for each declared type, or
   only their counts when the rows would not fit the response budget.
 
+- `negative_stock` (new tool; part of #1358): Tally's own Negative Stock list for a window, as `item`, `quantity`,
+  `rate` and `value` per listed stock item, returned as Tally prints them and compared with no other report
+  (`checks` says so). Being listed is not a finding that the quantity is below zero, and an empty answer is
+  `not_established`, never "no negative stock": Tally's empty answer cannot be told from a report that was not
+  rendered. Measured on synthetic books: a short item listed for a whole financial year, the same item at
+  another quantity for a window ending mid-year (with its rate and value empty), and a book with none short answered
+  an empty envelope. Any other window is named as unmeasured, a book whose master mark is over 874 is
+  refused before the report is asked for (a stated guess, as for `stock_summary`), and the cost on a large book is not known. Not yet run
+  against Tally.
+
 ## [0.6.0] - 2026-10-16
 
 ### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)

@@ -1,0 +1,10 @@
+2026-10-21T14:57:58Z	step pilot-m-before	r02-marks-pilot-lab.xml	curl 0	HTTP 200	3394 B	0.032278 s	8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+2026-10-21T14:57:58Z	step pilot-LR4	LR4-stock-opening-pilot-lab.xml	curl 0	HTTP 200	2998 B	0.008161 s	cf34fa0a514109d2691ae8ccd750fd83338927b5153541d55f810b0530658a1a
+2026-10-21T14:57:58Z	step pilot-m-after	r02-marks-pilot-lab.xml	curl 0	HTTP 200	3394 B	0.008060 s	8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+2026-10-21T14:59:41Z	step tieout-c-LR4	LR4-stock-opening-tieout-c.xml	curl 0	HTTP 200	4418 B	0.099044 s	ca5a76f0e9a4e1bede534e04b9e89131a63e082e76bf39ae3d261af5401ba92d
+2026-10-21T15:02:03Z	step shape-m-before	r02-marks-shape-lab.xml	curl 0	HTTP 200	3396 B	0.044986 s	c71056a0dcd9deb501b80363ae1dbc9f711e7659f01f491b074b22e992407c59
+2026-10-21T15:02:04Z	step shape-LR4	LR4-stock-opening-shape-lab.xml	curl 0	HTTP 200	17582 B	0.080273 s	d0d99bc9fff139ff45ba7cbe794cc2da86d6b414ee94023c1127ab793cd38bbf
+2026-10-21T15:02:05Z	step shape-m-after	r02-marks-shape-lab.xml	curl 0	HTTP 200	3396 B	0.032221 s	c71056a0dcd9deb501b80363ae1dbc9f711e7659f01f491b074b22e992407c59
+2026-10-21T15:03:41Z	step tieout-b-m-before	r02-marks-tieout-b.xml	curl 0	HTTP 200	3390 B	0.033247 s	621372b0c6d674a7111158ab73b02f5a3a97be1d6d05fc35cf4770ef60d881ef
+2026-10-21T15:03:42Z	step tieout-b-LR4	LR4-stock-opening-tieout-b.xml	curl 0	HTTP 200	7148 B	0.055674 s	f93a4dc30d9dd5eb17fbca442d0552a872374e454bff1bb3fa35efba02c78884
+2026-10-21T15:03:43Z	step tieout-b-m-after	r02-marks-tieout-b.xml	curl 0	HTTP 200	3390 B	0.035459 s	621372b0c6d674a7111158ab73b02f5a3a97be1d6d05fc35cf4770ef60d881ef

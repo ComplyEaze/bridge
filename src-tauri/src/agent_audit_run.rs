@@ -18,7 +18,9 @@ use bridge_tax_audit::registry::{self, CallerData};
 /// parity record at a pinned reference commit, and with a leak test of its own
 /// like the one for `cash_44ab` in this module's tests: `project` copies a
 /// test's values, clauses and fixed wording whole, so a test whose ids or text
-/// are built from the book would leak through it.
+/// are built from the book would leak through it. `cash_44ab`: a real-book
+/// parity check passed on 21 Oct 2026 at reference pin 6168aeaa (crate tree
+/// 53938eb8).
 pub(super) const ADMITTED: &[&str] = &["cash_44ab"];
 
 /// Refused rather than cut short: a result past these is not one a caller

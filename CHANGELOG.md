@@ -18,8 +18,9 @@ Apache-2.0 builds from current source stays unambiguous.
   figure and finding ids with their values, confidence and clauses, and the count of any failed book check,
   with no ledger, party or voucher name; you name the cash and bank groups. Books only, not a tax opinion;
   refused while a redaction setting is on (`audit_redaction_unsupported`), and for a period outside
-  1 April 2025 to 31 March 2026, the year its rules are for (`audit_period_outside_ay_2026_27`). Replayed from the engine's synthetic
-  book only: not yet run against a live Tally or a real book (part of #697).
+  1 April 2025 to 31 March 2026, the year its rules are for (`audit_period_outside_ay_2026_27`). The engine's
+  test passed a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8); the tool
+  is replayed from the engine's synthetic book and not yet run against a live Tally (part of #697).
 
 ## [0.6.0] - 2026-10-16
 

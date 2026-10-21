@@ -798,8 +798,9 @@ tool's own: `audit_test_refused` (the test refused the book without a rule code)
 no overall deadline: it is up to 128 parts, each between two checks, so a client that gives up early
 leaves the request it was waiting for abandoned.
 
-Measured on the engine's synthetic book replayed through the simulator. Not yet run against a live
-Tally, and no real book has been run: the lab comparison and a real-book parity record come first.
+Measured on the engine's synthetic book replayed through the simulator. The engine's `cash_44ab` passed
+a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8). The tool itself
+has not yet run against a live Tally: the lab comparison comes first.
 
 ### Stock Summary
 

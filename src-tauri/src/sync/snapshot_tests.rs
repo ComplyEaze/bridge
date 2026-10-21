@@ -465,9 +465,7 @@ fn core_groups_with_provenance(count: usize) -> CanonicalPackWindow {
 
 fn core_groups_with_foreign_master_text_diagnostic() -> CanonicalPackWindow {
     let mut window = core_groups(1);
-    let PackBatch::CoreAccounting(core) = &mut window.batch else {
-        panic!("core fixture");
-    };
+    let PackBatch::CoreAccounting(core) = &mut window.batch;
     core.foreign_master_text_diagnostics
         .push(bridge_tally_core::ForeignMasterTextDiagnostic {
             object_type: "group".to_string(),
@@ -2464,9 +2462,7 @@ async fn partial_window_attempt_then_disappearance_fails_without_advancing_check
     let previous_checkpoint = seed_verified_checkpoint(&mirror, &plan).await;
     let first = core_groups_with_provenance(MAX_WINDOW_STAGE_CHUNK + 1);
     let mut second = first.clone();
-    let PackBatch::CoreAccounting(second_core) = &mut second.batch else {
-        panic!("core fixture");
-    };
+    let PackBatch::CoreAccounting(second_core) = &mut second.batch;
     second_core.groups.remove(0);
     second
         .record_evidence
@@ -2766,7 +2762,6 @@ async fn committed_over_budget_pending_recovers_exact_proof_without_hydration() 
             source_identity: &plan.company.identity,
             query_profile: &planned.query_profile,
             filters_sha256: &planned.filters_sha256,
-            external_references: &plan.external_references,
             window_id: &planned.id,
             requested_window: &planned.range,
         },
@@ -2924,7 +2919,6 @@ async fn over_budget_max_window_state_terminalizes_before_hydration_and_is_resta
             source_identity: &plan.company.identity,
             query_profile: &first.query_profile,
             filters_sha256: &first.filters_sha256,
-            external_references: &plan.external_references,
             window_id: &first.id,
             requested_window: &first.range,
         },

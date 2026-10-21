@@ -34,8 +34,7 @@ fn server(directory: &Path, import_enabled: bool, redaction: Redaction) -> Serve
         max_bytes: 200_000,
         redaction,
         import_enabled,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     })
 }
 
@@ -163,6 +162,26 @@ fn the_published_schema_uses_only_patterns_the_validator_implements() {
     found.sort();
     found.dedup();
     assert_eq!(found, [r"\S", "^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"]);
+}
+
+/// The Python tool took the password from the environment and refused one on the command line;
+/// this tool reads it from a private file, so a `password` argument must be refused outright, and a
+/// malformed `to` date is refused before the statement is opened (the schema pattern, `argument_invalid:to`; an impossible `from` date is `invalid_date`, below).
+#[tokio::test]
+async fn a_password_argument_and_a_malformed_end_date_are_refused_before_the_statement_is_opened() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path(), true, Redaction::None);
+    let missing = directory.path().join("absent.pdf");
+    let base = arguments(&missing, &directory.path().join("absent.password"));
+    for (key, value, expected) in [
+        ("password", json!("hunter2"), "argument_unknown"),
+        ("to", json!("not-a-date"), "argument_invalid:to"),
+    ] {
+        let mut args = base.clone();
+        args[key] = value;
+        let response = server.call_tool("parse_bank_statement", args).await;
+        assert_eq!(error_code(&response), Some(expected), "{key}: {response:?}");
+    }
 }
 
 #[tokio::test]

@@ -948,8 +948,7 @@ async fn the_readback_right_after_a_post_never_computes_the_section() {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::On,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
@@ -1593,8 +1592,7 @@ fn server_with_cap(directory: &Path, port: u16, max_bytes: usize) -> Server {
         max_bytes,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     })
 }
 

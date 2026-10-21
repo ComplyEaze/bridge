@@ -19,7 +19,6 @@ test = true
 
 [dependencies]
 bridge-tally-primitives = { path = "../bridge-tally-primitives" }
-csv = "1"
 pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881", "thread_safe"] }
 regex = "1"
 serde = { version = "1", features = ["derive"] }

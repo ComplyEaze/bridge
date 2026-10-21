@@ -520,6 +520,15 @@ fn group_read_plans() -> Vec<ScenarioPlan> {
 /// The build request sequence for a payload that carries a cash/bank voucher:
 /// the Journal cycle plus a paired group read after each catalogue read.
 pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
+    bank_build_plans_numbering(build_numbering_plans(&[]))
+}
+
+/// How many requests a bank build sends up to and including its numbering
+/// read.
+const THROUGH_BANK_NUMBERING: usize = 2 + 10 + 6 + 6 + BUILD_NUMBERING_PLANS;
+
+/// [`bank_build_plans`], its numbering read answered by `numbering`.
+fn bank_build_plans_numbering(numbering: Vec<ScenarioPlan>) -> Vec<ScenarioPlan> {
     let cycle = import_family_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
     [
@@ -527,6 +536,7 @@ pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
         cycle[..10].to_vec(),
         group_read_plans(),
         cycle[10..16].to_vec(),
+        numbering,
         cycle[4..10].to_vec(),
         group_read_plans(),
         build_preflight_plans(),
@@ -559,9 +569,67 @@ pub(super) fn bank_server(directory: &std::path::Path, port: u16) -> Server {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     })
+}
+
+/// The committed series answers of 13 October 2026 through the build tool: a
+/// Receipt without a number, built against the answer taken with the Receipt
+/// type set to "Renumber Vouchers", is refused under the sub-method's code and
+/// names Receipt; against the answer taken before the change it is built.
+/// The join is edited (see `captured_numbering_answers`): the four rows carry
+/// the masters capture's GUIDs and AlterIDs of 1 to 4. Their method,
+/// sub-method and duplicate setting are as captured.
+#[tokio::test]
+async fn the_captured_series_answers_decide_a_numberless_receipt_through_the_build() {
+    use super::super::numbering_fixtures::captured_numbering_answers;
+    let numbering = |series: &[u8]| {
+        build_numbering_plans_answering(
+            captured_numbering_answers(CAPTURED_GUID, series),
+            &mode_tests::licensed_import_probe(),
+        )
+    };
+    let receipt = || {
+        let mut payload = captured_bank_payload();
+        payload.vouchers.remove(0);
+        assert_eq!(payload.vouchers[0].voucher_type.as_str(), "Receipt");
+        assert_eq!(payload.vouchers[0].voucher_number, None);
+        serde_json::to_value(payload).unwrap()
+    };
+
+    let mut plans = bank_build_plans_numbering(numbering(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_m8r_x4_series.utf16le.xml"
+    )));
+    plans.truncate(THROUGH_BANK_NUMBERING);
+    let simulator = SequenceSimulator::spawn(plans).expect("bank build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let refused = server.build_import_xml(&receipt()).await.unwrap();
+    let result = &refused.payload["result"];
+    assert_eq!(result["state"], "refused", "{result}");
+    assert_eq!(result["reason"], "import_voucher_numbering_not_retain");
+    assert_eq!(
+        result["refused_types"],
+        json!([{"voucher_type":"Receipt","observed":{"observation":"observed","method":"automatic","sub_method":"auto_renumber","duplicates":"not_prevented"}}])
+    );
+    assert_eq!(simulator.finish().unwrap().len(), THROUGH_BANK_NUMBERING);
+    assert_eq!(written_files(directory.path()), 0);
+
+    let plans = bank_build_plans_numbering(numbering(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_m8r_x0_series.utf16le.xml"
+    )));
+    let whole = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).expect("bank build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let built = server.build_import_xml(&receipt()).await.unwrap();
+    assert_eq!(
+        built.payload["result"]["voucher_count"], 1,
+        "{}",
+        built.payload
+    );
+    assert_eq!(simulator.finish().unwrap().len(), whole);
+    assert_eq!(written_files(directory.path()), 1);
 }
 
 #[tokio::test]
@@ -643,7 +711,10 @@ async fn a_payment_and_receipt_batch_builds_against_the_captured_masters() {
         .contains("call verify_import right away"));
     // A cash/bank payload reads the group collection twice, exactly as it reads
     // the catalogue twice, and the whole sequence is consumed.
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }
 
 /// bridge#466 through the tool call, not the builder: a three-entry Receipt
@@ -713,7 +784,10 @@ async fn a_multi_entry_receipt_builds_through_tools_call_and_says_it_is_unqualif
     .expect("written import file");
     assert_eq!(xml.matches("<ALLLEDGERENTRIES.LIST>").count(), 3, "{xml}");
     assert!(xml.contains("<PARTYLEDGERNAME>Bridge Nested Debtor WR4</PARTYLEDGERNAME>"));
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }
 
 fn demo_batch(voucher_type: &str, dr: &str, cr: &str) -> ImportPayload {
@@ -1317,15 +1391,20 @@ async fn a_contra_leg_outside_cash_and_bank_is_refused_without_writing_a_file() 
 async fn a_journal_only_batch_reads_no_group_collection() {
     // The Journal path keeps the exact request sequence its own qualification
     // was measured on; nothing here widened it.
-    let simulator =
-        SequenceSimulator::spawn(qualified_import_cycle_plans()[..32].to_vec()).expect("simulator");
+    let simulator = SequenceSimulator::spawn(
+        qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec(),
+    )
+    .expect("simulator");
     let directory = tempfile::tempdir().unwrap();
     let server = bank_server(directory.path(), simulator.address().port());
     server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
         .await
         .unwrap();
-    assert_eq!(simulator.finish().expect("requests").len(), 32);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        QUALIFIED_BUILD_REQUESTS
+    );
 }
 
 #[tokio::test]
@@ -1517,8 +1596,14 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
         json!({"count": 0, "purpose_not_confirmed": 0, "unidentified": 0})
     );
     // the same request sequence was consumed, so the same admission ran
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
-    assert_eq!(inline_simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
+    assert_eq!(
+        inline_simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 
     let read = |directory: &std::path::Path, result: &Value| {
         std::fs::read_to_string(
@@ -2217,7 +2302,10 @@ async fn a_parsed_statement_builds_an_import_file_by_proposals_id() {
         xml.contains("UPI 612345678901 from NORTHWIND TRADERS"),
         "{xml}"
     );
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }
 
 #[test]
@@ -3140,7 +3228,10 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
         .join("imports")
         .join(format!("{}.xml", result["batch_id"].as_str().unwrap()))
         .exists());
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 
     // The suspense ledger under Suspense A/c: the same build, no such warning.
     let simulator = SequenceSimulator::spawn({
@@ -3173,7 +3264,10 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
         "{response}"
     );
     assert!(codes_of(&response).is_empty(), "{response}");
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }
 
 // ---- statement facts written at build (#1392) -------------------------------------
@@ -3330,7 +3424,10 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
         .value;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["voucher_count"], 1, "{response}");
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 
     let batch_id = result["batch_id"].as_str().unwrap();
     let saved = server

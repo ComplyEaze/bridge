@@ -33,6 +33,8 @@ mod cash_bank;
 use cash_bank::{CashBankState, LegRequirement, ObservedMasters};
 #[path = "agent_import_identity.rs"]
 mod identity;
+#[path = "agent_import_invoice.rs"]
+pub(super) mod invoice;
 pub(super) use identity::import_identity;
 use identity::ImportIdentityScheme;
 #[path = "agent_import_schema.rs"]
@@ -61,10 +63,14 @@ pub(super) mod local_data;
 mod persistence;
 #[path = "agent_import_post.rs"]
 mod post;
+/// The post's next step for a numbering refusal, for the refusal table.
+pub(super) use post::numbering::POST_NEXT_STEP as POST_NUMBERING_NEXT_STEP;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
 #[path = "agent_import_statement_facts.rs"]
 mod statement_facts;
+#[path = "agent_import_stop.rs"]
+mod stop;
 #[path = "agent_import_transfers.rs"]
 mod transfers;
 pub(super) use approval::PostApprovals;
@@ -72,6 +78,7 @@ use statement_facts::{SkipOnlyRecord, StatementFacts};
 pub(super) use transfers::{check_not_run_section, counts_only_section, trim_section};
 #[path = "agent_import_verification.rs"]
 mod verification;
+use crate::local_files::visible_path::user_visible_path;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 use verification::{
@@ -79,13 +86,14 @@ use verification::{
     company_high_water_mark, corroborate_verification_window, expected_entry_fingerprint,
     final_verification_status, mark_verification_names, parse_import_voucher_rows,
     parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
-    verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
-    Attribution, DeltaBasis, VerificationStatus, WrittenNarration,
+    verification_window_identities, verify_batch_as, voucher_diffs,
+    voucher_is_accounting_effective, Attribution, DeltaBasis, InvoiceIdentity, VerificationStatus,
+    WrittenNarration,
 };
 #[cfg(test)]
 use verification::{
     batch_duplicate_sets, duplicates, expected_fingerprint, observed_fingerprint,
-    observed_voucher_identity, VERIFICATION_NAME_FIELDS,
+    observed_voucher_identity, verify_batch, VERIFICATION_NAME_FIELDS,
 };
 
 struct ImportProfileObservation {
@@ -143,6 +151,16 @@ fn pre_import_mark_refusal(parse_error: &str) -> &'static str {
     }
 }
 
+/// The company's two change marks from a read of them, as the build records
+/// them, or the code the build refuses with. The queue's re-read of an
+/// invoice's masters judges the marks it read as its binding reads began with
+/// this too (#1337).
+fn pre_import_mark_of(xml: &str, guid: &str) -> Result<PreImportMark, String> {
+    let high_water = parse_company_high_water(xml, guid)
+        .map_err(|code| pre_import_mark_refusal(&code).to_string())?;
+    company_high_water_mark(&high_water)
+}
+
 /// A batch's vouchers. `D` is the voucher date: the tool's text as
 /// `parse_payload` reads it, and a `TallyDate` from `validate_payload` on.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -167,10 +185,47 @@ struct ImportVoucher<D = TallyDate> {
     reference: Option<String>,
     #[serde(default)]
     voucher_number: Option<String>,
+    /// What a Sales invoice carries beyond its entries (place of supply, and
+    /// what the build observed in Tally). Absent on every other type, and on
+    /// every record written before invoices existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    invoice: Option<invoice::InvoiceDetail>,
     entries: Vec<ImportEntry>,
 }
 
 impl<D> ImportVoucher<D> {
+    /// The display name of the voucher type this voucher is filed under in the
+    /// book: the caller-named type for an invoice, the class name otherwise.
+    /// What a read-back must find, and what a render writes.
+    fn filed_type_name(&self) -> &str {
+        match &self.invoice {
+            Some(detail) if self.voucher_type.is_invoice() => &detail.voucher_type_name,
+            _ => self.voucher_type.as_str(),
+        }
+    }
+
+    /// The voucher type whose numbering admits this voucher at the build, and
+    /// whether it carries its own number (bridge#724): the type it is filed
+    /// under, so an invoice is read under its caller-named type with its own
+    /// number, never under the class "Sales".
+    fn numbering_at_build(&self) -> (&str, post::numbering::OwnNumber) {
+        (
+            self.filed_type_name(),
+            post::numbering::OwnNumber::of(self.voucher_number.as_deref()),
+        )
+    }
+
+    /// As `numbering_at_build`, for a native post. A post sends a voucher with
+    /// no number (one that carries a number is refused under the post's own
+    /// code), except an invoice, which is posted with its own number into a
+    /// type the build held to Manual with duplicates prevented.
+    fn numbering_at_post(&self) -> (&str, post::numbering::OwnNumber) {
+        match self.numbering_at_build() {
+            invoice if self.voucher_type.is_invoice() => invoice,
+            (filed, _) => (filed, post::numbering::OwnNumber::Absent),
+        }
+    }
+
     /// This voucher, holding `date` as its date.
     fn dated(self, date: TallyDate) -> ImportVoucher {
         let ImportVoucher {
@@ -180,6 +235,7 @@ impl<D> ImportVoucher<D> {
             narration,
             reference,
             voucher_number,
+            invoice,
             entries,
         } = self;
         ImportVoucher {
@@ -189,6 +245,7 @@ impl<D> ImportVoucher<D> {
             narration,
             reference,
             voucher_number,
+            invoice,
             entries,
         }
     }
@@ -219,6 +276,7 @@ enum VoucherType {
     Receipt,
     Journal,
     Contra,
+    Sales,
 }
 
 impl VoucherType {
@@ -228,7 +286,15 @@ impl VoucherType {
             Self::Receipt => "Receipt",
             Self::Journal => "Journal",
             Self::Contra => "Contra",
+            Self::Sales => "Sales",
         }
+    }
+
+    /// A GST invoice: a party leg, a sales or purchase leg and tax legs, with
+    /// an invoice view. It shares nothing of the bank shape and is refused
+    /// beside any other shape.
+    fn is_invoice(&self) -> bool {
+        matches!(self, Self::Sales)
     }
 }
 
@@ -276,7 +342,7 @@ impl VoucherType {
                     (EntrySide::Cr, LegRequirement::Money),
                 ],
             }),
-            Self::Journal => None,
+            Self::Journal | Self::Sales => None,
         }
     }
 }
@@ -285,14 +351,41 @@ impl VoucherType {
 // shape this module renders for it: Journal in
 // docs/agent/ASSESSMENT-2026-09-06.md, and Payment/Receipt/Contra in
 // docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.13. Adding a `VoucherType` variant
-// does not qualify it; the build refuses any type absent from this list, so
-// evidence has to arrive before the file can.
+// does not qualify it; the build refuses any type absent from this list before
+// its first request, and a post refuses a saved one, so evidence has to arrive
+// before the file can.
+//
+// Sales is NOT here. One lab rehearsal (7 Oct 2026, §9.16) showed the
+// duplicate-number read finding a known invoice, Tally taking two of the
+// element sets, every read-back field coming back, and the company's
+// STATENAME equal to the GST registration state of a keyed invoice. It joins
+// this list when what that rehearsal left owed is done (ADR 0004). The check
+// before a post now recognises an invoice by its number; that has not run
+// against Tally.
 const LIVE_QUALIFIED_VOUCHER_TYPES: &[VoucherType] = &[
     VoucherType::Journal,
     VoucherType::Payment,
     VoucherType::Receipt,
     VoucherType::Contra,
 ];
+
+#[cfg(test)]
+tokio::task_local! {
+    /// Test-only: the voucher types a run treats as qualified, in place of the
+    /// live list. It lets a test run a type that is not live yet through the
+    /// build, the post and the verification; no tool call can set it.
+    pub(super) static TEST_QUALIFIED_VOUCHER_TYPES: &'static [VoucherType];
+}
+
+/// The voucher types the build, the post and the verification accept. Always
+/// the live list outside a test.
+fn qualified_voucher_types() -> &'static [VoucherType] {
+    #[cfg(test)]
+    if let Ok(types) = TEST_QUALIFIED_VOUCHER_TYPES.try_with(|types| *types) {
+        return types;
+    }
+    LIVE_QUALIFIED_VOUCHER_TYPES
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 enum EntrySide {
@@ -706,7 +799,7 @@ impl Server {
                 "dates must be within the selected company's BOOKSFROM through today",
                 "ledger names must exactly match the live catalogue; validate_masters before build_import_xml",
                 "a batch may contain at most 100 distinct ledger names of at most 1024 characters each"
-            ], "limits": {"import_mode_qualification": "New files require freshly observed supported TallyPrime product and licence mode before and after the build reads. Release and licence tier are reported as observed facts. Journal, Payment, Receipt and Contra are the voucher types with recorded import/readback evidence, each only in the exact file shape this schema admits, except that a Payment, Receipt or Contra with more than two entries (bridge#466) rests on narrower evidence: hand-built files of that shape were imported and read back over the gateway (a Contra only with a repeated ledger) and one three-entry Receipt built by ComplyEaze Bridge was imported over the gateway and verified, but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu, and its build reports live_evidence hand_built_gateway_readback; every other voucher type is refused. A single-voucher batch is eligible for post_import (and, when BRIDGE_AGENT_ENABLE_BATCH_POST is on, a batch of 2 to 50 such vouchers): an unnumbered Journal, or a Payment, Receipt or Contra, whose legs post_import classifies again before approval and after approval inside the endpoint queue, before the final duplicate check and the post."}}}),
+            ], "limits": {"import_mode_qualification": "New files require freshly observed supported TallyPrime product and licence mode before and after the build reads. Release and licence tier are reported as observed facts. Journal, Payment, Receipt and Contra are the voucher types with recorded import/readback evidence, each only in the exact file shape this schema admits, except that a Payment, Receipt or Contra with more than two entries (bridge#466) rests on narrower evidence: hand-built files of that shape were imported and read back over the gateway (a Contra only with a repeated ledger) and one three-entry Receipt built by ComplyEaze Bridge was imported over the gateway and verified, but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu, and its build reports live_evidence hand_built_gateway_readback; every other voucher type is refused. A single-voucher batch is eligible for post_import, and so is a batch of 2 to 50 such vouchers: an unnumbered Journal, or a Payment, Receipt or Contra, whose legs post_import classifies again before approval and after approval inside the endpoint queue, before the final duplicate check and the post."}}}),
             evidence: local_evidence("voucher_schema"),
             company_guid: None,
             truncated: false,
@@ -830,17 +923,35 @@ impl Server {
         // key is taken out here and judged once the flags have been read.
         let approvals = bill_wise::take_approvals(&mut args).map_err(approval_invalid)?;
         let args = &args;
-        let payload = validate_payload(parse_payload(args)?)?;
+        let payload = parse_payload(args)?;
+        // First of all: a type that is not qualified is refused as that, not
+        // for whichever of its fields a later check would stop at.
+        refuse_unqualified_types(&payload.vouchers, qualified_voucher_types())?;
+        invoice::refuse_supplied_observed(&payload.vouchers)?;
+        let mut payload = validate_payload(payload)?;
         // After the whole of `validate_payload`: in a batch with several
         // defects, the first one it finds is reported, not this one (#1055).
         refuse_rewritten_narration(&payload.vouchers)?;
         let (debit, credit) = totals(&payload.vouchers)?;
-        refuse_unqualified_types(&payload.vouchers, LIVE_QUALIFIED_VOUCHER_TYPES)?;
         // Refuse an amendment Bridge could never admit before reading Tally.
         // Admission is repeated under the exclusive lock before publication.
         if payload.amends_batch_id.is_some() {
+            invoice::refuse_invoice_amendment(&payload.vouchers)?;
             let _admission_lock = self.lock_import_admission_shared()?;
             self.amendment_lineage_while_admitted(&payload)?;
+        }
+        // An invoice reaches Tally only through post_import: a file imported by
+        // hand skips the stop, the duplicate checks, the reads on either side of
+        // the approval and the readback. With posting off, no invoice file is
+        // written. Judged after the refusals that need no read, and before the
+        // first read.
+        if payload
+            .vouchers
+            .iter()
+            .any(|voucher| voucher.voucher_type.is_invoice())
+            && !self.settings.posting.enabled()
+        {
+            return Err(INVOICE_POST_NOT_ENABLED.to_string().into());
         }
         let opening_profile = self.qualified_import_profile().await?;
         validate_import_dates_for_profile(&payload, &opening_profile).map_err(|code| {
@@ -881,6 +992,35 @@ impl Server {
             // Bind each named ledger to the GUID this read observed (#239): a
             // post refuses a ledger renamed and replaced under its name since.
             let build_binding = bind_ledgers(&ledger_masters, requested_names)?;
+            // A Sales invoice reads its own masters (ledger compliance listing,
+            // the named voucher type, the party's bill-wise flag, the company's
+            // state), classifies every leg from them and records what it saw on
+            // the voucher. A journal-only or bank batch never takes this path.
+            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice()) {
+                match self
+                    .admit_sales_invoice(&identity, &company, &mut payload.vouchers[0], &ledger_masters)
+                    .await
+                {
+                    Ok(evidence) => {
+                        accumulated = combine_evidence(accumulated.clone(), evidence);
+                    }
+                    Err(invoice::InvoiceAdmission::Failed(failure)) => {
+                        return Err(failure.with_prior_evidence(accumulated.clone()));
+                    }
+                    Err(invoice::InvoiceAdmission::Refused(refusals)) => {
+                        return Ok(ToolOutcome {
+                            payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
+                                "state":"refused", "reason":"invoice_not_admitted",
+                                "refusals": refusals.iter().map(invoice::InvoiceRefusal::to_json).collect::<Vec<_>>(),
+                                "next_step":"No file was written. Each refusal names one defect and the ledger or value it concerns. Fix the voucher, or the master it names in Tally, then build again."
+                            }}),
+                            evidence: accumulated.clone(),
+                            company_guid: Some(payload.company_guid),
+                            truncated: false,
+                        });
+                    }
+                }
+            }
             // Only a payload carrying a cash/bank voucher reads the group
             // collection. Every payload, a Journal-only one included, reads
             // each named ledger's bill-wise flag (#1234), from the ledger list
@@ -962,6 +1102,16 @@ impl Server {
             // Admit the journal before publication; labels in older batches do not
             // collide with this build's independently generated wire identities.
             self.import_snapshot_while_admitted(None)?;
+            // The admission above read the stop before this lock; a post may
+            // have gone out since. No file is written for a stopped company.
+            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice())
+                && self
+                    .import_invoice_stop_while_admitted(&payload.company_guid)?
+                    .is_some()
+            {
+                return Err(ToolFailure::from("invoice_company_stopped".to_string())
+                    .with_prior_evidence(accumulated.clone()));
+            }
             let lineage = match payload.amends_batch_id {
                 Some(_) => Some(self.amendment_lineage_while_admitted(&payload)?),
                 None => None,
@@ -1121,6 +1271,53 @@ impl Server {
             let on_account_approved = verdict.approved;
             let (mark, mark_evidence) = self.pre_import_mark(&company, &identity).await?;
             accumulated = combine_evidence(accumulated.clone(), mark_evidence.clone());
+            // Every voucher is admitted against its voucher type's voucher
+            // numbering, read after the mark above (bridge#724). One written
+            // without a number is numbered by its type, so that type must be
+            // numbered Automatic with existing numbers retained. A Journal
+            // that carries its own number is also written into a type
+            // numbered Manual, where Tally keeps the number; under Automatic
+            // numbering Tally discards it and assigns its own (protocol
+            // reference §9.8), so there it is held to the same
+            // reading as a voucher without one. A blank number counts as
+            // none, and an amendment's vouchers are checked like any other.
+            let vouchers = payload.vouchers.iter().map(ImportVoucher::numbering_at_build);
+            let master_mark = mark
+                .master_value
+                .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
+            match self
+                .admit_voucher_numbering(&identity, master_mark, vouchers, &mut accumulated)
+                .await
+            {
+                Ok(_) => {}
+                Err(post::numbering::NumberingFailure::Read(failure)) => return Err(failure),
+                Err(post::numbering::NumberingFailure::Refused(refusal)) => {
+                    let mut result = json!({
+                        "state":"refused", "reason":refusal.code(),
+                        "refused_types":refusal.refused_types(),
+                    });
+                    // The next step goes out only under a budget that
+                    // holds it: an answer over its budget is replaced
+                    // whole, and the reason and the refused types are
+                    // what the caller needs most. An amendment has its
+                    // own: its book check has not run yet.
+                    if self.settings.max_bytes
+                        >= post::numbering::GUIDANCE_MIN_RESPONSE_BUDGET
+                    {
+                        result["next_step"] = json!(if payload.amends_batch_id.is_some() {
+                            post::numbering::BUILD_AMENDMENT_NEXT_STEP
+                        } else {
+                            post::numbering::BUILD_NEXT_STEP
+                        });
+                    }
+                    return Ok(ToolOutcome {
+                        payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
+                        evidence: accumulated.clone(),
+                        company_guid: Some(payload.company_guid),
+                        truncated: false,
+                    });
+                }
+            }
             let (_, _, _, repeated_catalogue_evidence) = self
                 .read_import_ledger_catalogue(&identity, &company.name)
                 .await?;
@@ -1266,6 +1463,18 @@ impl Server {
                 statement: statement_record,
                 withdrawn_skips,
             };
+            // An invoice that post_import would refuse writes no file either:
+            // it is refused here with the code post_import would give.
+            if holds_an_invoice(&line) {
+                if let Err(code) = post::admit_saved_voucher(
+                    &line,
+                    &self.settings.endpoint,
+                    post::PostScope::Vouchers,
+                    self.post_voucher_limit(post::PostScope::Vouchers),
+                ) {
+                    return Err(invoice_route_refusal(code).into());
+                }
+            }
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));
             if let Some(error) = persistence::persist_build(&imports, &line, xml.as_bytes(), || {
@@ -1289,7 +1498,7 @@ impl Server {
             // Keep the refusal code: `post_import` returns this same code, and
             // the guidance names it rather than guessing a reason (#866).
             let post_voucher_limit = self.post_voucher_limit(post::PostScope::Vouchers);
-            let native_post_refusal = if self.settings.writes_enabled {
+            let native_post_refusal = if self.settings.posting.enabled() {
                 post::admit_saved_voucher(
                     &line,
                     &self.settings.endpoint,
@@ -1301,9 +1510,8 @@ impl Server {
                 None
             };
             let (mut warnings, next_step) = build_import_guidance(
-                self.settings.writes_enabled,
+                self.settings.posting.enabled(),
                 native_post_refusal.as_deref(),
-                post_voucher_limit,
                 renders_bank_shape(&line.vouchers),
                 line.on_account_approved
                     .as_deref()
@@ -1311,7 +1519,13 @@ impl Server {
                 line.vouchers.iter().any(|voucher| {
                     voucher.voucher_type.bank_shape().is_some() && voucher.entries.len() > 2
                 }),
+                line.vouchers.iter().any(|voucher| invoice::new_ref_party(voucher).is_some()),
             );
+            let next_step = if holds_an_invoice(&line) {
+                invoice_guidance(&mut warnings)
+            } else {
+                next_step
+            };
             let next_step = match &amendment {
                 Some(_) => {
                     if let Some(list) = warnings.as_array_mut() {
@@ -1326,8 +1540,11 @@ impl Server {
                 }
                 None => next_step,
             };
+            // Appended last, so neither rewrite of the first warning above
+            // can replace it.
+            let hsn_warnings = hsn_warnings_of(&line.vouchers, &mut warnings);
             let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
-                    "batch_id": batch_id, "path": path, "sha256": sha256,
+                    "batch_id": batch_id, "sha256": sha256,
                     "amendment": amendment,
                     "voucher_count": line.vouchers.len(), "total_debit": debit.as_str(), "total_credit": credit.as_str(),
                     // How many lines a bank import sent to suspense, by tag,
@@ -1355,9 +1572,15 @@ impl Server {
                     "endpoint_origin": line.endpoint_origin,
                     "observed_profile": opening_profile.observed_profile,
                     "warnings": warnings,
+                    "hsn_warnings": hsn_warnings,
                     "statement_ledger_warnings": statement_warnings,
                     "next_step": next_step
                 }});
+            // Where a person finds the file: the real location, which a Microsoft
+            // Store install of Claude Desktop redirects into its package (#1459).
+            // The file was stored and is read by the logical `path`. Set before the
+            // essential length is measured, so the transfers section's room counts it.
+            user_visible_path(&path).put_into(&mut payload["result"], "path");
             // The summary was computed before the append, with this build in it,
             // so nothing after the append refuses a written build. It is drawn
             // here into the room the essential result leaves. The response
@@ -1522,6 +1745,8 @@ impl Server {
             .admit_verification_page(&page)
             .map_err(|failure| failure.with_prior_evidence(evidence))?;
         outcome.payload["result"] = page;
+        // From the whole proof, whose rows the page splits.
+        verification::attach_batch_headline(&mut outcome.payload, &proof);
         // After the verdict is persisted and the page admitted: nothing here
         // can change the verdict or fail the call.
         outcome.payload["result"]["transfers"] = self.transfers_for_verification(guid, essential);
@@ -1553,8 +1778,11 @@ impl Server {
             return Err("verification_proof_batch_mismatch".to_string().into());
         }
         let _ = self.admit_verification_page(&page)?;
+        // From the whole proof, so every page states the same outcome.
+        let mut payload = json!({"company": proof["company"], "result": page});
+        verification::attach_batch_headline(&mut payload, &proof);
         Ok(ToolOutcome {
-            payload: json!({"company": proof["company"], "result": page}),
+            payload,
             evidence: Evidence {
                 request_sha256: sha256_hex(
                     format!("verify_import_page:{batch_id}:{offset}").as_bytes(),
@@ -1664,6 +1892,13 @@ impl Server {
         if !batch_guid_matches(&line.company_guid, guid) {
             return Err("import_batch_company_mismatch".to_string().into());
         }
+        // A batch that was never sent is refused as the build and the post
+        // refuse it, before any request. A batch that was sent is still read:
+        // verification is how a stopped or uncertain post is reconciled and
+        // released, whatever the type was when it was posted.
+        if !dispatched {
+            refuse_unqualified_types(&line.vouchers, qualified_voucher_types())?;
+        }
         validate_dispatched_import_endpoint(&line, dispatched, &self.settings.endpoint)?;
         let opening_mode = self.observe_import_profile().await?;
         let (company, identity, identity_evidence) = self
@@ -1768,7 +2003,39 @@ impl Server {
             } else {
                 Attribution::Tag
             };
-            let mut result = verify_batch(&line, &observed, attribution)?;
+            // An invoice is recognised by its number, and by its figures as
+            // well while this machine holds an unsettled batch with them.
+            let mut result = self.verify_batch_by_journal_identity(&line, &observed, attribution)?;
+            // The standard readback sees a voucher's date, type, number, entries
+            // and narration. An invoice's party, GST header, reference and bill
+            // allocation are read back separately; "posted_verified" is kept
+            // only when those match as well. An invoice of a type this build
+            // does not qualify is marked not confirmed and is not read back.
+            if let Some((invoice_voucher, matched)) = verification::invoice_readback_due(
+                &mut result,
+                &line.vouchers,
+                qualified_voucher_types(),
+            ) {
+                let (mut differences, alter_id, guid, lines, evidence) = self
+                    .read_back_sales_invoice(&identity, &company, invoice_voucher)
+                    .await?;
+                accumulated = combine_evidence(accumulated.clone(), evidence);
+                // The voucher found by type and number must be the one the
+                // standard readback attributed to this batch.
+                if differences.is_empty() {
+                    differences = invoice::readback_identity_differences(
+                        guid.as_deref(),
+                        alter_id.as_deref(),
+                        &matched,
+                    );
+                }
+                verification::mark_invoice_readback(
+                    &mut result,
+                    &invoice_voucher.bridge_txn_id,
+                    &differences,
+                    &lines,
+                );
+            }
             if span.rolled_back {
                 verification::mark_book_rolled_back(&mut result);
             } else if pre_post_voucher_mark.is_some() && span.bindings.is_none() {
@@ -1814,7 +2081,23 @@ impl Server {
                         verification::mark_sent_after_reported_not_created(&mut result)
                     }
                     verification::UnmatchedCause::NotEstablished => {
-                        verification::mark_sent_not_attributed(&mut result)
+                        // An answer on record that was not clean (one that
+                        // did not parse included, as the post itself reads
+                        // it) makes an edit in Tally no likelier than a
+                        // voucher Tally did not create, so its line drops the
+                        // edit example (bridge#1108). With no answer on
+                        // record, or a clean one, the line is unchanged.
+                        let unclean = dispatch_response.as_ref().is_some_and(|response| {
+                            !post::import_outcome_is_clean(
+                                response.outcome.as_ref(),
+                                line.vouchers.len(),
+                            )
+                        });
+                        if unclean {
+                            verification::mark_sent_not_attributed_after_unclean_answer(&mut result)
+                        } else {
+                            verification::mark_sent_not_attributed(&mut result)
+                        }
                     }
                 }
             }
@@ -1896,6 +2179,9 @@ impl Server {
                 None => None,
             };
             let mut proof = proof;
+            // What the person approving was told to check, from the saved
+            // batch, whatever the verdict.
+            with_hsn_warnings(&mut proof, &line.vouchers);
             if let Some(masters) = &masters_after_post {
                 proof["masters_after_post"] =
                     served_masters_verdict(masters.clone(), &line.vouchers);
@@ -2397,11 +2683,7 @@ impl Server {
         let (xml, evidence) = self
             .post_read(identity, company_high_water_read(&company.name))
             .await?;
-        let high_water = parse_company_high_water(&xml, guid).map_err(|code| {
-            ToolFailure::from(pre_import_mark_refusal(&code).to_string())
-                .with_prior_evidence(evidence.clone())
-        })?;
-        let mark = company_high_water_mark(&high_water)
+        let mark = pre_import_mark_of(&xml, guid)
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
         Ok((mark, evidence))
     }
@@ -2596,6 +2878,122 @@ impl Server {
         }
     }
 
+    /// How an invoice batch's vouchers are recognised in the book: by number,
+    /// and by figures as well while this machine holds an unsettled batch with
+    /// them. A batch with no invoice takes the journal's lock and reads it not
+    /// at all, so Payment, Receipt, Contra and Journal posts and their
+    /// readbacks behave as they did before the number joined the identity.
+    fn import_invoice_identity(&self, line: &ImportLedgerLine) -> Result<InvoiceIdentity, String> {
+        if !holds_an_invoice(line) {
+            return Ok(InvoiceIdentity::ByNumber);
+        }
+        let _lock = self.lock_import_admission_shared()?;
+        Ok(InvoiceIdentity::beside(
+            self.import_unsettled_invoice_twin_while_admitted(line)?
+                .as_deref(),
+        ))
+    }
+
+    /// A batch's verdict over the rows read, with the invoice identity the
+    /// journal calls for (`import_invoice_identity`).
+    fn verify_batch_by_journal_identity(
+        &self,
+        line: &ImportLedgerLine,
+        observed: &ImportReadSource,
+        attribution: Attribution<'_>,
+    ) -> Result<Value, String> {
+        let identity = self.import_invoice_identity(line)?;
+        verify_batch_as(line, observed, attribution, identity)
+    }
+
+    /// What a refusal for rows already in the book says of the journal: `None`
+    /// for a batch with no invoice (which neither locks nor reads it), else the
+    /// unsettled twin, or why it could not be read.
+    pub(super) fn import_unsettled_invoice_twin_for_refusal(
+        &self,
+        line: &ImportLedgerLine,
+    ) -> Option<Result<Option<String>, String>> {
+        holds_an_invoice(line).then(|| {
+            self.lock_import_admission_shared()
+                .and_then(|_lock| self.import_unsettled_invoice_twin_while_admitted(line))
+        })
+    }
+
+    /// What the journal offers as the control for an invoice number read of
+    /// this company (`ledger::invoice_number_control`), read under the shared
+    /// admission lock and released at once.
+    fn import_invoice_number_control(
+        &self,
+        company_guid: &str,
+        year: (&str, &str),
+    ) -> Result<ledger::NumberControl, String> {
+        let _lock = self.lock_import_admission_shared()?;
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::invoice_number_control(reader, company_guid, year),
+            None => Ok(ledger::NumberControl::NoneStanding),
+        }
+    }
+
+    /// The batch of this company that stops every further Sales post
+    /// (`ledger::invoice_stop`), read under the shared admission lock and
+    /// released at once.
+    pub(super) fn import_invoice_stop(&self, company_guid: &str) -> Result<Option<String>, String> {
+        let _lock = self.lock_import_admission_shared()?;
+        self.import_invoice_stop_while_admitted(company_guid)
+    }
+
+    /// Whether `line` is an invoice that a stop of its company holds back. A
+    /// batch with no invoice is never judged by it: a stopped company stops no
+    /// Journal, Payment, Receipt or Contra.
+    pub(super) fn stopped_company_while_admitted(
+        &self,
+        line: &ImportLedgerLine,
+    ) -> Result<bool, String> {
+        if !holds_an_invoice(line) {
+            return Ok(false);
+        }
+        Ok(self
+            .import_invoice_stop_while_admitted(&line.company_guid)?
+            .is_some())
+    }
+
+    /// Every batch that stops this company, in id order.
+    pub(super) fn import_invoice_stops_while_admitted(
+        &self,
+        company_guid: &str,
+    ) -> Result<Vec<String>, String> {
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::invoice_stops(reader, company_guid),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// [`Self::import_invoice_stop`] for a caller that already holds an
+    /// admission lock: the build before it writes a file, and a post before it
+    /// records its dispatch intent.
+    pub(super) fn import_invoice_stop_while_admitted(
+        &self,
+        company_guid: &str,
+    ) -> Result<Option<String>, String> {
+        Ok(self
+            .import_invoice_stops_while_admitted(company_guid)?
+            .into_iter()
+            .next())
+    }
+
+    /// The batch, sent and whose latest status is not a verified post, that
+    /// holds an invoice with the figures of `line`'s invoice
+    /// (`ledger::unsettled_invoice_twin`).
+    pub(super) fn import_unsettled_invoice_twin_while_admitted(
+        &self,
+        line: &ImportLedgerLine,
+    ) -> Result<Option<String>, String> {
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::unsettled_invoice_twin(reader, line),
+            None => Ok(None),
+        }
+    }
+
     /// The batch, already sent or found posted, that holds a row of a build's
     /// `vouchers`.
     fn import_vouchers_already_posted_while_admitted(
@@ -2715,10 +3113,83 @@ impl Server {
 
 const AMENDMENT_WARNING: &str = "This file amends an earlier batch. Each voucher carries that batch's REMOTEID, so importing it alters the vouchers already in the book in place instead of creating new ones: Tally should report them as altered, not created. ComplyEaze Bridge compared those vouchers with what it built only as the book stood during this build, and only these fields: the date, a bank voucher's effective date when Tally returned one, the voucher type, the voucher number when the batch set one, each entry's ledger, amount and side, and the narration. It did not compare a voucher's reference, its bill-wise or cost-centre allocations, or which ledger Tally records as its party, because the verification read does not fetch them; instead it refused any voucher whose ALTERID has moved since ComplyEaze Bridge first verified it, which catches an edit to those fields made after that verification, provided a Tally edit advances the voucher's ALTERID (measured over the gateway; not yet for an edit made in Tally's own screens). An edit made before that first verification is not caught, so verify right after every import. An in-place alteration replaces a voucher's entries rather than merging them (measured over the gateway), and this file's entries carry no allocations, so allocations made in Tally, including those ComplyEaze Bridge advises adding after an import, are expected to be lost; that loss, and what happens to a reference, were not measured directly. An edit made in Tally between this build and the import is overwritten without warning. Import promptly, and build the amendment again if anyone may have changed these vouchers. Import and verify each amendment before building the next one for the same voucher: two amendments built from the same state overwrite each other, and the later import wins. In-place alteration with changed content was measured over the XML gateway on licensed TallyPrime 7.1 Silver for Journal, Payment, Receipt and Contra; an import through Tally's own Import menu was not measured.";
 
+/// Whether a batch holds an invoice: the one gate for every read of the journal's
+/// unsettled batches, so a bank batch never takes its lock for the number rule.
+fn holds_an_invoice(line: &ImportLedgerLine) -> bool {
+    line.vouchers
+        .iter()
+        .any(|voucher| voucher.voucher_type.is_invoice())
+}
+
 /// Why no file was written for a row another batch already sent (#876), and what
 /// to do instead. It never offers a hand import of this row: that is the second
 /// post the refusal exists to stop.
-const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and the user enters its unposted rows in Tally), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. If Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again: ask the user to enter the voucher in Tally.";
+const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and the user enters its unposted rows in Tally), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again: ask the user to enter the voucher in Tally.";
+
+/// The code of the refusal that stops an invoice build while voucher posting
+/// is off (see `build_import_xml`); its text is in agent.rs.
+const INVOICE_POST_NOT_ENABLED: &str = "invoice_post_not_enabled";
+
+/// The code an invoice build gives when `post_import` would refuse the saved
+/// invoice: the post's own code, except for the refusals of the approval text,
+/// which also refuse the other voucher types and so carry a code of their own
+/// here, with advice about an invoice.
+fn invoice_route_refusal(code: String) -> String {
+    match code.as_str() {
+        "import_review_layout_text" => "invoice_review_layout_text".to_string(),
+        "import_review_format_text" => "invoice_review_format_text".to_string(),
+        "import_review_too_large" => "invoice_review_too_large".to_string(),
+        _ => code,
+    }
+}
+
+const INVOICE_POST_ONLY_WARNING: &str = "No import XML was sent to Tally. This invoice is posted by post_import, which needs a separate native approval, and in no other way. Do not import the written file in Tally by hand: a hand import skips the stop on an unverified invoice, the duplicate checks, the reads on either side of the approval and the readback of the invoice.";
+
+/// The warning of an invoice whose sales ledgers' HSN/SAC look unusual: a
+/// warning, never a block. Tally stamps the code on the voucher when it
+/// is saved: a voucher saved while its ledger had no code kept the empty code
+/// after the master was given one, until it was saved again (measured); a
+/// code changed on a master after a voucher was saved with one was not
+/// measured (TALLY_PROTOCOL_REFERENCE section 9.16).
+const INVOICE_HSN_WARNING: &str = "HSN/SAC to check. This is a warning only: the invoice can still be posted. hsn_warnings names each sales ledger whose code looks unusual and where the code comes from (the ledger, a group or the company): a code that is not digits only; one that is not six digits (six are preferred; a longer code is not an error for that reason alone); a services ledger's code that does not start 99; a goods ledger's code that starts 99. hsn_warning_type_of_supply_not_judged means the ledger's type of supply is not Goods or Services, so those last two checks were not made. Tell the user before posting and let them decide; never change a code on their behalf. If they change one, they change it in Tally and the invoice is built again: a voucher saved before its ledger had a code kept the empty code until it was saved again in Tally, and whether a code changed after a voucher was saved with one reaches it was not measured.";
+
+/// A verification result names the HSN/SAC warnings its batch was approved
+/// with, when there are any.
+fn with_hsn_warnings(proof: &mut Value, vouchers: &[ImportVoucher]) {
+    let listed = vouchers
+        .iter()
+        .flat_map(invoice::hsn_warnings_json)
+        .collect::<Vec<_>>();
+    if !listed.is_empty() {
+        proof["hsn_warnings"] = json!(listed);
+    }
+}
+
+/// The HSN/SAC warnings of a saved batch's invoices, and the plain warning
+/// added to `warnings` when there is one.
+fn hsn_warnings_of(vouchers: &[ImportVoucher], warnings: &mut Value) -> Vec<Value> {
+    let listed = vouchers
+        .iter()
+        .flat_map(invoice::hsn_warnings_json)
+        .collect::<Vec<_>>();
+    if !listed.is_empty() {
+        if let Some(list) = warnings.as_array_mut() {
+            list.push(json!(INVOICE_HSN_WARNING));
+        }
+    }
+    listed
+}
+
+const INVOICE_POST_NEXT_STEP: &str = "Call post_import with this company_guid and batch_id; the local user must review and approve it before one posting attempt.";
+
+/// The guidance of a saved invoice batch: the posting route only, never a hand
+/// import. Replaces the first warning and the next step the batch kinds share.
+fn invoice_guidance(warnings: &mut Value) -> &'static str {
+    if let Some(first) = warnings.as_array_mut().and_then(|list| list.first_mut()) {
+        *first = json!(INVOICE_POST_ONLY_WARNING);
+    }
+    INVOICE_POST_NEXT_STEP
+}
 
 const AMENDMENT_NOT_POSTABLE: &str = "No import XML was sent to Tally. ComplyEaze Bridge does not post amendments (post_import refuses them), so import the written file by hand, promptly, then use verify_import; do not call post_import for this batch.";
 
@@ -2916,22 +3387,21 @@ fn approval_invalid(error: bill_wise::ApprovalError) -> ToolFailure {
 
 const BILL_WISE_UNAPPROVED_NEXT_STEP: &str = "No file was written. Each party listed is a ledger that keeps bills in Tally. An entry on it with no bill allocation lands On Account, and the person must then match it to a bill in Tally by hand. Show the person each party with its row_count, its debit_total and credit_total, and the rows listed, and say how many more rows there are (rows_omitted, refused_parties_omitted); raise BRIDGE_AGENT_MAX_BYTES to list them all. Ask whether each party's entries may be posted On Account, one party per question. Only for the parties the person says yes to, build again with on_account_approvals: a list with one {party_digest} for each, the digest copied from this answer (a ledger copied beside it is not read, so a masked name does no harm). The digest ties the approval to this exact batch, this company and this endpoint, and changing any row changes every party's digest, so the person is asked again. It does not prove that a person said yes, and a hand import of the file is not checked at all: never approve on the person's behalf. When the batch is posted, the native approval dialog marks each approved party On Account, from this build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines). That dialog is one answer for the whole batch and asks nothing about any one party, so it does not replace these questions. If this batch amends an earlier one, importing it also replaces any bill allocations the person made in Tally.";
 
+const INVOICE_NEW_REF_NOTE: &str = "The customer on this invoice is a bill-wise ledger, as read from Tally's ledger list during this build: its entry is written with a New Ref named by the invoice number, so it does not land On Account, and verify_import reads the allocation back. Every other ledger this batch names is not bill-wise. ComplyEaze Bridge reads the invoice's masters again before the approval dialog and again before the approval is spent, and refuses the post if the invoice would no longer be admitted or if what it recorded of the customer, the voucher type or the state of the company's GST registration has changed. A hand import of the file is not checked at all.";
 const BILL_WISE_NONE_NOTE: &str = "Checked: none of the ledgers this batch names is a bill-wise ledger, as read from Tally in the ledger list during this build. ComplyEaze Bridge reads the ledger list again before posting and refuses the post (import_bill_wise_changed) if a named ledger has become bill-wise since. This reads each ledger's own bill-wise setting, not the company's bill-wise feature. A hand import of the file is not checked at all.";
 
 const BILL_WISE_APPROVED_NOTE: &str = "Entries on the bill-wise ledgers listed in on_account_approved carry no bill allocation, so each amount lands On Account and must be matched to bills in Tally afterwards. Each has an approval digest that matches this batch; ComplyEaze Bridge cannot tell whether a person said yes. If this batch is posted natively, the approval dialog marks each of these ledgers On Account, from this build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines); a hand import of the file shows no dialog. Any other ledger this batch names that has become bill-wise by the time of posting is refused (import_bill_wise_changed).";
 
 /// Why `post_import` would refuse a saved batch, for the build's warning. The
 /// code is the one `post_import` returns; the text only explains it. A code
-/// with no entry here keeps its name and a pointer to the same refusal.
-fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
-    let count = if voucher_limit > 1 {
-        format!("1 to {voucher_limit} vouchers")
-    } else {
-        "one voucher (the limit while batch posting is off)".to_string()
-    };
+/// with no entry here keeps its name and a pointer to the same refusal. The
+/// build asks only while posting is on, and posting on admits a batch (#1090),
+/// so the limit is the batch cap.
+fn native_post_refusal_reason(code: &str) -> String {
+    let voucher_limit = ledger::MAX_BATCH_POST_VOUCHERS;
     match code {
         "import_post_requires_one_voucher" => format!(
-            "native posting takes {count}, each a Journal, Payment, Receipt or Contra, from a batch built by this version of ComplyEaze Bridge"
+            "native posting takes 1 to {voucher_limit} vouchers, each a Journal, Payment, Receipt or Contra, from a batch built by this version of ComplyEaze Bridge"
         ),
         "import_post_batch_too_large" => format!(
             "this batch has more vouchers than native posting takes at once ({voucher_limit})"
@@ -2940,7 +3410,7 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
             "a voucher carries its own number, and native posting lets Tally assign it".to_string()
         }
         "import_review_layout_text" | "import_review_format_text" => {
-            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name)".to_string()
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name), or a narration too long for one line holds a run of four or more dashes or a number in brackets, which the dialog keeps for its own dashed line and part labels".to_string()
         }
         "import_review_too_large" => {
             "the approval text does not fit in one native dialog".to_string()
@@ -2955,10 +3425,10 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
 fn build_import_guidance(
     writes_enabled: bool,
     native_post_refusal: Option<&str>,
-    voucher_limit: usize,
     bank_types: bool,
     on_account_approved: bool,
     multi_entry_bank: bool,
+    new_ref_invoice: bool,
 ) -> (Value, &'static str) {
     let preflight_warning =
         "The preflight observes the current verification window. The import or subsequent changes can make later readback exceed the source limits.";
@@ -3000,6 +3470,8 @@ fn build_import_guidance(
     );
     let allocation_warning = if on_account_approved {
         BILL_WISE_APPROVED_NOTE
+    } else if new_ref_invoice {
+        INVOICE_NEW_REF_NOTE
     } else {
         BILL_WISE_NONE_NOTE
     };
@@ -3032,7 +3504,7 @@ fn build_import_guidance(
         (
             warnings(&format!(
                 "No import XML was sent to Tally. This saved batch is not eligible for native posting: post_import would refuse it as {code} ({}). Import the written file manually, then use verify_import; do not call post_import for this batch.",
-                native_post_refusal_reason(code, voucher_limit),
+                native_post_refusal_reason(code),
             )),
             manual_import_next_step,
         )
@@ -3059,6 +3531,10 @@ fn live_evidence(vouchers: &[ImportVoucher]) -> Vec<Value> {
     let mut sources = BTreeMap::<(&str, &str), BTreeSet<&str>>::new();
     for voucher in vouchers {
         let source = match voucher.voucher_type.bank_shape() {
+            None if voucher.voucher_type.is_invoice() => (
+                "hand_keyed_reads_and_hand_imports_not_bridge_posted",
+                "docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md",
+            ),
             None => (
                 "synthetic_lab_readback",
                 "docs/agent/ASSESSMENT-2026-09-06.md",
@@ -3092,12 +3568,13 @@ fn live_evidence(vouchers: &[ImportVoucher]) -> Vec<Value> {
         .collect()
 }
 
-/// The last gate before any read: a voucher type absent from the qualified
-/// list never reaches a live request, let alone a written file. `qualified` is
-/// a parameter so the guard itself stays exercised even while every declared
-/// `VoucherType` happens to be qualified.
-fn refuse_unqualified_types(
-    vouchers: &[ImportVoucher],
+/// The first gate of a build, and a gate of every post before any request: a
+/// voucher type absent from the qualified list never reaches a live request,
+/// let alone a written file.
+/// `qualified` is a parameter so the guard can be exercised against a
+/// narrowed list as well as the real one.
+fn refuse_unqualified_types<D>(
+    vouchers: &[ImportVoucher<D>],
     qualified: &[VoucherType],
 ) -> Result<(), String> {
     vouchers
@@ -3129,6 +3606,18 @@ fn renders_bank_shape(vouchers: &[ImportVoucher]) -> bool {
 /// reallocation Journals went in on their own — so the union is refused rather
 /// than assumed from holding both citations at once.
 fn refuse_mixed_shapes<D>(vouchers: &[ImportVoucher<D>]) -> Result<(), String> {
+    // An invoice is its own shape and is built alone: its masters, its type's
+    // numbering and its party are read for that one voucher.
+    let invoices = vouchers
+        .iter()
+        .filter(|voucher| voucher.voucher_type.is_invoice())
+        .count();
+    if invoices > 0 && invoices != vouchers.len() {
+        return Err("voucher_type_shapes_mixed".to_string());
+    }
+    if invoices > 1 {
+        return Err("invoice_one_per_batch".to_string());
+    }
     let bank = vouchers
         .iter()
         .filter(|voucher| voucher.voucher_type.bank_shape().is_some())
@@ -3194,11 +3683,12 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
                 return Err("voucher_text_invalid".to_string());
             }
         }
-        if voucher
-            .voucher_number
-            .as_deref()
-            .is_some_and(|number| number.chars().count() > 32 || number.contains('$'))
-        {
+        if voucher.voucher_number.as_deref().is_some_and(|number| {
+            // Tally read back a number sent with a space at its end
+            // without it (§9.8, 2026-10-15), so it could never verify as
+            // posted; white space at the start is refused too, unmeasured.
+            number.chars().count() > 32 || number.contains('$') || number.trim() != number
+        }) {
             return Err("voucher_number_invalid".to_string());
         }
         for entry in &voucher.entries {
@@ -3224,6 +3714,7 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
         if voucher.voucher_type.bank_shape().is_some() {
             validate_bank_voucher_shape(voucher)?;
         }
+        invoice::validate_invoice_voucher(voucher)?;
     }
     Ok(ImportPayload {
         company_guid: payload.company_guid,
@@ -4326,6 +4817,14 @@ fn render_voucher_xml(
         .as_deref()
         .map(|value| format!("<VOUCHERNUMBER>{}</VOUCHERNUMBER>", xml_escape(value)))
         .unwrap_or_default();
+    if voucher.voucher_type.is_invoice() {
+        let date = voucher.date.as_str().to_string();
+        // An invoice reaches here only after the build recorded what it
+        // observed (`admit_saved_voucher_integrity` refuses one that has not).
+        // An unobserved one renders as nothing rather than as a guess.
+        return invoice::render_sales_invoice_xml(voucher, remote_id, &date, &narration)
+            .unwrap_or_default();
+    }
     let shape = voucher.voucher_type.bank_shape();
     // §9.13's measured files put the debit first in every voucher, and a
     // caller's ordering is not a fact about the batch. Canonicalise rather than
@@ -4805,6 +5304,10 @@ fn set_private_file(file: &std::fs::File) -> Result<(), String> {
 #[cfg(test)]
 #[path = "agent_import_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "agent_import_numbering_fixtures.rs"]
+pub(in crate::agent) mod numbering_fixtures;
 
 /// A verification page as it is served, from the saved proof's bytes: the
 /// proof, with every ledger name marked so the response's redaction applies,

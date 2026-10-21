@@ -263,8 +263,7 @@ fn service_debiting(
         max_bytes: 5_000_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::On,
     });
     // Fixture construction exclusively owns this temporary directory. Avoid a
     // setup lock that another parallel test's fork can transiently inherit.

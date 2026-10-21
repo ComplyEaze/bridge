@@ -201,10 +201,10 @@ fn scan_directory(
     }
 }
 
-/// Take stock of `root` (the agent data folder) and, when given, the endpoint
-/// coordination folder whose `native-dispatch-leases` holds the lease locks.
-/// Reads only.
-pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
+/// Take stock of `root` (the agent data folder) and the endpoint coordination
+/// folders (one, or on Windows two: see `paths::dispatch_coordination_roots`)
+/// whose `native-dispatch-leases` hold the lease locks. Reads only.
+pub(super) fn build(root: &Path, coordination: &[&Path]) -> Report {
     let mut report = Report {
         root: Root::Present,
         classes: CLASSES
@@ -299,14 +299,14 @@ fn is_dangling_link(path: &Path) -> bool {
 /// with a custom folder: scan each distinct one once. A lease folder that is a
 /// link, or under a coordination folder that is a dangling link, is named as not
 /// listed.
-fn scan_leases(report: &mut Report, root: &Path, coordination: Option<&Path>) {
-    if coordination.is_some_and(is_dangling_link) {
+fn scan_leases(report: &mut Report, root: &Path, coordination: &[&Path]) {
+    if coordination.iter().any(|dir| is_dangling_link(dir)) {
         note_not_listed(report, "lock_folder");
     }
     let mut leases: Vec<PathBuf> = Vec::new();
     for candidate in coordination
+        .iter()
         .map(|dir| dir.join("native-dispatch-leases"))
-        .into_iter()
         .chain([root.join("native-dispatch-leases")])
     {
         let canonical = fs::canonicalize(&candidate).unwrap_or_else(|_| candidate.clone());
@@ -376,7 +376,7 @@ fn age_days(time: SystemTime, now: SystemTime) -> u64 {
 pub(super) fn to_json(
     report: &Report,
     now: SystemTime,
-    paths: Option<(&Path, Option<&Path>)>,
+    paths: Option<(&Path, &[&Path])>,
 ) -> serde_json::Value {
     use serde_json::json;
     let root = match report.root {
@@ -430,8 +430,13 @@ pub(super) fn to_json(
     });
     if let Some((folder, locks)) = paths {
         value["folder_path"] = json!(folder.display().to_string());
-        if let Some(locks) = locks {
-            value["lock_folder_path"] = json!(locks.display().to_string());
+        // the first, as before; every one, in the order the locks are taken
+        if let Some(first) = locks.first() {
+            value["lock_folder_path"] = json!(first.display().to_string());
+            value["lock_folder_paths"] = json!(locks
+                .iter()
+                .map(|locks| locks.display().to_string())
+                .collect::<Vec<_>>());
         }
     }
     value
@@ -439,11 +444,15 @@ pub(super) fn to_json(
 
 /// The `local_data_report` tool's payload for `root`: no path, and no file of the
 /// folder is changed (the call itself is logged like any tool call). With it,
-/// why the report is incomplete, if it is. The coordination folder is the
-/// default one.
+/// why the report is incomplete, if it is. The coordination folders are the
+/// default ones.
 pub(in crate::agent) fn tool_payload(root: &Path) -> (serde_json::Value, Option<&'static str>) {
-    let coordination = crate::local_files::paths::default_dispatch_coordination_dir();
-    let report = build(root, coordination.as_deref());
+    let coordination = crate::local_files::paths::coordination_roots()
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    let coordination: Vec<&Path> = coordination.iter().map(PathBuf::as_path).collect();
+    let report = build(root, &coordination);
     (
         to_json(&report, SystemTime::now(), None),
         report.incomplete_reason(),
@@ -451,13 +460,16 @@ pub(in crate::agent) fn tool_payload(root: &Path) -> (serde_json::Value, Option<
 }
 
 /// Resolve the folders the way the MCP server does, without creating them.
-fn folders() -> (PathBuf, Option<PathBuf>) {
+fn folders() -> (PathBuf, Vec<PathBuf>) {
     let root = std::env::var_os("BRIDGE_AGENT_DATA_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(crate::local_files::paths::default_data_dir);
     (
         root,
-        crate::local_files::paths::default_dispatch_coordination_dir(),
+        crate::local_files::paths::coordination_roots()
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>(),
     )
 }
 
@@ -469,8 +481,9 @@ fn folders() -> (PathBuf, Option<PathBuf>) {
 /// listing cap: `incomplete_reason` says which) and 1 when it could not be printed.
 pub(in crate::agent) fn run(show_paths: bool) -> i32 {
     let (root, coordination) = folders();
-    let report = build(&root, coordination.as_deref());
-    let paths = show_paths.then_some((root.as_path(), coordination.as_deref()));
+    let coordination: Vec<&Path> = coordination.iter().map(PathBuf::as_path).collect();
+    let report = build(&root, &coordination);
+    let paths = show_paths.then_some((root.as_path(), coordination.as_slice()));
     let value = to_json(&report, SystemTime::now(), paths);
     let printed = writeln!(
         std::io::stdout(),

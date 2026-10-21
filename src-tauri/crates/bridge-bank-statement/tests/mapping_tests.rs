@@ -1,5 +1,4 @@
-//! Mapping keys and the mapping loader, ported from
-//! `scripts/bank_statement_import.test.py`.
+//! Mapping keys and the rules a mapping must follow.
 
 mod common;
 
@@ -7,8 +6,25 @@ use bridge_bank_statement::mapping::{Mapping, MappingRow, Treatment};
 use bridge_bank_statement::text::{ledger_key, mapping_key};
 use common::*;
 
+/// The tests write a mapping as a header line and one line per row (party, ledger,
+/// treatment), with no quoting. The header line is skipped; `Mapping` is built from
+/// rows only, as the app builds it.
 fn load(text: &str) -> Result<Mapping, bridge_bank_statement::Refusal> {
-    Mapping::from_csv(text.as_bytes())
+    let rows = text
+        .lines()
+        .skip(1)
+        .filter(|line| !line.is_empty())
+        .enumerate()
+        .map(|(index, line)| {
+            let fields: Vec<&str> = line.split(',').collect();
+            MappingRow {
+                origin: format!("mapping record {}", index + 2),
+                party: fields[0].to_string(),
+                ledger: fields[1].to_string(),
+                treatment: fields.get(2).map(|field| field.to_string()),
+            }
+        });
+    Mapping::from_rows(rows)
 }
 
 #[test]
@@ -24,21 +40,21 @@ fn mapping_key_survives_non_ascii_scripts() {
 fn mapping_key_keeps_punctuation_significant() {
     for (left, right) in [
         ("A & B", "AB"),
-        ("S.K. Minerals", "SK Minerals"),
-        ("M/s Mercury", "Ms Mercury"),
-        ("Shree-Ram Traders", "Shree Ram Traders"),
+        ("P.Q. Granite", "PQ Granite"),
+        ("M/s Halcyon", "Ms Halcyon"),
+        ("Blue-Fern Traders", "Blue Fern Traders"),
     ] {
         assert_ne!(mapping_key(left), mapping_key(right), "{left} / {right}");
     }
     assert_eq!(
-        mapping_key("MERCURYM ANUFACTURERS"),
-        mapping_key("MERCURYMANUFACTURERS")
+        mapping_key("HALCYONM ANUFACTURERS"),
+        mapping_key("HALCYONMANUFACTURERS")
     );
     assert_eq!(
         mapping_key("ZEPHYR MANUFACTURING"),
         mapping_key("ZEPHYRMANUFACTURING")
     );
-    assert_eq!(mapping_key("m/s mercury"), mapping_key("M/S MERCURY"));
+    assert_eq!(mapping_key("m/s halcyon"), mapping_key("M/S HALCYON"));
     assert_eq!(mapping_key("A&B"), "A&B");
 }
 
@@ -63,10 +79,6 @@ fn mapping_key_ignores_wrap_spacing() {
 
 #[test]
 fn mapping_refuses_ambiguous_input() {
-    refuses(
-        load("name,ledger,treatment\nA,L,auto\n"),
-        "mapping_headers_missing",
-    );
     refuses(
         load("party,ledger,treatment\nZEPHYR MANUFACTURING,Ledger One,auto\nZEPHYRMANUFACTURING,Ledger Two,auto\n"),
         "mapping_key_collision",
@@ -112,15 +124,6 @@ fn mapping_refuses_ambiguous_input() {
             .unwrap()
             .get("---"),
         Some(&("L".to_string(), Treatment::Auto))
-    );
-    refuses(
-        load("party,Party,ledger,treatment\nA,,L,auto\n"),
-        "mapping_headers_duplicated",
-    );
-    let padded = load(" Party , Ledger , Treatment \nAcme,Acme Ledger,auto\n").unwrap();
-    assert_eq!(
-        padded.get("ACME"),
-        Some(&("Acme Ledger".to_string(), Treatment::Auto))
     );
     // a blank treatment defaults to auto; a whitespace-only one does not
     assert_eq!(
@@ -207,7 +210,7 @@ fn ledger_key_folds_exactly_what_its_docstring_claims() {
     assert!(same("straße", "STRASSE"));
     assert!(same("A\tB", "A B"));
     assert!(same("A\u{a0}B", "A B"));
-    assert!(!same("ZZ Ram AND Sons", "ZZ Ram & Sons"));
+    assert!(!same("ZZ Fern AND Sons", "ZZ Fern & Sons"));
     assert!(!same("AB", "A & B"));
     assert!(!same("A_B", "A B"));
     assert!(!same("A/B", "A B"));

@@ -69,7 +69,7 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
             "narration":text, "reference":text,
             "voucher_number":{
                 "type":"string", "minLength":1, "maxLength":32,
-                "not":{"pattern":r"[\u0000-\u001F\u007F-\u009F$]"}
+                "not":{"pattern":r"[\u0000-\u001F\u007F-\u009F$]|^\s|\s$"}
             },
             "entries":{"type":"array", "minItems":2, "items":entry}
         }

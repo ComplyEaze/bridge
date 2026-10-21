@@ -486,8 +486,8 @@ pub struct DepreciationConfig {
     pub opening_wdv_paise: BTreeMap<String, i64>,
     pub dep_expense_ledgers: BTreeSet<String>,
     /// `[depreciation.put_to_use_by_voucher]`, guid -> date; optional, empty when absent (no
-    /// client TOML configures this key today -- the reference engine's own `pack.py` never
-    /// passes it either -- but `depreciation.py`'s `run()` signature carries it, so this port
+    /// client TOML configures this key today -- the reference engine's own pack never
+    /// passes it either -- but the depreciation test's `run()` signature carries it, so this port
     /// does too).
     pub put_to_use_by_voucher: BTreeMap<String, TallyDate>,
 }

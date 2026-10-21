@@ -136,7 +136,7 @@ pub fn s194n_terms(raw: Option<&toml::Value>) -> Result<BTreeSet<String>> {
         .collect()
 }
 
-/// Each ledger's counterparty type, as pack.py builds it: every configured loan ledger's
+/// Each ledger's counterparty type, as the reference's pack builds it: every configured loan ledger's
 /// `lender_type` first, then `[roles].counterparty_type_by_ledger` (keys already bound) over it.
 ///
 /// Divergence, deliberate, and not parity: the reference keeps a non-string type as written, where
@@ -160,7 +160,7 @@ pub fn counterparty_types(
     Ok(out)
 }
 
-/// The recipient type pack.py derives from the engagement's own entity type.
+/// The recipient type the reference's pack derives from the engagement's own entity type.
 pub fn s194n_recipient_type(entity_type: Option<&str>) -> Option<Recipient> {
     match entity_type {
         Some("individual" | "huf" | "firm" | "llp" | "company") => Some(Recipient::NotCoOperative),
@@ -485,7 +485,7 @@ fn party_ref(ledger: &str, row: &Row<'_>) -> EvidenceRef {
     }
 }
 
-/// The caller's inputs, as `tae/pack.py` passes them.
+/// The caller's inputs, as the reference's pack passes them.
 pub struct Inputs<'c> {
     pub cash: &'c BTreeSet<String>,
     pub bank: &'c BTreeSet<String>,

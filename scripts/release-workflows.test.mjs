@@ -523,6 +523,7 @@ test("the release header tells a person how to install and check a download, and
   assert.match(header, /shasum -a 256 <file>/);
   assert.match(header, /64-character code it prints must match the code at the start of the `\.sha256` file/);
   assert.match(header, /docs\/agent\/INSTALL\.md/);
+  assert.equal(header.match(/type `cd Downloads` and then run/g)?.length, 2, "both commands follow a change to the Downloads folder");
   // the header names every platform the publish workflow packages
   const platforms = /for platform in ((?:[a-z0-9-]+ ?)+); do/.exec(await readFile(new URL("../.github/workflows/release-mcpb-preview.yml", import.meta.url), "utf8"));
   assert.ok(platforms, "the workflow has no platform loop to compare");

@@ -820,6 +820,8 @@ disagree.
    On the release page the install-and-check header
    (`packaging/mcpb/INSTALL_AND_CHECK_RELEASE.md`) comes first, then the written
    parts, then the standard release-notes footer, then this generated list.
+   If the notes cannot be composed at all, the release carries the footer and
+   the generated list without the header.
 
 **`CHANGELOG.md`**
 

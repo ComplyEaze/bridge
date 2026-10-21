@@ -313,7 +313,7 @@ fn company_sweep_names_a_company_identity_refusal_and_keeps_other_failures() {
         ),
         (
             OutstandingsError::CompanyIdentityMismatch.into(),
-            "company_identity_mismatch",
+            "company_identity_not_matched",
         ),
     ];
     for (error, expected) in cases {

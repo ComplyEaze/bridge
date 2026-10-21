@@ -640,7 +640,7 @@ fn a_read_refused_for_the_company_identity_names_that_cause_and_the_next_step() 
         ),
         (
             OutstandingsError::CompanyIdentityMismatch.into(),
-            "company_identity_mismatch",
+            "company_identity_not_matched",
             true,
         ),
         // Named, but no next step: nothing measured says what a person should do about it.
@@ -671,6 +671,11 @@ fn a_read_refused_for_the_company_identity_names_that_cause_and_the_next_step() 
             assert!(step.contains("list_companies"), "{cause}: {step}");
         }
     }
+
+    // `company_identity_mismatch` is already the CODE verify_import and post_import answer with
+    // when a saved batch's company no longer matches after Tally confirmed the company. Advice to
+    // "repeat the request" would loop there, so it is not keyed on that code.
+    assert_eq!(refusal_remediation("company_identity_mismatch"), None);
 
     // The invalid-identity outstandings error is a different fault and keeps no identity cause,
     // and so does a parse fault: only the two identity checks are named.

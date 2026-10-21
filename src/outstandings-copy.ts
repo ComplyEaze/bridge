@@ -36,7 +36,7 @@ export function outstandingsPartialReason(
   if (value === "company_base_currency_undetermined") {
     return "Tally defines more than one currency for this company, and ComplyEaze Bridge could not tell from Tally which one is its base currency, so it does not read outstandings for it";
   }
-  if (value === "company_identity_absent_or_ambiguous" || value === "company_identity_mismatch") {
+  if (value === "company_identity_absent_or_ambiguous" || value === "company_identity_not_matched") {
     return "Tally did not confirm this company as one loaded company: it may not be open in Tally, may have been renamed, or may be listed more than once. Open it in Tally and read again";
   }
   if (value === "company_identity_presentation_collision") {

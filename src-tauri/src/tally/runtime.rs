@@ -916,7 +916,7 @@ pub(crate) fn company_identity_cause(
             bridge_tally_protocol::outstandings_shared::OutstandingsError::CompanyIdentityMismatch
         )
     )
-    .then_some("company_identity_mismatch")
+    .then_some("company_identity_not_matched")
 }
 
 /// The first company-identity cause in a refused read's error chain.

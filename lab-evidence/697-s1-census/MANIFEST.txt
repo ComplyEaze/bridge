@@ -1,0 +1,34 @@
+# 697-S1 (the audit read's census) on BRIDGE PILOT LAB, loaded alone, TallyPrime 7.1 Silver, Education No. Windows lab, 21 Oct 2026.
+# Request set: lab/697-s1-census on origin lab/697-s1-census-and-1605-s1 at d6e669573cdb1cdfb321ff37518c03d3e66e40a0; method of 697-S0A
+# (lab/697-s0a-run-sheet at 6cab00687fe3aaa4d3f87f848949a258beb05ca0). Request hashes equal SHA256.txt (checked before sending).
+# Sent with curl.exe one at a time, no time limit; answers byte-exact (with curl -D headers); one line per send in send-log.txt.
+#
+# Step | file | HTTP | bytes | count
+# 1 | r01 | 200 | 4000 | one company, BRIDGE PILOT LAB, GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85, BOOKSFROM 20260401, EDUMODE No
+# 2 | r02 | 200 | 3394 | ALTVCHID (M) 68, ALTMSTID 245
+# 3 | c01 FY 2025-26 | 200 | 3022 | 0 VOUCHER: no voucher in FY 2025-26
+# 4 | c02 FY 2026-27 | 200 | 102580 | 41 VOUCHER, dates 20260801..20260915, every row with GUID and ALTERID, ALTERID 2..68 (all <= M), all dates inside the window
+# 5 | r02 | 200 | 3394 | ALTVCHID 68, ALTMSTID 245; byte-identical to step 2
+# Every answer: STATUS 1, no LINEERROR. PASS (one run, PARTIAL).
+#
+# file | bytes | sha256
+.gitattributes | 8 | 705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da
+answers/1.headers.txt | 134 | 24c5ec3f724e89f460c44b9215b8003f9be39e7704b34fc013dbf72feb6535eb
+answers/1.xml | 4000 | 0cb23618073bc5eeddbc3441fd4f0da9e84c55699cd206b66d1410b304f8d147
+answers/2.headers.txt | 134 | a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0
+answers/2.xml | 3394 | 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+answers/3.headers.txt | 134 | d8476b58186ccb6d4894910d74b76776d7ab0cd2d05a93c789aa5bc7a0957bcf
+answers/3.xml | 3022 | 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+answers/4.headers.txt | 136 | 6cdc0f414b15f285a36859814cd39275730ea6fbe528eeaaabb5582671730a3d
+answers/4.xml | 102580 | 11c0077ba4a02cf6b076e56364b00928f20390db68257a65ffd25efc35e03f55
+answers/5.headers.txt | 134 | a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0
+answers/5.xml | 3394 | 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+requests/c01-census-fy2025-26.xml | 1436 | 267a302e2dfa222708d9e1af497ab6f66a10618f0be73bfeeb1be9750bf6a475
+requests/c02-census-fy2026-27.xml | 1436 | 685b646740a4f7751d44089bd99d248f4334da714d16e946d35d47f485a501ce
+requests/r01-company-extent.xml | 2524 | 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8
+requests/r02-marks.xml | 976 | 81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c
+send-log.txt | 743 | a302889362cd030c234f78586669d066420b8c85d92fbc3430c0f5e881753f57
+SHA256.txt | 351 | 85282a91c0653e4f0b12e3d84cd225e6833be4d842601b441264cce089b11db1
+#
+# Screenshots kept on the lab PC:
+# s01-gateway-pilot-lab-alone.jpg | 43431 | fe3b4d701ccc75506ac5bb6d9078b3049bc7b4266d8ad623c916e6d5ad7f456f

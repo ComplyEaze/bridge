@@ -1,0 +1,39 @@
+# 1605-S1 (integration flag and FY 2025-26 vouchers) on BRIDGE STOCK LAB, loaded alone, TallyPrime 7.1 Silver, Education No. 21 Oct 2026.
+# Request set: lab/1605-s1-integration-flag on the same branch and commit as 697-S1; same method. Request hashes equal SHA256.txt.
+#
+# Step | file | HTTP | bytes | count
+# 1 | r01 | 200 | 4000 | one company, BRIDGE STOCK LAB, GUID 1edb9b05-8d35-4c0c-9959-dce655730463, BOOKSFROM 20250401, EDUMODE No
+# 2 | r02 | 200 | 3392 | ALTVCHID (M) 4, ALTMSTID 292
+# 3 | s03 | 200 | 4208 | one /ENVELOPE/BODY/DATA/TALLYMESSAGE/COMPANY with the step-1 GUID; ISINTEGRATED present, verbatim: <ISINTEGRATED TYPE="Logical">Yes</ISINTEGRATED>
+#     HEADER: VERSION 1, STATUS 1, PRODMAJORVER 1, PRODMINORVER 1, PRODMAJORREL 7, PRODMINORREL 1, PRODTYPE 5.
+#     Screen (F11 Company Features, looked at only, left with Ctrl+Q): "Integrate Accounts with Inventory: Yes" (Maintain Inventory Yes, Enable Batches Yes).
+# 4 | c01 FY 2025-26 | 200 | 12610 | 4 VOUCHER, dates 20250415..20250421
+# 5 | r02 | 200 | 3392 | ALTVCHID 4; byte-identical to step 2
+# extra | r02 (answer 6-after-f11-look) | 200 | 3392 | byte-identical to step 5: the screen look changed nothing
+# Every answer: STATUS 1, no LINEERROR. PASS (one run, PARTIAL).
+#
+# file | bytes | sha256
+.gitattributes | 8 | 705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da
+answers/1.headers.txt | 134 | 24c5ec3f724e89f460c44b9215b8003f9be39e7704b34fc013dbf72feb6535eb
+answers/1.xml | 4000 | b724b342a59981629a22bf6d6d6802863150af802728a293ea603a9060510c11
+answers/2.headers.txt | 134 | e26a7d5cac0adf725060d158a6ee34a4609ebeb828f7b70f340f551879b83809
+answers/2.xml | 3392 | 79fc62dd4b26e6ad0c64199f43c1aa48c32d67630d7fcd4eaf1fafc0fbfd0ba4
+answers/3.headers.txt | 134 | 8549c1e4caba0b68ccda31163574895ddf854654787f121fc48b522e2f170802
+answers/3.xml | 4208 | 88de80b26d8794670c415336df1d5326e4dd7fc8984ba71c9442490bb649c19c
+answers/4.headers.txt | 135 | 1f2c45d28f90da558fd2c1b4fd6fb22514dea839123b121c1051b3fcb35acc4c
+answers/4.xml | 12610 | 30264859fc464c1502b0a11a97d3a707aca84b31f2165bb17a889e9332b64740
+answers/5.headers.txt | 134 | e26a7d5cac0adf725060d158a6ee34a4609ebeb828f7b70f340f551879b83809
+answers/5.xml | 3392 | 79fc62dd4b26e6ad0c64199f43c1aa48c32d67630d7fcd4eaf1fafc0fbfd0ba4
+answers/6-after-f11-look.headers.txt | 134 | e26a7d5cac0adf725060d158a6ee34a4609ebeb828f7b70f340f551879b83809
+answers/6-after-f11-look.xml | 3392 | 79fc62dd4b26e6ad0c64199f43c1aa48c32d67630d7fcd4eaf1fafc0fbfd0ba4
+requests/c01-census-fy2025-26-stock-lab.xml | 1436 | d94838cba09e53d3c57f6d624215eab311455b1b0e131f185ae069543af5b021
+requests/r01-company-extent.xml | 2524 | 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8
+requests/r02-marks-stock-lab.xml | 976 | a98987c65a39652c9a0703af5cb613490473267b7170b0aeb6ca7a36f2c15848
+requests/s03-company-object-stock-lab.xml | 896 | 1e12b72b1493637cfea18427ec41c097f78d6607640e4b28394855d0dad04e30
+send-log.txt | 947 | 0d0a71ed25e83271b4e8437d289dab1d45a0677aedf6350fb01950cd1e7d98ec
+SHA256.txt | 379 | c7069bfad1f2020bfc074e6590b3c5abb00ff145e8389d695f872a794fffa80f
+#
+# Screenshots kept on the lab PC:
+# s01-gateway-stock-lab-alone.jpg | 42893 | b4b13cbfe9cf7867f508925bb00ec2515933af82b5002f552eb0747a34d4e120
+# s02-F11-company-features-integrate-yes.jpg | 124218 | 353fb2230ac98abfb021367d3e8b97ce9984ec27af8590e9bcd6e5bbaaaedacd
+# s03-after-ctrlq-gateway.jpg | 43438 | b9ae2868f40ad2d324eee7057d153b0a3be57f766d0512d475ac7652fcd302a1

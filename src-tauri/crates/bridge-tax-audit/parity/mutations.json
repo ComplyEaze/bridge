@@ -14396,8 +14396,8 @@
   "by": "author",
   "what": "a wording patch leaves the old hash",
   "file": "src/divergence.rs",
-  "from": "            if let Some(hash) = parsed.hash_key() {\n",
-  "to": "            if let Some(hash) = None::<Key> {\n"
+  "from": "            if let Some(hash) = parsed.hash_key() {\n                let derived =\n",
+  "to": "            if let Some(hash) = None::<Key> {\n                let derived =\n"
  },
  {
   "id": "DV-16",
@@ -14430,5 +14430,21 @@
   "file": "src/divergence.rs",
   "from": "            .any(|line| line.starts_with(&format!(\"{id}: \")))\n",
   "to": "            .any(|_| true)\n"
+ },
+ {
+  "id": "DV-20",
+  "by": "author",
+  "what": "an added entry may carry a hash of its own",
+  "file": "src/divergence.rs",
+  "from": "                if let Some(hash) = entry.keys().find(|k| k.ends_with(\"_sha256_16\")) {\n",
+  "to": "                if let Some(hash) = None::<&String> {\n"
+ },
+ {
+  "id": "DV-21",
+  "by": "author",
+  "what": "two records may declare one real-book key",
+  "file": "src/divergence.rs",
+  "from": "                    if !real_keys.insert((text_of(\"test\")?, k.to_string())) {\n",
+  "to": "                    if false {\n"
  }
 ]

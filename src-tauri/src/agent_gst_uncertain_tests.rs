@@ -3,7 +3,11 @@
 //! The answers are the lab's, read on 13 Oct 2026 from the synthetic company `BRIDGE PILOT LAB`
 //! (TallyPrime 7.1 Silver) and committed byte for byte under `agent/gst-status/` (see its
 //! PROVENANCE.md): the company's marks, the narrow status read that counts the window, the wide
-//! read before one Accept As Is and the wide read after it; the company list the call reads first
+//! read before one Accept As Is and the wide read after it, and the marks after it. The lab made
+//! them in this order: marks, count, wide before, the accept, wide after, marks (PROVENANCE.md has
+//! the log). A call on the before answer is served the first marks; a call on the after answer is
+//! served the marks after the accept, with the count read made before it, because none was made
+//! after (nothing in the tool compares a mark with a voucher, or takes a status from the count); the company list the call reads first
 //! is the lab's answer of 9 Oct 2026 (`pilot-lab/`). The health checks after each read are the
 //! simulator's own page, not a capture. The expected rows below were taken from those
 //! bytes with a separate script (an XML tree, one direct child at a time), not from the code
@@ -26,6 +30,9 @@ const AFTER: &[u8] = include_bytes!(
 const MARKS: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-marks.utf16le.xml"
 );
+const MARKS_AFTER: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-marks-after.utf16le.xml"
+);
 const COUNT: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-count.utf16le.xml"
 );
@@ -39,6 +46,7 @@ const NARROW_REQUEST: &[u8] = include_bytes!(
 const BEFORE_SHA256: &str = "015ddda734957af2a50e0e6222c19ce9df5e1fa1607ac3567a573153362afc2a";
 const AFTER_SHA256: &str = "e73610f1e946673240dbe3c86b531addf84db6b4092199bd7cac54b620513dce";
 const MARKS_SHA256: &str = "8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6";
+const MARKS_AFTER_SHA256: &str = "4464435c71e3e9e4d358317ad730f1bd536df3f85b5a3b85a68074059d69e5d5";
 /// The lab's marks request (`r02-marks.xml`): the read the call's gate sends, as the lab was sent it.
 const MARKS_REQUEST_SHA256: &str =
     "81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c";
@@ -53,10 +61,9 @@ const LAB_TYPE: &str = "BRIDGE Sales";
 const LAB_PARTY: &str = "BRIDGE Walk-in";
 
 /// The pre-filing line for five vouchers of the type `BRIDGE Sales` dated the whole of August 2026:
-/// the wording that says only what the capture shows (the screen lists them as Uncertain, apart from
-/// the included ones), the product's full name, and the voucher type named in place of "Sales" (the
-/// type's class is not read).
-const LINE_FOR_FIVE: &str = "Tally's GSTR-1 screen lists 5 vouchers of the type BRIDGE Sales dated 2026-08-01 to 2026-08-31 as Uncertain, apart from the ones it shows as included. Amounts are from ComplyEaze Bridge's voucher read; Tally's JSON export and the portal are not checked. Resolve each in Tally before exporting; do not add them on the portal by hand.";
+/// the wording that says what is read (the type's uncertain flags), the product's full name, and the
+/// voucher type named in place of "Sales" (the type's class is not read).
+const LINE_FOR_FIVE: &str = "Tally marks 5 vouchers of the type BRIDGE Sales dated 2026-08-01 to 2026-08-31 as Uncertain on its GSTR-1 status flags. Amounts are from ComplyEaze Bridge's voucher read; Tally's JSON export and the portal are not checked. Resolve each in Tally before exporting; do not add them on the portal by hand.";
 
 fn decode_utf16(bytes: &[u8]) -> String {
     assert_eq!(bytes.len() % 2, 0, "whole UTF-16 code units");
@@ -174,6 +181,7 @@ fn the_committed_files_are_the_lab_bytes() {
         (BEFORE, 242_632, BEFORE_SHA256),
         (AFTER, 242_636, AFTER_SHA256),
         (MARKS, 3_394, MARKS_SHA256),
+        (MARKS_AFTER, 3_396, MARKS_AFTER_SHA256),
         (COUNT, 108_442, COUNT_SHA256),
         (WIDE_REQUEST, 1_892, WIDE_REQUEST_SHA256),
         (NARROW_REQUEST, 1_846, NARROW_REQUEST_SHA256),
@@ -181,7 +189,7 @@ fn the_committed_files_are_the_lab_bytes() {
         assert_eq!(bytes.len(), length);
         assert_eq!(sha256_hex(bytes), sha256);
     }
-    for answer in [BEFORE, AFTER, COUNT, MARKS] {
+    for answer in [BEFORE, AFTER, COUNT, MARKS, MARKS_AFTER] {
         assert_eq!(
             &answer[..2],
             b"<\0",
@@ -596,9 +604,20 @@ fn plans_to_the_count(marks: String, count: String) -> Vec<ScenarioPlan> {
 
 /// A whole call: those sixteen, then the wide read inside its bracket: twenty-two requests.
 fn plans_with(count: String, wide: String) -> Vec<ScenarioPlan> {
-    let mut plans = plans_to_the_count(marks(), count);
+    plans_with_marks(marks(), count, wide)
+}
+
+fn plans_with_marks(marks: String, count: String, wide: String) -> Vec<ScenarioPlan> {
+    let mut plans = plans_to_the_count(marks, count);
     bracketed(&mut plans, &plan(wide));
     plans
+}
+
+/// The marks the lab read after the accept (voucher mark 69).
+fn marks_after() -> String {
+    let text = decode_utf16(MARKS_AFTER);
+    assert_eq!(text.matches(GUID).count(), 1);
+    text
 }
 
 fn count() -> String {
@@ -608,7 +627,15 @@ fn count() -> String {
 /// The count answer, made to hold `vouchers` vouchers: its first voucher repeated under a
 /// master id of its own each time (a derived control; the lab did not read such a window).
 fn count_of(vouchers: usize) -> String {
-    let xml = count();
+    repeated(count(), vouchers)
+}
+
+/// The wide answer made to hold `vouchers` vouchers in the same way (derived).
+fn wide_of(vouchers: usize) -> String {
+    repeated(before(), vouchers)
+}
+
+fn repeated(xml: String, vouchers: usize) -> String {
     let start = xml.find("<VOUCHER REMOTEID=").expect("a voucher");
     let end = xml.rfind("</VOUCHER>").unwrap() + "</VOUCHER>".len();
     let first_end = start + xml[start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
@@ -697,6 +724,21 @@ async fn run(plans: Vec<ScenarioPlan>, args: Value) -> Call {
 /// A whole call on the lab's reads of `wide`.
 async fn call_on(wide: String) -> Call {
     let call = run(plans_with(count(), wide), lab_arguments()).await;
+    assert_eq!(
+        call.observed.len(),
+        call.expected,
+        "every planned request was served"
+    );
+    call
+}
+
+/// A whole call on the lab's reads after the accept: the marks it read after it and `wide`.
+async fn call_on_after(wide: String) -> Call {
+    let call = run(
+        plans_with_marks(marks_after(), count(), wide),
+        lab_arguments(),
+    )
+    .await;
     assert_eq!(
         call.observed.len(),
         call.expected,
@@ -885,6 +927,14 @@ async fn the_tool_sends_the_count_read_and_then_the_wide_read_the_lab_sent() {
     );
     assert_eq!(call.observed[5].request_body_sha256, MARKS_REQUEST_SHA256);
     assert_eq!(call.observed[7].request_body_sha256, MARKS_REQUEST_SHA256);
+    // Every company-list send, the two plain ones and the six that open and close the three
+    // brackets, is the request the lab was sent for its company list.
+    for at in [0, 2, 4, 9, 10, 15, 16, 21] {
+        assert_eq!(
+            call.observed[at].request_body_sha256, COMPANY_LIST_REQUEST_SHA256,
+            "{at}"
+        );
+    }
     assert_eq!(call.observed[11].request_body_sha256, NARROW_REQUEST_SHA256);
     assert_eq!(call.observed[13].request_body_sha256, NARROW_REQUEST_SHA256);
     assert_eq!(call.observed[17].request_body_sha256, WIDE_REQUEST_SHA256);
@@ -952,7 +1002,7 @@ async fn the_tool_sends_the_count_read_and_then_the_wide_read_the_lab_sent() {
 #[tokio::test]
 async fn after_the_accept_the_third_voucher_is_overridden_and_included_with_the_same_amount() {
     let earlier = call_on(before()).await;
-    let later = call_on(after()).await;
+    let later = call_on_after(after()).await;
     let result = payload(&later.response);
     assert_eq!(result["state"], "complete");
     assert_eq!(result["counts"]["uncertain"], 4);
@@ -962,7 +1012,7 @@ async fn after_the_accept_the_third_voucher_is_overridden_and_included_with_the_
     assert!(result["pre_filing_line"]
         .as_str()
         .unwrap()
-        .starts_with("Tally's GSTR-1 screen lists 4 vouchers of the type BRIDGE Sales dated 2026-08-01 to 2026-08-31 as Uncertain"));
+        .starts_with("Tally marks 4 vouchers of the type BRIDGE Sales dated 2026-08-01 to 2026-08-31 as Uncertain"));
     // Nothing but that voucher changed lists: the vouchers the earlier run listed, but the
     // third, are listed as they were.
     let find = |response: &Value, list: &str, number: &str| {
@@ -1013,7 +1063,7 @@ fn confirmed(earlier: &Value, later: &Value) -> Vec<String> {
 #[tokio::test]
 async fn two_runs_hold_what_a_confirmation_compares_and_confirm_only_the_accepted_voucher() {
     let earlier = call_on(before()).await;
-    let later = call_on(after()).await;
+    let later = call_on_after(after()).await;
     assert_eq!(confirmed(&earlier.response, &later.response), [TARGET]);
     // Run again with nothing accepted: nothing is confirmed.
     let same = call_on(before()).await;
@@ -1023,7 +1073,7 @@ async fn two_runs_hold_what_a_confirmation_compares_and_confirm_only_the_accepte
     let changed = edit(&after(), TARGET, |block| {
         block.replace("-1051.04", "-1051.03")
     });
-    let edited = call_on(changed).await;
+    let edited = call_on_after(changed).await;
     assert!(confirmed(&earlier.response, &edited.response).is_empty());
     // A voucher accepted under another master id is not confirmed.
     let other = edit(&after(), TARGET, |block| {
@@ -1033,7 +1083,7 @@ async fn two_runs_hold_what_a_confirmation_compares_and_confirm_only_the_accepte
             r#"<MASTERID TYPE="Number"> 99</MASTERID>"#,
         )
     });
-    let other_master = call_on(other).await;
+    let other_master = call_on_after(other).await;
     assert!(confirmed(&earlier.response, &other_master.response).is_empty());
 }
 
@@ -1163,13 +1213,13 @@ async fn the_line_names_the_voucher_type_and_one_uncertain_voucher_is_enough_to_
     assert_eq!(result["counts"]["uncertain"], 1);
     assert_eq!(
         result["pre_filing_line"],
-        LINE_FOR_FIVE.replace("lists 5 vouchers", "lists 1 vouchers")
+        LINE_FOR_FIVE.replace("marks 5 vouchers", "marks 1 voucher")
     );
     // The line names the type read and never says the type is a Sales type.
     assert!(result["pre_filing_line"]
         .as_str()
         .unwrap()
-        .contains(&format!("vouchers of the type {LAB_TYPE} dated")));
+        .contains(&format!("voucher of the type {LAB_TYPE} dated")));
 }
 
 #[tokio::test]
@@ -1190,7 +1240,7 @@ async fn a_post_dated_voucher_is_decided_before_its_flags_and_is_not_counted_unc
     assert!(result["pre_filing_line"]
         .as_str()
         .unwrap()
-        .starts_with("Tally's GSTR-1 screen lists 4 vouchers of the type BRIDGE Sales"));
+        .starts_with("Tally marks 4 vouchers of the type BRIDGE Sales"));
     assert!(listing(items(&call.response))
         .iter()
         .all(|(_, number)| number != "BP/26-27/0002"));
@@ -1225,7 +1275,7 @@ async fn an_accepted_voucher_that_reads_uncertain_or_excluded_now_is_listed_with
             )
         })
     };
-    let call = call_on(flags("No", "Yes", "No")).await;
+    let call = call_on_after(flags("No", "Yes", "No")).await;
     let result = payload(&call.response);
     assert_eq!(result["counts"]["uncertain"], 5);
     assert_eq!(result["counts"]["accepted_as_it_stands"], 6);
@@ -1240,7 +1290,7 @@ async fn an_accepted_voucher_that_reads_uncertain_or_excluded_now_is_listed_with
     for item in &third {
         assert_eq!(item["gst_status"], "uncertain");
     }
-    let call = call_on(flags("No", "No", "Yes")).await;
+    let call = call_on_after(flags("No", "No", "Yes")).await;
     let result = payload(&call.response);
     assert_eq!(result["counts"]["uncertain"], 4);
     assert_eq!(result["counts"]["excluded"], 1);
@@ -1396,13 +1446,46 @@ async fn an_unread_status_makes_the_result_partial_and_a_voucher_not_listed_does
     assert_eq!(payload(&call.response)["state"], "partial");
 }
 
+#[tokio::test]
+async fn a_listed_voucher_whose_flags_and_party_are_both_unread_is_counted_once() {
+    // BP/26-27/0005 reads accepted as it stands (so it is listed), with its included flag spoiled
+    // and its party removed (derived): its flags are unread, which counts it, and its party is
+    // unread as well, which must not count it again.
+    let changed = edit(&before(), "BP/26-27/0005", |block| {
+        let block = replace_direct(
+            &block,
+            r#"<VCHGSTSTATUSISINCLUDED TYPE="Logical">Yes</VCHGSTSTATUSISINCLUDED>"#,
+            r#"<VCHGSTSTATUSISINCLUDED TYPE="Logical">Maybe</VCHGSTSTATUSISINCLUDED>"#,
+        );
+        replace_direct(&block, PARTY_LINE, "")
+    });
+    let call = call_on(changed).await;
+    let result = payload(&call.response);
+    assert_eq!(result["state"], "partial");
+    assert_eq!(result["counts"]["unread"], 1);
+    assert_eq!(
+        result["pre_filing_line"],
+        json!({"withheld": "gst_uncertain_voucher_unread"})
+    );
+}
+
+#[tokio::test]
+async fn the_result_carries_no_offset_so_the_byte_cap_cannot_trim_it_with_a_cursor() {
+    let call = call_on(before()).await;
+    let result = payload(&call.response);
+    for key in ["offset", "next_offset", "limit"] {
+        assert!(result.get(key).is_none(), "{key}");
+    }
+    assert!(result["items"].is_array());
+}
+
 const DIRECT_AMOUNT_1050: &str = r#"<AMOUNT TYPE="Amount">-1050.00</AMOUNT>"#;
 
 #[tokio::test]
 async fn a_window_of_a_thousand_vouchers_is_read_and_a_thousand_and_one_is_refused_before_the_wide_read(
 ) {
     // 1,000: both reads are made.
-    let call = run(plans_with(count_of(1_000), before()), lab_arguments()).await;
+    let call = run(plans_with(count_of(1_000), wide_of(1_000)), lab_arguments()).await;
     assert_eq!(call.observed.len(), 22);
     assert_eq!(payload(&call.response)["state"], "complete");
     assert_eq!(
@@ -1465,12 +1548,63 @@ async fn a_read_that_fails_is_a_refusal_and_never_a_window_with_no_vouchers() {
         .observed
         .iter()
         .all(|request| request.request_body_sha256 != WIDE_REQUEST_SHA256));
-    // An answer with a collection and no voucher is a window with none, said as such.
-    let start = before().find("<VOUCHER REMOTEID=").unwrap();
-    let wide = before();
-    let end = wide.rfind("</VOUCHER>").unwrap() + "</VOUCHER>".len();
-    let empty = format!("{}{}", &wide[..start], &wide[end..]);
-    let call = call_on(empty).await;
+}
+
+/// `xml` with its vouchers from the `keep`th on removed (derived: the lab's answers always held
+/// all of the window's vouchers).
+fn keeping(xml: &str, keep: usize) -> String {
+    let opens: Vec<usize> = xml
+        .match_indices("<VOUCHER REMOTEID=")
+        .map(|(at, _)| at)
+        .collect();
+    assert!(keep <= opens.len());
+    let end = xml.rfind("</VOUCHER>").unwrap() + "</VOUCHER>".len();
+    let cut = if keep < opens.len() { opens[keep] } else { end };
+    format!("{}{}", &xml[..cut], &xml[end..])
+}
+
+#[tokio::test]
+async fn a_wide_read_with_fewer_vouchers_than_the_count_read_found_is_refused_not_an_empty_window()
+{
+    // The count read found 32 vouchers: a wide read of none (the collection and no voucher), or of
+    // fewer than 32, contradicts it and is refused with both numbers, never reported as a window
+    // with none (derived: the lab's two reads always agreed).
+    for kept in [0, 1, 31] {
+        let call = call_on(keeping(&before(), kept)).await;
+        assert_eq!(
+            refusal_code(&call.response),
+            "gst_uncertain_wide_read_short",
+            "{kept}"
+        );
+        assert_eq!(
+            call.response["structuredContent"]["result"]["error"]["counts"],
+            json!({"returned": kept, "counted": 32}),
+            "{kept}"
+        );
+        let result = &call.response["structuredContent"]["result"];
+        assert!(result.get("items").is_none() && result.get("total").is_none());
+        assert_eq!(receipt(&call.response)["state"], "partial");
+        assert_eq!(
+            receipt(&call.response)["reason_code"],
+            "gst_uncertain_wide_read_short"
+        );
+    }
+    // All 32 are read: no refusal.
+    assert_eq!(keeping(&before(), 32), before());
+    let call = call_on(keeping(&before(), 32)).await;
+    assert_eq!(payload(&call.response)["total"], 32);
+}
+
+#[tokio::test]
+async fn a_window_the_count_read_found_empty_is_complete_with_the_line_withheld() {
+    // The count read and the wide read both hold no voucher (derived by removing the vouchers from
+    // the lab's answers): a window with none, said as such, which a mistyped type name also gives.
+    let call = run(
+        plans_with(keeping(&count(), 0), keeping(&before(), 0)),
+        lab_arguments(),
+    )
+    .await;
+    assert_eq!(call.observed.len(), call.expected);
     let result = payload(&call.response);
     assert_eq!(result["total"], 0);
     assert_eq!(result["state"], "complete");
@@ -1673,7 +1807,9 @@ async fn the_limitations_say_what_was_not_read_and_what_was_not_measured() {
         "item invoices, a registered buyer, credit notes or other Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once, Gold and other releases",
         "the pre-filing line is withheld",
         "not that the voucher is correct or complete",
-        "whose origin is not recorded",
+        "the origin of the other three is not recorded",
+        "gst_uncertain_wide_read_short",
+        "agent_response_too_large",
         "listed under overridden",
         "above 1,000 vouchers",
         "provisional",

@@ -748,7 +748,7 @@ amount, and lists two things in one `items` list, each item carrying a `list`: `
 Yes once cancelled, optional and post-dated are decided first) and `overridden` (the acceptance flag, Accept As Is,
 reads Yes, with the `gst_status` the voucher reads now; a voucher that reads uncertain or excluded after it was
 accepted is the row to look at, and one voucher can be on both lists; that nothing but Accept As Is sets the flag to
-Yes is not measured, and the before-capture already held five vouchers with the flag Yes whose origin is not recorded). An item holds `voucher_number`, `date`,
+Yes is not measured, and the before-capture already held five vouchers with the flag Yes, an Accept As Is on Tally's screen is recorded for two of them, `BP/26-27/0005` and `BP/26-27/0016`, and the origin of the other three is not recorded). An item holds `voucher_number`, `date`,
 `party` (the party ledger), `amount` (the invoice total as Tally wrote it, without its sign, an exact decimal) with
 `party_side` (`debit` for a negative amount, `credit` for a positive one), `alter_id`, `master_id` and `gst_status`.
 A party or an amount that is empty, absent, repeated, zero or not a plain decimal (a foreign-currency amount) is
@@ -768,7 +768,7 @@ Two reads are made. The first is `gst_status`'s own read, which counts the windo
 1,000 is refused with `gst_uncertain_window_too_large` (the count is in the refusal's `counts`), before the second
 read, which asks for the party and the amount and so makes Tally send each voucher's ledger entries as well
 (about 7.5 KB a voucher on the lab's book). That bound is provisional. Every status is read from the second read
-alone. A count of rows above this server's row limit is refused (`gst_uncertain_rows_over_limit`). The party is
+alone. A second read that returns fewer vouchers than the first counted is refused (`gst_uncertain_wide_read_short`, with both numbers in `counts`), never reported as a smaller window. A count of rows above this server's row limit is refused (`gst_uncertain_rows_over_limit`). The answer is not paged, so one over this server's response byte cap is refused whole (`agent_response_too_large`, no counts): ask for a shorter window. The party is
 the party ledger (a cash sale shows the cash ledger); no GSTIN is fetched. The amount is the invoice total on the
 party's entry, tax and round-off included, not the taxable value of the GSTR-1 tables. `mask_parties` masks the
 party names of this tool's answer and not its amounts, and the answer carries both to the assistant, which

@@ -7,6 +7,11 @@ use crate::gst_details::{GstDetailsDefect, GstDetailsEntry, GstRate};
 use crate::hsn_details::{HsnDetailsDefect, HsnDetailsEntry};
 
 const COMPANY: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+
+/// Another company's identifier: the first group of the captured one changed.
+fn foreign_company() -> String {
+    COMPANY.replacen("3a6bd6e1", "ffffffff", 1)
+}
 const KIND: NativeMasterKind = NativeMasterKind::StockItems;
 /// The item the last capture holds with two dated entries in each list.
 const ITEM: &str = "HSN Two Dates Test Item";
@@ -804,19 +809,15 @@ fn a_row_is_bound_to_the_company_by_its_guid_and_its_computed_company_guid() {
     );
     // Another company's.
     assert_eq!(
-        parse(&edited(
-            &text,
-            COMPANY,
-            "ffffffff-b835-4bff-89dd-8a6af138c346"
-        )),
+        parse(&edited(&text, COMPANY, &foreign_company())),
         // The first occurrence is the row's GUID prefix.
         Err(NativeMastersError::RowGuidForeign)
     );
     assert_eq!(
-        parse_native_masters(KIND, &text, "ffffffff-b835-4bff-89dd-8a6af138c346"),
+        parse_native_masters(KIND, &text, &foreign_company()),
         Err(NativeMastersError::RowGuidForeign)
     );
-    let foreign_bound = bound.replace(COMPANY, "ffffffff-b835-4bff-89dd-8a6af138c346");
+    let foreign_bound = bound.replace(COMPANY, &foreign_company());
     assert_eq!(
         parse(&edited(&text, &bound, &foreign_bound)),
         Err(NativeMastersError::RowCompanyMismatch)

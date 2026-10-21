@@ -1587,8 +1587,11 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
     assert_eq!(rows.iter().filter(|row| row.may_key_by_hand).count(), 0);
 }
 
-/// The README and the tool description of `post_ledger_creates` say the same
-/// corrected things, and not the sentences they replaced.
+/// The README carries the corrected sentences about `post_ledger_creates`,
+/// and neither it nor the tool's short description carries the sentences they
+/// replaced. The description names its states and points to the guide, which
+/// holds every state and field: the tool list goes to every client on every
+/// session, so the full text lives in the guide.
 #[test]
 fn the_readme_and_the_tool_description_carry_the_corrected_sentences() {
     let flat = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -1615,10 +1618,22 @@ fn the_readme_and_the_tool_description_carry_the_corrected_sentences() {
             readme.contains(sentence) || readme.contains(&readme_sentence),
             "README: {sentence}"
         );
-        assert!(
-            description.contains(sentence) || description.contains(&readme_sentence),
-            "description: {sentence}"
-        );
+    }
+    for named in [
+        "posted_verified",
+        "posted_into_existing_master",
+        "master_write_located_elsewhere",
+        "confirmed_absent",
+        "masters_after_post_unconfirmed",
+        "posted_unverified",
+        "reconciliation_required",
+        "master_ledger_open_dispatch_overlaps",
+        "never retry",
+        "never create the ledger in Tally by hand",
+        "never rebuild or resend a sent batch",
+        "docs/agent/README.md",
+    ] {
+        assert!(description.contains(named), "description: {named}");
     }
     for replaced in [
         "is settled by loading the same companies and calling again",
@@ -1631,9 +1646,10 @@ fn the_readme_and_the_tool_description_carry_the_corrected_sentences() {
     }
 }
 
-/// The guide and the tool description say only what the read-back checks and
-/// where each answer comes from. Code names are compared with their backticks
-/// removed, since the guide marks them and the description does not.
+/// The guide says only what the read-back checks and where each answer comes
+/// from, and the tool's short description agrees with it where it speaks. Code
+/// names are compared with their backticks removed, since the guide marks them
+/// and the description does not.
 #[test]
 fn the_guide_and_the_tool_description_say_only_what_the_read_back_checks() {
     let flat = |text: &str| {
@@ -1670,7 +1686,6 @@ fn the_guide_and_the_tool_description_say_only_what_the_read_back_checks() {
         "When the journal could not be read for that answer, it says it is not known whether a send was recorded: call post_ledger_creates with the same batch_id again, which reads the book back and sends nothing if a send is on file, otherwise asks for approval again before anything is sent, and is refused as master_batch_not_found, sending nothing, if ComplyEaze Bridge holds no such batch",
     ] {
         assert!(guide.contains(sentence), "guide: {sentence}");
-        assert!(description.contains(sentence), "description: {sentence}");
     }
     assert!(guide.contains("no other loaded company's master mark moved"));
     assert!(description.contains("no other loaded company's did"));

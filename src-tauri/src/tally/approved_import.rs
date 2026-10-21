@@ -1241,6 +1241,22 @@ pub(crate) mod test_seam {
             super::review_title(count(50)),
             "ComplyEaze Bridge — record that you reviewed 50 vouchers"
         );
+        // The first line of each window says what its buttons do (#1780).
+        assert_eq!(
+            super::post_answer_line(ONE),
+            "Click \"Post voucher\" to post this voucher into Tally. Click Cancel to cancel. \
+             Nothing is posted until you answer."
+        );
+        assert_eq!(
+            super::post_answer_line(count(200)),
+            "Click \"Post 200 vouchers\" to post these 200 vouchers into Tally. Click Cancel to \
+             cancel. Nothing is posted until you answer."
+        );
+        assert_eq!(
+            super::review_answer_line(count(50)),
+            "Click \"I reviewed it\" to record that you reviewed these 50 vouchers. Click Cancel \
+             to cancel. Nothing is recorded until you answer."
+        );
     }
 
     /// The same for the Windows titles, which carry the question.
@@ -1262,6 +1278,22 @@ pub(crate) mod test_seam {
         assert_eq!(
             super::review_question(count(50)),
             "ComplyEaze Bridge — record that you reviewed these 50 vouchers?"
+        );
+        // The first line of each window says what Y and N do (#1780).
+        assert_eq!(
+            super::post_answer_line(ONE),
+            "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to \
+             cancel. Nothing is posted until you answer."
+        );
+        assert_eq!(
+            super::post_answer_line(count(200)),
+            "Press Y (or click Yes) to post these 200 vouchers into Tally. Press N (or click No) \
+             to cancel. Nothing is posted until you answer."
+        );
+        assert_eq!(
+            super::review_answer_line(count(50)),
+            "Press Y (or click Yes) to record that you reviewed these 50 vouchers. Press N (or \
+             click No) to cancel. Nothing is recorded until you answer."
         );
     }
 
@@ -1532,13 +1564,33 @@ fn review_title(count: VoucherCount) -> String {
     }
 }
 
+/// What a dialog is about, as the titles word it: one voucher, or a batch by
+/// its count (#746).
+fn these_vouchers(count: VoucherCount) -> String {
+    match count.batch() {
+        None => "this voucher".into(),
+        Some(count) => format!("these {count} vouchers"),
+    }
+}
+
+/// The first line of the acknowledgement dialog: what each answer does, in
+/// the words of its buttons, before anything else (#1780).
+#[cfg(not(windows))]
+fn review_answer_line(count: VoucherCount) -> String {
+    format!(
+        "Click \"{REVIEW_BUTTON}\" to record that you reviewed {}. Click Cancel to cancel. \
+         Nothing is recorded until you answer.",
+        these_vouchers(count)
+    )
+}
+
 /// The acknowledgement dialog. It posts nothing, so neither its title nor its
 /// button may read as approving a post.
 #[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     rfd::MessageDialog::new()
         .set_title(review_title(count))
-        .set_description(preview)
+        .set_description(format!("{}\n\n{preview}", review_answer_line(count)))
         .set_level(rfd::MessageLevel::Warning)
         .set_buttons(rfd::MessageButtons::OkCancelCustom(
             "Cancel".into(),
@@ -1546,6 +1598,17 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         ))
         .show()
         == rfd::MessageDialogResult::Custom(REVIEW_BUTTON.into())
+}
+
+/// The first line of the Windows acknowledgement dialog: Y and N answer a
+/// message box that has the keyboard, so it says so (#1780).
+#[cfg(windows)]
+fn review_answer_line(count: VoucherCount) -> String {
+    format!(
+        "Press Y (or click Yes) to record that you reviewed {}. Press N (or click No) to \
+         cancel. Nothing is recorded until you answer.",
+        these_vouchers(count)
+    )
 }
 
 /// The Windows acknowledgement dialog's title. Its Yes/No/Cancel box has no
@@ -1567,7 +1630,10 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
         MB_YESNOCANCEL,
     };
-    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let text: Vec<u16> = format!("{}\n\n{preview}", review_answer_line(count))
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
     let title: Vec<u16> = review_question(count)
         .encode_utf16()
         .chain(Some(0))
@@ -1581,8 +1647,10 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
             title.as_ptr(),
             // Topmost: a window the connector opens while Tally fills the
             // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). It changes only
-            // the drawing order; No stays the default button.
+            // process may not take the foreground (#1589). With
+            // MB_SETFOREGROUND the box also takes the foreground, so a key
+            // typed for Tally answers it; the first line of its text says
+            // what Y and N do (#1780). No stays the default button.
             MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }
@@ -1605,12 +1673,24 @@ fn post_words(count: VoucherCount) -> (String, String) {
     }
 }
 
+/// The first line of the post dialog: what each answer does, in the words of
+/// its buttons, before anything else (#1780).
+#[cfg(not(windows))]
+fn post_answer_line(count: VoucherCount) -> String {
+    format!(
+        "Click \"{}\" to post {} into Tally. Click Cancel to cancel. Nothing is posted until \
+         you answer.",
+        post_words(count).1,
+        these_vouchers(count)
+    )
+}
+
 #[cfg(not(windows))]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
     let (title, button) = post_words(count);
     rfd::MessageDialog::new()
         .set_title(title)
-        .set_description(preview)
+        .set_description(format!("{}\n\n{preview}", post_answer_line(count)))
         .set_level(rfd::MessageLevel::Warning)
         // The Cancel label supplies the native Escape action. Posting requires
         // the explicitly matched positive button; Return may leave this dialog open.
@@ -1620,6 +1700,17 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
         ))
         .show()
         == rfd::MessageDialogResult::Custom(button)
+}
+
+/// The first line of the Windows post dialog: Y and N answer a message box
+/// that has the keyboard, so it says so (#1780).
+#[cfg(windows)]
+fn post_answer_line(count: VoucherCount) -> String {
+    format!(
+        "Press Y (or click Yes) to post {} into Tally. Press N (or click No) to cancel. \
+         Nothing is posted until you answer.",
+        these_vouchers(count)
+    )
 }
 
 /// The Windows post dialog's title. Its Yes/No/Cancel box has no custom
@@ -1640,7 +1731,10 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     };
     // rfd without common-controls-v6 discards custom labels. Use the existing
     // Win32 dependency so No is the default and Escape/close remain Cancel.
-    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let text: Vec<u16> = format!("{}\n\n{preview}", post_answer_line(count))
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
     // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
     // no parent HWND is borrowed. No application state is exposed to callbacks.
@@ -1651,8 +1745,10 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
             title.as_ptr(),
             // Topmost: a window the connector opens while Tally fills the
             // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). It changes only
-            // the drawing order; No stays the default button.
+            // process may not take the foreground (#1589). With
+            // MB_SETFOREGROUND the box also takes the foreground, so a key
+            // typed for Tally answers it; the first line of its text says
+            // what Y and N do (#1780). No stays the default button.
             MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }

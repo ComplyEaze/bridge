@@ -1290,8 +1290,9 @@ fn the_queue_refuses_a_plan_that_does_not_fit_before_judging_any_answer() {
         admit(&plan_of(&other, &never), &never),
         Err(AdmissionInconsistent)
     );
-    // A plan made on another day (an approval that spans midnight) is named by
-    // its date, not taken for a wiring fault, whatever the answers say.
+    // A plan made on another day (midnight fell between the last re-read and
+    // the queue) is named by its date, not taken for a wiring fault, whatever
+    // the answers say.
     let mut yesterdays = plan_of(&voucher, &never);
     yesterdays.listing_as_of = bridge_tally_core::TallyDate::parse("20261009".to_string()).unwrap();
     assert_eq!(

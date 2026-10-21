@@ -1050,6 +1050,8 @@ mod tests {
         let rows = parse_lab_master_rows(&synthetic_stock_item_collection(), "StockItem").unwrap();
         assert_eq!(rows.len(), 1);
         let json = lab_master_json(LabMasterKind::StockItem, &rows[0]);
+        // The item's own name is marked as a party name, so masking reaches it (#999).
+        assert_eq!(json["name"], json!(party_name("Sodium Bicarbonate")));
         assert_eq!(json["parent"], "Chemicals");
         assert_eq!(json["base_unit"], "Kgs");
         assert_eq!(json["opening_qty"], "100");

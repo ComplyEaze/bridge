@@ -128,6 +128,13 @@ test("an unpinned archive is refused before extraction", async () => {
   assert.equal(existsSync(join(root, "out")), false);
 });
 
+test("an archive whose digest differs from its pin is refused before extraction", async () => {
+  lock.platforms.test.sha256 = "0".repeat(64);
+  writeLock();
+  await assert.rejects(runFetch(), (error) => error instanceof Refusal && error.message.startsWith("pdfium.tgz:"));
+  assert.equal(existsSync(join(root, "out")), false);
+});
+
 test("a library that differs from its pin is refused", async () => {
   lock.platforms.test.library_sha256 = "0".repeat(64);
   writeLock();

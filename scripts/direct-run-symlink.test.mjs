@@ -49,6 +49,7 @@ const PROBES = [
   { script: "check-pr-type-label.mjs", env: { PR_LABELS: "[]" }, status: 1, pattern: /A pull request needs exactly one of type:/ },
   { script: "check-surface-ack.mjs", args: ["--mode", "bogus"], status: 2, pattern: /--mode must be pull_request/ },
   { script: "check-unbounded-reads.mjs", args: ["--root"], status: 1, pattern: /--root requires a repository path/ },
+  { script: "fetch-pdfium.mjs", status: 1, pattern: /usage: fetch-pdfium\.mjs/ },
   { script: "prune-package-compiler-cache.mjs", args: ["--bogus"], status: 1, pattern: /Unexpected argument/ },
   { script: "release-notes.mjs", status: 2, pattern: /usage: release-notes\.mjs/ },
   { script: "render-legal.mjs", status: 2, pattern: /usage: render-legal\.mjs/ },

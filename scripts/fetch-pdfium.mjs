@@ -24,7 +24,7 @@
 // native job runs this without actions/setup-node.
 
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -171,6 +171,7 @@ async function download(url, limit) {
   });
   if (!response.ok) throw new Refusal(`${url}: HTTP ${response.status}; refusing it`);
   // Read at most one byte past the pin, so an oversized answer is refused by its count, not read whole.
+  // The 120-second signal bounds the whole download, body included, not each read.
   const chunks = [];
   let total = 0;
   const reader = response.body.getReader();
@@ -230,9 +231,7 @@ export async function main(argv = process.argv.slice(2), { lockPath = LOCK, stdo
   return 0;
 }
 
-// Compared as real paths: Node resolves a symbolic link in the module's own URL but not in
-// argv[1], and a run through a linked checkout must not exit 0 having done nothing.
-if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   main().catch((error) => {
     process.stderr.write(`${error instanceof Refusal ? error.message : error.stack}\n`);
     process.exitCode = 1;

@@ -175,6 +175,11 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
     action: "ComplyEaze Bridge cannot split below one calendar day. Reduce that day's source density or use a future qualified collection filter before starting a new run; retrying unchanged will fail again.",
     retry: "after_change",
   },
+  rejected_snapshot_records: {
+    title: "Source records were rejected",
+    action: "Some source records were rejected while this run was being read, so they are not in the local mirror. The proof facts and the support export keep the count. Inspect the support export for this run before relying on the mirror; an unchanged retry is not expected to help.",
+    retry: "not_useful",
+  },
   adaptive_window_limit_reached: {
     title: "Adaptive window safety limit reached",
     action: "Start a new run for a shorter requested period. ComplyEaze Bridge stopped before growing the durable split graph beyond its reviewed bound.",
@@ -377,7 +382,7 @@ export function MirrorProofScreen({
           <h2>{latestProof ? `${formatIdentifier(latestProof.outcome)} · ${formatIdentifier(latestProof.verification_state)} ${formatIdentifier(latestProof.pack_id)} attempt` : "No durable Core Accounting run receipt yet"}</h2>
           <p>
             {latestProof
-              ? `Within this run's declared Core Accounting scope, ComplyEaze Bridge persisted ${latestProof.accepted_records} provenance-backed accepted canonical rows, ${latestProof.provenance_unavailable_records} canonical rows with an explicit provenance-unavailable gap, and ${latestProof.rejected_records} rejected rows. These are not Tally source-total counts. ${latestProof.gap_codes.length} declared gap(s) and ${latestProof.warning_codes.length} warning(s).`
+              ? `Within this run's declared Core Accounting scope, ComplyEaze Bridge persisted ${latestProof.accepted_records} provenance-backed accepted canonical rows, ${latestProof.provenance_unavailable_records} canonical rows with an explicit provenance-unavailable gap. These are not Tally source-total counts. ${latestProof.gap_codes.length} declared gap(s) and ${latestProof.warning_codes.length} warning(s).`
               : "Endpoint reachability and fetched preview rows do not establish a Verified accounting state."}
           </p>
         </div>
@@ -586,8 +591,8 @@ export function MirrorProofScreen({
         ) : (
           <div className="table-wrap" role="region" aria-label="Hash-linked local proof ledger" tabIndex={0}>
             <table>
-              <caption>Loaded Proof of Sync attempt summaries; accepted/rejected values are returned run-scope rows, not source-completeness counts; older history may not be loaded</caption>
-              <thead><tr><th>Completed</th><th>Run</th><th>Pack</th><th>Result</th><th>Accepted / rejected returned rows</th><th>Proof hash</th><th>Gaps</th><th>Warnings</th><th>Support export</th></tr></thead>
+              <caption>Loaded Proof of Sync attempt summaries; the accepted value is a returned run-scope row count, not source-completeness counts; older history may not be loaded</caption>
+              <thead><tr><th>Completed</th><th>Run</th><th>Pack</th><th>Result</th><th>Accepted returned rows</th><th>Proof hash</th><th>Gaps</th><th>Warnings</th><th>Support export</th></tr></thead>
               <tbody>
                 {syncEvidence?.latest_proofs.map((proof) => (
                   <tr key={proof.selection_token}>
@@ -595,7 +600,7 @@ export function MirrorProofScreen({
                     <td><code>{proof.run_id}</code> <CopyTokenButton value={proof.run_id} label="run ID" /></td>
                     <td>{formatIdentifier(proof.pack_id)}</td>
                     <td>{formatIdentifier(proof.outcome)} · {formatIdentifier(proof.verification_state)} · Local hash check: {proof.integrity_state === "entry_hash_valid" ? "passed" : formatIdentifier(proof.integrity_state)}</td>
-                    <td>{proof.accepted_records} / {proof.rejected_records}</td>
+                    <td>{proof.accepted_records}</td>
                     <td><code title="Local consistency commitment; not authenticity">{proof.proof_sha256.slice(0, 12)}...</code> <CopyTokenButton value={proof.proof_sha256} label="local proof hash" /></td>
                     <td>{proof.gap_codes.length ? proof.gap_codes.map((code) => guidanceForGap(code).title).join(", ") : "None declared"}</td>
                     <td>{proof.warning_codes.length ? proof.warning_codes.map(formatIdentifier).join(", ") : "None declared"}</td>

@@ -625,12 +625,13 @@ fn count() -> String {
 }
 
 /// The count answer, made to hold `vouchers` vouchers: its first voucher repeated under a
-/// master id of its own each time (a derived control; the lab did not read such a window).
+/// master id of its own each time. DERIVED, not Tally's bytes: the lab did not read such a window.
 fn count_of(vouchers: usize) -> String {
     repeated(count(), vouchers)
 }
 
-/// The wide answer made to hold `vouchers` vouchers in the same way (derived).
+/// The wide answer made to hold `vouchers` vouchers in the same way. DERIVED, not Tally's bytes: the
+/// lab never read a window of 1,000 vouchers; this repeats its first voucher under new master ids.
 fn wide_of(vouchers: usize) -> String {
     repeated(before(), vouchers)
 }
@@ -1484,7 +1485,8 @@ const DIRECT_AMOUNT_1050: &str = r#"<AMOUNT TYPE="Amount">-1050.00</AMOUNT>"#;
 #[tokio::test]
 async fn a_window_of_a_thousand_vouchers_is_read_and_a_thousand_and_one_is_refused_before_the_wide_read(
 ) {
-    // 1,000: both reads are made.
+    // 1,000: both reads are made, on a count answer and a wide answer that are both DERIVED (the
+    // lab's first voucher repeated), so this proves the bound and not any read of the lab.
     let call = run(plans_with(count_of(1_000), wide_of(1_000)), lab_arguments()).await;
     assert_eq!(call.observed.len(), 22);
     assert_eq!(payload(&call.response)["state"], "complete");

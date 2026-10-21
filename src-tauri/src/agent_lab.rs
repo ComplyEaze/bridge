@@ -1052,7 +1052,8 @@ mod tests {
         let target = TARGET_GUID.to_ascii_lowercase();
         let with_deny = LabGuardConfig::from_values(TARGET_GUID, DENY_GUID_1).unwrap();
         let without_deny = LabGuardConfig::from_values(TARGET_GUID, "").unwrap();
-        let other = "5d8c0a9e-1f3b-4c2d-8e7a-0b6f9a1c2d3e";
+        // A company that is in neither list: DENY_GUID_2 is not in `with_deny` here.
+        let other = DENY_GUID_2;
         let t = Some(target.as_str());
         // No deny list: admitted only while the target is the only company loaded.
         assert_eq!(loaded_set_refusal(&without_deny, &[t]), None);

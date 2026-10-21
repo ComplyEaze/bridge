@@ -573,30 +573,46 @@ impl TallyRuntime {
                                 parse_native_statement(NativeStatementKind::ProfitAndLoss, &xml)?;
                             // The company's inventory flags are read only when that
                             // Profit and Loss offers a closing stock to use, so a
-                            // book without one sends nothing more.
+                            // book without one sends nothing more. A flags read that
+                            // fails or does not parse is not a failed statement: the
+                            // book is then not shown integrated, the figure is
+                            // declined, and the statement is the one it always was.
                             let inventory = if matches!(
                                 crate::reports::statements::TallyClosingStock::from_profit_and_loss(
                                     &profit_and_loss
                                 ),
                                 Ok(Some(_))
                             ) {
-                                let request = render_company_inventory_flags_request(
-                                    identity.display_name(),
-                                    identity.company_guid(),
-                                )?;
-                                let (xml, bytes, hash) = client
-                                    .fetch_native_report_paired(request.clone())
-                                    .await?
-                                    .require_stable(
-                                        PairedReadValidationError::StatementInventoryFlags,
+                                let flags_read: anyhow::Result<_> = async {
+                                    let request = render_company_inventory_flags_request(
+                                        identity.display_name(),
+                                        identity.company_guid(),
                                     )?;
-                                evidence = evidence
-                                    .clone()
-                                    .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                                let flags =
-                                    parse_company_inventory_flags(&xml, identity.company_guid())?
-                                        .flags;
-                                crate::reports::statements::IntegratedInventory::from_flags(&flags)
+                                    let (xml, bytes, hash) = client
+                                        .fetch_native_report_paired(request.clone())
+                                        .await?
+                                        .require_stable(
+                                            PairedReadValidationError::StatementInventoryFlags,
+                                        )?;
+                                    let flags = parse_company_inventory_flags(
+                                        &xml,
+                                        identity.company_guid(),
+                                    )?
+                                    .flags;
+                                    Ok((request, hash, bytes, flags))
+                                }
+                                .await;
+                                match flags_read {
+                                    Ok((request, hash, bytes, flags)) => {
+                                        evidence = evidence.clone().combine(
+                                            RuntimeReadEvidence::paired(&request, hash, bytes),
+                                        );
+                                        crate::reports::statements::IntegratedInventory::from_flags(
+                                            &flags,
+                                        )
+                                    }
+                                    Err(_) => None,
+                                }
                             } else {
                                 None
                             };

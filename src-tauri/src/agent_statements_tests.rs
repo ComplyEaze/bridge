@@ -472,7 +472,7 @@ fn the_not_established_codes_are_unchanged() {
 // answer of the inventory book with its GUID rewritten to this one's.
 
 fn stock_profit_and_loss() -> String {
-    "<ENVELOPE><DSPACCNAME><DSPDISPNAME>Sales Accounts</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT><BSMAINAMT>4027.00</BSMAINAMT></PLAMT><DSPACCNAME><DSPDISPNAME>Opening Stock</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT><BSMAINAMT></BSMAINAMT></PLAMT><DSPACCNAME><DSPDISPNAME>Less: Closing Stock</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT>-500.00</PLSUBAMT><BSMAINAMT></BSMAINAMT></PLAMT></ENVELOPE>".to_string()
+    "<ENVELOPE><DSPACCNAME><DSPDISPNAME>Sales Accounts</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT><BSMAINAMT>4027.00</BSMAINAMT></PLAMT><DSPACCNAME><DSPDISPNAME>Cost of Sales :</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT><BSMAINAMT>500.00</BSMAINAMT></PLAMT><DSPACCNAME><DSPDISPNAME>Opening Stock</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT><BSMAINAMT></BSMAINAMT></PLAMT><DSPACCNAME><DSPDISPNAME>Less: Closing Stock</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT>-500.00</PLSUBAMT><BSMAINAMT></BSMAINAMT></PLAMT></ENVELOPE>".to_string()
 }
 
 fn stock_balance_sheet() -> String {
@@ -551,4 +551,17 @@ async fn a_book_whose_profit_and_loss_offers_no_closing_stock_reads_no_flags() {
     let (response, sent, expected) = call("profit_and_loss", plans("-11027.00")).await;
     assert_eq!(sent, expected);
     assert!(result(&response)["closing_stock"].is_null());
+}
+
+#[tokio::test]
+async fn a_flags_read_that_does_not_bind_to_the_company_declines_the_figure_and_keeps_the_statement(
+) {
+    // The flags answer names another company: the read is not a failed
+    // statement, the book is simply not shown integrated.
+    let flags = inventory_flags("Yes").replace(GUID, "00000000-0000-4000-8000-000000000001");
+    let (response, sent, expected) = call("profit_and_loss", stock_plans(flags)).await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["closing_stock"]["why"], "book_not_shown_integrated");
+    assert_eq!(result["state"], "not_established");
 }

@@ -120,8 +120,9 @@ impl Server {
                 })
             })
             .collect::<Vec<_>>();
-        // A balance sheet shows how Tally's Profit and Loss compared only when
-        // that statement offered a closing stock, the one thing it reads it for.
+        // A balance sheet shows how Tally's Profit and Loss compared only when a
+        // closing stock was considered (offered, and the statement not refused for
+        // another reason first), the one thing it reads it for.
         let show_profit_and_loss_tie = kind == NativeStatementKind::ProfitAndLoss
             || !matches!(derived.closing_stock, ClosingStockUse::NotApplicable);
         let mut result = json!({
@@ -143,7 +144,7 @@ impl Server {
                         "A ledger under a user-created primary group, or with an incomplete group chain, is listed in unclassified; while any carries an amount, no result is established",
                         "Closing stock is not derived: with a Stock-in-Hand balance no result is established. Tally's own Less: Closing Stock is used, and shown in closing_stock, only as the description says (one integrated book, no opening stock); a costing method, opening stock, a window spanning two years and any other book are not measured",
                         "lines is null while this tool's result is not established, so a derived line is never shown as the statement; balance_sheet_gate and tie_out then show how each of Tally's own lines compared",
-                        "Every result is established only if Tally's own Balance Sheet for the window ties line for line (balance_sheet_gate); gross and net also need Tally's own Profit and Loss to tie (tie_out), with one heading, Cost of Sales, allowed while it equals the derived cost of sales; a book with stock items is expected to refuse, and no inventory book has been measured",
+                        "Every result is established only if Tally's own Balance Sheet for the window ties line for line (balance_sheet_gate); gross and net also need Tally's own Profit and Loss to tie (tie_out), with one heading, Cost of Sales, allowed while it equals the derived cost of sales; with stock items it refuses unless Tally's own closing stock is used, as closing_stock says (one integrated book measured)",
                         "A book with more than one currency master is refused before the Trial Balance is read",
                         "A Tally line the derivation has no counterpart for, such as a heading with an amount or a difference in opening balances, refuses the results rather than being guessed at",
                         "Tally's own statements carry no company identity; they are bound only by the company, mode and book-extent checks around the read",

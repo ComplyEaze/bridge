@@ -1279,3 +1279,13 @@ fn only_both_flags_yes_show_an_integrated_inventory() {
         );
     }
 }
+
+#[test]
+fn a_closing_stock_without_the_cost_of_sales_heading_is_declined() {
+    // synthetic mutation: the heading the figure is checked against is missing.
+    let derived = tieout_b_edited(
+        |lines| lines.retain(|line| line.0 != "Cost of Sales :"),
+        integrated(),
+    );
+    assert_eq!(declined(&derived), ClosingStockDeclined::ShapeNotAsSeen);
+}

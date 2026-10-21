@@ -232,8 +232,9 @@ pub const CLOSING_STOCK_SOURCE: &str = "tally_profit_and_loss_less_closing_stock
 /// Tally's own closing-stock figure, a debit (negative), read from the
 /// `Less: Closing Stock` line of its Profit and Loss. It cannot be built from
 /// anything else, and only from a statement whose shape is the one captured:
-/// one such line with the amount in its sub column alone, and an `Opening
-/// Stock` line shown empty (a book with opening stock is not measured).
+/// one such line with the amount in its sub column alone, an `Opening
+/// Stock` line shown empty (a book with opening stock is not measured) and the
+/// `Cost of Sales :` heading present once.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TallyClosingStock {
     amount: ExactDecimal,
@@ -282,6 +283,16 @@ impl TallyClosingStock {
         );
         if !shown_empty {
             return Err(ClosingStockDeclined::OpeningStockNotShownEmpty);
+        }
+        // The heading the figure is checked against must be there to check.
+        if statement
+            .lines
+            .iter()
+            .filter(|line| line.name == COST_OF_SALES_HEADING)
+            .count()
+            != 1
+        {
+            return Err(ClosingStockDeclined::ShapeNotAsSeen);
         }
         Ok(Some(Self {
             amount: amount.clone(),

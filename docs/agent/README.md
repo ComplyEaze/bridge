@@ -996,8 +996,8 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
   result is the one a book without the figure would get, and `closing_stock`
   says why it was declined:
   - the line is spelled exactly so, appears once, carries a debit in its sub
-    column alone, and the `Opening Stock` line is shown empty (opening stock
-    is not measured);
+    column alone, the `Opening Stock` line is shown empty (opening stock is
+    not measured) and the `Cost of Sales :` heading appears once;
   - the company's own flags (`ISINTEGRATED` and `ISINVENTORYON`, read only
     when the Profit and Loss offers the figure) are both `Yes`;
   - no Stock-in-Hand ledger carries an amount;
@@ -1011,8 +1011,13 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
   "tally_profit_and_loss_less_closing_stock"}`, `{"state": "declined", "why",
   "lines"}` (`why` is `shape_not_as_seen`, `not_a_debit`,
   `opening_stock_not_shown_empty`, `book_not_shown_integrated` or
-  `does_not_close_every_gap`), or null when the Profit and Loss offered no
-  closing stock. The figure is Tally's, not derived or taken from
+  `does_not_close_every_gap`), or null when no closing stock was considered:
+  the Profit and Loss offered none, or the statement was refused for another
+  reason first (an unclassified ledger, a Stock-in-Hand balance, no Profit &
+  Loss A/c ledger). The derived `lines` leave the figure out (the Trial Balance
+  holds no closing stock), so they do not add up to the result: the figure is
+  the separate line `closing_stock`. A flags read that fails is a declined
+  figure (`book_not_shown_integrated`), not a failed statement. The figure is Tally's, not derived or taken from
   `stock_summary`, and the derived Current Assets line keeps the Trial
   Balance's sum. Measured on one synthetic book: opening stock, a costing
   method, a non-integrated book, a window spanning two years and more than one

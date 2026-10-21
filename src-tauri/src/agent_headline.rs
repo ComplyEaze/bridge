@@ -417,9 +417,11 @@ impl StatementBasis {
     }
 
     /// Whether the result's own comparison included Tally's Profit and Loss:
-    /// only a profit and loss that read it.
+    /// a profit and loss that read it, and any statement that used Tally's
+    /// closing stock, which comes from it.
     fn compared_with_tally_profit_and_loss(&self) -> bool {
-        self.kind == StatementKind::ProfitAndLoss && self.read_tally_profit_and_loss
+        (self.kind == StatementKind::ProfitAndLoss && self.read_tally_profit_and_loss)
+            || self.closing_stock_from_tally
     }
 
     /// Whether the derived lines are withheld from the result: the tool shows

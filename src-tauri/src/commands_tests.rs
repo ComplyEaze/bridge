@@ -45,11 +45,12 @@ use super::{
     party_ledger_master_currency_admission_error, party_ledger_master_foreign_currency_error,
     party_ledger_master_mixed_currency_error, party_ledger_master_runtime_command_error,
     party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
-    reviewed_probe_commitment_sha256, tally_command_error, tally_runtime_command_error,
-    verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
-    OutstandingsRequest, PartyLedgerMasterExport, PartyLedgerMasterRequest, PersistedTallyCompany,
-    SavedTallySetup, SelectedCompanyIdentity, VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
-    MIRROR_KEY_INVALID_MESSAGE, MIRROR_KEY_MISSING_MESSAGE,
+    reviewed_probe_commitment_sha256, sweep_failure_naming_identity, tally_command_error,
+    tally_runtime_command_error, verify_observed_company_tuple_from_companies,
+    write_unique_download, CompanySweepFailure, OutstandingsRequest, PartyLedgerMasterExport,
+    PartyLedgerMasterRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
+    VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED, MIRROR_KEY_INVALID_MESSAGE,
+    MIRROR_KEY_MISSING_MESSAGE,
 };
 use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
@@ -289,6 +290,59 @@ fn an_outstandings_request_carries_no_currency_assertion() {
             "{assertion:?}"
         );
     }
+}
+
+#[test]
+fn company_sweep_names_a_company_identity_refusal_and_keeps_other_failures() {
+    use crate::tally::runtime::CompanyIdentityBracketError;
+    use bridge_tally_protocol::outstandings_shared::OutstandingsError;
+
+    let reason = |failure: CompanySweepFailure| match failure {
+        CompanySweepFailure::ReasonCode(code) => code,
+        CompanySweepFailure::OutstandingsRead => "company_outstandings_read_failed",
+        CompanySweepFailure::CompanyVerification(error) => error.code,
+    };
+    let cases: [(anyhow::Error, &str); 3] = [
+        (
+            CompanyIdentityBracketError::AbsentOrAmbiguous.into(),
+            "company_identity_absent_or_ambiguous",
+        ),
+        (
+            CompanyIdentityBracketError::PresentationCollision.into(),
+            "company_identity_presentation_collision",
+        ),
+        (
+            OutstandingsError::CompanyIdentityMismatch.into(),
+            "company_identity_mismatch",
+        ),
+    ];
+    for (error, expected) in cases {
+        let error = error.context("the sweep's read of one company");
+        for otherwise in [
+            CompanySweepFailure::ReasonCode("company_currency_probe_failed"),
+            CompanySweepFailure::OutstandingsRead,
+        ] {
+            let failure = sweep_failure_naming_identity(&error, otherwise);
+            assert_eq!(reason(failure), expected);
+        }
+    }
+
+    // Any other fault keeps the failure the sweep would have reported.
+    let other = anyhow::Error::new(OutstandingsError::InvalidResponse("synthetic_parse_fault"));
+    assert_eq!(
+        reason(sweep_failure_naming_identity(
+            &other,
+            CompanySweepFailure::ReasonCode("company_currency_probe_failed")
+        )),
+        "company_currency_probe_failed"
+    );
+    assert_eq!(
+        reason(sweep_failure_naming_identity(
+            &other,
+            CompanySweepFailure::OutstandingsRead
+        )),
+        "company_outstandings_read_failed"
+    );
 }
 
 #[test]

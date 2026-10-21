@@ -36,6 +36,10 @@ test("new native and sweep boundaries have operator-readable reasons", () => {
     /more than one currency.*could not tell.*base currency/i,
   );
   assert.match(outstandingsPartialReason("company_outstandings_read_failed"), /company read failed/i);
+  for (const code of ["company_identity_absent_or_ambiguous", "company_identity_mismatch"]) {
+    assert.match(outstandingsPartialReason(code), /not .* one loaded company.*Open it in Tally/i);
+  }
+  assert.match(outstandingsPartialReason("company_identity_presentation_collision"), /another company whose name matches/i);
 });
 
 test("a foreign-currency ledger names the blocked book without inviting a repeat", () => {

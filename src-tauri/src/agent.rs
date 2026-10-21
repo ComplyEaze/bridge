@@ -838,6 +838,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         if cause.is::<crate::tally::connection::NativeReportPairDrift>() {
             return Some(crate::tally::connection::NativeReportPairDrift::SAFE_CODE);
         }
+        // The named company is not loaded in Tally, was renamed, or was listed more than once
+        // (#1699): the read failed closed, and this says why.
+        if let Some(identity) = crate::tally::runtime::company_identity_cause(cause) {
+            return Some(identity);
+        }
         if let Some(catalogue) =
             cause.downcast_ref::<bridge_tally_protocol::StandardLedgerCatalogError>()
         {
@@ -948,6 +953,13 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// This never softens a refusal — it only says what to do about one.
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "company_identity_absent_or_ambiguous" | "company_identity_mismatch" => Some(
+            "Tally did not confirm the selected company as exactly one loaded company, so nothing \
+             was returned. The company may not be loaded in Tally, may have been renamed since \
+             list_companies, or Tally may list it more than once. Ask the user to open the company \
+             in Tally, then call list_companies again and repeat the request with the \
+             company_guid it returns.",
+        ),
         "setting_retired" => Some(
             "BRIDGE_AGENT_ENABLE_BATCH_POST was retired: batch posting now follows the posting \
              setting (BRIDGE_AGENT_ENABLE_WRITES), which covers one voucher or a saved batch of \

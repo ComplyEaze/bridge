@@ -91,6 +91,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "company_features",
         "egress_log",
         "gst_status",
+        "gst_uncertain_vouchers",
         "ledger_masters",
         "ledger_movement",
         "list_companies",
@@ -1338,6 +1339,16 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "gst_status",
             "The reason for a status is not available",
             "the tool names no reason for a status",
+        ),
+        (
+            "gst_uncertain_vouchers",
+            "The reason for uncertainty is not read",
+            "the tool names no reason for a voucher's uncertainty",
+        ),
+        (
+            "gst_uncertain_vouchers",
+            "not the taxable value of the GSTR-1 tables",
+            "the amount is the invoice total, not a figure of the return",
         ),
         (
             "voucher_read_cost",

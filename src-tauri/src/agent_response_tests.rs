@@ -52,6 +52,22 @@ fn a_paged_ledgers_result_is_trimmed_with_a_cursor_and_an_unpaged_one_is_not() {
 }
 
 #[test]
+fn a_paged_items_result_is_trimmed_with_a_cursor_and_an_unpaged_one_is_not() {
+    // gst_status pages `items` by `offset`; gst_uncertain_vouchers returns `items` whole,
+    // with counts and a line that cover the whole window, and takes no offset: a cursor into
+    // it would resume nothing, so an over-budget answer is refused instead.
+    let mut paged = json!({"result":{"offset":0,"next_offset":null,
+        "items":[{"n":"A"},{"n":"B"},{"n":"C"}]}});
+    assert!(truncate_response_items(&mut paged).expect("trims an items page"));
+    assert_eq!(paged["result"]["items"].as_array().unwrap().len(), 2);
+    assert_eq!(paged["result"]["next_offset"], 2);
+    let mut unpaged = json!({"result":{"items":[{"n":"A"},{"n":"B"}]}});
+    assert!(!truncate_response_items(&mut unpaged).expect("no page shape"));
+    assert_eq!(unpaged["result"]["items"].as_array().unwrap().len(), 2);
+    assert!(unpaged["result"].get("next_offset").is_none());
+}
+
+#[test]
 fn standalone_master_and_status_rows_are_counted_in_final_receipts() {
     for (tool, axis) in [
         ("validate_masters", "masters"),

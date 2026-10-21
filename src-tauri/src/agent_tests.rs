@@ -731,6 +731,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ),
         ("egress_log", json!({"records":[]})),
         (
+            "gst_uncertain_vouchers",
+            json!({"items":[{"list":"uncertain","voucher_number":"BP/1","party":party_name("Customer One"),"amount":"1050.00","party_side":"debit"}]}),
+        ),
+        (
             "ledger_masters",
             json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder"}))}]}),
         ),

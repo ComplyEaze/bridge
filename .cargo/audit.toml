@@ -34,7 +34,7 @@
 # yanked) as at least a warning; `cargo audit`'s process exit code is already
 # non-zero only for an actual `error` (a real vulnerability, or an ignored-id
 # that turns out to still be unresolved) unless explicitly told to also fail
-# on warnings. The 9 entries below are accepted WARNINGS, each with a reason;
+# on warnings. The entries below are accepted WARNINGS, each with a reason;
 # nothing here silences an actual vulnerability (`error`), and the workflow's
 # real job -- catching a new one, like RUSTSEC-2026-0285 against `rustls` on
 # 2026-09-15 -- is untouched by this file. `--ignore` only removes an id from
@@ -99,6 +99,31 @@ ignore = [
   "RUSTSEC-2025-0081",
   "RUSTSEC-2025-0098",
   "RUSTSEC-2025-0100",
+
+  # --- zbus family, all unmaintained (RUSTSEC-2026-0370 zvariant 5.14.0, ---
+  # --- RUSTSEC-2026-0371 zbus_names 4.3.4, RUSTSEC-2026-0372 zvariant_derive 5.14.0) ---
+  # Published 2026-10-16: the standalone crates were merged into `zbus` 6.0.0,
+  # and the advisories list no patched version. Transitive only through the
+  # Linux Secret Service credential store:
+  #   {zvariant, zvariant_derive, zbus_names} <- zbus 5.19.0 <- secret-service
+  #   <- zbus-secret-service-keyring-store <- keyring 4.2.0 <- bridge
+  # (`cargo tree --locked -i zvariant --target all`; the same chain for the
+  # other two). Confirmed not reachable on the shipped targets: for each of the
+  # three crates, `cargo tree --locked -p bridge -i <crate> --target
+  # aarch64-apple-darwin` and `--target x86_64-pc-windows-msvc` print nothing
+  # ("nothing to print"), checked against src-tauri/Cargo.lock on 2026-10-18;
+  # none of them appears in tools/Cargo.lock. This project ships only macOS and
+  # Windows builds (docs/release-process.md), which use the Apple and Windows
+  # credential stores. There is no in-range fix: `cargo update --dry-run -p
+  # zbus` and `-p keyring` lock nothing new, because the move to `zbus` 6 is
+  # the Secret Service crates' own change, not ours. Not a known vulnerability,
+  # only "no longer maintained".
+  # Review-by: 2027-04-18 (6 months) -- re-run the target check above and look
+  # for a `keyring` / `secret-service` release on `zbus` 6 (which drops all
+  # three); renew only if a Linux build target is still not shipped.
+  "RUSTSEC-2026-0370",
+  "RUSTSEC-2026-0371",
+  "RUSTSEC-2026-0372",
 ]
 # A yanked crate (no RUSTSEC id -- cargo-audit reports yanked crates
 # separately from `ignore`-able advisory ids) can't be listed here:

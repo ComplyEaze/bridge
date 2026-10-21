@@ -1,5 +1,4 @@
-//! Amounts, control values and the balance chain, ported from
-//! `scripts/bank_statement_import.test.py`.
+//! Amounts, control values and the balance chain.
 
 mod common;
 

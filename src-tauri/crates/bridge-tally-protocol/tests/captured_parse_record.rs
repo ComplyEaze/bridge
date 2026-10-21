@@ -26,6 +26,7 @@ use bridge_tally_protocol::native_cash_flow::{parse_native_cash_flow, WholeMonth
 use bridge_tally_protocol::native_company_features::{parse_company_features, ExpectedCompany};
 use bridge_tally_protocol::native_funds_flow::parse_native_funds_flow;
 use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
+use bridge_tally_protocol::native_month_register::parse_native_month_register;
 use bridge_tally_protocol::native_negative_stock::parse_native_negative_stock;
 use bridge_tally_protocol::native_outstandings::{
     parse_company_currency, parse_company_currency_name,
@@ -256,6 +257,12 @@ fn funds_flow(text: &str, from: &str, to: &str) -> String {
     let window = WholeMonthWindow::new(DateBoundaryProfile::ModeAgnostic, date(from), date(to))
         .expect("a whole-month window copied from a test");
     typed(parse_native_funds_flow(text, &window))
+}
+
+fn month_register(text: &str, from: &str, to: &str) -> String {
+    let window = WholeMonthWindow::new(DateBoundaryProfile::ModeAgnostic, date(from), date(to))
+        .expect("a whole-month window copied from a test");
+    typed(parse_native_month_register(text, &window))
 }
 
 fn company_features(text: &str, guid: &str, name: &str, number: &str) -> String {
@@ -1119,6 +1126,19 @@ const ROWS: &[Row] = &[
         parser: "parse_native_funds_flow(20250401..20260331)",
         parse: |_, text| funds_flow(text, "20250401", "20260331"),
     },
+    // Built-in Sales and Purchase Registers: src/native_month_register_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_sales_register_pilot_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_month_register(20260401..20270331)",
+        parse: |_, text| month_register(text, "20260401", "20270331"),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_purchase_register_pilot_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_month_register(20260401..20270331)",
+        parse: |_, text| month_register(text, "20260401", "20270331"),
+    },
     // Company settings and currency symbol: src/native_company_features_tests.rs.
     Row {
         fixture: "tests/fixtures/company_features_shape_lab_live.utf16le.xml",
@@ -1151,6 +1171,20 @@ const ROWS: &[Row] = &[
     // Series-level numbering: src/native_voucher_type_numbering_tests.rs (a Windows synthetic book).
     Row {
         fixture: "tests/fixtures/voucher_type_numbering_series_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_voucher_type_numbering",
+        parse: |_, text| typed(parse_voucher_type_numbering(text)),
+    },
+    // The same read of a second synthetic book, before and after its Receipt type was set to
+    // renumber (13 October 2026).
+    Row {
+        fixture: "tests/fixtures/voucher_type_numbering_m8r_x0_series.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_voucher_type_numbering",
+        parse: |_, text| typed(parse_voucher_type_numbering(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/voucher_type_numbering_m8r_x4_series.utf16le.xml",
         source: Source::Captured,
         parser: "parse_voucher_type_numbering",
         parse: |_, text| typed(parse_voucher_type_numbering(text)),
@@ -2265,6 +2299,48 @@ const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
      (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md: kept as evidence for §12a.16)";
+const PILOT_LAB_READBACK: &str =
+    "a read-back answer of the pilot lab (9 and 10 Oct 2026), with no \
+     row here: the app crate's invoice tests (src/agent_import_invoice_tests.rs, and the replay in \
+     src/agent_import_post_e2e_tests.rs) parse it with the read-back's own parser and pin what it \
+     returns; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oct 2026), with no \
+     row here: the app crate's replay (src/agent_import_post_e2e_tests.rs, and for the tax units \
+     src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
+     feeds it through the build, the post and the read-back and pins what each parse returns; \
+     pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_W18_REPLAY: &str = "an answer of the pilot lab's W18, W18b and W18c sittings (12 and 13 Oct 2026), \
+     with no row here: the app crate's HSN/SAC warning replay (src/agent_import_w18_replay_tests.rs) \
+     feeds it through the build, the post and the verification and pins what each parse returns; \
+     pilot-lab-w18/PROVENANCE.md says what it is";
+const PILOT_LAB_COMPANY_HSN: &str = "an answer of the HSN/SAC check's reads on the Windows lab \
+     (12 Oct 2026), with no row here: the app crate's HSN/SAC check (src/agent_import_invoice_hsn.rs \
+     and src/agent_import_invoice_wire.rs) parses it, and its tests \
+     (src/agent_import_invoice_hsn_tests.rs, and the replay in src/agent_import_post_e2e_tests.rs) \
+     pin what each parse returns; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_PARENT_FILTER: &str =
+    "an answer of the pilot lab's parent-filter round (10 Oct 2026), \
+     with no row here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
+     src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_scope_tests.rs, \
+     and the replay in src/agent_import_post_e2e_tests.rs) pin what each parse returns; \
+     pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_NUMBERING: &str = "an answer of the pilot lab read on 16 Oct 2026, a week \
+     after the invoice round, with no row here: the app crate's replay \
+     (src/agent_import_post_e2e_tests.rs) serves it to the voucher-numbering read of the \
+     build and of the post DERIVED, with the voucher types above the replay's master mark \
+     removed; the file is the answer whole as received; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_EVIDENCE: &str = "an answer of the pilot lab's invoice round (9 Oct 2026) that no \
+     test reads: kept beside the answers the replay uses as the evidence for §9.16; \
+     pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_ADMISSION: &str = "an answer of the pilot lab (9 Oct 2026), with no row here: \
+     the app crate's invoice tests (src/agent_import_invoice_admission_tests.rs through the server, \
+     src/agent_import_invoice_wire_tests.rs and src/agent_import_invoice_tests.rs on the parsers \
+     and the read-back comparison) pin what each parse returns; pilot-lab/PROVENANCE.md says what \
+     each file is";
+const REGISTER_NOT_RECORDED: &str =
+    "another synthetic book's Sales Register (6 Oct 2026), kept as \
+     evidence for §12a.16 (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md); native_month_register reads its \
+     grammar, and its tests run on BRIDGE PILOT LAB's registers instead";
 const GST_STATUS_READ: &str = "an answer of the GST status read (10 and 12 Oct 2026), which no parser of \
      this crate reads: the app crate's gst_status tool parses it (src/agent_gst_status.rs), and its \
      tests (src/agent_gst_status_tests.rs) pin what each parse returns; \
@@ -2275,6 +2351,192 @@ const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tes
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
+    (
+        "tests/fixtures/builtin_sales_register_probe_b_fy_live.utf16le.xml",
+        REGISTER_NOT_RECORDED,
+    ),
+    // The pilot lab invoice round answers, and the import request they came with.
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml",
+        PILOT_LAB_COMPANY_HSN,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.utf16le.xml",
+        PILOT_LAB_COMPANY_HSN,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-request.utf16le.xml",
+        IMPORT_REQUEST,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml",
+        PILOT_LAB_EVIDENCE,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-resaved.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-uncertain.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml",
+        PILOT_LAB_PARENT_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-case-changed.utf16le.xml",
+        PILOT_LAB_PARENT_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml",
+        PILOT_LAB_PARENT_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-whole-10oct.utf16le.xml",
+        PILOT_LAB_PARENT_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml",
+        PILOT_LAB_COMPANY_HSN,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-marks-before-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbering-masters.utf16le.xml",
+        PILOT_LAB_NUMBERING,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbering-series.utf16le.xml",
+        PILOT_LAB_NUMBERING,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-fields.utf16le.xml",
+        PILOT_LAB_EVIDENCE,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-vouchers-after-post.utf8.xml",
+        PILOT_LAB_EVIDENCE,
+    ),
+    // The W18 replay answers (the build's reads on the book with the four-digit ledger).
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-book-extent.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-company-object.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-groups.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-ledgers-compliance.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-ledgers-paired.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-marks.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-number-0040.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-tax-units.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-voucher-types.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18b-verification-window.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
     // The GST status read answers.
     (
         "tests/fixtures/agent/gst-status/pilot-lab-gst-status-august.utf16le.xml",
@@ -2539,10 +2801,6 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     // Built-in reports no parser reads.
     (
         "tests/fixtures/builtin_ratio_analysis_probe_b_fy_live.utf16le.xml",
-        NOT_READ_REPORT,
-    ),
-    (
-        "tests/fixtures/builtin_sales_register_probe_b_fy_live.utf16le.xml",
         NOT_READ_REPORT,
     ),
     // Object readbacks and the sanitizer sample.

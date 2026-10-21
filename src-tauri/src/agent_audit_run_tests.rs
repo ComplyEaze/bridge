@@ -32,8 +32,7 @@ fn serve(plans: Vec<tally_protocol_simulator::ScenarioPlan>, redaction: Redactio
         max_bytes: 200_000,
         redaction,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     OneServer {
         simulator,
@@ -146,7 +145,19 @@ async fn a_completed_run_returns_figures_and_findings_and_no_name_of_the_book() 
     let one = replayed(&Replay::small(), Redaction::None);
     let response = one.server.call_tool("audit_test_run", args()).await;
     let run = result(&response);
-    assert_eq!(run["state"], "completed");
+    // The book is cut to thirty vouchers against the whole year's trial
+    // balance, so the checks that tie vouchers to it fail, and the state says
+    // so rather than `completed`.
+    assert_eq!(run["state"], "completed_with_failed_book_checks");
+    assert_eq!(
+        run["book_checks"]["failed"],
+        json!([
+            {"count": 1, "invariant": "MAP-1"},
+            {"count": 27, "invariant": "POP-1"},
+            {"count": 1, "invariant": "POP-2"},
+            {"count": 1, "invariant": "POP-3"},
+        ])
+    );
     assert_eq!(run["test"]["test_id"], "cash_44ab");
 
     // The same figures the crate's own golden holds for this test.

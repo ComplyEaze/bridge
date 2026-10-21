@@ -16,10 +16,12 @@ These changes are in source and not yet in a published build.
 
 - `ledger_masters` with `include_gst_details` now names Tally's `GSTINELIGIBLEITC` as `ineligible_itc` (true for Yes,
   false for No, null when the element is absent), where 0.6.0 named it `itc_eligible` and so told an assistant that
-  an entry with a keyed "Eligible for Input Tax Credit: No" was eligible. Measured on a ledger created in a
-  synthetic book (TallyPrime 7.1): the screen's Yes read as the element absent and its No as Yes, so the
-  element is an ineligibility flag; one book, one release, one ledger kind (PARTIAL; part of #1741). On Tally's own
-  default entry (source `As per Company/Group`) a Yes was seen with no keyed No, and says nothing there. The value
+  an entry with a keyed "Eligible for Input Tax Credit: No" was eligible. Measured on one ledger created
+  under Purchase Accounts in a synthetic book (TallyPrime 7.1): the screen's Yes read as the element absent and
+  its No as Yes, so the element is an ineligibility flag (PARTIAL: one book, one release, one ledger, one dated
+  entry; part of #1741). A Yes on any other ledger says nothing either way: the Sales ledgers of one captured book
+  carry a Yes on their keyed entries, and Tally's own default entry (source `As per Company/Group`) carries one with
+  no keyed No; neither was read against the screen. The value
   mapping is unchanged: do not read `true` as eligible.
 
 ## [0.6.0] - 2026-10-16

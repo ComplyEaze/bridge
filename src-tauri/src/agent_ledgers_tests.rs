@@ -5006,7 +5006,7 @@ mod through_the_tool {
                 "place of supply is in the registration history",
                 "slab rates are only flagged",
                 "Do not read true as eligible",
-                "says nothing about eligibility there",
+                "says nothing either way",
                 "14-ledger lab book of TallyPrime 7.1 Silver",
                 "not yet run through this tool on a live Tally",
                 "admitted at 8,000 bytes a ledger instead of 3,750",

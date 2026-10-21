@@ -47,12 +47,14 @@ pub struct GstDetailsEntry {
     /// `SRCOFGSTDETAILS`.
     pub source: Option<String>,
     /// `GSTINELIGIBLEITC`, `Yes` or `No`, as sent, under the name of Tally's
-    /// element: an *in*eligibility flag. On a ledger with a keyed history row
-    /// the screen `Eligible for Input Tax Credit: Yes` read as the element
-    /// absent and `No` as `Yes` (#1741; PARTIAL: one synthetic book, one
-    /// release, one ledger kind). On Tally's own default entry (source `As per
-    /// Company/Group`) a `Yes` was seen with no keyed No, so it says nothing
-    /// there. Protocol reference §12a.20.
+    /// element: an *in*eligibility flag where measured. On one ledger under
+    /// Purchase Accounts with a keyed history row the screen `Eligible for
+    /// Input Tax Credit: Yes` read as the element absent and `No` as `Yes`
+    /// (#1741; PARTIAL: one synthetic book, one release, one ledger, one dated
+    /// entry). A `Yes` on any other ledger says nothing either way: the Sales
+    /// ledgers of one captured book carry it on their keyed entries, and
+    /// Tally's own default entry (source `As per Company/Group`) carries it
+    /// with no keyed No. Protocol reference §12a.20.
     pub ineligible_itc: Option<bool>,
     pub states: Vec<GstStateDetails>,
     /// True when the element held content this parser does not model, at the

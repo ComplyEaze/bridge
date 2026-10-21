@@ -629,8 +629,8 @@ fn a_read_deadline_is_named_rather_than_collapsed_into_the_generic_failure() {
 
 #[test]
 fn a_refusal_for_a_book_that_changed_during_the_read_says_to_run_it_again() {
-    // Every code the change-during-read refusals use, as a code and as a cause (#1633). A new
-    // arm that is not on this list, or one dropped from the match, fails here by name.
+    // Every code the change-during-read refusals use, as a code and as a cause (#1633). An arm
+    // dropped from the match fails here by name; a new code has to be added to this list.
     for code in [
         "voucher_window_changed_during_read",
         "native_ledger_extent_changed",
@@ -656,8 +656,8 @@ fn a_refusal_for_a_book_that_changed_during_the_read_says_to_run_it_again() {
             "{code}"
         );
     }
-    // The connection's own vocabulary is the source of the extent codes: each extent refusal it
-    // can raise has the advice.
+    // The connection's own code for each extent refusal it has today has the advice. The list is
+    // written by hand: an extent refusal added later has to be added here.
     use crate::tally::connection::PairedReadValidationError as Paired;
     for refusal in [
         Paired::NativeLedgerExtent,

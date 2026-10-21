@@ -1156,8 +1156,8 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         | "masters_extent_changed"
         | "month_register_extent_changed"
         | "stock_summary_extent_changed" => Some(
-            "The company's books changed in Tally while this call was being read, so nothing was \
-             returned. Saving in Tally can do it, and so can a report that raises the voucher \
+            "The company's books changed in Tally while this call was being read, so the call \
+             stopped and nothing was changed in Tally. Saving in Tally can do it, and so can a report that raises the voucher \
              mark without changing a voucher: one GST return export raised it by 3. Nothing is \
              wrong with the request. Ask the person whether anything is being saved or exported \
              in Tally, then run the same request again once, when that has finished.",
@@ -1166,8 +1166,8 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // snapshot is gone (#1633).
         "listing_snapshot_changed" => Some(
             "A later page cannot be served from the listing the first page held: the company's \
-             books changed in Tally since that page, or the held listing has expired or been \
-             replaced. Run the request again from the first page, without snapshot_id, and page \
+             books changed in Tally since that page, or the held listing has expired, been \
+             replaced or was never held. Run the request again from the first page, without snapshot_id, and page \
              through that result. If the person is saving or exporting in Tally, wait for it to \
              finish first.",
         ),

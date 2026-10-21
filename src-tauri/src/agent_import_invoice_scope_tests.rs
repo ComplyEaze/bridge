@@ -119,7 +119,7 @@ fn parents_of(scope: &InvoiceLedgerScope) -> Vec<String> {
 /// The lab's request with the HSN/SAC check's three fields added to its field
 /// list (#691, W16): the edit that turns the lab's unrestricted rates request
 /// into the one it answered on 12 Oct 2026 (the code renders the restricted one
-/// with the same three fields, which the lab was not sent as such). The edit
+/// with the same three fields, which the lab answered on 21 Oct 2026). The edit
 /// must apply exactly once.
 fn with_the_hsn_fields(request: String) -> String {
     const FROM: &str = "ROUNDINGLIMIT</FETCH>";

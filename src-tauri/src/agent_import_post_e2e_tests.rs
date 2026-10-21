@@ -6607,7 +6607,9 @@ macro_rules! pilot_queue_block {
 // read restricted to the parents of the invoice's ledgers (#1331) with the
 // HSN/SAC fields (#691). They are one coherent pair read in the same minute (the
 // scoped answer holds exactly the catalogue's ledgers under those parents),
-// paired here with the 9 Oct answers of the same book; the pairing was not
+// paired here with the earlier answers of the same book (the 9 Oct listings,
+// groups and tax units; the 12 Oct company object `O` and groups with HSN `G`;
+// the 16 Oct numbering answers `X` and `Y`, DERIVED above); the pairing was not
 // observed at one time. The order below is the order the
 // build and then the post asked in, as observed against a replay of those
 // answers; it is not an order read off the code. Legend: s status probe, e

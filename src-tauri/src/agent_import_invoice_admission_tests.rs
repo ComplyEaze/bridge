@@ -1,21 +1,24 @@
 //! One Sales invoice admission, and one read-back, run from the first request
 //! to the last against the scripted transport, on one book's answers only:
-//! BRIDGE PILOT LAB (the `pilot-lab` set, captured on 9 Oct 2026; its
-//! PROVENANCE table is beside the fixtures). Every answer is Tally's own bytes.
+//! BRIDGE PILOT LAB (the `pilot-lab` set; its PROVENANCE table is beside the
+//! fixtures). Every answer is Tally's own bytes, from three days of the book:
+//! the 9 Oct set, the company object (`O`, 12 Oct) and the rates read with the
+//! ledger catalogue it is paired with (21 Oct).
 //!
 //! - The admission: the company list, the marks, the book extent, the
 //!   currencies, the ledger compliance listing, the paired listing, the
-//!   groups, the voucher types, the number read, the company's tax units and the
-//!   ledger catalogue the party's bill-wise flag comes from, from the third
-//!   round and the invoice round before the post (marks 16 and 223 in both).
-//!   So is the number read for a number the book uses, from the same day's
+//!   groups, the voucher types, the number read and the company's tax units,
+//!   from the third round and the invoice round before the post (9 Oct, marks
+//!   16 and 223 in both). So is the number read for a number the book uses, from the same day's
 //!   second round (marks 15 and 223: between the rounds one voucher of
 //!   another number was keyed, and the voucher it finds reads the same
 //!   alteration id in both); the lab sent it as the number control's read,
-//!   whose request is the same bytes.
+//!   whose request is the same bytes. The company object the HSN/SAC check
+//!   reads is the 12 Oct answer (`O`).
 //! - The rate listing: the compliance listing with each ledger's GST rate and
 //!   rounding, restricted to the parents of the invoice's ledgers, as the lab
-//!   answered it on 21 Oct 2026 (`Q`, with the ledger catalogue of that day).
+//!   answered it on 21 Oct 2026 (`Q`, with the ledger catalogue read in the same
+//!   minute, which the party's bill-wise flag and the scope come from).
 //!   The derived answers of these tests are built by counted edits: the same
 //!   listing with its ledger rows removed, and with the Sundry Debtors row
 //!   removed (a party under Sales Accounts leaves that parent out of the scope).

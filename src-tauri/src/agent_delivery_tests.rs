@@ -19,8 +19,7 @@ fn server(path: &Path) -> Server {
         max_bytes: 200_000,
         redaction: Redaction::MaskParties,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     })
 }
@@ -441,8 +440,7 @@ mod request_trail_receipts {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
             master_writes_enabled: false,
         })
     }

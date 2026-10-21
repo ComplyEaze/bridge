@@ -35,7 +35,7 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 | `builtin_ratio_analysis_fy_request.utf16le.xml` | 772 | `c47d3a745d75821e39d918867c05a226cd19de062bd31fdb550ec9a096df3103` | request, Ratio Analysis, 2025-04-01 to 2026-03-31 |
 | `builtin_ratio_analysis_probe_b_fy_live.utf16le.xml` | 3636 | `bd2b6621da370413ea602929e4e8bf760a243fc55cedb911c11739134a3dd635` | Ratio Analysis, 23 name and value pairs (not read by any parser) |
 | `builtin_sales_register_fy_request.utf16le.xml` | 772 | `71ac0fb926d28e10423edd7f10df646bedb74fe63545b40500f3f9d6ac341ae1` | request, Sales Register, 2025-04-01 to 2026-03-31 |
-| `builtin_sales_register_probe_b_fy_live.utf16le.xml` | 5888 | `61981e3281f26d1d9fab6199089dd78b5bc5ecbbc1ed6641b899413f8d22c80b` | Sales Register, 12 month rows (not read by any parser) |
+| `builtin_sales_register_probe_b_fy_live.utf16le.xml` | 5888 | `61981e3281f26d1d9fab6199089dd78b5bc5ecbbc1ed6641b899413f8d22c80b` | Sales Register, 12 month rows (the grammar `native_month_register` reads; not read by a test) |
 
 ## Added 2026-10-07: Cash Flow on three more synthetic books
 
@@ -53,3 +53,17 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 | `builtin_cash_flow_amend_lab_apr_sep_live.utf16le.xml` | 2876 | `9c0e4946165e784d00987713a0b1d81651191eb78621c305e064c13600bd08e0` | Cash Flow, 6 month rows, credits present | `eb8c282b7f35bdfe204e37f46db8aae9ccd521bd77220593d20bdffd3018d266` |
 | `builtin_cash_flow_shape_lab_fy_live.utf16le.xml` | 5622 | `f384c5e7b2bfaa4affc8e8941d2e11f8d724a0563cc0f2626812ef42f17ebf3c` | Cash Flow, 12 month rows, both columns and a positive closing | `3e462f1cfa31b3ca68ee9efbf4c663cb9331918bfec2a156633f82122454664a` |
 | `builtin_cash_flow_corpus_dense_fy_empty_live.utf16le.xml` | 5502 | `54667ddd7f613d50c11c3a97b06a57c78eec7b9105878463769c97851c75801a` | Cash Flow, 12 month rows, every amount empty | `d518f28d13549a353b4f9d4de57d844801b1a95b31f1647cd498266bb40ab43d` |
+
+## Added 2026-10-13: the month-wise Sales and Purchase Registers of BRIDGE PILOT LAB
+
+- **Date and instance:** 2026-10-13, 08:17 to 08:18 UTC, one request at a time, TallyPrime 7.1 Silver on Windows, one synthetic company loaded (`BRIDGE PILOT LAB`). Every answer was HTTP 200 with `CONTENT-LENGTH` equal to the bytes on disk, `RESPSTATUS` 1 in the HTTP headers and `/status` healthy before and after; a marks read before the first and after the last request answered the same bytes both times. No dialog appeared at the Tally screen.
+- **Sender:** a lab script (`curl`, not `bridge_mcp`) sending the request files tabled below, UTF-16LE with a BOM, whose text is the envelope `render_built_in_report_request` produces (a test asserts that equality for both). The answers and their send log are on the branch `lab/issue-reads-2026-10-13` (commit `9c75e2e2`, folder `1232/pilot`); each file here is byte-equal to the file there, and its SHA-256 equals the one the send log recorded.
+- **What the captures show:** each answer has the Cash Flow's month-row grammar: 12 rows for 2026-04-01 to 2027-03-31, every month present. The Sales Register prints the month's sales in `DSPCRAMTA` (August 17638.50, September 210.20) and a running total in `DSPCLAMTA` for August and September only (17638.50, then 17848.70), the other months' `DSPCLAMTA` empty; the Purchase Register prints the month's purchases as a negative `DSPDRAMTA` (August -2100.00) and `DSPCLAMTA` for August and, unchanged, for September, which has no amount of its own; its other months are empty. The lab read those figures against the book's vouchers: August's sales equalled the invoice totals, tax included, of the month's Sales-class vouchers that are neither cancelled nor optional, September's the one Sales voucher of 15 Sep; August's purchases the two Purchases' total.
+- **Not established:** equality with Tally's own register screens; credit and debit notes; a book with stock items; a window shorter than the year or crossing years; Receipt, Payment and other registers; other releases.
+
+| file | bytes | sha256 | content |
+| --- | ---: | --- | --- |
+| `builtin_sales_register_pilot_lab_fy_request.utf16le.xml` | 760 | `6b07243bf22fd02207c11e5949eb0f5e670f3b438d58ee3325cf8ceed38d99f6` | request, Sales Register, 2026-04-01 to 2027-03-31, on the pilot lab |
+| `builtin_sales_register_pilot_lab_fy_live.utf16le.xml` | 5562 | `03208b50260350059a55ac7db39acfa4662da89dc35fb357f06443196ad15861` | Sales Register, 12 month rows, two with amounts (read by `native_month_register`) |
+| `builtin_purchase_register_pilot_lab_fy_request.utf16le.xml` | 766 | `84998b3748069d070f6d900427554e7131bfebe48592e7d1bb00418016364fb1` | request, Purchase Register, 2026-04-01 to 2027-03-31, on the pilot lab |
+| `builtin_purchase_register_pilot_lab_fy_live.utf16le.xml` | 5550 | `dc3d8d424786913b6560e1bffa2217b3b03f307afb30e625b36c77de9bde45c5` | Purchase Register, 12 month rows, one with a month amount (read by `native_month_register`) |

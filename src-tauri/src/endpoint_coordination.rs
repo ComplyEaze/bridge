@@ -7,27 +7,65 @@
 //! additionally take a secondary exclusive lock so they remain serialized.
 //! A crash drops the kernel leases; the caller's durable local intent and
 //! reconciliation remain the recovery boundary.
+//!
+//! Each lease is a set of files, one under each coordination root
+//! (`paths::dispatch_coordination_roots`), taken all or none (#1584).
 use crate::local_files::{
     directory::ensure_private_directory,
-    file::{lock_error, open_local_file},
-    paths::default_dispatch_coordination_dir,
+    lock_set::{try_lock_all, HeldLocks, LockMode, LockSetError},
+    paths::dispatch_coordination_roots,
 };
 use bridge_tally_transport::{canonical_loopback_origin, TallyEndpointConfig};
 use sha2::{Digest, Sha256};
-use std::fs::File;
 use std::path::{Path, PathBuf};
 
 pub(crate) struct EndpointDispatchLease {
-    _file: File,
+    _locks: HeldLocks,
 }
 
 pub(crate) struct EndpointSnapshotLease {
     _primary: EndpointObservationLease,
-    _snapshot: File,
+    _snapshot: HeldLocks,
 }
 
 pub(crate) struct EndpointObservationLease {
-    _primary: File,
+    _primary: HeldLocks,
+}
+
+/// The roots every lease is taken under, or the refusal when one cannot be
+/// resolved.
+fn roots() -> Result<Vec<PathBuf>, String> {
+    dispatch_coordination_roots().ok_or_else(|| "import_admission_lock_unavailable".to_string())
+}
+
+fn as_paths(roots: &[PathBuf]) -> Vec<&Path> {
+    roots.iter().map(PathBuf::as_path).collect()
+}
+
+fn lease_error(error: LockSetError) -> String {
+    match error {
+        LockSetError::Busy => "import_admission_busy",
+        LockSetError::Unavailable => "import_admission_lock_unavailable",
+    }
+    .into()
+}
+
+/// The port's lease file under each root, with `extension` for a lock beside it.
+fn lease_paths(
+    roots: &[&Path],
+    endpoint: &TallyEndpointConfig,
+    extension: Option<&str>,
+) -> Result<Vec<PathBuf>, String> {
+    roots
+        .iter()
+        .map(|root| {
+            let path = lease_path(root, endpoint)?;
+            Ok(match extension {
+                Some(extension) => path.with_extension(extension),
+                None => path,
+            })
+        })
+        .collect()
 }
 
 /// Acquire the existing nonblocking, exclusive per-user/per-port dispatch lease.
@@ -37,9 +75,7 @@ pub(crate) struct EndpointObservationLease {
 /// Tally listener. This is intentionally more conservative than the transport
 /// endpoint identity.
 pub(crate) fn acquire(endpoint: &TallyEndpointConfig) -> Result<EndpointDispatchLease, String> {
-    let root = default_dispatch_coordination_dir()
-        .ok_or_else(|| "import_admission_lock_unavailable".to_string())?;
-    acquire_at(&root, endpoint)
+    acquire_at(&as_paths(&roots()?), endpoint)
 }
 
 /// Acquire a short shared observation lease. An active native dispatch excludes
@@ -47,9 +83,7 @@ pub(crate) fn acquire(endpoint: &TallyEndpointConfig) -> Result<EndpointDispatch
 pub(crate) fn acquire_observation(
     endpoint: &TallyEndpointConfig,
 ) -> Result<EndpointObservationLease, String> {
-    let root = default_dispatch_coordination_dir()
-        .ok_or_else(|| "import_admission_lock_unavailable".to_string())?;
-    acquire_observation_at(&root, endpoint)
+    acquire_observation_at(&as_paths(&roots()?), endpoint)
 }
 
 /// Acquire a serialized read-only snapshot lease: shared on the primary
@@ -57,42 +91,34 @@ pub(crate) fn acquire_observation(
 pub(crate) fn acquire_snapshot(
     endpoint: &TallyEndpointConfig,
 ) -> Result<EndpointSnapshotLease, String> {
-    let root = default_dispatch_coordination_dir()
-        .ok_or_else(|| "import_admission_lock_unavailable".to_string())?;
-    acquire_snapshot_at(&root, endpoint)
+    acquire_snapshot_at(&as_paths(&roots()?), endpoint)
 }
 
 fn acquire_at(
-    coordination_root: &Path,
+    roots: &[&Path],
     endpoint: &TallyEndpointConfig,
 ) -> Result<EndpointDispatchLease, String> {
-    let path = lease_path(coordination_root, endpoint)?;
-    let file = open_local_file(&path, true)
-        .map_err(|_| "import_admission_lock_unavailable".to_string())?;
-    file.try_lock().map_err(lock_error)?;
-    Ok(EndpointDispatchLease { _file: file })
+    let paths = lease_paths(roots, endpoint, None)?;
+    let locks = try_lock_all(&paths, LockMode::Exclusive).map_err(lease_error)?;
+    Ok(EndpointDispatchLease { _locks: locks })
 }
 
 fn acquire_observation_at(
-    coordination_root: &Path,
+    roots: &[&Path],
     endpoint: &TallyEndpointConfig,
 ) -> Result<EndpointObservationLease, String> {
-    let path = lease_path(coordination_root, endpoint)?;
-    let file = open_local_file(&path, true)
-        .map_err(|_| "import_admission_lock_unavailable".to_string())?;
-    file.try_lock_shared().map_err(lock_error)?;
-    Ok(EndpointObservationLease { _primary: file })
+    let paths = lease_paths(roots, endpoint, None)?;
+    let locks = try_lock_all(&paths, LockMode::Shared).map_err(lease_error)?;
+    Ok(EndpointObservationLease { _primary: locks })
 }
 
 fn acquire_snapshot_at(
-    coordination_root: &Path,
+    roots: &[&Path],
     endpoint: &TallyEndpointConfig,
 ) -> Result<EndpointSnapshotLease, String> {
-    let primary = acquire_observation_at(coordination_root, endpoint)?;
-    let snapshot_path = lease_path(coordination_root, endpoint)?.with_extension("snapshot.lock");
-    let snapshot = open_local_file(&snapshot_path, true)
-        .map_err(|_| "import_admission_lock_unavailable".to_string())?;
-    snapshot.try_lock().map_err(lock_error)?;
+    let primary = acquire_observation_at(roots, endpoint)?;
+    let paths = lease_paths(roots, endpoint, Some("snapshot.lock"))?;
+    let snapshot = try_lock_all(&paths, LockMode::Exclusive).map_err(lease_error)?;
     Ok(EndpointSnapshotLease {
         _primary: primary,
         _snapshot: snapshot,

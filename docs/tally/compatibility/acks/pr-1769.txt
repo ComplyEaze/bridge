@@ -1,0 +1,9 @@
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_change_parse.rs
+src-tauri/src/agent_read_profiles.rs
+src-tauri/src/agent_responses.rs
+src-tauri/src/agent_tests.rs
+src-tauri/src/agent_voucher_parse_tests.rs
+removed-pin: src-tauri/src/agent_changes.rs
+reviewer: lamemustafa

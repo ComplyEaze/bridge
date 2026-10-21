@@ -180,8 +180,7 @@ async fn forex_outstandings(
         max_bytes: 200_000,
         redaction,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let response = server
@@ -621,8 +620,7 @@ async fn mcp_outstandings_refuse_a_conflicting_detail_request_before_any_read() 
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let guid = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
@@ -779,8 +777,7 @@ async fn ageing_outstandings_with(
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let mut arguments =
@@ -1014,8 +1011,7 @@ async fn replay_recorded_call(
         max_bytes: 2_000_000,
         redaction,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let response = server

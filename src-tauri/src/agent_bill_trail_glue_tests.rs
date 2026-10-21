@@ -135,8 +135,7 @@ async fn run(
         max_bytes: 200_000,
         redaction: call.redaction,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
     });
     let (mut company, identity, _) = server.verified_company(CAPTURED_GUID).await.unwrap();

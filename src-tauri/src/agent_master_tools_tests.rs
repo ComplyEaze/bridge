@@ -16,7 +16,7 @@ use super::super::master_post::{TEST_LEDGER_INDEX, TEST_LEDGER_INDEX_AFTER_POST}
 use super::verify::{judged_next_step, not_read_back_next_step};
 use super::*;
 use crate::agent::master_writes_effective;
-use crate::agent::{Redaction, Settings};
+use crate::agent::{Posting, Redaction, Settings};
 use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
 use crate::tally::approved_import::{ApprovedImport, DispatchLicense};
 use crate::tally::VerifiedCompanyIdentity;
@@ -250,8 +250,7 @@ fn server_with(
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: Posting::On,
         master_writes_enabled,
     })
 }
@@ -424,17 +423,20 @@ fn assert_no_private_value(label: &str, text: &str) {
 #[test]
 fn the_master_writes_setting_is_off_unset_and_on_for_true_and_one() {
     use std::env::VarError::NotPresent;
-    assert_eq!(master_writes_effective(Err(NotPresent), true), Ok(false));
+    assert_eq!(
+        master_writes_effective(Err(NotPresent), Posting::On),
+        Ok(false)
+    );
     for on in ["1", "true"] {
         assert_eq!(
-            master_writes_effective(Ok(on.into()), true),
+            master_writes_effective(Ok(on.into()), Posting::On),
             Ok(true),
             "{on}"
         );
     }
     for off in ["0", "false"] {
         assert_eq!(
-            master_writes_effective(Ok(off.into()), true),
+            master_writes_effective(Ok(off.into()), Posting::On),
             Ok(false),
             "{off}"
         );
@@ -444,17 +446,17 @@ fn the_master_writes_setting_is_off_unset_and_on_for_true_and_one() {
 #[test]
 fn the_master_writes_setting_is_validated_even_with_posting_off() {
     use std::env::VarError::NotPresent;
-    for writes in [false, true] {
+    for writes in [Posting::Off, Posting::On, Posting::RetiredSettingPresent] {
         for bad in ["yes", "TRUE", "", "2", " true"] {
             assert_eq!(
                 master_writes_effective(Ok(bad.into()), writes),
                 Err("boolean_setting_invalid".to_string()),
-                "{bad:?} writes={writes}"
+                "{bad:?} writes={writes:?}"
             );
         }
     }
     assert_eq!(
-        master_writes_effective(Err(std::env::VarError::NotUnicode("x".into())), true),
+        master_writes_effective(Err(std::env::VarError::NotUnicode("x".into())), Posting::On),
         Err("boolean_setting_invalid".to_string())
     );
     let _ = NotPresent;
@@ -463,7 +465,22 @@ fn the_master_writes_setting_is_validated_even_with_posting_off() {
 #[test]
 fn master_writes_on_without_posting_is_ineffective() {
     for on in ["1", "true"] {
-        assert_eq!(master_writes_effective(Ok(on.into()), false), Ok(false));
+        assert_eq!(
+            master_writes_effective(Ok(on.into()), Posting::Off),
+            Ok(false)
+        );
+    }
+}
+
+/// Posting on with the retired batch setting still present makes `post_import`
+/// refuse until it is removed; master writes stay off for as long.
+#[test]
+fn master_writes_stay_off_while_the_retired_batch_setting_is_present() {
+    for on in ["1", "true"] {
+        assert_eq!(
+            master_writes_effective(Ok(on.into()), Posting::RetiredSettingPresent),
+            Ok(false)
+        );
     }
 }
 
@@ -1941,7 +1958,11 @@ fn the_hand_key_step_appears_only_for_a_read_that_found_the_name_absent_and_did_
     // by hand; the open absent state says the name stays held and what a later
     // call shows.
     for step in &seen {
-        for hand in ["create it in Tally by hand", "keyed by hand", "Keying it by hand"] {
+        for hand in [
+            "create it in Tally by hand",
+            "keyed by hand",
+            "Keying it by hand",
+        ] {
             assert!(!step.contains(hand), "{step}");
         }
     }

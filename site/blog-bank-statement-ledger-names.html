@@ -200,8 +200,8 @@
 <p>This post is about release 0.4.1. If you have 0.3.0 or 0.4.0, remove it and install 0.4.1 or later first, because the bank-statement tool in those had a flaw about network paths (the security page describes it).</p></div>
 <h2 id="limits">Limits to know before you rely on it</h2>
 <dl class="limits">
-<div><dt>Posting is one voucher per batch.</dt><dd>The published extension does not turn on batch posting, so it refuses a batch of more than one voucher, and a batch built from several statement rows holds several.</dd></div>
-<div><dt>If you post a single voucher, it waits for you.</dt><dd>Posting starts off, and an upgrade may keep it on, so check the setting. Each voucher waits for your approval in a separate window, and the approval lasts at most fifteen minutes. No ComplyEaze Bridge tool can approve it, but software that can control your screen could click the button, so close such software first.</dd></div>
+<div><dt>With posting on, a batch can be posted.</dt><dd>The extension can post a saved batch of 2 to 50 vouchers after one approval of its summary, and a batch built from several statement rows holds several.</dd></div>
+<div><dt>If you post, it waits for you.</dt><dd>Posting starts off, and its setting is new, so if you turned posting on in an earlier version, turn it on again. Each post waits for your approval in a separate window, and the approval lasts at most fifteen minutes. No ComplyEaze Bridge tool can approve it, but software that can control your screen could click the button, so close such software first.</dd></div>
 <div><dt>Leave companies and ledgers alone until the post lands.</dt><dd>A rename, replacement or reload at that moment can send the voucher elsewhere.</dd></div>
 <div><dt>ComplyEaze Bridge cannot undo a posted voucher.</dt><dd>You fix mistakes in Tally.</dd></div>
 <div><dt>Party amounts land On Account.</dt><dd>Bill-wise allocation is not supported. It does not post sales, purchase, tax or inventory entries.</dd></div>

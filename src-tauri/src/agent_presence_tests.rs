@@ -22,8 +22,7 @@ fn offline_server(directory: &std::path::Path) -> Server {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     })
 }
@@ -781,8 +780,7 @@ async fn a_small_book_window_is_counted_so_a_proposal_nothing_resembles_is_absen
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let response = server
@@ -855,8 +853,7 @@ async fn an_uncounted_nonempty_window_issues_no_absent() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let response = server
@@ -907,8 +904,7 @@ async fn a_nonempty_window_counted_by_its_census_can_issue_absent() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let response = server
@@ -966,8 +962,7 @@ async fn a_narration_marker_decides_a_present_from_a_nonempty_window() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let response = server
@@ -1166,8 +1161,7 @@ async fn a_ledger_missing_from_the_catalogue_fails_closed() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let response = server
@@ -1218,8 +1212,7 @@ async fn a_party_with_too_many_identifiers_costs_no_read() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let response = server
@@ -1403,8 +1396,7 @@ async fn replay_the_twenty_invoice_engagement() {
         redaction: Redaction::None,
         import_enabled: false,
         // Read-only, and stated in the settings rather than only in a comment.
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
 
@@ -1834,8 +1826,7 @@ async fn a_batch_id_the_writer_could_not_have_made_is_refused() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     for (batch, refused) in [
@@ -1900,8 +1891,7 @@ async fn a_transaction_label_outside_the_published_nested_schema_is_refused_befo
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     // A space is the case the writer rejects and the declared pattern names.
@@ -1958,8 +1948,7 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let response = server

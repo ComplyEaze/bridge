@@ -22,8 +22,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use sha1::{Digest, Sha1};
-
 use crate::book::{Book, Voucher};
 use crate::documents::{AisRow, Form26asRow, TisRow};
 use crate::error::Result;
@@ -31,7 +29,7 @@ use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value}
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::{iso, Window};
 use crate::rules::Rules;
-use crate::support::{count, overflow, py_repr_str, voucher_label};
+use crate::support::{count, hash8, overflow, py_repr_str, voucher_label};
 use crate::Tds26asConfig;
 
 pub const TEST_ID: &str = "tds_tcs_26as";
@@ -66,11 +64,6 @@ fn part_kind(part: &str) -> Option<&'static str> {
         "VI" => Some("tcs"),
         _ => None,
     }
-}
-
-/// The reference's `_hash`: sha1 of the text, first 8 hex digits.
-fn hash8(text: &str) -> String {
-    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()
 }
 
 fn sum_paise(mut values: impl Iterator<Item = i64>) -> Result<i64> {
@@ -972,4 +965,39 @@ twentysixas_agg_count ({agg_total})"
         }
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bridge_tally_primitives::TallyDate;
+
+    /// A configured deductor alias is a figure whose id carries the first eight hex digits of the
+    /// sha1 of its TAN (`hashlib.sha1(b"TAN-X").hexdigest()[:8]`, measured in Python), so a change
+    /// to the shared tag changes this module's ids.
+    #[test]
+    fn a_deductor_alias_figure_is_tagged_with_the_sha1_of_its_tan() {
+        let cfg = Tds26asConfig {
+            deductor_aliases: BTreeMap::from([("TAN-X".to_string(), "Deductor X".to_string())]),
+            ..Default::default()
+        };
+        let period = Window {
+            from: TallyDate::parse("20250401").unwrap(),
+            to: TallyDate::parse("20260331").unwrap(),
+        };
+        let r = run(
+            &Book::default(),
+            &Rules::vendored().unwrap(),
+            &period,
+            &[],
+            &[],
+            &[],
+            &cfg,
+        )
+        .unwrap();
+        assert!(r
+            .figures
+            .iter()
+            .any(|f| f.id == "tds_tcs_26as.alias_e23ad136"));
+    }
 }

@@ -108,9 +108,104 @@ pub(super) struct VoucherAdmission {
     /// The company's Currency masters, re-read inside the queue: a post goes
     /// only into a book with exactly one (bridge#551).
     currency_request: AgentReadRequest,
+    /// The reads an invoice's admission makes, for the queue to make again
+    /// under its lock (#1337). `None` for every other voucher type. Boxed so
+    /// that an approval an enum carries stays the size it was.
+    invoice: Option<Box<InvoiceReadPlan>>,
+}
+
+/// The reads one Sales invoice's admission makes of its masters, fixed from the
+/// saved invoice when the plan is made (#1337). The queue sends exactly these
+/// inside the identity brackets of the POST and hands the answers back; what
+/// they mean is the admission's own judgement, run on them there, so the rule
+/// has one copy and a master added to the admission reaches the queue with it.
+#[derive(Clone, Debug)]
+pub(crate) struct InvoiceReadPlan {
+    /// The company the reads are about, as the admission names it.
+    pub(crate) company_name: String,
+    /// The date the compliance listing is read as of.
+    pub(crate) listing_as_of: TallyDate,
+    /// What the queue may do with the marks and currencies it has read before
+    /// it sends any of the reads below. The admission provides it, so the size
+    /// limits and the currency are judged by the rule the build judges them by,
+    /// ahead of the reads they spare.
+    pub(crate) precheck: InvoicePrechecker,
+    /// The company's own ledger count: sent only when the precheck asks for it,
+    /// for a book over the master mark.
+    pub(crate) ledger_count: AgentReadRequest,
+    pub(crate) rates: AgentReadRequest,
+    pub(crate) voucher_types: AgentReadRequest,
+    pub(crate) number: AgentReadRequest,
+    /// The same read for the invoice the journal held as the number's control.
+    pub(crate) number_control: Option<AgentReadRequest>,
+    pub(crate) registration: AgentReadRequest,
+    /// The company object the HSN/SAC check reads once the classification
+    /// admits, and the groups with their HSN/SAC rows. The build sends the
+    /// groups only when a sales ledger's own row defers to them; the queue
+    /// sends them whenever it sends the invoice's reads, and the judge parses
+    /// an answer that is present whether or not it is needed, so a groups
+    /// answer that cannot be read fails the post in the queue only.
+    pub(crate) company_hsn: AgentReadRequest,
+    pub(crate) group_hsn: AgentReadRequest,
+}
+
+/// What the queue has read when it asks whether an invoice's reads may go on.
+pub(crate) struct InvoicePrecheckInput<'a> {
+    /// The all-company marks, as the binding reads began.
+    pub(crate) marks: &'a str,
+    /// The company's Currency masters, as the queue read them.
+    pub(crate) currencies: &'a str,
+    /// The company's ledger count, once the precheck has asked for it.
+    pub(crate) ledger_count: Option<&'a str>,
+    pub(crate) company_name: &'a str,
+    pub(crate) company_guid: &'a str,
+}
+
+/// The precheck's answer when it refuses nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InvoicePrecheck {
+    /// The limits and the currency admit the book: send the rest of the plan.
+    Admitted,
+    /// The master mark is over the size gate's mark: the ledger count decides.
+    NeedsLedgerCount,
+}
+
+/// A function of the invoice module that the queue runs before the plan's
+/// reads, so that this layer does not call that one.
+pub(crate) type InvoicePrechecker =
+    fn(&InvoicePrecheckInput<'_>) -> Result<InvoicePrecheck, ApprovedImportAdmissionError>;
+
+/// What the queue read for an [`InvoiceReadPlan`], or what the build has read
+/// of one so far: each answer is `None` until it is read. The admission's judge
+/// names the first answer it still needs.
+#[derive(Debug, Default)]
+pub(crate) struct InvoiceAnswers {
+    /// The all-company marks, as the binding reads began.
+    pub(crate) marks: Option<String>,
+    pub(crate) ledger_count: Option<String>,
+    pub(crate) listing: Option<super::runtime::PartyLedgerMasterListing>,
+    pub(crate) rates: Option<String>,
+    pub(crate) voucher_types: Option<String>,
+    pub(crate) number: Option<String>,
+    pub(crate) number_control: Option<String>,
+    pub(crate) registration: Option<String>,
+    pub(crate) company_hsn: Option<String>,
+    pub(crate) group_hsn: Option<String>,
+}
+
+/// An invoice's plan and the answers the queue read for it.
+pub(crate) struct QueuedInvoice<'a> {
+    pub(crate) plan: &'a InvoiceReadPlan,
+    pub(crate) answers: &'a InvoiceAnswers,
 }
 
 impl VoucherAdmission {
+    /// The reads an invoice's admission makes, `None` for every other
+    /// voucher type (#1337).
+    pub(super) fn invoice_plan(&self) -> Option<&InvoiceReadPlan> {
+        self.invoice.as_deref()
+    }
+
     pub(super) fn verification_request(&self) -> AgentReadRequest {
         self.verification_request.clone()
     }
@@ -213,6 +308,8 @@ pub(crate) enum QueuedAdmission<'a> {
         company_marks_at_binding: &'a str,
         company_marks: &'a str,
         ledger_binding: &'a StandardLedgerCatalogBinding,
+        /// An invoice's masters, read again for the admission's judge (#1337).
+        invoice: Option<QueuedInvoice<'a>>,
     },
     /// Each index is read twice, as the voucher absence reads are: the recheck
     /// requires the pairs byte-equal.
@@ -265,9 +362,23 @@ impl ApprovedImport {
                 ledger_binding,
                 group_collection_request,
                 currency_request,
+                invoice: None,
             }),
             company_marks_request,
         })
+    }
+
+    /// The same approval, to be redeemed with an invoice's masters read again
+    /// in the queue. A plain field of the approval and no part of what the
+    /// person was shown: the queue's judge holds the plan to the invoice. Only
+    /// a voucher approval carries a plan; a master approval is returned as it
+    /// is, since the voucher post that calls this admits a voucher approval
+    /// only.
+    pub(crate) fn with_invoice(mut self, invoice: Option<InvoiceReadPlan>) -> Self {
+        if let ApprovedKind::Vouchers(vouchers) = &mut self.kind {
+            vouchers.invoice = invoice.map(Box::new);
+        }
+        self
     }
 
     /// The master post's approval: the one-ledger dialog, answered only by its
@@ -398,6 +509,7 @@ impl ApprovedImport {
                 ledger_binding,
                 group_collection_request: None,
                 currency_request,
+                invoice: None,
             }),
             company_marks_request,
         }
@@ -667,7 +779,10 @@ pub(crate) enum ApprovedImportAdmissionError {
     BaseCurrencyUndetermined,
     /// The target's master mark (ALTMSTID) moved between the snapshot taken as
     /// the queue's binding reads began and the aim snapshot read last before
-    /// the POST: a master changed after the catalogue re-read (bridge#239).
+    /// the POST: a master changed after the catalogue re-read (bridge#239). Or
+    /// it moved between the mark the voucher numbering was read under, before
+    /// the approval, and that first snapshot (bridge#724): a master, perhaps a
+    /// voucher type, changed since the numbering was read.
     #[error("post_masters_moved")]
     MastersMoved,
     /// That comparison could not be made: the first snapshot could not be
@@ -697,6 +812,21 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// so a foreign company's answer is told apart from a malformed one.
     #[error("master_ledger_index_unavailable")]
     MasterLedgerIndexUnavailable { cause: &'static str },
+    /// What the queue read of an invoice's masters differs from what the build
+    /// recorded (#1337). `field` names the first that differs.
+    #[error("import_invoice_masters_changed")]
+    InvoiceMastersChanged { field: &'static str },
+    /// The admission's judge refused the invoice on the queue's reads, under
+    /// the code the build would have refused it with: a number now in use, a
+    /// series set back to Automatic, a registration lapsed (#1337).
+    #[error("{code}")]
+    InvoiceRefused { code: String },
+    /// A read of an invoice's masters that could not be used (a response that
+    /// does not parse, a request that is not admitted), under the code that
+    /// names it. Not a master that moved, and not the admission refusing the
+    /// invoice (#1337).
+    #[error("{code}")]
+    InvoiceReadUnusable { code: String },
 }
 
 /// The data-free code a group snapshot refusal carries as its `cause`, for
@@ -778,6 +908,11 @@ pub(crate) enum UnderLockRefusal {
     /// state could not be checked: nothing was recorded and nothing was sent.
     #[error("master_ledger_unavailable")]
     MasterJournalUnavailable,
+    /// Another invoice of this company was sent and is not verified posted, as
+    /// an approval dialog stood open (ADR 0004, slice 4): nothing was recorded
+    /// or sent.
+    #[error("invoice_company_stopped")]
+    CompanyStopped,
 }
 
 impl UnderLockRefusal {
@@ -796,6 +931,7 @@ impl UnderLockRefusal {
             Self::MasterOverlapsOpenDispatch => "master_ledger_open_dispatch_overlaps",
             Self::MasterJournalRefused => "master_ledger_invalid",
             Self::MasterJournalUnavailable => "master_ledger_unavailable",
+            Self::CompanyStopped => "invoice_company_stopped",
         }
     }
 }
@@ -1971,7 +2107,8 @@ fn review_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
+        MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = review_question(count)
@@ -1985,7 +2122,11 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND,
+            // Topmost: a window the connector opens while Tally fills the
+            // screen is otherwise drawn behind it, since a background
+            // process may not take the foreground (#1589). It changes only
+            // the drawing order; No stays the default button.
+            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }
 }
@@ -2037,7 +2178,8 @@ fn post_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
+        MB_YESNOCANCEL,
     };
     // rfd without common-controls-v6 discards custom labels. Use the existing
     // Win32 dependency so No is the default and Escape/close remain Cancel.
@@ -2050,7 +2192,11 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND,
+            // Topmost: a window the connector opens while Tally fills the
+            // screen is otherwise drawn behind it, since a background
+            // process may not take the foreground (#1589). It changes only
+            // the drawing order; No stays the default button.
+            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }
 }

@@ -118,6 +118,7 @@ pub enum ReadOnlyProfileId {
     StandardLedgerCatalogV3,
     LedgersV1,
     AuditCompanyObjectV1,
+    InvoiceCompanyHsnV1,
     AuditLedgersV1,
     AuditVouchersV1,
     AuditStockItemsV1,
@@ -135,6 +136,7 @@ impl ReadOnlyProfileId {
             Self::StandardLedgerCatalogV3 => "standard_ledger_catalog_v3",
             Self::LedgersV1 => "ledgers_v1",
             Self::AuditCompanyObjectV1 => "audit_company_object_v1",
+            Self::InvoiceCompanyHsnV1 => "invoice_company_hsn_v1",
             Self::AuditLedgersV1 => "audit_ledgers_v1",
             Self::AuditVouchersV1 => "audit_vouchers_v1",
             Self::AuditStockItemsV1 => "audit_stock_items_v1",
@@ -173,7 +175,12 @@ impl ReadOnlyProfileId {
             Self::StandardLedgerCatalogV2 => render_standard_ledger_catalog_v2(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV3 => render_standard_ledger_catalog_v3(TEMPLATE_COMPANY),
             Self::LedgersV1 => render_ledgers(TEMPLATE_COMPANY),
-            Self::AuditCompanyObjectV1 => render_audit_company_object(TEMPLATE_COMPANY),
+            Self::AuditCompanyObjectV1 => {
+                render_company_object(TEMPLATE_COMPANY, &AUDIT_COMPANY_FETCH)
+            }
+            Self::InvoiceCompanyHsnV1 => {
+                render_company_object(TEMPLATE_COMPANY, &INVOICE_COMPANY_FETCH)
+            }
             Self::AuditLedgersV1 => {
                 render_audit_ledgers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
             }
@@ -285,6 +292,11 @@ pub enum ReadOnlyProfile<'a> {
     AuditCompanyObjectV1 {
         company: &'a ValidatedCompanyName,
     },
+    /// The company object an invoice build reads for the company-level
+    /// HSN/SAC and its settings. See [`INVOICE_COMPANY_FETCH`].
+    InvoiceCompanyHsnV1 {
+        company: &'a ValidatedCompanyName,
+    },
     /// The `ledgers` part of a tally-read v1 read, for the audit period.
     AuditLedgersV1 {
         company: &'a ValidatedCompanyName,
@@ -314,6 +326,7 @@ impl ReadOnlyProfile<'_> {
             Self::StandardLedgerCatalogV3 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV3,
             Self::LedgersV1 { .. } => ReadOnlyProfileId::LedgersV1,
             Self::AuditCompanyObjectV1 { .. } => ReadOnlyProfileId::AuditCompanyObjectV1,
+            Self::InvoiceCompanyHsnV1 { .. } => ReadOnlyProfileId::InvoiceCompanyHsnV1,
             Self::AuditLedgersV1 { .. } => ReadOnlyProfileId::AuditLedgersV1,
             Self::AuditVouchersV1 { .. } => ReadOnlyProfileId::AuditVouchersV1,
             Self::AuditStockItemsV1 { .. } => ReadOnlyProfileId::AuditStockItemsV1,
@@ -344,7 +357,12 @@ impl ReadOnlyProfile<'_> {
                 render_standard_ledger_catalog_v3(company.as_str())
             }
             Self::LedgersV1 { company } => render_ledgers(company.as_str()),
-            Self::AuditCompanyObjectV1 { company } => render_audit_company_object(company.as_str()),
+            Self::AuditCompanyObjectV1 { company } => {
+                render_company_object(company.as_str(), &AUDIT_COMPANY_FETCH)
+            }
+            Self::InvoiceCompanyHsnV1 { company } => {
+                render_company_object(company.as_str(), &INVOICE_COMPANY_FETCH)
+            }
             Self::AuditLedgersV1 { company, period } => render_audit_ledgers(
                 company.as_str(),
                 period.from_yyyymmdd(),
@@ -666,6 +684,15 @@ fn render_ledgers(company: &str) -> String {
 /// profile id.
 pub const AUDIT_COMPANY_FETCH: [&str; 4] = ["GUID", "NAME", "BOOKSFROM", "ISINTEGRATED"];
 
+/// FETCHLIST of the invoice build's company read (`InvoiceCompanyHsnV1`):
+/// every field, the shape that was measured (§9.11a). The company-level
+/// HSN/SAC (`HSNDETAILS.LIST`) and its settings (`CMPGSTDETAILS.LIST`) came
+/// back in it and not in the company collection (protocol reference §9.16,
+/// the HSN/SAC check before a post, 12 Oct 2026); whether an explicit list
+/// carries them is not measured. The answer is parsed for those lists and
+/// the company's GUID, then dropped: it is never stored.
+pub const INVOICE_COMPANY_FETCH: [&str; 1] = ["*"];
+
 /// FETCH of the tally-read v1 `ledgers` part (`AuditLedgersV1`).
 ///
 /// The fields the audit consumers were recorded reading (the recorded
@@ -722,9 +749,9 @@ INVENTORYENTRIESOUT.STOCKITEMNAME,INVENTORYENTRIESOUT.ACTUALQTY,INVENTORYENTRIES
 pub const AUDIT_STOCK_ITEM_FETCH: &str = "NAME, GUID, PARENT, BASEUNITS, \
 OPENINGBALANCE, OPENINGVALUE, CLOSINGBALANCE, CLOSINGVALUE";
 
-fn render_audit_company_object(company: &str) -> String {
+fn render_company_object(company: &str, fetch: &[&str]) -> String {
     let company = xml_escape(company);
-    let fetch = AUDIT_COMPANY_FETCH
+    let fetch = fetch
         .iter()
         .map(|field| format!("<FETCH>{field}</FETCH>"))
         .collect::<String>();

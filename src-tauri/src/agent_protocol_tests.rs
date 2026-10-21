@@ -18,8 +18,7 @@ fn server(path: &Path) -> Server {
         max_bytes: 200_000,
         redaction: Redaction::MaskParties,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     })
 }
@@ -118,7 +117,7 @@ async fn served_instructions(import_enabled: bool, writes_enabled: bool) -> Stri
     let directory = tempfile::tempdir().unwrap();
     let mut served = server(directory.path());
     served.settings.import_enabled = import_enabled;
-    served.settings.writes_enabled = writes_enabled;
+    served.settings.posting = Posting::from_enabled(writes_enabled);
     let responses = session(served, &[initialize("2025-06-18")]).await;
     responses[0]["result"]["instructions"]
         .as_str()
@@ -196,6 +195,32 @@ fn descriptions<'a>(value: &'a Value, path: &str, out: &mut Vec<(String, &'a str
     }
 }
 
+/// While the retired batch setting refuses `post_import` (#1090), posting is
+/// still configured on: both posting tools stay listed, so the refusal names
+/// what to remove rather than the tool vanishing.
+#[tokio::test]
+async fn the_retired_batch_setting_keeps_the_posting_tools_listed() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut served = server(directory.path());
+    served.settings.posting = Posting::RetiredSettingPresent;
+    let responses = session(
+        served,
+        &[
+            initialize("2025-06-18"),
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+        ],
+    )
+    .await;
+    let names: Vec<&str> = responses[1]["result"]["tools"]
+        .as_array()
+        .expect("tools/list result")
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect();
+    assert!(names.contains(&"post_import"), "{names:?}");
+    assert!(names.contains(&"acknowledge_post_review"), "{names:?}");
+}
+
 /// The server instructions and every tool and parameter description pair their
 /// backticks, checked as `initialize` and `tools/list` serve them, with posting
 /// off and on. One lost backtick turns every later code span in that text inside
@@ -216,7 +241,7 @@ async fn every_served_description_and_instruction_pairs_its_backticks() {
         let mut served = server(directory.path());
         served.settings.max_bytes = 4_000_000;
         served.settings.import_enabled = import_enabled;
-        served.settings.writes_enabled = writes_enabled;
+        served.settings.posting = Posting::from_enabled(writes_enabled);
         let responses = session(
             served,
             &[
@@ -526,11 +551,15 @@ async fn unknown_tools_and_methods_return_protocol_errors_with_exact_refusal_rec
         json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"absent_tool","arguments":{}}}),
         json!({"jsonrpc":"2.0","id":3,"method":"absent/method"}),
         json!({"jsonrpc":"2.0","id":4,"method":"ping"}),
+        json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"changed_since","arguments":{}}}),
     ]).await;
     assert_eq!(responses[1]["error"]["code"], -32602);
     assert_eq!(responses[1]["error"]["message"], "tool_not_found");
     assert_eq!(responses[2]["error"]["code"], -32601);
     assert_eq!(responses[3]["result"], json!({}));
+    // The removed change-feed tool is an unknown name like any other.
+    assert_eq!(responses[4]["error"]["code"], -32602);
+    assert_eq!(responses[4]["error"]["message"], "tool_not_found");
     let receipt: Value = serde_json::from_str(
         fs::read_to_string(directory.path().join("agent-egress.jsonl"))
             .unwrap()
@@ -546,6 +575,20 @@ async fn unknown_tools_and_methods_return_protocol_errors_with_exact_refusal_rec
     assert_eq!(
         receipt["response_sha256"],
         sha256_hex(format!("{}\n", responses[1]).as_bytes())
+    );
+    let removed_tool_receipt: Value =
+        fs::read_to_string(directory.path().join("agent-egress.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .find(|receipt| receipt["tool_name_sha256"] == sha256_hex(b"changed_since"))
+            .expect("a receipt for the removed tool's name");
+    assert_eq!(removed_tool_receipt["tool"], "unknown");
+    assert_eq!(removed_tool_receipt["rows_prepared"], 0);
+    assert_eq!(removed_tool_receipt["fields_prepared"], json!([]));
+    assert_eq!(
+        removed_tool_receipt["response_sha256"],
+        sha256_hex(format!("{}\n", responses[4]).as_bytes())
     );
 }
 

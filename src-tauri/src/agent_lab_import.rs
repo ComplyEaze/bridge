@@ -2375,11 +2375,11 @@ fn lab_marker_id(source_guid: &str) -> Uuid {
 /// `narration_text` for why a third key is needed).
 ///
 /// `voucher_number` alone is not durable: TallyPrime silently reassigns it
-/// to its own per-voucher-type sequential series on Create, in **receipt**
-/// order, not the value supplied
-/// (protocol reference §9.8 records the supplied number being discarded
-/// under automatic numbering; the reassignment was reproduced on both
-/// Education and licensed builds in runs not recorded in this repository).
+/// to its own per-voucher-type sequential series on Create, not the value
+/// supplied (protocol reference §9.8 records the supplied number being
+/// discarded under automatic numbering). That the new numbers follow the
+/// **receipt** order is UNVERIFIED here: it was seen in lab runs on both
+/// Education and licensed builds that this repository does not record.
 /// The 2026-09-14 rehearsal hit exactly this: batch 1 posted two same-date groups
 /// (Payment 20250518 #98-106, Contra 20250609 #9-11) whose supplied
 /// numbers were NOT in ascending numeric order in the request (a separate,
@@ -2548,11 +2548,11 @@ fn voucher_mismatch_detail(expected: &BookVoucher, observed: &[ObservedVoucher])
 /// compared **numerically** when it parses as an integer. The original code
 /// compared `voucher_number` as a plain `&str`, so for one date "100"
 /// sorted before "98" -- a batch is posted to Tally in THIS order, and
-/// TallyPrime auto-numbers Payment/Receipt/Contra by receipt order rather
-/// than by the supplied `VOUCHERNUMBER`
-/// (protocol reference §12a.4 row 6, §9.8), so a scrambled posting order
-/// produces Tally-assigned numbers that no longer line up with the book's
-/// own numbers. This is what actually produced the 2026-09-14 rehearsal's
+/// TallyPrime auto-numbers Payment/Receipt/Contra instead of using the
+/// supplied `VOUCHERNUMBER` (protocol reference §12a.4 row 6, §9.8); if it
+/// does so in receipt order (UNVERIFIED here, see `voucher_number` above), a
+/// scrambled posting order produces Tally-assigned numbers that no longer
+/// line up with the book's own numbers. This is what actually produced the 2026-09-14 rehearsal's
 /// 11 batch-1 mismatches: two same-date groups (Payment 20250518 #98-106,
 /// Contra 20250609 #9-11) whose numbers cross a power-of-10 boundary were
 /// sent out of numeric order. A non-numeric or missing `voucher_number`

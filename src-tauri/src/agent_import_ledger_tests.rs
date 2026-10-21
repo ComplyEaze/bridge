@@ -5,6 +5,8 @@ fn batch() -> ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -37,8 +39,7 @@ fn server(path: &Path) -> Server {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
     })
 }

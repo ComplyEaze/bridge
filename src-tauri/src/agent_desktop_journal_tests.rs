@@ -164,6 +164,38 @@ fn action_ipc_keeps_bounded_response_evidence_and_drops_invalid_metadata() {
         .is_none());
 }
 
+/// An endpoint nothing listens on: a connect to it is refused at once. It is a
+/// port the operating system has just handed out and taken back, with no socket
+/// on it. Holding a bound socket there instead is not the same: a connect to a
+/// bound socket that never listens waits on macOS, which cost these tests about
+/// eight seconds a connect.
+///
+/// What this costs: from the moment of the drop until the connect, another
+/// process could take the port. Both tests that use it assert
+/// `import_mode_probe_failed`, which any failed probe gives (a refused connect,
+/// but also a reply that is not HTTP, an HTTP error, a non-XML content type, or
+/// no answer before the deadline), so a stranger that took the port and
+/// answered in one of those ways would let the test pass for the wrong reason.
+/// A stranger that answered with XML the probe cannot read would fail it with a
+/// different code. No call in these tests can tell the cases apart: the desktop
+/// calls keep only the code and the message, and the assistant's post of a sent
+/// Journal answers with an outcome whose error holds the code and a message
+/// about reconciling, with no field that says why the probe failed. The window
+/// is the test's own setup between the drop and the connect. The saved Journal
+/// records the endpoint's origin when the service is built, so the endpoint
+/// cannot be drawn later than the service's construction without changing what
+/// the tests assert.
+fn refused_endpoint() -> TallyEndpointConfig {
+    let port = {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.local_addr().unwrap().port()
+    };
+    TallyEndpointConfig {
+        host: "127.0.0.1".into(),
+        port,
+    }
+}
+
 fn service(root: PathBuf) -> (DesktopJournalService, ImportLedgerLine) {
     service_with_voucher_number(root, None)
 }
@@ -231,8 +263,7 @@ fn service_debiting(
         max_bytes: 5_000_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::On,
         master_writes_enabled: false,
     });
     // Fixture construction exclusively owns this temporary directory. Avoid a
@@ -630,18 +661,10 @@ fn review_refuses_fresh_numbered_journal_but_retains_dispatched_reconciliation()
 #[tokio::test]
 async fn review_refuses_fresh_unreviewable_text_but_retains_dispatched_reconciliation() {
     let directory = tempfile::tempdir().unwrap();
-    // Reserve a port without listening: recovery must reach a read failure,
-    // independently of any live Tally instance or reusable free-port race.
-    let socket = tokio::net::TcpSocket::new_v4().unwrap();
-    socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
-    let (service, mut line) = service_at_endpoint(
-        directory.path().join("agent"),
-        None,
-        TallyEndpointConfig {
-            host: "127.0.0.1".into(),
-            port: socket.local_addr().unwrap().port(),
-        },
-    );
+    // A port nothing listens on: recovery must reach a read failure,
+    // independently of any live Tally instance.
+    let (service, mut line) =
+        service_at_endpoint(directory.path().join("agent"), None, refused_endpoint());
     std::fs::remove_file(
         service
             .server
@@ -801,21 +824,11 @@ async fn the_desktop_post_and_reconcile_refuse_a_ledger_name_ending_in_a_line_br
     const WORDS: &str = "This saved Journal names a ledger whose name in Tally ends in a line break, and this screen cannot show such a name. Use the assistant for this Journal: its approval dialog shows such a name with the line break written out, and it can check a Journal that was already posted. If this one was already posted, do not post it again.";
     // A port nothing listens on: an answer that reached for Tally would
     // carry a read failure, never this refusal.
-    let unused_endpoint = || {
-        let socket = tokio::net::TcpSocket::new_v4().unwrap();
-        socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
-        let endpoint = TallyEndpointConfig {
-            host: "127.0.0.1".into(),
-            port: socket.local_addr().unwrap().port(),
-        };
-        (socket, endpoint)
-    };
     let directory = tempfile::tempdir().unwrap();
-    let (_socket, endpoint) = unused_endpoint();
     let (service, line) = service_debiting(
         directory.path().join("agent"),
         None,
-        endpoint,
+        refused_endpoint(),
         json!([]),
         "Expense\r\n",
     );
@@ -885,8 +898,7 @@ async fn the_desktop_post_and_reconcile_refuse_a_ledger_name_ending_in_a_line_br
 
     // A sent Journal that names no such ledger goes on to read Tally.
     let plain = tempfile::tempdir().unwrap();
-    let (_socket, endpoint) = unused_endpoint();
-    let (service, line) = service_at_endpoint(plain.path().join("agent"), None, endpoint);
+    let (service, line) = service_at_endpoint(plain.path().join("agent"), None, refused_endpoint());
     sent(&service, &line);
     for result in [
         service

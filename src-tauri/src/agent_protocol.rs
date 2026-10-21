@@ -28,7 +28,7 @@ enum VoucherReach {
 
 impl VoucherReach {
     fn of(settings: &Settings) -> Self {
-        if settings.writes_enabled {
+        if settings.posting.enabled() {
             Self::Post
         } else if settings.import_enabled {
             Self::Prepare
@@ -143,7 +143,7 @@ where
             }
             "ping" => Ok(json!({})),
             _ if !initialized => Err("initialize_required".to_string()),
-            "tools/list" => Ok(json!({"tools": catalog::tool_definitions_with_masters(server.settings.import_enabled, server.settings.writes_enabled, server.settings.master_writes_enabled)})),
+            "tools/list" => Ok(json!({"tools": catalog::tool_definitions_with_masters(server.settings.import_enabled, server.settings.posting.enabled(), server.settings.master_writes_enabled)})),
             "tools/call" => match params.get("name").and_then(Value::as_str) {
                 Some(name) => {
                 let arguments = params

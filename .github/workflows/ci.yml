@@ -277,11 +277,7 @@ jobs:
       - run: node --test scripts/check-conflict-markers.test.mjs
       - run: python3 scripts/collect-macos-test-crashes.test.py
       - run: python3 scripts/retain-macos-test-binaries.test.py
-      - run: python3 scripts/bank_statement_import.test.py
       - run: python3 scripts/fetch-pdfium.test.py
-      # the committed statement PDFs are this generator's output, byte for byte
-      - run: python3 scripts/generate-bank-statement-fixtures.py src-tauri/crates/bridge-bank-statement/tests/fixtures --check
-      - run: python3 scripts/sanitise-bbox-capture.test.py
       - run: python3 scripts/merge-gate.test.py
       - run: python3 scripts/surface_coverage_report.test.py
 
@@ -321,7 +317,7 @@ jobs:
         working-directory: src-tauri
         run: >-
           cargo test --locked -p bridge-tally-protocol --no-fail-fast
-          --features india-tax-observation-parser,bills-payments-observation-parser,bills-native-outstandings-probe
+          --features bills-native-outstandings-probe
       - name: Test isolated native outstandings qualification path
         working-directory: tools
         run: |
@@ -344,7 +340,7 @@ jobs:
         working-directory: src-tauri
         run: >-
           cargo clippy --locked -p bridge-tally-protocol
-          --features india-tax-observation-parser,bills-payments-observation-parser,bills-native-outstandings-probe
+          --features bills-native-outstandings-probe
           --all-targets -- -D warnings -A clippy::pedantic
       - name: Lint isolated native outstandings qualification path
         working-directory: tools

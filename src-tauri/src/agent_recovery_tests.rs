@@ -7,7 +7,7 @@ async fn persisted_build(cap: usize) -> (tempfile::TempDir, Server, ToolResponse
     let simulator = SequenceSimulator::spawn(
         qualified_import_cycle_plans()
             .into_iter()
-            .take(32)
+            .take(QUALIFIED_BUILD_REQUESTS)
             .collect(),
     )
     .unwrap();
@@ -30,8 +30,7 @@ async fn persisted_build(cap: usize) -> (tempfile::TempDir, Server, ToolResponse
         max_bytes: cap,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
     });
     let tool = server
@@ -62,7 +61,7 @@ async fn persisted_build(cap: usize) -> (tempfile::TempDir, Server, ToolResponse
     assert_eq!(ledger["batch_id"], *batch_id);
     assert_eq!(ledger["status"], "built");
     assert_eq!(ledger["sha256"], sha256_hex(&xml));
-    assert_eq!(simulator.finish().unwrap().len(), 32);
+    assert_eq!(simulator.finish().unwrap().len(), QUALIFIED_BUILD_REQUESTS);
     (directory, server, tool)
 }
 

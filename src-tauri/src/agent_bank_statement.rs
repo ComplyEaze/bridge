@@ -33,6 +33,7 @@
 use super::*;
 use crate::local_files::local_disk_path::LocalDiskPath;
 use bridge_bank_statement::bank::Bank;
+use bridge_bank_statement::bank::BankReference;
 use bridge_bank_statement::cash::{CashAnswer, CashAnswerRow, CashAnswers, CashMovement};
 use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
@@ -40,7 +41,9 @@ use bridge_bank_statement::money::Controls;
 use bridge_bank_statement::pdf::{self, MAX_PDF_BYTES};
 use bridge_bank_statement::pipeline::{prepare_text, ParsedStatement, StatementRequest};
 use bridge_bank_statement::proposals::StatementRecord;
-use bridge_bank_statement::proposals::{format_amount, Disposition};
+use bridge_bank_statement::proposals::{
+    format_amount, tie_out_window, Direction, Disposition, VoucherType,
+};
 use bridge_bank_statement::Refusal;
 use std::fs;
 use std::io::Read;
@@ -52,7 +55,14 @@ pub(super) const MAX_CASH_ANSWERS: usize = 1000;
 const MAX_PASSWORD_FILE_BYTES: u64 = 1024;
 const MAX_PATH_CHARS: usize = 4096;
 const PROPOSALS_DIRECTORY: &str = "bank-statements";
-const PROPOSALS_SCHEMA: &str = "bridge.bank_statement.proposals.v1";
+/// The schema before facts: no direction, reversal flag or coverage.
+const PROPOSALS_SCHEMA_V1: &str = "bridge.bank_statement.proposals.v1";
+/// The schema this tool writes: v1 plus `coverage` and, on each record, its
+/// `direction` and `reversed_same_day`.
+const PROPOSALS_SCHEMA: &str = "bridge.bank_statement.proposals.v2";
+/// How a proposals file's tie-out edges were worked out: from the statement's
+/// rows, by transaction date.
+pub(super) const TIE_OUT_BASIS: &str = "statement_rows_by_transaction_date";
 /// Larger than any admissible file: 1000 vouchers at the text limits.
 const MAX_PROPOSALS_FILE_BYTES: u64 = 16 * 1024 * 1024;
 
@@ -104,7 +114,7 @@ pub(super) fn input_schema() -> Value {
     })
 }
 
-pub(super) const DESCRIPTION: &str = "Read a local SBI, HDFC, Union Bank of India or Bank of Baroda bank-statement PDF (password-protected; a statement that opens without a password needs password_file to be an empty file) and propose one Payment, Receipt or Contra per row (none for a cash line not yet answered), for build_import_xml's voucher shape. The whole run is refused unless the statement's account-number line ends with the digits in account_label (a Bank of Baroda number is masked: see below), and every row's running balance, the closing balance, and (where the statement prints them) the debit and credit totals reproduce the figures supplied exactly. A Union Bank statement, and a Bank of Baroda statement in the measured layout, print no debit or credit totals and no opening or closing balance: take both balances from the books or the bank, since the statement cannot confirm them, and give an overdrawn (Dr) balance as a negative number (-16,141.16). With no printed totals, those two balances and a Page N of M footer on every page are the only checks on which rows were read, and missing rows whose amounts net to zero would not be seen. A Bank of Baroda statement is read only if page 1 prints an IFSC Code with the bank's prefix on the line that carries the words IFSC Code:, and otherwise is refused as statement_bank_not_recognised (the statements print the bank's name only in an image, so the code is the one thing in the text that names the bank). It prints its account number masked, so account_label must carry the whole number, and only its first three and last three digits are compared with the statement. It prints its newest row first (a statement printed the other way round is refused when its dates show it) and cuts a narration at about 50 characters, so a party can end mid-word and two payers whose names agree up to the cut read as one party; rows are numbered oldest first, as the balance replay reads them. Text in render mode 3 (invisible), which a scanner app writes as its OCR layer under the page image, is not read. A PDF from which no figures can be read (a scan, a printed copy or an image has none), or whose text is mostly in that mode with no statement row in the rest, is refused as statement_no_readable_text: ask for the statement downloaded from net banking as a text PDF. A character that draws nothing (Unicode Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the prepended concatenation marks) is not read from the PDF; a soft hyphen is read as a hyphen. The password is read from password_file, a local file, and is never returned. On a Mac the file is refused unless it is yours and its group and other permissions are off; on Windows it is refused unless it is owned by you or Administrators and no one but you, SYSTEM and Administrators can read or change it. That refusal is statement_password_file_permissions, whose next step says how to make the file private. Full proposals stay in a private local file; the result is a counterparty summary (spelling as printed, row count, disposition, suspense) for writing `mapping`, and the ledger names to check with validate_masters. A party the mapping does not name, or the parser could not identify, goes to suspense_ledger, tagged UNIDENTIFIED; a voucher posted to a mapped ledger carries ` | Statement party: <name>`, the counterparty as the statement printed it, at the end of its narration text (a file imported by hand adds the `[BRIDGE:...]` tag after it; a party containing |, carrying the reserved [BRIDGE: marker or making the narration over 2000 characters is refused, party_not_admissible: skip it or map it to the suspense ledger; the parser's own labels such as BANK CHARGES and a cash movement are not written as a party); `skip` omits a transfer already carried by another account's Contra. Only SBI 'ATM WDL' withdrawals and Union Bank and Bank of Baroda 'BY CASH' deposits are recognised as cash. Other cash text is not: where the parser names a party it is an ordinary party, and where it cannot (as for SBI deposits and HDFC cash text) it goes to the UNIDENTIFIED fallback. A recognised cash line is never mapped or defaulted: it is returned in cash_questions with its question and answers, and build_import_xml refuses the proposals (cash_questions_open) until each is answered in cash_answers. Only a dont_know answer posts one to suspense_ledger, tagged \"Bridge: purpose not confirmed; reclassify\"; every line sent to suspense is counted (suspense_rows, and suspense_by_reason by why), and suspense parties are listed first in counterparties, within its bound, with their rows; a line's own date, amount and label stay in the local file. The result carries no amount except the figures the caller supplied, echoed in reconciled (closing_balance, and total_debits and total_credits where given), and an open cash line's amount (below). Arithmetic on the caller's own inputs can still give a row's amount, for example total_debits minus the open cash amounts when one other debit row remains, and when a direction has a single row the caller's own total is that row's amount and counterparties names its party; and a from/to window holding one row shows through rows_in_window that a row falls in it, and through counterparties that row's party and direction; no result can hide what follows from the caller's inputs. An open cash line is the one exception: its cash_questions entry carries its bridge_txn_id, date and amount, its party name (masked when BRIDGE_AGENT_REDACTION is mask_parties) and whether it is a withdrawal or a deposit, so the person can tell which line is asked about. No other value of any row is returned. Every list in the result is bounded by the response size and counts what it left out (cash_questions_omitted, counterparties_omitted, ledgers_to_validate_omitted); cash_questions_open, suspense_rows and skipped count them all. An answer for a row outside from/to is refused (cash_answer_outside_window). An ambiguous mapping is refused, never guessed. Re-run with a corrected mapping: bridge_txn_id labels depend only on the statement row, so they do not change. build_import_xml builds the whole file, so from and to choose the batch. Import a statement in whole-day batches: cut a batch only between days, at most 50 vouchers (the most one batch post takes), because a same-day row with the same type, ledgers and amounts that an earlier batch posted refuses the whole later batch as import_preexisting_identity; from and to are days, so a window never cuts one, and a day with more than 50 rows does not fit one batch, an open limit: ask the user. Batch posting is off by default, and with it off each post takes one voucher, so same-day twins post together only with batch posting on or through a hand import of the built file. To build, pass the returned proposals_id and sha256 to build_import_xml as proposals_id and proposals_sha256; to correct a batch already built from an earlier run, add amends_batch_id. Never contacts Tally.";
+pub(super) const DESCRIPTION: &str = "Read a local SBI, HDFC, Union Bank of India or Bank of Baroda bank-statement PDF (password-protected; a statement that opens without a password needs password_file to be an empty file) and propose one Payment, Receipt or Contra per row (none for a cash line not yet answered), for build_import_xml's voucher shape. The whole run is refused unless the statement's account-number line ends with the digits in account_label (a Bank of Baroda number is masked: see below), and every row's running balance, the closing balance, and (where the statement prints them) the debit and credit totals reproduce the figures supplied exactly. A Union Bank statement, and a Bank of Baroda statement in the measured layout, print no debit or credit totals and no opening or closing balance: take both balances from the books or the bank, since the statement cannot confirm them, and give an overdrawn (Dr) balance as a negative number (-16,141.16). With no printed totals, those two balances and a Page N of M footer on every page are the only checks on which rows were read, and missing rows whose amounts net to zero would not be seen. A Bank of Baroda statement is read only if page 1 prints an IFSC Code with the bank's prefix on the line that carries the words IFSC Code:, and otherwise is refused as statement_bank_not_recognised (the statements print the bank's name only in an image, so the code is the one thing in the text that names the bank). It prints its account number masked, so account_label must carry the whole number, and only its first three and last three digits are compared with the statement. It prints its newest row first (a statement printed the other way round is refused when its dates show it) and cuts a narration at about 50 characters, so a party can end mid-word and two payers whose names agree up to the cut read as one party; rows are numbered oldest first, as the balance replay reads them. Text in render mode 3 (invisible), which a scanner app writes as its OCR layer under the page image, is not read. A PDF from which no figures can be read (a scan, a printed copy or an image has none), or whose text is mostly in that mode with no statement row in the rest, is refused as statement_no_readable_text: ask for the statement downloaded from net banking as a text PDF. A character that draws nothing (Unicode Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the prepended concatenation marks) is not read from the PDF; a soft hyphen is read as a hyphen. The password is read from password_file, a local file, and is never returned. On a Mac the file is refused unless it is yours and its group and other permissions are off; on Windows it is refused unless it is owned by you or Administrators and no one but you, SYSTEM and Administrators can read or change it. That refusal is statement_password_file_permissions, whose next step says how to make the file private. Full proposals stay in a private local file; the result is a counterparty summary (spelling as printed, row count, disposition, suspense) for writing `mapping`, and the ledger names to check with validate_masters. A party the mapping does not name, or the parser could not identify, goes to suspense_ledger, tagged UNIDENTIFIED; a voucher posted to a mapped ledger carries ` | Statement party: <name>`, the counterparty as the statement printed it, at the end of its narration text (a file imported by hand adds the `[BRIDGE:...]` tag after it; a party containing |, carrying the reserved [BRIDGE: marker or making the narration over 2000 characters is refused, party_not_admissible: skip it or map it to the suspense ledger; the parser's own labels such as BANK CHARGES and a cash movement are not written as a party); `skip` omits a transfer already carried by another account's Contra, and its mapping row must name the other account's ledger, so that Contra can be found; build_import_xml records a skipped row and lists it in a transfers section, by id and date, with its state and what to do, until the other account's Contra is built and verified through ComplyEaze Bridge or, for a skip a person withdrew, a batch holding the row is found posted; a skipped row that a batch found posted also posts, with no withdrawal named, stays listed as posted_against_skip, and a row with an equal amount going the other way the same day on its own statement is listed as reversed_same_day when no Contra with an equal network reference could carry it, because a reversal and a pair of real transfers look alike: it is paired only by an equal network reference, and the person checks in Tally which rows are transfers (a skip with no ledger is refused, skip_without_ledger, and so is one naming bank_ledger itself, skip_ledger_is_statement_bank, or suspense_ledger, skip_ledger_is_suspense). Only SBI 'ATM WDL' withdrawals and Union Bank and Bank of Baroda 'BY CASH' deposits are recognised as cash. Other cash text is not: where the parser names a party it is an ordinary party, and where it cannot (as for SBI deposits and HDFC cash text) it goes to the UNIDENTIFIED fallback. A recognised cash line is never mapped or defaulted: it is returned in cash_questions with its question and answers, and build_import_xml refuses the proposals (cash_questions_open) until each is answered in cash_answers. Only a dont_know answer posts one to suspense_ledger, tagged \"Bridge: purpose not confirmed; reclassify\"; every line sent to suspense is counted (suspense_rows, and suspense_by_reason by why), and suspense parties are listed first in counterparties, within its bound, with their rows; a line's own date, amount and label stay in the local file. The result carries no amount except the figures the caller supplied, echoed in reconciled (closing_balance, and total_debits and total_credits where given), and an open cash line's amount (below). Arithmetic on the caller's own inputs can still give a row's amount, for example total_debits minus the open cash amounts when one other debit row remains, and when a direction has a single row the caller's own total is that row's amount and counterparties names its party; and a from/to window holding one row shows through rows_in_window that a row falls in it, and through counterparties that row's party and direction; no result can hide what follows from the caller's inputs. An open cash line is the one exception: its cash_questions entry carries its bridge_txn_id, date and amount, its party name (masked when BRIDGE_AGENT_REDACTION is mask_parties) and whether it is a withdrawal or a deposit, so the person can tell which line is asked about. No other value of any row is returned. A file parsed for the whole statement, or for whole calendar months (from the 1st to a month's last day) within its rows, can be checked with statement_tie_out, whose gaps together with the book's own figures give the statement's balance at those edges and its net over those months: totals per calendar month, never a part of a month except the part-months at the statement's own start and end, whose net a month edge's balance gives together with the opening and closing you supplied; though a month in which every other row's amount is already known (one row alone, or one row beside open cash lines) gives that row's amount. statement_tie_out compares no other narrowed window (window_not_whole_calendar_months). Every list in the result is bounded by the response size and counts what it left out (cash_questions_omitted, counterparties_omitted, ledgers_to_validate_omitted); cash_questions_open, suspense_rows and skipped count them all. An answer for a row outside from/to is refused (cash_answer_outside_window). An ambiguous mapping is refused, never guessed. Re-run with a corrected mapping: bridge_txn_id labels depend only on the statement row, so they do not change. build_import_xml builds the whole file, so from and to choose the batch. Import a statement in whole-day batches: cut a batch only between days, at most 50 vouchers (the most one batch post takes), because a same-day row with the same type, ledgers and amounts that an earlier batch posted refuses the whole later batch as import_preexisting_identity; from and to are days, so a window never cuts one, and a day with more than 50 rows does not fit one batch, an open limit: ask the user. With posting on, a saved batch of up to 50 posts after one approval, so same-day twins post together in one batch or through a hand import of the built file. To build, pass the returned proposals_id and sha256 to build_import_xml as proposals_id and proposals_sha256; to correct a batch already built from an earlier run, add amends_batch_id. Never contacts Tally.";
 
 impl Server {
     pub(super) async fn parse_bank_statement(
@@ -427,18 +437,42 @@ fn persist(
             "total_debits": request.controls.debits.as_ref().map(|value| value.as_str()),
             "total_credits": request.controls.credits.as_ref().map(|value| value.as_str()),
         },
+        "coverage": parsed.coverage.map(|(from, to)| json!({"from": from.iso(), "to": to.iso()})),
         "vouchers": parsed.build.proposals,
         "records": parsed.build.records,
     });
     // Optional, and not part of the schema's required shape: the loader reads
-    // fields by name, so an older binary still reads a file that carries it.
-    // The statement's own first and last row dates, and whether this parse's
-    // from/to window left any row out. None of it is returned in the summary.
+    // fields by name, so a reader of this schema version still reads a file that
+    // carries it. An older binary refuses the version itself, so going back to it
+    // needs a fresh parse.
+    // The statement's own first and last row dates, whether this parse's
+    // from/to window left any row out, and where statement_tie_out may compare
+    // it with the book. None of it is returned in the summary.
     if let Some((first, last)) = parsed.build.span {
+        let tie_out = match tie_out_window(
+            &parsed.build,
+            &request.controls.opening,
+            &request.controls.closing,
+            request.date_from,
+            request.date_to,
+        ) {
+            Some(Ok(Ok(edges))) => json!({
+                "state": "established",
+                "first_date": edges.first().iso(),
+                "last_date": edges.last().iso(),
+                "opening_balance": format_amount(edges.opening()),
+                "closing_balance": format_amount(edges.closing()),
+                "basis": TIE_OUT_BASIS,
+            }),
+            Some(Ok(Err(reason))) => json!({"state": "not_established", "reason": reason.code()}),
+            Some(Err(refusal)) => return Err(refused(&refusal)),
+            None => Value::Null,
+        };
         document["window"] = json!({
             "first_row_date": first.iso(),
             "last_row_date": last.iso(),
             "whole_statement": parsed.build.rows_outside_window == 0,
+            "tie_out": tie_out,
         });
     }
     let bytes = serde_json::to_vec_pretty(&document)
@@ -522,6 +556,14 @@ fn summary(
                 parsed.build.proposals.iter().flat_map(|proposal| {
                     proposal.entries.iter().map(|entry| entry.ledger.as_str())
                 }),
+            )
+            // A skipped row posts nothing, but its ledger is the other bank
+            // account's, under which its Contra is looked for.
+            .chain(
+                records
+                    .iter()
+                    .filter(|record| record.disposition == Disposition::Skipped)
+                    .map(|record| record.ledger.as_str()),
             )
             .collect();
     ledgers.sort_unstable();
@@ -648,6 +690,143 @@ pub(super) struct ResolvedImport {
     pub(super) cash_ledgers: Vec<AnsweredCashLedger>,
     /// The two ledgers the parse was given, when the file names both.
     pub(super) statement_ledgers: Option<StatementLedgers>,
+    /// What the statement's own file says of its Contras and skipped rows;
+    /// `None` for inline vouchers and for a file written before it did.
+    pub(super) statement: Option<ResolvedStatement>,
+}
+
+/// A statement's Contras, skipped rows and the days it read in full, read from
+/// a version 2 proposals file at the boundary, so a later step relies on the
+/// types and checks nothing again.
+pub(super) struct ResolvedStatement {
+    pub(super) bank_ledger: String,
+    pub(super) coverage: Option<(bridge_tally_core::TallyDate, bridge_tally_core::TallyDate)>,
+    /// One per Contra voucher the file proposes, cash-answer Contras included.
+    pub(super) contras: Vec<StatementContra>,
+    /// One per row the person skipped as recorded from the other bank's
+    /// statement.
+    pub(super) skips: Vec<StatementSkip>,
+    /// The file proposes no voucher.
+    posts_nothing: bool,
+}
+
+pub(super) struct StatementContra {
+    pub(super) bridge_txn_id: String,
+    pub(super) reference: Option<BankReference>,
+    pub(super) instrument: Option<String>,
+    pub(super) reversed_same_day: bool,
+}
+
+pub(super) struct StatementSkip {
+    pub(super) bridge_txn_id: String,
+    pub(super) date: bridge_tally_core::TallyDate,
+    pub(super) amount: String,
+    pub(super) direction: Direction,
+    pub(super) other_ledger: String,
+    pub(super) reference: Option<BankReference>,
+    pub(super) instrument: Option<String>,
+    pub(super) reversed_same_day: bool,
+}
+
+impl ResolvedStatement {
+    /// A statement whose every row was skipped: it proposes no voucher and
+    /// holds at least one skipped row, and so is recorded without a batch.
+    pub(super) fn is_skip_only(&self) -> bool {
+        self.posts_nothing && !self.skips.is_empty()
+    }
+
+    /// The ledgers the facts name beyond the vouchers': the statement's bank
+    /// and each skipped row's other ledger, each once, in name order.
+    pub(super) fn ledger_names(&self) -> Vec<String> {
+        std::iter::once(&self.bank_ledger)
+            .chain(self.skips.iter().map(|skip| &skip.other_ledger))
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+}
+
+/// A record of a version 2 file, as far as the facts need it. Only a skipped
+/// row reads the fields after the first four.
+#[derive(serde::Deserialize)]
+struct FileRecord {
+    bridge_txn_id: String,
+    disposition: Disposition,
+    direction: Direction,
+    reversed_same_day: bool,
+    #[serde(default)]
+    date: Option<String>,
+    #[serde(default)]
+    amount: Option<String>,
+    #[serde(default)]
+    ledger: Option<String>,
+    #[serde(default)]
+    reference: Option<String>,
+    #[serde(default)]
+    instrument: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct FileCoverage {
+    from: String,
+    to: String,
+}
+
+/// The facts a version 2 file carries. Any part that is missing or not of the
+/// shape the parse writes makes the file invalid.
+fn read_statement_facts(
+    document: &Value,
+    records: &[Value],
+    posts_nothing: bool,
+) -> Result<ResolvedStatement, String> {
+    let invalid = || "proposals_file_invalid".to_string();
+    let bank_ledger = document["bank_ledger"].as_str().ok_or_else(invalid)?;
+    let date = |text: &str| normalized_date(text).map_err(|_| invalid());
+    // `coverage` is always written, null when no day was read in full
+    let coverage = match document.get("coverage").ok_or_else(invalid)? {
+        Value::Null => None,
+        value => {
+            let window: FileCoverage =
+                serde_json::from_value(value.clone()).map_err(|_| invalid())?;
+            Some((date(&window.from)?, date(&window.to)?))
+        }
+    };
+    let reference = |text: Option<String>| {
+        text.map(|text| BankReference::from_recorded(&text).ok_or_else(invalid))
+            .transpose()
+    };
+    let mut contras = Vec::new();
+    let mut skips = Vec::new();
+    for record in records {
+        let record: FileRecord = serde_json::from_value(record.clone()).map_err(|_| invalid())?;
+        match record.disposition {
+            Disposition::Voucher(VoucherType::Contra) => contras.push(StatementContra {
+                bridge_txn_id: record.bridge_txn_id,
+                reference: reference(record.reference)?,
+                instrument: record.instrument,
+                reversed_same_day: record.reversed_same_day,
+            }),
+            Disposition::Skipped => skips.push(StatementSkip {
+                bridge_txn_id: record.bridge_txn_id,
+                date: date(record.date.as_deref().ok_or_else(invalid)?)?,
+                amount: record.amount.ok_or_else(invalid)?,
+                direction: record.direction,
+                other_ledger: record.ledger.ok_or_else(invalid)?,
+                reference: reference(record.reference)?,
+                instrument: record.instrument,
+                reversed_same_day: record.reversed_same_day,
+            }),
+            Disposition::Voucher(_) | Disposition::NeedsAnswer => {}
+        }
+    }
+    Ok(ResolvedStatement {
+        bank_ledger: bank_ledger.to_string(),
+        coverage,
+        contras,
+        skips,
+        posts_nothing,
+    })
 }
 
 /// The bank and suspense ledgers a proposals file was parsed for.
@@ -743,7 +922,13 @@ pub(super) fn load_proposals(
     }
     let document: Value =
         serde_json::from_slice(&bytes).map_err(|_| "proposals_file_invalid".to_string())?;
-    if document["schema"] != PROPOSALS_SCHEMA || document["proposals_id"] != proposals_id {
+    // a version 1 file is read too: what a caller may build from one is the
+    // caller's to decide
+    if !matches!(
+        document["schema"].as_str(),
+        Some(PROPOSALS_SCHEMA | PROPOSALS_SCHEMA_V1)
+    ) || document["proposals_id"] != proposals_id
+    {
         return Err("proposals_file_invalid".into());
     }
     Ok(document)
@@ -772,12 +957,14 @@ pub(super) fn resolve_import_arguments(
             args: args.clone(),
             cash_ledgers: Vec::new(),
             statement_ledgers: None,
+            statement: None,
         });
     };
     if object.contains_key("vouchers") {
         return Err("proposals_id_with_vouchers".into());
     }
     let document = load_proposals(data_dir, proposals_id, object.get("proposals_sha256"))?;
+    let legacy = document["schema"] == PROPOSALS_SCHEMA_V1;
     let vouchers = document
         .get("vouchers")
         .filter(|vouchers| vouchers.is_array())
@@ -802,6 +989,21 @@ pub(super) fn resolve_import_arguments(
                     .is_none())
     }) {
         return Err("cash_questions_open".into());
+    }
+    // A file written before facts existed cannot say which rows were skipped or
+    // which Contras it holds. Built anyway, its Contras would be invisible to
+    // the transfer checks and its skips unrecorded, so it is parsed again.
+    if legacy
+        && (records
+            .iter()
+            .any(|record| record["disposition"] == "skipped")
+            || vouchers.as_array().is_some_and(|vouchers| {
+                vouchers
+                    .iter()
+                    .any(|voucher| voucher["voucher_type"] == "Contra")
+            }))
+    {
+        return Err("proposals_legacy".into());
     }
     // Every ledger a person named in an answer, bound to the voucher actually
     // built: that bridge_txn_id's voucher has the type the answer makes, with
@@ -846,6 +1048,12 @@ pub(super) fn resolve_import_arguments(
             bank_ledger: bank_ledger.to_string(),
             suspense_ledger: suspense_ledger.to_string(),
         });
+    let statement = if legacy {
+        None
+    } else {
+        let posts_nothing = vouchers.as_array().is_some_and(Vec::is_empty);
+        Some(read_statement_facts(&document, records, posts_nothing)?)
+    };
     let mut resolved = object.clone();
     resolved.remove("proposals_id");
     resolved.remove("proposals_sha256");
@@ -854,6 +1062,7 @@ pub(super) fn resolve_import_arguments(
         args: Value::Object(resolved),
         cash_ledgers,
         statement_ledgers,
+        statement,
     })
 }
 

@@ -1384,8 +1384,9 @@ pub(super) fn write_pre_image(
 }
 
 /// [`write_pre_image`] with the directory sync given. The shared record write
-/// ignores a failed directory sync; for the sidecar it is checked here, whether
-/// the sidecar was just placed or was there already.
+/// fails when the sync after a new placement fails, but a sidecar already there
+/// may be an earlier attempt's whose sync failed, so the directory is synced
+/// here as well, whether the sidecar was just placed or was there already.
 fn write_pre_image_syncing(
     data_dir: &Path,
     _lock: &ExclusiveAdmission,

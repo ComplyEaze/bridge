@@ -88,7 +88,6 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     const READ_TOOLS: &[&str] = &[
         "balance_sheet",
         "cash_flow",
-        "changed_since",
         "company_features",
         "egress_log",
         "gst_status",
@@ -97,6 +96,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "list_companies",
         "local_data_report",
         "masters",
+        "month_register",
         "outstandings",
         "profit_and_loss",
         "purchase_register",
@@ -131,7 +131,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     // Local writers: (name, destructive, the exact sentence).
     const LOCAL_WRITERS: &[(&str, bool, &str)] = &[
         // Fresh batch id and file each call: additive.
-        ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally."),
+        ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer (for a statement of only skipped rows, no import file: one record of those rows); writes nothing to Tally."),
         // A new file each call: additive.
         ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally."),
         // Each verification adds its own proof files beside the earlier ones
@@ -309,8 +309,7 @@ async fn voucher_type_selector_is_bounded_before_any_tally_read() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let mut args = json!({"company_guid":"00000000-0000-4000-8000-000000000001",
@@ -324,46 +323,6 @@ async fn voucher_type_selector_is_bounded_before_any_tally_read() {
     assert_eq!(response.value["structuredContent"]["evidence"]["bytes"], 0);
     args["voucher_type"] = json!("名".repeat(1024));
     assert!(validate_tool_arguments("vouchers", &args).is_ok());
-}
-
-#[tokio::test]
-async fn unqualified_change_feed_is_hidden_and_direct_calls_refuse_before_tally() {
-    for import_enabled in [false, true] {
-        assert!(!tool_definitions(import_enabled, false)
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|tool| tool["name"] == "changed_since"));
-    }
-    let directory = tempfile::tempdir().unwrap();
-    let server = Server::new(Settings {
-        endpoint: TallyEndpointConfig {
-            host: "127.0.0.1".into(),
-            port: 9,
-        },
-        data_dir: directory.path().to_path_buf(),
-        max_rows: 500,
-        max_bytes: 200_000,
-        redaction: Redaction::None,
-        import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
-        master_writes_enabled: false,
-    });
-    // A dispatched read against this unavailable endpoint would return a
-    // transport/company failure, not the explicit admission refusal.
-    for arguments in [
-        json!({}),
-        json!({"company_guid":"00000000-0000-4000-8000-000000000001"}),
-    ] {
-        let result = server.call_tool_response("changed_since", arguments).await;
-        assert_eq!(result.value["isError"], true);
-        assert_eq!(
-            result.value["structuredContent"]["result"]["error"]["code"],
-            "changed_since_unqualified"
-        );
-        assert_eq!(result.value["structuredContent"]["evidence"]["bytes"], 0);
-    }
 }
 
 #[tokio::test]
@@ -390,8 +349,7 @@ async fn verification_remains_catalogued_and_admitted_when_import_and_writes_are
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     let response = server.call_tool_response("verify_import", json!({})).await;
@@ -416,8 +374,7 @@ async fn master_validation_rejects_unbounded_and_blank_names_before_tally() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     for ledgers in [
@@ -464,8 +421,7 @@ async fn ledger_selectors_are_bounded_before_company_or_catalogue_reads() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     for tool in ["vouchers", "ledger_movement"] {
@@ -501,8 +457,7 @@ async fn oversized_unknown_property_cannot_expand_response_or_retained_evidence(
         max_bytes: 5_000_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
         master_writes_enabled: false,
     });
     for key in ["unknown".to_string(), "x".repeat(1_000_000)] {
@@ -728,9 +683,8 @@ fn no_tool_description_names_the_product_by_its_bare_short_name() {
 /// Every input parameter of every listed tool carries a description (#1155):
 /// a tool that gains a parameter without one fails here by name. A description
 /// a schema already wrote is kept, and a schema with no parameters gains none.
-/// Three tools are held to the parameters many tools share only:
-/// `changed_since`, registered but not listed (`tool_definitions`), and the
-/// two lab-only import tools, compiled in only with the `lab-writes` feature;
+/// Two tools are held to the parameters many tools share only: the two
+/// lab-only import tools, compiled in only with the `lab-writes` feature;
 /// their own parameters were not read for this.
 #[test]
 fn every_parameter_of_every_tool_is_described() {
@@ -762,10 +716,7 @@ fn every_parameter_of_every_tool_is_described() {
                 .is_some_and(Value::is_null),
             "{name} gained a null properties"
         );
-        let shared_only = matches!(
-            name,
-            "changed_since" | "lab_import_masters" | "lab_import_vouchers"
-        );
+        let shared_only = matches!(name, "lab_import_masters" | "lab_import_vouchers");
         for (parameter, property) in tool["inputSchema"]["properties"]
             .as_object()
             .into_iter()
@@ -950,9 +901,9 @@ fn the_vouchers_description_does_not_say_a_capture_showed_post_dated_omitted() {
 fn the_posting_setting_keeps_each_known_limit() {
     let manifest: Value =
         serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
-    let writes = manifest["user_config"]["enable_writes"]["description"]
+    let writes = manifest["user_config"]["enable_posting_2026_10"]["description"]
         .as_str()
-        .expect("the enable_writes setting has a description");
+        .expect("the enable_posting_2026_10 setting has a description");
     const LIMITS: &[(&str, &str)] = &[
         ("Off by default", "the setting says posting is off until the person turns it on"),
         (
@@ -1008,6 +959,47 @@ fn the_posting_setting_keeps_each_known_limit() {
         (
             "can do so without it",
             "limit 4: that connector can change entries without the approval",
+        ),
+        (
+            "This is a new setting",
+            "an upgrader's earlier posting choice does not carry over (#1090): it consented to one voucher at a time",
+        ),
+        ("2 to 50", "the batch size the post admits"),
+        (
+            "shows a summary: the totals for each ledger",
+            "a batch's window shows per-ledger totals, not each voucher",
+        ),
+        (
+            "only when there are 10 or fewer",
+            "per-voucher lines appear only for small batches",
+        ),
+        (
+            "and those lines fit",
+            "per-voucher lines that do not fit leave the totals only, so 10 or fewer is a ceiling",
+        ),
+        (
+            "creates only some vouchers of a batch",
+            "batch limit 5: a batch can land partly",
+        ),
+        (
+            "which ones it finds in the book and which it does not",
+            "batch limit 5: the report is per voucher, by what the read-back finds",
+        ),
+        (
+            "refuses to post the missing ones again",
+            "batch limit 5: rows of a sent batch are refused if posted again",
+        ),
+        (
+            "check each in Tally",
+            "batch limit 5: a voucher not found may be absent or edited, so the person checks it",
+        ),
+        (
+            "may still be in Tally, edited: do not re-enter it before you check",
+            "batch limit 5: a voucher not found is never re-entered unchecked, since it may be edited, not absent",
+        ),
+        (
+            "more than 50, or one whose summary does not fit the window",
+            "batch limit 6: the cap and the window's size, each refused rather than cut",
         ),
         (
             "that writes nothing to Tally",
@@ -1134,6 +1126,46 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "build_import_xml",
+            "Do not enter a listed transfer in Tally by hand: a later post of the other statement would book it twice.",
+            "a transfer entered by hand is booked again when the other statement is posted",
+        ),
+        (
+            "build_import_xml",
+            "it never means nothing is missing",
+            "a transfer view that is not established is not a clean one",
+        ),
+        (
+            "build_import_xml",
+            "name a row only when the person confirms the other account's statement does not carry it",
+            "a skip is withdrawn on the person's word, never the assistant's",
+        ),
+        (
+            "build_import_xml",
+            "A withdrawal is refused while exactly one verified Contra matches the row and nothing else claims that Contra.",
+            "a skip one verified Contra matches is not withdrawn",
+        ),
+        (
+            "build_import_xml",
+            "or the only match carries a different reference and is verified",
+            "a Contra of another reference leaves the choice to the person only once it is verified",
+        ),
+        (
+            "build_import_xml",
+            "is refused as withdraw_skip_paired, naming each such batch",
+            "a skip the other account's statement carries is not withdrawn into a second booking",
+        ),
+        (
+            "verify_import",
+            "transfers.state not_established means it could not be computed",
+            "a failed transfer view is not an empty one",
+        ),
+        (
+            "parse_bank_statement",
+            "build_import_xml records a skipped row and lists it in a transfers section",
+            "a skip is recorded and listed with its state and what to do",
+        ),
+        (
+            "build_import_xml",
             "cut a batch only between days, at most 50 vouchers",
             "a statement day split across batches refuses the later batch for a twin (#865)",
         ),
@@ -1144,13 +1176,13 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "build_import_xml",
-            "same-day twins post together only with batch posting on or through a hand import of the built file",
-            "with batch posting off a second same-day twin is refused by the post (#865)",
+            "same-day twins post together in one batch or through a hand import of the built file",
+            "a second same-day twin in a separate post is refused by the post (#865)",
         ),
         (
             "parse_bank_statement",
-            "same-day twins post together only with batch posting on or through a hand import of the built file",
-            "with batch posting off a second same-day twin is refused by the post (#865)",
+            "same-day twins post together in one batch or through a hand import of the built file",
+            "a second same-day twin in a separate post is refused by the post (#865)",
         ),
         (
             "tally_status",
@@ -1186,6 +1218,11 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "local_data_report",
             "never suggest deleting them",
             "the journal and imports folder are what was already sent to Tally",
+        ),
+        (
+            "local_data_report",
+            "the skipped-rows file agent-import-statement-skips.jsonl",
+            "the record of skipped statement rows is not offered for deletion",
         ),
         (
             "verify_import",
@@ -1350,6 +1387,36 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         );
     }
 
+    // build_import_xml states the withdrawal rule twice: in its description and
+    // on its withdraw_skips argument. Each sentence of the rule is pinned in
+    // both, so neither text can change and leave the other behind.
+    let build = description_of("build_import_xml");
+    let argument = definitions
+        .as_array()
+        .and_then(|tools| {
+            tools
+                .iter()
+                .find(|entry| entry["name"] == "build_import_xml")
+        })
+        .and_then(|tool| tool.pointer("/inputSchema/properties/withdraw_skips/description"))
+        .and_then(Value::as_str)
+        .expect("the withdraw_skips description");
+    for sentence in [
+        "A withdrawal is refused while exactly one verified Contra matches the row and nothing else claims that Contra.",
+        "Where more than one verified Contra matches, the match is also claimed by another row or booked twice, the amount reverses the same day and the match is by date, or the only match carries a different reference and is verified, ComplyEaze Bridge cannot tell which entry the row belongs to: the withdrawal is then the person's explicit choice, and the batch of every matching Contra is listed on the row in the transfers section.",
+        "While the only match is not yet verified, the withdrawal is refused and the step says to verify that entry first.",
+        "So is one with any match in a batch not yet verified, whatever the row's state: a person can confirm only what Tally holds.",
+    ] {
+        assert!(
+            build.contains(sentence),
+            "build_import_xml lost a sentence of the withdrawal rule: {sentence:?}"
+        );
+        assert!(
+            argument.contains(sentence),
+            "withdraw_skips lost a sentence of the withdrawal rule: {sentence:?}"
+        );
+    }
+
     // The stock_summary pin needs its negation: the clause before "is a stock
     // value or a total" must say "neither", or "either"/"each" would invert it.
     // The clause runs back to the nearest `.`, `,`, `:` or `;`, which keeps both
@@ -1409,6 +1476,44 @@ fn a_paged_tools_limit_names_no_default_its_handler_does_not_apply() {
                 limit.get("default").is_none(),
                 "{name}: its limit defaults to the configured row limit, so the schema names no default"
             );
+        }
+    }
+}
+
+/// The texts about skipped rows say what the code does: a skipped row that a
+/// batch found posted also posts stays open, and nothing says the send-time
+/// check is part of this release.
+#[test]
+fn the_transfer_texts_claim_only_what_the_code_does() {
+    let definitions = registered_tool_definitions(true, true);
+    let tool = |name: &str| -> Value {
+        definitions
+            .as_array()
+            .and_then(|tools| tools.iter().find(|entry| entry["name"] == name))
+            .unwrap_or_else(|| panic!("{name} is not registered"))
+            .clone()
+    };
+    let description = |name: &str| tool(name)["description"].as_str().unwrap().to_owned();
+    let parse = description("parse_bank_statement");
+    assert!(!parse.contains("never silent"), "{parse}");
+    assert!(parse.contains("posted_against_skip"), "{parse}");
+    let build = description("build_import_xml");
+    assert!(
+        !build.contains("each skipped row not yet paired"),
+        "{build}"
+    );
+    assert!(build.contains("posted_against_skip"), "{build}");
+    let argument = tool("build_import_xml")
+        .pointer("/inputSchema/properties/withdraw_skips/description")
+        .and_then(Value::as_str)
+        .unwrap()
+        .to_owned();
+    assert!(!argument.contains("It is not saved"), "{argument}");
+    assert!(!argument.contains("Without this a build"), "{argument}");
+    assert!(argument.contains("posted_against_skip"), "{argument}");
+    for text in [&parse, &build, &argument] {
+        for phrase in ["1703", "merges with"] {
+            assert!(!text.contains(phrase), "{phrase}: {text}");
         }
     }
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // fetch-pdfium.mjs refuses every byte it was not pinned to, and writes the notice it was pinned
-// to. Offline: archives are built here and passed with --archive, and the lock is a temporary copy.
+// to. No network is used: archives are built here and passed with --archive, and the lock is a temporary copy.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -189,4 +189,23 @@ test("a header that fails its checksum, a truncated archive and a malformed pax 
   assert.throws(() => tarFiles(entry("LICENSE", "a").subarray(0, 600)), /runs past|ends inside/);
   assert.throws(() => tarFiles(Buffer.alloc(100)), /ends inside/);
   assert.throws(() => tarFiles(tar([entry("PaxHeader", "garbage", "x"), entry("LICENSE", "a")])), /pax header/);
+});
+
+test("a pax path applies to the next entry only, a pre-POSIX directory is skipped, and the last of two names wins", () => {
+  const files = tarFiles(
+    tar([
+      entry("PaxHeader", paxRecord("path", "licenses/renamed.txt"), "x"),
+      entry("first", "renamed"),
+      entry("second", "kept its own name"),
+      entry("licenses/", "", "\0"),
+      entry("LICENSE", "old"),
+      entry("LICENSE", "new"),
+    ]),
+  );
+  assert.deepEqual([...files.keys()], ["licenses/renamed.txt", "second", "LICENSE"]);
+  assert.equal(files.get("LICENSE").toString(), "new");
+});
+
+test("an unknown option is a refusal, not a stack trace", async () => {
+  await assert.rejects(main(["--platfrom", "test"], { lockPath: lockPath() }), (error) => error instanceof Refusal && /usage/.test(error.message));
 });

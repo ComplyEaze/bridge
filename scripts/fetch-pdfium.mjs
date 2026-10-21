@@ -24,7 +24,7 @@
 // native job runs this without actions/setup-node.
 
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -80,7 +80,7 @@ export function tarFiles(tar) {
     const header = tar.subarray(offset, offset + 512);
     if (header.every((byte) => byte === 0)) return files;
     checkChecksum(header, offset);
-    const type = String.fromCharCode(header[156] || 0x30);
+    const type = String.fromCharCode(header[156] || 0x30); // NUL is a regular file, as "0"
     const size = pending.size ?? octal(header.subarray(124, 136), offset);
     const dataStart = offset + 512;
     const dataEnd = dataStart + size;
@@ -98,7 +98,8 @@ export function tarFiles(tar) {
     }
     const rawName = pending.path ?? ustarName(header);
     pending = {};
-    if (type === "0" || type === "\0" || type === "7") {
+    // A pre-POSIX header marks a directory only by a trailing slash on a regular-file type.
+    if ((type === "0" || type === "7") && !rawName.endsWith("/")) {
       files.set(rawName.replace(/^[./]+/, ""), Buffer.from(data));
     }
   }
@@ -144,7 +145,8 @@ function paxRecords(data, offset) {
   while (index < data.length) {
     const space = data.indexOf(0x20, index);
     if (space === -1) throw new Refusal(`pax header at ${offset} is malformed`);
-    const length = Number(data.subarray(index, space).toString("latin1"));
+    const digits = data.subarray(index, space).toString("latin1");
+    const length = /^[0-9]+$/.test(digits) ? Number(digits) : NaN;
     if (!Number.isInteger(length) || length <= space - index || index + length > data.length) {
       throw new Refusal(`pax header at ${offset} is malformed`);
     }
@@ -164,7 +166,9 @@ function paxRecords(data, offset) {
 }
 
 async function download(url, limit) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(120_000), redirect: "follow" });
+  const response = await fetch(url, { signal: AbortSignal.timeout(120_000), redirect: "follow" }).catch((error) => {
+    throw new Refusal(`${url}: ${error.message}; refusing it`);
+  });
   if (!response.ok) throw new Refusal(`${url}: HTTP ${response.status}; refusing it`);
   // Read at most one byte past the pin, so an oversized answer is refused by its count, not read whole.
   const chunks = [];
@@ -181,7 +185,9 @@ async function download(url, limit) {
 }
 
 export async function main(argv = process.argv.slice(2), { lockPath = LOCK, stdout = process.stdout } = {}) {
-  const { values } = parseArgs({
+  let values;
+  try {
+    ({ values } = parseArgs({
     args: argv,
     options: {
       platform: { type: "string" },
@@ -190,7 +196,10 @@ export async function main(argv = process.argv.slice(2), { lockPath = LOCK, stdo
       archive: { type: "string" }, // a local copy, for tests
     },
     strict: true,
-  });
+    }));
+  } catch (error) {
+    throw new Refusal(`${error.message}; usage: fetch-pdfium.mjs --platform P --dest DIR [--github-env FILE]`);
+  }
   if (!values.platform || !values.dest) throw new Refusal("usage: fetch-pdfium.mjs --platform P --dest DIR [--github-env FILE]");
   const lock = JSON.parse(readFileSync(lockPath, "utf8"));
   const pin = Object.hasOwn(lock.platforms, values.platform) ? lock.platforms[values.platform] : undefined;
@@ -221,7 +230,9 @@ export async function main(argv = process.argv.slice(2), { lockPath = LOCK, stdo
   return 0;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Compared as real paths: Node resolves a symbolic link in the module's own URL but not in
+// argv[1], and a run through a linked checkout must not exit 0 having done nothing.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   main().catch((error) => {
     process.stderr.write(`${error instanceof Refusal ? error.message : error.stack}\n`);
     process.exitCode = 1;

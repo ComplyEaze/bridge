@@ -703,9 +703,10 @@ fn map_transport_error(error: anyhow::Error) -> TallyError {
             | TallyTransportError::UnsupportedContentEncoding
             | TallyTransportError::InvalidEncoding { .. }
             | TallyTransportError::HttpStatus { .. } => protocol_error(transport.safe_code()),
-            TallyTransportError::ConnectionFailed
-            | TallyTransportError::RequestTimedOut
-            | TallyTransportError::RequestFailed => TallyError::Unreachable,
+            TallyTransportError::RequestTimedOut => TallyError::RequestDeadlineExceeded,
+            TallyTransportError::ConnectionFailed | TallyTransportError::RequestFailed => {
+                TallyError::Unreachable
+            }
         };
     }
     if let Some(read) = error.downcast_ref::<TallyRuntimeReadError>() {
@@ -761,6 +762,7 @@ fn capability_failure_code(error: &TallyError) -> String {
         | TallyError::InvalidData { code }
         | TallyError::Unsupported { code } => code.clone(),
         TallyError::Unreachable => "tally_unreachable".to_string(),
+        TallyError::RequestDeadlineExceeded => "request_deadline_exceeded".to_string(),
         TallyError::ReadResponseTooLarge { .. } => {
             "voucher_response_size_limit_exceeded".to_string()
         }

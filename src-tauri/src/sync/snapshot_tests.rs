@@ -3413,6 +3413,10 @@ async fn reviewed_tally_error_codes_are_precise_allowlisted_and_persisted() {
             "company_identity_ambiguous",
         ),
         (
+            TallyError::RequestDeadlineExceeded,
+            "request_deadline_exceeded",
+        ),
+        (
             TallyError::Unsupported {
                 code: "endpoint_queue_deadline_exceeded".to_string(),
             },

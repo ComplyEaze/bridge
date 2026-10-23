@@ -3482,6 +3482,7 @@ fn terminal_kind(error: &TallyError) -> TerminalKind {
 pub(crate) fn tally_error_code(error: &TallyError) -> &'static str {
     match error {
         TallyError::Unreachable => "tally_unreachable",
+        TallyError::RequestDeadlineExceeded => "request_deadline_exceeded",
         TallyError::Protocol { code } => match code.as_str() {
             "application_response_rejected" => "application_response_rejected",
             "canary_cache_unavailable" => "canary_cache_unavailable",

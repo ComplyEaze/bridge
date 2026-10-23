@@ -130,27 +130,43 @@ test("an unexpected job in the release workflow is refused", () => {
   refused(withChange(".github/workflows/release-mcpb-preview.yml", (text) => `${text.trimEnd()}\n  extra-job:\n    runs-on: ubuntu-latest\n`), "must have exactly the jobs release-admission, package, attest and publish-preview");
 });
 
-// `continue-on-error` is refused except on four pinned, diagnostics-only artifact uploads. Each case below
-// makes one change a weaker rule would let through; the unmodified tree has exactly four allowed flags.
+// `continue-on-error` is refused except on five pinned, diagnostics-only artifact uploads. Each case below
+// makes one change a weaker rule would let through; the unmodified tree has exactly five allowed flags.
 const CI_FILE = ".github/workflows/ci.yml";
 const FLAG = "        continue-on-error: true";
 const UPLOAD = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
 const TIMINGS = `${FLAG}\n        uses: ${UPLOAD} # v7.0.1\n        with:\n          name: native-compiler-timings`;
+const TEST_TIMINGS_STEP = [
+  "      - name: Retain macOS per-test timings",
+  "        if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'success' }}",
+  FLAG,
+  `        uses: ${UPLOAD} # v7.0.1`,
+  "        with:",
+  "          name: native-test-timings-macos",
+  "          path: src-tauri/target/nextest/default/junit.xml",
+  "          if-no-files-found: warn",
+  "          retention-days: 7",
+].join("\n");
 const AFTER_NATIVE_PIN = "      - name: Test native workspace doctests\n";
 const ONLY_EXACT = "ci.yml must not use continue-on-error except the one exact line in each pinned diagnostics-only upload";
 const UPLOAD_SHAPE = "changed shape; review it and update diagnosticUploads";
 
-test("the unmodified tree has exactly four allowed flags", () => {
-  assert.equal(readFileSync(join(copy, CI_FILE), "utf8").split("\n").filter((line) => line === FLAG).length, 4);
+test("the unmodified tree has exactly five allowed flags", () => {
+  assert.equal(readFileSync(join(copy, CI_FILE), "utf8").split("\n").filter((line) => line === FLAG).length, 5);
 });
 
 for (const [name, change, messages] of [
-  ["a flag on a step that is not one of the four", (text) => text.replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}${FLAG}\n`), [ONLY_EXACT]],
+  ["a flag on a step that is not one of the five", (text) => text.replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}${FLAG}\n`), [ONLY_EXACT]],
   ["a job-level flag", (text) => text.replace("  seam-control:\n", "  seam-control:\n    continue-on-error: true\n"), [ONLY_EXACT]],
   ["a flag moved from an allowed step to another step", (text) => text.replace(TIMINGS, TIMINGS.slice(FLAG.length + 1)).replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}${FLAG}\n`), [UPLOAD_SHAPE]],
   ["an id on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace(FLAG, `${FLAG}\n        id: timings`)), [UPLOAD_SHAPE]],
   ["an expression instead of true on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace(FLAG, "        continue-on-error: ${{ always() }}")), [ONLY_EXACT, UPLOAD_SHAPE]],
   ["a different upload action on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace("043fb46d", "043fb46e")), [UPLOAD_SHAPE]],
+  // The per-test timings report carries a failing test's panic text, so it is uploaded only after a passing test step.
+  ["the per-test timings upload without its passing-test condition", (text) => text.replace(TEST_TIMINGS_STEP, TEST_TIMINGS_STEP.replace(" && steps.native-tests.outcome == 'success'", "")), [UPLOAD_SHAPE]],
+  ["the per-test timings upload on every operating system", (text) => text.replace(TEST_TIMINGS_STEP, TEST_TIMINGS_STEP.replace(" && runner.os == 'macOS'", "")), [UPLOAD_SHAPE]],
+  ["a wider path on the per-test timings upload", (text) => text.replace(TEST_TIMINGS_STEP, TEST_TIMINGS_STEP.replace("default/junit.xml", "default/*")), [UPLOAD_SHAPE]],
+  ["a longer retention on the per-test timings upload", (text) => text.replace(TEST_TIMINGS_STEP, TEST_TIMINGS_STEP.replace("retention-days: 7", "retention-days: 90")), [UPLOAD_SHAPE]],
 ]) {
   test(`diagnostics uploads: ${name} is refused`, () => {
     const result = withChange(CI_FILE, change);
@@ -158,7 +174,7 @@ for (const [name, change, messages] of [
   });
 }
 
-test("diagnostics uploads: an allowed step moved to another job is refused although the count stays four", () => {
+test("diagnostics uploads: an allowed step moved to another job is refused although the count stays five", () => {
   const step = [
     "      - name: Retain native compiler timings",
     "        if: ${{ always() }}",
@@ -180,6 +196,66 @@ test("diagnostics uploads: an allowed step moved to another job is refused altho
     return `${without.slice(0, jobStart)}${block}\n${step}\n\n${without.slice(jobEnd)}`;
   });
   refused(result, UPLOAD_SHAPE);
+});
+
+// The Playwright browsers cache is saved only by push, manual and scheduled runs. The combined restore-and-save cache action saves from
+// every ref, and a pull-request or merge-queue ref saves a copy only that ref can read: on 15 Oct 2026 five copies of
+// the 365 MiB Playwright browsers, saved by pull-request and merge-queue refs, sat in a repository cache at 9.96 of 10 GiB.
+const PLAYWRIGHT_SAVE = [
+  "      - name: Save Playwright browsers",
+  "        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}",
+  "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+  "        with:",
+  "          path: ~/.cache/ms-playwright",
+  "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}",
+].join("\n");
+const COMBINED = "ci.yml must not use the combined restore-and-save cache action (actions/cache@)";
+const PLAYWRIGHT_RESTORE_KEY = "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}\n      - name: Install Playwright browsers and system dependencies";
+const PLAYWRIGHT_INSTALL_HEAD = "      - name: Install Playwright browsers and system dependencies\n";
+const SAVE_SHAPE = "the Playwright browsers save step changed shape";
+const RESTORE_SHAPE = "the Playwright browsers restore step changed shape";
+for (const [name, change, message] of [
+  ["the combined action back in the restore step", (text) => text.replace("        id: playwright-cache\n        uses: actions/cache/restore@", "        id: playwright-cache\n        uses: actions/cache@"), COMBINED],
+  ["the save step without its event condition", (text) => text.replace(PLAYWRIGHT_SAVE, PLAYWRIGHT_SAVE.replace(" && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')", "")), "the Playwright browsers save step changed shape"],
+  ["the save step on pull requests too", (text) => text.replace(PLAYWRIGHT_SAVE, PLAYWRIGHT_SAVE.replace(" || github.event_name == 'schedule')", " || github.event_name == 'schedule' || github.event_name == 'pull_request')")), "the Playwright browsers save step changed shape"],
+  ["the save step removed", (text) => text.replace(`${PLAYWRIGHT_SAVE}\n`, ""), "the Playwright browsers save step changed shape"],
+  ["the save step moved before the install step", (text) => text.replace(`${PLAYWRIGHT_SAVE}\n`, "").replace(PLAYWRIGHT_INSTALL_HEAD, `${PLAYWRIGHT_SAVE}\n${PLAYWRIGHT_INSTALL_HEAD}`), SAVE_SHAPE],
+  ["a second cache save step in the job", (text) => text.replace(`${PLAYWRIGHT_SAVE}\n`, `${PLAYWRIGHT_SAVE}\n${PLAYWRIGHT_SAVE.replace("Save Playwright browsers", "Save more browsers")}\n`), SAVE_SHAPE],
+  ["a restore key that differs from the save key", (text) => text.replace(PLAYWRIGHT_RESTORE_KEY, PLAYWRIGHT_RESTORE_KEY.replace("key: playwright-", "key: playwright-v2-")), RESTORE_SHAPE],
+  ["restore-keys added to the restore step", (text) => text.replace(PLAYWRIGHT_RESTORE_KEY, PLAYWRIGHT_RESTORE_KEY.replace("\n      - name", "\n          restore-keys: playwright-\n      - name")), RESTORE_SHAPE],
+]) {
+  test(`cache saving: ${name} is refused`, () => {
+    refused(withChange(CI_FILE, change), message);
+  });
+}
+
+// The per-test timings artifact is public for 7 days. What it carries is set in nextest.toml, outside the
+// pinned upload step, so the file is pinned too: exactly one JUnit table, with the output stores off, and no
+// setup scripts (their command, arguments and environment names would join the report).
+const NEXTEST = "src-tauri/.config/nextest.toml";
+const NEXTEST_MESSAGE = "src-tauri/.config/nextest.toml must hold exactly one JUnit report table";
+for (const [name, change] of [
+  ["a passing test's output stored", (text) => text.replace("store-success-output = false", "store-success-output = true")],
+  ["a failing test's output stored", (text) => text.replace("store-failure-output = false", "store-failure-output = true")],
+  ["the report written elsewhere", (text) => text.replace('path = "junit.xml"', 'path = "/tmp/junit.xml"')],
+  ["a second profile with a report", (text) => `${text.trimEnd()}\n\n[profile.ci.junit]\npath = "ci.xml"\n`],
+  ["a setup script section", (text) => `${text.trimEnd()}\n\n[scripts.setup.probe]\ncommand = "echo"\n`],
+  ["a property-adding profile script", (text) => `${text.trimEnd()}\n\n[[profile.default.scripts]]\nfilter = "all()"\nsetup = "probe"\n`],
+  // The same tables without a bracketed header: valid TOML that nextest reads as setup scripts.
+  ["a setup script as a top-level dotted key", (text) => `scripts.setup.probe.command = "echo"\n${text}`],
+  ["a setup script as a top-level inline table", (text) => `scripts = { setup = { probe = { command = "echo" } } }\n${text}`],
+  ["a profile script as an inline array", (text) => text.replace("[profile.default]\n", '[profile.default]\nscripts = [{ filter = "all()", setup = "probe" }]\n')],
+  ["a setup script under a key spelled with an escape", (text) => `"scr\\u0069pts".setup.probe.command = "echo"\n${text}`],
+]) {
+  test(`nextest report: ${name} is refused`, () => {
+    refused(withChange(NEXTEST, change), NEXTEST_MESSAGE);
+  });
+}
+
+// Comments are not pinned: the pin reads every line that is not blank or a full-line comment.
+test("nextest report: a changed comment line is accepted", () => {
+  const result = withChange(NEXTEST, (text) => text.replace("# Hang guard for the native test run", "# Hang guard, reworded, for the native test run"));
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test("diagnostics uploads: the flag in any other workflow is refused", () => {

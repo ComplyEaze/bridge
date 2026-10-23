@@ -1,4 +1,4 @@
-import { selectRelease, releaseAssets } from "./release-catalog.mjs";
+import { selectRelease, releaseAssets, sha256Digest } from "./release-catalog.mjs";
 import { loadReleases, versionLabel } from "./release-source.mjs";
 
 var PLATFORMS = {
@@ -65,6 +65,16 @@ function platformCard(release, platformKey, kind) {
   meta.appendChild(sep);
   meta.appendChild(checksumLink);
   card.appendChild(meta);
+
+  // the code GitHub reports for this file, to compare with what certutil or shasum prints
+  var digest = sha256Digest(assets.bundle);
+  if (digest) {
+    var line = el("p", "dl-meta dl-digest", "SHA-256 as GitHub reports it: ");
+    var code = el("code");
+    code.textContent = digest;
+    line.appendChild(code);
+    card.appendChild(line);
+  }
 
   card.appendChild(el("p", "dl-note", info.note));
   // beside every download, and only this

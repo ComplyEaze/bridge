@@ -242,6 +242,58 @@ test("a probe whose core read stopped names the refusal by its title in Pack rea
   host.remove();
 });
 
+test("the proof screen shows no rejected-row count and names the rejected-records gap", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const fixture = props(async () => []);
+  fixture.result.snapshotStartOutcomeUnknown = false;
+  fixture.result.syncEvidence = {
+    latest_proofs: [{
+      integrity_state: "entry_hash_valid",
+      run_id: "run",
+      selection_token: "token",
+      proof_sha256: "0".repeat(64),
+      pack_id: "core_accounting",
+      outcome: "failed",
+      verification_state: "unverified",
+      started_at_unix_ms: 1,
+      completed_at_unix_ms: 2,
+      accepted_records: 7,
+      rejected_records: 0,
+      provenance_unavailable_records: 0,
+      gap_codes: ["rejected_snapshot_records"],
+      warning_codes: [],
+    }],
+    latest_reconciliation_mismatches: [],
+    incremental: {
+      execution_enabled: false,
+      affirmative_exact_capability_receipts: 0,
+      establishment_receipts: 0,
+      active_checkpoint_heads: 0,
+      state: "execution_not_enabled",
+      fallback_warning_code: "none",
+    },
+    core_accounting_freshness: { state: "never_verified", checkpoint_present: false, proof_present: true },
+  };
+  fixture.result.latestProof = fixture.result.syncEvidence.latest_proofs[0];
+  fixture.result.activeGapCodes = ["rejected_snapshot_records"];
+  await act(async () => root.render(<MirrorProofScreen {...fixture.result} />));
+  const text = host.textContent ?? "";
+  // The count is always zero (only accepted rows enter the mirror), so it is not shown.
+  expect(text).not.toMatch(/rejected rows/i);
+  expect(text).not.toContain("Accepted / rejected");
+  expect(text).not.toContain("7 / 0");
+  expect([...host.querySelectorAll("th")].map((cell) => cell.textContent)).toContain("Accepted returned rows");
+  const cells = [...host.querySelectorAll("td")].map((cell) => cell.textContent);
+  expect(cells).toContain("7");
+  expect(cells).toContain("Source records were rejected");
+  expect(text).toContain("Do not rely on the mirror for this run's records until the cause of the rejection is understood");
+  expect(text).toMatch(/accepted canonical rows and \d+ canonical rows/);
+  await act(async () => root.unmount());
+  host.remove();
+});
+
 test("the proof ledger's Gaps column names each gap by its Gap Map title", async () => {
   const host = document.createElement("div");
   document.body.append(host);

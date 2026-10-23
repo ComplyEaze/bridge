@@ -1,0 +1,29 @@
+0f9d3c1e-6b7a-4c58-9a21-5d3e8b1c7f40
+1
+Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is
+posted until you answer.
+
+L01 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L02 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L03 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L04 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L05 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L06 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L07 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L08 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L09 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L10 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L11 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L12 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L13 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L14 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L15 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L16 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L17 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L18 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L19 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L20 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L21 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L22 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L23 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx
+L24 synthetic preview line xxxxxxxxxxxxxxxxxxxxxxxxx

@@ -1,0 +1,44 @@
+0f9d3c1e-6b7a-4c58-9a21-5d3e8b1c7f40
+10
+Press Y (or click Yes) to post these 10 vouchers into Tally. Press N (or click No) to cancel.
+Nothing is posted until you answer.
+
+Create 10 vouchers in "Synthetic Accounts"
+Company number: 100001  Books from: 20260401
+Types: 10 Payment
+Dates: 20260901 to 20260901  Voucher numbers: Tally assigns them
+Total debit: 10  Total credit: 10
+Money out by Payment vouchers: 10
+Company GUID: 00000000-0000-4000-8000-000000000002
+Tally: http://127.0.0.1:9001
+Each voucher: type, date, amount, ledger, narration (references not shown):
+Each line ends with its narration, quoted; a cut one is marked … (+N characters).
+Payment 20260901  1  "Party 0"  "Synthetic test only"
+Payment 20260901  1  "Party 1"  "Synthetic test only"
+Payment 20260901  1  "Party 2"  "Synthetic test only"
+Payment 20260901  1  "Party 3"  "Synthetic test only"
+Payment 20260901  1  "Party 4"  "Synthetic test only"
+Payment 20260901  1  "Party 5"  "Synthetic test only"
+Payment 20260901  1  "Party 6"  "Synthetic test only"
+Payment 20260901  1  "Party 7"  "Synthetic test only"
+Payment 20260901  1  "Party 8"  "Synthetic test only"
+Payment 20260901  1  "Party 9"  "Synthetic test only"
+
+Dr 0  Cr 10  10 entries  "Cash"
+Dr 1  Cr 0  1 entry  "Party 0"
+Dr 1  Cr 0  1 entry  "Party 1"
+Dr 1  Cr 0  1 entry  "Party 2"
+Dr 1  Cr 0  1 entry  "Party 3"
+Dr 1  Cr 0  1 entry  "Party 4"
+Dr 1  Cr 0  1 entry  "Party 5"
+Dr 1  Cr 0  1 entry  "Party 6"
+Dr 1  Cr 0  1 entry  "Party 7"
+Dr 1  Cr 0  1 entry  "Party 8"
+Dr 1  Cr 0  1 entry  "Party 9"
+
+Batch: bridge-00000000-0000-4000-8000-000000000001
+
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.

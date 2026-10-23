@@ -19,6 +19,10 @@ pub const MAX_EXACT_DECIMAL_BYTES: usize = 256;
 pub enum TallyError {
     #[error("Tally is not reachable")]
     Unreachable,
+    /// A request reached its deadline (#1671). It may have been sent, and Tally may still be
+    /// answering it, so this is not "Tally is not reachable".
+    #[error("A request to Tally reached its deadline")]
+    RequestDeadlineExceeded,
     #[error("Tally returned an invalid protocol response ({code})")]
     Protocol { code: String },
     #[error("Tally data failed validation ({code})")]

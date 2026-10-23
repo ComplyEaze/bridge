@@ -321,9 +321,14 @@ request is predicted over a budget well below the cap.
   `ledger_movement` keeps its second read: it compares two ledger catalogues taken either side of
   the voucher read, and skipping the replay would leave the second catalogue outside the marks
   bracket.
-- **An abandoned call is not cancelled mid-read.** For every tool but `post_import`, the stdio server
-  awaits a tool call to completion before reading its input again, so a host's cancellation or
-  closed input is seen only afterwards, and the read dispatches its remaining (bounded) requests.
+- **An abandoned call is withdrawn before its next Tally operation, never during one.** The stdio
+  server keeps reading input while any tool runs (#554). A `notifications/cancelled` naming the call
+  stops its queued operations before the next one starts and the call is answered as withdrawn; a
+  request already sent to Tally is not abandoned, because abandoning a request does not stop Tally.
+  A `lab_import_*` write is never withdrawn, so its mandatory read-back runs. A closed input is not
+  a withdrawal: the call runs to completion and the session ends after it. `post_import` has its own
+  withdrawal (#725), before its dispatch intent only. This is from reading the code
+  (`agent_protocol.rs`); no Tally was involved, and what a host sends is in section 11f.
 - **`ALTVCHID` and `ALTMSTID` moving on every change** was observed only for changes made through
   the XML gateway, once each, on one release (§11c.5). Changes made in the Tally UI, the Edit Log
   SKU and Education mode were not tested.
@@ -1498,11 +1503,45 @@ on a read-back through ComplyEaze Bridge that is not captured as a fixture:
 | A referenced opening balance | it is a bill, with no voucher; an unreferenced opening is residual only |
 | An advance or a pending note with a reference | listed as a named bill in the report of the opposite direction, with no type label (12a.1) |
 
-**Not shown:** any client book; a multi-currency book; cost centres; an as-of date earlier than the last
-voucher; post-dated vouchers; whether a `PARTYLEDGERNAME`
+**Not shown:** any client book; a multi-currency book; cost centres; whether a `PARTYLEDGERNAME`
 term in the request would be lossless for the journal above (it was not tried, which is why the
 party detail reads the whole window and filters by each entry's own ledger); the cost of that
 whole-window read on a large book.
+
+**Captures of 9 October 2026 (capture 4 of #1356): VERIFIED on one synthetic party of one book.** TallyPrime Silver 7.1
+(licensed), Windows 10, the synthetic company `BRIDGE BILLTRAIL LAB` (books from 1 April 2025, bill-wise on, inventory off,
+the only company loaded), through the published 0.5.1 `outstandings` tool with `party` and `detail`. Every result was
+compared, bill for bill, with Tally's Ledger Outstandings (Pending Bills) screen for the same date; the screen was compared
+by screenshot, and the screenshots are kept, not committed. The ledgers and five vouchers were created through the lab
+import tool and read back; the Credit Note and the post-dated receipt were keyed by hand in Tally's screens. The answers
+are kept unchanged with these sizes and hashes:
+
+| As of | Detail | State | Bytes | SHA-256 |
+| --- | --- | --- | --- | --- |
+| 31-Jul-2025 | `bill_trail` | `bills_listed`, 4 vouchers read | 8,096 | `86e89c3bd7318035b7240dec759e12ccc32d22969f138f27fc0f5aa47bb6673e` |
+| 31-Jul-2025 | `unadjusted` | `residual_not_explained_by_vouchers` | 6,412 | `4bf23b2c00d5dbaa81232241362deaae2237c2d9efdc90cef179c38252f432b8` |
+| 31-Mar-2026 | `bill_trail` | `bills_listed`, 7 vouchers read | 9,608 | `da006110f4722b4923e7fad910457c8b7bbc0286d0c8c0bedef980045d762800` |
+| 31-Mar-2026 | `unadjusted` | `residual_not_explained_by_vouchers` | 7,494 | `9b4a3291acdc5d7dfdb258bf2919ef9a080944953d9bbe19e27477f7cb00d6d6` |
+| 28-Feb-2026 | `bill_trail` | `bills_listed`, 6 vouchers read | 9,196 | `fea009bb902258c552e686594c5b53354f481bac9d87a667315689e4bbc2d0b2` |
+| 28-Feb-2026 | `unadjusted` | `residual_not_explained_by_vouchers` | 7,494 | `8eb81d86757ec1e816fe7a0df10d5c544a7dfb045c513bfefa1042bc44230ca3` |
+| 31-Mar-2026, after a hand-keyed opening bill | `unadjusted` | `residual_not_explained_by_vouchers`, 7 vouchers read | 7,794 | `106e92ded3552b74e42fd712414d3894dc680a34a5b70ec39e18dd3815e17060` |
+
+| What was measured | Result |
+| --- | --- |
+| An `as_of` earlier than the last voucher | the window ends at the `as_of` (4 vouchers read of 7 at 31-Jul-2025, 6 at 28-Feb-2026); bills and balances equal the screen for that date. VERIFIED |
+| An advance later adjusted by an invoice | the bill trail lists both allocations as made and marks the bill closed; the unadjusted detail still lists the advance as an `advance` row at the amount allocated (4,000), with `native_balance` null and `native_rows` 0 in all four unadjusted reads at 31-Jul-2025, 28-Feb-2026, 31-Mar-2026 and 31-Mar-2026 after the opening bill; the screen does not list it. VERIFIED, as "no netting is built on a later adjustment". Whether a closed advance should be hidden is a choice not yet taken; it needs a second book showing a later invoice adjusting an advance |
+| A post-dated receipt dated before the `as_of` | listed as an `Agst Ref` allocation on its invoice at 31-Mar-2026 (3,000 left) and counted by the screen too. VERIFIED for this case |
+| The same post-dated receipt, with an `as_of` before its date (28-Feb-2026) | left out of the tool's window and of the screen (6 vouchers, the invoice stays at 5,000). VERIFIED. The screenshot for 28-Feb was taken after the opening bill below was added, so its On Account line (4,600) differs from the unadjusted residual read before it (-14,600) by exactly that bill's 10,000; the 28-Feb reads were not repeated after the change |
+| A note with a reference and a note without one | the first is a named bill of the opposite sign (`pending_note_with_reference`); the second is `on_account` and its 400 is in `on_account_sum`. VERIFIED |
+| The unadjusted `residual` | equals the screen's On Account line on both dates (-15,000 at 31-Jul-2025, -14,600 at 31-Mar-2026). VERIFIED |
+| An opening bill with a reference, keyed by hand (10,000 Dr; Tally rejected 1-Apr-2025 as its date and kept 31-Mar-2025) | the unadjusted detail does not list it as a row; its `difference` falls from -15,000 to -5,000 and `difference_equals_opening_balance` becomes false; the `residual` (-4,600) equals the screen's On Account line; `totals.receivable` (scope `open_bills_only`) rises from 15,000 to 25,000, which includes the opening bill. VERIFIED on this book |
+| `totals` with scope `open_bills_only` before the opening bill | receivable 25,000 at 31-Jul-2025 and 15,000 at 31-Mar-2026, the open debit bills only; the screen's totals (37,000 and 26,000 Dr) also include On Account and the credit bills. Recorded as observed |
+
+The lab import tool did not create the opening bills it was given (Tally showed no bill and the whole 15,000 as On Account);
+its read-back checked only the opening balance. That is a defect of the lab tool, not of the shipped reads (#1500; the lab
+tool now refuses a ledger's opening bills before any request, #1508). **Not measured:** `bill_trail` with an opening bill; an
+opening bill with a credit sign; more than one opening bill; narrowing by `reference`; the three captures of #1356 that are
+still open (a party term against an unfiltered control, a per-ledger or per-bill native report, the cost on a large book).
 
 **What the tie-out does not prove.** The voucher read and the bills reports are two reads whose
 extents are not compared, so a voucher posted between them usually breaks a bill's tie, but two
@@ -1511,9 +1550,9 @@ means the on-account sum equals the residual, not that the residual's compositio
 unadjusted tie-out is captured whole (the on-account debtor above); the other residuals in the
 tests are typed from the seeded vouchers, not captured ledger rows. A ledger the snapshot lists no residual for is reported as
 having no residual row, never as a residual of zero, and an empty voucher read is reported as
-such, never corroborated. No captured book shows a later invoice adjusting an advance, so the
+such, never corroborated. One captured party shows a later invoice adjusting an advance (above), and the
 unadjusted detail lists each advance and note at its amount as allocated and puts Tally's own open
-balance for its reference beside it, rather than netting allocations on an unverified rule.
+balance for its reference beside it, rather than netting allocations on a rule shown by one party only.
 
 ---
 
@@ -1590,6 +1629,16 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 - **The code's own request, answered (VERIFIED, 9 Oct 2026, after ten vouchers were keyed and before the invoice was imported).** Sent in UTF-16 as ComplyEaze Bridge sends it, the request returned the same two rows and the same registration, and the build admitted an invoice on it. A narrower request that fetches only `GUID`, `TAXTYPE`, `TAXREGISTRATION`, `USEDFOR`, `GSTREGNUMBER`, `GSTOLDREGNUMBER` and the registration's dated rows returned the same values for those fields. Both answers are in the `pilot-lab` fixtures.
 - **Not measured:** a company with GST off (the company's GST flag is not read), or with no registration; how Tally writes an inactive or composition registration, or a changed GSTIN; two loaded companies (whether `TaxUnit`, like `Company`, ignores `SVCURRENTCOMPANY`); several registrations; another company's units; a voucher type bound to a tax unit (`TAXUNITNAME`, `Any` on the lab's Sales type); Gold, Education, other releases; a real book (not a lab book).
 
+### 12a.20 A ledger's input tax credit flag on the wire is the opposite of the screen's setting (PARTIAL)
+
+**PARTIAL: one ledger (under Purchase Accounts), one dated entry, one release.** Measured on 15 October 2026 on TallyPrime 7.1 in one synthetic company (`BRIDGE SHAPE LAB`) by a keying sitting of `lab/itc-ledger-write-run-sheet` (curl only, no ComplyEaze Bridge build; one backup, one ledger created, two alterations, each followed by a read). The element is `GSTINELIGIBLEITC`, inside a ledger's `GSTDETAILS.LIST` entry (read as the committed capture `ledger_gst_details_live` was read: the ledger collection with its GST details).
+
+- **A keyed Yes reads as the element absent; a keyed No reads as `Yes` (PARTIAL).** A new ledger under Purchase Accounts was given one GST history row dated 20250401 (taxability `Taxable`, source `Specify Details Here`, IGST 18). With the screen setting `Eligible for Input Tax Credit` keyed Yes, the ledger read back with no `GSTINELIGIBLEITC` in the entry (answer of 105,844 bytes, sha256 `b4b2641bc7ae81b88c23afa50775b51fe09746fc433d46b3d5ff5c7d2a9ffa72`). Changing only that setting to No, the next read carried `GSTINELIGIBLEITC` `Yes` in the same entry and nothing else moved (105,970 bytes, sha256 `5d531467b4c5714bfcf04b961f0dda2138c32297b3f424e55db954699baf61e7`). The screen label was exactly `Eligible for Input Tax Credit` in both photographs. The book's master mark rose by one for each change (290, 291, 292). So on this ledger the element is an ineligibility flag: Yes on the wire means the screen says No. Nothing here says the rule holds for any other ledger.
+- **The same reading was seen earlier on a stock item (PARTIAL: one item, two rows).** A draft change that adds stock items to `masters` (#1742, not merged) reads the element the same way and names it `ineligible_itc`; nothing of it is on master.
+- **A Yes elsewhere says nothing either way (VERIFIED in the committed capture `ledger_gst_details_live`, not read against the screen).** The three Sales Accounts ledgers of that capture carry `GSTINELIGIBLEITC` `Yes` on their keyed entries (source `Specify Details Here`); the one Purchase Accounts ledger carries none; a ledger entry whose source is `As per Company/Group` (Tally's own default entry) carries `Yes` with no keyed No behind it. None of these was compared with its screen, so reading the Sales ledgers as ineligible, or a default entry's Yes as a choice, is not supported.
+- **What ComplyEaze Bridge does.** `ledger_masters` with `include_gst_details` sends the element as `ineligible_itc` (true for Yes, false for No, null when absent, never defaulted) and says in its text and in the result's `limitations` that true is not eligible. 0.6.0 sent it as `itc_eligible`, which read the opposite way (#1741).
+- **Not measured:** any other ledger or group (a Sales ledger, a duty ledger, a party ledger), a second dated entry on one ledger, an entry keyed new beside one Tally made itself, what an absent element means for the tax (eligible, or deferring to the company or group), the screen of Tally's own default entry, Gold, other releases.
+
 ## 13. Open questions
 
 | Question | Why it matters |
@@ -1650,3 +1699,4 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 | 2026-10-02 | §12a.13: `NUMSTOCKITEMS` against the item rows after create, create-on-existing, rename, alias, move to another group, an inventory purchase and two bulk imports of 20 items on one synthetic licensed 7.1 Silver company: equal at every point; this alias was not counted as an item and added a name entry to the row; a Create on an existing item changed no field of those read; a parent-only Alter changed, of the fields read, only the parent. For a ledger, §9.4g records (one run, PARTIAL) that a Create on an existing name with a changed parent, bill-wise flag and opening balance replaced all three, also answering `CREATED=0, ALTERED=1`: the two master types gave different results here, and neither result is generalised to the other. PARTIAL, one item each, once; not measured: screen-created items, delete with vouchers, merge, a reload. |
 | 2026-10-03 | §12a.3: a whole `outstandings` call (release build from master 7b994e65) on the book of the 1-Dec-2108 due date: state `complete`, 52 requests with none refused, 4.0 s, 1,498 open bills in a page of 500 and a 181,044-byte result. PARTIAL, one run, one book; not measured: the 2108 bill's row in a live response (not on the page: the page runs oldest-due first and the bill is not yet due), the later pages, other books or directions. |
 | 2026-10-06 | §12a.15: the ledger catalogue request with one more native method (`IsBillWiseOn`) returned exactly one `Yes` or `No` `ISBILLWISEON` on every ledger of five synthetic licensed 7.1 Silver books, equal, on the two books where it was compared, to the outstandings snapshot's flags, with the cash, bank and duty ledgers answering `No` and four CR LF ledger names answering a flag (three `No`, one `Yes`). VERIFIED for those books (the captures of four are committed; the GST RECON LAB answer is not); no large book |
+| 2026-10-09 | §12a.14: capture 4 of #1356 on one synthetic licensed 7.1 Silver party (`BRIDGE BILLTRAIL LAB`, the published 0.5.1 tool): an `as_of` earlier than the last voucher, a post-dated receipt before and after its date, an advance later adjusted by an invoice (listed as allocated in the unadjusted detail, closed in the bill trail), a note with and without a reference, and a hand-keyed opening bill, each compared with Tally's Pending Bills screen. VERIFIED for this party; what was not measured is listed in the section |

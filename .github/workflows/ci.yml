@@ -111,7 +111,7 @@ jobs:
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.py$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes\.py$|retain-macos-test-binaries\.py$))' <<< "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.mjs$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes(\.test)?\.mjs$|retain-macos-test-binaries(\.test)?\.mjs$))' <<< "$changed_files"; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
@@ -124,7 +124,7 @@ jobs:
             echo 'tax_audit=false' >> "$GITHUB_OUTPUT"
           fi
 
-          if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.py|capture-package-log(\.test)?\.py|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
           else
             echo 'bundle=false' >> "$GITHUB_OUTPUT"
@@ -159,9 +159,12 @@ jobs:
       - name: Read the Playwright version
         id: playwright-version
         run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      # Restored here and saved by the "Save Playwright browsers" step after the install, not by the combined cache action,
+      # so that only a push, manual or scheduled run writes the cache: a pull-request ref's copy is readable by that ref
+      # alone (15 Oct 2026: five such copies, 1.8 GiB of a 10 GiB cap).
       - name: Restore Playwright browsers
         id: playwright-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
@@ -207,6 +210,12 @@ jobs:
             done
             exit 1
           fi
+      - name: Save Playwright browsers
+        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - run: corepack pnpm test
       - run: corepack pnpm run build
 
@@ -274,9 +283,8 @@ jobs:
       # A committed merge-conflict marker passes every other check and ships as text.
       - run: node scripts/check-conflict-markers.mjs
       - run: node --test scripts/check-conflict-markers.test.mjs
-      - run: python3 scripts/collect-macos-test-crashes.test.py
-      - run: python3 scripts/retain-macos-test-binaries.test.py
-      - run: python3 scripts/fetch-pdfium.test.py
+      - run: node --test scripts/collect-macos-test-crashes.test.mjs scripts/retain-macos-test-binaries.test.mjs
+      - run: node --test scripts/fetch-pdfium.test.mjs
       - run: python3 scripts/merge-gate.test.py
       - run: python3 scripts/surface_coverage_report.test.py
 
@@ -398,10 +406,23 @@ jobs:
         run: >-
           cargo nextest run --locked --manifest-path src-tauri/Cargo.toml
           --workspace --no-fail-fast --retries 0 --test-threads num-cpus --timings
+      # Test names, binaries, times and outcomes from nextest's JUnit report (src-tauri/.config/nextest.toml),
+      # for choosing which tests to trim or split. The report carries a failing test's panic text whatever
+      # the store-*-output settings say, so it is uploaded only when the test step passed. It sits right after
+      # that step because the PDFium step below runs nextest again and rewrites the same file.
+      - name: Retain macOS per-test timings
+        if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-test-timings-macos
+          path: src-tauri/target/nextest/default/junit.xml
+          if-no-files-found: warn
+          retention-days: 7
       - name: Collect minimized macOS test crash stacks
         if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}
         run: >-
-          python3 scripts/collect-macos-test-crashes.py
+          node scripts/collect-macos-test-crashes.mjs
           --since-file "$RUNNER_TEMP/bridge-native-start"
           --output "$RUNNER_TEMP/bridge-native-crashes.json"
           --wait-seconds ${{ steps.native-tests.outcome == 'failure' && '30' || '0' }}
@@ -419,7 +440,7 @@ jobs:
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: >-
-          python3 scripts/retain-macos-test-binaries.py
+          node scripts/retain-macos-test-binaries.mjs
           --crash-json "$RUNNER_TEMP/bridge-native-crashes.json"
           --target src-tauri/target/debug/deps
           --output "$RUNNER_TEMP/bridge-native-binaries"
@@ -439,7 +460,7 @@ jobs:
       - name: Fetch pinned PDFium
         shell: bash
         run: >-
-          "$(command -v python3 || command -v python)" scripts/fetch-pdfium.py
+          node scripts/fetch-pdfium.mjs
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/pdfium" --github-env "$GITHUB_ENV"
       # Nine tests, selected on the workspace build above and run on both systems: in
@@ -603,9 +624,9 @@ jobs:
           # Pinned Tauri CLI logs bundle_dmg.sh stdout/stderr only at debug.
           TAURI_CLI_VERBOSITY: '1'
         run: |
-          python3 scripts/capture-package-log.test.py
+          node --test scripts/capture-package-log.test.mjs
           set -o pipefail
-          corepack pnpm run tauri:build -- --timings 2>&1 | python3 scripts/capture-package-log.py
+          corepack pnpm run tauri:build -- --timings 2>&1 | node scripts/capture-package-log.mjs
       - name: Collect failed macOS bundle context
         if: ${{ failure() && runner.os == 'macOS' && steps.macos-bundle.outcome == 'failure' }}
         run: |
@@ -634,12 +655,12 @@ jobs:
           node scripts/check-macos-bundle-resources.mjs
           node scripts/check-macos-bundle-resources.mutation.mjs
       # parse_bank_statement loads PDFium from beside bridge_mcp, so the bundle
-      # carries the pinned build. fetch-pdfium.py verifies the archive, the
+      # carries the pinned build. fetch-pdfium.mjs verifies the archive, the
       # library and the licence notice it writes against the lock before use.
       - name: Fetch pinned PDFium for the MCPB
         shell: bash
         run: >-
-          "$(command -v python3 || command -v python)" scripts/fetch-pdfium.py
+          node scripts/fetch-pdfium.mjs
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/mcpb-pdfium"
       # tauri build uses --bins, including the auto-discovered bridge_mcp.
@@ -873,7 +894,7 @@ jobs:
           printf '%s\n' "$NEEDS_JSON"
           failed="$(
             printf '%s' "$NEEDS_JSON" \
-              | python3 -c "import json,sys; d=json.load(sys.stdin); failed=[k for k,v in d.items() if v.get('result') in ('failure','cancelled')]; failed += [] if d.get('workflow-consistency', {}).get('result') == 'success' else ['workflow-consistency']; print(' '.join(dict.fromkeys(failed)))"
+              | node -e 'const d = JSON.parse(require("fs").readFileSync(0, "utf8")); const failed = Object.keys(d).filter((k) => ["failure", "cancelled"].includes(d[k].result)); if (d["workflow-consistency"]?.result !== "success") failed.push("workflow-consistency"); console.log([...new Set(failed)].join(" "))'
           )"
           if [[ -n "$failed" ]]; then
             echo "Required jobs did not pass: $failed"

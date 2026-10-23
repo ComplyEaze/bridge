@@ -98,7 +98,7 @@ capability from assumption, and a completed request from a verified snapshot.
   `bridge_mcp` (see [`packaging/mcpb/README.md`](../../packaging/mcpb/README.md)).
 
   Its PDF tests need the PDFium library and are ignored by default: fetch the pinned build with
-  `python3 scripts/fetch-pdfium.py --platform macos-arm64 --dest <dir>` (it verifies the SHA-256
+  `node scripts/fetch-pdfium.mjs --platform macos-arm64 --dest <dir>` (it verifies the SHA-256
   in `packaging/pdfium/pdfium.lock.json` before extracting), then run
   `BRIDGE_PDFIUM_LIBRARY=<dir>/libpdfium.dylib cargo test -p bridge-bank-statement -- --ignored`.
 

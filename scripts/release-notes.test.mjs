@@ -100,6 +100,8 @@ test("notes fall back from the version section to a non-empty Unreleased to noth
   assert.throws(() => pickNotes(sections, "v0.1.0"), /not a release tag/);
   assert.equal(composeBody({ mode: "none", body: "" }, "Footer.\n"), "Footer.\n");
   assert.equal(composeBody({ mode: "version", body: "Body" }, "Footer.\n"), "Body\n\n---\n\nFooter.\n");
+  assert.equal(composeBody({ mode: "version", body: "Body" }, "Footer.\n", "Header.\n"), "Header.\n\n---\n\nBody\n\n---\n\nFooter.\n");
+  assert.equal(composeBody({ mode: "none", body: "" }, "Footer.\n", "Header.\n"), "Header.\n\n---\n\nFooter.\n");
 });
 
 test("the page renderer escapes everything and links only https URLs and issue numbers", () => {
@@ -215,6 +217,7 @@ function inTemporaryRepository(callback) {
     mkdirSync(join(dir, "packaging", "mcpb"), { recursive: true });
     mkdirSync(join(dir, "tmp"));
     writeFileSync(join(dir, "packaging", "mcpb", "UNSIGNED_PREVIEW_RELEASE.md"), "Footer.\n");
+    writeFileSync(join(dir, "packaging", "mcpb", "INSTALL_AND_CHECK_RELEASE.md"), "Header.\n");
     return callback(dir);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -236,18 +239,26 @@ test("the compose step publishes the version section, then Unreleased, then the 
   inTemporaryRepository((dir) => {
     copyFileSync(join(root, "scripts", "release-notes.mjs"), join(dir, "scripts", "release-notes.mjs"));
     writeFileSync(join(dir, "CHANGELOG.md"), changelog);
-    assert.equal(compose(dir, "mcp-preview-0.4.0").notes, "### In plain words\n\n- Four (#12).\n\n```\n## [9.9.9] - inside a fence, not a section\n```\n\n---\n\nFooter.\n");
+    assert.equal(compose(dir, "mcp-preview-0.4.0").notes, "Header.\n\n---\n\n### In plain words\n\n- Four (#12).\n\n```\n## [9.9.9] - inside a fence, not a section\n```\n\n---\n\nFooter.\n");
     const unreleased = compose(dir, "mcp-preview-0.5.0");
-    assert.equal(unreleased.notes, "Next words.\n\n---\n\nFooter.\n");
+    assert.equal(unreleased.notes, "Header.\n\n---\n\nNext words.\n\n---\n\nFooter.\n");
     assert.match(unreleased.stdout, /::warning::.*no 0\.5\.0 section/);
     writeFileSync(join(dir, "CHANGELOG.md"), "## [0.3.0] - 2026-09-26\n\n- Three.\n");
     const none = compose(dir, "mcp-preview-0.5.0");
-    assert.equal(none.notes, "Footer.\n");
+    assert.equal(none.notes, "Header.\n\n---\n\nFooter.\n");
     assert.match(none.stdout, /::warning::.*no section/);
     rmSync(join(dir, "CHANGELOG.md"));
     const missing = compose(dir, "mcp-preview-0.5.0");
-    assert.equal(missing.notes, "Footer.\n");
+    assert.equal(missing.notes, "Header.\n\n---\n\nFooter.\n");
     assert.match(missing.stdout, /::warning::could not read release notes/);
+  });
+  inTemporaryRepository((dir) => {
+    copyFileSync(join(root, "scripts", "release-notes.mjs"), join(dir, "scripts", "release-notes.mjs"));
+    writeFileSync(join(dir, "CHANGELOG.md"), changelog);
+    rmSync(join(dir, "packaging", "mcpb", "INSTALL_AND_CHECK_RELEASE.md"));
+    const headerless = compose(dir, "mcp-preview-0.5.0");
+    assert.equal(headerless.notes, "Next words.\n\n---\n\nFooter.\n");
+    assert.match(headerless.stdout, /::warning::could not read the release header/);
   });
   inTemporaryRepository((dir) => {
     const crashed = compose(dir, "mcp-preview-0.5.0");

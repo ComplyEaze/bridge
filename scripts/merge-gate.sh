@@ -5,7 +5,8 @@
 # A change of the one review tier (scripts/review-tier.mjs: docs, plain tests and read-side production code only) needs the CLEAN line alone.
 #
 # Usage: scripts/merge-gate.sh <pr-number> [--repo OWNER/NAME]
-#        [--binary-review-sha FULL_SHA] (the owner's own act: binary bytes, ownership, license, and NOTICE reviewed)
+#        [--binary-review-sha FULL_SHA] (the owner's own act: binary bytes, ownership, license, and NOTICE reviewed;
+#        a binary listed, path and blob, in scripts/merge-gate-lab-captures.json on master needs no attestation)
 # Exit:  0 may merge, 1 must not, 2 could not determine.
 #
 # This script intentionally does not re-derive PR/head/base identity binding,
@@ -48,7 +49,7 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     -h|--help)
-      sed -n '2,16p' "$0"
+      sed -n '2,17p' "$0"
       exit 0
       ;;
     -*)
@@ -252,6 +253,7 @@ fi
 files_status=0
 files=$(gh api --paginate --slurp "repos/$REPO/pulls/$PR/files?per_page=100" 2>"$errfile") || files_status=$?
 changed_records="$tmpdir/changed-files.tsv"
+changed_blobs="$tmpdir/changed-blobs.tsv"
 if [ "$files_status" -ne 0 ] || ! jq -e '
   type == "array" and
   (all(.[]; type == "array" and all(.[];
@@ -272,6 +274,9 @@ if [ "$files_status" -ne 0 ] || ! jq -e '
   changed=""
 else
   jq -r '(if all(.[]; type == "array") then flatten else . end)[] | [.filename, .status, .additions, .deletions, (.previous_filename? // "")] | @tsv' <<<"$files" >"$changed_records"
+  # The blob id GitHub reports for each file, kept apart from changed_records (its readers take five columns). It only
+  # ever decides the lab-capture exemption: an absent or malformed id means no exemption, never a pass.
+  jq -r '(if all(.[]; type == "array") then flatten else . end)[] | [.filename, (if (.sha | type) == "string" then .sha else "" end)] | @tsv' <<<"$files" >"$changed_blobs" 2>/dev/null || : >"$changed_blobs"
   changed=$(cut -f1 "$changed_records")
   changed_count=$(jq '(if all(.[]; type == "array") then flatten else . end) | length' <<<"$files")
   unique_changed_count=$(jq '(if all(.[]; type == "array") then flatten else . end) | map(.filename) | unique | length' <<<"$files")
@@ -635,6 +640,99 @@ else
     jq -r '.records[] | [.destination, .added, .deleted, (if .textual_destination == null then 0 else 1 end), (if .binary then 1 else 0 end), (if .gitlink then 1 else 0 end)] | @tsv' <<<"$parsed_diff" >"$diff_stats"
     jq -r '.added_payload[]' <<<"$parsed_diff" >"$added_payload"
 
+  # The lab-capture manifest: binaries (UTF-16 captures from the lab, mostly) the owner has listed on master by path and git
+  # blob id. It is read exactly as the synthetic-UUID registry is below: as a regular-file blob of one resolved commit of the
+  # master ref fetched above, never from the checkout or the pull request, so a pull request cannot list its own binaries (a
+  # change to the file matches the self-protection pattern at the end, and so is the owner's own merge). Anything wrong with it
+  # means no exemptions, which is what the gate did before the manifest existed. Branches in the lab are never read.
+  lab_capture_path="scripts/merge-gate-lab-captures.json"
+  lab_captures_file="$tmpdir/lab-captures.tsv"
+  : >"$lab_captures_file"
+  load_lab_captures() {
+    local tip entry mode count
+    tip=$(git -C "$gate_tree" rev-parse --verify -q "refs/merge-gate/master^{commit}" 2>/dev/null) || {
+      say "note" "lab-capture manifest not applied: could not resolve master"; return 0; }
+    entry=$(git -C "$gate_tree" ls-tree "$tip" -- "$lab_capture_path" 2>/dev/null) || {
+      say "note" "lab-capture manifest not applied: could not look it up on master"; return 0; }
+    [ -n "$entry" ] || return 0
+    mode=${entry%% *}
+    if [ "$mode" != "100644" ]; then
+      say "note" "lab-capture manifest not applied: it is not a regular file on master"; return 0
+    fi
+    git -C "$gate_tree" cat-file -e "$tip:$lab_capture_path" 2>/dev/null || {
+      say "note" "lab-capture manifest not applied: could not read it from master"; return 0; }
+    # The bytes go straight from git into jq (a shell variable would drop a NUL byte and could make an invalid file valid).
+    if ! git -C "$gate_tree" cat-file blob "$tip:$lab_capture_path" 2>/dev/null | jq -e '
+      type == "object" and (keys == ["entries", "schema_version"]) and .schema_version == 1 and
+      (.entries | type == "array" and length <= 1000 and
+        all(.[]; type == "object" and (keys == ["blob", "capture_id", "company", "lab_ref", "path", "seed_basis", "sha256", "size"]) and
+          (.path | type == "string" and length > 0 and (test("[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]") | not) and (startswith("/") | not) and (startswith("..") | not)) and
+          (.blob | type == "string" and length == 40 and test("^[0-9a-f]{40}$")) and
+          (.sha256 | type == "string" and length == 64 and test("^[0-9a-f]{64}$")) and
+          (.size | type == "number" and floor == . and . >= 0) and
+          (.capture_id | type == "string" and test("[^\\s]")) and
+          (.company | type == "string" and test("[^\\s]")) and
+          (.lab_ref | type == "string" and test("[^\\s]")) and
+          (.seed_basis | type == "string" and test("[^\\s]"))) and
+        (([.[].path] | length) == ([.[].path] | unique | length)))
+    ' >/dev/null 2>&1; then
+      say "note" "lab-capture manifest not applied: it is not valid (schema 1, at most 1000 entries, each with a path, a 40-hex blob, a 64-hex sha256, a size and four non-blank text fields, no duplicate paths)"; return 0
+    fi
+    if ! git -C "$gate_tree" cat-file blob "$tip:$lab_capture_path" 2>/dev/null | jq -r '.entries[] | [.path, .blob, (.size | tostring), .sha256] | @tsv' >"$lab_captures_file" 2>/dev/null; then
+      : >"$lab_captures_file"
+      say "note" "lab-capture manifest not applied: could not write the list for the gate"; return 0
+    fi
+    count=$(wc -l <"$lab_captures_file" | tr -d ' ')
+    say "note" "lab-capture manifest: $count listed capture(s) (blob $(git -C "$gate_tree" rev-parse --short=12 "$tip:$lab_capture_path" 2>/dev/null))"
+  }
+  # Reads the blob answer from a file (the bytes never pass through a shell variable) and says match, differ or malformed.
+  read -r -d '' lab_blob_check_py <<'PY' || true
+import base64, binascii, hashlib, json, sys
+path, want_size, want_sha = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    with open(path, "rb") as handle:
+        doc = json.load(handle)
+    if not isinstance(doc, dict) or doc.get("encoding") != "base64" or not isinstance(doc.get("content"), str):
+        raise ValueError("shape")
+    data = base64.b64decode("".join(doc["content"].split()), validate=True)
+    size = doc.get("size")
+    if isinstance(size, bool) or not isinstance(size, int) or size != len(data):
+        raise ValueError("size")
+except (OSError, ValueError, binascii.Error):
+    print("malformed")
+    sys.exit(0)
+print("match" if str(len(data)) == want_size and hashlib.sha256(data).hexdigest() == want_sha else "differ")
+PY
+  # True only when this record's REST name and REST blob id equal one manifest entry's path and blob, and the bytes of that blob
+  # (fetched through the API, never held in a shell variable) have the size and sha256 the owner recorded. A removed file has no new
+  # blob, so it is never listed by this rule; a missing, malformed or ambiguous REST id lists nothing. Strings are compared as
+  # strings: an awk would otherwise compare "100" and "1e2" as numbers. A failed or mismatching byte check is a note, not an
+  # exemption, and the two are told apart (P5).
+  lab_capture_listed() {
+    local name="$1" kind="$2" blob entry want_size want_sha shown verdict blob_json="$tmpdir/lab-blob.json"
+    [ "$kind" != "removed" ] || return 1
+    [ -s "$lab_captures_file" ] || return 1
+    blob=$(LG_NAME="$name" awk -F '\t' '($1 "") == (ENVIRON["LG_NAME"] "") { n++; v = $2 } END { if (n == 1) print v }' "$changed_blobs" 2>/dev/null) || return 1
+    [[ "$blob" =~ ^[0-9a-f]{40}$ ]] || return 1
+    entry=$(LG_NAME="$name" LG_BLOB="$blob" awk -F '\t' '($1 "") == (ENVIRON["LG_NAME"] "") && ($2 "") == (ENVIRON["LG_BLOB"] "") { n++; w = $3 "\t" $4 } END { if (n == 1) print w }' "$lab_captures_file" 2>/dev/null) || return 1
+    [ -n "$entry" ] || return 1
+    IFS=$'\t' read -r want_size want_sha <<<"$entry"
+    shown=$(bounded_coverage_name "$name")
+    : >"$errfile"
+    if ! gh api "repos/$REPO/git/blobs/$blob" >"$blob_json" 2>"$errfile"; then
+      say "note" "listed capture '$shown' not exempt: could not check its bytes (the blob request failed)"; return 1
+    fi
+    verdict=$(python3 -I -c "$lab_blob_check_py" "$blob_json" "$want_size" "$want_sha" 2>/dev/null) || verdict=""
+    case "$verdict" in
+      match) return 0 ;;
+      differ) say "note" "listed capture '$shown' not exempt: its bytes differ from the size or sha256 in the manifest" ;;
+      *) say "note" "listed capture '$shown' not exempt: could not check its bytes (the blob answer was malformed)" ;;
+    esac
+    return 1
+  }
+  load_lab_captures
+  lab_exempt_count=0
+  lab_exempt_examples=""
   coverage_count=0
   coverage_examples=""
   metadata_only_count=0
@@ -678,6 +776,14 @@ else
       IFS=$'\t' read -r _ diff_added diff_deleted textual binary gitlink <<<"$diff_record"
       if [ "$gitlink" -eq 1 ]; then
         gitlink_count=$((gitlink_count + 1))
+      fi
+      if [ "$binary" -eq 1 ] && lab_capture_listed "$filename" "$status"; then
+        # Listed, path and blob, in the owner-approved manifest on master: the owner read these bytes when he merged the list.
+        lab_exempt_count=$((lab_exempt_count + 1))
+        if [ "$lab_exempt_count" -le 8 ]; then
+          lab_exempt_examples="${lab_exempt_examples}${lab_exempt_examples:+; }$(bounded_coverage_name "$filename")"
+        fi
+        continue
       fi
       if [ "$binary" -eq 1 ]; then
         # Its bytes cannot be reconciled through textual hunks.
@@ -725,6 +831,9 @@ else
     # This option is an operator statement, never evidence inferred from the
     # PR body: it attests that every current binary addition/change byte and
     # its ownership, license, and NOTICE obligations were independently read.
+    if [ "$lab_exempt_count" -gt 0 ]; then
+      say "ok" "$lab_exempt_count binary capture(s) are listed, path and blob, in the owner-approved lab-capture manifest on master, and their size and sha256 match: $lab_exempt_examples"
+    fi
     if [ "$binary_count" -gt 0 ]; then
       if [ "$BINARY_REVIEW_SHA" = "$head" ]; then
         say "ok" "$binary_count binary addition/change(s) have the owner's current-head binary review attestation"

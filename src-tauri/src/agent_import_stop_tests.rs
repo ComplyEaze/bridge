@@ -185,6 +185,12 @@ async fn a_release_needs_the_person_and_survives_a_restart() {
     assert_eq!(result(&response)["seen_at_release"], "not_established");
     assert_eq!(result(&response)["seen_detail"], "sent_not_attributed");
     assert_eq!(approval.review_counts(), [1]);
+    // Asked as the release, not as a review: its dialog says what Y does to the
+    // stop, not that a voucher was reviewed (#1780).
+    assert_eq!(
+        approval.review_kinds(),
+        [crate::tally::approved_import::ReviewKind::StopRelease]
+    );
     assert_eq!(approval.reviews(), [dialog(&line, NOT_ATTRIBUTED)]);
     assert!(approval.previews().is_empty(), "not a post dialog");
     assert_eq!(stop(&server), None);
@@ -639,6 +645,42 @@ fn the_release_dialog_does_not_show_text_that_could_mislead() {
     assert_eq!(
         release_preview(&line, &seen),
         words.replace("WR2 Unicode Lab", GUID)
+    );
+}
+
+/// What the release dialog shows (#1780): the statement that the stop is
+/// released stays the first line, under it the answer text says what Y does
+/// to the stop, and nothing in it says a voucher was reviewed.
+#[test]
+fn the_release_dialog_opens_with_its_statement_and_then_says_what_yes_does() {
+    use crate::tally::approved_import::{review_text, ReviewKind};
+    let line = batch("Sales", "http://127.0.0.1:9000");
+    let seen = Seen::of(
+        &json!({"vouchers": [{"bridge_txn_id": "t1", "status": "posted_divergent"}]}),
+        &line,
+    );
+    let preview = super::super::super::stop::release_preview(&line, &seen);
+    let count = crate::tally::approved_import::VoucherCount::new(1).unwrap();
+    let shown = review_text(ReviewKind::StopRelease, count, &preview);
+    assert!(
+        shown.starts_with("THIS RELEASES THE INVOICE STOP FOR THE COMPANY.\n\n"),
+        "{shown}"
+    );
+    let (_, answer) = shown.split_once("\n\n").unwrap();
+    assert!(
+        answer.contains("release the invoice stop for this company"),
+        "{shown}"
+    );
+    assert!(!shown.contains("record that you reviewed"), "{shown}");
+    assert!(
+        shown.ends_with(preview.split_once("\n\n").unwrap().1),
+        "{shown}"
+    );
+    // The review of a doubted post is shown with its own words.
+    let review = review_text(ReviewKind::Review, count, &preview);
+    assert!(
+        review.contains("record that you reviewed this voucher"),
+        "{review}"
     );
 }
 

@@ -177,7 +177,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "7729a6f503d498234407f34ca350cdfec39384adcf2e6a0bfb3583e7c3dcd825"],
+  ], "34a5f27cbf362aceafb42eabd9a288c2aef2b8c0844875a863a3649a61530e06"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -188,7 +188,7 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "bdd80e3bf24c8f565e9f34c266bcc6db7a12708b1555109c7ec1c0d4de01ad8c"],
+  ], "513a53144ba181c8221fe3dfd3d23504e18fb45d9d401111ef09245b23a9be88"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
@@ -312,6 +312,39 @@ for (const [job, lines] of diagnosticUploads) {
 const flagLines = workflow.split("\n").filter((line) => line.includes("continue-on-error"));
 if (flagLines.length !== diagnosticUploads.length || flagLines.some((line) => line.replace(/\r$/, "") !== "        continue-on-error: true")) {
   failures.push("ci.yml must not use continue-on-error except the one exact line in each pinned diagnostics-only upload: a failure would report success");
+}
+// The Playwright browsers cache is saved only by push, manual and scheduled runs (other caches, such as the Node
+// package cache, still save from every ref). The combined restore-and-save cache action saves from
+// every ref, and a pull-request or merge-queue ref saves a copy only that ref can read: on 15 Oct 2026 five copies of
+// the 365 MiB Playwright browsers, saved by pull-request and merge-queue refs, sat in a repository cache that was at
+// 9.96 of 10 GiB, and the eviction left the Windows runs cold. So the browsers are restored with the restore action and saved by one pinned step that runs after the install.
+if (/actions\/cache@/.test(workflow)) {
+  failures.push("ci.yml must not use the combined restore-and-save cache action (actions/cache@): a pull-request ref would save a copy of its own");
+}
+const playwrightSave = [
+  "      - name: Save Playwright browsers",
+  "        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}",
+  "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+  "        with:",
+  "          path: ~/.cache/ms-playwright",
+  "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}",
+].join("\n");
+const playwrightRestore = [
+  "      - name: Restore Playwright browsers",
+  "        id: playwright-cache",
+  "        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+  "        with:",
+  "          path: ~/.cache/ms-playwright",
+  "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}",
+].join("\n");
+const frontendJob = jobBlock(workflow, "frontend");
+if (stepBlock(frontendJob, "      - name: Restore Playwright browsers") !== playwrightRestore) {
+  failures.push("the Playwright browsers restore step changed shape: its key must equal the save step's and it must have no restore-keys; review it and update playwrightRestore");
+}
+const playwrightInstallAt = frontendJob.indexOf("      - name: Install Playwright browsers and system dependencies\n");
+const playwrightSaveAt = frontendJob.indexOf("      - name: Save Playwright browsers\n");
+if (stepBlock(frontendJob, "      - name: Save Playwright browsers") !== playwrightSave || frontendJob.split("actions/cache/save@").length !== 2 || playwrightInstallAt === -1 || playwrightSaveAt < playwrightInstallAt) {
+  failures.push("the Playwright browsers save step changed shape, or does not follow the install step; review it and update playwrightSave");
 }
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
   if (name !== "ci.yml" && source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);
@@ -442,7 +475,7 @@ const expectedChanges = [
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
   "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
-  "          if grep -Eq '^(\\.github/workflows/|\\.github/actions/|rust-toolchain\\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.py$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes\\.py$|retain-macos-test-binaries\\.py$))' <<< \"$changed_files\"; then",
+  "          if grep -Eq '^(\\.github/workflows/|\\.github/actions/|rust-toolchain\\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.py$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes(\\.test)?\\.mjs$|retain-macos-test-binaries(\\.test)?\\.mjs$))' <<< \"$changed_files\"; then",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
@@ -456,7 +489,7 @@ const expectedChanges = [
   "          fi",
   "",
   "          # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.",
-  "          if grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.py|capture-package-log(\\.test)?\\.py|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
+  "          if grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.py|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",
@@ -483,8 +516,8 @@ const readAtRunTime = [
   ["scripts/package-mcpb.mjs", "src-tauri/tests/approval_seam_gate.rs (it starts cargo)"],
   ["packaging/pdfium/pdfium.lock.json", "the native job's PDFium step"],
   ["scripts/fetch-pdfium.py", "the native job's PDFium step"],
-  ["scripts/collect-macos-test-crashes.py", "the native job's macOS crash steps"],
-  ["scripts/retain-macos-test-binaries.py", "the native job's macOS crash steps"],
+  ["scripts/collect-macos-test-crashes.mjs", "the native job's macOS crash steps"],
+  ["scripts/retain-macos-test-binaries.mjs", "the native job's macOS crash steps"],
   ["scripts/check-tally-request-builder-hazards.mjs", "src-tauri/src/tally/tdl_engine.rs"],
   ["scripts/fixtures/", "src-tauri/crates/bridge-bank-statement/tests/common/mod.rs"],
   ["docs/tally/compatibility/compatibility-surface.json", "src-tauri/tests/admission_and_egress_files_stay_pinned.rs"],
@@ -549,7 +582,7 @@ const expectedRequiredChecks = [
   "          printf '%s\\n' \"$NEEDS_JSON\"",
   "          failed=\"$(",
   "            printf '%s' \"$NEEDS_JSON\" \\",
-  "              | python3 -c \"import json,sys; d=json.load(sys.stdin); failed=[k for k,v in d.items() if v.get('result') in ('failure','cancelled')]; failed += [] if d.get('workflow-consistency', {}).get('result') == 'success' else ['workflow-consistency']; print(' '.join(dict.fromkeys(failed)))\"",
+  "              | node -e 'const d = JSON.parse(require(\"fs\").readFileSync(0, \"utf8\")); const failed = Object.keys(d).filter((k) => [\"failure\", \"cancelled\"].includes(d[k].result)); if (d[\"workflow-consistency\"]?.result !== \"success\") failed.push(\"workflow-consistency\"); console.log([...new Set(failed)].join(\" \"))'",
   "          )\"",
   "          if [[ -n \"$failed\" ]]; then",
   "            echo \"Required jobs did not pass: $failed\"",

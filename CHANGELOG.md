@@ -30,6 +30,16 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- The approval window, and the review window, now open with a line that says what each answer does, before any
+  detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
+  voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N
+  vouchers"; the review window says "record that you reviewed" and "recorded"); on a Mac it names the buttons to click.
+  The invoice-stop release, which shares the review window, says that Yes releases the stop, under its own
+  statement. The text is wrapped under 100 characters a line, so the window's caps grew by its size (3 lines and
+  150 characters at most) and every text that fitted before still fits. The `post_import` tool text carries the same
+  sentence, with a note to say it before calling. The keys are unchanged: Y and N still answer the Windows window.
+  Not yet run by us on Windows or in a real box at the new size; on a non-English Windows the box's own button
+  letters may differ, which was not measured.
 - A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
   `verify_import` reads the company's voucher mark below the floor a natively posted batch had proved (a mark Tally
   omits twice counts as a company holding no voucher), the import journal records it, a second restore too, and from then on no natively posted batch of that company at that Tally
@@ -59,6 +69,16 @@ These changes are in source and not yet in a published build.
   the moment of the read. A call that declares no type manual reads no numbering and its result says
   `numbering_read` `not_read`; a call that does read it returns what the book said for each declared type, or
   only their counts when the rows would not fit the response budget.
+
+- `ledger_masters` with `include_gst_details` now names Tally's `GSTINELIGIBLEITC` as `ineligible_itc` (true for Yes,
+  false for No, null when the element is absent), where 0.6.0 named it `itc_eligible` and so told an assistant that
+  an entry with a keyed "Eligible for Input Tax Credit: No" was eligible. Measured on one ledger created
+  under Purchase Accounts in a synthetic book (TallyPrime 7.1): the screen's Yes read as the element absent and
+  its No as Yes, so the element is an ineligibility flag (PARTIAL: one book, one release, one ledger, one dated
+  entry; part of #1741). A Yes on any other ledger says nothing either way: the Sales ledgers of one captured book
+  carry a Yes on their keyed entries, and Tally's own default entry (source `As per Company/Group`) carries one with
+  no keyed No; neither was read against the screen. The value
+  mapping is unchanged: do not read `true` as eligible.
 
 - `negative_stock` (new tool; part of #1358): Tally's own Negative Stock list for a window, as `item`, `quantity`,
   `rate` and `value` per listed stock item, returned as Tally prints them and compared with no other report

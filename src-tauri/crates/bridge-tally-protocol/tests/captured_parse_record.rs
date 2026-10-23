@@ -2342,6 +2342,12 @@ const PILOT_LAB_PARENT_FILTER: &str =
      src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_scope_tests.rs, \
      and the replay in src/agent_import_post_e2e_tests.rs) pin what each parse returns; \
      pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_SCOPED_HSN: &str = "an answer of the pilot lab read on 21 Oct 2026, with no row \
+     here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
+     src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_admission_tests.rs, \
+     src/agent_import_invoice_scope_tests.rs, and the replay in \
+     src/agent_import_post_e2e_tests.rs) pin what each parse returns; the file is the answer \
+     whole as received; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_NUMBERING: &str = "an answer of the pilot lab read on 16 Oct 2026, a week \
      after the invoice round, with no row here: the app crate's replay \
      (src/agent_import_post_e2e_tests.rs) serves it to the voucher-numbering read of the \
@@ -2443,6 +2449,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-case-changed.utf16le.xml",
         PILOT_LAB_PARENT_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml",
+        PILOT_LAB_SCOPED_HSN,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml",

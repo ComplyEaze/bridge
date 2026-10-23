@@ -24,7 +24,7 @@
 //! data folder's journal; another install posting into the same company is not
 //! stopped by it.
 use super::*;
-use crate::tally::approved_import::{ReviewAcknowledged, VoucherCount};
+use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount};
 
 /// What the read made for the dialog saw of the batch's invoice, decided on
 /// the invoice's own row alone (the one carrying its `bridge_txn_id`), by its
@@ -145,7 +145,7 @@ impl Seen {
                 "the voucher posted for this invoice is not in the book for these dates now",
             )),
             ("book_rolled_back", _) => {
-                Self::NotEstablished(why("the company's books are older than this post"))
+                Self::NotEstablished(why("the company's books were restored after this post"))
             }
             // The release cannot tell absence: these say only what the row
             // says, never a bare "not found".
@@ -364,7 +364,7 @@ impl Server {
         };
         let preview = release_preview(&held.batch, &seen);
         let count = VoucherCount::new(1).ok_or_else(|| "ack_stop_batch_not_sent".to_string())?;
-        let _acknowledged = ReviewAcknowledged::confirm(count, &preview)
+        let _acknowledged = ReviewAcknowledged::confirm(ReviewKind::StopRelease, count, &preview)
             .await
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
 

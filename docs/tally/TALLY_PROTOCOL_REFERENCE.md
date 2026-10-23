@@ -432,6 +432,9 @@ base revision.
 <a id="12a19-a-companys-gst-registration-is-a-tax-unit-with-dated-rows"></a>
 
 [12a.19 A company's GST registration is a tax unit, with dated rows](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a19-a-companys-gst-registration-is-a-tax-unit-with-dated-rows)
+<a id="12a20-a-ledgers-input-tax-credit-flag-on-the-wire-is-the-opposite-of-the-screens-setting-partial"></a>
+
+[12a.20 A ledger's input tax credit flag on the wire is the opposite of the screen's setting (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a20-a-ledgers-input-tax-credit-flag-on-the-wire-is-the-opposite-of-the-screens-setting-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

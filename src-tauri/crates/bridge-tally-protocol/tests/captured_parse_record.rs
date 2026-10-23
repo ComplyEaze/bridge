@@ -2337,6 +2337,12 @@ const PILOT_LAB_PARENT_FILTER: &str =
      src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_scope_tests.rs, \
      and the replay in src/agent_import_post_e2e_tests.rs) pin what each parse returns; \
      pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_SCOPED_HSN: &str = "an answer of the pilot lab read on 21 Oct 2026, with no row \
+     here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
+     src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_admission_tests.rs, \
+     src/agent_import_invoice_scope_tests.rs, and the replay in \
+     src/agent_import_post_e2e_tests.rs) pin what each parse returns; the file is the answer \
+     whole as received; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_NUMBERING: &str = "an answer of the pilot lab read on 16 Oct 2026, a week \
      after the invoice round, with no row here: the app crate's replay \
      (src/agent_import_post_e2e_tests.rs) serves it to the voucher-numbering read of the \
@@ -2354,10 +2360,16 @@ const REGISTER_NOT_RECORDED: &str =
     "another synthetic book's Sales Register (6 Oct 2026), kept as \
      evidence for §12a.16 (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md); native_month_register reads its \
      grammar, and its tests run on BRIDGE PILOT LAB's registers instead";
-const GST_STATUS_READ: &str = "an answer of the GST status read (10 and 12 Oct 2026), which no parser of \
-     this crate reads: the app crate's gst_status tool parses it (src/agent_gst_status.rs), and its \
-     tests (src/agent_gst_status_tests.rs) pin what each parse returns; \
+const GST_STATUS_READ: &str = "an answer of the GST status read (10, 12 and 13 Oct 2026), which no parser of \
+     this crate reads: the app crate's gst_status and gst_uncertain_vouchers tools parse it \
+     (src/agent_gst_status.rs, src/agent_gst_uncertain.rs), and their tests \
+     (src/agent_gst_status_tests.rs, src/agent_gst_uncertain_tests.rs) pin what each parse returns; \
      agent/gst-status/PROVENANCE.md says what each file is";
+const GST_STATUS_MARKS: &str = "an answer of the company-marks read that opens the GST status \
+     reads of a call (13 Oct 2026, before and after the one Accept As Is), with no row here: the app crate's gate \
+     (src/agent_gst_status.rs) parses it, and the tests of gst_uncertain_vouchers \
+     (src/agent_gst_uncertain_tests.rs) serve it and pin what the parse returns; \
+     agent/gst-status/PROVENANCE.md says what it is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
@@ -2432,6 +2444,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-case-changed.utf16le.xml",
         PILOT_LAB_PARENT_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml",
+        PILOT_LAB_SCOPED_HSN,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml",
@@ -2566,6 +2582,26 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/gst-status/pilot-lab-gst-status-window.utf16le.xml",
         GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-after.utf16le.xml",
+        GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-before.utf16le.xml",
+        GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-count.utf16le.xml",
+        GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-marks-after.utf16le.xml",
+        GST_STATUS_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-marks.utf16le.xml",
+        GST_STATUS_MARKS,
     ),
     // Import request bodies named without `request`.
     ("tests/fixtures/agent/d3-batch-import.xml", IMPORT_REQUEST),

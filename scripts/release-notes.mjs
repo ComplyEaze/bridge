@@ -77,9 +77,8 @@ export function pickNotes(sections, tag) {
   return { mode: "none", body: "" };
 }
 
-export function composeBody(picked, footer) {
-  const tail = footer.trim();
-  return picked.body === "" ? `${tail}\n` : `${picked.body}\n\n---\n\n${tail}\n`;
+export function composeBody(picked, footer, header = "") {
+  return `${[header.trim(), picked.body, footer.trim()].filter((part) => part !== "").join("\n\n---\n\n")}\n`;
 }
 
 const escapeHtml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -254,6 +253,14 @@ export function main(argv) {
   if (command === "notes") {
     const tag = argument(args, "--tag");
     const footer = readFileSync(argument(args, "--footer"), "utf8");
+    let header = "";
+    if (args.includes("--header")) {
+      try {
+        header = readFileSync(argument(args, "--header"), "utf8");
+      } catch (error) {
+        warn(`could not read the release header (${error.message}); the release carries the notes and the standard text without it`);
+      }
+    }
     let picked = { mode: "none", body: "" };
     try {
       const { sections, problems } = parseChangelogWithProblems(readFileSync(argument(args, "--changelog"), "utf8"));
@@ -264,7 +271,7 @@ export function main(argv) {
     }
     if (picked.mode === "none") warn(`CHANGELOG.md has no section for ${tag}; the release carries the standard text and GitHub's change list only`);
     if (picked.mode === "unreleased") warn(`CHANGELOG.md has no ${versionFromTag(tag)} section; the release carries its [Unreleased] text, which may describe changes this build does not have. Check the release body`);
-    writeFileSync(argument(args, "--out"), composeBody(picked, footer));
+    writeFileSync(argument(args, "--out"), composeBody(picked, footer, header));
     console.log(picked.mode);
     return 0;
   }
@@ -294,7 +301,7 @@ export function main(argv) {
     writeFileSync(argument(args, "--out"), html);
     return 0;
   }
-  console.error("usage: release-notes.mjs notes --tag T --changelog F --footer F --out F | page --changelog F [--template F] --out F");
+  console.error("usage: release-notes.mjs notes --tag T --changelog F --footer F [--header F] --out F | page --changelog F [--template F] --out F");
   return 2;
 }
 

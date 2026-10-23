@@ -2329,13 +2329,17 @@ pub(crate) async fn sweep_company_outstandings(
     as_of: &TallyDate,
     ageing_anchor: crate::tally::OutstandingsAgeingAnchor,
 ) -> Result<OutstandingsLoadResult, CompanySweepFailure> {
-    let Ok(currency) = runtime
+    let currency = match runtime
         .detect_classified_base_currency_with_extent(config.clone(), identity)
         .await
-    else {
-        return Err(CompanySweepFailure::ReasonCode(
-            "company_currency_probe_failed",
-        ));
+    {
+        Ok(currency) => currency,
+        Err(error) => {
+            return Err(sweep_failure_naming_identity(
+                &error,
+                CompanySweepFailure::ReasonCode("company_currency_probe_failed"),
+            ));
+        }
     };
     let witness = currency
         .admit_inr_classified()
@@ -2349,7 +2353,20 @@ pub(crate) async fn sweep_company_outstandings(
             ageing_anchor,
         )
         .await
-        .map_err(|_| CompanySweepFailure::OutstandingsRead)
+        .map_err(|error| {
+            sweep_failure_naming_identity(&error, CompanySweepFailure::OutstandingsRead)
+        })
+}
+
+/// A sweep company's failure, naming the identity check when that is what refused it (#1699):
+/// the company is not loaded in Tally, was renamed, or was listed more than once. Any other
+/// error keeps the failure the caller would have reported. The reason carries no company name.
+pub(crate) fn sweep_failure_naming_identity(
+    error: &anyhow::Error,
+    otherwise: CompanySweepFailure,
+) -> CompanySweepFailure {
+    crate::tally::runtime::company_identity_refusal_cause(error)
+        .map_or(otherwise, CompanySweepFailure::ReasonCode)
 }
 
 /// Reads outstandings for several companies in one action.

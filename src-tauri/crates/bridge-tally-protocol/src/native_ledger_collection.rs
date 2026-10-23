@@ -1280,7 +1280,7 @@ fn read_gst_details_entry(
                             b"APPLICABLEFROM" => &mut entry.applicable_from,
                             b"TAXABILITY" => &mut entry.taxability,
                             b"SRCOFGSTDETAILS" => &mut entry.source,
-                            _ => &mut entry.itc_eligible,
+                            _ => &mut entry.ineligible_itc,
                         };
                         set_once(slot, value, &mut entry.repeated_field);
                     }
@@ -1301,7 +1301,7 @@ fn read_gst_details_entry(
                     b"APPLICABLEFROM" => Some(&mut entry.applicable_from),
                     b"TAXABILITY" => Some(&mut entry.taxability),
                     b"SRCOFGSTDETAILS" => Some(&mut entry.source),
-                    b"GSTINELIGIBLEITC" => Some(&mut entry.itc_eligible),
+                    b"GSTINELIGIBLEITC" => Some(&mut entry.ineligible_itc),
                     _ => None,
                 };
                 if let Some(slot) = slot {

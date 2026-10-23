@@ -105,7 +105,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - `mask_parties` shortens, to their first two and last two characters, the
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase
-    register, bank-statement proposals, voucher totals by ledger, the ledgers
+    register, bank-statement proposals, voucher totals by ledger, the party ledger of
+    each voucher `gst_uncertain_vouchers` lists, the ledgers
     listed under a group total, the ledger named when a group total cannot be
     given, the list of bill-wise ledgers waiting for approval, the suspense ledger
     named in a build warning and the ledger in a refused cash-or-bank row), stock
@@ -207,6 +208,17 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       post-dated and what its status flags read) and whether it was accepted
       as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
+    - The uncertain-voucher read (`gst_uncertain_vouchers`) sends the company,
+      the voucher type name and the dates, the counts of the whole window and
+      the pre-filing line, and, only for each voucher it lists as uncertain or
+      as accepted as it stands, its number, date, party ledger's name,
+      invoice total (without its sign) and which side it is on, Tally's two
+      identifiers and its status. It sends no voucher type and no status
+      flags per item.
+      Unlike the status read, its answer therefore carries party names and
+      amounts to the assistant. `mask_parties` shortens the party names in
+      it and does not shorten the amounts. It holds no narrations and no
+      ledger entries of the voucher.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

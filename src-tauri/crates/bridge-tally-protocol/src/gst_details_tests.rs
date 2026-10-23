@@ -25,7 +25,7 @@ fn entry(date: Option<&str>, rates: Vec<RawGstRateDetails>) -> RawGstDetailsEntr
         applicable_from: date.map(str::to_string),
         taxability: Some("Taxable".to_string()),
         source: Some("Specify Details Here".to_string()),
-        itc_eligible: Some("Yes".to_string()),
+        ineligible_itc: Some("Yes".to_string()),
         states: vec![state(rates)],
         repeated_field: false,
         skipped: false,
@@ -186,9 +186,9 @@ fn each_defect_has_its_own_reason() {
 fn input_tax_credit_is_yes_or_no_and_nothing_else() {
     let itc = |text: Option<&str>| {
         let mut e = entry(Some("20260401"), vec![]);
-        e.itc_eligible = text.map(str::to_string);
+        e.ineligible_itc = text.map(str::to_string);
         match GstDetailsObservation::from_raw(vec![e]) {
-            GstDetailsObservation::Entries { entries } => Ok(entries[0].itc_eligible),
+            GstDetailsObservation::Entries { entries } => Ok(entries[0].ineligible_itc),
             GstDetailsObservation::Unreadable { defect } => Err(defect),
             GstDetailsObservation::NotObserved => unreachable!(),
         }

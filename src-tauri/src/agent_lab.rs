@@ -65,8 +65,9 @@ impl LabGuardConfig {
     fn from_env() -> Result<Self, String> {
         let target = env::var("BRIDGE_LAB_TARGET_GUID")
             .map_err(|_| "lab_target_guid_required".to_string())?;
-        let deny_raw =
-            env::var("BRIDGE_LAB_DENY_GUIDS").map_err(|_| "lab_deny_guids_required".to_string())?;
+        // The deny list may be absent: a write is then admitted only while the target is the
+        // only company loaded (#972, see `admit_lab_target`).
+        let deny_raw = env::var("BRIDGE_LAB_DENY_GUIDS").unwrap_or_default();
         Self::from_values(&target, &deny_raw)
     }
 
@@ -91,9 +92,6 @@ impl LabGuardConfig {
                 .to_owned();
             deny_guids.push(guid);
         }
-        if deny_guids.is_empty() {
-            return Err("lab_deny_guids_required".to_string());
-        }
         if deny_guids
             .iter()
             .any(|guid| guid.eq_ignore_ascii_case(&target_guid))
@@ -112,8 +110,8 @@ impl LabGuardConfig {
 // ---------------------------------------------------------------------------
 
 /// The always-on lab preconditions: `BRIDGE_LAB_WRITES=1`, the Tally endpoint
-/// pinned to port 9001, and `BRIDGE_LAB_TARGET_GUID`/`BRIDGE_LAB_DENY_GUIDS`
-/// both present and well-formed. Every lab tool call requires these,
+/// pinned to port 9001, `BRIDGE_LAB_TARGET_GUID` present and well-formed, and
+/// `BRIDGE_LAB_DENY_GUIDS` well-formed when present. Every lab tool call requires these,
 /// `lab_read_inventory` included -- but a *read* does not require the target
 /// to be the company being read, or to be the company currently loaded (that
 /// stronger requirement, [`admit_lab_target`], is scoped to a write batch:
@@ -140,37 +138,23 @@ fn require_lab_read_guards(server: &Server) -> Result<LabGuardConfig, ToolFailur
 /// of any request built from this identity, not a separate check that could
 /// drift out of sync with it.
 ///
-/// Reserved for the Phase 3.5 lab writer (not yet built); `lab_read_inventory`
-/// (Phase 3.2, read-only) intentionally does not call this -- see
+/// With no deny list, the batch is admitted only while the target is the only
+/// company Tally has loaded: a write that lands in the wrong company then lands
+/// in the target (#972). With a deny list, the existing rule stands: no denied
+/// company loaded, and the target loaded. The lab write tools call this;
+/// `lab_read_inventory` (read-only) intentionally does not -- see
 /// [`require_lab_read_guards`].
-#[allow(dead_code)]
 pub(super) async fn admit_lab_target(
     server: &Server,
 ) -> Result<(TallyCompany, VerifiedCompanyIdentity, Evidence), ToolFailure> {
     let config = require_lab_read_guards(server)?;
     let (companies, evidence) = server.companies().await?;
-    let denied = companies.iter().any(|company| {
-        company.guid.as_deref().is_some_and(|guid| {
-            config
-                .deny_guids
-                .iter()
-                .any(|deny| deny.eq_ignore_ascii_case(guid))
-        })
-    });
-    if denied {
-        return Err(ToolFailure::from("lab_source_company_loaded".to_string())
-            .with_prior_evidence(evidence));
-    }
-    let loaded = companies.iter().any(|company| {
-        company
-            .guid
-            .as_deref()
-            .is_some_and(|guid| guid.eq_ignore_ascii_case(&config.target_guid))
-    });
-    if !loaded {
-        return Err(
-            ToolFailure::from("lab_target_not_loaded".to_string()).with_prior_evidence(evidence)
-        );
+    let loaded = companies
+        .iter()
+        .map(|company| company.guid.as_deref())
+        .collect::<Vec<_>>();
+    if let Some(code) = loaded_set_refusal(&config, &loaded) {
+        return Err(ToolFailure::from(code.to_string()).with_prior_evidence(evidence));
     }
     let (company, identity, verify_evidence) =
         server
@@ -182,6 +166,47 @@ pub(super) async fn admit_lab_target(
         identity,
         combine_evidence(evidence, verify_evidence),
     ))
+}
+
+/// Why a write batch is refused for the set of companies Tally has loaded, if it is (#972), in
+/// the order the checks run. With no deny list, the target must be the only company loaded.
+/// With one, no denied company may be loaded; either way the target must be.
+fn loaded_set_refusal(config: &LabGuardConfig, loaded: &[Option<&str>]) -> Option<&'static str> {
+    if config.deny_guids.is_empty()
+        && !loaded_set_is_exactly_target(loaded.iter().copied(), &config.target_guid)
+    {
+        return Some("lab_deny_guids_required");
+    }
+    let denied = loaded.iter().flatten().any(|guid| {
+        config
+            .deny_guids
+            .iter()
+            .any(|deny| deny.eq_ignore_ascii_case(guid))
+    });
+    if denied {
+        return Some("lab_source_company_loaded");
+    }
+    let target_loaded = loaded
+        .iter()
+        .flatten()
+        .any(|guid| guid.eq_ignore_ascii_case(&config.target_guid));
+    (!target_loaded).then_some("lab_target_not_loaded")
+}
+
+/// Whether the loaded companies are one company, the target: at least one is loaded, and every
+/// one has a GUID equal to the target's. A company without a GUID is another company.
+fn loaded_set_is_exactly_target<'a>(
+    loaded: impl IntoIterator<Item = Option<&'a str>>,
+    target_guid: &str,
+) -> bool {
+    let mut any = false;
+    for guid in loaded {
+        any = true;
+        if !guid.is_some_and(|guid| guid.eq_ignore_ascii_case(target_guid)) {
+            return false;
+        }
+    }
+    any
 }
 
 // ---------------------------------------------------------------------------
@@ -944,7 +969,7 @@ mod tests {
     }
 
     #[test]
-    fn lab_guard_config_requires_all_env_vars() {
+    fn lab_guard_config_requires_the_target_env_var_and_not_the_deny_list() {
         let _guard = lock_env();
         std::env::remove_var("BRIDGE_LAB_TARGET_GUID");
         std::env::remove_var("BRIDGE_LAB_DENY_GUIDS");
@@ -952,6 +977,14 @@ mod tests {
             LabGuardConfig::from_env(),
             Err("lab_target_guid_required".to_string())
         );
+        // #972: with the target alone, the config reads, with an empty deny list.
+        std::env::set_var("BRIDGE_LAB_TARGET_GUID", TARGET_GUID);
+        let config = LabGuardConfig::from_env();
+        std::env::remove_var("BRIDGE_LAB_TARGET_GUID");
+        assert!(config
+            .expect("the target alone parses")
+            .deny_guids
+            .is_empty());
     }
 
     #[test]
@@ -961,6 +994,100 @@ mod tests {
         let result =
             LabGuardConfig::from_values(TARGET_GUID, &format!("{DENY_GUID_1},{TARGET_GUID}"));
         assert_eq!(result, Err("lab_deny_guids_invalid".to_string()));
+    }
+
+    #[test]
+    fn lab_guard_config_accepts_no_deny_list_and_still_checks_the_ones_it_gets() {
+        // #972: the deny list may be absent. `admit_lab_target` then requires the loaded set to
+        // be exactly the target.
+        for absent in ["", " ", ",", " , "] {
+            let config = LabGuardConfig::from_values(TARGET_GUID, absent)
+                .unwrap_or_else(|code| panic!("{absent:?}: {code}"));
+            assert!(config.deny_guids.is_empty(), "{absent:?}");
+        }
+        // A deny list that is given is still parsed strictly.
+        assert_eq!(
+            LabGuardConfig::from_values(TARGET_GUID, "not-a-guid"),
+            Err("lab_deny_guids_invalid".to_string())
+        );
+        assert_eq!(
+            LabGuardConfig::from_values("not-a-guid", ""),
+            Err("lab_target_guid_invalid".to_string())
+        );
+    }
+
+    #[test]
+    fn the_loaded_set_equals_the_target_only_when_every_loaded_company_is_it() {
+        let target = TARGET_GUID.to_ascii_lowercase();
+        let upper = TARGET_GUID.to_ascii_uppercase();
+        // Exactly the target: one company, or the same company listed twice, in any case.
+        assert!(loaded_set_is_exactly_target(
+            [Some(upper.as_str())],
+            &target
+        ));
+        assert!(loaded_set_is_exactly_target(
+            [Some(target.as_str()), Some(upper.as_str())],
+            &target
+        ));
+        // Nothing loaded is not the target.
+        assert!(!loaded_set_is_exactly_target(
+            std::iter::empty::<Option<&str>>(),
+            &target
+        ));
+        // Any other company, a company without a GUID, or another company beside the target.
+        assert!(!loaded_set_is_exactly_target([Some(DENY_GUID_1)], &target));
+        assert!(!loaded_set_is_exactly_target([None], &target));
+        assert!(!loaded_set_is_exactly_target(
+            [Some(target.as_str()), Some(DENY_GUID_1)],
+            &target
+        ));
+        assert!(!loaded_set_is_exactly_target(
+            [Some(target.as_str()), None],
+            &target
+        ));
+    }
+
+    #[test]
+    fn a_write_batch_is_admitted_by_the_loaded_set_as_the_issue_says() {
+        let target = TARGET_GUID.to_ascii_lowercase();
+        let with_deny = LabGuardConfig::from_values(TARGET_GUID, DENY_GUID_1).unwrap();
+        let without_deny = LabGuardConfig::from_values(TARGET_GUID, "").unwrap();
+        // A company that is in neither list: DENY_GUID_2 is not in `with_deny` here.
+        let other = DENY_GUID_2;
+        let t = Some(target.as_str());
+        // No deny list: admitted only while the target is the only company loaded.
+        assert_eq!(loaded_set_refusal(&without_deny, &[t]), None);
+        assert_eq!(
+            loaded_set_refusal(&without_deny, &[t, Some(other)]),
+            Some("lab_deny_guids_required")
+        );
+        assert_eq!(
+            loaded_set_refusal(&without_deny, &[t, None]),
+            Some("lab_deny_guids_required")
+        );
+        assert_eq!(
+            loaded_set_refusal(&without_deny, &[Some(other)]),
+            Some("lab_deny_guids_required")
+        );
+        assert_eq!(
+            loaded_set_refusal(&without_deny, &[]),
+            Some("lab_deny_guids_required")
+        );
+        // A deny list keeps the earlier rule: others may be loaded, a denied one may not.
+        assert_eq!(loaded_set_refusal(&with_deny, &[t, Some(other)]), None);
+        assert_eq!(loaded_set_refusal(&with_deny, &[t]), None);
+        assert_eq!(
+            loaded_set_refusal(&with_deny, &[t, Some(DENY_GUID_1)]),
+            Some("lab_source_company_loaded")
+        );
+        assert_eq!(
+            loaded_set_refusal(&with_deny, &[Some(other)]),
+            Some("lab_target_not_loaded")
+        );
+        assert_eq!(
+            loaded_set_refusal(&with_deny, &[]),
+            Some("lab_target_not_loaded")
+        );
     }
 
     #[test]
@@ -1050,6 +1177,8 @@ mod tests {
         let rows = parse_lab_master_rows(&synthetic_stock_item_collection(), "StockItem").unwrap();
         assert_eq!(rows.len(), 1);
         let json = lab_master_json(LabMasterKind::StockItem, &rows[0]);
+        // The item's own name is marked as a party name, so masking reaches it (#999).
+        assert_eq!(json["name"], json!(party_name("Sodium Bicarbonate")));
         assert_eq!(json["parent"], "Chemicals");
         assert_eq!(json["base_unit"], "Kgs");
         assert_eq!(json["opening_qty"], "100");
@@ -1543,8 +1672,7 @@ mod tests {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         let expected = render_lab_master_collection(
             identity.display_name(),

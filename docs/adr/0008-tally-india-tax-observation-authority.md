@@ -3,6 +3,8 @@
 Status: accepted for the dormant parser contract; extraction and canonical
 promotion are not enabled.
 
+**Amended 2026-10-14:** the parser that implemented this decision, `india_tax_observation.rs`, was deleted in [#1710](https://github.com/ComplyEaze/bridge/pull/1710), because it had no request artifact and no caller outside itself, and no shipped build compiled it. The gates this decision sets for any future extraction stand. The text below is kept as written.
+
 ## Decision
 
 Bridge may parse one exact, Bridge-defined India Tax observation envelope only

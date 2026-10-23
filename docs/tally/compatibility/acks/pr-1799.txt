@@ -1,0 +1,5 @@
+src-tauri/crates/bridge-tally-primitives/src/lib.rs
+src-tauri/src/db/tally_mirror.rs
+src-tauri/src/sync/snapshot.rs
+src-tauri/src/tally/connector.rs
+reviewer: lamemustafa

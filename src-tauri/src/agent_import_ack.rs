@@ -16,7 +16,7 @@
 //! party ledger) is caught only if it moves the ALTERID, which is not yet
 //! measured for an edit made in Tally's own screens.
 use super::*;
-use crate::tally::approved_import::{ReviewAcknowledged, VoucherCount, REVIEW_BUTTON};
+use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount, REVIEW_BUTTON};
 
 /// Names the fields [`voucher_fingerprint`] covers, and in which order. A new
 /// field is a new version, so a record never matches a fingerprint computed
@@ -533,6 +533,8 @@ fn render_review_text(
     )
     .map_err(ack_text_refusal)?;
     let (doubted, entry_names) = names.split_at(doubted.len());
+    let (narration_pointer, narration_text) =
+        narration_lines(narration.as_deref(), &shown(&narration))?;
     // One per line: a changed ledger's name is as long as the book made it.
     let ledgers = doubted
         .iter()
@@ -564,7 +566,7 @@ fn render_review_text(
         .collect::<Result<Vec<_>, String>>()?
         .join("\n");
     let preview = format!(
-        "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\nNarration:\n  {}\n{entries}{note}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
+        "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\n{narration_pointer}\n{entries}{note}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.\n{}\n{narration_text}",
         // Quoted like every other value read from Tally, so every Tally value
         // in this text is escaped.
         row.voucher_type
@@ -575,13 +577,34 @@ fn render_review_text(
         quoted(row.date.as_str()),
         shown(&row.voucher_number),
         row.alter_id.map(|id| id.to_string()).unwrap_or_else(|| "(none)".into()),
-        shown(&narration),
         batch_id,
+        post::VOUCHER_TEXT_HEADING,
     );
     if !post::line_break_names_are_marked(&preview, names.iter().copied()) {
         return Err(ack_text_refusal(post::ReviewTextRefusal::Layout));
     }
     Ok(preview)
+}
+
+/// Where a one-voucher review shows the narration (#1535): the line in its
+/// place says it is below the dashes, and after every line ComplyEaze Bridge
+/// writes, under the approval's heading, it stands as the approval shows it,
+/// on one line or in quoted parts split only at a space. A narration that
+/// cannot be split stays whole on one line, and the dialog's caps refuse it
+/// as before. Returns the pointer line and the lines under the heading.
+fn narration_lines(narration: Option<&str>, whole: &str) -> Result<(String, String), String> {
+    let lines = match post::narration_lines(narration) {
+        Ok(lines) => lines,
+        Err(post::VoucherTextRefusal::Layout) => {
+            return Err(ack_text_refusal(post::ReviewTextRefusal::Layout))
+        }
+        Err(post::VoucherTextRefusal::DoesNotFit) => vec![format!("Narration: {whole}")],
+    };
+    let pointer = match lines.len() {
+        1 => "Narration: below the dashes".to_string(),
+        parts => format!("Narration: below the dashes, in {parts} parts"),
+    };
+    Ok((pointer, lines.join("\n")))
 }
 
 /// The code an acknowledgement dialog refuses a value with.
@@ -762,10 +785,10 @@ fn negated_as_written(amount: &ExactDecimal) -> String {
 /// have no scrollable review surface, so a review over any is refused.
 fn caps_exceeded(preview: &str) -> Vec<&'static str> {
     let mut exceeded = Vec::new();
-    if preview.chars().count() > 1_600 {
+    if preview.chars().count() > post::ONE_VOUCHER_MAX_CHARS {
         exceeded.push("characters");
     }
-    if preview.lines().count() > 24 {
+    if preview.lines().count() > post::ONE_VOUCHER_MAX_LINES {
         exceeded.push("lines");
     }
     if preview.lines().any(|line| line.chars().count() > 100) {
@@ -992,6 +1015,11 @@ impl Server {
         &self,
         args: &Value,
     ) -> Result<ToolOutcome, ToolFailure> {
+        // The release of a Sales stop is its own act with its own record, and
+        // never one of the doubts below: this review "unblocks nothing".
+        if args.get("doubt").and_then(Value::as_str) == Some("invoice_stop") {
+            return self.release_invoice_stop(args).await;
+        }
         let batch_id = required_string(args, "batch_id")?;
         let imports = self.imports_dir()?;
         let ledger::BatchSnapshot {
@@ -1134,7 +1162,7 @@ impl Server {
         // The dialog's title names how many vouchers it shows (#746).
         let count = VoucherCount::new(reviewed_rows.len())
             .ok_or_else(|| fail("ack_readback_not_matched".to_string()))?;
-        let approval = ReviewAcknowledged::confirm(count, &preview)
+        let approval = ReviewAcknowledged::confirm(ReviewKind::Review, count, &preview)
             .await
             .map_err(fail)?;
 

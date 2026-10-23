@@ -85,16 +85,16 @@ fn ancestry_json(chain: &AncestryChain) -> Value {
 /// when they differ is unmeasured, so both are reported and a difference is
 /// flagged rather than resolved.
 #[derive(Debug, PartialEq, Eq)]
-struct PartyGstin {
-    gstin: Option<String>,
-    status: &'static str,
+pub(super) struct PartyGstin {
+    pub(super) gstin: Option<String>,
+    pub(super) status: &'static str,
     /// The in-force entry's `GSTREGISTRATIONTYPE`, so "Regular with no GSTIN"
     /// is not read as unregistered.
-    registration_type: Option<String>,
+    pub(super) registration_type: Option<String>,
     flat: Option<String>,
     /// The flat field names a GSTIN and a readable history says something
     /// else on that date: another GSTIN, or none.
-    sources_disagree: bool,
+    pub(super) sources_disagree: bool,
 }
 
 /// The row keys a [`PartyGstin`] answer is reported under.
@@ -112,7 +112,11 @@ fn party_gstin_fields(gstin: PartyGstin, as_of: &str) -> serde_json::Map<String,
     fields
 }
 
-fn party_gstin_on(flat: Option<&str>, history: &GstRegistrationHistory, as_of: &str) -> PartyGstin {
+pub(super) fn party_gstin_on(
+    flat: Option<&str>,
+    history: &GstRegistrationHistory,
+    as_of: &str,
+) -> PartyGstin {
     // `flat` is the field as returned, so an explicit `<PARTYGSTIN/>` is
     // `Some("")`: reported as read, but it names no GSTIN.
     let named = flat.filter(|value| !value.is_empty()).map(str::to_string);
@@ -362,10 +366,11 @@ fn requested_gst_details(args: &Value) -> Result<bool, String> {
 /// What a result with `include_gst_details` says about the rows it adds, so
 /// that a caller does not read more into them than the one capture behind
 /// them shows.
-const GST_DETAILS_LIMITATIONS: [&str; 5] = [
+const GST_DETAILS_LIMITATIONS: [&str; 6] = [
     "compliance.gst_details holds Tally's ledger-level GST details as sent, per dated entry and state row; a rate is absent (the element was missing), empty, zero or a value, four different observations that are never merged.",
     "HSN/SAC and type of supply are not returned because no capture shows them; the place of supply is in the registration history (compliance.gst_registrations), not here; slab rates are only flagged (slab_rates_present), not read; other_content_skipped says an entry held content that was not read.",
     "A state_name or valuation_type that starts with U+FFFD and #4; is a Tally reserved value (written &#4; on the wire), kept as the parser returned it.",
+    "ineligible_itc is Tally's GSTINELIGIBLEITC as sent under its own name: true for Yes, false for No, null when the element is absent. It is an ineligibility flag where measured: on one ledger under Purchase Accounts, with a keyed history row, the screen's Eligible for Input Tax Credit Yes read as the element absent and its No as Yes (PARTIAL: one synthetic book, one release, one ledger, one dated entry; this book is not the 14-ledger one below). Do not read true as eligible. A Yes on any other ledger says nothing either way: the Sales ledgers of one captured book carry a Yes on their keyed entries, and Tally's own default entry (source As per Company/Group) carries one with no keyed No; neither was read against the screen. With several dated entries, read the one in force on the date.",
     "Measured on one 14-ledger lab book of TallyPrime 7.1 Silver; this was not yet run through this tool on a live Tally.",
     "The read is admitted at 8,000 bytes a ledger instead of 3,750, a margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element), not a measured ratio; a large book may be read in more parts or refused as too large.",
 ];

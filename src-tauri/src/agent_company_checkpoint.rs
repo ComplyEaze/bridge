@@ -225,11 +225,22 @@ pub(in crate::agent) fn company_voucher_high_water(
     xml: &str,
     expected_guid: &str,
 ) -> Result<u64, String> {
+    company_voucher_mark(xml, expected_guid).map(|mark| mark.unwrap_or(0))
+}
+
+/// The company's voucher mark as Tally answered it: `None` when the answer
+/// omits it (a company holding no voucher), which is not the same answer as
+/// a mark of zero (AGENTS.md P3).
+pub(in crate::agent) fn company_voucher_mark(
+    xml: &str,
+    expected_guid: &str,
+) -> Result<Option<u64>, String> {
     match parse_company_high_water(xml, expected_guid) {
         Ok(mark) => mark["altvchid"]
             .as_u64()
+            .map(Some)
             .ok_or_else(|| "voucher_checkpoint_invalid".to_string()),
-        Err(code) if code == VOUCHER_CHECKPOINT_NOT_OBSERVED => Ok(0),
+        Err(code) if code == VOUCHER_CHECKPOINT_NOT_OBSERVED => Ok(None),
         Err(code) => Err(code),
     }
 }

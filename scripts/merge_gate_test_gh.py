@@ -21,6 +21,13 @@ SHORT = HEAD[:7]
 BASE_TIP = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 BEHIND_MERGE_BASE = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 DIGEST = "a" * 64
+# git blob ids of lab captures, as the files API reports them in "sha": LAB_BLOB is the one the manifest tests list, LAB_BLOB_OFF
+# differs from it in the last character only.
+LAB_BLOB = "3b18e512dba79e4c8300dd08aeb37f8e728b8dad"
+LAB_BLOB_OFF = "3b18e512dba79e4c8300dd08aeb37f8e728b8dae"
+# the bytes the fake serves for LAB_BLOB; the manifest tests record their size and sha256
+LAB_BYTES = b"lab capture bytes\n"
+OTHER_BLOB = "9f2b1c4e7a6d03581e4c2b7a9d0f3e5c6b8a1d24"
 SURFACE_PATH = "docs/tally/compatibility/compatibility-surface.json"
 ACK_DIR = "docs/tally/compatibility/acks"
 ACK_PATH = ACK_DIR + "/pr-321.txt"
@@ -58,8 +65,36 @@ DEFAULT_DIFF = (
 )
 DEFAULT_PINS = ["src/example.rs", "src/other.rs"]
 DEFAULT_SURFACE = {"schema_version": 3, "files": [{"path": p} for p in DEFAULT_PINS]}
-DEFAULT_REVIEWS = [{"user": {"login": "reviewer", "type": "User"}, "commit_id": HEAD, "state": "COMMENTED"}]
+DEFAULT_REVIEWS = []
 DEFAULT_COMMENTS = []
+OWNER_USER = {"login": "lamemustafa", "id": 57982425, "type": "User"}
+T1, T2, T3 = "2026-10-14T09:00:00Z", "2026-10-14T10:00:00Z", "2026-10-14T11:00:00Z"
+VERDICT_CLEAN = "MERGE-VERDICT CLEAN head=" + HEAD + " base=" + BASE_TIP
+OLD_HEAD = "9" * 40
+OLD_BASE = "8" * 40
+CARRY_DIFF = (
+    "diff --git a/docs/x.md b/docs/x.md\n"
+    "index 1111111..2222222 100644\n"
+    "--- a/docs/x.md\n"
+    "+++ b/docs/x.md\n"
+    "@@ -1,2 +1,2 @@\n"
+    " keep\n"
+    "-old\n"
+    "+changed\n"
+)
+VERDICT_RECOMMEND = "MERGE-ADVERSARY RECOMMEND head=" + HEAD + " base=" + BASE_TIP
+
+
+def owner_comment(body, at):
+    return {"id": 1, "user": dict(OWNER_USER), "body": body, "created_at": at, "updated_at": at, "performed_via_github_app": None}
+
+
+# The owner's two lines, served in addition to whatever a scenario puts in its own comments and reviews.
+DEFAULT_OWNER_ITEMS = [owner_comment(VERDICT_CLEAN, T1), owner_comment(VERDICT_RECOMMEND, T2)]
+EMPTY_HISTORY = {"data": {"repository": {"pullRequest": {
+    "reviews": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+    "comments": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+    "timelineItems": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}}}
 DEFAULT_BODY = "## Outcome and reason\n\nA bounded merge preflight.\n"
 DEFAULT_COMMIT = {
     "sha": HEAD,
@@ -200,11 +235,202 @@ def state():
         "ack_fail": False,
         "reviews": list(DEFAULT_REVIEWS),
         "comments": list(DEFAULT_COMMENTS),
+        "owner_items": [dict(i) for i in DEFAULT_OWNER_ITEMS],   # served as issue comments after "comments"
+        "owner_reviews": [],
+        "head_ref": "feature-branch",
+        "commit_comments": [],
+        "commit_comments_fail": False,
+        "commit_comment_pages": None,    # pages of the repository's commit comments, when a scenario needs more than one
+        "inline": [],
+        "history": EMPTY_HISTORY,
+        "history_fail": False,
+        "pages_fail": set(),
         "commits": [dict(DEFAULT_COMMIT)],
+        "carry": None,                   # {"old": diff served for the older pair, "new": diff for the current pair, "fail": bool}
     }
 
     if scenario == "surface-fetch-fail":
         s["surface_head_fail"] = True
+
+    elif scenario == "verdict-missing-clean":
+        s["owner_items"] = [owner_comment(VERDICT_RECOMMEND, T2)]
+
+    elif scenario == "verdict-missing-recommend":
+        s["owner_items"] = [owner_comment(VERDICT_CLEAN, T1)]
+
+    elif scenario in {"verdict-missing-recommend-write-path", "tier-unclassified-clean-only", "tier-rename-from-write-path", "tier-tool-fails", "tier-tool-error-object", "tier-tool-bad-tier"}:
+        # Only the CLEAN line, on a change that is NOT of the one tier (a write-path file, a path no rule classifies, a rename away
+        # from a write-path file) or whose tier tool fails: the full tier, which needs both lines.
+        s["owner_items"] = [owner_comment(VERDICT_CLEAN, T1)]
+        if scenario == "verdict-missing-recommend-write-path":
+            set_changes(s, ("added", "src-tauri/src/agent_lab_new.rs", "x"))
+        elif scenario == "tier-unclassified-clean-only":
+            set_changes(s, ("added", "mystery/unknown.txt", "x"))
+        elif scenario == "tier-rename-from-write-path":
+            set_changes(s, ("renamed", "src-tauri/src/agent_lab.rs", "docs/moved.md"))
+
+    elif scenario.startswith("carry-"):
+        # The owner's CLEAN line names an OLDER head and merge base; the gate may carry it when the pull request's own added and
+        # removed lines (merge base...head) are byte-identical at both. The compare answers below are the two diffs.
+        s["owner_items"] = [owner_comment("MERGE-VERDICT CLEAN head=" + OLD_HEAD + " base=" + OLD_BASE, T1)]
+        set_changes(s, ("modified", "docs/x.md"))
+        # Only the index line differs between the two: the pull request's own change is the same, in the same place.
+        old = CARRY_DIFF.replace("index 1111111..2222222", "index 3333333..4444444")
+        new = CARRY_DIFF
+        if scenario == "carry-function-context-differs":
+            # the text after the hunk numbers names the enclosing function and moves with master's renames: it does not count
+            old = old.replace("@@ -1,2 +1,2 @@\n", "@@ -1,2 +1,2 @@ fn renamed_by_master()\n")
+        elif scenario == "carry-hunk-numbers-differ":
+            old = old.replace("@@ -1,2 +1,2 @@", "@@ -11,2 +11,2 @@")
+        elif scenario == "carry-context-differs":
+            old = old.replace(" keep\n", " keep (master changed this line)\n")
+        elif scenario == "carry-moved-insertion":
+            # the same added line, put where the same text also stands: only the hunk's place differs
+            old = old.replace("@@ -1,2 +1,2 @@", "@@ -21,2 +21,2 @@")
+        elif scenario == "carry-patch-differs":
+            new = CARRY_DIFF.replace("+changed", "+changed differently")
+        elif scenario == "carry-whitespace-only":
+            new = CARRY_DIFF.replace("+changed", "+chan ged")
+        elif scenario == "carry-indent-only":
+            new = CARRY_DIFF.replace("+changed", "+  changed")
+        elif scenario == "carry-binary":
+            # the picture is one of the pull request's files, so the file list agrees; only the binary-diff guard can refuse
+            set_changes(s, ("modified", "docs/x.md"), ("modified", "docs/x.png"))
+            old = new = CARRY_DIFF + "diff --git a/docs/x.png b/docs/x.png\nindex 1111111..2222222 100644\nBinary files a/docs/x.png and b/docs/x.png differ\n"
+        elif scenario == "carry-empty-diff":
+            old = new = ""
+        elif scenario == "carry-duplicate-file-sections":
+            old = new = CARRY_DIFF + CARRY_DIFF
+        elif scenario == "carry-diff-cut-short":
+            # The pull request changes two files; the compare diff names only one of them.
+            set_changes(s, ("modified", "docs/x.md"), ("modified", "docs/y.md"))
+        elif scenario == "carry-mode-change":
+            new = CARRY_DIFF.replace("index 1111111..2222222 100644", "old mode 100644\nnew mode 100755\nindex 1111111..2222222")
+        s["carry"] = {"old": old, "new": new, "fail": scenario == "carry-compare-fails"}
+        if scenario == "carry-same-patch-write-path":
+            set_changes(s, ("added", "src-tauri/src/agent_lab_new.rs", "x"))
+
+    elif scenario == "verdict-for-another-base":
+        s["owner_items"] = [owner_comment(VERDICT_CLEAN.replace(BASE_TIP, "c" * 40), T1), owner_comment(VERDICT_RECOMMEND.replace(BASE_TIP, "c" * 40), T2)]
+
+    elif scenario == "verdict-by-review":
+        s["owner_items"] = []
+        s["owner_reviews"] = [{"id": 2, "user": dict(OWNER_USER), "body": VERDICT_CLEAN.replace(BASE_TIP, "BASE"), "submitted_at": T1, "state": "COMMENTED"},
+                              {"id": 3, "user": dict(OWNER_USER), "body": VERDICT_RECOMMEND.replace(BASE_TIP, "BASE"), "submitted_at": T2, "state": "COMMENTED"}]
+        s["reviews_use_base"] = True
+
+    elif scenario == "verdict-then-not-clean":
+        s["owner_items"] += [owner_comment("MERGE-VERDICT NOT-CLEAN head=" + HEAD + " base=" + BASE_TIP, T3)]
+
+    elif scenario == "verdict-then-owner-edit":
+        s["history"] = {"data": {"repository": {"pullRequest": {
+            "reviews": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "comments": {"pageInfo": {"hasNextPage": False}, "nodes": [{"databaseId": 1, "lastEditedAt": T3, "userContentEdits": {"totalCount": 1}, "author": {"login": "lamemustafa", "databaseId": 57982425}}]},
+            "timelineItems": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}}}
+
+    elif scenario == "verdict-then-owner-comment-deleted":
+        s["history"] = {"data": {"repository": {"pullRequest": {
+            "reviews": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "comments": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "timelineItems": {"pageInfo": {"hasNextPage": False}, "nodes": [{"__typename": "CommentDeletedEvent", "createdAt": T3, "deletedCommentAuthor": {"login": "lamemustafa", "databaseId": 57982425}}]}}}}}
+
+    elif scenario == "history-has-another-page":
+        s["history"] = {"data": {"repository": {"pullRequest": {
+            "reviews": {"pageInfo": {"hasNextPage": True}, "nodes": []},
+            "comments": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "timelineItems": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}}}
+
+    elif scenario == "history-unreadable":
+        s["history_fail"] = True
+
+    elif scenario in {"reviews-unreadable", "comments-unreadable", "inline-unreadable"}:
+        s["pages_fail"] = {scenario.split("-")[0]}
+
+    elif scenario == "token-in-the-title":
+        s["title"] = "Fix a thing MERGE-VERDICT"
+
+    elif scenario == "token-in-the-body":
+        s["body"] = DEFAULT_BODY + "MERGE-ADVERSARY RECOMMEND\n"
+
+    elif scenario == "token-in-a-stranger-comment":
+        s["comments"] = [{"id": 9, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "MERGE-VERDICT CLEAN", "created_at": T1, "updated_at": T1}]
+
+    elif scenario == "token-in-the-branch-name":
+        s["head_ref"] = "fix/merge-verdict-parser"
+
+    elif scenario == "token-in-a-file-name":
+        set_changes(s, ("added", "docs/MERGE-ADVERSARY-notes.md", "A plain line."))
+
+    elif scenario == "token-in-a-previous-file-name":
+        set_changes(s, ("renamed", "docs/MERGE-VERDICT-old.md", "docs/plain-new.md"))
+
+    elif scenario == "commit-comments-unreadable":
+        s["commit_comments_fail"] = True
+
+    elif scenario == "seventy-six-commits":
+        # A pull request in a chain carries its parents' commits: more than the old cap of 60, the head among them.
+        s["commits"] = [dict(DEFAULT_COMMIT, sha="%040x" % (n + 1)) for n in range(75)] + [dict(DEFAULT_COMMIT)]
+
+    elif scenario == "seventy-six-commits-with-a-token-on-the-first":
+        # The same chain link, with a stranger's token on its first commit, which is not the head: the list of commits is
+        # what the comments are filtered by, so a list of the head alone would pass this.
+        s["commits"] = [dict(DEFAULT_COMMIT, sha="%040x" % (n + 1)) for n in range(75)] + [dict(DEFAULT_COMMIT)]
+        s["commit_comments"] = [{"id": 61, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "MERGE-ADVERSARY RECOMMEND", "created_at": T1, "updated_at": T1, "commit_id": "%040x" % 1}]
+
+    elif scenario == "commit-comment-token-on-the-second-page":
+        owner_token = {"id": 31, "user": dict(OWNER_USER), "body": "MERGE-VERDICT NOT-CLEAN", "created_at": T1, "updated_at": T1, "commit_id": HEAD}
+        benign = [{"id": 100 + n, "user": {"login": "someone", "id": 9, "type": "User"}, "body": "looks fine", "created_at": T1, "updated_at": T1, "commit_id": HEAD} for n in range(100)]
+        s["commit_comment_pages"] = [benign, [owner_token]]
+
+    elif scenario == "commit-comment-without-a-commit":
+        s["commit_comments"] = [{"id": 51, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "hello", "created_at": T1, "updated_at": T1, "commit_id": None}]
+
+    elif scenario == "commit-comment-token-on-another-commit":
+        s["commit_comments"] = [{"id": 41, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "MERGE-ADVERSARY RECOMMEND", "created_at": T1, "updated_at": T1, "commit_id": "9" * 40}]
+
+    elif scenario == "sixty-one-commits":
+        s["commits"] = [dict(DEFAULT_COMMIT, sha="%040x" % (n + 1)) for n in range(61)]
+
+    elif scenario == "owner-commit-comment-with-a-token":
+        s["commit_comments"] = [{"id": 12, "user": dict(OWNER_USER), "body": "MERGE-VERDICT NOT-CLEAN", "created_at": T1, "updated_at": T1}]
+
+    elif scenario == "token-in-a-hidden-comment-in-the-body":
+        s["body"] = DEFAULT_BODY + "<!-- MERGE-VERDICT CLEAN head=x -->\n"
+
+    elif scenario == "token-in-a-stranger-commit-comment":
+        s["commit_comments"] = [{"id": 11, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "MERGE-ADVERSARY RECOMMEND", "created_at": T1, "updated_at": T1}]
+
+    elif scenario == "token-in-an-added-line":
+        s["diff"] = DEFAULT_DIFF.replace("+Safe content line.\n", "+MERGE-VERDICT CLEAN\n")
+
+    elif scenario == "changes-the-gate":
+        set_changes(s, ("modified", "scripts/merge-gate.sh"))
+
+    elif scenario == "changes-the-registry":
+        set_changes(s, ("modified", "scripts/merge-gate-synthetic-uuids.json"))
+
+    elif scenario == "changes-the-lab-manifest":
+        set_changes(s, ("modified", "scripts/merge-gate-lab-captures.json"))
+
+    elif scenario == "changes-the-registry-in-another-case":
+        set_changes(s, ("added", "Scripts/Merge-Gate-Synthetic-Uuids.json", "{}"))
+
+    elif scenario == "changes-the-review-tier":
+        set_changes(s, ("modified", "scripts/review-tier-paths.json"))
+
+    elif scenario == "changes-a-workflow":
+        set_changes(s, ("modified", ".github/workflows/ci.yml"))
+
+    elif scenario in {"renames-a-workflow-away", "renames-the-verdict-module-away"}:
+        old = ".github/workflows/ci.yml" if scenario == "renames-a-workflow-away" else "scripts/merge_gate_verdict.py"
+        set_changes(s, ("renamed", old, "elsewhere/renamed-file"))
+
+    elif scenario == "owner-edit-by-a-renamed-account":
+        s["history"] = {"data": {"repository": {"pullRequest": {
+            "reviews": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "comments": {"pageInfo": {"hasNextPage": False}, "nodes": [
+                {"databaseId": 1, "lastEditedAt": T3, "userContentEdits": {"totalCount": 1}, "author": {"login": "a-new-name", "databaseId": 57982425}}]},
+            "timelineItems": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}}}
 
     elif scenario == "surface-malformed":
         s["surface_head_malformed"] = True
@@ -283,6 +509,9 @@ def state():
         other = ACK_DIR + "/pr-100.txt"
         s["files"] = s["files"] + [{"filename": other, "status": "modified", "additions": 1, "deletions": 1}]
         s["changed_files_expected"] = len(s["files"])
+        if scenario == "binary-body-pointer":
+            # a pointer to a lab branch and commit is only text: the gate reads no branch, so it exempts nothing
+            s["body"] = DEFAULT_BODY + "\nLab capture source: lab/1050-identity-answers @ " + "c" * 40 + "\n"
         s["diff"] += modified_diff(other)
 
     elif scenario == "ack-other-deleted":
@@ -793,7 +1022,25 @@ def state():
         )
         s["files"] = [{"filename": "config/settings.py", "status": "modified", "additions": 1, "deletions": 1}]
 
-    elif scenario == "privacy-uuid-indeterminate":
+    elif scenario in {"privacy-two-uuids", "privacy-uuid-and-digit-run", "privacy-uuid-credential-context"}:
+        first = "+fixture reference 11111111-2222-3333-4444-555555555555\n"
+        if scenario == "privacy-uuid-credential-context":
+            first = "+session token 11111111-2222-3333-4444-555555555555\n"
+        second = {"privacy-two-uuids": "+other reference 66666666-7777-8888-9999-aaaaaaaaaaaa\n",
+                  "privacy-uuid-and-digit-run": "+synthetic account " + "12345" + "678901" + " for the test\n",
+                  "privacy-uuid-credential-context": "+plain line\n"}[scenario]
+        s["files"] = [{"filename": "docs/example.md", "status": "added", "additions": 2, "deletions": 0}]
+        s["changed_files_expected"] = 1
+        s["diff"] = (
+            "diff --git a/docs/example.md b/docs/example.md\n"
+            "new file mode 100644\n"
+            "index 0000000..1111111\n"
+            "--- /dev/null\n"
+            "+++ b/docs/example.md\n"
+            "@@ -0,0 +1,2 @@\n" + first + second
+        )
+
+    elif scenario in {"privacy-uuid-indeterminate", "manifest-write-failure"}:
         s["diff"] = (
             "diff --git a/docs/example.md b/docs/example.md\n"
             "new file mode 100644\n"
@@ -804,16 +1051,45 @@ def state():
             "+fixture reference 11111111-2222-3333-4444-555555555555\n"
         )
 
-    elif scenario in {"binary-missing-attestation", "binary-with-attestation"}:
-        s["files"] = [{"filename": "docs/new.png", "status": "added", "additions": 0, "deletions": 0}]
-        s["changed_files_expected"] = 1
-        s["diff"] = (
-            "diff --git a/docs/new.png b/docs/new.png\n"
-            "new file mode 100644\n"
-            "index 0000000..1111111\n"
-            "GIT binary patch\n"
-            "literal 3\nQwerty\n"
-        )
+    elif scenario in {"binary-missing-attestation", "binary-with-attestation", "binary-no-rest-sha", "binary-malformed-rest-sha",
+                      "binary-one-char-off", "binary-other-path", "binary-listed-and-unlisted", "binary-removed", "binary-renamed",
+                      "binary-and-manifest-edit", "binary-body-pointer", "binary-blob-fails", "binary-blob-malformed",
+                      "binary-blob-not-base64", "binary-blob-size-field-differs", "binary-numeric-path", "binary-numeric-path-lookalike"}:
+        def binary_file(name, sha, status="added", previous=None):
+            record = {"filename": name, "status": status, "additions": 0, "deletions": 0}
+            if sha is not None:
+                record["sha"] = sha
+            if previous:
+                record["previous_filename"] = previous
+            section = f"diff --git a/{previous or name} b/{name}\n"
+            if status == "removed":
+                section += "deleted file mode 100644\nindex 1111111..0000000\n"
+            elif previous:
+                section += f"similarity index 90%\nrename from {previous}\nrename to {name}\nindex 1111111..2222222 100644\n"
+            else:
+                section += "new file mode 100644\nindex 0000000..1111111\n"
+            return record, section + "GIT binary patch\nliteral 3\nQwerty\n"
+
+        wanted = {
+            "binary-no-rest-sha": [binary_file("docs/new.png", None)],
+            "binary-malformed-rest-sha": [binary_file("docs/new.png", "3B18E512DBA79E4C8300DD08AEB37F8E728B8DAD")],
+            "binary-one-char-off": [binary_file("docs/new.png", LAB_BLOB_OFF)],
+            "binary-other-path": [binary_file("docs/other.png", LAB_BLOB)],
+            "binary-listed-and-unlisted": [binary_file("docs/new.png", LAB_BLOB), binary_file("docs/extra.bin", OTHER_BLOB)],
+            "binary-removed": [binary_file("docs/new.png", LAB_BLOB, "removed")],
+            "binary-renamed": [binary_file("docs/new.png", LAB_BLOB, "renamed", "docs/old.png")],
+            "binary-and-manifest-edit": [binary_file("docs/new.png", LAB_BLOB)],
+            "binary-numeric-path": [binary_file("1e2", LAB_BLOB)],
+            "binary-numeric-path-lookalike": [binary_file("100", LAB_BLOB)],
+        }.get(scenario, [binary_file("docs/new.png", LAB_BLOB)])
+        s["files"] = [record for record, _ in wanted]
+        s["diff"] = "".join(section for _, section in wanted)
+        if scenario == "binary-and-manifest-edit":
+            # the pull request lists its own capture: the edit is judged as a change to the gate, and does not apply to its own run
+            manifest = "scripts/merge-gate-lab-captures.json"
+            s["files"].append({"filename": manifest, "status": "modified", "additions": 1, "deletions": 1})
+            s["diff"] += modified_diff(manifest)
+        s["changed_files_expected"] = len(s["files"])
 
     elif scenario == "gitlink-change":
         s["files"] = [{"filename": "vendor/module", "status": "modified", "additions": 1, "deletions": 1}]
@@ -926,7 +1202,7 @@ def has(*needles):
 
 if args[:2] == ["pr", "view"]:
     emit({"headRefOid": HEAD, "baseRefName": "master", "title": S["title"], "body": S["body"],
-          "changedFiles": S["changed_files_expected"]})
+          "changedFiles": S["changed_files_expected"], "headRefName": S["head_ref"]})
 
 elif args[:2] == ["pr", "diff"]:
     emit(S["diff"])
@@ -957,6 +1233,32 @@ elif args and args[0] == "api":
             emit({"encoding": "base64", "content": b64(S["ack_text"])})
         else:
             fail("unknown contents fixture")
+    elif "/git/blobs/" in joined:
+        if scenario == "binary-blob-fails":
+            fail("controlled blob failure")
+        if not joined.rstrip().endswith("/git/blobs/" + LAB_BLOB):
+            fail("unknown blob fixture")
+        encoded = base64.encodebytes(LAB_BYTES).decode()
+        if scenario == "binary-blob-malformed":
+            emit({"encoding": "base64", "content": 5, "size": len(LAB_BYTES)})
+        elif scenario == "binary-blob-not-base64":
+            emit({"encoding": "utf-8", "content": LAB_BYTES.decode(), "size": len(LAB_BYTES)})
+        elif scenario == "binary-blob-size-field-differs":
+            emit({"encoding": "base64", "content": encoded, "size": len(LAB_BYTES) + 1})
+        else:
+            emit({"sha": LAB_BLOB, "encoding": "base64", "content": encoded, "size": len(LAB_BYTES)})
+    elif "/compare/" in joined and "vnd.github.diff" in joined:
+        carry = S["carry"]
+        if carry is None or carry["fail"]:
+            fail("controlled compare diff failure")
+        spec = next(a for a in args if "/compare/" in a).split("/compare/")[1]
+        merge_base = BEHIND_MERGE_BASE if S["surface_merge_base"] is not None else BASE_TIP
+        if spec == OLD_BASE + "..." + OLD_HEAD:
+            emit(carry["old"])
+        elif spec == merge_base + "..." + HEAD:
+            emit(carry["new"])
+        else:
+            fail("unknown compare diff fixture: " + spec)
     elif "/compare/" in joined:
         if S["merge_base_fail"]:
             fail("controlled merge-base failure")
@@ -969,9 +1271,31 @@ elif args and args[0] == "api":
     elif "/pulls/321/files" in joined:
         emit([S["files"]])
     elif "/pulls/321/reviews" in joined:
-        emit([S["reviews"]])
+        if "reviews" in S["pages_fail"]:
+            fail("controlled reviews failure")
+        merge_base = BEHIND_MERGE_BASE if S["surface_merge_base"] is not None else BASE_TIP
+        emit([S["reviews"] + [dict(r, body=r["body"].replace("base=BASE", "base=" + merge_base)) for r in S["owner_reviews"]]])
     elif "/issues/321/comments" in joined:
-        emit([S["comments"]])
+        if "comments" in S["pages_fail"]:
+            fail("controlled comments failure")
+        merge_base = BEHIND_MERGE_BASE if S["surface_merge_base"] is not None else BASE_TIP
+        emit([S["comments"] + [dict(i, body=i["body"].replace("base=" + BASE_TIP, "base=" + merge_base)) for i in S["owner_items"]]])
+    elif "/commits/" in joined and joined.rstrip().split("?")[0].endswith("/comments"):
+        fail("a commit comment read per commit: the gate reads the repository's commit comments once")
+    elif any(a.endswith("/comments?per_page=100") and "/issues/" not in a and "/pulls/" not in a and "/commits/" not in a for a in args):
+        # the repository's commit comments, each naming the commit it is on (the pull request's head unless a scenario says otherwise)
+        if S["commit_comments_fail"]:
+            fail("controlled commit comments failure")
+        pages = S["commit_comment_pages"] if S["commit_comment_pages"] is not None else [S["commit_comments"]]
+        emit([[dict({"commit_id": HEAD}, **c) for c in page] for page in pages])
+    elif "/pulls/321/comments" in joined:
+        if "inline" in S["pages_fail"]:
+            fail("controlled inline comments failure")
+        emit([S["inline"]])
+    elif "graphql" in joined:
+        if S["history_fail"]:
+            fail("controlled history failure")
+        emit(S["history"])
     elif "branches/master" in joined:
         emit(BASE_TIP)
     else:

@@ -1,0 +1,131 @@
+# fixture: tests/fixtures/builtin_sales_register_pilot_lab_fy_live.utf16le.xml
+# parser: parse_native_month_register(20260401..20270331)
+# source: captured
+Ok(NativeMonthRegister {
+    rows: [
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 4,
+            },
+            dr: Empty,
+            cr: Empty,
+            cl: Empty,
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 5,
+            },
+            dr: Empty,
+            cr: Empty,
+            cl: Empty,
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 6,
+            },
+            dr: Empty,
+            cr: Empty,
+            cl: Empty,
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 7,
+            },
+            dr: Empty,
+            cr: Empty,
+            cl: Empty,
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 8,
+            },
+            dr: Empty,
+            cr: Present(
+                ExactDecimal(
+                    "17638.50",
+                ),
+            ),
+            cl: Present(
+                ExactDecimal(
+                    "17638.50",
+                ),
+            ),
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 9,
+            },
+            dr: Empty,
+            cr: Present(
+                ExactDecimal(
+                    "210.20",
+                ),
+            ),
+            cl: Present(
+                ExactDecimal(
+                    "17848.70",
+                ),
+            ),
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 10,
+            },
+            dr: Empty,
+            cr: Empty,
+            cl: Empty,
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 11,
+            },
+            dr: Empty,
+            cr: Empty,
+            cl: Empty,
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 12,
+            },
+            dr: Empty,
+            cr: Empty,
+            cl: Empty,
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2027,
+                month: 1,
+            },
+            dr: Empty,
+            cr: Empty,
+            cl: Empty,
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2027,
+                month: 2,
+            },
+            dr: Empty,
+            cr: Empty,
+            cl: Empty,
+        },
+        NativeMonthRegisterRow {
+            month: CashFlowMonth {
+                year: 2027,
+                month: 3,
+            },
+            dr: Empty,
+            cr: Empty,
+            cl: Empty,
+        },
+    ],
+})

@@ -8,10 +8,11 @@ The developer configuration below remains for supported client integrations.
 `bridge_mcp` is Bridge's newline-delimited JSON-RPC 2.0 MCP server. It uses
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
-parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra) is
-off by default because of the four limits under *Approved voucher posting* below;
-the **Allow voucher posting (Journal, Payment, Receipt, Contra)** setting adds it, with
-separate native approval for each new attempt. Command-line installations
+parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra, or
+a saved batch of 2 to 50) is off by default because of the limits under
+*Approved voucher posting* below; the **Allow voucher posting, one voucher or a
+batch of up to 50** setting adds it, with separate native approval for each new
+attempt. Command-line installations
 retain explicit environment switches.
 
 Build and run it with Rust 1.96:
@@ -21,7 +22,7 @@ rustup run 1.96.0 cargo run --manifest-path src-tauri/Cargo.toml --bin bridge_mc
 ```
 
 Every tool call refuses, in band, until the Terms of Use are accepted. Read them first
-(https://bridge.complyeaze.com/terms); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
+(https://bridge.complyeaze.com/terms.html); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
 as its "I accept" setting. `initialize` and `tools/list` still answer without it. When it
 is on, Bridge appends a line per terms version (version, time, source) to
 `terms-acceptance.jsonl` in its data folder when it starts (two servers starting together
@@ -35,8 +36,10 @@ Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 `BRIDGE_TALLY_PORT` (default `9000`), `BRIDGE_AGENT_DATA_DIR` (Bridge's
 platform application-data directory by default), `BRIDGE_AGENT_MAX_ROWS`
 (default `500`), `BRIDGE_AGENT_MAX_BYTES` (default `200000`), and
-`BRIDGE_AGENT_REDACTION` (`none`, `mask_parties`, or `drop_narration`). The
-host is validated by `bridge-tally-transport`; non-loopback hosts are refused.
+`BRIDGE_AGENT_REDACTION` (`none`, `mask_parties`, or `drop_narration`).
+`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer. Control replies (to
+`initialize`, `ping` and `tools/list`), which the build fixes and which carry no
+book data, are held to 1,000,000 bytes, or to it if it is larger. The host is validated by `bridge-tally-transport`; non-loopback hosts are refused.
 The resolved data path must be valid Unicode so saved artifact paths can be
 returned exactly in JSON. Invalid platform encoding is refused before state
 creation with `agent_data_dir_encoding_invalid`; no lossy path alias is used.
@@ -91,11 +94,13 @@ The ordinary default tools, in name order:
 - `company_features`
 - `egress_log`
 - `gst_status`
+- `gst_uncertain_vouchers`
 - `ledger_masters`
 - `ledger_movement`
 - `list_companies`
 - `local_data_report`
 - `masters`
+- `month_register`
 - `outstandings`
 - `profit_and_loss`
 - `purchase_register`
@@ -114,8 +119,8 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status` and `voucher_read_cost` are in the
-source after release 0.5.0 and are not in a published build yet. `local_data_report` (also
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
+release 0.6.0. `gst_uncertain_vouchers` is in the source after release 0.6.0 and is not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -153,8 +158,9 @@ installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
 that import workflow and exposes `post_import` and `acknowledge_post_review`. The MCPB extension always
-sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting
-(Journal, Payment, Receipt, Contra)** setting, off by default, to `BRIDGE_AGENT_ENABLE_WRITES`.
+sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting, one
+voucher or a batch of up to 50** setting (`enable_posting_2026_10`), off by
+default, to `BRIDGE_AGENT_ENABLE_WRITES`.
 This is a source-configuration inventory, not a claim that an installed client
 uses a particular setting or that a tool is qualified for every runtime. Each
 call returns compact JSON with the
@@ -287,7 +293,16 @@ Like `remediation`, `expected`, `cause`, `counts`, `size`, `endpoint`, `ledger`,
 `candidates_reason`, `candidates_total`, `candidates_total_is_lower_bound`, `candidates_truncated`,
 `candidates`, `requested` and `window` are omitted when
 `BRIDGE_AGENT_MAX_BYTES` is below 4,096, so that the code always fits. A refusal's list of
-candidate ledgers needs at least 16,384, so it can be absent above 4,096 too. Before a tool response is written, Bridge appends a
+candidate ledgers needs at least 16,384, so it can be absent above 4,096 too. The two
+voucher-numbering refusals (`import_voucher_numbering_not_automatic` and
+`import_voucher_numbering_not_retain`) need at least 8,192 for their `next_step` and, on
+`post_import`, for the message that names the refused voucher types: from 4,096 up to 8,192 a
+refused `build_import_xml` still returns `state`, `reason` and `refused_types`, and a refused
+`post_import` its `error.code` and `error.refused_types` with the general message; under about
+2,500 bytes even those do not fit, and the answer is cut down as any tool's is. The tests hold a
+refused post naming three voucher types and a refused build naming one within 8,192 bytes with
+the next step and within 4,096 without it, and an answer naming four voucher types within the
+server's caps at 8,192; the sizes themselves are not printed here, since the texts change. Before a tool response is written, ComplyEaze Bridge appends a
 `response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`. It holds
 hashes, counts and field paths, and one set of values: for a response that carries an error, its
 `error` keeps the code, the cause when it is a code, and a voucher window's timings (requested
@@ -343,10 +358,6 @@ cancellation of the call) stays unread until the call ends. The lab write tools 
 not cancellable.
 `egress_log` reads only the final 256 KiB, in 64 KiB reverse-seek chunks, so a
 larger receipt file still yields its bounded tail without loading the head.
-`changed_since` is unavailable: it is omitted from tool discovery and direct calls
-are refused as `changed_since_unqualified` before contacting Tally. Bounded change
-enumeration and snapshot continuation have not been qualified. There is no operator
-setting to enable this tool.
 
 ### Native Trial Balance
 
@@ -405,6 +416,67 @@ reads those allocations yet. A `groups` row carries `name`,
 parent that is Tally's reserved root keeps its marker form, as in
 `trial_balance`. Alias names are not returned.
 
+A `voucher_types` row also carries `series_numbering`, the numbering of the
+type's number series, which `numbering_method` is not (that is the type-level
+value, which read `None` for types set to Automatic and to Manual on the
+screen). It is read from a second paired read of the voucher-type export with
+the series-level fields added, inside the same brackets and between the first
+collection and the closing extent, and is joined to each row by GUID with the
+name as a second equality. It is `{"observation":"observed","method":...,"duplicates":...}`
+(`method` is `automatic`, `manual`, `automatic_manual_override` or
+`{"unrecognised": "<raw text>"}`; `duplicates` is `prevented` or `not_prevented`),
+`{"observation":"series_count","count":n}` where a type has no series or
+several (nothing is read from it), or `{"observation":"field_invalid","code":...}`.
+Under `"method":"automatic"`, and under no other method, it also carries
+`sub_method`, the series' own `NUMBERINGSUBMETHOD`: `auto_retain` (the screen's
+"Retain Original Voucher No."), `auto_renumber` ("Renumber Vouchers"), `absent`
+where the series printed none, or `{"unrecognised": "<raw text>"}` for any other
+text, a blank one included. A Manual series printed `Auto Retain` as well on
+both books read, which is not the numbering in force there, so it is not
+returned for one.
+A type found in one answer only (`masters_numbering_names_differ`), or a GUID
+and name that disagree between the two answers
+(`masters_numbering_identity_differs`), refuses the whole read; so does the
+numbering collection changing between its two reads
+(`masters_numbering_collection_changed`) and a numbering answer whose row count
+or size breaks the mark's premise (`masters_bound_premise_violated`). A
+numbering answer that does not parse, a missing or repeated GUID among the
+causes, refuses at once with a `masters_*` cause, and a moved book is reported
+as `masters_extent_changed` in place of a join or premise refusal. Measured on one synthetic
+book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series
+named `Default`, of which three (Journal Automatic, Payment Manual with
+duplicates prevented, Receipt Manual with duplicates not prevented) were
+checked against Tally's screen. Automatic (Manual Override) through this tool
+(it is mapped from the series text measured on a synthetic book on 13 October
+2026), more than one series, Multi-user Auto, a single series not named
+`Default`, a voucher type created new and other releases are not measured, and
+an `unrecognised` method is never `manual`. The integrated read, the two
+requests sent as one tool call, was run live on 14 October 2026 on two
+synthetic books (TallyPrime 7.1 Silver, Windows; 24 voucher types each, each
+with exactly one series, whose name is not read): it was not refused, and on
+the six types whose numbering was set or checked on Tally's screen it returned
+that numbering (Manual with duplicates prevented, Manual with duplicates not
+prevented, Automatic); the other types, left at a new company's defaults and
+not checked on screen, read Automatic. `sub_method` was measured on a
+second synthetic book (TallyPrime 7.1 Silver, Windows, 13 October 2026) and one
+voucher type, Receipt: it read `Auto Retain`, then `Auto Renumber` after the
+type's screen was set to "Renumber Vouchers", then `Auto Retain` after it was
+set back. With the type on "Renumber Vouchers", numbers already in the book
+changed: at the switch, when a voucher with an earlier date was entered by
+hand, and when a voucher with an earlier date was sent by import without a
+number, where the import's answer read CREATED 1, ALTERED 0 and no voucher's
+AlterID moved; a voucher dated after every other changed nothing. Later runs
+on that book (protocol reference §9.8) found that a file of two Receipts
+without numbers was numbered by date and changed four numbers, that a
+Receipt carrying a number read back the number of its place in date order,
+and that a Journal imported without a number and dated between two others
+was numbered by its date and moved the later one. A file of more than two
+vouchers, a mixed file, a Journal that carries a number or is dated after
+every other, Payment and Contra, Gold, other releases and the same through
+ComplyEaze Bridge's own post are not measured. Neither is any other
+wording, or a series that prints no sub-method: on such a book every Automatic
+type would read `absent` or `unrecognised`.
+
 The read runs inside the same company, mode and identity brackets as
 `trial_balance`, with the book extent read before and after (they must be
 equal) and the collection read twice and compared. Education mode is refused.
@@ -425,7 +497,7 @@ marks of about 100,000 and 300,000, refuse godowns, units and stock groups (cost
 centres and categories were not tried on them); how common such
 marks are across live books is unmeasured (protocol reference §12a.12). `voucher_types` and `groups` have no size check
 before the read: voucher types keep the policy of Bridge's other voucher-type
-read, and groups that of the group read `profit_and_loss` and `balance_sheet`
+read (their second, numbering read is likewise sent with no size check), and groups that of the group read `profit_and_loss` and `balance_sheet`
 make.
 
 The size rests on premises that are checked after the read, not assumed. For
@@ -436,7 +508,9 @@ both reads) are checked against the mark and the admitted size: more rows
 than the mark, an AlterID above it, a repeated AlterID or an oversize response
 refuses the whole read as `masters_bound_premise_violated`, unless the closing
 extent shows the book moved, which is reported instead
-(`masters_extent_changed`). A response Bridge cannot read refuses at once with
+(`masters_extent_changed`). The voucher types' numbering answer is held to
+the same kind of checks (more rows than the mark or an oversize response).
+A response Bridge cannot read refuses at once with
 a `masters_*` cause (for `groups`, the group reader's, such as `group_xml_malformed`),
 without waiting for the closing extent. A `voucher_types`
 answer with no rows refuses as `masters_voucher_types_empty`, because every
@@ -587,6 +661,33 @@ control character, a bidirectional override or isolate, a zero-width or other in
 `company_features_changed` and `company_features_extent_changed`. Measured on three synthetic books of one
 TallyPrime 7.1 Silver (protocol reference §12a.18); the tool was run against those three books and equalled the F11 screen on all nine values.
 
+### Month-wise Sales and Purchase Registers (`month_register`)
+
+`month_register` takes `company_guid`, `kind` (`sales` or `purchase`) and a window of whole months,
+`from` the 1st of a month and `to` the last day of a month, at most twelve months, not starting before
+the book does. It reads Tally's own Sales Register or Purchase Register by report name, twice, with the
+book extent checked before and after and the company and mode checked around the read, and returns
+`months`: one row per month, `month` as `YYYY-MM`, and Tally's three columns `debit`, `credit` and
+`closing`, each `{"state": "present", "value": ...}` or `{"state": "empty"}` exactly as Tally printed
+it. An empty amount is not zero.
+
+Nothing ties the rows to the vouchers, to the trial balance or to `sales_register` and
+`purchase_register`; `checks` says so. On the one synthetic book read (BRIDGE PILOT LAB, one financial
+year, 13 Oct 2026) the Sales Register's credit was the month's sales invoices, tax included, neither
+cancelled nor optional, and its closing was printed for August and September only, as a running total,
+with the other months empty; the Purchase Register's debit was the month's purchases as a negative amount,
+and its closing was printed for August and, unchanged, for September, a month with no purchase. That
+reading is not applied. Equality with Tally's own register screens has not been measured, and `checks`
+says `against_register_screen: not_checked`. The set of months is not left unchecked: an answer whose
+months are not the window's is refused (`month_register_months_unexpected`). A window that is not whole
+months is refused after the company and mode reads and before the register is asked for
+(`month_register_window_not_month_start`, `_not_month_end`, `_reversed`, `_too_many_months`,
+`_unsupported_boundary`), as is one that starts before the books (`month_register_before_books`) and
+Education mode (`month_register_education_unqualified`); an answer Tally marks as a failure, an
+empty answer and a book that moved during the read fail the call (`month_register_read_failed` with the
+cause). The Journal Register prints a count of vouchers, not amounts, and is not read; the Receipt and
+Payment Registers have not been captured.
+
 ### GSTR-1 status of one voucher type (`gst_status`)
 
 `gst_status` takes `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD) and `voucher_type_name`, and
@@ -637,6 +738,52 @@ refused (`gst_status_book_too_large`), because the selection is evaluated on eve
 bound is provisional: the read has been timed only on a book of about thirty vouchers. Measured on one
 synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales invoices (protocol reference
 §9.17 holds the Sales flags and Accept As Is; the by-name selection and the narrow field list are in the fixtures' PROVENANCE.md); a registered buyer, other releases and Gold are not measured, and `excluded` has not been observed.
+
+### Uncertain vouchers of one voucher type (`gst_uncertain_vouchers`)
+
+`gst_uncertain_vouchers` takes `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD) and `voucher_type_name`, with
+the same checks and refusals as `gst_status` (an exact type name, at most 93 days, a book whose voucher mark is at most
+25,000) and no `limit` or `offset`. It reads the status flags `gst_status` reads and adds each voucher's party and
+amount, and lists two things in one `items` list, each item carrying a `list`: `uncertain` (Tally's uncertain flag reads
+Yes once cancelled, optional and post-dated are decided first) and `overridden` (the acceptance flag, Accept As Is,
+reads Yes, with the `gst_status` the voucher reads now; a voucher that reads uncertain or excluded after it was
+accepted is the row to look at, and one voucher can be on both lists; that nothing but Accept As Is sets the flag to
+Yes is not measured, and the before-capture already held five vouchers with the flag Yes, an Accept As Is on Tally's screen is recorded for two of them, `BP/26-27/0005` and `BP/26-27/0016`, and the origin of the other three is not recorded). An item holds `voucher_number`, `date`,
+`party` (the party ledger), `amount` (the invoice total as Tally wrote it, without its sign, an exact decimal) with
+`party_side` (`debit` for a negative amount, `credit` for a positive one), `alter_id`, `master_id` and `gst_status`.
+A party or an amount that is empty, absent, repeated, zero or not a plain decimal (a foreign-currency amount) is
+`{"unread": code}`, never a name or a zero. `counts` are those of `gst_status` over the whole window, except that `unread` also counts a listed voucher whose party or amount was not read. The result
+also holds `pre_filing_line`, the line a CA reads before filing, with the number of vouchers Tally marks Uncertain
+and the window's dates, naming the voucher type read (the type's class is not checked, so the line does not call it a Sales type), and `filed_period_note`,
+which says the list may differ from a filed return and to check against it. The line is withheld (`{"withheld": ...}`) and the note is left out, and the
+result is `partial` (`gst_uncertain_voucher_unread`), when a voucher's flags or acceptance flag were not read or a
+listed voucher's party or amount was not, so the number in the line is never short. The line alone is withheld
+(`{"withheld": ...}`), the result staying `complete` with its counts, when no voucher was read in the window
+(`gst_uncertain_no_vouchers_in_window`, as a mistyped type name gives) or none is marked Uncertain
+(`gst_uncertain_none_marked_uncertain`), because a line of 0 would read as clearance. A cancelled voucher reads an
+empty party and amount and is not listed as uncertain; one whose acceptance flag reads Yes is listed under
+`overridden`, and its empty party and amount then make the result `partial` and withhold the line.
+
+Two reads are made. The first is `gst_status`'s own read, which counts the window's vouchers; a window above
+1,000 is refused with `gst_uncertain_window_too_large` (the count is in the refusal's `counts`), before the second
+read, which asks for the party and the amount and so makes Tally send each voucher's ledger entries as well
+(about 7.5 KB a voucher on the lab's book). That bound is provisional. Every status is read from the second read
+alone. A second read that returns fewer vouchers than the first counted is refused (`gst_uncertain_wide_read_short`, with both numbers in `counts`), never reported as a smaller window. A count of rows above this server's row limit is refused (`gst_uncertain_rows_over_limit`). The answer is not paged, so one over this server's response byte cap is refused whole (`agent_response_too_large`, no counts): ask for a shorter window. The party is
+the party ledger (a cash sale shows the cash ledger); no GSTIN is fetched. The amount is the invoice total on the
+party's entry, tax and round-off included, not the taxable value of the GSTR-1 tables. `mask_parties` masks the
+party names of this tool's answer and not its amounts, and the answer carries both to the assistant, which
+`gst_status` does not.
+
+The reason for uncertainty is not read, and bills missing an HSN/SAC are not split out from the others: they need
+re-saving with the code, not Accept As Is. To confirm an acceptance after someone accepts vouchers in Tally, run the
+tool again and compare by `master_id`: the acceptance is confirmed only if an earlier run listed the voucher uncertain
+and this run lists it overridden with `gst_status` included and the same amount. That shows only that the acceptance
+flag was set and the voucher reads included with the same amount, not that the voucher is correct or complete. Nothing
+is kept between runs. Measured on one synthetic
+book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, which changed that voucher alone, for the
+unregistered buyer of its Sales invoices. Not measured: item invoices, a registered buyer, credit notes or other
+Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once,
+Gold and other releases.
 
 ### Stock Summary
 
@@ -1375,8 +1522,8 @@ has already read and labelled and send no Tally request of their own, so each co
 same `vouchers` call costs. The `group` and `primary_group` summaries also read the ledger
 list and the group list (see below).
 
-**Search.** `voucher_number`, `reference`, `narration_contains` and `amount` keep
-the vouchers that satisfy every criterion given.
+**Search.** `voucher_number`, `reference`, `narration_contains`, `amount` and
+`suspense_tagged` keep the vouchers that satisfy every criterion given.
 
 - `voucher_number` and `reference` are matched whole, ignoring ASCII case and the
   spaces around the term. Numbers repeat across voucher types, so a number can
@@ -1392,6 +1539,31 @@ the vouchers that satisfy every criterion given.
   against the absolute value of every ledger entry of a voucher, so it finds an
   invoice total and a tax line alike (checked live on an invoice-mode Purchase: 900.25 found its CGST and State Tax lines; an invoice total was not searched, nor an item invoice with stock lines). Each item carries `matched.amount_entries`,
   the positions in its `amounts` that equalled the amount.
+- `suspense_tagged: true` (only `true`, and only together with `ledger`, the
+  suspense ledger) keeps the vouchers of that ledger whose narration ends in a
+  suspense tag ComplyEaze Bridge writes: `Bridge: purpose not confirmed;
+  reclassify` (a cash line answered "don't know") or `UNIDENTIFIED - reallocate
+  from <ledger>` (a party no mapping names; the whole tail, the tag's own words
+  and the ledger, is compared as the build compared it, ignoring case, spacing and
+  hyphens, and the ledger must be one of the voucher's own; `Bridge: purpose not confirmed; reclassify` is matched exactly). One
+  closing ` [BRIDGE:...]` marker set off by whitespace, as a file imported by hand
+  carries, and trailing whitespace are ignored; a second marker, a marker with no
+  space before it, or text after the tag means the tag is not at the end and the
+  voucher is not listed. The tag must name one of the voucher's own ledgers, not
+  necessarily the `ledger` you gave. Cancelled and optional vouchers are listed
+  too; each item carries its flags. Each item says which tag in
+  `matched.suspense_tag` (`purpose_not_confirmed` or `unidentified`). The tag
+  classifies; it does not define what is in suspense: a voucher on the ledger
+  whose narration was edited after the tag is not listed, and the same text
+  typed by hand matches, so a listing is not proof that ComplyEaze Bridge wrote
+  the voucher. Read the ledger without the filter too, and treat every voucher
+  left over as still in suspense. Refused as `search_suspense_tagged_needs_ledger`
+  without `ledger`, and `search_narration_redacted` where narrations are withheld.
+  A value other than `true` never reaches the search: the argument check of a
+  tool call refuses it as `argument_invalid:suspense_tagged`
+  (`search_suspense_tagged_invalid` is the search's own second guard). Not measured: a
+  tagged narration read back from a real Tally (no capture holds one), including
+  a hand import and a narration near the 2000-character limit.
 - A term of spaces only, a narration phrase under three characters and an
   amount that is not a plain positive decimal are refused before the window is read (the identity read has already happened)
   (`search_criterion_empty`, `search_narration_too_short`,
@@ -1642,8 +1814,7 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   `BILLCREDITPERIOD` inside one allocation, or a child element inside either,
   refuses the read as a protocol error (`agent_read_protocol_invalid`). A
   malformed `BILLDATE` refuses as `bill_allocation_date_invalid`. Both reach every reader that shares the voucher parser,
-  not only `vouchers`: `changes` (where a refusal holds the checkpoint),
-  `voucher_presence`, the empty-window corroboration read and the desktop voucher
+  not only `vouchers`: `voucher_presence`, the empty-window corroboration read and the desktop voucher
   screen. Write-side verification is not affected, because its fetch names no
   allocation fields.
 - An allocation is read only when it has a `BILLTYPE`. An untyped one is skipped
@@ -1694,10 +1865,11 @@ The four rest on different observations, and each build reports its own in
   with `import_bill_wise_changed` a ledger that became bill-wise since.
 
 Historical batch records remain readable. None of this qualifies every host,
-licence mode, or manually imported file. In the MCPB extension an unnumbered
+licence mode, or manually imported file. An unnumbered
 Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
-per approval (a voucher that carries a voucher number is refused); a saved batch of 2 to 50 posts in one import only in a source build
-that turns that on.
+per approval (a voucher that carries a voucher number is refused), and a saved
+batch of 2 to 50 posts in one import after one approval of its summary. One
+posting setting covers both, in the MCPB extension and on the command line (#1090).
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
    IDs are client-supplied, unique within the batch, and retained in the local import ledger.
@@ -1729,7 +1901,12 @@ that turns that on.
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,
    company date extent, live masters, and local journal integrity,
    repeats the full catalogue to reject intervening changes, then writes `<data_dir>/imports/<batch_id>.xml` and records an append-only
-   `agent-import-ledger.jsonl` line. On a `Journal`, `voucher_number` and
+   `agent-import-ledger.jsonl` line. The result's `path` is where a person finds
+   that file, and `path_state` says how it was obtained: `resolved` (Windows
+   reported the file's real location, which on a Microsoft Store install of
+   Claude Desktop can be inside the package's own folder), `as_is` (macOS or
+   Linux, shown as written), or `unresolved` (it could not be resolved; this is
+   the logical path, not confirmed to exist). On a `Journal`, `voucher_number` and
    `reference` are optional: when a number is absent Tally applies the voucher
    type's own numbering configuration, and when supplied it is validated and
    sent so a Manual-type duplicate policy can reject it. On `Payment`,
@@ -1779,6 +1956,163 @@ that turns that on.
    `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see
    the limits noted in reference §9.13.
 
+### Skipped rows and the `transfers` section (#1392)
+
+A transfer between two of the company's own bank accounts prints on both
+statements and is booked once: a Contra from one statement, and the row mapped
+`skip` on the other. `parse_bank_statement` writes proposals file version 2,
+which a build needs for this; a version 1 file holding a skip or a Contra is
+refused as `proposals_legacy` (parse the statement again).
+
+- **What a statement build records.** Beside its vouchers: the statement's bank
+  ledger GUID, the days it read in full, each Contra row's network reference
+  and instrument (the cheque or number the statement prints), and each skipped
+  row's date, amount, direction, other ledger, reference and instrument, with a
+  flag on any row that has an equal amount going the other way the same day on
+  its own statement. A statement whose every row is skipped saves no
+  batch file: it appends one record to `agent-import-statement-skips.jsonl` and
+  returns `state: skips_recorded`. No pairing is stored; the view is computed
+  again from these records on every call.
+- **The section.** Every successful build, and the first page of
+  `verify_import`, returns `transfers`, except that a written build whose
+  result fits the response cap only without it, not even beside the note that
+  the check did not run, is answered without it and its envelope is marked
+  `truncated`: `state` (`computed`, or
+  `not_established` when the view could not be computed or the section was cut
+  to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired` and
+  `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
+  `batch_id` where one is involved: `not_found`, `ambiguous`,
+  `other_side_unverified`, `held_elsewhere`, `posted_against_skip`, `matched_unconfirmed`,
+  `reference_differs`, `reversed_same_day`, `not_established`, or
+  `double_booked` for a Contra booked from both statements. No amount,
+  reference, instrument, party or ledger is returned.
+- **What `not_found` claims.** Only that the other account's statement went
+  through ComplyEaze Bridge, was verified for that day, and holds no Contra of
+  the row's day, amount, ledgers and direction that is not already paired, or
+  matched by date, with another row, whatever its reference. A row pairs by an
+  equal reference, or by an equal date (k = 0 until two real statements of one
+  transfer have been measured), so a Contra the other bank printed on another
+  day is not matched.
+- **What `held_elsewhere` and `posted_against_skip` mean.** A skipped row that
+  a batch holds as a voucher is not a skip to pair. While no batch holding the
+  row is found posted it reads `held_elsewhere`, with the batch to verify. Once
+  a batch is found posted, the skip is retired (counted in `retired`) only if
+  every batch found posted that holds the row has a build in its lineage that
+  recorded the withdrawal: a build keeps the rows the person named in
+  `withdraw_skips`, and they count once that build is sent or found posted and
+  it was built after the newest record of the skip (a later build of the
+  skipping statement, or a skip-only record of it, records the skip again; a
+  withdrawal built at the very instant of the record does not count).
+  Otherwise the posted voucher contradicts the skip, and the row stays open as
+  `posted_against_skip`, with that batch: the other account's Contra may carry
+  the transfer too, ComplyEaze Bridge does not compare the two, and no step
+  inside ComplyEaze Bridge removes a voucher already in Tally. The row leaves
+  the list only when a build in that batch's lineage that names it in
+  `withdraw_skips` is found posted after the newest record of the skip, which
+  the person confirms only when the other account's statement does not carry
+  it; a batch ComplyEaze Bridge posted itself cannot be amended, so for it no
+  step inside ComplyEaze Bridge clears the row. Two builds made before either
+  is sent are both admitted, so this is how a skip and a posting of one row
+  that were built apart are reported once both are sent and one is found
+  posted. A skip may be withdrawn whether or not its statement was ever sent,
+  so a statement parsed again with the row posted is built again naming the row
+  in `withdraw_skips`, and the batch built first is not sent: sending it
+  instead gives `posted_against_skip`. The answer of the build that names the
+  row lists it as `held_elsewhere` with its own batch, which is the one to send
+  and verify. The batch left unsent blocks the days of its rows for the other
+  account's coverage until it is verified, and no step inside ComplyEaze Bridge
+  clears that. A build that names a row held this way is judged against the
+  other account's Contras like any skip. For a skip that was sent or is in a
+  statement of only skipped rows (a live skip), an amendment of a batch whose
+  row reads `posted_against_skip` is refused as `skip_row_paired_elsewhere`
+  unless it names the row in `withdraw_skips`; a skip that was never sent does
+  not refuse it. An amendment that names the row counts once it is found posted
+  (`post_import` does not send amendments), and one that never reaches
+  found posted counts for nothing. A held skip is judged against the Contras alone, without
+  the other skips: a refusal as `paired` for it means a Contra may carry it,
+  not that it is established that it does.
+- **What `reference_differs` means.** The person sees the row listed once for
+  each batch holding a Contra of the same day and amount whose reference
+  differs from the row's, verifies that batch if it is not verified yet, and
+  checks that Contra in Tally, because ComplyEaze Bridge cannot tell whether it
+  is the row's other side: they keep the skip if it is, and may name the row in
+  `withdraw_skips` if it is not.
+- **What `ambiguous` and `reversed_same_day` list.** The row is listed once
+  for each batch holding a Contra that could carry it, and ComplyEaze Bridge
+  does not choose among them: the person checks them in Tally. A
+  `reversed_same_day` row that no Contra matches is listed once, without a
+  `batch_id`.
+- **What `double_booked` compares.** Two Contras of one amount between the same
+  two ledgers and the same way, one booked from each statement: where their
+  references are equal, whatever their dates (the second build is refused as
+  `transfer_double_booked`), and where their dates are equal and at least one
+  of them carries no reference (both are listed). Nothing else is compared: a
+  Receipt or Payment that posts a skipped row is reported as `held_elsewhere`
+  until its batch is found posted, then as `posted_against_skip` unless the
+  withdrawal was recorded, not here. No step inside ComplyEaze Bridge removes a
+  voucher already in Tally yet; the step says not to send a batch not yet sent.
+- **What `matched_unconfirmed` means.** The person sees the row listed with the
+  batch whose verified Contra matches it by day and amount, where the statement
+  records of the two accounts do not both cover that day, and keeps the skip.
+  The row can be decided only once statement records of both accounts cover
+  that day: for each account that needs a statement whose rows begin before
+  that day and end after it, built and, where it books a voucher, verified (a
+  statement that begins or ends on that day does not cover it, and a day
+  blocked by a batch that holds no statement records is covered by none).
+  Until then the row stays as it is.
+- **What the records cannot see.** A batch that holds no statement records
+  (built from inline vouchers, or by a release before them) can still book a
+  transfer. Each Contra and statement row it holds makes the days it names (its
+  date, and the date in its `st-` id) give no coverage for the ledgers it names,
+  whatever the batch's status. A skip naming one of those ledgers that a single
+  verified Contra matches by date on such a day is `matched_unconfirmed`, never
+  paired. A skip with no candidate is `not_found` only where the other
+  account's windows still hold its day, and otherwise `not_established`;
+  `reference_differs` and `reversed_same_day` are decided before either. A
+  Contra with no statement record inside a statement's own builds blocks the
+  same way; another voucher there does not.
+  A record with no endpoint (from an early release) blocks the ledgers it names
+  at every endpoint, and one with no ledger binding blocks every ledger at its
+  endpoint, so such a record can turn every skip across its days
+  `not_established`. A blocked day removes the whole window it falls in. A
+  statement build blocks the days of its rows until it is verified, so one
+  abandoned unsent keeps them `not_established`, and no step inside ComplyEaze
+  Bridge clears it yet. A statement build whose send Tally rejected also stays
+  unverified, and building that statement again is refused as
+  `import_txn_already_posted`: a row waiting on it (`other_side_unverified`)
+  has no step inside ComplyEaze Bridge either.
+- **Refused before anything is written:** `skip_row_already_posted`,
+  `skip_row_paired_elsewhere`, `transfer_double_booked`, `withdraw_skip_invalid`,
+  `withdraw_skip_paired` and `transfer_view_not_established`, each with a
+  `next_step`.
+- **`withdraw_skips`.** Names skipped rows a build posts anyway, only when the
+  person confirms the other account's statement does not carry them. A
+  withdrawal is refused while exactly one verified Contra matches the row and
+  nothing else claims that Contra. Where more than one verified Contra
+  matches, the match is also claimed by another row or booked twice, the amount
+  reverses the same day and the match is by date, or the only match carries a
+  different reference and is verified, ComplyEaze Bridge cannot tell which
+  entry the row belongs to: the withdrawal is then the person's explicit
+  choice, and the batch of every matching Contra is listed on the row in the
+  `transfers` section. While the only match is not yet verified, the
+  withdrawal is refused and the step says to verify that entry first. So is
+  one with any match in a batch not yet verified, whatever the row's state: the
+  person can confirm only what Tally holds. The refusal is
+  `withdraw_skip_paired`, and its `paired_rows` names each such batch with the
+  row's state there (`paired`, `matched_unconfirmed` or
+  `other_side_unverified`). A Contra matches a row by an equal reference, or
+  by the same date and amount where one of the two carries no reference. One
+  of the same day and amount whose reference differs from the row's is a match
+  only for a row that nothing else matches. One dated another day, or with a
+  third leg, does not match and does not refuse: verify every batch of the
+  other account's statement before naming a row.
+- **Records a release cannot read.** The statement records refuse unknown
+  fields, so records written by a later release make this one refuse every
+  build that needs the view (`transfer_view_not_established`); builds that do
+  not need it go on with `transfers.state: not_established`. A missing
+  skip-only file reads as no skip-only records, as a missing import journal
+  reads as no batches.
+
 The file path is deliberately not a direct-posting path. Masters must already
 exist and match exactly. File generation requires fresh supported product/mode
 observations; the checks do not make a later manual import atomic with the earlier reads.
@@ -1788,7 +2122,8 @@ voucher type, not only `Journal`. A different requested date is refused as
 Optional narration and reference must contain 1–2,000 Unicode characters when
 supplied; omit them when unused. Control characters and the reserved attribution
 marker are refused, including XML entity-encoded marker spellings. Voucher
-numbers contain 1–32 characters and cannot contain controls or `$`. Lengths match
+numbers contain 1–32 characters, cannot contain controls or `$`, and cannot begin
+or end with white space (Tally read a number back without its end space). Lengths match
 JSON Schema's character semantics; the 5 MB request-frame limit remains separate.
 If verification would report any `not_found`, the supported TallyPrime product and
 licence mode must have been observed before and after readback. Otherwise
@@ -1903,10 +2238,9 @@ deadlocks.
 limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it.
 The saved batch file is now checked byte for byte against the approved record
 before posting ([#575](https://github.com/ComplyEaze/bridge/issues/575), fixed).
-**Allow voucher posting (Journal, Payment, Receipt, Contra)** turns it on for
-users who accept those risks. Existing
-saved settings are respected, so an installation that saved the earlier default
-may still have posting on; check the setting.
+**Allow voucher posting, one voucher or a batch of up to 50** turns it on for
+users who accept those risks. It is a new setting, so a posting choice saved
+for an earlier version does not carry over: posting starts off.
 For command-line installation, set `BRIDGE_AGENT_ENABLE_WRITES=true`.
 This enables `build_import_xml`, `parse_bank_statement`, `post_import` and
 `acknowledge_post_review`, which asks the local user, in its own native dialog, to
@@ -1917,21 +2251,30 @@ after posting is turned off. `BRIDGE_AGENT_ENABLE_IMPORT=true` alone exposes
 the manual file workflow and bank-statement proposal preparation, while
 verification remains available without either switch.
 
-`BRIDGE_AGENT_ENABLE_BATCH_POST=true`, together with
-`BRIDGE_AGENT_ENABLE_WRITES=true`, lets `post_import` post a saved batch of 2 to
-50 vouchers in one import, after one approval of the batch's summary: every
+`BRIDGE_AGENT_ENABLE_WRITES=true` also lets `post_import` post a saved batch of 2
+to 50 vouchers in one import, after one approval of the batch's summary: every
 ledger's debit and credit totals, the money Receipts bring in and Payments take
-out, and the standing cautions. It is off by default. It is a command-line
-setting only, not in the MCPB extension, until a batch post through Bridge has
-been proved on a live book. A batch is `posted_verified` only when Tally created
+out, and the standing cautions (#1090). In the MCPB extension this is the
+setting **Allow voucher posting, one voucher or a batch of up to 50**
+(`enable_posting_2026_10`). It is a new key, off by default, so a posting choice
+saved for an earlier version, which covered one voucher at a time, does not
+carry over. An empty value, or the key's unresolved
+`${user_config.enable_posting_2026_10}` placeholder, reads as off; what Claude
+Desktop passes for a new key on an upgrade is not yet measured. The separate
+`BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while it is set, with any value,
+and posting is on, `post_import` refuses as `setting_retired` until it is
+removed; every other tool works. A batch is `posted_verified` only when Tally created
 exactly that many vouchers, the readback verifies every one, and the company's
 voucher mark moved by exactly that many. Otherwise it is
 `reconciliation_required` (`batch_step_unconfirmed` when only the mark
 was not confirmed). Review a doubted batch's vouchers in Tally and do not rebuild it;
 `acknowledge_post_review` records that review, one doubt at a time, and changes
-no verdict.
+no verdict. Its `invoice_stop` value is the one exception to "review": it
+releases the stop a sent Sales invoice that is not verified posted puts on its
+company (`invoice_company_stopped`), after the person has checked Tally, in the
+same dialog the model cannot answer.
 
-All three switches accept `true`/`false` or `1`/`0`; invalid values stop startup. No model-supplied argument can grant approval. Claude controls
+Both switches accept `true`/`false` or `1`/`0`; any other value stops startup, except that an empty `BRIDGE_AGENT_ENABLE_WRITES`, or the extension's unresolved placeholder for it, reads as off. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**
 for the user. That client permission does not approve an accounting entry.
 
@@ -1972,14 +2315,54 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    `import_multi_currency_unsupported` if the company defines more than one
    currency: Bridge does not post into multi-currency books yet. This is checked
    before approval and again inside the queue. A Currency read that names no
-   usable master refuses with `import_base_currency_undetermined`. Inside the
-   queue, a change to the company's masters from just before the catalogue
-   re-read to the last read before the post refuses with `post_masters_moved`
+   usable master refuses with `import_base_currency_undetermined`. A native
+   post sends no voucher number, so before approval ComplyEaze Bridge reads the
+   company's master mark and then each voucher type's voucher numbering
+   (bridge#724): a voucher type that does not read Automatic refuses with
+   `import_voucher_numbering_not_automatic`, and one that reads Automatic
+   without the sub-method `Auto Retain` (it reads `Auto Renumber`, prints no
+   sub-method, or prints one ComplyEaze Bridge does not recognise) refuses with
+   `import_voucher_numbering_not_retain`. Either names each such voucher type
+   and what was read in `refused_types`; a batch that holds both is refused
+   as `import_voucher_numbering_not_automatic`. `build_import_xml` checks every
+   voucher the same way, and writes a Journal that carries its own voucher
+   number into a voucher type that reads Manual with duplicate numbers
+   prevented as well: Tally keeps the number there and refuses one a Journal
+   already holds. Under Manual with duplicates allowed a Payment carrying a
+   held number was created as a second voucher (protocol reference §9.8), so
+   a numbered Journal is refused there. Under Automatic
+   numbering Tally discards a supplied number and assigns its own, so such a
+   Journal is held to `Auto Retain` like a voucher without a number; it is
+   refused on a voucher type set to "Renumber Vouchers", where Tally was seen
+   to discard the number a Receipt carried and give it the number of its
+   place in date order (protocol reference §9.8). With a
+   type set to "Renumber Vouchers", numbers already in the book were seen to
+   change when a voucher with an earlier date was entered by hand, and again
+   when a voucher with an earlier date was sent by import without a number:
+   the import's answer read CREATED 1, ALTERED 0 and no voucher's AlterID
+   moved; a voucher dated after every other changed nothing (one book,
+   TallyPrime 7.1 Silver, Receipts; a file of two Receipts, a Receipt that
+   carried a number and a Journal imported without a number were measured
+   there too, §9.8). A file of more than two vouchers, a mixed file, a
+   Journal that carries a number or is dated after every other, Payment and
+   Contra, Gold, other releases and the same through ComplyEaze Bridge's own
+   post are not measured. On a release, an edition or a book whose series
+   prints no sub-method, or words it differently, every Automatic voucher type
+   refuses this way; a `masters` read of `voucher_types` shows what a book
+   prints. A voucher
+   type saved during that read refuses it with `masters_bound_premise_violated`
+   (cause `masters_alter_id_above_master_mark`): run the call again. A book in
+   Education mode is refused with `masters_education_unqualified`. Inside the
+   queue, a change to the company's masters from that numbering read to the
+   last read before the post refuses with `post_masters_moved`
    (`post_masters_unconfirmed` if it cannot be checked); re-run the post. This
    sees only changes that move the company's master AlterID (`ALTMSTID`):
-   measured for ledger renames and creates made through the gateway. A regroup,
-   an edit made in Tally's own screens, and whether posting a voucher moves it
-   are not yet measured. A queue catalogue re-read that does not parse as this
+   measured for ledger renames and creates made through the gateway, and each
+   of thirteen saves of a voucher type's screen in Tally moved it by 2 (nine of
+   a type holding no vouchers, and two in each of two runs on a type holding
+   vouchers, all on one synthetic book, TallyPrime 7.1 Silver). A regroup, any
+   other edit made in Tally's own screens, and whether posting a voucher moves
+   it are not yet measured. A queue catalogue re-read that does not parse as this
    company's catalogue refuses with `post_catalogue_unreadable`, whose `cause`
    names why, and nothing is sent; a repeated or unusable ledger name refuses
    again until it is corrected in Tally. A queue re-read of the group collection
@@ -2011,10 +2394,9 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    same-day rows of one amount are not split across batches; they pass this
    check together in one batch. A proposals file is whole days already, since
    `from` and `to` are days. A day with more than 50 rows does not fit one
-   batch, and that case is open: ask the user. Batch posting is off by
-   default, and with it off each post takes one voucher, so same-day twins
-   post together only with batch posting on or through a hand import of the
-   built file. The list and step are
+   batch, and that case is open: ask the user. With posting on, a saved
+   batch of up to 50 posts after one approval, so same-day twins post
+   together in one batch or through a hand import of the built file. The list and step are
    withheld on a very small response budget, and the same refusal inside the
    queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known (a read the endpoint's
@@ -2082,7 +2464,11 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    Choose **Post voucher** (for a batch,
    **Post N vouchers**) on macOS or **Yes** on Windows to permit this attempt. **Cancel** or Escape
    declines on macOS; Return may leave the dialog open. Windows defaults to
-   **No**. Long or directionally ambiguous previews are refused; use the
+   **No**, and its window also takes the keyboard (Windows 10, a full-screen Tally,
+   one screen, each tried once, #1780: on the 0.6.0 release candidate a Down arrow
+   moved its buttons; on the published 0.6.0 a typed **n** declined it and a typed
+   **y** approved it; macOS not measured). When you ask for a post, stop typing in Tally until you have
+   answered the window with the mouse. Long or directionally ambiguous previews are refused; use the
    manual file workflow instead. A desktop session is required.
 4. Bridge refreshes company identity, product/mode, date admission and exact
    masters, checks the batch is absent, then records a durable dispatch intent
@@ -2152,16 +2538,35 @@ window no longer holds as `bound_not_in_window`, never `not_found`; and, for a
 company whose voucher mark reads below the mark the post left, every voucher it
 no longer holds as `book_rolled_back`, never `not_found`, with nothing bound in
 it. Such a book was rolled back (a backup restored, or another copy put in its
-place). The check sees a rollback only while the mark reads below the post's: a
-book keyed past it again after a restore is not seen as rolled back. Tally then
-gives the vouchers keyed again the MasterIDs, GUIDs and numbers the post's
-vouchers held (measured once on a synthetic company, bridge#1050), so a bound
-voucher names another voucher, which reads `posted_divergent`, or a false
-`posted_verified` when its content is the same. In plain words: after a restore, a native
-voucher keyed again with the same content before any check can read verified,
-and no identifier a read returns tells the two apart (measured once on
-TallyPrime 7.1 Silver, with Tally's security off), so
-after restoring a backup over a company, check its posted vouchers in Tally. Bridge still records those rows as posted, so a rebuilt batch holding
+place). Tally gives vouchers keyed again after a restore the MasterIDs, GUIDs and
+numbers the post's vouchers held (measured once on a synthetic company,
+bridge#1050), and no identifier a read returns tells the two apart. So a
+rollback, once seen, is recorded: when a check of a native post reads the
+company's voucher mark below the floor any native post of the company had
+proved (a mark Tally omits twice reads as a company holding no voucher), the
+import journal keeps a record of it whenever it covers a post no earlier record
+covers, so a second restore is recorded too (`post_span_binding.rollback_recorded`,
+with `other_batches_covered`: how many of the company's other native posts it
+covers, and the first ten, to verify again). A record that cannot be written
+fails the check, to be run again.
+From then on no native post of the same company (name, GUID, company number
+and books-from date) at the same Tally address reads `posted_verified` if it
+was sent before that check read the journal and the vouchers it had proved by
+then (its binding, else Tally's answer, else its mark before the post) put it
+above the mark read:
+`post_span_binding` is then `book_rolled_back` with `mark_read` and `seen_by`
+(the batch whose check saw it), its vouchers read as matching content, not as
+its own, and the plain line says to check them in Tally. The check still sees a
+rollback only while the mark reads below some post's: a book restored and then
+keyed or edited past the mark before any check is not seen, and a native voucher
+keyed again with the same content can then read verified (measured once on
+TallyPrime 7.1 Silver, with Tally's security off), so after restoring a backup
+over a company, check its posted vouchers in Tally. A record is kept for good: a
+wrong backup restored and then the right one leaves the posts it covers reading
+rolled back, and a covered Sales invoice batch stops that company's invoices
+until it is released; a repair or rewrite of the company's data that lowered the
+voucher mark (not measured) would be recorded the same way. An older build refuses a journal holding the record: do not
+downgrade after posting. Bridge still records those rows as posted, so a rebuilt batch holding
 them is refused as `import_txn_already_posted`; re-entering them in that book is
 the person's decision. The result's `post_span_binding` names the binding's
 `state`: `bound`, `refused` with its `code`, `unsettled` with its `code` (for
@@ -2237,8 +2642,8 @@ but not whether this post created it); and whether a write from another Gold
 user's process can share or skip the mark Bridge reads is unmeasured. Open
 follow-ups: the hand-import file still carries the tag (bridge#1037); re-posting
 the rows of a rolled-back batch needs the person's approval (bridge#1038);
-closing a batch whose binding was refused (bridge#1039); and detecting a restore
-keyed past the post's mark (bridge#1050).
+closing a batch whose binding was refused (bridge#1039); and seeing a restore
+keyed past the post's mark before any check (bridge#1050).
 
 Posting binds the saved batch to its loopback endpoint and full company tuple.
 Legacy batches without that endpoint binding remain readable/verifiable but
@@ -2275,6 +2680,54 @@ This is a bounded first posting slice, not blanket host/licence qualification.
 A ledger mapper is unnecessary for exact existing names: `validate_masters`
 returns exact matches and bounded near matches. Resolve ambiguity with the
 user rather than silently creating or choosing a ledger.
+
+### A bank line is posted at most once
+
+ComplyEaze Bridge sends each bank-statement line to a company at most once from
+this computer. Once a line has been sent, Bridge will not send it again as a new
+voucher, even if the post failed, the reply was lost, or the voucher was later
+changed or deleted in Tally. If Tally does not hold it, enter it in Tally
+yourself; do not edit the statement to get it past Bridge. After each post
+Bridge reads the books back and marks a voucher verified only when it finds
+exactly the voucher its own post created. A correction built with
+`amends_batch_id` is a file the person imports by hand, meant to alter the
+vouchers in place and add none (measured over Tally's gateway, not yet through
+its Import menu); Bridge refuses to build one for a batch it posted itself.
+
+What carries the rule, by its code: the journal row check refuses a row another
+batch of the company was sent with, by its transaction id (for a row with any
+other id, also its date and amounts), whether or not that batch ended well
+(`import_txn_already_posted`, #876, #898); the read-back before
+the post names a voucher already in the book with the same date, type, ledgers
+and amounts and refuses (`import_preexisting_identity`, #901, #908); a native
+post is verified by binding its vouchers to their own exact AlterID span, with
+their GUID and MasterID recorded in the journal (#864, #1054). A post whose
+binding was refused, or whose reply was lost, is closed only by the person
+checking the vouchers in Tally (a way to close it inside Bridge is #1039). This
+was read from the code, and the cases below were not measured on a live Tally
+unless a number links to the measurement.
+
+What the rule does not cover:
+
+1. The memory of what was sent is on this computer. Posting the same company's
+   statement from a second computer, or after reinstalling Bridge or deleting
+   its data folder, is checked only against what Tally holds, and a voucher
+   changed since is not recognised.
+2. Two downloads of the same statement from different places (for example net
+   banking and a branch printout) may read a narration differently and so not be
+   recognised as the same lines; a posted voucher changed in Tally since is then
+   not recognised.
+3. Entries typed by hand are recognised only if date, voucher type, ledgers and
+   amounts all match.
+4. Never import Bridge's saved file into Tally by hand after posting it from
+   Bridge. The saved file carries a different REMOTEID from the post's, so a
+   second voucher is expected (not measured), and Bridge would only report it at
+   the next `verify_import`.
+5. If a reply is lost, or someone works in Tally while Bridge posts, the batch
+   may never read verified; Bridge shows any voucher it finds with the same
+   content, or reports the line as sent but not found, and the person checks
+   them in Tally.
+6. After restoring a backup, check the posted vouchers in Tally.
 
 ## Review and post from the ComplyEaze Bridge app
 
@@ -2385,10 +2838,6 @@ start of the company's books, and `opening_balance_as_of` names that date (the
 admitted `BOOKSFROM` the request pins). On a book holding several years it is
 not the current year's opening: for a period's opening, use `trial_balance` or
 `ledger_movement` with that period's `from`.
-
-The unavailable `changed_since` implementation must not be used as
-change-enumeration evidence; its retained internal response states that
-deletion detection is unsupported.
 
 ### What each tool's evidence covers
 
@@ -2508,9 +2957,18 @@ Per tool:
 - `voucher_presence` (`src-tauri/src/agent_presence.rs`):
   1. the company read;
   2. the ledger catalogue;
-  3. the window read;
-  4. the corroboration (if empty);
-  5. the ledger catalogue again.
+  3. only when a voucher type is declared `manual` (20 requests): the company's master mark (6),
+     then the voucher-type numbering (14: the mode probe and identity, the masters pair, the
+     numbering pair, identity and mode again); the call is refused here, before any window
+     request, when a declared-manual type is not Manual with exactly one series that prevents duplicate
+     numbers in the book, the
+     book holds no type of that exact name, or its numbering cannot be read (Education mode keeps
+     the read's own code, `masters_education_unqualified`). The check reads the numbering as it
+     is now, holds for the moment of the read, and does not know how existing vouchers were
+     numbered when they were entered;
+  4. the window read;
+  5. the corroboration (if empty);
+  6. the ledger catalogue again.
 
   Its `catalogue_evidence_sha256` hashes parsed names, not a request.
 - `ledger_movement` (`src-tauri/src/agent_movement.rs`):
@@ -2586,8 +3044,6 @@ Per tool:
   request: its request digest hashes
   `verify_import_page:<batch_id>:<offset>` and its response digest hashes
   the saved proof.
-- `changed_since` is refused before any request, so it carries only the
-  refusal's local evidence.
 - `egress_log`, `local_data_report`, `parse_bank_statement`, `read_evidence`
   and `voucher_schema` read nothing from Tally. Their request digest hashes the tool's name, and
   their response digest hashes what they return (for `voucher_schema`, the
@@ -2622,16 +3078,40 @@ until it has words) and, for a difference, how many lines did not tie (a Tally l
 amount that nothing derived was compared with, a derived line Tally has no counterpart for, and for a
 profit and loss the Cost of Sales heading when it is off the derived cost of sales), says when the
 derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
-`profit_and_loss` and `balance_sheet` carry one; the other read tools and the refusals follow.
+`profit_and_loss` and `balance_sheet` carry one, and `post_import` and `verify_import` carry one of
+another shape (below); the other read tools and the refusals follow.
+
+`post_import` (after a send was read back) and every page of `verify_import` carry a headline that
+says how the batch ended, counted voucher by voucher from the verification's own rows, never from
+tool arguments and never stored in the proof (a later page recomputes the same one from the saved
+proof). The lead says whether the batch is confirmed: for a batch of one voucher it is a sentence about
+that voucher, and for a batch of several vouchers it gives their number and, when some are not
+confirmed, how many read back (`posted_verified`) and how many are not. The counts are always in `batch`, which holds `vouchers`, `confirmed`, `not_confirmed` (one count for each other row status,
+and `unrecognised` for any status this build does not know) and `verdict` (`posted_verified` only when
+every voucher is confirmed and the readback as a whole is). When every voucher reads back but the
+batch as a whole is not confirmed (a duplicate, a doubt about the ledgers or the voucher mark, or an
+answer from Tally that was not clean or is missing), the lead says so and does not call the batch
+confirmed. When only some vouchers read back, the counts hold the rows only and cannot tell a doubt
+about the whole batch from a doubt about one row, so the lead says that the vouchers read back and that
+the batch is not confirmed, and never calls those vouchers confirmed. When some vouchers are not
+confirmed, the lead says that each row says what was found and
+gives a next step where there is one: only four statuses (`bound_not_in_window`, `book_rolled_back`,
+`sent_not_attributed`, `tally_reported_not_created`) carry a `next_step`. Only a batch ComplyEaze Bridge dispatched natively
+(`result.dispatch.state` present and not `not_dispatched`) carries one: a built batch not yet posted, a
+file imported by hand and a refusal before anything was sent carry none, because the batch can still be
+posted.
 
 ## Protocol and migration notes
 
 The server negotiates MCP `2025-06-18` or `2024-11-05`, returning a supported
 version when a client proposes a newer one. Initialization must precede tool
-requests. Incoming frames are limited to 5 MB. All responses obey the configured
-byte cap, including control replies, the JSON-RPC wrapper, and newline. A tool
-catalogue that cannot fit returns `agent_response_too_large`; the session remains
-usable. Text content contains the same
+requests. Incoming frames are limited to 5 MB. Every tool answer obeys the configured
+byte cap, including the JSON-RPC wrapper and newline. Control replies (to `initialize`,
+`ping` and `tools/list`, and the refusal of an unknown method) are fixed by the build and
+the request id and carry no book data, so they are held instead to a ceiling of
+1,000,000 bytes, or the configured cap if that is larger: the tool list is sent whole
+whatever the cap. A control reply that cannot fit returns `agent_response_too_large`;
+the session remains usable. Text content contains the same
 serialized, redacted JSON as `structuredContent` for older clients. The `initialize` result also
 carries `instructions`, a short text for the client to show its model: start with `list_companies`,
 use the one open company only when the user named no client (or exactly one open company matches the
@@ -2669,8 +3149,7 @@ scoped access refuses them before any company report is read.
 Port zero and ports above 65535 are rejected at startup.
 Unknown arguments, wrong selector types, and invalid enums are rejected before
 any Tally request, and so is a missing required argument (`<name>_required`, for
-example `company_guid_required`). Checkpoint numeric strings are no longer accepted at the tool
-boundary. `changed_since` is unavailable; existing clients must stop calling it.
+example `company_guid_required`).
 
 `validate_masters` accepts 1–100 nonblank names, each at most 1024 characters.
 Near-miss suggestions are limited to 25 names and 8192 UTF-8 bytes per requested
@@ -2807,8 +3286,10 @@ vouchers in the window, not the party's. A named bill's window never starts befo
 The vouchers and the bills reports are two reads whose extents are not compared: a voucher posted
 between them usually shows as `trail_does_not_tie`, but two changes that compensate, or
 allocations that net to zero, can still read `tied`. Measured on one synthetic book only
-(reference 12a.14); an `as_of` earlier than the last voucher and post-dated vouchers were not
-measured.
+(reference 12a.14); a second synthetic book (captures of 9 October 2026) also showed an `as_of`
+earlier than the last voucher, a post-dated voucher and an advance later adjusted by an invoice
+reading as Tally's own screen does, bill for bill. Not measured: a client book, an opening bill with
+a credit sign, more than one opening bill.
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own
 Bills Receivable and Bills Payable reports scope them, not the type of party, and
@@ -2825,7 +3306,8 @@ of an `unallocated` amount is the sign of the party's net unallocated balance, s
 an on-account receipt and an on-account payment on one party net into one figure.
 For one party, `detail: unadjusted` separates advances, pending credit and debit notes and
 on-account amounts by their voucher's bill type (below). The book-wide `open_bills.kind` and
-`unallocated` figures do not; what is still to be measured is in #1356, the follow-up to #945.
+`unallocated` figures do not. What is still to be measured (a party term against an unfiltered
+control, a per-ledger report, the cost on a large book) is in #1356, the follow-up to #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted

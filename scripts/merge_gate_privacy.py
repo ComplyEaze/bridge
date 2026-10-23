@@ -4,8 +4,9 @@
 The program accepts raw, already-complete gate input on stdin and writes only a
 small JSON decision record.  It deliberately reports counts and categories,
 never matched values.  UUIDs are recognized before generic hexadecimal digest
-masking: a nil UUID is an explicit sentinel, while every other UUID needs
-exact, current-head fixture provenance.
+masking: a nil UUID is an explicit sentinel, while every other UUID must be
+listed in the synthetic-UUID registry that scripts/merge-gate.sh reads from
+master.
 """
 from __future__ import print_function
 
@@ -25,6 +26,7 @@ UUID_OR_DIGEST_RE = re.compile(
     r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{12}|[0-9A-Fa-f]{32,}"
 )
+ASCII_ALNUM = frozenset("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 PLACEHOLDER_RE = re.compile(r"^(X+|Z+)\d+(X|Z)?$|^\d{2}(X+|Z+)\d+[0-9A-Z]*$", re.I)
 # Boundaries include ordinary words plus snake/kebab field names and the first
 # capital of camelCase.  A UUID cannot evade the credential rule by changing
@@ -101,6 +103,43 @@ GROUPED_NUMBER_RE = re.compile(r"(^|[^\w])\d{4}[ ._-]\d{4}[ ._-]\d{4}(?:[ ._-]\d
 DATE_RANGE_RE = re.compile(r"^(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])-20\d{2}\s+(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])-20\d{2}$")
 
 
+# Text in a UTF-16 encoding puts a NUL beside every ASCII character, which hides its
+# digits and letters from every pattern in this file. Two or more ASCII characters
+# each paired with a NUL on the same side are read as the text they stand for; one
+# stray NUL is not. This reads ASCII only: a value next to characters outside ASCII
+# in a UTF-16 text with no byte order mark is not reached.
+UTF16_RUN_RE = re.compile(r"(?:[\x01-\x7f]\x00){2,}|(?:\x00[\x01-\x7f]){2,}")
+UTF16_BOMS = (b"\xff\xfe", b"\xfe\xff")
+
+
+def decode_utf16_runs(text):
+    """Return ``text`` with the NULs of each NUL-spaced run of ASCII removed, and how many runs there were."""
+    runs = 0
+
+    def decode(match):
+        nonlocal runs
+        runs += 1
+        return match.group(0).replace("\x00", "")
+
+    return UTF16_RUN_RE.sub(decode, text), runs
+
+
+def read_scan_input():
+    """Read the scan input as text.
+
+    Input that starts with a UTF-16 byte order mark is scanned twice over, as UTF-16
+    and as UTF-8, one after the other: the mark does not prove the rest is one
+    encoding, so reading it as UTF-16 must never hide what the UTF-8 reading shows.
+    Anything else must be UTF-8, and so must the rest of a marked input that is not
+    whole UTF-16 code units: bytes that are not raise ``UnicodeError``, which ``main``
+    reports as indeterminate, whatever the locale of the process.
+    """
+    raw = sys.stdin.buffer.read()
+    if raw[:2] in UTF16_BOMS:
+        return raw.decode("utf-16") + "\n" + raw.decode("utf-8", "surrogateescape")
+    return raw.decode("utf-8")
+
+
 def result_record():
     return {"blockers": [], "indeterminate": [], "notes": []}
 
@@ -114,9 +153,9 @@ def load_fixture_provenance(path, head, record):
 
     The manifest is deliberately narrow: a list of objects with only an exact
     UUID, the current full head, and ``source: fixture`` qualifies.  The gate
-    currently supplies an empty manifest; this interface exists so a later,
-    server-bound fixture inventory can authorize values without any text or
-    path-name heuristic.
+    builds it from the synthetic-UUID registry on master (no registry, or an
+    invalid one, means no manifest), so values are authorized without any text
+    or path-name heuristic.
     """
     if not path:
         return set()
@@ -170,7 +209,7 @@ def tokenize_uuids(text, allowed, record):
     if credential:
         add(record, "blockers", "privacy scan found %d non-nil UUID shape(s) in credential, session, token, or bearer context" % credential)
     if unknown:
-        add(record, "indeterminate", "privacy scan found %d non-nil UUID shape(s) without exact current-head fixture provenance" % unknown)
+        add(record, "indeterminate", "privacy scan found %d non-nil UUID shape(s) not listed in the synthetic-UUID registry" % unknown)
     return "".join(retained)
 
 
@@ -337,13 +376,52 @@ def redact_public_agent_attribution_messages(messages):
     return [redact_public_agent_attribution_trailer(message) for message in messages]
 
 
+# One digit repeated, and nothing else: the narrow family a test uses for a made-up reference (#1743).
+REPEATED_DIGIT_RE = re.compile(r"(\d)\1+")
+
+
+def enclosing_token(text, start, end):
+    """The run of ASCII letters and digits that contains text[start:end]."""
+    left = start
+    while left > 0 and text[left - 1] in ASCII_ALNUM:
+        left -= 1
+    right = end
+    while right < len(text) and text[right] in ASCII_ALNUM:
+        right += 1
+    return text[left:right]
+
+
+# A visibly synthetic token around a run of digits: three or four X or Z, then digits only, at most 24 of
+# them (#1743). Nothing may follow the digits, so an identifier glued after a prefix does not pass.
+SYNTHETIC_PREFIX_TOKEN_RE = re.compile(r"(?:X{3,4}|Z{3,4})\d{1,24}", re.I)
+DIGITS_ONLY_RE = re.compile(r"[0-9]+")
+
+
+def synthetic_token(token):
+    """Whether a whole token of digits is visibly synthetic: a 3-4 letter X/Z prefix and digits only, or one
+    digit repeated.
+
+    The token is judged whole, so a run beside a placeholder (a space or a hyphen between), a repeated run
+    inside a longer token that is not itself repeated, and an identifier glued after a prefix (two digits
+    and an X before a mobile-shaped run) still count.
+    """
+    return bool(SYNTHETIC_PREFIX_TOKEN_RE.fullmatch(token) or REPEATED_DIGIT_RE.fullmatch(token))
+
+
 def nonplaceholder_count(pattern, text):
     count = 0
     for match in pattern.finditer(text):
         value = match.group(0).upper()
         compact = value.replace(" ", "").replace("-", "")
-        if not PLACEHOLDER_RE.fullmatch(compact):
-            count += 1
+        if PLACEHOLDER_RE.fullmatch(compact):
+            continue
+        # The whole-token rule applies to a run of digits only. A match that holds letters (a PAN or GSTIN
+        # shape) keeps the earlier rule: it is exempt only when the match itself is a placeholder.
+        if DIGITS_ONLY_RE.fullmatch(value) and synthetic_token(
+            enclosing_token(text, match.start(), match.end())
+        ):
+            continue
+        count += 1
     return count
 
 
@@ -388,6 +466,12 @@ def redact_shapes(text):
 
 def scan(text, head, fixture_provenance=None):
     record = result_record()
+    decoded, utf16_runs = decode_utf16_runs(text)
+    if utf16_runs:
+        add(record, "notes", "%d UTF-16 text segment(s) were decoded before the scan" % utf16_runs)
+        # Both readings are scanned: decoding can join a run to the characters beside it and remove
+        # the boundary a pattern needs, so the original text must be read as well as the decoded one.
+        text = decoded + "\n" + text
     allowed = load_fixture_provenance(fixture_provenance, head, record)
 
     home_count = len(HOME_RE.findall(text))
@@ -523,7 +607,7 @@ def main(argv=None):
             parser.error(str(error))
         return 0
     try:
-        text = sys.stdin.read()
+        text = read_scan_input()
     except UnicodeError:
         print(json.dumps({"blockers": [], "indeterminate": ["could not read privacy scan input"], "notes": []}))
         return 0

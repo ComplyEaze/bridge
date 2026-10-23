@@ -66,6 +66,95 @@ pub(crate) struct ApprovedImport {
     /// The all-company change marks, read last before the POST to confirm the
     /// aim and again right after it to see where the voucher went (#574).
     company_marks_request: AgentReadRequest,
+    /// The reads an invoice's admission makes, for the queue to make again
+    /// under its lock (#1337). `None` for every other voucher type. Boxed so
+    /// that an approval an enum carries stays the size it was.
+    invoice: Option<Box<InvoiceReadPlan>>,
+}
+
+/// The reads one Sales invoice's admission makes of its masters, fixed from the
+/// saved invoice when the plan is made (#1337). The queue sends exactly these
+/// inside the identity brackets of the POST and hands the answers back; what
+/// they mean is the admission's own judgement, run on them there, so the rule
+/// has one copy and a master added to the admission reaches the queue with it.
+#[derive(Clone, Debug)]
+pub(crate) struct InvoiceReadPlan {
+    /// The company the reads are about, as the admission names it.
+    pub(crate) company_name: String,
+    /// The date the compliance listing is read as of.
+    pub(crate) listing_as_of: TallyDate,
+    /// What the queue may do with the marks and currencies it has read before
+    /// it sends any of the reads below. The admission provides it, so the size
+    /// limits and the currency are judged by the rule the build judges them by,
+    /// ahead of the reads they spare.
+    pub(crate) precheck: InvoicePrechecker,
+    /// The company's own ledger count: sent only when the precheck asks for it,
+    /// for a book over the master mark.
+    pub(crate) ledger_count: AgentReadRequest,
+    pub(crate) rates: AgentReadRequest,
+    pub(crate) voucher_types: AgentReadRequest,
+    pub(crate) number: AgentReadRequest,
+    /// The same read for the invoice the journal held as the number's control.
+    pub(crate) number_control: Option<AgentReadRequest>,
+    pub(crate) registration: AgentReadRequest,
+    /// The company object the HSN/SAC check reads once the classification
+    /// admits, and the groups with their HSN/SAC rows. The build sends the
+    /// groups only when a sales ledger's own row defers to them; the queue
+    /// sends them whenever it sends the invoice's reads, and the judge parses
+    /// an answer that is present whether or not it is needed, so a groups
+    /// answer that cannot be read fails the post in the queue only.
+    pub(crate) company_hsn: AgentReadRequest,
+    pub(crate) group_hsn: AgentReadRequest,
+}
+
+/// What the queue has read when it asks whether an invoice's reads may go on.
+pub(crate) struct InvoicePrecheckInput<'a> {
+    /// The all-company marks, as the binding reads began.
+    pub(crate) marks: &'a str,
+    /// The company's Currency masters, as the queue read them.
+    pub(crate) currencies: &'a str,
+    /// The company's ledger count, once the precheck has asked for it.
+    pub(crate) ledger_count: Option<&'a str>,
+    pub(crate) company_name: &'a str,
+    pub(crate) company_guid: &'a str,
+}
+
+/// The precheck's answer when it refuses nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InvoicePrecheck {
+    /// The limits and the currency admit the book: send the rest of the plan.
+    Admitted,
+    /// The master mark is over the size gate's mark: the ledger count decides.
+    NeedsLedgerCount,
+}
+
+/// A function of the invoice module that the queue runs before the plan's
+/// reads, so that this layer does not call that one.
+pub(crate) type InvoicePrechecker =
+    fn(&InvoicePrecheckInput<'_>) -> Result<InvoicePrecheck, ApprovedImportAdmissionError>;
+
+/// What the queue read for an [`InvoiceReadPlan`], or what the build has read
+/// of one so far: each answer is `None` until it is read. The admission's judge
+/// names the first answer it still needs.
+#[derive(Debug, Default)]
+pub(crate) struct InvoiceAnswers {
+    /// The all-company marks, as the binding reads began.
+    pub(crate) marks: Option<String>,
+    pub(crate) ledger_count: Option<String>,
+    pub(crate) listing: Option<super::runtime::PartyLedgerMasterListing>,
+    pub(crate) rates: Option<String>,
+    pub(crate) voucher_types: Option<String>,
+    pub(crate) number: Option<String>,
+    pub(crate) number_control: Option<String>,
+    pub(crate) registration: Option<String>,
+    pub(crate) company_hsn: Option<String>,
+    pub(crate) group_hsn: Option<String>,
+}
+
+/// An invoice's plan and the answers the queue read for it.
+pub(crate) struct QueuedInvoice<'a> {
+    pub(crate) plan: &'a InvoiceReadPlan,
+    pub(crate) answers: &'a InvoiceAnswers,
 }
 
 /// What the queue read for the last admission before the POST.
@@ -79,6 +168,8 @@ pub(crate) struct QueuedAdmission<'a> {
     pub(crate) company_marks_at_binding: &'a str,
     pub(crate) company_marks: &'a str,
     pub(crate) ledger_binding: &'a StandardLedgerCatalogBinding,
+    /// An invoice's masters, read again for the admission's judge (#1337).
+    pub(crate) invoice: Option<QueuedInvoice<'a>>,
 }
 
 /// Whether the profile accepts every voucher's date, and there is at least
@@ -115,7 +206,20 @@ impl ApprovedImport {
             group_collection_request,
             currency_request,
             company_marks_request,
+            invoice: None,
         })
+    }
+
+    /// The same approval, to be redeemed with an invoice's masters read again
+    /// in the queue. A plain field of the approval and no part of what the
+    /// person was shown: the queue's judge holds the plan to the invoice.
+    pub(crate) fn with_invoice(mut self, invoice: Option<InvoiceReadPlan>) -> Self {
+        self.invoice = invoice.map(Box::new);
+        self
+    }
+
+    pub(super) fn invoice_plan(&self) -> Option<&InvoiceReadPlan> {
+        self.invoice.as_deref()
     }
 
     pub(super) fn xml(&self) -> &str {
@@ -183,6 +287,7 @@ impl ApprovedImport {
             group_collection_request: None,
             currency_request,
             company_marks_request,
+            invoice: None,
         }
     }
 }
@@ -347,8 +452,12 @@ impl ApprovedImport {
 pub(crate) struct ReviewAcknowledged(());
 
 impl ReviewAcknowledged {
-    pub(crate) async fn confirm(count: VoucherCount, preview: &str) -> Result<Self, String> {
-        approve_review(count, preview).await?;
+    pub(crate) async fn confirm(
+        kind: ReviewKind,
+        count: VoucherCount,
+        preview: &str,
+    ) -> Result<Self, String> {
+        approve_review(kind, count, preview).await?;
         Ok(Self(()))
     }
 }
@@ -422,7 +531,10 @@ pub(crate) enum ApprovedImportAdmissionError {
     BaseCurrencyUndetermined,
     /// The target's master mark (ALTMSTID) moved between the snapshot taken as
     /// the queue's binding reads began and the aim snapshot read last before
-    /// the POST: a master changed after the catalogue re-read (bridge#239).
+    /// the POST: a master changed after the catalogue re-read (bridge#239). Or
+    /// it moved between the mark the voucher numbering was read under, before
+    /// the approval, and that first snapshot (bridge#724): a master, perhaps a
+    /// voucher type, changed since the numbering was read.
     #[error("post_masters_moved")]
     MastersMoved,
     /// That comparison could not be made: the first snapshot could not be
@@ -435,6 +547,21 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// data-free cause the refusal carries.
     #[error("post_catalogue_unreadable")]
     CatalogueUnreadable(#[source] bridge_tally_protocol::StandardLedgerCatalogError),
+    /// What the queue read of an invoice's masters differs from what the build
+    /// recorded (#1337). `field` names the first that differs.
+    #[error("import_invoice_masters_changed")]
+    InvoiceMastersChanged { field: &'static str },
+    /// The admission's judge refused the invoice on the queue's reads, under
+    /// the code the build would have refused it with: a number now in use, a
+    /// series set back to Automatic, a registration lapsed (#1337).
+    #[error("{code}")]
+    InvoiceRefused { code: String },
+    /// A read of an invoice's masters that could not be used (a response that
+    /// does not parse, a request that is not admitted), under the code that
+    /// names it. Not a master that moved, and not the admission refusing the
+    /// invoice (#1337).
+    #[error("{code}")]
+    InvoiceReadUnusable { code: String },
 }
 
 /// The data-free code a group snapshot refusal carries as its `cause`, for
@@ -489,6 +616,11 @@ pub(crate) enum UnderLockRefusal {
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
+    /// Another invoice of this company was sent and is not verified posted, as
+    /// an approval dialog stood open (ADR 0004, slice 4): nothing was recorded
+    /// or sent.
+    #[error("invoice_company_stopped")]
+    CompanyStopped,
 }
 
 impl UnderLockRefusal {
@@ -501,6 +633,7 @@ impl UnderLockRefusal {
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
+            Self::CompanyStopped => "invoice_company_stopped",
         }
     }
 }
@@ -577,6 +710,7 @@ pub(crate) mod test_seam {
         /// as `previews` and `reviews` (#746).
         counts: Arc<Mutex<Vec<usize>>>,
         review_counts: Arc<Mutex<Vec<usize>>>,
+        review_kinds: Arc<Mutex<Vec<super::ReviewKind>>>,
         /// Run while the approval is pending, as something else changing the
         /// book or the journal while an operator reads the dialog would.
         while_pending: Option<Arc<dyn Fn() + Send + Sync>>,
@@ -653,6 +787,7 @@ pub(crate) mod test_seam {
                 reviews: Arc::default(),
                 counts: Arc::default(),
                 review_counts: Arc::default(),
+                review_kinds: Arc::default(),
                 while_pending: None,
                 held: None,
                 opened: Arc::default(),
@@ -673,6 +808,11 @@ pub(crate) mod test_seam {
 
         pub(crate) fn review_counts(&self) -> Vec<usize> {
             self.review_counts.lock().unwrap().clone()
+        }
+
+        /// Which use of the review dialog each review was asked for.
+        pub(crate) fn review_kinds(&self) -> Vec<super::ReviewKind> {
+            self.review_kinds.lock().unwrap().clone()
         }
     }
 
@@ -746,6 +886,7 @@ pub(crate) mod test_seam {
     /// The test-build review dialog, scripted by the same decision and
     /// declining the same way when unscoped.
     pub(super) async fn approve_review(
+        kind: super::ReviewKind,
         count: super::VoucherCount,
         preview: &str,
     ) -> Result<(), String> {
@@ -753,6 +894,7 @@ pub(crate) mod test_seam {
             .try_with(|scripted| {
                 scripted.reviews.lock().unwrap().push(preview.to_string());
                 scripted.review_counts.lock().unwrap().push(count.0.get());
+                scripted.review_kinds.lock().unwrap().push(kind);
                 if let Some(while_pending) = &scripted.while_pending {
                     while_pending();
                 }
@@ -784,7 +926,7 @@ pub(crate) mod test_seam {
     async fn the_real_review_refuses_an_oversized_preview_before_starting_a_process() {
         let oversized = "x".repeat(super::MAX_PREVIEW_BYTES + 1);
         assert_eq!(
-            super::confirm_review(ONE, &oversized).await,
+            super::confirm_review(super::ReviewKind::Review, ONE, &oversized).await,
             Err("ack_review_too_large".to_string())
         );
     }
@@ -1112,6 +1254,28 @@ pub(crate) mod test_seam {
             super::review_title(count(50)),
             "ComplyEaze Bridge — record that you reviewed 50 vouchers"
         );
+        // What each window's answer text says, in its own buttons' words (#1780).
+        assert_eq!(
+            super::answer_text(super::Shown::Post, ONE),
+            "Click \"Post voucher\" to post this voucher into Tally. Click Cancel to cancel. \
+             Nothing is posted until you answer."
+        );
+        assert_eq!(
+            super::answer_text(super::Shown::Post, count(200)),
+            "Click \"Post 200 vouchers\" to post these 200 vouchers into Tally. Click Cancel to \
+             cancel. Nothing is posted until you answer."
+        );
+        assert_eq!(
+            super::answer_text(super::Shown::Review, count(50)),
+            "Click \"I reviewed it\" to record that you reviewed these 50 vouchers. Click Cancel \
+             to cancel. Nothing is recorded until you answer."
+        );
+        assert_eq!(
+            super::answer_text(super::Shown::StopRelease, ONE),
+            "Click \"I reviewed it\" to release the invoice stop for this company, so that \
+             ComplyEaze Bridge builds and posts invoices for it again. Click Cancel to cancel. \
+             Nothing is released until you answer."
+        );
     }
 
     /// The same for the Windows titles, which carry the question.
@@ -1134,6 +1298,119 @@ pub(crate) mod test_seam {
             super::review_question(count(50)),
             "ComplyEaze Bridge — record that you reviewed these 50 vouchers?"
         );
+        // What each window's answer text says: Y and N answer a message box
+        // that has the keyboard (#1780).
+        assert_eq!(
+            super::answer_text(super::Shown::Post, ONE),
+            "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to \
+             cancel. Nothing is posted until you answer."
+        );
+        assert_eq!(
+            super::answer_text(super::Shown::Post, count(200)),
+            "Press Y (or click Yes) to post these 200 vouchers into Tally. Press N (or click No) \
+             to cancel. Nothing is posted until you answer."
+        );
+        assert_eq!(
+            super::answer_text(super::Shown::Review, count(50)),
+            "Press Y (or click Yes) to record that you reviewed these 50 vouchers. Press N (or \
+             click No) to cancel. Nothing is recorded until you answer."
+        );
+        assert_eq!(
+            super::answer_text(super::Shown::StopRelease, ONE),
+            "Press Y (or click Yes) to release the invoice stop for this company, so that \
+             ComplyEaze Bridge builds and posts invoices for it again. Press N (or click No) to \
+             cancel. Nothing is released until you answer."
+        );
+    }
+
+    /// The answer text is wrapped under the dialog's line width without losing
+    /// a word, and adds no more than three lines and 150 characters above a
+    /// post or review text, the size the dialog's caps were raised by (#1780).
+    /// A wording that outgrows it fails here, so the box does not grow unseen.
+    #[test]
+    fn the_answer_text_is_wrapped_and_stays_within_the_size_the_caps_allow() {
+        for shown in [
+            super::Shown::Post,
+            super::Shown::Review,
+            super::Shown::StopRelease,
+        ] {
+            for n in [1, 2, 9, 10, 50] {
+                let text = super::answer_text(shown, count(n));
+                let wrapped = super::wrapped(&text);
+                assert_eq!(wrapped.replace('\n', " "), text, "{shown:?} {n}");
+                assert!(
+                    wrapped.lines().all(|line| line.chars().count() <= 100),
+                    "{wrapped}"
+                );
+            }
+        }
+        let (lines, chars) = super::answer_reserve();
+        assert!(
+            lines <= 3 && chars <= 150,
+            "{lines} lines, {chars} characters"
+        );
+    }
+
+    /// A preview at exactly the dialog's cap is shown whole with its answer
+    /// text above it, and is refused by one line more; the stop release, which
+    /// keeps its statement first, is not measured (#1780).
+    #[test]
+    fn a_preview_at_the_cap_is_shown_whole_with_its_answer_text() {
+        // `lines` lines of at most 100 characters that make `chars` characters.
+        let preview = |lines: usize, chars: usize| -> String {
+            let text = chars - (lines - 1);
+            (0..lines)
+                .map(|at| "x".repeat(text / lines + usize::from(at < text % lines)))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        for shown in [super::Shown::Post, super::Shown::Review] {
+            for (n, lines, chars) in [(1, 24, 1_600), (2, 40, 3_200), (50, 40, 3_200)] {
+                let at_cap = preview(lines, chars);
+                assert_eq!(
+                    (at_cap.lines().count(), at_cap.chars().count()),
+                    (lines, chars)
+                );
+                let shown_text = super::displayed_text(shown, count(n), &at_cap);
+                assert!(super::fits_the_box(shown, count(n), &shown_text), "{n}");
+                assert!(
+                    shown_text.starts_with(&super::wrapped(&super::answer_text(shown, count(n))))
+                );
+                assert!(shown_text.ends_with(&at_cap));
+                // One line more, or characters past what the box has room for.
+                let over = super::displayed_text(shown, count(n), &preview(lines + 1, chars));
+                assert!(!super::fits_the_box(shown, count(n), &over), "{n}");
+                let wide =
+                    super::displayed_text(shown, count(n), &format!("{at_cap}{}", "x".repeat(200)));
+                assert!(!super::fits_the_box(shown, count(n), &wide), "{n}");
+            }
+        }
+    }
+
+    /// Each use of the review dialog writes its own first lines, and a stop
+    /// release keeps its statement first (#1780).
+    #[test]
+    fn each_dialog_kind_writes_its_own_first_lines() {
+        let preview = "THIS RELEASES THE INVOICE STOP FOR THE COMPANY.\n\nCompany: Synthetic Co";
+        let post = super::displayed_text(super::Shown::Post, ONE, "Details");
+        let review = super::displayed_text(super::Shown::Review, ONE, "Details");
+        let release = super::displayed_text(super::Shown::StopRelease, ONE, preview);
+        let wrapped = |shown| super::wrapped(&super::answer_text(shown, ONE));
+        assert_eq!(post, format!("{}\n\nDetails", wrapped(super::Shown::Post)));
+        assert_eq!(
+            review,
+            format!("{}\n\nDetails", wrapped(super::Shown::Review))
+        );
+        assert_eq!(
+            release,
+            format!(
+                "THIS RELEASES THE INVOICE STOP FOR THE COMPANY.\n\n{}\n\nCompany: Synthetic Co",
+                wrapped(super::Shown::StopRelease)
+            )
+        );
+        assert_ne!(post, review);
+        assert!(!release.contains("record that you reviewed"));
+        assert!(!post.contains("release the invoice stop"));
     }
 
     /// The dialog subprocesses show a dialog only for input of the shape the
@@ -1174,6 +1451,172 @@ pub(crate) mod test_seam {
     }
 }
 
+/// Which dialog a text is shown in (#1780). Each says in its first lines what
+/// its answers do, in the words of its own buttons, and the parent writes them,
+/// so the caps that keep a native box reviewable measure what the box shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Shown {
+    Post,
+    Review,
+    StopRelease,
+}
+
+/// The two uses of the review dialog. [`ReviewAcknowledged::confirm`] takes
+/// one, so the invoice-stop release cannot be shown with the review's words.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReviewKind {
+    Review,
+    StopRelease,
+}
+
+impl ReviewKind {
+    fn shown(self) -> Shown {
+        match self {
+            Self::Review => Shown::Review,
+            Self::StopRelease => Shown::StopRelease,
+        }
+    }
+}
+
+/// What a dialog is about, as the titles word it: one voucher, or a batch by
+/// its count (#746).
+fn these_vouchers(count: VoucherCount) -> String {
+    match count.batch() {
+        None => "this voucher".into(),
+        Some(count) => format!("these {count} vouchers"),
+    }
+}
+
+/// What the positive answer does, and what stays undone until it is given.
+fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
+    match shown {
+        Shown::Post => (
+            format!("post {} into Tally", these_vouchers(count)),
+            "Nothing is posted until you answer.",
+        ),
+        Shown::Review => (
+            format!("record that you reviewed {}", these_vouchers(count)),
+            "Nothing is recorded until you answer.",
+        ),
+        Shown::StopRelease => (
+            "release the invoice stop for this company, so that ComplyEaze Bridge builds and \
+             posts invoices for it again"
+                .into(),
+            "Nothing is released until you answer.",
+        ),
+    }
+}
+
+/// The answer text of a Windows box, whose Yes and No answer to Y and N (#1780).
+#[cfg(windows)]
+fn answer_text(shown: Shown, count: VoucherCount) -> String {
+    let (yes, nothing) = answer_effect(shown, count);
+    format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}")
+}
+
+/// The answer text of a Mac alert, which names its buttons and claims no key.
+#[cfg(not(windows))]
+fn answer_text(shown: Shown, count: VoucherCount) -> String {
+    let (yes, nothing) = answer_effect(shown, count);
+    let button = match shown {
+        Shown::Post => post_words(count).1,
+        Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
+    };
+    format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}")
+}
+
+/// The most characters a line of a dialog's text takes (the post dialog's cap).
+const ANSWER_WIDTH: usize = 100;
+
+/// `text` broken at spaces into lines of at most [`ANSWER_WIDTH`] characters.
+fn wrapped(text: &str) -> String {
+    let (mut lines, mut width) = (String::new(), 0);
+    for word in text.split(' ') {
+        let length = word.chars().count();
+        if width == 0 {
+            lines.push_str(word);
+            width = length;
+        } else if width + 1 + length <= ANSWER_WIDTH {
+            lines.push(' ');
+            lines.push_str(word);
+            width += 1 + length;
+        } else {
+            lines.push('\n');
+            lines.push_str(word);
+            width = length;
+        }
+    }
+    lines
+}
+
+/// What the native box holds of a post or review text (#1780): the lines and
+/// characters of one voucher's text and of a batch's. The builders refuse a
+/// preview over them, never cut it. The box also shows the answer text above
+/// the preview, which has room of its own, [`answer_reserve`].
+pub(crate) const ONE_VOUCHER_LINES: usize = 24;
+pub(crate) const ONE_VOUCHER_CHARS: usize = 1_600;
+pub(crate) const BATCH_LINES: usize = 40;
+pub(crate) const BATCH_CHARS: usize = 3_200;
+/// The most vouchers a dialog is asked about: a batch posts at most this many.
+const MOST_VOUCHERS: usize = 50;
+
+/// The lines and characters the answer text adds above a post or review text,
+/// at most, over every text the code writes (both dialogs, one voucher to
+/// [`MOST_VOUCHERS`]): its wrapped lines and a blank line, and the characters
+/// of both. Derived from the text itself, so a new wording moves the box's
+/// caps with it; a test holds it to the size the maintainers were told.
+fn answer_reserve() -> (usize, usize) {
+    let mut reserve = (0, 0);
+    for shown in [Shown::Post, Shown::Review] {
+        for count in (1..=MOST_VOUCHERS).filter_map(VoucherCount::new) {
+            let answer = wrapped(&answer_text(shown, count));
+            let added = (answer.lines().count() + 1, answer.chars().count() + 2);
+            reserve = (reserve.0.max(added.0), reserve.1.max(added.1));
+        }
+    }
+    reserve
+}
+
+/// Whether the text the box will show is within the box's caps (#1780): the
+/// preview's own caps and room for the answer text, with no line over 100
+/// characters. The parent measures what is shown, so a text that does not fit
+/// is refused before a window opens, never cut. A stop release has no caps
+/// beyond the byte limit.
+fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
+    if shown == Shown::StopRelease {
+        return true;
+    }
+    let (lines, chars) = match count.batch() {
+        None => (ONE_VOUCHER_LINES, ONE_VOUCHER_CHARS),
+        Some(_) => (BATCH_LINES, BATCH_CHARS),
+    };
+    let (extra_lines, extra_chars) = answer_reserve();
+    displayed.lines().count() <= lines + extra_lines
+        && displayed.chars().count() <= chars + extra_chars
+        && displayed
+            .lines()
+            .all(|line| line.chars().count() <= ANSWER_WIDTH)
+}
+
+/// What the review dialog shows for `kind` (#1780), for the caller's tests.
+#[cfg(test)]
+pub(crate) fn review_text(kind: ReviewKind, count: VoucherCount, preview: &str) -> String {
+    displayed_text(kind.shown(), count, preview)
+}
+
+/// What the dialog shows: the answer text, then the preview. A stop release
+/// keeps its own statement first, because the title of the shared review
+/// dialog names only a review, and puts the answer text under it.
+fn displayed_text(shown: Shown, count: VoucherCount, preview: &str) -> String {
+    let answer = wrapped(&answer_text(shown, count));
+    match (shown, preview.split_once("\n\n")) {
+        (Shown::StopRelease, Some((statement, rest))) => {
+            format!("{statement}\n\n{answer}\n\n{rest}")
+        }
+        _ => format!("{answer}\n\n{preview}"),
+    }
+}
+
 /// The post dialog. An exit status alone is not an answer (#635): an
 /// executable that does not know `--confirm-journal`, such as a build of
 /// `bridge_mcp` older than the flag left at `current_exe()`, starts the MCP
@@ -1182,7 +1625,11 @@ pub(crate) mod test_seam {
 /// only this dialog's positive button prints, and a clean exit as well.
 async fn confirm(count: VoucherCount, preview: &str) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| "import_approval_unavailable")?;
-    confirm_with(&executable, count, preview).await
+    let shown = displayed_text(Shown::Post, count, preview);
+    if !fits_the_box(Shown::Post, count, &shown) {
+        return Err("import_review_too_large".into());
+    }
+    confirm_with(&executable, count, &shown).await
 }
 
 async fn confirm_with(
@@ -1218,9 +1665,17 @@ async fn confirm_with(
 /// its title and button never read as approving a post. It is answered by
 /// the token alone, as the post dialog is by the token and a clean exit; a
 /// clean exit without the token is unavailable, as the post dialog's is.
-async fn confirm_review(count: VoucherCount, preview: &str) -> Result<(), String> {
+async fn confirm_review(
+    kind: ReviewKind,
+    count: VoucherCount,
+    preview: &str,
+) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| "ack_review_unavailable")?;
-    confirm_review_with(&executable, count, preview).await
+    let shown = displayed_text(kind.shown(), count, preview);
+    if !fits_the_box(kind.shown(), count, &shown) {
+        return Err("ack_review_too_large".into());
+    }
+    confirm_review_with(&executable, count, &shown).await
 }
 
 async fn confirm_review_with(
@@ -1435,7 +1890,8 @@ fn review_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
+        MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = review_question(count)
@@ -1449,7 +1905,14 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND,
+            // Topmost: a window the connector opens while Tally fills the
+            // screen is otherwise drawn behind it, since a background
+            // process may not take the foreground (#1589). With
+            // MB_SETFOREGROUND the box also takes the foreground, so a key
+            // typed for Tally answers it; the parent puts a first line on
+            // its text that says what Y and N do (#1780). No stays the
+            // default button.
+            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }
 }
@@ -1501,7 +1964,8 @@ fn post_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
+        MB_YESNOCANCEL,
     };
     // rfd without common-controls-v6 discards custom labels. Use the existing
     // Win32 dependency so No is the default and Escape/close remain Cancel.
@@ -1514,7 +1978,14 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND,
+            // Topmost: a window the connector opens while Tally fills the
+            // screen is otherwise drawn behind it, since a background
+            // process may not take the foreground (#1589). With
+            // MB_SETFOREGROUND the box also takes the foreground, so a key
+            // typed for Tally answers it; the parent puts a first line on
+            // its text that says what Y and N do (#1780). No stays the
+            // default button.
+            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }
 }

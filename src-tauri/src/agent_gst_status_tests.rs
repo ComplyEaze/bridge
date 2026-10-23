@@ -26,6 +26,11 @@ use tally_protocol_simulator::{
     Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
 
+/// The status rows of an answer: [`parse_rows_with`] with nothing extra read.
+fn parse_status_rows(xml: &str) -> Result<Vec<StatusRow>, &'static str> {
+    parse_rows_with(xml, |_| ()).map(|rows| rows.into_iter().map(|(row, ())| row).collect())
+}
+
 const SALES_WINDOW: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-sales-window.utf16le.xml"
 );
@@ -1427,8 +1432,7 @@ fn tool_server(port: u16, directory: &std::path::Path) -> Server {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     })
 }
 

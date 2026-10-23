@@ -7,16 +7,156 @@ All notable changes to ComplyEaze Bridge are documented here. The project follow
 
 Published builds are MCPB packages that are not yet code-signed (tags
 `mcp-preview-*` and, from 0.4.0, `mcp-v*`): so far
-`mcp-preview-0.2.0`, `mcp-preview-0.3.0`, `mcp-v0.4.0`, `mcp-v0.4.1`, `mcp-v0.4.2`, `mcp-v0.5.0` and `mcp-v0.5.1`. The
+`mcp-preview-0.2.0`, `mcp-preview-0.3.0`, `mcp-v0.4.0`, `mcp-v0.4.1`, `mcp-v0.4.2`, `mcp-v0.5.0`, `mcp-v0.5.1` and `mcp-v0.6.0`. The
 number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-### In plain words: the next build, since 0.5.1
-
 These changes are in source and not yet in a published build.
 
 **Added**
+
+- `gst_uncertain_vouchers` lists the vouchers of one voucher type (a Sales type is what was measured) in a window that Tally marks Uncertain in its
+  GSTR-1, and the vouchers a person accepted as they stand (Accept As Is), each with its party ledger, its invoice total
+  (without its sign, with its side) and Tally's identifiers, and the line a CA reads before filing. It counts the window's
+  vouchers with the status read first and refuses a window above 1,000 vouchers (provisional) before it reads amounts,
+  and refuses an amounts read that returns fewer vouchers than the count found; the
+  line names the voucher type it covers, and is withheld when no voucher was read or none is uncertain, and, with the
+  result partial, when a voucher's flags or a listed voucher's party or amount were not read. Its answer carries party names and amounts
+  to the assistant; `mask_parties` masks the names and not the amounts. The reason for uncertainty is not read, and bills
+  missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one
+  Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not
+  measured.
+
+**Changed**
+
+- The approval window, and the review window, now open with a line that says what each answer does, before any
+  detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
+  voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N
+  vouchers"; the review window says "record that you reviewed" and "recorded"); on a Mac it names the buttons to click.
+  The invoice-stop release, which shares the review window, says that Yes releases the stop, under its own
+  statement. The text is wrapped under 100 characters a line, so the window's caps grew by its size (3 lines and
+  150 characters at most) and every text that fitted before still fits. The `post_import` tool text carries the same
+  sentence, with a note to say it before calling. The keys are unchanged: Y and N still answer the Windows window.
+  Not yet run by us on Windows or in a real box at the new size; on a non-English Windows the box's own button
+  letters may differ, which was not measured.
+- A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
+  `verify_import` reads the company's voucher mark below the floor a natively posted batch had proved (a mark Tally
+  omits twice counts as a company holding no voucher), the import journal records it, a second restore too, and from then on no natively posted batch of that company at that Tally
+  address that it covers reads `posted_verified`, even after vouchers keyed again by hand raise the mark past it:
+  a voucher it finds reads as matching content, one it does not as `book_rolled_back`, and the answer says to check
+  them in Tally. The answer that records it names the company's other native batches it covers, to verify again. Before, a voucher keyed again
+  with the same content could read verified once the mark had risen. Limits: a restore that is keyed or edited past
+  the mark before any check is still not seen; a wrong backup restored and then the right one leaves the batches it
+  covered reading rolled back (as would a repair or rewrite that lowered the mark, not measured); and a covered Sales
+  invoice batch stops that company's invoices until released.
+  **Do not go back to an earlier release after this one has seen a restore:** an earlier release refuses an import
+  journal holding the new record, and stops every build, post and verification until ComplyEaze Bridge is upgraded
+  again.
+
+- `voucher_presence` now checks a voucher type declared `manual` against the book's own numbering before it
+  reads the window, because a voucher number is an identity only where the book's series for the type says
+  Manual and prevents duplicate numbers. A call that declares a type manual now makes 20 more requests (34 become 54 on a small book: the
+  company's master mark, then the voucher-type numbering) and is refused as a whole, with
+  `presence_numbering_method_differs_from_book` and the types in `candidates`, when the book does not number a
+  declared-manual type Manual with exactly one series that prevents duplicate numbers (the check now also reads the
+  duplicate setting, and shows it in `book`) or holds no type of that exact name; a numbering that
+  cannot be read refuses with the read's own code (`masters_education_unqualified` in Education mode, for
+  example) or `presence_numbering_unreadable`. Calls that were answered before are refused in those cases.
+  A sub-method printed on a Manual series is ignored (a sub-method printed twice still refuses the read as
+  `field_invalid`). Names match exactly. Every type declared manual is
+  checked, whether or not a proposal names it. The check reads the book's numbering as it is now and holds for
+  the moment of the read. A call that declares no type manual reads no numbering and its result says
+  `numbering_read` `not_read`; a call that does read it returns what the book said for each declared type, or
+  only their counts when the rows would not fit the response budget.
+
+- `ledger_masters` with `include_gst_details` now names Tally's `GSTINELIGIBLEITC` as `ineligible_itc` (true for Yes,
+  false for No, null when the element is absent), where 0.6.0 named it `itc_eligible` and so told an assistant that
+  an entry with a keyed "Eligible for Input Tax Credit: No" was eligible. Measured on one ledger created
+  under Purchase Accounts in a synthetic book (TallyPrime 7.1): the screen's Yes read as the element absent and
+  its No as Yes, so the element is an ineligibility flag (PARTIAL: one book, one release, one ledger, one dated
+  entry; part of #1741). A Yes on any other ledger says nothing either way: the Sales ledgers of one captured book
+  carry a Yes on their keyed entries, and Tally's own default entry (source `As per Company/Group`) carries one with
+  no keyed No; neither was read against the screen. The value
+  mapping is unchanged: do not read `true` as eligible.
+
+## [0.6.0] - 2026-10-16
+
+### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)
+
+These changes are in ComplyEaze Bridge 0.6.0. Most lines name the pull
+requests or issues they come from. Like every build so far, it is not yet
+code-signed.
+
+**Should I upgrade?**
+
+- **If you use posting, or want to post batches: yes, read this first.** One
+  setting, **Allow voucher posting, one voucher or a batch of up to 50**, now
+  covers a single voucher and a saved batch of 2 to 50. It is a new setting and
+  is off by default: if you turned posting on in 0.5.1 or earlier, turn it on
+  again after installing 0.6.0. Every post still waits for your approval in a
+  separate window, and for a batch you approve its summary (#1090, #1630).
+- **If you use the bank-statement tool:** a skipped row must now name the other
+  account's ledger, and a transfer between two of your own accounts is checked so
+  that it is not booked twice (#1585, #1625). Several refusals are new; see
+  "What works differently" below.
+- **If you only read your books:** the new reads below are the reason to update,
+  if any. Nothing in 0.6.0 writes to Tally unless posting is on.
+- **How:** ComplyEaze Bridge does not update itself. Follow the
+  [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
+  (1) close any other program that runs ComplyEaze Bridge; (2) in Claude Desktop,
+  Settings, Extensions, install the new file; (3) keep ComplyEaze Bridge's data
+  folder; (4) check that the extension shows 0.6.0, that the Terms setting is
+  ticked, and that **Allow voucher posting, one voucher or a batch of up to 50**
+  is as you want it; (5) quit Claude Desktop completely and reopen it.
+
+**What you can do now**
+
+- `month_register` is a new read-only tool: Tally's own month-wise Sales Register or Purchase Register for whole
+  months, one row per month with Tally's debit, credit and closing columns exactly as printed. A window that is not
+  whole months, or that starts before the books, is refused. The rows are not tied to the vouchers, to the trial
+  balance or to `sales_register` and `purchase_register`, and not compared with Tally's register screen. Its request
+  renders as the lab sent it, and its parser reads the answers BRIDGE PILOT LAB gave on 13 October 2026 (one
+  synthetic book, TallyPrime 7.1 Silver). The Receipt and Payment Registers are not read (part of #1232, #1759).
+
+- A transfer between two of a firm's own bank accounts, printed on both statements and booked once, is now followed
+  from one statement to the other. A `skip` row must name the other account's ledger (a `skip` with no ledger, or one
+  naming the statement's own bank ledger or the suspense ledger, is refused at its row), and the parse records each
+  row's network transfer reference and printed instrument, for the transfer references both banks print. A build
+  records each Contra and each skipped row, and a successful build and the first page of a verification carry a
+  `transfers` section: each skipped row is paired with the other account's Contra by reference, then by date, or
+  listed in one of its open states (not found, ambiguous, other side unverified or not established, among others), with counts only, no amount, reference,
+  party or ledger. A build that would book a transfer a second time is refused (part of #1392, #1585, #1592, #1625).
+  Run once, on 15 October 2026, on a Windows lab PC (TallyPrime 7.1 Silver, one synthetic company) with the Contras
+  imported by hand. Not measured: which banks print the same reference on both statements of a transfer, how many
+  days apart two banks print one transfer, and posting a batch that holds a transfer with `post_import`.
+
+- `masters` with `kind` `voucher_types` now returns, on each row, `series_numbering`: the numbering method
+  (`automatic`, `manual`, `automatic_manual_override`, or the raw text under `unrecognised`, never read as
+  `manual`) and whether duplicate numbers are prevented, read at the number-series level from a second paired
+  read of the voucher-type export and joined to the row by GUID with the name as a second equality; a type with no
+  series or several returns `series_count` and nothing is read from it, and a series missing or repeating a field
+  returns `field_invalid`. Under `automatic`, and under no other method, a row also carries `sub_method`, the
+  series' own setting for the numbers of vouchers already entered: `auto_retain` ("Retain Original Voucher No."),
+  `auto_renumber` ("Renumber Vouchers"), `absent` where the series printed none, or the raw text under
+  `unrecognised`. A type found in one read only (`masters_numbering_names_differ`), or a GUID and name that disagree between the
+  two reads (`masters_numbering_identity_differs`), refuses the whole read; so does the numbering read changing
+  between its two reads (`masters_numbering_collection_changed`) and a numbering answer whose row count or size
+  breaks the mark's premise (`masters_bound_premise_violated`), and one that does not parse (a missing or repeated
+  GUID among the causes) refuses at once; a moved book is reported as `masters_extent_changed` in place of a
+  join or premise refusal. The type-level `numbering_method` stays as it was, with its limitation.
+  Measured on one synthetic book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series named
+  `Default`, of which three (Journal Automatic, Payment Manual with duplicates prevented, Receipt Manual with
+  duplicates not prevented) were checked against Tally's screen. Automatic (Manual Override) through this tool (it is
+  mapped from the series text measured on a synthetic book on 13 October 2026), more than one series, Multi-user
+  Auto, a single series not named `Default`, a type created new and other releases are not measured. The two
+  requests were run live as one tool call on 14 October 2026 on two synthetic books (TallyPrime 7.1 Silver,
+  Windows; 24 voucher types each, exactly one series per type, its name not read): the read was not refused, and on
+  the six types whose numbering was set or checked on Tally's screen it returned that numbering (Manual with
+  duplicates prevented, Manual with duplicates not prevented, Automatic); the other types, left at a new company's
+  defaults and not checked on screen, read Automatic (part of #724). `sub_method` was measured on a second
+  synthetic book of the same release and edition, on one voucher type (Receipt, set to "Renumber Vouchers" and
+  back); any other wording, a series that prints none, Gold and other releases are not measured.
 
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
@@ -49,8 +189,10 @@ These changes are in source and not yet in a published build.
   after one made by hand. It covers a whole statement, or whole calendar months of it, names no cause and writes
   nothing. It returns the two dates and the gaps, not the balances, though a gap plus the statement's balance at
   that date (for a whole statement, the balance you supplied) gives the book's. The parse's proposals file now also
-  records the statement's first and last dates (part of #1211). It is not yet proved against a live book: one run
-  on two synthetic companies by an outside contributor is only partly recorded (see the pull request).
+  records the statement's first and last dates (part of #1211). It was run once in the lab on 14 October
+  2026 (TallyPrime 7.1 Silver, one synthetic company): whole months before and after their post, a whole
+  statement whose last month was not posted, and reads after the ledger's last voucher all gave the gaps
+  expected; a read at a date in the middle of a month is not measured (see the pull request).
 - `statement_tie_out` can check whole calendar months of a longer statement: a file parsed with `from` and `to` (or
   one of them) from the 1st of a month to the last day of a month, within the statement's rows, is compared with the
   book at those dates, against the statement's balance there as worked out from its own rows. Any other narrowed
@@ -103,8 +245,79 @@ These changes are in source and not yet in a published build.
   mobile-banking and internet-banking rows, interest and every other wording go to suspense. A statement that
   opens without a password needs `password_file` to be an empty file (on a Mac it must be owned by you with no group or other permission bits; on Windows it must be owned by you or Administrators, and no one but you, SYSTEM and Administrators may read or change it). Not measured: other
   account types and branches, statements printed oldest first, other wordings, and a statement downloaded another way.
+- `vouchers` can keep only the vouchers of a ledger whose narration ends in a suspense
+  tag ComplyEaze Bridge writes (`suspense_tagged: true` with `ledger`, #810 slice 2):
+  "purpose not confirmed" for a cash line answered "don't know", or "UNIDENTIFIED -
+  reallocate from" the ledger for a party no mapping names; each item says which in
+  `matched.suspense_tag`. It reads the tag from the narration, so a voucher whose
+  narration was edited after the tag is not listed and the same text typed by hand
+  matches: read the ledger without the filter too. Not measured: a tagged narration
+  read back from a real Tally. The same tag test now also counts, in a build's `suspense_lines`, a voucher whose tag names its ledger in another case, spacing or hyphenation.
 
-**Changed**
+- `post_import` (after a send was read back) and `verify_import` now begin with a `headline` for a batch
+  ComplyEaze Bridge sent: whether the batch is confirmed in Tally (a batch of several vouchers also says how
+  many of its vouchers read back and how many are not confirmed), with the counts, and a count for each other
+  status, in `batch`, counted from the result's own rows. A batch whose vouchers all read back but whose
+  readback as a whole is not confirmed is not called confirmed, and neither is a batch of which only some
+  vouchers read back: its lead says that they read back and that the batch is not confirmed. A batch not yet posted, a file imported by
+  hand and a refusal before anything was sent have none. The result is unchanged (part of #1090).
+
+**What works differently**
+
+- One setting now covers all posting: with posting on, ComplyEaze Bridge posts one voucher per
+  approval, or a saved batch of 2 to 50 Journals, or of 2 to 50 Payments, Receipts and Contras, after
+  one approval of the batch's summary (#1090). In the extension it is a new setting, **Allow voucher
+  posting, one voucher or a batch of up to 50**, off by default: it is a new setting, so if you turned posting on in 0.5.1 or
+  earlier, turn it on again under the new text. On the command
+  line, `BRIDGE_AGENT_ENABLE_WRITES` now admits batches too, and the separate
+  `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while it is set and posting is on, `post_import` refuses
+  as `setting_retired` until you remove it. A batch saved earlier that was refused as more than one
+  voucher now posts after its own approval.
+- `post_import` and `build_import_xml` now refuse a voucher sent without a voucher number into a voucher type whose
+  voucher numbering does not read Automatic, as `import_voucher_numbering_not_automatic`, and into one that reads
+  Automatic without the sub-method `Auto Retain` (the screen's "Retain Original Voucher No."), as
+  `import_voucher_numbering_not_retain`. Either names each such voucher type and what was read in `refused_types`,
+  and a batch that holds both is refused as `import_voucher_numbering_not_automatic` (part of #724). Under Manual
+  voucher numbering, a second voucher sent without a number was seen to take a number already used, or to be refused
+  whole. With a voucher type set to "Renumber Vouchers" (the series reads `Auto Renumber`), Tally was seen to change
+  the numbers of vouchers already in the book: at the switch, when a voucher with an earlier date was entered by
+  hand, and when a voucher with an earlier date was sent by import without a number, without moving any voucher's
+  AlterID and with the import's answer reading CREATED 1, ALTERED 0; a voucher dated after every other changed
+  nothing (one synthetic book, one voucher type, TallyPrime 7.1 Silver). A series that prints no sub-method, or one
+  ComplyEaze Bridge does not recognise, is refused the same way. An amendment's vouchers are checked the same
+  way. It is refused before its own check of the book, so its next step says that
+  whether the earlier batch's vouchers are in the book was not checked, and has the assistant call `verify_import`
+  for that batch first: a voucher found in the book is never entered again, one that is not found is not built as a
+  new voucher either, and the vouchers of the refused voucher types are left out until ComplyEaze Bridge numbers vouchers
+  itself; no refusal sends anyone to enter a voucher in Tally. A Journal that carries its own voucher number (one built for Tally's Import menu)
+  is checked by `build_import_xml` too: it is written into a voucher type that reads Manual with duplicate numbers
+  prevented, where Tally keeps the number and refuses one a Journal already holds, or Automatic with `Auto Retain`,
+  where Tally discards the number
+  and assigns the next, and it is refused otherwise under the same two codes, Manual with duplicates allowed included,
+  where a Payment carrying a held number was created as a second voucher. It is refused on a voucher type set
+  to "Renumber Vouchers": there Tally was seen to discard the number a Receipt carried and give it the number of its
+  place in date order, and the later-dated Receipts' numbers went up by one. So a build that holds only Journals carrying their own numbers,
+  which made no numbering read before, now makes that read: it can fail with that read's own codes, or as `pre_import_mark_unobserved` when the
+  company's master mark cannot be read, and it is
+  refused on a book in Education mode, as a build of vouchers without numbers is. On the desktop's Journal
+  screen the refusal names the voucher type and what was read of it. The next step, and a post's message naming
+  the voucher types, are sent only where `BRIDGE_AGENT_MAX_BYTES` is at least 8,192; from 4,096 up to that a refused build
+  still returns its `reason` and `refused_types`, and a refused post its code and `refused_types`. On a type set to "Renumber Vouchers",
+  a file of more than two vouchers, a mixed file, a Journal that carries a number or is dated after every other,
+  Payment and Contra are not measured; nor are Gold, other releases, a series not named Default and the
+  same through ComplyEaze Bridge's own post: on a
+  release, an edition or a book whose series prints no sub-method, or words it differently, every Automatic voucher
+  type is refused.
+- Before approval a post now reads the company's master mark and then the voucher numbering, and compares the mark
+  again just before the post is sent: any master saved in that span, while the person decides included (a ledger
+  created, a voucher type changed), refuses the post as `post_masters_moved` and withdraws the approval; post again.
+  Each of thirteen saves of a voucher type's screen in Tally moved the mark by 2 (nine of a type holding no vouchers,
+  and two in each of two runs on a type holding vouchers, all on one synthetic book, TallyPrime 7.1 Silver). A voucher type
+  saved during the read itself refuses as `masters_bound_premise_violated` (cause
+  `masters_alter_id_above_master_mark`). A book in Education mode is now refused, as
+  `masters_education_unqualified`, for a post and for a build. Each pass of a post
+  sends 20 more requests to Tally before the approval (12 of them POSTs), so a held approval redeemed in a later call
+  sends them again; a build sends 14 more (8 POSTs), under its admission lock.
 
 - **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
   differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,
@@ -157,6 +370,28 @@ These changes are in source and not yet in a published build.
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
 
+- **On Windows, the approval window now opens above a full-screen Tally (seen once).** It could open behind TallyPrime when Tally filled the screen, so the person saw
+  nothing and the approval lapsed unanswered. Both windows, the post approval and the review
+  acknowledgement, are now drawn above every window that is not itself kept on top. Nothing
+  else changes: the text, the buttons, No as the default and the two-minute limit. Seen once, on
+  one screen, in front of a full-screen Tally and in front of Claude Desktop; the same run found that the window
+  takes keyboard focus (see "Known limits") (#1589).
+
+- **A one-voucher approval now shows a long narration in parts, where it refused it before.**
+  A bank-statement voucher's narration is often too long for one line of the dialog, so posting
+  it alone was refused and the file had to be imported by hand. Such a narration is now shown
+  under the heading in numbered parts, each quoted on its own line and split only at a space,
+  so that the parts joined in order are the text that is posted. A line above the heading
+  counts the parts, and the date line says the voucher's own text is below the dashes. It is
+  still refused whole, never cut, when no space splits it into parts that fit, when it holds a
+  run of dashes or a number in brackets, or when the whole text passes the dialog's caps. A
+  reference is never split: one too long for its line is refused as before. Each part past the
+  first, and the counting line, leave one line fewer for entries. The review dialog of
+  `acknowledge_post_review` now shows the narration last, under the same heading, on one line
+  or in parts, which leaves it room for nine entries instead of ten. An approval text that fits
+  as before is unchanged. Not yet measured: how the Windows and macOS dialogs draw the parts
+  (#1535).
+
 - **A `post_import` refusal made before anything was sent now says what to do next.** Its
   `error.next_step` carries the same step every other tool gives for that refusal: its code's,
   or else its cause's. Before, a code raised inside the post, such as a date range too large to
@@ -164,6 +399,13 @@ These changes are in source and not yet in a published build.
   refusal after a send, or when a send could not be ruled out, still carries no such step, and is
   reconciled with `verify_import`. The steps the post already gave (a busy port, a row another
   batch posted) are unchanged (#1573).
+
+- **A batch approval now shows its totals first.** The window for a batch shows, in this order:
+  the count and company, the company number, the count by type, the dates, the total debit and
+  credit and the money lines; then the company GUID and the Tally address, the voucher lines or
+  the sentence in their place, the per-ledger lines, the batch id and the cautions. Every line
+  keeps its wording. The window for one voucher is unchanged. This order has not yet been seen
+  in a running window on Windows or macOS (#746).
 
 - **A batch approval's Journal lines now name a ledger on each side, and the window no longer
   says narrations are shown exactly.** In a batch of up to ten, each Journal's line named only
@@ -213,8 +455,119 @@ These changes are in source and not yet in a published build.
   (`empty_uncorroborated`, `company_has_no_vouchers`, `window_contradicted`) are unchanged, and the `vouchers` and
   `voucher_presence` tool descriptions and the agent guide now list all three outcomes of an empty window.
 
+- **The install steps are rewritten for a first-time accountant.** The installation guide gives one short action
+  per step, the exact words on each button, what the screen shows next and what to do when yours differs; the
+  download page and the home page give the same steps in short form, and the download page points to the guide.
+  They name the three things a new user meets in Claude Desktop (the notice that the extension is not verified by
+  Anthropic, the confirm box, and the permission prompt before a tool runs), give TallyPrime's path (F1,
+  Settings, Connectivity, Client/Server configuration), and say to leave posting off. The guide now lists what
+  the data folder holds, says the list is not complete, and includes the last four digits of a statement's
+  account number kept with its proposals, the ledger names chosen for a statement, the sign-in name a recorded
+  review can include, and the record of accepting the Terms. TallyPrime's Step 1 screens, the browser check and
+  the Alt+K and Alt+Y menus were checked by looking on Windows (TallyPrime 7.1, 10 October 2026); the guide says
+  which steps were not tried (#1017).
+
+- The texts that say what Response redaction leaves unhidden now also say that the last four digits of a bank
+  statement's account number (`account_last4` in the answer of `parse_bank_statement`) are always sent: the
+  extension's description and its redaction setting, the two tool descriptions that describe redaction, the
+  README, both guides, the security page, the FAQ and one article. Only the wording changed; what is sent is the
+  same (#1616).
+
+- `parse_bank_statement`, `build_import_xml` and the agent guide now tell the assistant to import a bank
+  statement in whole-day batches: cut a batch only between days, at most 50 vouchers. `post_import` refuses a
+  whole batch with `import_preexisting_identity` when a voucher has a twin with the same date, type, ledgers and
+  amounts that an earlier batch posted, while twins inside one batch pass together; a statement cut across two
+  batches on one day hit that refusal. A day with more than 50 rows does not fit one batch, and the text says to
+  ask you. Batch posting is off by default, so same-day twins post together only with it on or through a hand
+  import of the built file. Wording only: no new refusal and no change to the check (#1614).
+
+- `verify_import`'s description now says in plain words that after a restore from a backup, a native voucher
+  keyed again with the same content before any check can read verified, that no identifier a read returns tells
+  the two apart, and that after restoring a backup over a company you should check its posted vouchers in Tally.
+  Tally gave the vouchers keyed again the post's MasterIDs, GUIDs and voucher numbers (measured once, on one
+  synthetic company on TallyPrime 7.1 Silver; the run that compared every identifier had Tally's security off);
+  the description had called that reuse unmeasured. Behaviour is unchanged (#1612, #1636).
+
+- The installation guide now says that a batch posted from the command line is approved on a summary of
+  per-ledger totals and, when there are ten or fewer vouchers and the lines fit, a line for each voucher; it said
+  the summary showed no voucher's date or narration. The window has listed each voucher of such a small batch
+  since 0.5.0 (#1632).
+
+- **A native post whose binding was refused now says what the book holds.** When `verify_import` cannot bind a
+  batch to the vouchers its own post created, `post_span_binding.summary` says the batch stays open (except when
+  every voucher reads `tally_reported_not_created`, where the summary differs) and, when every voucher reads
+  `matching_content_observed` against a voucher that is neither cancelled nor optional (or only some do), that
+  the book holds, for each voucher sent (or for some), one with the same date, voucher type and ledger entries,
+  and that ComplyEaze Bridge cannot tell whether that voucher is this post's; it never says the post's vouchers
+  are in the book. `local_data_report` counts such batches as `not_settled_binding_refused`, and
+  `not_settled_not_verified` no longer includes them. The `post_import` description now says no review can be
+  recorded for such a batch: `acknowledge_post_review` refuses it, because its vouchers are matched by content
+  only, so the person checks them in Tally and the batch is not rebuilt (#1469).
+
+- **A refusal because Tally did not answer now carries a next step.** `endpoint_unreachable` tells the assistant
+  to ask you to confirm that Tally is running with the XML server enabled on the port named in the error, and not
+  to repeat the request until you have; `endpoint_circuit_cooldown` (a request held back after repeated failed
+  requests to Tally, nothing sent) says it can be repeated after about ten seconds. A code's own step still comes
+  first, and the other unanswered reasons still name none. The `parse_bank_statement` description and the
+  security and privacy notes in the repository also now say that ` | Statement party: <name>` sits at the end of
+  the narration text, and that a file imported by hand adds the `[BRIDGE:...]` tag after it (#1483).
+
+- The Terms of Use setting is now told as "tick" wherever a person is asked to set it: the refusal a tool gives
+  before the Terms are accepted, the installation guide, the connection guide, the download and home pages and
+  the FAQ said "turn on" or "switch on". "Turn on" stays for the HTTP gateway and the posting setting (#1484).
+
+- The `masters` tool no longer calls a voucher type's numbering value its numbering method. Its description and
+  its result's limitation now say the value is the one Tally reports at the type level, that it read `None` for
+  types set to Automatic and to Manual on Tally's screen (one synthetic book, Windows), that it can differ from
+  the number series that decides what a supplied number does, and that it is not to be passed to
+  `voucher_presence`'s `numbering`. That input now says the method is the one you confirm for the series used.
+  What is read is unchanged (#1487).
+
+- The Outstandings screen's ledger-master export now ends its balances at the screen's "As of" date, so a
+  workbook can be exported as of 31 March; it ignored the field and used the date of the computer. With no date
+  chosen nothing changes, and the assistant's `ledger_masters` still uses the computer's date. A date before the
+  company's books begin is refused as `as_of_precedes_books_from` before any master, balance or group is
+  requested. Only the 1st, 2nd and 31st of a month are accepted as a balance-period end, so a typed 30 June ends
+  on 1 July and that day's vouchers are inside the balances; the notice says so (#1531).
+
+- The security and privacy notes in the repository now say the 0.5.1 Terms refusal (`terms_not_accepted`, naming
+  the setting) was the answer the tools the assistant called gave on one Mac with a test package and on one
+  Windows computer with the build our checks made for 0.5.1; they had said it was not yet checked on Windows
+  (#1543).
+
+- The README's table of tools now has a row for each tool offered with posting off, adding `company_features`,
+  `gst_status` and `voucher_read_cost` (#1672).
+
+- The FAQ answer and the security page about a second computer reaching Tally's gateway now state the rule: do
+  not assume the gateway is closed to your office network; the firewall of the computer that runs Tally is what
+  keeps other computers out, so confirm it blocks incoming connections to Tally's port. They keep the scope of
+  the one test on TallyPrime 7.1 (a second computer got the status answer; nothing else was checked) and no
+  longer say it was "not recorded in the repository" (#1685).
+
+- The README and two blog pages no longer say that the record of a test run is our dated notes, "kept privately";
+  what was and was not run is stated as before (#1528).
+
+- **The core for posting one GST Sales invoice is in this build and switched off.** Sales is not in the qualified
+  list, so every Sales build is refused before anything is sent to Tally, no file is written, the tools' schema does
+  not offer the type, and a saved Sales batch is refused at post. A Sales invoice that was sent and is not verified
+  posted would stop every further Sales invoice of its company until it verifies or a person releases it; that cannot
+  happen while Sales is off. For Journal, Payment, Receipt and Contra one change is accepted: `"invoice": null` is
+  read as absent. A first rehearsal on 7 October 2026 posted two invoices and found what must change before Sales can
+  be switched on. In 0.6.0 Sales stays switched off, and a Sales invoice would be built only when voucher posting is on, so
+  there would be no hand import of one (part of #691, #1342, #1463, #1488, #1491).
+
 **Safer or fixed**
 
+- On Windows, every request to one Tally port is now also serialised through a lock file under your user profile
+  (`.complyeaze-bridge\coordination`), in addition to the one under AppData. Windows writes a Store-installed Claude
+  Desktop extension's AppData files into the package's private folder, so the extension and an unpackaged
+  ComplyEaze Bridge process could each hold "the" lock in a different folder and a post could overlap a read on the
+  same Tally. A process that cannot create that folder refuses every send as `import_admission_lock_unavailable`.
+  Not measured: the cost of the extra lock per send (#1584, #1641).
+- `build_import_xml` shows where the import file really is when a Microsoft Store install of Claude Desktop keeps
+  Bridge's files in the package's private folder, so File Explorer and Tally can open the path it prints; a new
+  `path_state` field says whether the path was resolved. Where files are stored and read is unchanged. Measured
+  once, partly, on one Windows PC with Claude Desktop from the Microsoft Store, on 15 October 2026 (#1459, #1569).
 - When the local Tally mirror's key is missing from the computer's credential store, or is stored but is
   not a valid key, the app now says so with its own codes (`tally_mirror_key_missing`,
   `tally_mirror_key_invalid`) and tells you that a retry will not help, instead of asking you to approve a
@@ -238,6 +591,126 @@ These changes are in source and not yet in a published build.
   a batch whose voucher mark moved across the post, keep the earlier line.
   Measured live once, on a single voucher refused whole; a batch is not
   measured live (#1108).
+- A voucher of an unbound native post that ComplyEaze Bridge cannot find in the book no longer has its next
+  step suggest that it was edited in Tally when Tally's own answer to that post was not clean (for example a
+  batch Tally created only partly, or an answer that did not parse): the line now says only that it cannot be
+  matched, and to check in Tally before posting it again (#1108).
+- `build_import_xml` refuses a voucher whose own `voucher_number` begins or ends with white space, or is only
+  white space, as `voucher_number_invalid`, before any file is written: on a raw import Tally read a number
+  sent with a space at its end back without it, so such a voucher could never verify as posted (#1730). A
+  space inside a number is still admitted.
+
+- `parse_bank_statement` no longer reads a statement PDF's text in render mode 3 (invisible), which is how a
+  scanner app lays a hidden OCR layer under a page image, so that text is not parsed as if the bank had printed
+  it. A scan whose only text is a hidden layer, or whose drawn text yields no statement row while most of the
+  document's characters were hidden, is refused as `statement_no_readable_text` (before: its text was parsed, or
+  the refusal was `statement_no_account_number_line` or `statement_page_sequence_unproven`). A character PDFium
+  cannot classify refuses the file as `statement_unreadable_pdf`. No OCR is attempted. Neither PDFium failure was
+  seen on the real files checked (#1637).
+
+- A Tally read that timed out, or whose response body failed after Tally had begun answering, is now sent once
+  instead of up to three times: a client timeout does not stop the work Tally is doing, so a further send could
+  queue behind the first. This covers the company-list reads, the ledger listing's extent read and the desktop
+  snapshot's small reads. A read whose connection or send failed, or that Tally answered with a server error or a
+  rate limit, is still retried (#1538, #1556).
+
+- The desktop core snapshot sends each of its group, ledger, voucher-type and voucher-window exports once: when
+  the connection closes after the request was sent, it returns the error instead of sending the export up to
+  three times. Its small reads (the pair of book-extent reads around each export, and the company list) keep the
+  three-attempt retry, so one lost extent read does not make you start the run again (#1674).
+
+- The desktop core snapshot no longer sends the ledger period-balance report it used after each window to
+  corroborate balances: one TallyPrime release could not evaluate it (others were not tried), and it was never
+  seen returning a usable answer. A core run therefore cannot reach Verified; every window it reads records
+  `report_tie_out_unavailable`, as one already did when the report was refused (Education mode). A resumed run no
+  longer reopens a completed window, though a run resumed from an earlier build's saved state keeps a tie-out
+  already stored. No published package sent this read, only the unreleased desktop app's Proof of Sync (#1643).
+
+- A desktop core snapshot that stops because the book changed while its groups, ledgers or vouchers were read is
+  now recorded as `source_changed_during_run` ("Run again during a controlled quiet period"); one that stops
+  because the two reads of a book extent differ, or because Tally gave no master-change marker, is recorded as
+  `company_book_extent_drifted` or `company_altmstid_missing`, each with Gap Map guidance, where all showed
+  "Response parse failed". A well-formed extent that names no row for the selected company is now
+  `company_identity_mismatch` where it showed "Application response rejected". The two native-export drift
+  conditions still use the catch-all (#1554).
+
+- The import journal's first record is now made durable in its folder: when the journal is new or empty, the data
+  folder is synced after the write, and if that sync fails the record is taken back and the append refuses with
+  `import_ledger_unavailable` (`import_ledger_rollback_failed` if the take-back also fails). A failed folder sync
+  on the acknowledgement, the proofs, the verified-baseline additions and the doubt record is now reported instead
+  of ignored: the acknowledgement refuses with `import_file_write_failed`, and publishing proofs refuses before
+  the status record is appended. The masters-check verdict still ignores a failed folder sync, and the built
+  import file is not folder-synced, as before. Before, a power loss soon after the first record could leave no
+  journal and so no local record of a post. On Windows the folder sync does nothing, as before (#1548).
+
+- Desktop setup now refuses a selected company GUID that is not in the strict form of a Tally GUID, as
+  `company_selection_invalid` (retry not recommended), and the snapshot identity check refuses a stored one as
+  `company_identity_invalid`; before, the setup accepted any short trimmed ASCII text. Every company GUID in the
+  committed captures (some of them synthetic) is in the strict form, so none is expected to be refused; a
+  TallyPrime release that writes another spelling would be refused until it is observed (#1627).
+
+- The `changed_since` tool, which no build offered, and the code only it reached are deleted (#1769).
+
+- Locked dependencies moved, with no source change: `rustls` 0.23.45 to 0.23.46, which clears four advisories
+  published on 14 October 2026 (RUSTSEC-2026-0346 to -0349: secrets in `Debug` output of client session values,
+  a Brotli certificate decompression that can allocate up to 1 GiB before authentication, and a ServerHello
+  downgrade of later connections to classical key exchange), and `tokio`, `uuid`, `zeroize`, `libc` and `objc2`
+  by a patch or minor release (tokio 1.53.2 fixes a Windows process-handle wait and a blocking-pool shutdown bug,
+  per its release notes). The Rust licence inventory is regenerated (#1718, #1580).
+
+**Known limits**
+
+- **Live pass of what 0.6.0 writes into Tally (16 October 2026).** The release candidate was installed as the
+  extension in Claude Desktop (Microsoft Store build 2.37337.1.0) on Windows 10 Home 22H2 (build 19045), and run against
+  TallyPrime 7.1 Silver on port 9001, on one new synthetic company, BRIDGE RC GATE LAB. Build: commit
+  `a3b7316947cdf3c5ce46615c8b89e45d538345f3` (pull request #1775, CI run 38877254488), `bridge-tally.mcpb` SHA-256
+  `6b83ca74377d7ed86a2b524f4d53bd2e9753b3318bfa6634078d5f5645184022`, containing `bridge_mcp.exe` SHA-256
+  `e9780806594e60afabdb83d35bb751f0aeefba708b2b63c33b11452bbf0e5a84`; the installed copy was checked against that hash
+  before the run, and the server answered every call (Bridge's own log). With the one posting setting on, each of the
+  four voucher types was posted once with no voucher number after its approval window, and one saved batch of three (a
+  Payment, a Receipt and a Contra) was posted after one approval. In every post Tally's answer reported every counter,
+  created 1 (3 for the batch) and nothing else counted; each voucher then read `posted_verified` in the post's own
+  readback and again in `verify_import`, with no duplicates, and the company's voucher mark moved by exactly the
+  number created. Tally gave the numbers itself: Journal 1, Receipt 2 (the book's seed receipt held 1), Contra 1,
+  Payment 1, then in the batch Payment 2, Receipt 3, Contra 2. On Windows the approval window showed in front of a
+  full-screen Tally and in front of Claude Desktop, with No as the default (one screen, one run). In that run a key meant for Tally (the Down arrow) moved the selection
+  inside the approval window (No, Cancel, Yes) and Tally did not react: the window takes keyboard focus. No is still the
+  default, so Enter alone refuses; arrow keys followed by Enter can reach Yes. A typed letter was not tried in that run (later that day, on the published file, a typed n
+  declined the window and a typed y approved it: #1780) (#1148,
+  #1589, #1630).
+- **Not run in that pass:** a batch of Journals; a batch larger than 3 or near 50; a post Tally refused or that landed
+  partly; amendments; the review acknowledgement window (no voucher raised a doubt); a post that needs an On Account
+  approval (a bill-wise party; the build refused one as designed); the retired batch variable (`setting_retired`); an
+  import file taken to Tally's Import menu; Sales invoice posting (not offered in 0.6.0); the desktop app; Gold; macOS;
+  any other Windows or Tally release. Also not run: the voucher-numbering rows (#724, #1668: a back-dated numberless
+  Journal, a second numberless Payment, the refusal of a numberless voucher into a Manual-numbered type);
+  `voucher_read_cost` against a real `vouchers` call (#1465); the Store-install proof of the lock (#1584, #1459: lock
+  contention, `local_data_report` from the chat, which folder the desktop app uses); a second monitor. The candidate was
+  installed while 0.5.1 was present, and its settings were not compared with 0.5.1's; what Claude Desktop passes for a
+  new setting on an upgrade is not measured (#1090, #1630).
+- **The file tested above is not the file that will be tagged.** The pass ran on the CI package of the release pull
+  request. The release workflow builds `bridge_mcp` again on its own, with a plain release build of that binary, where
+  the CI package takes it from the Tauri build; the two files are the same source but not byte-identical, and no build
+  is claimed to be reproducible. Between that commit and the commit the release is built from, no file that goes into
+  the package or the desktop bundles changed (the check is recorded on the pull request that adds this paragraph).
+- **Release package check (16 October 2026, 19:13 local time).** A package built by the release workflow's own package
+  steps (rehearsal run 38885882661, pull request #1777, source commit `d6561887130d4fd4265121d6ef40db650b538280`, which
+  is `a3b73169` plus one workflow file) was installed over the release candidate in Claude Desktop (Microsoft Store
+  2.37337.1.0) on the same Windows 10 computer, TallyPrime 7.1 Silver and company. `bridge-tally-mcp-v0.6.0-windows-x64.mcpb`
+  SHA-256 `3e76e8f6edf4d00fa8a1420b696661be9ddbe0b6ab3c84465f9cff58cc3fda05` (13,821,469 bytes), holding `bridge_mcp.exe`
+  SHA-256 `10e4614f74eab975897834ec1c9750edbe9fc7ad91584b802e5cde57a8180899`, which is not the release candidate's file;
+  its manifest is byte-identical to the candidate's. The settings were kept by that replace (port 9001, posting on); one
+  run, same version, and it says nothing about an upgrade from 0.5.1. One Journal (12 August 2026, debit BRIDGE RC Expense,
+  credit BRIDGE RC Suspense 5.00, no voucher number) was posted after its approval window: Tally answered created 1,
+  every other counter 0 (538 bytes, SHA-256 `42e4de026f72a1e7d882ad6f19067a8f9a6cf549dc1c40f90c752aefdfebfec5`), the
+  company's voucher mark moved from 8 to 9, the post read `posted_verified` in its own readback and again in
+  `verify_import`, and Tally gave it number 2. The four voucher types and the batch ran on the release candidate, not on
+  this file. The published file is built by the release workflow's own run, after these notes are written, so its
+  `bridge_mcp.exe` is not compared with the one above here.
+- The `headline` of a batch post has not been seen on a live Tally post (#1090, #1532).
+- Nothing was run on a Mac against a live TallyPrime for this release; the Mac package is built and started by our
+  checks without Tally.
+- What has been run against a real TallyPrime is listed in the README.
 
 ## [0.5.1] - 2026-10-09
 

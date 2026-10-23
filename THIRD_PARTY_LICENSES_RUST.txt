@@ -151,6 +151,10 @@ cfg-if 1.0.4
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang/cfg-if
 
+cfg_aliases 0.2.2
+License: MIT
+Source: https://github.com/katharostech/cfg_aliases
+
 chrono 0.4.45
 License: MIT OR Apache-2.0
 Source: https://github.com/chronotope/chrono
@@ -234,14 +238,6 @@ Source: https://github.com/servo/rust-cssparser
 cssparser-macros 0.7.1
 License: MPL-2.0
 Source: https://github.com/servo/rust-cssparser
-
-csv 1.4.0
-License: Unlicense OR MIT
-Source: https://github.com/BurntSushi/rust-csv
-
-csv-core 0.1.13
-License: Unlicense OR MIT
-Source: https://github.com/BurntSushi/rust-csv
 
 ctor 1.0.13
 License: Apache-2.0 OR MIT
@@ -675,6 +671,10 @@ new_debug_unreachable 1.0.6
 License: MIT
 Source: https://github.com/mbrubeck/rust-debug-unreachable
 
+nix 0.31.3
+License: MIT
+Source: https://github.com/nix-rust/nix
+
 nu-ansi-term 0.50.3
 License: MIT
 Source: https://github.com/nushell/nu-ansi-term
@@ -887,7 +887,7 @@ rfd 0.17.2
 License: MIT
 Source: https://github.com/PolyMeilex/rfd
 
-rust_xlsxwriter 0.99.1
+rust_xlsxwriter 0.100.0
 License: MIT OR Apache-2.0
 Source: https://github.com/jmcnamara/rust_xlsxwriter
 
@@ -903,7 +903,7 @@ rustix 1.1.4
 License: Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
 Source: https://github.com/bytecodealliance/rustix
 
-rustls 0.23.45
+rustls 0.23.46
 License: Apache-2.0 OR MIT OR ISC
 Source: https://github.com/rustls/rustls
 
@@ -915,7 +915,7 @@ rustls-platform-verifier 0.7.0
 License: MIT OR Apache-2.0
 Source: https://github.com/rustls/rustls-platform-verifier
 
-rustls-webpki 0.103.14
+rustls-webpki 0.103.16
 License: ISC
 Source: https://github.com/rustls/webpki
 
@@ -1010,6 +1010,10 @@ Source: https://github.com/chippers/serialize-to-javascript
 servo_arc 0.4.3
 License: MIT OR Apache-2.0
 Source: https://github.com/servo/stylo
+
+sha1 0.11.0
+License: MIT OR Apache-2.0
+Source: https://github.com/RustCrypto/hashes
 
 sha1_smol 1.0.1
 License: BSD-3-Clause
@@ -1519,7 +1523,7 @@ zerovec-derive 0.11.4
 License: Unicode-3.0
 Source: https://github.com/unicode-org/icu4x
 
-zip 8.6.0
+zip 9.0.5
 License: MIT
 Source: https://github.com/zip-rs/zip2
 
@@ -3029,7 +3033,7 @@ Apache License 2.0
 
 -------------------------------------------------------------------------------
 Apache License 2.0
-- rust_xlsxwriter 0.99.1
+- rust_xlsxwriter 0.100.0
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7880,7 +7884,7 @@ Apache License 2.0
 - regex 1.13.1
 - rustc_version 0.4.1
 - rustix 1.1.4
-- rustls 0.23.45
+- rustls 0.23.46
 - rusty-fork 0.3.1
 - scopeguard 1.2.0
 - security-framework-sys 2.17.0
@@ -8539,6 +8543,7 @@ Apache License 2.0
 - digest 0.10.7
 - digest 0.11.3
 - hybrid-array 0.4.14
+- sha1 0.11.0
 - sha2 0.10.9
 - sha2 0.11.0
 
@@ -11405,7 +11410,7 @@ THIS SOFTWARE.
 
 -------------------------------------------------------------------------------
 ISC License
-- rustls-webpki 0.103.14
+- rustls-webpki 0.103.16
 
 Except as otherwise noted, this project is licensed under the following
 (ISC-style) terms:
@@ -12268,6 +12273,21 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 MIT License
+- cfg_aliases 0.2.2
+
+MIT License
+
+Copyright (c) 2020 Katharos Technology
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+-------------------------------------------------------------------------------
+MIT License
 - urlpattern 0.6.0
 
 MIT License
@@ -12521,7 +12541,7 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 MIT License
-- zip 8.6.0
+- zip 9.0.5
 
 The MIT License (MIT)
 
@@ -12606,14 +12626,39 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 MIT License
 - aho-corasick 1.1.5
 - byteorder 1.5.0
-- csv-core 0.1.13
-- csv 1.4.0
 - memchr 2.8.3
 - walkdir 2.5.0
 
 The MIT License (MIT)
 
 Copyright (c) 2015 Andrew Gallant
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+-------------------------------------------------------------------------------
+MIT License
+- nix 0.31.3
+
+The MIT License (MIT)
+
+Copyright (c) 2015 Carl Lerche + nix-rust Authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

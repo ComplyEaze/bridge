@@ -9,20 +9,20 @@ ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Its so
 
 What we checked ourselves, and what we did not. The Claude Desktop install screens and buttons in these steps are as
 seen in our tests on 1 and 2 October 2026. The Mac had Claude Desktop version 2.19675.0 (read from the app's files),
-and the owner reports that the Windows PC had the same version. The TallyPrime screens of Step 1 (F1, Settings,
+and the maintainer reports that the Windows PC had the same version. The TallyPrime screens of Step 1 (F1, Settings,
 Connectivity, the Client/Server configuration box and its list), the browser check, and the Alt+K and Alt+Y menus were
 checked by looking, on TallyPrime 7.1 on Windows on 10 October 2026; saving with Ctrl+A, restarting TallyPrime and
 the Backup & Restore submenu were not part of that check. The Mac keys are written from general knowledge of those programs; we did not walk them
 ourselves. On a Mac, the question in Step 6 ("Which company is open in Tally?") has not been run by us. These are
 other companies' programs and they change, so a screen of yours may differ a little.
 
-## At a glance, release 0.5.1
+## At a glance, release 0.6.0
 
-- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), and one ledger's movement.
-- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, values only, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
+- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), one ledger's movement, and Tally's own month-wise Sales or Purchase Register for whole months (not tied to the vouchers; read on one synthetic book).
+- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
 - **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags, and Tally's Funds Flow, Ratio Analysis and negative-balance reports.
 
-"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.5.1 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.6.0 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
 ## Before you start
 
@@ -158,11 +158,11 @@ A settings window opens with five lines. If none opens, open Settings, then Exte
 
 | Line | What to do | What it is |
 | --- | --- | --- |
-| **I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)** | Read the [Terms of Use](https://bridge.complyeaze.com/terms). Then **tick** this box. If you do not own the practice, the owner should read and agree first. | Your agreement. Until you tick it, ComplyEaze Bridge does not read from Tally, and from release 0.5.1 every tool answers that the Terms of Use are not accepted and names this setting (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). In 0.5.0, after an update from 0.4.2, Claude Desktop may not start ComplyEaze Bridge: on a Mac with an error that does not mention the Terms, on one Windows computer with no error (bridge#1413). |
+| **I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)** | Read the [Terms of Use](https://bridge.complyeaze.com/terms.html). Then **tick** this box. If you do not own the practice, the owner should read and agree first. | Your agreement. Until you tick it, ComplyEaze Bridge does not read from Tally, and from release 0.5.1 every tool answers that the Terms of Use are not accepted and names this setting (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). In 0.5.0, after an update from 0.4.2, Claude Desktop may not start ComplyEaze Bridge: on a Mac with an error that does not mention the Terms, on one Windows computer with no error (bridge#1413). |
 | **Tally host** | Do not change it. It says `localhost`. | "This computer". Only this computer's own address is accepted. |
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
 | **Response redaction** | Do not change it. It says `none`. | A way to limit what ComplyEaze Bridge sends to the AI provider. Choose one value. The other two are `mask_parties` (shortens party and ledger names, and the bank account details read from a ledger, to their first two and last two characters; some names are not shortened, and narrations are not changed) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Neither hides, among other things: amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details and references, or the last four digits of a bank statement's account number. [Security and privacy](../security-and-privacy.md) lists the rest. |
-| **Allow voucher posting (Journal, Payment, Receipt, Contra)** | Leave it **off**. | Lets Claude make entries in Tally, each one only after you approve it. |
+| **Allow voucher posting, one voucher or a batch of up to 50** | Leave it **off**. | Lets Claude make entries in Tally: one voucher, or a saved batch of up to 50, each post only after you approve it in a separate window. |
 
 Click **Save**.
 
@@ -208,7 +208,7 @@ Still stuck? See [Help](#help).
 - **Decide who agrees.** What Claude reads, party names and amounts included, goes to Anthropic. How Anthropic keeps
   and uses it is set by your Claude account and Anthropic's own privacy policy. If the books belong to clients, the
   owner of the practice decides. How ComplyEaze Bridge itself handles information is in its
-  [Privacy Policy](https://bridge.complyeaze.com/privacy).
+  [Privacy Policy](https://bridge.complyeaze.com/privacy.html).
 - **Take a backup first** (Alt+Y, Backup & Restore, in TallyPrime).
 - **Leave Tally's port alone.** Do not open it to the internet, and do not try to reach a Tally on another computer.
   ComplyEaze Bridge accepts only this computer's own address.
@@ -217,16 +217,19 @@ Still stuck? See [Help](#help).
 
 ## If you turn posting on
 
-Posting means Claude makes an entry (a voucher) in Tally. It stays off unless you switch on **Allow voucher posting**
+Posting means Claude makes an entry (a voucher) in Tally. It stays off unless you switch on **Allow voucher posting, one voucher or a batch of up to 50**
 in the settings. Read [The limits of posting](#the-limits-of-posting) before you do.
 
-Even with posting on, **every voucher needs your approval** in a separate ComplyEaze Bridge window that shows the
-voucher:
+Even with posting on, **every post needs your approval** in a separate ComplyEaze Bridge window: for one voucher it shows
+the voucher, for a saved batch a summary:
 
 ![The two approval windows, drawn as a diagram. Windows: "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel. Mac: "ComplyEaze Bridge — approve one voucher" with Post voucher and Cancel.](./img/install-approval.svg)
 
 - **Windows:** the window asks "post this voucher?" with **Yes**, **No** and **Cancel**. Only **Yes** posts. **No**
-  is the button already chosen, so pressing Enter does not post.
+  is the button already chosen, so pressing Enter does not post. **When you ask the assistant to post, stop typing in
+  Tally until you have answered this window.** It also takes the keyboard: in our tests (Windows 10,
+  TallyPrime 7.1 full screen, one screen, each tried once; #1780) a Down arrow moved its buttons on the 0.6.0 release
+  candidate, and on the published 0.6.0 a typed **n** declined it and a typed **y** approved it. Answer it with the mouse. The Mac window has not been measured for this.
 - **Mac:** the window says "approve one voucher" with **Post voucher** and **Cancel**. Only **Post voucher** posts; pressing Return may leave the window open.
 
 There is no tool to undo or delete a posted voucher. A wrong entry must be corrected by hand in Tally.
@@ -247,7 +250,7 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
   - a record of your acceptance of the Terms of Use.
 
   Section 7 of the
-  [Privacy Policy](https://bridge.complyeaze.com/privacy) explains how to archive them: keep the import journal in an
+  [Privacy Policy](https://bridge.complyeaze.com/privacy.html) explains how to archive them: keep the import journal in an
   encrypted archive rather than deleting it. Section 4 of [Security and privacy](../security-and-privacy.md) lists
   every file.
 - **Update:** it does not update by itself. Stop ComplyEaze Bridge, and every other program that uses it, before you
@@ -268,8 +271,8 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
     ComplyEaze Bridge, and every tool answers that the Terms of Use are not accepted (the tools the assistant called
     gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this
     release; bridge#1413).
-- **What to do after updating.** Tick the Terms setting, check **Allow voucher posting** (an earlier default may still
-  be saved as on), then quit and reopen Claude Desktop.
+- **What to do after updating.** Tick the Terms setting, check **Allow voucher posting, one voucher or a batch of up to 50** (it is a new
+  setting: if you turned posting on in an earlier version, turn it on again), then quit and reopen Claude Desktop.
 - **A release older than 0.4.2.** Installing over one was not tried: remove such a release first.
 - **Two ComplyEaze Bridge entries.** If Settings, then Extensions lists two entries (as happened when 0.4.2 was
   installed beside an older release), remove the older entry before you use either, and do not delete the data folder,
@@ -288,7 +291,9 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 - **Checking the download.** Releases are on [GitHub Releases](https://github.com/ComplyEaze/bridge/releases), the
   newest first. Each archive has a same-named `.sha256` file and a small provenance record on its release, so an
   organization can identify the downloaded bytes and the source commit. Run `certutil -hashfile <file> SHA256` on
-  Windows or `shasum -a 256 <file>` on a Mac and compare the result with the `.sha256` file.
+  Windows or `shasum -a 256 <file>` on a Mac, in the folder that holds the file (a command window opens in your home
+  folder, so `cd Downloads` first), and compare the 64-character code it prints with the code at the start of the
+  `.sha256` file.
 - **Build attestation.** From 0.4.0 each archive also has a build attestation, which `gh attestation verify` can
   check. It says which workflow run and commit produced those bytes. It is not a code signature, no client checks it
   yet, and it does not show that the code is safe.
@@ -302,18 +307,21 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 Voucher file preparation and bank-statement parsing are available by default;
 they write nothing to Tally. **Voucher posting is off by default** while four
 known limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. ComplyEaze Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post (bridge#607). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. ComplyEaze Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, bridge#574). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. ComplyEaze Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected (bridge#623). And ComplyEaze Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet (bridge#579, bridge#582). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it.
-Turning on **Allow voucher posting (Journal, Payment, Receipt, Contra)** in the
+Turning on **Allow voucher posting, one voucher or a batch of up to 50** in the
 extension settings adds posting; every new posting still requires your approval in a separate ComplyEaze Bridge
-dialog. Leave it off unless you accept those risks. If you installed an earlier
-version, check the setting: an earlier default may still be saved as on.
+dialog. For a batch there are two more limits: if Tally creates only some vouchers of a batch, ComplyEaze Bridge
+reports which ones it finds in the book and which it does not, and refuses to post the missing ones again, so check
+each in Tally (a voucher it does not find may still be in Tally, edited: do not re-enter it before you check); and a batch of more than 50, or one whose summary does not fit the window, is refused. Leave it off
+unless you accept those risks. This is a new setting: if you turned posting on in an earlier version, turn it on
+again.
 
-Native posting through the extension accepts one Journal, Payment, Receipt or
-Contra per approval, with existing ledgers and no supplied voucher number. A
-command-line installation can also post a saved batch of 2 to 50 such vouchers
-after one approval of a summary (per-ledger totals, and a line for each voucher
-when there are ten or fewer and those lines fit), when
-`BRIDGE_AGENT_ENABLE_BATCH_POST` is on together with posting.
-That setting is off by default and the extension does not set it (bridge#712).
+With posting on, native posting accepts one Journal, Payment, Receipt or
+Contra per approval, or a saved batch of 2 to 50 Journals, or of 2 to 50
+Payments, Receipts and Contras, after one approval of a summary (per-ledger
+totals, and a line for each voucher when there are ten or fewer and those lines
+fit), with existing ledgers and no supplied voucher number. One setting covers
+both. `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while posting is on and it is
+still set, `post_import` refuses as `setting_retired`; remove it.
 Batch posting through ComplyEaze Bridge has run live on a synthetic company on licensed
 TallyPrime Silver, 200 Journals in one import with a test build whose cap was
 raised, and verified; it is not proven on a multi-user book (bridge#725). A Payment, Receipt or Contra is

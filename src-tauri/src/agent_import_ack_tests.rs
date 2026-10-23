@@ -122,6 +122,11 @@ async fn an_approved_review_is_recorded_once_and_changes_no_verdict() {
     assert_eq!(result["operator_review"]["state"], "current", "{response}");
     assert_eq!(approval.reviews().len(), 1, "{response}");
     assert_eq!(approval.review_counts(), [1], "{response}");
+    assert_eq!(
+        approval.review_kinds(),
+        [crate::tally::approved_import::ReviewKind::Review],
+        "{response}"
+    );
     assert!(approval.previews().is_empty(), "no post dialog: {response}");
     let review = &approval.reviews()[0];
     assert!(review.contains("Cash"), "the doubt is shown: {review}");
@@ -436,7 +441,7 @@ async fn a_recorded_review_goes_stale_when_anything_it_bound_changes() {
         ("voucher_guid", reconcile_readback(), other_guid),
         ("voucher_master_id", reconcile_readback(), other_master_id),
     ];
-    for (name, later, change) in cases {
+    async fn goes_stale(name: &str, later: Vec<ScenarioPlan>, change: Change) {
         let mut plans = reconcile_readback();
         plans.extend(reconcile_readback());
         plans.extend(later);
@@ -460,6 +465,36 @@ async fn a_recorded_review_goes_stale_when_anything_it_bound_changes() {
             "{name}"
         );
     }
+
+    // The cases share no file, lock or port: each has its own simulator,
+    // directory and server. A case spends its time waiting on its simulator
+    // (about 70 requests), so they run side by side on this thread and the
+    // waits overlap. Every case is joined, and a panic in any of them is
+    // passed on under the case's name.
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async {
+            let running = cases
+                .into_iter()
+                .map(|(name, later, change)| {
+                    (
+                        name,
+                        tokio::task::spawn_local(goes_stale(name, later, change)),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let mut panicked = None;
+            for (name, case) in running {
+                if let Err(error) = case.await {
+                    eprintln!("case {name} failed");
+                    panicked.get_or_insert(error);
+                }
+            }
+            if let Some(error) = panicked {
+                std::panic::resume_unwind(error.into_panic());
+            }
+        })
+        .await;
 }
 
 #[tokio::test]
@@ -476,8 +511,7 @@ async fn the_tool_needs_the_posting_opt_in() {
     let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = Server::new(crate::agent::Settings {
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
         ..server_at(simulator.address(), directory.path())
             .settings
             .clone()

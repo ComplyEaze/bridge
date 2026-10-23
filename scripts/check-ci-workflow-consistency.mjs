@@ -177,7 +177,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "34a5f27cbf362aceafb42eabd9a288c2aef2b8c0844875a863a3649a61530e06"],
+  ], "bbb5adeb42d5ff582270600cd5834cb763298e95f7c018be8ea8dbab6a46bd93"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -188,13 +188,13 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "513a53144ba181c8221fe3dfd3d23504e18fb45d9d401111ef09245b23a9be88"],
+  ], "8e37fac9f60813953a1d5b39abbd1a4e6904e9506b16392e7650291c4998be21"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs src-tauri/target/release/${{ matrix.binary }}",
-  ], "b0f27a021c9d0fe13a3021a2177a3e649b5afa33e7e90e6738e4f7fd9b72fee4"],
+  ], "b8f6b70bdced2019e32e8fee1c1d20a7dcce0d270384849636182953702a384a"],
 ]) {
   if (stepBlock(jobBlock(source, job), expected[0]) !== expected.join("\n")) {
     failures.push(`${job}: step "${expected[0].trim()}" changed shape; review it and update its pinned copy`);
@@ -475,7 +475,7 @@ const expectedChanges = [
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
   "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
-  "          if grep -Eq '^(\\.github/workflows/|\\.github/actions/|rust-toolchain\\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.py$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes(\\.test)?\\.mjs$|retain-macos-test-binaries(\\.test)?\\.mjs$))' <<< \"$changed_files\"; then",
+  "          if grep -Eq '^(\\.github/workflows/|\\.github/actions/|rust-toolchain\\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.mjs$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes(\\.test)?\\.mjs$|retain-macos-test-binaries(\\.test)?\\.mjs$))' <<< \"$changed_files\"; then",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
@@ -489,7 +489,7 @@ const expectedChanges = [
   "          fi",
   "",
   "          # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.",
-  "          if grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.py|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
+  "          if grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",
@@ -515,7 +515,7 @@ const readAtRunTime = [
   ["scripts/check-no-test-seam.mjs", "src-tauri/tests/approval_seam_gate.rs (it starts cargo)"],
   ["scripts/package-mcpb.mjs", "src-tauri/tests/approval_seam_gate.rs (it starts cargo)"],
   ["packaging/pdfium/pdfium.lock.json", "the native job's PDFium step"],
-  ["scripts/fetch-pdfium.py", "the native job's PDFium step"],
+  ["scripts/fetch-pdfium.mjs", "the native job's PDFium step"],
   ["scripts/collect-macos-test-crashes.mjs", "the native job's macOS crash steps"],
   ["scripts/retain-macos-test-binaries.mjs", "the native job's macOS crash steps"],
   ["scripts/check-tally-request-builder-hazards.mjs", "src-tauri/src/tally/tdl_engine.rs"],

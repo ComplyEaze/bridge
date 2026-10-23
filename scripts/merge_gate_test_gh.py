@@ -23,10 +23,12 @@ BEHIND_MERGE_BASE = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 DIGEST = "a" * 64
 # git blob ids of lab captures, as the files API reports them in "sha": LAB_BLOB is the one the manifest tests list, LAB_BLOB_OFF
 # differs from it in the last character only.
-LAB_BLOB = "3b18e512dba79e4c8300dd08aeb37f8e728b8dad"
-LAB_BLOB_OFF = "3b18e512dba79e4c8300dd08aeb37f8e728b8dae"
-# the bytes the fake serves for LAB_BLOB; the manifest tests record their size and sha256
+LAB_BLOB = "1e0627036228d2a3032c1d66e96b9e997bea34af"
+LAB_BLOB_OFF = "1e0627036228d2a3032c1d66e96b9e997bea34ae"
+# the bytes the fake serves for LAB_BLOB (LAB_BLOB is their git blob id); the manifest tests record their size and sha256.
+# OTHER_LAB_BYTES are served for LAB_BLOB in one scenario: an answer whose bytes are not that blob.
 LAB_BYTES = b"lab capture bytes\n"
+OTHER_LAB_BYTES = b"other capture bytes\n"
 OTHER_BLOB = "9f2b1c4e7a6d03581e4c2b7a9d0f3e5c6b8a1d24"
 SURFACE_PATH = "docs/tally/compatibility/compatibility-surface.json"
 ACK_DIR = "docs/tally/compatibility/acks"
@@ -1054,7 +1056,8 @@ def state():
     elif scenario in {"binary-missing-attestation", "binary-with-attestation", "binary-no-rest-sha", "binary-malformed-rest-sha",
                       "binary-one-char-off", "binary-other-path", "binary-listed-and-unlisted", "binary-removed", "binary-renamed",
                       "binary-and-manifest-edit", "binary-body-pointer", "binary-blob-fails", "binary-blob-malformed",
-                      "binary-blob-not-base64", "binary-blob-size-field-differs", "binary-numeric-path", "binary-numeric-path-lookalike"}:
+                      "binary-blob-not-base64", "binary-blob-size-field-differs", "binary-blob-not-that-blob", "binary-numeric-path",
+                      "binary-numeric-path-lookalike"}:
         def binary_file(name, sha, status="added", previous=None):
             record = {"filename": name, "status": status, "additions": 0, "deletions": 0}
             if sha is not None:
@@ -1245,6 +1248,8 @@ elif args and args[0] == "api":
             emit({"encoding": "utf-8", "content": LAB_BYTES.decode(), "size": len(LAB_BYTES)})
         elif scenario == "binary-blob-size-field-differs":
             emit({"encoding": "base64", "content": encoded, "size": len(LAB_BYTES) + 1})
+        elif scenario == "binary-blob-not-that-blob":
+            emit({"sha": LAB_BLOB, "encoding": "base64", "content": base64.encodebytes(OTHER_LAB_BYTES).decode(), "size": len(OTHER_LAB_BYTES)})
         else:
             emit({"sha": LAB_BLOB, "encoding": "base64", "content": encoded, "size": len(LAB_BYTES)})
     elif "/compare/" in joined and "vnd.github.diff" in joined:

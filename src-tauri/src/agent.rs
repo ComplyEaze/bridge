@@ -1158,6 +1158,35 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              Summarise by ledger, month or voucher_type instead, and read ledger_masters for each \
              ledger's group. Retrying this call refuses again.",
         ),
+        // The company's voucher mark, or another part of its book extent, differed between the two
+        // reads that bracket a read (#1633). Codes and causes alike: the same text answers a
+        // divided window read, the registers and every report read between two extent reads. One
+        // measured case: a GST return export raised the voucher mark by 3 with no voucher change.
+        "voucher_window_changed_during_read"
+        | "native_ledger_extent_changed"
+        | "party_ledger_extent_changed"
+        | "company_book_extent_changed"
+        | "company_features_extent_changed"
+        | "currency_extent_changed"
+        | "currency_to_master_extent_changed"
+        | "masters_extent_changed"
+        | "month_register_extent_changed"
+        | "stock_summary_extent_changed" => Some(
+            "The company's books changed in Tally while this call was being read, so the call \
+             stopped and nothing was changed in Tally. Saving in Tally can do it, and so can a report that raises the voucher \
+             mark without changing a voucher: one GST return export raised it by 3. Nothing is \
+             wrong with the request. Ask the person whether anything is being saved or exported \
+             in Tally, then run the same request again once, when that has finished.",
+        ),
+        // A later page asked for the held listing and could not have it: the book moved, or the
+        // snapshot is gone (#1633).
+        "listing_snapshot_changed" => Some(
+            "A later page cannot be served from the listing the first page held: the company's \
+             books changed in Tally since that page, or the held listing has expired, been \
+             replaced or was never held. Run the request again from the first page, without snapshot_id, and page \
+             through that result. If the person is saving or exporting in Tally, wait for it to \
+             finish first.",
+        ),
         "group_snapshot_drifted" => Some(
             "A ledger's group, or a group's place in the tree, changed in Tally while this call \
              was being read, so the groups read before the window and after it differ and no \

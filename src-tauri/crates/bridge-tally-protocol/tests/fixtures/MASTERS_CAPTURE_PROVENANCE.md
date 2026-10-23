@@ -78,3 +78,11 @@ The three answers are the same request sent at three points of one sitting: befo
 | `masters_stock_items_shape_lab_baseline_live.utf16le.xml` | 19450 | `7038532ed86f7b924fe537d42b241eab93576d471787627e42f96837833c8a92` | stock items, baseline | 11 |
 | `masters_stock_items_shape_lab_item_created_live.utf16le.xml` | 23938 | `bdfffd330d47fcc2acc97eb40ded1ff262f86bd385c831a5b7b1b107bbcedd74` | stock items, item as first saved | 12 |
 | `masters_stock_items_shape_lab_two_dates_live.utf16le.xml` | 28208 | `6a4fd0b871763bad43db92cc98cbf0e0c48fcda441b84fbe20664d753df5d653` | stock items, two dated entries per list | 12 |
+| `masters_stock_items_tieout_b_live.utf16le.xml` | 16328 | `4566334dc76cf64df6edf1eb0a6e55b8ae8c5df7c3976a3ebd2c9b823ae10bf8` | stock items of the second synthetic stock book, Tally's own entries on all three items | 3 |
+
+## Added 2026-10-21: the second synthetic stock book (`masters_stock_items_tieout_b_*`)
+
+- **Date and instance:** 2026-10-21, TallyPrime Silver (licensed) 7.1 on Windows, `education_mode=false`, one request at a time with curl, HTTP 200 in 0.02 s; the company loaded alone. The request is the committed stock-items request with only the company changed (not committed again); a send log records the answer's sha256, equal to this file's.
+- **Book:** a synthetic company with three stock items (`Lab Widget A`, `B`, `C`) under Primary, whose items were entered by hand with opening stock. Every `BRIDGECOMPANYGUID` is the company's.
+- **What it shows:** each item carries one HSN entry and one GST entry dated 1 April 2025, source `As per Company/Stock Group`, with no HSN code, no taxability and no rate on any head, `GSTINELIGIBLEITC` Yes, a state row `Any`, and an empty slab-rate list element (a placeholder, not a slab rate). It is the shape the "item as first saved" capture shows on the first book, here on three items of a second book.
+- **Not shown:** a code or rate keyed on an item, a state row other than `Any`, slab rates, a client book.

@@ -45,6 +45,14 @@ fn two_dates() -> String {
     ))
 }
 
+fn tieout_b() -> String {
+    utf16le(include_bytes!(
+        "../tests/fixtures/masters_stock_items_tieout_b_live.utf16le.xml"
+    ))
+}
+
+const TIEOUT_B_COMPANY: &str = "d64eda55-da7c-4106-a171-3e3cb6cdd331";
+
 fn parse(text: &str) -> Result<NativeMasters, NativeMastersError> {
     parse_native_masters(KIND, text, COMPANY)
 }
@@ -132,6 +140,32 @@ fn the_baseline_capture_has_eleven_items_each_with_both_lists_and_gst_content_on
         }
     }
     assert_eq!(with_gst, ["Soda Ash Light"]);
+}
+
+#[test]
+fn a_second_book_shows_the_same_entries_tally_added_itself_on_all_three_of_its_items() {
+    let masters = parse_native_masters(KIND, &tieout_b(), TIEOUT_B_COMPANY).unwrap();
+    let names: Vec<_> = masters.rows.iter().map(|row| row.name.as_str()).collect();
+    assert_eq!(names, ["Lab Widget A", "Lab Widget B", "Lab Widget C"]);
+    for row in &masters.rows {
+        let (hsn, gst) = lists(row);
+        let hsn = hsn_entries(hsn);
+        assert_eq!(hsn.len(), 1, "{}", row.name);
+        assert_eq!(hsn[0].applicable_from, "20250401");
+        assert_eq!(hsn[0].hsn_code, None);
+        assert_eq!(hsn[0].source.as_deref(), Some("As per Company/Stock Group"));
+        let gst = gst_entries(gst);
+        assert_eq!(gst.len(), 1, "{}", row.name);
+        assert_eq!(gst[0].source.as_deref(), Some("As per Company/Stock Group"));
+        assert_eq!(gst[0].ineligible_itc, Some(true));
+        assert_eq!(gst[0].states.len(), 1);
+        // The empty slab-rate list Tally prints is not a slab rate.
+        assert!(!gst[0].states[0].slab_rates_present);
+        assert!(gst[0].states[0]
+            .rates
+            .iter()
+            .all(|rate| rate.rate == GstRate::Absent));
+    }
 }
 
 #[test]

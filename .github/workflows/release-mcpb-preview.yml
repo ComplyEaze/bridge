@@ -232,8 +232,9 @@ jobs:
         run: |
           set -euo pipefail
           footer=packaging/mcpb/UNSIGNED_PREVIEW_RELEASE.md
+          header=packaging/mcpb/INSTALL_AND_CHECK_RELEASE.md
           notes="$RUNNER_TEMP/release-notes.md"
-          if ! node scripts/release-notes.mjs notes --tag "$RELEASE_TAG" --changelog CHANGELOG.md --footer "$footer" --out "$notes"; then
+          if ! node scripts/release-notes.mjs notes --tag "$RELEASE_TAG" --changelog CHANGELOG.md --footer "$footer" --header "$header" --out "$notes"; then
             echo "::warning::could not compose release notes from CHANGELOG.md; publishing the standard unsigned-preview text only"
             cp "$footer" "$notes"
           fi

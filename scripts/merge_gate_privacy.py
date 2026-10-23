@@ -26,6 +26,7 @@ UUID_OR_DIGEST_RE = re.compile(
     r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{12}|[0-9A-Fa-f]{32,}"
 )
+ASCII_ALNUM = frozenset("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 PLACEHOLDER_RE = re.compile(r"^(X+|Z+)\d+(X|Z)?$|^\d{2}(X+|Z+)\d+[0-9A-Z]*$", re.I)
 # Boundaries include ordinary words plus snake/kebab field names and the first
 # capital of camelCase.  A UUID cannot evade the credential rule by changing
@@ -375,13 +376,52 @@ def redact_public_agent_attribution_messages(messages):
     return [redact_public_agent_attribution_trailer(message) for message in messages]
 
 
+# One digit repeated, and nothing else: the narrow family a test uses for a made-up reference (#1743).
+REPEATED_DIGIT_RE = re.compile(r"(\d)\1+")
+
+
+def enclosing_token(text, start, end):
+    """The run of ASCII letters and digits that contains text[start:end]."""
+    left = start
+    while left > 0 and text[left - 1] in ASCII_ALNUM:
+        left -= 1
+    right = end
+    while right < len(text) and text[right] in ASCII_ALNUM:
+        right += 1
+    return text[left:right]
+
+
+# A visibly synthetic token around a run of digits: three or four X or Z, then digits only, at most 24 of
+# them (#1743). Nothing may follow the digits, so an identifier glued after a prefix does not pass.
+SYNTHETIC_PREFIX_TOKEN_RE = re.compile(r"(?:X{3,4}|Z{3,4})\d{1,24}", re.I)
+DIGITS_ONLY_RE = re.compile(r"[0-9]+")
+
+
+def synthetic_token(token):
+    """Whether a whole token of digits is visibly synthetic: a 3-4 letter X/Z prefix and digits only, or one
+    digit repeated.
+
+    The token is judged whole, so a run beside a placeholder (a space or a hyphen between), a repeated run
+    inside a longer token that is not itself repeated, and an identifier glued after a prefix (two digits
+    and an X before a mobile-shaped run) still count.
+    """
+    return bool(SYNTHETIC_PREFIX_TOKEN_RE.fullmatch(token) or REPEATED_DIGIT_RE.fullmatch(token))
+
+
 def nonplaceholder_count(pattern, text):
     count = 0
     for match in pattern.finditer(text):
         value = match.group(0).upper()
         compact = value.replace(" ", "").replace("-", "")
-        if not PLACEHOLDER_RE.fullmatch(compact):
-            count += 1
+        if PLACEHOLDER_RE.fullmatch(compact):
+            continue
+        # The whole-token rule applies to a run of digits only. A match that holds letters (a PAN or GSTIN
+        # shape) keeps the earlier rule: it is exempt only when the match itself is a placeholder.
+        if DIGITS_ONLY_RE.fullmatch(value) and synthetic_token(
+            enclosing_token(text, match.start(), match.end())
+        ):
+            continue
+        count += 1
     return count
 
 

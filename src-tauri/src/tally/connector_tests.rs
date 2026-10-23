@@ -1809,3 +1809,34 @@ fn response_encoding_failure_remains_distinct_from_unreachable_for_connector_cal
         TallyError::Unreachable
     ));
 }
+
+/// A request that reached its deadline may have been sent and Tally may still be answering it
+/// (#1671), so it is not recorded as "Tally is not reachable". A refused or failed connection
+/// still is.
+#[test]
+fn a_request_deadline_is_not_recorded_as_tally_unreachable() {
+    let timed_out = map_transport_error(anyhow::Error::new(TallyTransportError::RequestTimedOut));
+    assert!(
+        matches!(timed_out, TallyError::RequestDeadlineExceeded),
+        "{timed_out:?}"
+    );
+    assert_eq!(
+        crate::sync::snapshot::tally_error_code(&timed_out),
+        "request_deadline_exceeded"
+    );
+    assert_eq!(
+        capability_failure_code(&timed_out),
+        "request_deadline_exceeded"
+    );
+    for other in [
+        TallyTransportError::ConnectionFailed,
+        TallyTransportError::RequestFailed,
+    ] {
+        let mapped = map_transport_error(anyhow::Error::new(other));
+        assert!(matches!(mapped, TallyError::Unreachable), "{mapped:?}");
+        assert_eq!(
+            crate::sync::snapshot::tally_error_code(&mapped),
+            "tally_unreachable"
+        );
+    }
+}

@@ -9,7 +9,7 @@ ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Its so
 
 What we checked ourselves, and what we did not. The Claude Desktop install screens and buttons in these steps are as
 seen in our tests on 1 and 2 October 2026. The Mac had Claude Desktop version 2.19675.0 (read from the app's files),
-and the owner reports that the Windows PC had the same version. The TallyPrime screens of Step 1 (F1, Settings,
+and the maintainer reports that the Windows PC had the same version. The TallyPrime screens of Step 1 (F1, Settings,
 Connectivity, the Client/Server configuration box and its list), the browser check, and the Alt+K and Alt+Y menus were
 checked by looking, on TallyPrime 7.1 on Windows on 10 October 2026; saving with Ctrl+A, restarting TallyPrime and
 the Backup & Restore submenu were not part of that check. The Mac keys are written from general knowledge of those programs; we did not walk them
@@ -292,7 +292,9 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 - **Checking the download.** Releases are on [GitHub Releases](https://github.com/ComplyEaze/bridge/releases), the
   newest first. Each archive has a same-named `.sha256` file and a small provenance record on its release, so an
   organization can identify the downloaded bytes and the source commit. Run `certutil -hashfile <file> SHA256` on
-  Windows or `shasum -a 256 <file>` on a Mac and compare the result with the `.sha256` file.
+  Windows or `shasum -a 256 <file>` on a Mac, in the folder that holds the file (a command window opens in your home
+  folder, so `cd Downloads` first), and compare the 64-character code it prints with the code at the start of the
+  `.sha256` file.
 - **Build attestation.** From 0.4.0 each archive also has a build attestation, which `gh attestation verify` can
   check. It says which workflow run and commit produced those bytes. It is not a code signature, no client checks it
   yet, and it does not show that the code is safe.

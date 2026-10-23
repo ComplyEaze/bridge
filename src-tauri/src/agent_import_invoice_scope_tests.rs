@@ -25,6 +25,7 @@ const LEGS: [&str; 6] = [
 
 const CATALOGUE: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml");
 const SCOPED_REQUEST: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.request.utf16le.xml");
+const SCOPED_HSN_REQUEST: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.request.utf16le.xml");
 const SCOPED_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml");
 const WHOLE_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-whole-10oct.utf16le.xml");
 const CASE_CHANGED_REQUEST: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-case-changed.request.utf16le.xml");
@@ -118,7 +119,7 @@ fn parents_of(scope: &InvoiceLedgerScope) -> Vec<String> {
 /// The lab's request with the HSN/SAC check's three fields added to its field
 /// list (#691, W16): the edit that turns the lab's unrestricted rates request
 /// into the one it answered on 12 Oct 2026 (the code renders the restricted one
-/// with the same three fields, which the lab was not sent as such). The edit
+/// with the same three fields, which the lab answered on 21 Oct 2026). The edit
 /// must apply exactly once.
 fn with_the_hsn_fields(request: String) -> String {
     const FROM: &str = "ROUNDINGLIMIT</FETCH>";
@@ -130,8 +131,9 @@ fn with_the_hsn_fields(request: String) -> String {
 }
 
 /// The scope the lab invoice's legs make is the four parents, and the request
-/// it renders is, byte for byte, the one the lab answered on 10 Oct 2026 (the
-/// file starts with a byte order mark) with the HSN/SAC fields added.
+/// it renders is, byte for byte, the one the lab answered on 21 Oct 2026 (the
+/// file starts with a byte order mark): the four-parent request of 10 Oct with
+/// the HSN/SAC fields added to its field list.
 #[test]
 fn the_lab_invoices_legs_make_the_request_the_lab_answered() {
     let scope = scope_of(&pilot_catalogue(), &LEGS).unwrap();
@@ -146,6 +148,8 @@ fn the_lab_invoices_legs_make_the_request_the_lab_answered() {
     );
     let rendered =
         wire::render_ledger_rates_request_for_parents(PILOT, WINDOW, scope.part()).unwrap();
+    assert_eq!(captured(SCOPED_HSN_REQUEST), rendered);
+    // The same request without the fields is the one the lab answered on 10 Oct.
     assert_eq!(with_the_hsn_fields(captured(SCOPED_REQUEST)), rendered);
     // Naming a ledger twice, or in another order, is the same scope.
     let mut shuffled = LEGS.to_vec();

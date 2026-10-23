@@ -92,6 +92,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "company_features",
         "egress_log",
         "gst_status",
+        "gst_uncertain_vouchers",
         "ledger_masters",
         "ledger_movement",
         "list_companies",
@@ -1345,6 +1346,16 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "the tool names no reason for a status",
         ),
         (
+            "gst_uncertain_vouchers",
+            "The reason for uncertainty is not read",
+            "the tool names no reason for a voucher's uncertainty",
+        ),
+        (
+            "gst_uncertain_vouchers",
+            "not the taxable value of the GSTR-1 tables",
+            "the amount is the invoice total, not a figure of the return",
+        ),
+        (
             "voucher_read_cost",
             "a narrower window does not lower it",
             "the census follows the book's mark, so a shorter window is not a cheaper call",
@@ -1511,6 +1522,26 @@ fn the_transfer_texts_claim_only_what_the_code_does() {
             assert!(!text.contains(phrase), "{phrase}: {text}");
         }
     }
+}
+
+/// The post tool says what the Windows approval window's first lines say for one
+/// voucher, so the assistant tells the person the same thing before the window
+/// opens (#1780).
+#[test]
+fn the_post_tool_says_what_the_approval_window_says() {
+    let definitions = registered_tool_definitions(true, true);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|entry| entry["name"] == "post_import"))
+        .and_then(|tool| tool["description"].as_str())
+        .expect("post_import is registered");
+    assert!(
+        description.contains(
+            "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to \
+             cancel. Nothing is posted until you answer."
+        ),
+        "{description}"
+    );
 }
 
 /// The most bytes the full catalogue may take in its tools/list answer. The

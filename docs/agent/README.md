@@ -94,6 +94,7 @@ The ordinary default tools, in name order:
 - `company_features`
 - `egress_log`
 - `gst_status`
+- `gst_uncertain_vouchers`
 - `ledger_masters`
 - `ledger_movement`
 - `list_companies`
@@ -120,7 +121,7 @@ The ordinary default tools, in name order:
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
 release 0.6.0. `audit_test_run` is in the source after release 0.6.0 and is not in a published build yet; it is
-not a default tool: it is listed only when its setting is on (below). `local_data_report` (also
+not a default tool: it is listed only when its setting is on (below). `gst_uncertain_vouchers` is in the source after release 0.6.0 and is not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -812,6 +813,52 @@ Measured on the engine's synthetic book replayed through the simulator. The engi
 a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8), on one book
 whose cash payments were zero, so its payments side was checked only at zero. The tool itself
 has not yet run against a live Tally: the lab comparison comes first.
+
+### Uncertain vouchers of one voucher type (`gst_uncertain_vouchers`)
+
+`gst_uncertain_vouchers` takes `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD) and `voucher_type_name`, with
+the same checks and refusals as `gst_status` (an exact type name, at most 93 days, a book whose voucher mark is at most
+25,000) and no `limit` or `offset`. It reads the status flags `gst_status` reads and adds each voucher's party and
+amount, and lists two things in one `items` list, each item carrying a `list`: `uncertain` (Tally's uncertain flag reads
+Yes once cancelled, optional and post-dated are decided first) and `overridden` (the acceptance flag, Accept As Is,
+reads Yes, with the `gst_status` the voucher reads now; a voucher that reads uncertain or excluded after it was
+accepted is the row to look at, and one voucher can be on both lists; that nothing but Accept As Is sets the flag to
+Yes is not measured, and the before-capture already held five vouchers with the flag Yes, an Accept As Is on Tally's screen is recorded for two of them, `BP/26-27/0005` and `BP/26-27/0016`, and the origin of the other three is not recorded). An item holds `voucher_number`, `date`,
+`party` (the party ledger), `amount` (the invoice total as Tally wrote it, without its sign, an exact decimal) with
+`party_side` (`debit` for a negative amount, `credit` for a positive one), `alter_id`, `master_id` and `gst_status`.
+A party or an amount that is empty, absent, repeated, zero or not a plain decimal (a foreign-currency amount) is
+`{"unread": code}`, never a name or a zero. `counts` are those of `gst_status` over the whole window, except that `unread` also counts a listed voucher whose party or amount was not read. The result
+also holds `pre_filing_line`, the line a CA reads before filing, with the number of vouchers Tally marks Uncertain
+and the window's dates, naming the voucher type read (the type's class is not checked, so the line does not call it a Sales type), and `filed_period_note`,
+which says the list may differ from a filed return and to check against it. The line is withheld (`{"withheld": ...}`) and the note is left out, and the
+result is `partial` (`gst_uncertain_voucher_unread`), when a voucher's flags or acceptance flag were not read or a
+listed voucher's party or amount was not, so the number in the line is never short. The line alone is withheld
+(`{"withheld": ...}`), the result staying `complete` with its counts, when no voucher was read in the window
+(`gst_uncertain_no_vouchers_in_window`, as a mistyped type name gives) or none is marked Uncertain
+(`gst_uncertain_none_marked_uncertain`), because a line of 0 would read as clearance. A cancelled voucher reads an
+empty party and amount and is not listed as uncertain; one whose acceptance flag reads Yes is listed under
+`overridden`, and its empty party and amount then make the result `partial` and withhold the line.
+
+Two reads are made. The first is `gst_status`'s own read, which counts the window's vouchers; a window above
+1,000 is refused with `gst_uncertain_window_too_large` (the count is in the refusal's `counts`), before the second
+read, which asks for the party and the amount and so makes Tally send each voucher's ledger entries as well
+(about 7.5 KB a voucher on the lab's book). That bound is provisional. Every status is read from the second read
+alone. A second read that returns fewer vouchers than the first counted is refused (`gst_uncertain_wide_read_short`, with both numbers in `counts`), never reported as a smaller window. A count of rows above this server's row limit is refused (`gst_uncertain_rows_over_limit`). The answer is not paged, so one over this server's response byte cap is refused whole (`agent_response_too_large`, no counts): ask for a shorter window. The party is
+the party ledger (a cash sale shows the cash ledger); no GSTIN is fetched. The amount is the invoice total on the
+party's entry, tax and round-off included, not the taxable value of the GSTR-1 tables. `mask_parties` masks the
+party names of this tool's answer and not its amounts, and the answer carries both to the assistant, which
+`gst_status` does not.
+
+The reason for uncertainty is not read, and bills missing an HSN/SAC are not split out from the others: they need
+re-saving with the code, not Accept As Is. To confirm an acceptance after someone accepts vouchers in Tally, run the
+tool again and compare by `master_id`: the acceptance is confirmed only if an earlier run listed the voucher uncertain
+and this run lists it overridden with `gst_status` included and the same amount. That shows only that the acceptance
+flag was set and the voucher reads included with the same amount, not that the voucher is correct or complete. Nothing
+is kept between runs. Measured on one synthetic
+book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, which changed that voucher alone, for the
+unregistered buyer of its Sales invoices. Not measured: item invoices, a registered buyer, credit notes or other
+Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once,
+Gold and other releases.
 
 ### Stock Summary
 
@@ -2985,9 +3032,18 @@ Per tool:
 - `voucher_presence` (`src-tauri/src/agent_presence.rs`):
   1. the company read;
   2. the ledger catalogue;
-  3. the window read;
-  4. the corroboration (if empty);
-  5. the ledger catalogue again.
+  3. only when a voucher type is declared `manual` (20 requests): the company's master mark (6),
+     then the voucher-type numbering (14: the mode probe and identity, the masters pair, the
+     numbering pair, identity and mode again); the call is refused here, before any window
+     request, when a declared-manual type is not Manual with exactly one series that prevents duplicate
+     numbers in the book, the
+     book holds no type of that exact name, or its numbering cannot be read (Education mode keeps
+     the read's own code, `masters_education_unqualified`). The check reads the numbering as it
+     is now, holds for the moment of the read, and does not know how existing vouchers were
+     numbered when they were entered;
+  4. the window read;
+  5. the corroboration (if empty);
+  6. the ledger catalogue again.
 
   Its `catalogue_evidence_sha256` hashes parsed names, not a request.
 - `ledger_movement` (`src-tauri/src/agent_movement.rs`):
@@ -3315,8 +3371,10 @@ vouchers in the window, not the party's. A named bill's window never starts befo
 The vouchers and the bills reports are two reads whose extents are not compared: a voucher posted
 between them usually shows as `trail_does_not_tie`, but two changes that compensate, or
 allocations that net to zero, can still read `tied`. Measured on one synthetic book only
-(reference 12a.14); an `as_of` earlier than the last voucher and post-dated vouchers were not
-measured.
+(reference 12a.14); a second synthetic book (captures of 9 October 2026) also showed an `as_of`
+earlier than the last voucher, a post-dated voucher and an advance later adjusted by an invoice
+reading as Tally's own screen does, bill for bill. Not measured: a client book, an opening bill with
+a credit sign, more than one opening bill.
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own
 Bills Receivable and Bills Payable reports scope them, not the type of party, and
@@ -3333,7 +3391,8 @@ of an `unallocated` amount is the sign of the party's net unallocated balance, s
 an on-account receipt and an on-account payment on one party net into one figure.
 For one party, `detail: unadjusted` separates advances, pending credit and debit notes and
 on-account amounts by their voucher's bill type (below). The book-wide `open_bills.kind` and
-`unallocated` figures do not; what is still to be measured is in #1356, the follow-up to #945.
+`unallocated` figures do not. What is still to be measured (a party term against an unfiltered
+control, a per-ledger report, the cost on a large book) is in #1356, the follow-up to #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted

@@ -267,14 +267,15 @@ test("the install page snapshot step drops drafts and refuses a list with no mcp
   const page = await workflow("../.github/workflows/deploy-install-page.yml");
   const { run } = page.jobs.build.steps.find((candidate) => candidate.name === "Snapshot releases for the install page");
   const files = (tag) => ["windows-x64", "macos-arm64"].flatMap((platform) => [`bridge-tally-${tag}-${platform}.mcpb`, `bridge-tally-${tag}-${platform}.mcpb.sha256`]);
-  const release = (tag_name, draft, names = files(tag_name)) => ({ tag_name, draft, prerelease: true, published_at: "2026-09-26T11:19:29Z", body: "x", assets: names.map((name) => ({ name, browser_download_url: `https://example.invalid/${name}`, size: 1 })) });
+  const release = (tag_name, draft, names = files(tag_name)) => ({ tag_name, draft, prerelease: true, published_at: "2026-09-26T11:19:29Z", body: "x", assets: names.map((name) => ({ name, browser_download_url: `https://example.invalid/${name}`, digest: `sha256:${"a".repeat(64)}`, size: 1 })) });
 
   const ok = runSnapshotStep(run, [release("mcp-preview-0.4.0", true), release("mcp-preview-0.3.0", false), release("v0.1.0", false)]);
   assert.equal(ok.status, 0, ok.stderr);
   const snapshot = JSON.parse(ok.written);
   assert.deepEqual(snapshot.map((entry) => entry.tag_name), ["mcp-preview-0.3.0", "v0.1.0"]);
   assert.deepEqual(Object.keys(snapshot[0]).sort(), ["assets", "draft", "prerelease", "published_at", "tag_name"]);
-  assert.deepEqual(Object.keys(snapshot[0].assets[0]).sort(), ["browser_download_url", "name"]);
+  assert.deepEqual(Object.keys(snapshot[0].assets[0]).sort(), ["browser_download_url", "digest", "name"]);
+  assert.equal(snapshot[0].assets[0].digest, `sha256:${"a".repeat(64)}`);
 
   const onlyDraftPreview = runSnapshotStep(run, [release("mcp-preview-0.4.0", true), release("v0.1.0", false)]);
   assert.equal(onlyDraftPreview.status, 1);
@@ -515,6 +516,22 @@ test("the release footer states what the release check covers, the true limits, 
   assert.doesNotMatch(prose, /\bpreviews?\b|for evaluation|production/i);
   const claims = prose.replace(/not yet\s+code-signed or notarized/g, "").replace(/unsigned/g, "");
   assert.doesNotMatch(claims, /\b(?:code-)?signed\b|\bnotarized\b|\bnotarised\b/i, "the footer may not claim signing or notarization");
+});
+
+test("the release header tells a person how to install and check a download, and does not claim signing", async () => {
+  const header = (await readFile(new URL("../packaging/mcpb/INSTALL_AND_CHECK_RELEASE.md", import.meta.url), "utf8")).replace(/\s+/g, " ");
+  assert.match(header, /certutil -hashfile <file> SHA256/);
+  assert.match(header, /shasum -a 256 <file>/);
+  assert.match(header, /64-character code it prints must match the code at the start of the `\.sha256` file/);
+  assert.match(header, /docs\/agent\/INSTALL\.md/);
+  assert.equal(header.match(/type `cd Downloads` and then run/g)?.length, 2, "both commands follow a change to the Downloads folder");
+  // the header names every platform the publish workflow packages
+  const platforms = /for platform in ((?:[a-z0-9-]+ ?)+); do/.exec(await readFile(new URL("../.github/workflows/release-mcpb-preview.yml", import.meta.url), "utf8"));
+  assert.ok(platforms, "the workflow has no platform loop to compare");
+  for (const platform of platforms[1].trim().split(" ")) assert.ok(header.includes(`${platform}.mcpb`), `the header does not name ${platform}.mcpb`);
+  assert.match(header, /not yet code-signed or notarized, so your computer may warn you/);
+  const claims = header.replace(/not yet code-signed or notarized/g, "");
+  assert.doesNotMatch(claims, /\bpreviews?\b|\bfree\b|\b(?:code-)?signed\b|\bnotarized\b|for evaluation|production/i);
 });
 
 test("the install guide does not call a release a preview or say it is for evaluation", async () => {

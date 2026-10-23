@@ -1,7 +1,7 @@
 //! `audit_test_run` through the MCP adapter, replayed from the tax-audit
 //! crate's synthetic read (cut to thirty vouchers so the production window
 //! limits read it as one request).
-use super::super::audit_read::tests::{companies_xml, plan, Replay, FIXTURE_GUID};
+use super::super::audit_read::tests::{companies_xml, fixture_guid, plan, Replay};
 use super::super::*;
 use super::*;
 use tally_protocol_simulator::{
@@ -58,9 +58,9 @@ fn replayed(replay: &Replay, redaction: Redaction) -> OneServer {
             .with_framing(ResponseFraming::ContentLength)
     };
     let mut plans = vec![
-        plan(companies_xml(FIXTURE_GUID)),
+        plan(companies_xml(fixture_guid())),
         status(),
-        plan(companies_xml(FIXTURE_GUID)),
+        plan(companies_xml(fixture_guid())),
         status(),
     ];
     plans.extend(replay.plans());
@@ -69,7 +69,7 @@ fn replayed(replay: &Replay, redaction: Redaction) -> OneServer {
 
 fn args() -> Value {
     json!({
-        "company_guid": FIXTURE_GUID,
+        "company_guid": fixture_guid(),
         "from": "20250401",
         "to": "20260331",
         "test": "cash_44ab",

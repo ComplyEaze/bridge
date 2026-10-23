@@ -44,6 +44,7 @@ const GUARD =
 // script, arguments and environment of a harmless probe, the exit status it ends with and a pattern
 // its output (stdout and stderr) matches when `main` ran.
 const PROBES = [
+  { script: "capture-package-log.mjs", args: ["--bogus"], status: 2, pattern: /usage: corepack pnpm run tauri:build/ },
   { script: "check-conflict-markers.mjs", status: 2, pattern: /could not check for conflict markers/ },
   { script: "check-pr-milestone.mjs", env: { PR_MILESTONE: "null" }, status: 1, pattern: /A pull request needs a milestone/ },
   { script: "check-pr-type-label.mjs", env: { PR_LABELS: "[]" }, status: 1, pattern: /A pull request needs exactly one of type:/ },
@@ -59,6 +60,8 @@ const PROBES = [
   { script: "next-version.mjs", args: ["--bogus"], status: 1, pattern: /next-version: unknown flag --bogus/ },
   { script: "package-mcpb.mjs", status: 1, pattern: /usage: node scripts\/package-mcpb\.mjs/ },
   { script: "review-tier.mjs", status: 2, pattern: /give --paths-file FILE or --pr N/ },
+  { script: "collect-macos-test-crashes.mjs", status: 2, pattern: /--since-file and --output are required/ },
+  { script: "retain-macos-test-binaries.mjs", status: 2, pattern: /--crash-json, --target and --output are required/ },
 ];
 
 function environment(extra = {}) {

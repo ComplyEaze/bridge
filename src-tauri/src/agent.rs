@@ -49,6 +49,8 @@ mod cash_flow;
 mod company_features;
 #[path = "agent_gst_status.rs"]
 mod gst_status;
+#[path = "agent_gst_uncertain.rs"]
+mod gst_uncertain;
 #[path = "agent_headline.rs"]
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
@@ -870,6 +872,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         if cause.is::<crate::tally::connection::NativeReportPairDrift>() {
             return Some(crate::tally::connection::NativeReportPairDrift::SAFE_CODE);
         }
+        // The named company is not loaded in Tally, was renamed, or was listed more than once
+        // (#1699): the read failed closed, and this says why.
+        if let Some(identity) = crate::tally::runtime::company_identity_cause(cause) {
+            return Some(identity);
+        }
         if let Some(catalogue) =
             cause.downcast_ref::<bridge_tally_protocol::StandardLedgerCatalogError>()
         {
@@ -980,6 +987,13 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// This never softens a refusal — it only says what to do about one.
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "company_identity_absent_or_ambiguous" | "company_identity_not_matched" => Some(
+            "Tally did not confirm the selected company as exactly one loaded company, so nothing \
+             was returned. The company may not be loaded in Tally, may have been renamed since \
+             list_companies, or Tally may list it more than once. Ask the user to open the company \
+             in Tally, then call list_companies again and repeat the request with the \
+             company_guid it returns.",
+        ),
         "setting_retired" => Some(
             "BRIDGE_AGENT_ENABLE_BATCH_POST was retired: batch posting now follows the posting \
              setting (BRIDGE_AGENT_ENABLE_WRITES), which covers one voucher or a saved batch of \
@@ -1173,6 +1187,35 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              company with fewer ledgers may be refused. Tell the person the limit is provisional. \
              Summarise by ledger, month or voucher_type instead, and read ledger_masters for each \
              ledger's group. Retrying this call refuses again.",
+        ),
+        // The company's voucher mark, or another part of its book extent, differed between the two
+        // reads that bracket a read (#1633). Codes and causes alike: the same text answers a
+        // divided window read, the registers and every report read between two extent reads. One
+        // measured case: a GST return export raised the voucher mark by 3 with no voucher change.
+        "voucher_window_changed_during_read"
+        | "native_ledger_extent_changed"
+        | "party_ledger_extent_changed"
+        | "company_book_extent_changed"
+        | "company_features_extent_changed"
+        | "currency_extent_changed"
+        | "currency_to_master_extent_changed"
+        | "masters_extent_changed"
+        | "month_register_extent_changed"
+        | "stock_summary_extent_changed" => Some(
+            "The company's books changed in Tally while this call was being read, so the call \
+             stopped and nothing was changed in Tally. Saving in Tally can do it, and so can a report that raises the voucher \
+             mark without changing a voucher: one GST return export raised it by 3. Nothing is \
+             wrong with the request. Ask the person whether anything is being saved or exported \
+             in Tally, then run the same request again once, when that has finished.",
+        ),
+        // A later page asked for the held listing and could not have it: the book moved, or the
+        // snapshot is gone (#1633).
+        "listing_snapshot_changed" => Some(
+            "A later page cannot be served from the listing the first page held: the company's \
+             books changed in Tally since that page, or the held listing has expired, been \
+             replaced or was never held. Run the request again from the first page, without snapshot_id, and page \
+             through that result. If the person is saving or exporting in Tally, wait for it to \
+             finish first.",
         ),
         "group_snapshot_drifted" => Some(
             "A ledger's group, or a group's place in the tree, changed in Tally while this call \
@@ -1675,9 +1718,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "import_voucher_numbering_not_automatic" | "import_voucher_numbering_not_retain" => {
             Some(agent_import::POST_NUMBERING_NEXT_STEP)
         }
+        // The two refusals of the numbering check in `voucher_presence` (#1691).
+        "presence_numbering_method_differs_from_book" => Some(PRESENCE_NUMBERING_REMEDIATION),
+        "presence_numbering_unreadable" => Some(PRESENCE_NUMBERING_UNREADABLE_REMEDIATION),
         _ => None,
     }
 }
+
+/// The next step of the numbering refusal of `voucher_presence` (#1691): the
+/// types it names are in the refusal's candidates, each with what the book says.
+const PRESENCE_NUMBERING_REMEDIATION: &str = "A voucher type you declared manual is not numbered Manual with exactly one series that prevents duplicate numbers in the book, or the book holds no type of that exact name; the types, and what the book says of each, are in the candidates. Correct the spelling to the book's own type name, or declare the type automatic or unknown to compare by resemblance only. The check reads the book's numbering as it is now.";
+
+/// The next step when the numbering could not be read for a manual declaration.
+const PRESENCE_NUMBERING_UNREADABLE_REMEDIATION: &str = "The book's numbering could not be read, so a manual declaration cannot be checked. Declare the types automatic or unknown to compare by resemblance only, or ask again once the numbering can be read.";
 
 /// The one next step every date refusal gives (#1268).
 const DATE_REMEDIATION: &str = "Give each date as YYYYMMDD (YYYY-MM-DD also works), a real \
@@ -2514,6 +2567,7 @@ impl Server {
             "company_features" => self.company_features(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
             "gst_status" => self.gst_status(args).await,
+            "gst_uncertain_vouchers" => self.gst_uncertain_vouchers(args).await,
             "ledger_masters" => self.ledger_masters(args).await,
             "ledger_movement" => self.ledger_movement(args).await,
             "list_companies" => {

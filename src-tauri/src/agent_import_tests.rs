@@ -2425,24 +2425,9 @@ fn utf16le(bytes: &[u8]) -> String {
     .unwrap()
 }
 
-/// DERIVED, not Tally's bytes: the answer to the rates read the code sends now
-/// (restricted to the parents of the invoice's ledgers, #1331, with the three
-/// HSN/SAC fields added to its field list, #691), which the lab was not sent.
-/// It is the lab's answer to the unrestricted read with those three fields
-/// (`pilot-lab-ledger-rates-hsn`, 12 Oct 2026) with every ledger row removed
-/// that the lab's answer to the restricted read (`pilot-lab-ledger-rates-scoped`,
-/// 10 Oct 2026) does not hold: that read held exactly the unrestricted read's
-/// rows under the four parents (PROVENANCE; PARTIAL: one book, one spelling),
-/// and the book gained two ledgers (`BRIDGE Svc 4D 5%`, `BRIDGE Svc INH 5%`)
-/// between the two days, which the 10 Oct catalogue the replay pairs with does
-/// not hold. The removal is counted, and the rows left must be the scoped read's
-/// rows, name for name, each under one of the four parents.
-pub(super) fn pilot_scoped_rates_hsn() -> String {
-    let scoped = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml"));
-    derived_scoped_rates_hsn(&ledger_row_names(&scoped))
-}
-
-/// DERIVED, not Tally's bytes: as [`pilot_scoped_rates_hsn`], for the book of
+/// DERIVED, not Tally's bytes: the answer to the rates read the code sends
+/// (`pilot-lab-ledger-rates-scoped-hsn`, which the lab answered on 21 Oct 2026
+/// for the book as it then stood), for the book of
 /// the lab's W18 sittings (`pilot-lab-w18`), which the lab was not asked the
 /// scoped rates request on either. The rows are the lab's W16 answer's rows of
 /// the ledgers that the W18 catalogue holds under the four parents (the two

@@ -1011,6 +1011,10 @@ servo_arc 0.4.3
 License: MIT OR Apache-2.0
 Source: https://github.com/servo/stylo
 
+sha1 0.11.0
+License: MIT OR Apache-2.0
+Source: https://github.com/RustCrypto/hashes
+
 sha1_smol 1.0.1
 License: BSD-3-Clause
 Source: https://github.com/mitsuhiko/sha1-smol
@@ -8539,6 +8543,7 @@ Apache License 2.0
 - digest 0.10.7
 - digest 0.11.3
 - hybrid-array 0.4.14
+- sha1 0.11.0
 - sha2 0.10.9
 - sha2 0.11.0
 

@@ -14,6 +14,20 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
+**Added**
+
+- `gst_uncertain_vouchers` lists the vouchers of one voucher type (a Sales type is what was measured) in a window that Tally marks Uncertain in its
+  GSTR-1, and the vouchers a person accepted as they stand (Accept As Is), each with its party ledger, its invoice total
+  (without its sign, with its side) and Tally's identifiers, and the line a CA reads before filing. It counts the window's
+  vouchers with the status read first and refuses a window above 1,000 vouchers (provisional) before it reads amounts,
+  and refuses an amounts read that returns fewer vouchers than the count found; the
+  line names the voucher type it covers, and is withheld when no voucher was read or none is uncertain, and, with the
+  result partial, when a voucher's flags or a listed voucher's party or amount were not read. Its answer carries party names and amounts
+  to the assistant; `mask_parties` masks the names and not the amounts. The reason for uncertainty is not read, and bills
+  missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one
+  Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not
+  measured.
+
 **Changed**
 
 - A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
@@ -46,6 +60,15 @@ These changes are in source and not yet in a published build.
   `numbering_read` `not_read`; a call that does read it returns what the book said for each declared type, or
   only their counts when the rows would not fit the response budget.
 
+- `ledger_masters` with `include_gst_details` now names Tally's `GSTINELIGIBLEITC` as `ineligible_itc` (true for Yes,
+  false for No, null when the element is absent), where 0.6.0 named it `itc_eligible` and so told an assistant that
+  an entry with a keyed "Eligible for Input Tax Credit: No" was eligible. Measured on one ledger created
+  under Purchase Accounts in a synthetic book (TallyPrime 7.1): the screen's Yes read as the element absent and
+  its No as Yes, so the element is an ineligibility flag (PARTIAL: one book, one release, one ledger, one dated
+  entry; part of #1741). A Yes on any other ledger says nothing either way: the Sales ledgers of one captured book
+  carry a Yes on their keyed entries, and Tally's own default entry (source `As per Company/Group`) carries one with
+  no keyed No; neither was read against the screen. The value
+  mapping is unchanged: do not read `true` as eligible.
 
 - `masters` can list a company's stock items (`kind` `stock_items`): each row carries the item's own dated HSN
   entries (`hsn`) and GST rate entries (`gst`) as Tally sent them, nothing choosing the code or the rate for a date
@@ -59,8 +82,7 @@ These changes are in source and not yet in a published build.
   ineligibility flag; null is neither eligible nor ineligible, and what an absent element means for the tax is
   not known. On an entry whose source is `As per Company/Stock Group` (the entry Tally adds itself on a first save; a person can also choose that source) a flag Tally sent is withheld:
   `ineligible_itc` is null and `ineligible_itc_withheld` is `tally_default_entry`, because the Yes seen on such an
-  entry was never compared with the screen; a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is. `ledger_masters` keeps its own key for the same element (tracked in
-  #1741). A book is read only up to a master mark of 489 (a limit of 489 refuses, by arithmetic, both client
+  entry was never compared with the screen; a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is. `ledger_masters` names the same element the same way (#1741). A book is read only up to a master mark of 489 (a limit of 489 refuses, by arithmetic, both client
   books measured; not tried on them). Measured on one synthetic book of TallyPrime 7.1 Silver (three captures, one item
   with two dated entries in each list); a state row other than `Any`, slab rates, another release, a larger book
   and a zero-row stock-item answer are not measured. `stock_summary` is unchanged.

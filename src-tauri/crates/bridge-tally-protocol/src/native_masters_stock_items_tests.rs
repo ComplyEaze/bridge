@@ -150,7 +150,7 @@ fn the_item_created_capture_shows_the_entries_tally_added_on_the_first_save() {
     assert_eq!(gst[0].applicable_from, "20250401");
     assert_eq!(gst[0].taxability, None);
     assert_eq!(gst[0].source.as_deref(), Some("As per Company/Stock Group"));
-    assert_eq!(gst[0].itc_eligible, Some(true));
+    assert_eq!(gst[0].ineligible_itc, Some(true));
     // No rate on any head: absent, not empty and not zero.
     assert_eq!(gst[0].states.len(), 1);
     assert!(gst[0].states[0]
@@ -197,8 +197,8 @@ fn the_two_date_capture_reads_two_hsn_and_two_gst_entries_as_sent() {
     // `GSTINELIGIBLEITC` is present on one entry and absent on the other, and
     // neither is filled in. (It was Yes where the screen read `Eligible for
     // Input Tax Credit: No`, so the tool names it `ineligible_itc`.)
-    assert_eq!(gst[0].itc_eligible, Some(true));
-    assert_eq!(gst[1].itc_eligible, None);
+    assert_eq!(gst[0].ineligible_itc, Some(true));
+    assert_eq!(gst[1].ineligible_itc, None);
     let rates = |entry: &GstDetailsEntry| {
         entry.states[0]
             .rates
@@ -481,7 +481,7 @@ fn a_credit_flag_that_is_not_yes_or_no_fails_the_gst_list() {
         "<GSTINELIGIBLEITC TYPE=\"Logical\">No</GSTINELIGIBLEITC>",
     )
     .unwrap();
-    assert_eq!(gst_entries(&gst)[0].itc_eligible, Some(false));
+    assert_eq!(gst_entries(&gst)[0].ineligible_itc, Some(false));
 }
 
 #[test]

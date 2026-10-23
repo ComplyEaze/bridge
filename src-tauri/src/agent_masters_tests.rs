@@ -1598,7 +1598,7 @@ async fn stock_items_read_end_to_end_with_their_lists_exactly_as_sent() {
     assert!(gst
         .iter()
         .all(|entry| entry.get("ineligible_itc_withheld").is_none()));
-    // The ledger key is not on a stock item's entries.
+    // The key 0.6.0 shipped for the ledger output is not on a stock item's entries.
     assert!(gst.iter().all(|entry| entry.get("itc_eligible").is_none()));
     let igst = |entry: &Value| entry["states"][0]["rates"][2].clone();
     assert_eq!(

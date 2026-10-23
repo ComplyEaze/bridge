@@ -1,7 +1,7 @@
 //! The closed reader of a stock item's `HSNDETAILS.LIST` and `GSTDETAILS.LIST`
 //! inside a `masters` row (kind `stock_items`).
 //!
-//! Evidence: one synthetic book on one licensed `TallyPrime` 7.1 (section 12a.20 of
+//! Evidence: one synthetic book on one licensed `TallyPrime` 7.1 (section 12a.22 of
 //! the protocol reference; PARTIAL). The lists sit directly under the row, in the
 //! order `GSTDETAILS.LIST`, `HSNDETAILS.LIST`, `LANGUAGENAME.LIST`, one element
 //! per dated entry; an item without entries carries one whitespace-only element
@@ -190,7 +190,7 @@ fn read_gst_entry(reader: &mut Reader<&[u8]>) -> Result<RawGstDetailsEntry, Nati
             b"APPLICABLEFROM" => &mut entry.applicable_from,
             b"TAXABILITY" => &mut entry.taxability,
             b"SRCOFGSTDETAILS" => &mut entry.source,
-            b"GSTINELIGIBLEITC" => &mut entry.itc_eligible,
+            b"GSTINELIGIBLEITC" => &mut entry.ineligible_itc,
             b"STATEWISEDETAILS.LIST" => {
                 let state = if empty {
                     RawGstStateDetails::default()

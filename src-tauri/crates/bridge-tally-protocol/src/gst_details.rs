@@ -47,14 +47,16 @@ pub struct GstDetailsEntry {
     pub taxability: Option<String>,
     /// `SRCOFGSTDETAILS`.
     pub source: Option<String>,
-    /// `GSTINELIGIBLEITC`, `Yes` or `No`, as sent. The name is the one the
-    /// ledger output ships. The element's name says *in*eligible, and on one
-    /// stock item its Yes was seen where the screen read `Eligible for Input Tax
-    /// Credit: No` (PARTIAL), so the `masters` presentation of a stock item
-    /// writes it as `ineligible_itc`; `ledger_masters` is unchanged. Two keys
-    /// for one Tally element is deliberate until the ledger key is rectified
-    /// (tracked in #1741).
-    pub itc_eligible: Option<bool>,
+    /// `GSTINELIGIBLEITC`, `Yes` or `No`, as sent, under the name of Tally's
+    /// element: an *in*eligibility flag where measured. On one ledger under
+    /// Purchase Accounts with a keyed history row the screen `Eligible for
+    /// Input Tax Credit: Yes` read as the element absent and `No` as `Yes`
+    /// (#1741; PARTIAL: one synthetic book, one release, one ledger, one dated
+    /// entry). A `Yes` on any other ledger says nothing either way: the Sales
+    /// ledgers of one captured book carry it on their keyed entries, and
+    /// Tally's own default entry (source `As per Company/Group`) carries it
+    /// with no keyed No. Protocol reference §12a.20.
+    pub ineligible_itc: Option<bool>,
     pub states: Vec<GstStateDetails>,
     /// True when the element held content this parser does not model, at the
     /// entry, in any state row or in any rate row. The read is then not the
@@ -122,7 +124,7 @@ pub struct RawGstDetailsEntry {
     pub applicable_from: Option<String>,
     pub taxability: Option<String>,
     pub source: Option<String>,
-    pub itc_eligible: Option<String>,
+    pub ineligible_itc: Option<String>,
     pub states: Vec<RawGstStateDetails>,
     pub repeated_field: bool,
     /// An unrecognised child was skipped at this level.
@@ -161,7 +163,7 @@ impl RawGstDetailsEntry {
         self.applicable_from.is_none()
             && self.taxability.is_none()
             && self.source.is_none()
-            && self.itc_eligible.is_none()
+            && self.ineligible_itc.is_none()
             && self.states.is_empty()
     }
 }
@@ -240,7 +242,7 @@ fn validate_entry(entry: RawGstDetailsEntry) -> Result<GstDetailsEntry, GstDetai
     if TallyDate::parse(applicable_from.as_str()).is_err() {
         return Err(GstDetailsDefect::DateInvalid);
     }
-    let itc_eligible = match entry.itc_eligible.as_deref().map(str::trim) {
+    let ineligible_itc = match entry.ineligible_itc.as_deref().map(str::trim) {
         None => None,
         Some("Yes") => Some(true),
         Some("No") => Some(false),
@@ -282,7 +284,7 @@ fn validate_entry(entry: RawGstDetailsEntry) -> Result<GstDetailsEntry, GstDetai
         applicable_from,
         taxability: entry.taxability,
         source: entry.source,
-        itc_eligible,
+        ineligible_itc,
         states,
         other_content_skipped,
     })

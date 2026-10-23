@@ -420,6 +420,10 @@
       "reason": "The gst_status tool: reads Tally's GSTR-1 status flags of the vouchers of one type in a window and parses the answer closed. A defect reports a voucher whose flags were absent, repeated or odd as included, or a voucher outside the type or window."
     },
     {
+      "path": "src-tauri/src/agent_gst_uncertain.rs",
+      "reason": "The gst_uncertain_vouchers tool: lists the vouchers Tally marks Uncertain and the ones accepted as they stand, with the party and invoice total of each, and the line a CA reads before filing. A defect reports a wrong count or amount, lists a cancelled or optional voucher, or states a number that is short because a voucher was not read."
+    },
+    {
       "path": "src-tauri/src/agent_headline.rs",
       "reason": "Decides the sentence a CA reads about whether a read is whole or partial, and states the company and the period."
     },

@@ -4714,6 +4714,17 @@ async fn post_and_verify(
     readback: Vec<ScenarioPlan>,
     later: Vec<Vec<ScenarioPlan>>,
 ) -> (Value, Vec<Value>, Vec<Value>) {
+    post_and_verify_with_journal(marks_after, readback, later, |text| text).await
+}
+
+/// [`post_and_verify`], with `edit` applied to the journal's text before each
+/// later verification.
+async fn post_and_verify_with_journal(
+    marks_after: String,
+    readback: Vec<ScenarioPlan>,
+    later: Vec<Vec<ScenarioPlan>>,
+    edit: impl Fn(String) -> String,
+) -> (Value, Vec<Value>, Vec<Value>) {
     let mut plans = before_approval();
     plans.extend(after_approval(xml(created_one())));
     plans.push(xml(marks_after));
@@ -4741,7 +4752,7 @@ async fn post_and_verify(
         let text = String::from_utf8(journal(directory.path())).unwrap();
         fs::write(
             directory.path().join("agent-import-ledger.jsonl"),
-            text.replace(&origin, &later_origin),
+            edit(text.replace(&origin, &later_origin)),
         )
         .unwrap();
         origin = later_origin;
@@ -5070,6 +5081,136 @@ async fn a_refused_binding_matched_only_by_an_optional_voucher_keeps_the_open_li
     );
 }
 
+/// #1050: a rollback seen once is recorded, and outlasts the mark rising
+/// again. The post binds at mark 11; a verification reads the book at 10
+/// (a backup restored) and records it; a later verification reads the mark at
+/// 11 again with a voucher of the post's content in the window (keyed again by
+/// hand): the batch reads rolled back, never `posted_verified`, and no second
+/// record is written.
+#[tokio::test]
+async fn a_rollback_once_seen_outlasts_the_mark_rising_again() {
+    let (posted, verified, verdicts) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![
+            span_readback(empty_collection(), 10),
+            span_readback(untagged_posted_journal(), 11),
+            span_readback(untagged_posted_journal(), 11),
+        ],
+    )
+    .await;
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["state"], "posted_verified",
+        "{posted}"
+    );
+    let first = &verified[0]["structuredContent"]["result"];
+    assert_eq!(
+        first["post_span_binding"]["state"], "book_rolled_back",
+        "{first}"
+    );
+    assert_eq!(first["post_span_binding"]["current_mark"], 10, "{first}");
+    assert_eq!(
+        first["post_span_binding"]["rollback_recorded"], true,
+        "{first}"
+    );
+    assert_eq!(
+        first["post_span_binding"]["other_batches_covered"],
+        json!({"count": 0, "first": []}),
+        "{first}"
+    );
+    for later in &verified[1..] {
+        let result = &later["structuredContent"]["result"];
+        let binding = &result["post_span_binding"];
+        assert_eq!(binding["state"], "book_rolled_back", "{result}");
+        assert_eq!(binding["mark_read"], 10, "{result}");
+        assert!(
+            binding["seen_by"].as_str().is_some_and(|id| !id.is_empty()),
+            "{result}"
+        );
+        // Covered: nothing more is recorded.
+        assert!(binding.get("rollback_recorded").is_none(), "{result}");
+        assert_ne!(result["verification_status"], "posted_verified", "{result}");
+        assert_eq!(result["counts"]["posted_verified"], 0, "{result}");
+    }
+    assert_eq!(verdicts.len(), 1, "the post's own binding, and no other");
+}
+
+/// #1050: a check of a post that reads intact can still see a restore that
+/// reaches another post of the company: here a second post, sent after this
+/// one, had proved the mark at 12, and this post's check reads 11. The record
+/// is written, the second post is named to verify again, and this post's own
+/// summary says so; this post stays verified.
+#[tokio::test]
+async fn an_intact_posts_check_records_a_restore_that_reaches_a_later_post() {
+    let later = crate::agent::agent_import::tests::sentinel_batch_id(0x1051);
+    // A second post of the same company and address, recorded after this one:
+    // its own batch, dispatch intent (pre-POST mark 11) and Tally's answer,
+    // copied from this post's records with its own id, digest and REMOTEID.
+    let add_later_post = |text: String| {
+        if text.contains(later.as_str()) {
+            return text;
+        }
+        let records: Vec<Value> = text
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        let batch = records
+            .iter()
+            .find(|record| record.get("record_type").is_none())
+            .unwrap();
+        let of = |kind: &str| {
+            records
+                .iter()
+                .find(|record| record["record_type"] == kind)
+                .unwrap()
+                .clone()
+        };
+        let sha = "f".repeat(64);
+        let mut later_batch = batch.clone();
+        later_batch["batch_id"] = json!(later);
+        later_batch["sha256"] = json!(sha);
+        let mut intent = of("dispatch_intent");
+        intent["batch_id"] = json!(later);
+        intent["batch_sha256"] = json!(sha);
+        intent["pre_post_voucher_mark"] = json!(11);
+        intent["native_remote_id"] =
+            json!(crate::agent::agent_import::tests::sentinel_uuid(0x10b1).to_string());
+        let mut response = of("dispatch_response");
+        response["batch_id"] = json!(later);
+        response["batch_sha256"] = json!(sha);
+        let mut out = text;
+        for record in [later_batch, intent, response] {
+            out.push_str(&serde_json::to_string(&record).unwrap());
+            out.push('\n');
+        }
+        out
+    };
+    let (_, verified, _) = post_and_verify_with_journal(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![span_readback(untagged_posted_journal(), 11)],
+        add_later_post,
+    )
+    .await;
+    let result = &verified[0]["structuredContent"]["result"];
+    let binding = &result["post_span_binding"];
+    assert_eq!(binding["state"], "bound", "{result}");
+    assert_eq!(binding["rollback_recorded"], true, "{result}");
+    assert_eq!(
+        binding["other_batches_covered"],
+        json!({"count": 1, "first": [later]}),
+        "{result}"
+    );
+    assert!(
+        binding["summary"]
+            .as_str()
+            .is_some_and(|summary| summary.contains("restored from a backup")
+                && summary.contains("the other post named in other_batches_covered")),
+        "{result}"
+    );
+    assert_eq!(result["verification_status"], "posted_verified", "{result}");
+}
+
 /// A copy that holds no voucher at all (one never used, put in place of the
 /// book) omits its voucher mark: that reads as 0, so the post's vouchers are
 /// `book_rolled_back`, never a failed verification and never `not_found`.
@@ -5085,6 +5226,8 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
     later.extend(paired(marks()));
     later.extend(paired(empty_collection()));
     later.extend(paired(empty_collection()));
+    later.extend(paired(no_voucher_mark.clone()));
+    // Omitted once, the mark is read again (#1050).
     later.extend(paired(no_voucher_mark));
     let (_, verified, _) = post_and_verify(
         company_marks(11, 50, "WR2 Unicode Lab"),
@@ -5093,6 +5236,12 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
     )
     .await;
     let result = &verified[0]["structuredContent"]["result"];
+    // Omitted twice, the company holds no voucher: below the post's floor,
+    // so it is recorded (#1050), failing closed.
+    assert_eq!(
+        result["post_span_binding"]["rollback_recorded"], true,
+        "{result}"
+    );
     assert_eq!(
         result["post_span_binding"]["state"], "book_rolled_back",
         "{result}"
@@ -6456,18 +6605,21 @@ macro_rules! pilot_queue_block {
 // (fixtures/agent/pilot-lab/PROVENANCE.md), except that the two voucher-numbering
 // answers (X and Y) were read on 16 Oct 2026, after the book had moved on, and
 // are served DERIVED: their rows above the master mark 223 removed
-// (`pilot_types_as_of_the_round`). Two more are from 10 Oct 2026, after the book
-// gained four ledgers: the ledger catalogue `k` and the rates read `Q`, which is
-// the read restricted to the parents of the invoice's ledgers (#1331). They are
-// one coherent pair (the scoped answer holds exactly the catalogue's ledgers
-// under those parents), paired here with the 9 Oct answers of the same book; the
-// pairing was not observed at one time. The order below is the order the
+// (`pilot_types_as_of_the_round`). Two more are from 21 Oct 2026, after the book
+// gained ledgers: the ledger catalogue `k` and the rates read `Q`, which is the
+// read restricted to the parents of the invoice's ledgers (#1331) with the
+// HSN/SAC fields (#691). They are one coherent pair read in the same minute (the
+// scoped answer holds exactly the catalogue's ledgers under those parents),
+// paired here with the earlier answers of the same book (the 9 Oct listings,
+// groups and tax units; the 12 Oct company object `O` and groups with HSN `G`;
+// the 16 Oct numbering answers `X` and `Y`, DERIVED above); the pairing was not
+// observed at one time. The order below is the order the
 // build and then the post asked in, as observed against a replay of those
 // answers; it is not an order read off the code. Legend: s status probe, e
 // company list, m/M marks before/after the import, b book extent, c currencies,
 // L compliance listing, Q the same listing with each ledger's GST rate and
-// rounding (10 Oct 2026), restricted to the parents of the invoice's ledgers
-// and with the HSN/SAC rows (W16, 12 Oct 2026), P paired listing, g groups, T
+// rounding, restricted to the parents of the invoice's ledgers and with the
+// HSN/SAC rows (21 Oct 2026), P paired listing, g groups, T
 // voucher types, N number read, k ledger catalogue, w/W the 1-Aug window
 // before/after, C tax units, O the company object (W16, read after the
 // classification admits), X the voucher types bounded by the master mark and Y
@@ -6507,10 +6659,9 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'b' => "eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49", // r03-book-extent.xml
         'c' => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661", // r04-currencies.xml
         'L' => "c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386", // r05-ledgers-compliance.xml
-        // q1-rates-four-parents.xml (#1331) with the three HSN/SAC fields of
-        // w16-ledger-rates-hsn.xml added: the request the code renders, which
-        // the lab was not sent (the same edit turns the lab's unrestricted
-        // request into its W16 one: 2e728e00... to 03de8fa7...).
+        // The rates read restricted to the four parents (#1331) with the three
+        // HSN/SAC fields: the request the code renders, which the lab was
+        // sent on 21 Oct 2026 (req-1640-q1-hsn-rates-four-parents.xml).
         'Q' => "3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc",
         'O' => "72d8cd921a2a89aa781cbd768d013e58f167c2dc5072249fa92df5bdad301648", // w14-company-object.xml
         'G' => "237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02", // w16-groups-hsn.xml
@@ -6629,7 +6780,7 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml"),
         'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml"),
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
-        'Q' => unreachable!("DERIVED: served by pilot_plan from the lab's W16 answer"),
+        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"),
         'G' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.utf16le.xml"),
         'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
@@ -6637,7 +6788,7 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
         'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
-        'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml"),
+        'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"),
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
         'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
@@ -6648,10 +6799,6 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
 }
 
 fn pilot_plan(letter: char) -> ScenarioPlan {
-    if letter == 'Q' {
-        // DERIVED: see `pilot_scoped_rates_hsn`.
-        return pilot_answer(super::super::tests::pilot_scoped_rates_hsn());
-    }
     match pilot_bytes(letter) {
         // DERIVED: the two numbering answers as of the invoice round.
         Some(bytes) if matches!(letter, 'X' | 'Y') => {
@@ -6994,9 +7141,6 @@ fn pilot_queue_positions(letter: char) -> Vec<usize> {
 
 /// The captured answer to a kind of read, as text.
 fn pilot_text(letter: char) -> String {
-    if letter == 'Q' {
-        return super::super::tests::pilot_scoped_rates_hsn();
-    }
     captured(pilot_bytes(letter).expect("a kind with an answer"))
 }
 

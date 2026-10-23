@@ -235,10 +235,6 @@ pub(crate) enum AuditPartShape {
 /// that needs a book-state witness brackets the part with the company's
 /// AlterID marks itself.
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "used by the audit_read orchestrator, plan step 7")
-)]
 pub(crate) struct AuditPart {
     pub(crate) encoded_body: Vec<u8>,
     pub(crate) encoded_sha256: String,
@@ -673,8 +669,18 @@ async fn fetch_admitted_audit_part(
             raw.encoded_body.len(),
         ),
     };
+    // The same envelope check for every answer. The company Object export's
+    // header also carries five product release fields (item 697-S0A), which are
+    // set aside first; everything else about its envelope is still checked. The
+    // company part's own admission (`admit_audit_company_part`) then checks it
+    // again, as the audit read does on the body.
+    let envelope = if window.is_company_object() {
+        without_release_header(&raw.text)
+    } else {
+        std::borrow::Cow::Borrowed(raw.text.as_str())
+    };
     if !matches!(
-        bridge_tally_protocol::export_status(&raw.text),
+        bridge_tally_protocol::export_status(&envelope),
         Ok(bridge_tally_protocol::TallyExportStatus::Success)
     ) {
         return Err(with_read_evidence(
@@ -706,6 +712,44 @@ async fn fetch_admitted_audit_part(
         evidence,
         boundary_profile,
     })
+}
+
+/// The company Object export's answer with its five product release fields
+/// (`PRODMAJORVER`, `PRODMINORVER`, `PRODMAJORREL`, `PRODMINORREL`, `PRODTYPE`) taken out of
+/// the `HEADER`, each at most once and only when its value is a number. A repeated field,
+/// a value that is not a number and any other header field stay, so the envelope check
+/// refuses them.
+fn without_release_header(text: &str) -> std::borrow::Cow<'_, str> {
+    const FIELDS: [&str; 5] = [
+        "PRODMAJORVER",
+        "PRODMINORVER",
+        "PRODMAJORREL",
+        "PRODMINORREL",
+        "PRODTYPE",
+    ];
+    let Some(start) = text.find("<HEADER>") else {
+        return std::borrow::Cow::Borrowed(text);
+    };
+    let Some(length) = text[start..].find("</HEADER>") else {
+        return std::borrow::Cow::Borrowed(text);
+    };
+    let end = start + length;
+    let mut header = text[start..end].to_string();
+    for field in FIELDS {
+        let (open, close) = (format!("<{field}>"), format!("</{field}>"));
+        let Some(at) = header.find(&open) else {
+            continue;
+        };
+        let value_start = at + open.len();
+        let Some(value_length) = header[value_start..].find(&close) else {
+            continue;
+        };
+        let value = &header[value_start..value_start + value_length];
+        if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) {
+            header.replace_range(at..value_start + value_length + close.len(), "");
+        }
+    }
+    std::borrow::Cow::Owned(format!("{}{}{}", &text[..start], header, &text[end..]))
 }
 
 /// An approved import response retains the import wire separately from the
@@ -906,6 +950,40 @@ pub(crate) enum CompanyIdentityBracketError {
     PresentationCollision,
     #[error("Tally complete company identity was absent or ambiguous")]
     AbsentOrAmbiguous,
+}
+
+impl CompanyIdentityBracketError {
+    /// The cause a refused read names; it holds no data (#1699).
+    pub(crate) const fn safe_code(&self) -> &'static str {
+        match self {
+            Self::PresentationCollision => "company_identity_presentation_collision",
+            Self::AbsentOrAmbiguous => "company_identity_absent_or_ambiguous",
+        }
+    }
+}
+
+/// The company-identity cause of one error in a chain, if it is one of the two identity checks:
+/// the bracket around a scoped read, or the outstandings parse that found another company's
+/// identity in the answer (#1699). Every other error is `None`, so a caller falls back to its own
+/// code. The cause carries no company name or other data.
+pub(crate) fn company_identity_cause(
+    cause: &(dyn std::error::Error + 'static),
+) -> Option<&'static str> {
+    if let Some(bracket) = cause.downcast_ref::<CompanyIdentityBracketError>() {
+        return Some(bracket.safe_code());
+    }
+    matches!(
+        cause.downcast_ref::<bridge_tally_protocol::outstandings_shared::OutstandingsError>(),
+        Some(
+            bridge_tally_protocol::outstandings_shared::OutstandingsError::CompanyIdentityMismatch
+        )
+    )
+    .then_some("company_identity_not_matched")
+}
+
+/// The first company-identity cause in a refused read's error chain.
+pub(crate) fn company_identity_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
+    error.chain().find_map(company_identity_cause)
 }
 
 /// Re-enumerate the complete identity immediately before or after a scoped
@@ -1762,9 +1840,11 @@ pub(crate) fn observed_opening_boundary(
 /// over the master mark the precheck asks for the ledger count, which is read
 /// and the precheck asked again. Then the reads, in the order the admission
 /// makes them: the compliance listing, the rates, the voucher types, the
-/// number, the number's control, the company's registration. Each goes through
-/// the identity-bracketed paired read, and the listing through the bracketed
-/// source read.
+/// number, the number's control, the company's registration, the company
+/// object's HSN/SAC fields and the groups' (always read here, though the build
+/// reads the groups only when a ledger's own row defers to them). Each goes
+/// through the identity-bracketed paired read, and the listing through the
+/// bracketed source read.
 async fn read_invoice_plan(
     client: &TallyClient,
     identity: &VerifiedCompanyIdentity,

@@ -21,6 +21,13 @@ SHORT = HEAD[:7]
 BASE_TIP = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 BEHIND_MERGE_BASE = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 DIGEST = "a" * 64
+# git blob ids of lab captures, as the files API reports them in "sha": LAB_BLOB is the one the manifest tests list, LAB_BLOB_OFF
+# differs from it in the last character only.
+LAB_BLOB = "3b18e512dba79e4c8300dd08aeb37f8e728b8dad"
+LAB_BLOB_OFF = "3b18e512dba79e4c8300dd08aeb37f8e728b8dae"
+# the bytes the fake serves for LAB_BLOB; the manifest tests record their size and sha256
+LAB_BYTES = b"lab capture bytes\n"
+OTHER_BLOB = "9f2b1c4e7a6d03581e4c2b7a9d0f3e5c6b8a1d24"
 SURFACE_PATH = "docs/tally/compatibility/compatibility-surface.json"
 ACK_DIR = "docs/tally/compatibility/acks"
 ACK_PATH = ACK_DIR + "/pr-321.txt"
@@ -402,6 +409,9 @@ def state():
     elif scenario == "changes-the-registry":
         set_changes(s, ("modified", "scripts/merge-gate-synthetic-uuids.json"))
 
+    elif scenario == "changes-the-lab-manifest":
+        set_changes(s, ("modified", "scripts/merge-gate-lab-captures.json"))
+
     elif scenario == "changes-the-registry-in-another-case":
         set_changes(s, ("added", "Scripts/Merge-Gate-Synthetic-Uuids.json", "{}"))
 
@@ -499,6 +509,9 @@ def state():
         other = ACK_DIR + "/pr-100.txt"
         s["files"] = s["files"] + [{"filename": other, "status": "modified", "additions": 1, "deletions": 1}]
         s["changed_files_expected"] = len(s["files"])
+        if scenario == "binary-body-pointer":
+            # a pointer to a lab branch and commit is only text: the gate reads no branch, so it exempts nothing
+            s["body"] = DEFAULT_BODY + "\nLab capture source: lab/1050-identity-answers @ " + "c" * 40 + "\n"
         s["diff"] += modified_diff(other)
 
     elif scenario == "ack-other-deleted":
@@ -1038,16 +1051,45 @@ def state():
             "+fixture reference 11111111-2222-3333-4444-555555555555\n"
         )
 
-    elif scenario in {"binary-missing-attestation", "binary-with-attestation"}:
-        s["files"] = [{"filename": "docs/new.png", "status": "added", "additions": 0, "deletions": 0}]
-        s["changed_files_expected"] = 1
-        s["diff"] = (
-            "diff --git a/docs/new.png b/docs/new.png\n"
-            "new file mode 100644\n"
-            "index 0000000..1111111\n"
-            "GIT binary patch\n"
-            "literal 3\nQwerty\n"
-        )
+    elif scenario in {"binary-missing-attestation", "binary-with-attestation", "binary-no-rest-sha", "binary-malformed-rest-sha",
+                      "binary-one-char-off", "binary-other-path", "binary-listed-and-unlisted", "binary-removed", "binary-renamed",
+                      "binary-and-manifest-edit", "binary-body-pointer", "binary-blob-fails", "binary-blob-malformed",
+                      "binary-blob-not-base64", "binary-blob-size-field-differs", "binary-numeric-path", "binary-numeric-path-lookalike"}:
+        def binary_file(name, sha, status="added", previous=None):
+            record = {"filename": name, "status": status, "additions": 0, "deletions": 0}
+            if sha is not None:
+                record["sha"] = sha
+            if previous:
+                record["previous_filename"] = previous
+            section = f"diff --git a/{previous or name} b/{name}\n"
+            if status == "removed":
+                section += "deleted file mode 100644\nindex 1111111..0000000\n"
+            elif previous:
+                section += f"similarity index 90%\nrename from {previous}\nrename to {name}\nindex 1111111..2222222 100644\n"
+            else:
+                section += "new file mode 100644\nindex 0000000..1111111\n"
+            return record, section + "GIT binary patch\nliteral 3\nQwerty\n"
+
+        wanted = {
+            "binary-no-rest-sha": [binary_file("docs/new.png", None)],
+            "binary-malformed-rest-sha": [binary_file("docs/new.png", "3B18E512DBA79E4C8300DD08AEB37F8E728B8DAD")],
+            "binary-one-char-off": [binary_file("docs/new.png", LAB_BLOB_OFF)],
+            "binary-other-path": [binary_file("docs/other.png", LAB_BLOB)],
+            "binary-listed-and-unlisted": [binary_file("docs/new.png", LAB_BLOB), binary_file("docs/extra.bin", OTHER_BLOB)],
+            "binary-removed": [binary_file("docs/new.png", LAB_BLOB, "removed")],
+            "binary-renamed": [binary_file("docs/new.png", LAB_BLOB, "renamed", "docs/old.png")],
+            "binary-and-manifest-edit": [binary_file("docs/new.png", LAB_BLOB)],
+            "binary-numeric-path": [binary_file("1e2", LAB_BLOB)],
+            "binary-numeric-path-lookalike": [binary_file("100", LAB_BLOB)],
+        }.get(scenario, [binary_file("docs/new.png", LAB_BLOB)])
+        s["files"] = [record for record, _ in wanted]
+        s["diff"] = "".join(section for _, section in wanted)
+        if scenario == "binary-and-manifest-edit":
+            # the pull request lists its own capture: the edit is judged as a change to the gate, and does not apply to its own run
+            manifest = "scripts/merge-gate-lab-captures.json"
+            s["files"].append({"filename": manifest, "status": "modified", "additions": 1, "deletions": 1})
+            s["diff"] += modified_diff(manifest)
+        s["changed_files_expected"] = len(s["files"])
 
     elif scenario == "gitlink-change":
         s["files"] = [{"filename": "vendor/module", "status": "modified", "additions": 1, "deletions": 1}]
@@ -1191,6 +1233,20 @@ elif args and args[0] == "api":
             emit({"encoding": "base64", "content": b64(S["ack_text"])})
         else:
             fail("unknown contents fixture")
+    elif "/git/blobs/" in joined:
+        if scenario == "binary-blob-fails":
+            fail("controlled blob failure")
+        if not joined.rstrip().endswith("/git/blobs/" + LAB_BLOB):
+            fail("unknown blob fixture")
+        encoded = base64.encodebytes(LAB_BYTES).decode()
+        if scenario == "binary-blob-malformed":
+            emit({"encoding": "base64", "content": 5, "size": len(LAB_BYTES)})
+        elif scenario == "binary-blob-not-base64":
+            emit({"encoding": "utf-8", "content": LAB_BYTES.decode(), "size": len(LAB_BYTES)})
+        elif scenario == "binary-blob-size-field-differs":
+            emit({"encoding": "base64", "content": encoded, "size": len(LAB_BYTES) + 1})
+        else:
+            emit({"sha": LAB_BLOB, "encoding": "base64", "content": encoded, "size": len(LAB_BYTES)})
     elif "/compare/" in joined and "vnd.github.diff" in joined:
         carry = S["carry"]
         if carry is None or carry["fail"]:

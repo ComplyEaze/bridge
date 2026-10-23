@@ -629,6 +629,131 @@ fn a_read_deadline_is_named_rather_than_collapsed_into_the_generic_failure() {
 }
 
 #[test]
+fn a_refusal_for_a_book_that_changed_during_the_read_says_to_run_it_again() {
+    // Every code the change-during-read refusals use, as a code and as a cause (#1633). An arm
+    // dropped from the match fails here by name; a new code has to be added to this list.
+    for code in [
+        "voucher_window_changed_during_read",
+        "native_ledger_extent_changed",
+        "party_ledger_extent_changed",
+        "company_book_extent_changed",
+        "company_features_extent_changed",
+        "currency_extent_changed",
+        "currency_to_master_extent_changed",
+        "masters_extent_changed",
+        "month_register_extent_changed",
+        "stock_summary_extent_changed",
+    ] {
+        let step = refusal_remediation(code).unwrap_or_else(|| panic!("{code} has no next step"));
+        assert!(
+            step.contains("run the same request again once"),
+            "{code}: {step}"
+        );
+        assert!(step.contains("books changed in Tally"), "{code}: {step}");
+        // Through a shared operation code, the cause carries it.
+        assert_eq!(
+            remediation_for("native_outstandings_read_failed", Some(code)),
+            Some(step),
+            "{code}"
+        );
+    }
+    // The connection's own code for each extent refusal it has today has the advice. The list is
+    // written by hand: an extent refusal added later has to be added here.
+    use crate::tally::connection::PairedReadValidationError as Paired;
+    for refusal in [
+        Paired::NativeLedgerExtent,
+        Paired::PartyLedgerExtent,
+        Paired::CompanyBookExtent,
+        Paired::CompanyFeaturesExtent,
+        Paired::CurrencyExtent,
+        Paired::CurrencyToMasterExtent,
+        Paired::MastersExtent,
+        Paired::MonthRegisterExtent,
+        Paired::StockSummaryExtent,
+    ] {
+        let code = refusal.safe_code();
+        assert!(code.ends_with("_extent_changed"), "{code}");
+        assert!(
+            refusal_remediation(code).is_some(),
+            "{code} has no next step"
+        );
+    }
+    let snapshot = refusal_remediation("listing_snapshot_changed").expect("a next step");
+    assert!(
+        snapshot.contains("from the first page, without snapshot_id"),
+        "{snapshot}"
+    );
+}
+
+#[test]
+fn a_read_refused_for_the_company_identity_names_that_cause_and_the_next_step() {
+    use crate::tally::runtime::CompanyIdentityBracketError;
+    use bridge_tally_protocol::outstandings_shared::OutstandingsError;
+
+    let cases: [(anyhow::Error, &str, bool); 3] = [
+        (
+            CompanyIdentityBracketError::AbsentOrAmbiguous.into(),
+            "company_identity_absent_or_ambiguous",
+            true,
+        ),
+        (
+            OutstandingsError::CompanyIdentityMismatch.into(),
+            "company_identity_not_matched",
+            true,
+        ),
+        // Named, but no next step: nothing measured says what a person should do about it.
+        (
+            CompanyIdentityBracketError::PresentationCollision.into(),
+            "company_identity_presentation_collision",
+            false,
+        ),
+    ];
+    for (error, cause, has_next_step) in cases {
+        // Wrapped as production wraps a read failure, so the chain walk is what is tested.
+        let failure = ToolFailure::from_runtime(
+            "ledger_movement_read_failed",
+            crate::tally::runtime::with_read_evidence(
+                error.context("reading the ledger movement"),
+                crate::tally::runtime::RuntimeReadEvidence::empty(),
+            ),
+        );
+        assert_eq!(failure.code, "ledger_movement_read_failed", "{cause}");
+        assert_eq!(failure.cause, Some(cause));
+        let step = remediation_for(&failure.code, failure.cause);
+        assert_eq!(step.is_some(), has_next_step, "{cause}");
+        if let Some(step) = step {
+            assert!(
+                step.contains("open the company in Tally"),
+                "{cause}: {step}"
+            );
+            assert!(step.contains("list_companies"), "{cause}: {step}");
+        }
+    }
+
+    // `company_identity_mismatch` is already the CODE verify_import and post_import answer with
+    // when a saved batch's company no longer matches after Tally confirmed the company. Advice to
+    // "repeat the request" would loop there, so it is not keyed on that code.
+    assert_eq!(refusal_remediation("company_identity_mismatch"), None);
+
+    // The invalid-identity outstandings error is a different fault and keeps no identity cause,
+    // and so does a parse fault: only the two identity checks are named.
+    for other in [
+        OutstandingsError::InvalidCompanyIdentity,
+        OutstandingsError::InvalidResponse("synthetic_parse_fault"),
+        OutstandingsError::MasterWitnessAbsent,
+    ] {
+        let failure = ToolFailure::from_runtime("ledger_movement_read_failed", other.into());
+        assert!(
+            failure
+                .cause
+                .is_none_or(|cause| !cause.starts_with("company_identity")),
+            "{:?}",
+            failure.cause
+        );
+    }
+}
+
+#[test]
 fn ledger_master_fields_reject_unknown_schema_values() {
     assert_eq!(
         ledger_master_fields("complaince"),
@@ -663,6 +788,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             json!({"masters":[{"requested":party_name("Supplier Two"),"candidates":[party_name("Supplier Two")]}]}),
         ),
         ("egress_log", json!({"records":[]})),
+        (
+            "gst_uncertain_vouchers",
+            json!({"items":[{"list":"uncertain","voucher_number":"BP/1","party":party_name("Customer One"),"amount":"1050.00","party_side":"debit"}]}),
+        ),
         (
             "ledger_masters",
             json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder"}))}]}),
@@ -782,18 +911,52 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         .iter()
         .map(|tool| tool["name"].as_str().expect("tool name").to_string())
         .collect::<BTreeSet<_>>();
-    // The lab-only tools, compiled in with the `lab-writes` feature, are not
-    // sampled yet: `lab_read_inventory` returns party-bearing fields and the two
-    // import tools were not examined (#999). Exempt those this read registered.
+    // The lab-only tools are compiled in with the `lab-writes` feature (#999), and registered
+    // only while this read of the catalogue has them. `lab_read_inventory` is sampled: it marks a
+    // unit's, godown's, stock group's and stock item's own name and a voucher's party with
+    // `party_name`, which the tests in `agent_lab.rs` pin on the real parsers (the unit and stock
+    // item names and the voucher's party). The sample is built in this test like the others, so it
+    // tests the walk, not the tool.
+    //
+    // Known gap, lab-only (#999): the same names come back UNMARKED where they appear as another
+    // field: a stock item's `parent` and `base_unit`, and a voucher entry's `stock_item` and
+    // `godown` and a batch's `godown`. Under `MaskParties` a unit masked in `units` stays in the
+    // clear as a `base_unit`. The sample's values for those fields are not party-like, so the walk
+    // cannot see it. Marking them is a separate change.
+    #[allow(unused_mut)] // only pushed to when the `lab-writes` feature is compiled in
+    let mut lab_samples: Vec<(&str, Value)> = Vec::new();
+    #[cfg(feature = "lab-writes")]
+    if registered.contains("lab_read_inventory") {
+        lab_samples.push((
+            "lab_read_inventory",
+            json!({
+                "units": [{"name": party_name("Customer One"), "decimal_places": "3"}],
+                "stock_items": [{
+                    "name": party_name("Supplier Two"),
+                    "parent": "Primary",
+                    "hsn_code": "2836",
+                }],
+                "vouchers": {
+                    "items": [{
+                        "party": party_name("Customer One"),
+                        "inventory_entries": [{"stock_item": "Widget", "amount": "-8000.00"}],
+                    }],
+                    "offset": 0,
+                },
+            }),
+        ));
+    }
+    // The two lab import tools stay without a sample, on purpose. Their results carry names as
+    // plain strings that no marking reaches: the masters and vouchers the caller itself sent (as
+    // `Kind:Name` strings and `ledger_line[<name>]`, a ledger's name among them) and names read
+    // back from the target book. A sample would show a name that the walk cannot mask. The tools write only to a target admitted by `admit_lab_target`,
+    // whose guard today is a deny list of other companies (#972); a client's ledger names could
+    // appear unmasked only if that guard failed. Marking those names is a separate change.
     #[cfg(feature = "lab-writes")]
     without_a_sample.extend(
-        [
-            "lab_import_masters",
-            "lab_import_vouchers",
-            "lab_read_inventory",
-        ]
-        .into_iter()
-        .filter(|name| registered.contains(*name)),
+        ["lab_import_masters", "lab_import_vouchers"]
+            .into_iter()
+            .filter(|name| registered.contains(*name)),
     );
     let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
     assert_eq!(
@@ -811,6 +974,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         .iter()
         .chain(&without_a_sample)
         .copied()
+        .chain(lab_samples.iter().map(|(tool, _)| *tool))
         .collect::<Vec<_>>();
     assert_eq!(
         covered.len(),
@@ -831,7 +995,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         Vec::<&String>::new(),
         "a sample or exemption names a tool that is not registered"
     );
-    for (tool, sample) in samples {
+    for (tool, sample) in samples.into_iter().chain(lab_samples) {
         let redacted = redact_value(sample, Redaction::MaskParties);
         assert_no_known_party_name(&redacted, &known_parties, tool);
     }

@@ -3163,8 +3163,8 @@ fn review_text(
         .join("\n");
     // Native message boxes have no portable scrollable review surface. Keep this
     // first posting slice reviewable; longer batches retain the manual file path.
-    if preview.chars().count() > 1_600
-        || preview.lines().count() > 24
+    if preview.chars().count() > ONE_VOUCHER_MAX_CHARS
+        || preview.lines().count() > ONE_VOUCHER_MAX_LINES
         || preview.lines().any(|line| line.chars().count() > 100)
     {
         return Err("import_review_too_large".into());
@@ -3320,8 +3320,8 @@ fn invoice_review_preview(
         ])
         .collect::<Vec<_>>()
         .join("\n");
-    if preview.chars().count() > 1_600
-        || preview.lines().count() > 24
+    if preview.chars().count() > ONE_VOUCHER_MAX_CHARS
+        || preview.lines().count() > ONE_VOUCHER_MAX_LINES
         || preview.lines().any(|line| line.chars().count() > 100)
     {
         return Err("import_review_too_large".into());
@@ -3374,11 +3374,17 @@ fn approval_narration_lines(value: Option<&str>) -> Result<Vec<String>, String> 
     })
 }
 
+/// The most a one-voucher approval or review text may take: what the native
+/// dialog holds. Its own answer text stands above it (#1780) and has room of
+/// its own, so a text that fits here is shown whole.
+pub(super) const ONE_VOUCHER_MAX_LINES: usize = crate::tally::approved_import::ONE_VOUCHER_LINES;
+pub(super) const ONE_VOUCHER_MAX_CHARS: usize = crate::tally::approved_import::ONE_VOUCHER_CHARS;
+
 /// The most a batch's approval text may take: lines, characters, characters
 /// a line, and UTF-8 bytes (under the native dialog's 8,000). A batch whose
 /// summary does not fit is refused, never cut; the caller posts it in parts.
-pub(super) const BATCH_REVIEW_MAX_LINES: usize = 40;
-pub(super) const BATCH_REVIEW_MAX_CHARS: usize = 3_200;
+pub(super) const BATCH_REVIEW_MAX_LINES: usize = crate::tally::approved_import::BATCH_LINES;
+pub(super) const BATCH_REVIEW_MAX_CHARS: usize = crate::tally::approved_import::BATCH_CHARS;
 pub(super) const BATCH_REVIEW_MAX_LINE_CHARS: usize = 100;
 pub(super) const BATCH_REVIEW_MAX_BYTES: usize = 7_000;
 

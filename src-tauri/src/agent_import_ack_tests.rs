@@ -122,6 +122,11 @@ async fn an_approved_review_is_recorded_once_and_changes_no_verdict() {
     assert_eq!(result["operator_review"]["state"], "current", "{response}");
     assert_eq!(approval.reviews().len(), 1, "{response}");
     assert_eq!(approval.review_counts(), [1], "{response}");
+    assert_eq!(
+        approval.review_kinds(),
+        [crate::tally::approved_import::ReviewKind::Review],
+        "{response}"
+    );
     assert!(approval.previews().is_empty(), "no post dialog: {response}");
     let review = &approval.reviews()[0];
     assert!(review.contains("Cash"), "the doubt is shown: {review}");

@@ -498,3 +498,6 @@ mod security_config_tests;
 #[cfg(test)]
 #[path = "lib_client_preference_mount_tests.rs"]
 mod client_preference_mount_tests;
+
+#[cfg(test)]
+mod hand_entry_texts_tests;

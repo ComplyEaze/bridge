@@ -109,6 +109,7 @@ async fn call(plans: Vec<ScenarioPlan>, args: Value) -> (Value, usize, usize) {
         redaction: Redaction::None,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let response = server.call_tool("month_register", args).await;
     (response, simulator.finish().unwrap().len(), expected)
@@ -344,6 +345,7 @@ async fn the_arguments_are_refused_before_any_request() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     for (args, code) in [
         (

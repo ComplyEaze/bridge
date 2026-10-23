@@ -186,7 +186,11 @@ fn stock_item_gst_json(gst: &GstDetailsObservation) -> Value {
             if let Some(object) = entry.as_object_mut() {
                 let own =
                     object.get("source").and_then(Value::as_str) == Some(TALLY_OWN_ENTRY_SOURCE);
-                if own && object.get("ineligible_itc").is_some_and(|flag| !flag.is_null()) {
+                if own
+                    && object
+                        .get("ineligible_itc")
+                        .is_some_and(|flag| !flag.is_null())
+                {
                     object.insert("ineligible_itc".to_string(), Value::Null);
                     object.insert(
                         "ineligible_itc_withheld".to_string(),

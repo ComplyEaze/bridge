@@ -1,8 +1,6 @@
 name: macOS crash capture control
 
 on:
-  push:
-    branches: [tapish-codex/macos-ci-crash-evidence, tapish-codex/macos-crash-binary-linkage]
   workflow_dispatch:
 
 jobs:
@@ -17,66 +15,64 @@ jobs:
         with:
           persist-credentials: false
       - name: Test collector parsing and bounded collection
-        run: |
-          python3 scripts/collect-macos-test-crashes.test.py
-          python3 scripts/retain-macos-test-binaries.test.py
+        run: node --test scripts/collect-macos-test-crashes.test.mjs scripts/retain-macos-test-binaries.test.mjs
       - name: Generate one disposable control report
         shell: bash
         run: |
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-          import subprocess
-          root = Path(os.environ["RUNNER_TEMP"])
-          source = root / "crash-control.c"
-          source.write_text("#include <signal.h>\nint main(void) { return raise(SIGTRAP); }\n")
-          binary = root / "bridge_lib-cafe"
-          subprocess.run(["clang", str(source), "-o", str(binary)], check=True)
-          (root / "control-start").touch()
-          result = subprocess.run([str(binary)], capture_output=True)
-          assert result.returncode == -5, "control did not exit with SIGTRAP"
-          PY
+          set -euo pipefail
+          printf '#include <signal.h>\nint main(void) { return raise(SIGTRAP); }\n' > "$RUNNER_TEMP/crash-control.c"
+          clang "$RUNNER_TEMP/crash-control.c" -o "$RUNNER_TEMP/bridge_lib-cafe"
+          touch "$RUNNER_TEMP/control-start"
+          status=0
+          "$RUNNER_TEMP/bridge_lib-cafe" || status=$?
+          # 128 + SIGTRAP (5): the control must have died by the signal, not exited.
+          test "$status" -eq 133 || { echo "control did not exit with SIGTRAP (status $status)"; exit 1; }
       - name: Capture and verify the control stack
         shell: bash
         run: |
-          python3 scripts/collect-macos-test-crashes.py --since-file "$RUNNER_TEMP/control-start" --output "$RUNNER_TEMP/control-crash.json" --wait-seconds 30
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          result = json.loads((Path(os.environ["RUNNER_TEMP"]) / "control-crash.json").read_text())
-          assert result["status"] == "captured", "hosted crash report was not captured"
-          assert any(report["process"] == "bridge_lib-cafe" and report["exception"]["signal"] == "SIGTRAP" and report["threads"] for report in result["reports"])
-          PY
+          set -euo pipefail
+          node scripts/collect-macos-test-crashes.mjs --since-file "$RUNNER_TEMP/control-start" --output "$RUNNER_TEMP/control-crash.json" --wait-seconds 30
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+          import { join } from "node:path";
+          const result = JSON.parse(readFileSync(join(process.env.RUNNER_TEMP, "control-crash.json"), "utf8"));
+          assert.equal(result.status, "captured", "hosted crash report was not captured");
+          assert.ok(
+            result.reports.some((report) => report.process === "bridge_lib-cafe" && report.exception.signal === "SIGTRAP" && report.threads.length > 0),
+          );
+          JS
       - name: Verify matching executable retention and mismatch refusal
         shell: bash
         run: |
-          python3 scripts/retain-macos-test-binaries.py --crash-json "$RUNNER_TEMP/control-crash.json" --target "$RUNNER_TEMP" --output "$RUNNER_TEMP/control-binaries"
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-          import subprocess
-          root = Path(os.environ["RUNNER_TEMP"])
-          result = json.loads((root / "control-binaries/manifest.json").read_text())
-          assert result["status"] == "linked" and len(result["binaries"]) == 1
-          binary = result["binaries"][0]
-          staged = root / "control-binaries" / binary["file"]
-          assert staged.read_bytes() == (root / "bridge_lib-cafe").read_bytes()
-          assert hashlib.sha256(staged.read_bytes()).hexdigest() == binary["sha256"]
-          assert result["provenance"]["checkout_sha"] == subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-          # Compile a different owned image; it is never executed or crashed.
-          mismatch = root / "mismatch"
-          mismatch.mkdir()
-          (mismatch / "other.c").write_text("int main(void) { return 0; }\n")
-          subprocess.run(["clang", str(mismatch / "other.c"), "-o", str(mismatch / "bridge_lib-cafe")], check=True)
-          refused = subprocess.run(["python3", "scripts/retain-macos-test-binaries.py", "--crash-json", str(root / "control-crash.json"), "--target", str(mismatch), "--output", str(root / "mismatch-evidence")])
-          assert refused.returncode == 1
-          rejected = json.loads((root / "mismatch-evidence/manifest.json").read_text())
-          assert rejected["errors"] == ["image_identity_mismatch"] and rejected["binaries"] == []
-          assert [path.name for path in (root / "mismatch-evidence").iterdir()] == ["manifest.json"]
-          PY
+          set -euo pipefail
+          node scripts/retain-macos-test-binaries.mjs --crash-json "$RUNNER_TEMP/control-crash.json" --target "$RUNNER_TEMP" --output "$RUNNER_TEMP/control-binaries"
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import { execFileSync, spawnSync } from "node:child_process";
+          import { createHash } from "node:crypto";
+          import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+          import { join } from "node:path";
+          const root = process.env.RUNNER_TEMP;
+          const result = JSON.parse(readFileSync(join(root, "control-binaries/manifest.json"), "utf8"));
+          assert.ok(result.status === "linked" && result.binaries.length === 1);
+          const binary = result.binaries[0];
+          const staged = readFileSync(join(root, "control-binaries", binary.file));
+          assert.ok(staged.equals(readFileSync(join(root, "bridge_lib-cafe"))));
+          assert.equal(createHash("sha256").update(staged).digest("hex"), binary.sha256);
+          assert.equal(result.provenance.checkout_sha, execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim());
+          // Compile a different owned image; it is never executed or crashed.
+          const mismatch = join(root, "mismatch");
+          mkdirSync(mismatch);
+          writeFileSync(join(mismatch, "other.c"), "int main(void) { return 0; }\n");
+          execFileSync("clang", [join(mismatch, "other.c"), "-o", join(mismatch, "bridge_lib-cafe")]);
+          const refused = spawnSync("node", ["scripts/retain-macos-test-binaries.mjs", "--crash-json", join(root, "control-crash.json"), "--target", mismatch, "--output", join(root, "mismatch-evidence")], { stdio: "inherit" });
+          assert.equal(refused.status, 1);
+          const rejected = JSON.parse(readFileSync(join(root, "mismatch-evidence/manifest.json"), "utf8"));
+          assert.deepEqual(rejected.errors, ["image_identity_mismatch"]);
+          assert.deepEqual(rejected.binaries, []);
+          assert.deepEqual(readdirSync(join(root, "mismatch-evidence")), ["manifest.json"]);
+          JS
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ always() }}
         with:

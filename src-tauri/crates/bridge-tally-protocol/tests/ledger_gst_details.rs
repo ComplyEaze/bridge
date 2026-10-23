@@ -124,11 +124,11 @@ fn a_ledger_with_a_rate_carries_leading_spaces_and_the_state_marker() {
     assert_eq!(entry.taxability.as_deref(), Some("Taxable"));
     assert_eq!(entry.source.as_deref(), Some("Specify Details Here"));
     assert_eq!(
-        entry.itc_eligible, None,
+        entry.ineligible_itc, None,
         "this entry sends no GSTINELIGIBLEITC"
     );
     assert_eq!(
-        entries_of(&parsed, "BRIDGE Svc 998313 5%")[0].itc_eligible,
+        entries_of(&parsed, "BRIDGE Svc 998313 5%")[0].ineligible_itc,
         Some(true)
     );
     assert_eq!(entry.states.len(), 1);
@@ -295,7 +295,7 @@ fn input_tax_credit_other_than_yes_or_no_is_a_defect() {
         "<GSTINELIGIBLEITC TYPE=\"Logical\">No</GSTINELIGIBLEITC>",
     );
     assert_eq!(
-        entries_of(&parse(&no).unwrap(), GOODS)[0].itc_eligible,
+        entries_of(&parse(&no).unwrap(), GOODS)[0].ineligible_itc,
         Some(false)
     );
 }

@@ -110,10 +110,19 @@ enum StatusKind {
     /// sent, and never a batch status. A later `posted_verified` of that batch
     /// voids it.
     StopRelease,
+    /// A verification of a native batch read the company's voucher mark below
+    /// that batch's floor: the book was rolled back (a backup restored) after
+    /// the post (#1050). Recorded once per batch at a given mark, never a batch
+    /// status. From then on no native batch of the same company and endpoint
+    /// that it covers reads `posted_verified` ([`rollback_cover`]).
+    RollbackSeen,
 }
 
 /// The status a stop release record carries. It is not a batch status.
 const STOP_RELEASE_STATUS: &str = "stop_released";
+
+/// The status a rollback-seen record carries. It is not a batch status.
+const ROLLBACK_SEEN_STATUS: &str = "rollback_seen";
 
 /// The status a post-span verdict record carries. It is not a batch status:
 /// readers keep the batch's own status when they meet it.
@@ -176,6 +185,20 @@ pub(in crate::agent) struct StatusRecord {
     /// field before it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     release_seen: Option<ReleaseSeen>,
+    /// A rollback-seen record's company voucher mark as the verification read
+    /// it (present in Tally's answer, never an omitted mark read as zero).
+    /// `Some` only on a rollback-seen record. A binary older than this field
+    /// refuses a journal holding one (`deny_unknown_fields`, and the record
+    /// kind is unknown to it): the release notes say not to downgrade.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    mark_read: Option<u64>,
+    /// A rollback-seen record's count of journal records the verification
+    /// had read before it read the mark. Only what the journal held within
+    /// that count decides which batches the record covers, so a post written
+    /// meanwhile is judged on nothing it proved after the read. `Some` only on
+    /// a rollback-seen record.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    records_before_read: Option<u64>,
 }
 
 /// What the read at a stop release saw of the batch's invoice, as journaled
@@ -226,6 +249,8 @@ impl StatusRecord {
             binding_refusal: None,
             proof: None,
             release_seen: None,
+            mark_read: None,
+            records_before_read: None,
         }
     }
     /// The dispatch intent of one native post, bound to the request it sends:
@@ -277,6 +302,8 @@ impl StatusRecord {
             binding_refusal,
             proof: None,
             release_seen: None,
+            mark_read: None,
+            records_before_read: None,
         }
     }
 
@@ -285,8 +312,35 @@ impl StatusRecord {
     fn sets_status(&self) -> bool {
         !matches!(
             self.record_type,
-            StatusKind::PostSpanVerdict | StatusKind::StopRelease
+            StatusKind::PostSpanVerdict | StatusKind::StopRelease | StatusKind::RollbackSeen
         )
+    }
+
+    /// The record that `batch`'s verification read the company's voucher
+    /// mark at `mark_read`, below the batch's floor, having read
+    /// `records_before_read` journal records before that read.
+    pub(super) fn rollback_seen(
+        batch: &ImportLedgerLine,
+        mark_read: u64,
+        records_before_read: u64,
+    ) -> Self {
+        Self {
+            record_type: StatusKind::RollbackSeen,
+            batch_id: batch.batch_id.clone(),
+            batch_sha256: batch.sha256.clone(),
+            status: ROLLBACK_SEEN_STATUS.into(),
+            response: None,
+            native_request_sha256: None,
+            native_remote_id: None,
+            native_remote_ids: None,
+            pre_post_voucher_mark: None,
+            bindings: None,
+            binding_refusal: None,
+            proof: None,
+            release_seen: None,
+            mark_read: Some(mark_read),
+            records_before_read: Some(records_before_read),
+        }
     }
 
     /// A person's release of the stop `batch` holds. `seen` is what the fresh
@@ -306,6 +360,8 @@ impl StatusRecord {
             binding_refusal: None,
             proof: None,
             release_seen: Some(seen),
+            mark_read: None,
+            records_before_read: None,
         }
     }
 
@@ -342,6 +398,8 @@ impl StatusRecord {
             binding_refusal: None,
             proof: None,
             release_seen: None,
+            mark_read: None,
+            records_before_read: None,
         }
     }
 }
@@ -371,6 +429,8 @@ impl StatusRecord {
             binding_refusal: None,
             proof: None,
             release_seen: None,
+            mark_read: None,
+            records_before_read: None,
         }
     }
 }
@@ -648,7 +708,9 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
                 StatusKind::PostSpanVerdict => {
                     progress.binding_refused = update.binding_refusal.is_some();
                 }
-                StatusKind::VerificationStatus | StatusKind::StopRelease => {}
+                StatusKind::VerificationStatus
+                | StatusKind::StopRelease
+                | StatusKind::RollbackSeen => {}
             }
             // The latest status of every kind is the batch's status, as
             // `read_snapshot` takes it: a dispatch intent or a response after a
@@ -1259,6 +1321,34 @@ fn scan_records(
             } else if update.release_seen.is_some() {
                 return Err("import_ledger_invalid".into());
             }
+            // A rollback-seen record follows a native dispatch intent that
+            // recorded a pre-POST mark, names a count of records it had read no
+            // larger than its own position, and carries nothing else. Its mark
+            // is not checked against a floor: the floor a writer used may rest
+            // on a mark read after the post, which the journal does not hold,
+            // and a record a writer emits must never be refused.
+            if matches!(update.record_type, StatusKind::RollbackSeen) {
+                let within = update
+                    .records_before_read
+                    .and_then(|count| usize::try_from(count).ok())
+                    .is_some_and(|count| count <= ordinal);
+                if !marked.contains(&update.batch_id)
+                    || update.status != ROLLBACK_SEEN_STATUS
+                    || update.mark_read.is_none()
+                    || !within
+                    || update.response.is_some()
+                    || update.native_request_sha256.is_some()
+                    || update.native_remote_id.is_some()
+                    || update.native_remote_ids.is_some()
+                    || update.pre_post_voucher_mark.is_some()
+                    || update.bindings.is_some()
+                    || update.binding_refusal.is_some()
+                {
+                    return Err("import_ledger_invalid".into());
+                }
+            } else if update.mark_read.is_some() || update.records_before_read.is_some() {
+                return Err("import_ledger_invalid".into());
+            }
             // A saved proof belongs only to a verification status record.
             if update.proof.is_some()
                 && !matches!(update.record_type, StatusKind::VerificationStatus)
@@ -1334,6 +1424,236 @@ fn scan_records(
             .ok_or_else(|| "import_ledger_invalid".to_string())?;
     }
     Ok(())
+}
+
+/// What the rollback-seen records say about one batch (#1050), from one scan.
+pub(super) struct RollbackScan {
+    /// How many records the journal held when it was read: the count a
+    /// rollback-seen record carries when the mark it names is read after this
+    /// scan.
+    pub(super) records: u64,
+    /// The record that covers the batch, if any (the lowest mark among them).
+    pub(super) covered_by: Option<RollbackCover>,
+}
+
+/// A rollback-seen record that covers a batch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct RollbackCover {
+    pub(super) mark_read: u64,
+    /// The batch whose verification read the mark.
+    pub(super) seen_by: String,
+}
+
+/// What one batch had journaled, and where, for judging a record's cover.
+#[derive(Default)]
+struct NativePost {
+    intent_at: Option<usize>,
+    pre_post_voucher_mark: Option<u64>,
+    /// Where its answer with a parsed outcome was recorded, and the vouchers
+    /// that answer counted created.
+    created_at: Option<(usize, u64)>,
+    /// Where its binding was recorded, and how many vouchers it bound.
+    bound_at: Option<(usize, u64)>,
+}
+
+impl NativePost {
+    /// The floor the post had proved within the first `prefix` records: the
+    /// vouchers it bound (the bind read exactly those AlterIDs above the
+    /// pre-POST mark), else the vouchers Tally's recorded answer counted
+    /// created (a recorded answer means they had landed), else the pre-POST
+    /// mark alone. `None` for a post not dispatched within the prefix or with
+    /// no pre-POST mark.
+    fn floor_within(&self, prefix: usize) -> Option<u64> {
+        let before = self.pre_post_voucher_mark?;
+        if self.intent_at.is_none_or(|at| at >= prefix) {
+            return None;
+        }
+        let proved = match (self.bound_at, self.created_at) {
+            (Some((at, bound)), _) if at < prefix => bound,
+            (_, Some((at, created))) if at < prefix => created,
+            _ => 0,
+        };
+        Some(before.saturating_add(proved))
+    }
+}
+
+/// The rollback-seen records that cover `batch_id`, the whole journal
+/// admitted on the way. A record covers a batch of the same company (all four
+/// fields) and endpoint when, within the records the record's verification
+/// had read, the batch's dispatch intent was recorded and the floor it had
+/// proved there is above the mark the record read. Only facts journaled before
+/// that read count, so a post whose answer or binding came later is judged on
+/// its pre-POST mark alone, which a mark read after it cannot fall below.
+pub(super) fn rollback_cover(reader: impl BufRead, batch_id: &str) -> Result<RollbackScan, String> {
+    let facts = RollbackFacts::scan(reader)?;
+    Ok(RollbackScan {
+        records: facts.records as u64,
+        covered_by: facts.cover_of(batch_id),
+    })
+}
+
+/// Whether a rollback-seen record that `seen_by`'s verification would write,
+/// for a mark read at `mark_read` after reading `records_before_read` records,
+/// covers a native batch of its company and address that no record on file
+/// covers (#1050). Only such a record is written: a check of a batch already
+/// covered still records a second restore that reaches a batch posted since,
+/// and a record that would cover nothing new is not written.
+pub(super) fn rollback_record_extends(
+    reader: impl BufRead,
+    seen_by: &str,
+    mark_read: u64,
+    records_before_read: u64,
+) -> Result<bool, String> {
+    let facts = RollbackFacts::scan(reader)?;
+    let Some(place) = facts.place_of(seen_by) else {
+        return Ok(false);
+    };
+    let prefix = usize::try_from(records_before_read).unwrap_or(usize::MAX);
+    Ok(facts.order.iter().any(|batch_id| {
+        facts.place_of(batch_id) == Some(place)
+            && facts
+                .posts
+                .get(batch_id)
+                .and_then(|post| post.floor_within(prefix))
+                .is_some_and(|floor| floor > mark_read)
+            && facts.cover_of(batch_id).is_none()
+    }))
+}
+
+/// The other native batches the rollback-seen records `seen_by` wrote cover,
+/// in journal order, for the answer that records a rollback to name: their
+/// own status is unchanged until each is verified again.
+pub(super) fn covered_by_records_of(
+    reader: impl BufRead,
+    seen_by: &str,
+) -> Result<Vec<String>, String> {
+    let facts = RollbackFacts::scan(reader)?;
+    let Some(place) = facts.place_of(seen_by) else {
+        return Ok(Vec::new());
+    };
+    let records = facts
+        .seen
+        .iter()
+        .filter(|(by, _, _)| by == seen_by)
+        .collect::<Vec<_>>();
+    Ok(facts
+        .order
+        .iter()
+        .filter(|batch_id| batch_id.as_str() != seen_by)
+        .filter(|batch_id| facts.place_of(batch_id) == Some(place))
+        .filter(|batch_id| {
+            facts.posts.get(*batch_id).is_some_and(|post| {
+                records.iter().any(|(_, mark_read, prefix)| {
+                    post.floor_within(*prefix)
+                        .is_some_and(|floor| floor > *mark_read)
+                })
+            })
+        })
+        .cloned()
+        .collect())
+}
+
+/// The batch's company and Tally address, as its full record names them.
+type Place = (Option<ImportCompanyTuple>, Option<String>);
+
+/// What one scan of the journal says about native posts and rollback-seen
+/// records, for [`rollback_cover`] and [`covered_by_records_of`].
+struct RollbackFacts {
+    places: BTreeMap<String, Place>,
+    posts: BTreeMap<String, NativePost>,
+    /// Batch ids in the order their first full record appeared.
+    order: Vec<String>,
+    /// Each rollback-seen record: the batch that wrote it, its mark and count.
+    seen: Vec<(String, u64, usize)>,
+    records: usize,
+}
+
+impl RollbackFacts {
+    fn scan(reader: impl BufRead) -> Result<Self, String> {
+        let mut facts = Self {
+            places: BTreeMap::new(),
+            posts: BTreeMap::new(),
+            order: Vec::new(),
+            seen: Vec::new(),
+            records: 0,
+        };
+        scan_records(reader, |record, VerificationGeneration(at)| {
+            facts.records = at + 1;
+            match record {
+                Record::Batch(batch) => {
+                    if !facts.places.contains_key(&batch.batch_id) {
+                        facts.order.push(batch.batch_id.clone());
+                    }
+                    facts.places.insert(
+                        batch.batch_id.clone(),
+                        (batch.company.clone(), batch.endpoint_origin.clone()),
+                    );
+                }
+                Record::Status(update) => {
+                    let post = facts.posts.entry(update.batch_id.clone()).or_default();
+                    match update.record_type {
+                        StatusKind::DispatchIntent => {
+                            post.intent_at = Some(at);
+                            post.pre_post_voucher_mark = update.pre_post_voucher_mark;
+                        }
+                        StatusKind::DispatchResponse => {
+                            if let Some(outcome) = update
+                                .response
+                                .as_ref()
+                                .and_then(|response| response.outcome.as_ref())
+                            {
+                                post.created_at = Some((at, outcome.counters().created));
+                            }
+                        }
+                        StatusKind::PostSpanVerdict => {
+                            if let Some(bound) = &update.bindings {
+                                post.bound_at = Some((at, bound.len() as u64));
+                            }
+                        }
+                        StatusKind::RollbackSeen => {
+                            if let (Some(mark), Some(count)) =
+                                (update.mark_read, update.records_before_read)
+                            {
+                                // Admission bounds the count by the record's position.
+                                let count = usize::try_from(count).unwrap_or(at);
+                                facts.seen.push((update.batch_id.clone(), mark, count));
+                            }
+                        }
+                        StatusKind::VerificationStatus | StatusKind::StopRelease => {}
+                    }
+                }
+            }
+        })?;
+        Ok(facts)
+    }
+
+    /// The record that covers `batch_id`, if any (the lowest mark among them):
+    /// one written by a batch of the same place, within whose prefix the batch
+    /// was dispatched and had proved a floor above the mark read.
+    fn cover_of(&self, batch_id: &str) -> Option<RollbackCover> {
+        let own_place = self.place_of(batch_id)?;
+        let post = self.posts.get(batch_id)?;
+        self.seen
+            .iter()
+            .filter(|(seen_by, mark_read, prefix)| {
+                self.place_of(seen_by) == Some(own_place)
+                    && post
+                        .floor_within(*prefix)
+                        .is_some_and(|floor| floor > *mark_read)
+            })
+            .min_by_key(|(_, mark_read, _)| *mark_read)
+            .map(|(seen_by, mark_read, _)| RollbackCover {
+                mark_read: *mark_read,
+                seen_by: seen_by.clone(),
+            })
+    }
+
+    /// The batch's place, when its record names both a company and an address.
+    fn place_of(&self, batch_id: &str) -> Option<&Place> {
+        self.places
+            .get(batch_id)
+            .filter(|(company, endpoint)| company.is_some() && endpoint.is_some())
+    }
 }
 
 /// Every GUID that a batch other than `own_batch_id` has bound, the whole

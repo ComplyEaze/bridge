@@ -52,6 +52,13 @@ export function releaseAssets(release, platform) {
   return { bundle, checksum };
 }
 
+// GitHub reports "sha256:" and 64 lowercase hex characters for an asset it stored. Anything else
+// (absent on an old release, null in the snapshot, another algorithm) gives nothing to show.
+export function sha256Digest(asset) {
+  const match = /^sha256:([0-9a-f]{64})$/.exec(asset?.digest ?? "");
+  return match ? match[1] : undefined;
+}
+
 export function releaseLabel(release) {
   return `${release.tag_name} (not yet code-signed)`;
 }

@@ -24,6 +24,7 @@ DEFAULT_TOOLS = {
     "company_features",
     "egress_log",
     "gst_status",
+    "gst_uncertain_vouchers",
     "ledger_masters",
     "ledger_movement",
     "list_companies",
@@ -69,7 +70,7 @@ def expected_tools(environment):
         tools |= POSTING_TOOLS
     return tools
 # The bundled PDFium: beside the binary, where parse_bank_statement loads it,
-# with the licence notice scripts/fetch-pdfium.py generated at the root. Both are
+# with the licence notice scripts/fetch-pdfium.mjs generated at the root. Both are
 # checked against packaging/pdfium/pdfium.lock.json, not merely present.
 PDFIUM_NOTICE = "THIRD_PARTY_LICENSES_PDFIUM.txt"
 PDFIUM_LIBRARIES = {"darwin": "libpdfium.dylib", "win32": "pdfium.dll"}

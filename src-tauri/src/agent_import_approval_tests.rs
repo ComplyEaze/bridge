@@ -1078,11 +1078,13 @@ async fn a_batch_posted_elsewhere_releases_its_hold() {
 }
 
 /// `post_import` over the stdio path every agent post takes, cancelled once
-/// `simulator` has received `after` requests when that is given.
+/// `simulator` has received `after` requests when that is given, and failed
+/// if it has not ended within `bound`.
 async fn post_over_stdio(
     server: &Server,
     args: &Value,
     cancel: Option<(&SequenceSimulator, usize)>,
+    bound: Duration,
 ) -> ToolCallEnd {
     let (client, source) = tokio::io::duplex(1 << 16);
     let (_client_read, mut client_write) = tokio::io::split(client);
@@ -1108,11 +1110,9 @@ async fn post_over_stdio(
             client_write.write_all(CANCEL_7).await.unwrap();
         }
     };
-    let (outcome, ()) = tokio::time::timeout(Duration::from_secs(20), async {
-        tokio::join!(post, canceller)
-    })
-    .await
-    .unwrap();
+    let (outcome, ()) = tokio::time::timeout(bound, async { tokio::join!(post, canceller) })
+        .await
+        .unwrap();
     outcome.unwrap()
 }
 
@@ -1125,7 +1125,7 @@ async fn post_over_stdio(
 #[tokio::test]
 async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
     let lease_reads = after_approval(xml(created_one())).len() - 1;
-    async fn one_case(held_at: Option<usize>) {
+    async fn one_case(held_at: Option<usize>, bound: Duration) {
         let mut plans = before_approval();
         let lease_start = plans.len();
         let mut lease = after_approval(xml(created_one()));
@@ -1144,6 +1144,7 @@ async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() 
             &server,
             &args,
             held_at.map(|held_at| (&simulator, lease_start + held_at)),
+            bound,
         )
         .await;
         let observed = sent(simulator);
@@ -1183,15 +1184,22 @@ async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() 
     // others for more than a small part of the 300 milliseconds a held read
     // lasts. Every case is joined, and a panic in any of them is passed on
     // after the others have finished, with the case named.
+    //
+    // The cases of a group share one thread, and the synchronous work of each
+    // runs while the others wait, so on a loaded runner a late case of a group
+    // can end only after the others: a case's bound is one case's allowance
+    // for every case of its group, not a fixed time.
     const AT_ONCE: usize = 11;
+    const ONE_CASE: Duration = Duration::from_secs(20);
     let cases = (0..lease_reads).map(Some).chain([None]).collect::<Vec<_>>();
     for group in cases.chunks(AT_ONCE) {
+        let bound = ONE_CASE * u32::try_from(group.len()).unwrap();
         let local = tokio::task::LocalSet::new();
         local
             .run_until(async {
                 let running = group
                     .iter()
-                    .map(|&held_at| (held_at, tokio::task::spawn_local(one_case(held_at))))
+                    .map(|&held_at| (held_at, tokio::task::spawn_local(one_case(held_at, bound))))
                     .collect::<Vec<_>>();
                 let mut panicked = None;
                 for (held_at, case) in running {

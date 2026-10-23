@@ -668,7 +668,7 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
         }
         Some("unsettled") => "ComplyEaze Bridge could not finish matching this post to Tally just now; run the check again.",
         Some("not_bound") => "ComplyEaze Bridge has no readable answer from Tally to this post, so it cannot confirm it: check the vouchers in Tally and do not post them again.",
-        Some("book_rolled_back") => "The company's books are older than this post (probably restored from a backup or replaced by another copy), so its vouchers are no longer there: check in Tally before posting again.",
+        Some("book_rolled_back") => "The company's books were restored from a backup, or replaced by another copy, after this post, so its vouchers may be gone or may have been entered again by hand: check them in Tally before posting again.",
         _ => return report,
     };
     // When Tally's own answer reported every voucher of this post as not
@@ -706,6 +706,23 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     } else {
         "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
     };
+    // A check that recorded a restore while its own post reads intact names
+    // it: the restore reaches other posts of the company, and the posts it
+    // covers keep their status until each is verified again (#1050).
+    let mut summary = summary.to_string();
+    if report["rollback_recorded"] == true && report["state"] != "book_rolled_back" {
+        let count = report["other_batches_covered"]["count"]
+            .as_u64()
+            .unwrap_or(0);
+        let posts = if count == 1 {
+            "the other post named in other_batches_covered".to_string()
+        } else {
+            format!("the {count} other posts named in other_batches_covered")
+        };
+        summary.push_str(&format!(
+            " This check also found the company's books restored from a backup after other posts of it, and recorded that: verify {posts} again, and check their vouchers in Tally."
+        ));
+    }
     report["summary"] = json!(summary);
     report
 }
@@ -733,6 +750,19 @@ impl PostSpanDecision {
             recorded_at: None,
             rolled_back: false,
             report,
+        }
+    }
+
+    /// A batch a recorded rollback covers (#1050): rolled back whatever the
+    /// mark reads now, never bound, so it never reads `posted_verified`.
+    fn covered_by(cover: &ledger::RollbackCover) -> Self {
+        Self {
+            rolled_back: true,
+            ..Self::reported(json!({
+                "state": "book_rolled_back",
+                "mark_read": cover.mark_read,
+                "seen_by": cover.seen_by,
+            }))
         }
     }
 }
@@ -1974,23 +2004,66 @@ impl Server {
             };
             let span = match pre_post_voucher_mark {
                 Some(pre_post_voucher_mark) => {
+                    // Read before the mark: a rollback seen earlier, by this
+                    // verification or another, covers this batch whatever the
+                    // mark reads now (#1050), and the count of records read here
+                    // is what a new record of a rollback carries.
+                    let rollback = self.rollback_scan(&line.batch_id)?;
                     let (current, mark_evidence) =
                         self.current_voucher_mark(&company, &identity).await?;
                     accumulated = combine_evidence(accumulated.clone(), mark_evidence);
-                    let decision = self.decide_post_span(
-                        &line,
-                        span_identity::PreMark::recorded(pre_post_voucher_mark),
-                        span_verdict,
-                        dispatch_response.as_ref(),
-                        &observed,
-                        after_post_mark,
-                        current,
-                        generation,
-                    );
+                    // An omitted mark is read once more (AGENTS.md P5): omitted
+                    // twice, the company holds no voucher, which is below every
+                    // post's floor, and it is recorded as such (fail closed).
+                    let mark = match current {
+                        Some(mark) => mark,
+                        None => {
+                            let (again, again_evidence) =
+                                self.current_voucher_mark(&company, &identity).await?;
+                            accumulated = combine_evidence(accumulated.clone(), again_evidence);
+                            again.unwrap_or(0)
+                        }
+                    };
+                    let mut decision = match &rollback.covered_by {
+                        Some(cover) => PostSpanDecision::covered_by(cover),
+                        None => self.decide_post_span(
+                            &line,
+                            span_identity::PreMark::recorded(pre_post_voucher_mark),
+                            span_verdict,
+                            dispatch_response.as_ref(),
+                            &observed,
+                            after_post_mark,
+                            mark,
+                            generation,
+                        ),
+                    };
                     // This verification's own verdict record moved the journal:
                     // its status is persisted against the record it appended.
                     if let Some(recorded) = decision.recorded_at {
                         generation = recorded;
+                    }
+                    // A mark below a floor some native post of the company had
+                    // proved is a rollback, whichever post's check reads it. It
+                    // is recorded whenever the record would cover a post no
+                    // record covers yet, so it outlasts the mark rising again,
+                    // a covered post's check still records a second restore,
+                    // and nothing is written twice. A record that cannot be
+                    // written fails this verification, retryably: a rollback
+                    // seen and not recorded is the false verified this guards.
+                    if self.rollback_would_extend(&line.batch_id, mark, rollback.records)? {
+                        if let Some((recorded, others)) = self
+                            .record_rollback_seen(&line, mark, rollback.records, generation)
+                            .map_err(ToolFailure::from)?
+                        {
+                            generation = recorded;
+                            decision.report["rollback_recorded"] = json!(true);
+                            // The company's other native batches it covers keep
+                            // their status until each is verified again.
+                            decision.report["other_batches_covered"] = json!({
+                                "count": others.len(),
+                                "first": others.iter().take(10).collect::<Vec<_>>(),
+                            });
+                        }
                     }
                     decision
                 }
@@ -2252,8 +2325,23 @@ impl Server {
         let update = &update;
         let _admission_lock = self.lock_import_admission()?;
         let current = self.import_snapshot_while_admitted(Some(&update.batch_id))?;
-        if current.map(|snapshot| snapshot.generation) != Some(expected_generation) {
+        if current.as_ref().map(|snapshot| snapshot.generation) != Some(expected_generation) {
             return Err("import_verification_conflict_retry".into());
+        }
+        // A rollback another verification recorded since this one read the
+        // journal covers this batch: it is not verified, and the next
+        // verification says why (#1050).
+        if update.status == "posted_verified"
+            && current.is_some_and(|snapshot| snapshot.pre_post_voucher_mark.is_some())
+        {
+            if let Some(reader) = self.import_journal_while_admitted()? {
+                if ledger::rollback_cover(reader, &update.batch_id)?
+                    .covered_by
+                    .is_some()
+                {
+                    return Err("import_verification_conflict_retry".into());
+                }
+            }
         }
         let imports = self.imports_dir()?;
         // Saved with its party-name marks, so a page served from it masks
@@ -2638,6 +2726,81 @@ impl Server {
         Ok((verdict.clone(), recorded.generation))
     }
 
+    /// What the journal's rollback-seen records say about `batch_id`, read
+    /// under the shared lock.
+    fn rollback_scan(&self, batch_id: &str) -> Result<ledger::RollbackScan, String> {
+        let _lock = self.lock_import_admission_shared()?;
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::rollback_cover(reader, batch_id),
+            None => Err("import_batch_not_found".into()),
+        }
+    }
+
+    /// Records that `line`'s verification read the company's voucher mark at
+    /// `mark` below the batch's floor, having read `records_before_read`
+    /// journal records first (#1050). Under the exclusive lock, against the
+    /// generation this verification read, as a post-span verdict is. Returns
+    /// the new generation and the company's other native batches it covers,
+    /// or `None` when, judged under the lock, the record would cover no post
+    /// that a record on file does not.
+    fn record_rollback_seen(
+        &self,
+        line: &ImportLedgerLine,
+        mark: u64,
+        records_before_read: u64,
+        expected: ledger::VerificationGeneration,
+    ) -> Result<Option<(ledger::VerificationGeneration, Vec<String>)>, String> {
+        let _lock = self.lock_import_admission()?;
+        let current = self
+            .import_snapshot_while_admitted(Some(&line.batch_id))?
+            .ok_or_else(|| "import_batch_not_found".to_string())?;
+        if current.batch.sha256 != line.sha256 || current.generation != expected {
+            return Err("import_verification_conflict_retry".into());
+        }
+        // Judged again where no other writer can: a record another check wrote
+        // since may already cover what this one would.
+        let extends = match self.import_journal_while_admitted()? {
+            Some(reader) => {
+                ledger::rollback_record_extends(reader, &line.batch_id, mark, records_before_read)?
+            }
+            None => false,
+        };
+        if !extends {
+            return Ok(None);
+        }
+        self.append_import_record_while_admitted(&ledger::StatusRecord::rollback_seen(
+            line,
+            mark,
+            records_before_read,
+        ))?;
+        let recorded = self
+            .import_snapshot_while_admitted(Some(&line.batch_id))?
+            .ok_or_else(|| "import_batch_not_found".to_string())?;
+        let others = match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::covered_by_records_of(reader, &line.batch_id)?,
+            None => Vec::new(),
+        };
+        Ok(Some((recorded.generation, others)))
+    }
+
+    /// Whether a record of `mark`, read after `records_before_read` journal
+    /// records, would cover a post no record covers yet; read under the shared
+    /// lock, so a check that would record nothing takes no exclusive lock.
+    fn rollback_would_extend(
+        &self,
+        batch_id: &str,
+        mark: u64,
+        records_before_read: u64,
+    ) -> Result<bool, String> {
+        let _lock = self.lock_import_admission_shared()?;
+        match self.import_journal_while_admitted()? {
+            Some(reader) => {
+                ledger::rollback_record_extends(reader, batch_id, mark, records_before_read)
+            }
+            None => Ok(false),
+        }
+    }
+
     /// Every GUID another batch's post-span verdict bound.
     fn guids_bound_elsewhere(&self, own_batch_id: &str) -> Result<BTreeSet<String>, String> {
         let _lock = self.lock_import_admission_shared()?;
@@ -2649,14 +2812,15 @@ impl Server {
 
     /// The company's voucher mark now, for telling a book that kept a post from
     /// one rolled back below it. A company holding no voucher omits the mark,
-    /// which reads as 0 here (a copy put in place of the book, or one emptied):
-    /// unlike before a first import, that is an answer, not a refusal. Any
-    /// other failure to read is a failed verification, never a guess.
+    /// which is `None` here (a copy put in place of the book, or one emptied):
+    /// unlike before a first import, that is an answer, not a refusal, and the
+    /// span decision reads it as 0. Any other failure to read is a failed
+    /// verification, never a guess.
     async fn current_voucher_mark(
         &self,
         company: &bridge_tally_protocol::TallyCompany,
         identity: &super::VerifiedCompanyIdentity,
-    ) -> Result<(u64, Evidence), ToolFailure> {
+    ) -> Result<(Option<u64>, Evidence), ToolFailure> {
         let guid = company
             .guid
             .as_deref()
@@ -2664,7 +2828,7 @@ impl Server {
         let (xml, evidence) = self
             .post_read(identity, company_high_water_read(&company.name))
             .await?;
-        let mark = super::change_parse::company_voucher_high_water(&xml, guid).map_err(|code| {
+        let mark = super::change_parse::company_voucher_mark(&xml, guid).map_err(|code| {
             ToolFailure::from(pre_import_mark_refusal(&code).to_string())
                 .with_prior_evidence(evidence.clone())
         })?;

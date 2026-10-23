@@ -661,9 +661,8 @@ fn interactive_company_discovery_stops_before_materializing_an_oversized_listing
 /// Measured live 2026-08-07: the `Company` collection response
 /// (`ReadOnlyProfile::CompanyListV2`) for a Tally instance with three loaded
 /// companies. `CMPINFO` deliberately carries a bare `<COMPANY>0</COMPANY>`
-/// object counter ahead of `DATA` — the same trap `scripts/tally_probe.py`
-/// documents — so every test below also proves that counter is never
-/// mistaken for a fourth company row.
+/// object counter ahead of `DATA`, so every test below also proves that
+/// counter is never mistaken for a fourth company row.
 const COMPANY_COLLECTION_LIVE_RESPONSE: &str = r#"<ENVELOPE>
  <HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER>
  <BODY><DESC><CMPINFO><COMPANY>0</COMPANY><GROUP>0</GROUP><LEDGER>0</LEDGER></CMPINFO></DESC>

@@ -1320,13 +1320,6 @@ impl WindowReader for AgentReader<'_> {
 
 /// One admitted request of an audit window read, kept as it arrived.
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "sealed by the audit_read orchestrator, plan step 7"
-    )
-)]
 pub(super) struct RetainedWindowRead {
     pub(super) kind: WindowReadKind,
     /// SHA-256 of the UTF-16LE request Bridge sent.
@@ -1351,13 +1344,6 @@ pub(super) struct AuditWindowReader<'a> {
     failure: std::sync::Mutex<Option<crate::tally::runtime::AuditPartFailureKind>>,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "driven by the audit_read orchestrator, plan step 7"
-    )
-)]
 impl<'a> AuditWindowReader<'a> {
     pub(super) fn new(runtime: &'a TallyRuntime, config: TallyConfig) -> Self {
         Self {
@@ -1523,10 +1509,6 @@ impl WindowReader for AuditWindowReader<'_> {
 
 /// One audit window read: its outcome, and, only when that outcome succeeded,
 /// every read it made; on failure, why ([`AuditWindowReader::read_window`]).
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "read by the audit_read orchestrator, plan step 7")
-)]
 pub(super) struct AuditWindowRead<T> {
     pub(super) outcome: Result<WindowReadOutcome<T>, ToolFailure>,
     pub(super) retained: Option<Vec<RetainedWindowRead>>,
@@ -1545,10 +1527,6 @@ pub(super) enum AuditWindowFailure {
     Refused(String),
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "read by the audit_read orchestrator, plan step 7")
-)]
 impl AuditWindowFailure {
     /// Whether the orchestrator may read the same window again later. Someone
     /// else writing is the normal case on a multi-user book, so a window that
@@ -2492,7 +2470,7 @@ pub(super) fn split_verification_window(
 /// `pre_import_mark_refusal`). A response the marks cannot be read from is
 /// refused with the parser's own code — never read as an empty book, and never
 /// folded into a planning or bracket outcome that would hide which it was.
-fn company_marks(xml: &str, company_guid: &str) -> Result<CompanyMarks, String> {
+pub(super) fn company_marks(xml: &str, company_guid: &str) -> Result<CompanyMarks, String> {
     parse_company_marks(xml, company_guid)
         .map(|(vouchers, masters)| CompanyMarks { vouchers, masters })
 }

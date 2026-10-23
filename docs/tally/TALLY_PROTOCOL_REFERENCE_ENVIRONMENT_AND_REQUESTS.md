@@ -281,7 +281,7 @@ missing, empty, or disagreeing release across company rows cannot identify a
 release. Silver or Gold is known only when Education is false and exactly one
 tier flag is true. The observed label does not establish other releases,
 customised TDL, Gold, ERP9, Edit Log, or every voucher configuration. It does
-not promote any compatibility-matrix claim.
+not promote any claim.
 
 The former TallyPrime Silver 7.1 admission rule was retired on 2026-09-07. The
 current runtime requires a fresh observed TallyPrime product and recognised

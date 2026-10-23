@@ -177,7 +177,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "bbb5adeb42d5ff582270600cd5834cb763298e95f7c018be8ea8dbab6a46bd93"],
+  ], "e03fb18145fada3e014982178c8f367d35b600e0db986068e012c12bcf0d8382"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -475,7 +475,7 @@ const expectedChanges = [
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
   "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
-  "          if grep -Eq '^(\\.github/workflows/|\\.github/actions/|rust-toolchain\\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.mjs$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes(\\.test)?\\.mjs$|retain-macos-test-binaries(\\.test)?\\.mjs$))' <<< \"$changed_files\"; then",
+  "          if grep -Eq '^(\\.github/workflows/|\\.github/actions/|rust-toolchain\\.toml|glama/Dockerfile$|src-tauri/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.mjs$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes(\\.test)?\\.mjs$|retain-macos-test-binaries(\\.test)?\\.mjs$))' <<< \"$changed_files\"; then",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
@@ -488,7 +488,6 @@ const expectedChanges = [
   "            echo 'tax_audit=false' >> \"$GITHUB_OUTPUT\"",
   "          fi",
   "",
-  "          # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.",
   "          if grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
@@ -500,10 +499,11 @@ if (jobBlock(workflow, "changes").trimEnd() !== expectedChanges) {
 }
 // The native job runs on a pull request only when the scope above selects it. A test in it that reads
 // a file the scope does not list is skipped, with the file's change, by the queue, and only a master
-// push would find the break. So: every file a Rust test pulls in from outside src-tauri/ and tools/
+// push would find the break. So: every file a Rust test pulls in from outside src-tauri/
 // through include_str!/include_bytes!, and every file listed below that a test or a native-job step
-// reads at run time, must be matched by the native scope's own pattern. Tests in tools/ are not listed: `Tally
-// portable core` runs that workspace on every pull request, whatever the scope selects.
+// reads at run time, must be matched by the native scope's own pattern. A portable-core test that reads the
+// repository at run time (`bridge-tally-core/tests/compatibility_surface_stays_whole.rs`) is not listed:
+// `Tally portable core` runs those crates on every pull request, whatever the scope selects.
 const nativeScope = new RegExp(/grep -Eq '(\^\([^']+\))' <<< "\$changed_files"; then\n\s+echo 'native=true'/.exec(jobBlock(workflow, "changes"))?.[1] ?? "(unreadable)");
 const tracked = trackedFiles();
 const readAtRunTime = [
@@ -533,7 +533,7 @@ for (const [entry, reader, optional] of readAtRunTime) {
   else if (files.length === 0) failures.push(`the run-time read list names ${entry}, which has no tracked file; update the list (${reader})`);
   for (const file of files) if (!nativeScope.test(file)) failures.push(`the native scope omits ${file}, which ${reader} reads`);
 }
-for (const file of tracked.filter((path) => /^(?:src-tauri|tools)\/.+\.rs$/.test(path))) {
+for (const file of tracked.filter((path) => /^src-tauri\/.+\.rs$/.test(path))) {
   const source = readFileSync(resolve(repositoryRoot, file), "utf8").replace(/^\s*\/\/.*$/gm, "");
   for (const opening of source.matchAll(/include_(?:str|bytes)!\(/g)) {
     // The argument runs to the matching parenthesis, so a nested concat!(env!(..), "..") is read whole.
@@ -548,7 +548,7 @@ for (const file of tracked.filter((path) => /^(?:src-tauri|tools)\/.+\.rs$/.test
       continue;
     }
     const resolved = posix.normalize(posix.join(posix.dirname(file), literal));
-    if (!/^(?:src-tauri|tools)\//.test(resolved) && !nativeScope.test(resolved)) {
+    if (!/^src-tauri\//.test(resolved) && !nativeScope.test(resolved)) {
       failures.push(`the native scope omits ${resolved}, which ${file} includes`);
     }
   }
@@ -625,9 +625,9 @@ for (const step of parseWorkflowSteps(workflow)) {
 
 // ADR 0004: `lab-writes` compiles the lab-only Tally write tools. The only way in is an explicit
 // `--features lab-writes`, which no workflow, action or Cargo config (an alias could carry it) may
-// name, so no feature (default included) and no dependency declaration in either workspace may turn
+// name, so no feature (default included) and no dependency declaration in the workspace may turn
 // it on for a build that did not ask.
-for (const manifest of ["src-tauri", "tools"]) {
+for (const manifest of ["src-tauri"]) {
   for (const candidate of workspaceMetadata(resolve(repositoryRoot, manifest, "Cargo.toml")).packages) {
     for (const [feature, members] of Object.entries(candidate.features)) {
       if (members.some((member) => /(?:^|\/)lab-writes$/.test(member))) {
@@ -646,10 +646,6 @@ for (const file of trackedFiles().filter((path) => buildInputs.test(path))) {
   if (/lab[-_]writes|--all-features/i.test(readFileSync(resolve(repositoryRoot, file), "utf8"))) {
     failures.push(`${file} names lab-writes or --all-features; no CI build may compile the lab write tools`);
   }
-}
-
-for (const stalePath of staleToolPaths()) {
-  failures.push(`stale tools-workspace path: ${stalePath.file} references ${stalePath.path}`);
 }
 
 if (failures.length) {
@@ -796,19 +792,6 @@ function workspaceMetadata(manifestPath) {
   const metadata = JSON.parse(result.stdout);
   metadataByWorkspace.set(manifestPath, metadata);
   return metadata;
-}
-
-function staleToolPaths() {
-  const toolsMetadata = workspaceMetadata(resolve(repositoryRoot, "tools", "Cargo.toml"));
-  const legacyPaths = toolsMetadata.packages.map((candidate) => `src-tauri/crates/${candidate.name}`);
-  const stale = [];
-  for (const file of trackedFiles()) {
-    const contents = readFileSync(resolve(repositoryRoot, file), "utf8");
-    for (const path of legacyPaths) {
-      if (contents.includes(path)) stale.push({ file, path });
-    }
-  }
-  return stale;
 }
 
 function trackedFiles() {

@@ -295,8 +295,7 @@ fi
 # unrelated nested `path` must not turn an incomplete manifest into an empty
 # pin set.
 #
-# A pinned file is not hash-checked here (CI computes the digest from live
-# bytes). Instead, a PR that touches a pinned path must ADD exactly one
+# A pinned file is not hash-checked here. Instead, a PR that touches a pinned path must ADD exactly one
 # acknowledgement file, docs/tally/compatibility/acks/pr-<PR>.txt, listing the
 # touched paths. (The acknowledgement's reviewer line is still read for its shape,
 # but no review is matched against it any more: the owner's merge verdict, checked

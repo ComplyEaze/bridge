@@ -76,12 +76,13 @@ answer for each (named DERIVED where it is built, in `agent_import_tests.rs` and
 
 - **`Q`, the rates read restricted to the invoice's parents, with the three HSN/SAC fields.** The request is
   the code's, SHA-256 `3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc`; the lab was not
-  sent it on any book (it answered the four-parent request without the fields on 10 Oct 2026 and the
-  unrestricted request with them on 12 Oct 2026). The answer is the unrestricted answer
+  sent it on this book's state (it answered it on 21 Oct 2026, on the book as it then stood, and its
+  answer is equal row for row to this derived one: `../pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml`).
+  The answer is the unrestricted answer
   (`../pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml`, byte-equal to what W18 read) cut to the ledgers
   this directory's catalogue (`w18-ledger-catalogue-v2`) holds under the four parents the invoice's ledgers
   sit under (`Duties & Taxes`, `Indirect Expenses`, `Sales Accounts`, `Sundry Debtors`), the removal
-  counted and the rows left asserted equal to the catalogue's, name for name. Not sent to the lab; derived
+  counted and the rows left asserted equal to the catalogue's, name for name. Not sent to the lab on this state; derived
   from W16 by the parent filter (protocol reference section 11e, PARTIAL: the lab's 10 Oct restricted read
   held exactly the unrestricted read's rows under the parents it named, on one book and one spelling).
 - **`X` and `Y`, the voucher-type numbering reads.** The requests are the code's, `229f54c9...` and
@@ -92,7 +93,7 @@ answer for each (named DERIVED where it is built, in `agent_import_tests.rs` and
   GUID. The series-level fields of the rows left have no W18 capture, so for them the inference is not
   checked.
 
-Captures on this book are owed (`CAPTURE-1640` and its W18 addendum, written for the next lab sitting). A
+Captures of the numbering reads on this book are owed (`CAPTURE-1640` and its W18 addendum, written for the next lab sitting). A
 capture of the numbering reads at W18's state needs the book restored from the backup the W18b and W18c
 sittings used; on the live book, whose mark is now 245, it would be the numbering of a different state.
 

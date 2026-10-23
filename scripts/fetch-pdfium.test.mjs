@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { gzipSync } from "node:zlib";
 
-import { LOCK, main, noticeBytes, Refusal, tarFiles } from "./fetch-pdfium.mjs";
+import { DOWNLOAD_ATTEMPTS, LOCK, main, noticeBytes, Refusal, RETRY_PAUSES_MS, tarFiles } from "./fetch-pdfium.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
@@ -215,4 +215,152 @@ test("a pax path applies to the next entry only, a pre-POSIX directory is skippe
 
 test("an unknown option is a refusal, not a stack trace", async () => {
   await assert.rejects(main(["--platfrom", "test"], { lockPath: lockPath() }), (error) => error instanceof Refusal && /usage/.test(error.message));
+});
+
+// The archive download is retried a bounded number of times, and only for failures that say nothing about the bytes.
+// A scripted fetch stands in for the network; the pauses are recorded, not slept.
+function scripted(...answers) {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    const answer = answers[Math.min(calls.length, answers.length) - 1];
+    if (answer instanceof Error) throw answer;
+    return typeof answer === "function" ? answer() : answer;
+  };
+  return { calls, fetchImpl };
+}
+
+const ok = (bytes) => () => new Response(bytes, { status: 200 });
+
+async function runDownload({ calls, fetchImpl }) {
+  const pauses = [];
+  const output = [];
+  const logs = [];
+  const code = await main(["--platform", "test", "--dest", join(root, "out")], {
+    lockPath: lockPath(),
+    stdout: { write: (text) => output.push(text) },
+    fetchImpl,
+    sleep: async (ms) => pauses.push(ms),
+    log: (line) => logs.push(line),
+  });
+  return { code, pauses, calls, logs, output: output.join("") };
+}
+
+test("the retry budget is three attempts with two pauses of one and three seconds", () => {
+  assert.equal(DOWNLOAD_ATTEMPTS, 3);
+  assert.deepEqual(RETRY_PAUSES_MS, [1000, 3000]);
+});
+
+test("a 502 and then the pinned archive succeeds on the second attempt, after one pause", async () => {
+  const { code, pauses, calls } = await runDownload(scripted(new Response("bad gateway", { status: 502 }), ok(archive)));
+  assert.equal(code, 0);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(pauses, [1000]);
+  assert.equal(readFileSync(join(root, "out", "libpdfium.dylib"), "utf8"), "library bytes");
+});
+
+test("a network error, then a 429, then the pinned archive succeeds on the third attempt, after two pauses", async () => {
+  const { code, pauses, calls } = await runDownload(scripted(new TypeError("fetch failed"), new Response("slow down", { status: 429 }), ok(archive)));
+  assert.equal(code, 0);
+  assert.equal(calls.length, 3);
+  assert.deepEqual(pauses, [1000, 3000]);
+});
+
+test("a body stream that breaks mid-download is retried", async () => {
+  const broken = () => new Response(new ReadableStream({ start(controller) { controller.enqueue(archive.subarray(0, 10)); controller.error(new Error("connection reset")); } }), { status: 200 });
+  const { code, calls } = await runDownload(scripted(broken, ok(archive)));
+  assert.equal(code, 0);
+  assert.equal(calls.length, 2);
+});
+
+test("three 503 answers are refused after exactly three attempts, naming the status", async () => {
+  const run = runDownload(scripted(new Response("", { status: 503 })));
+  await assert.rejects(run, (error) => error instanceof Refusal && /HTTP 503/.test(error.message) && /tried 3 times/.test(error.message));
+  const probe = scripted(new Response("", { status: 503 }));
+  const pauses = [];
+  await main(["--platform", "test", "--dest", join(root, "out2")], { lockPath: lockPath(), fetchImpl: probe.fetchImpl, sleep: async (ms) => pauses.push(ms), log: () => {} }).catch(() => {});
+  assert.equal(probe.calls.length, 3);
+  assert.deepEqual(pauses, [1000, 3000]);
+});
+
+test("a 404 is refused on the first sight, without a retry or a pause", async () => {
+  const probe = scripted(new Response("", { status: 404 }));
+  const pauses = [];
+  await assert.rejects(
+    main(["--platform", "test", "--dest", join(root, "out")], { lockPath: lockPath(), fetchImpl: probe.fetchImpl, sleep: async (ms) => pauses.push(ms), log: () => {} }),
+    (error) => error instanceof Refusal && /HTTP 404/.test(error.message) && !/tried/.test(error.message),
+  );
+  assert.equal(probe.calls.length, 1);
+  assert.deepEqual(pauses, []);
+});
+
+test("a download whose bytes do not match the pin is refused at once and never retried", async () => {
+  const tampered = Buffer.from(archive);
+  tampered[tampered.length - 1] ^= 0xff;
+  const probe = scripted(ok(tampered), ok(archive));
+  const pauses = [];
+  await assert.rejects(
+    main(["--platform", "test", "--dest", join(root, "out")], { lockPath: lockPath(), fetchImpl: probe.fetchImpl, sleep: async (ms) => pauses.push(ms), log: () => {} }),
+    (error) => error instanceof Refusal && /refusing/.test(error.message),
+  );
+  assert.equal(probe.calls.length, 1, "a mismatch must not be retried until a good answer arrives");
+  assert.deepEqual(pauses, []);
+  assert.equal(existsSync(join(root, "out")), false, "nothing is written for a refused archive");
+});
+
+test("a retry that succeeds still verifies the library and the notice (a good archive with a wrong library pin is refused)", async () => {
+  lock.platforms.test.library_sha256 = "0".repeat(64);
+  writeLock();
+  const probe = scripted(new Response("", { status: 502 }), ok(archive));
+  await assert.rejects(
+    main(["--platform", "test", "--dest", join(root, "out")], { lockPath: lockPath(), fetchImpl: probe.fetchImpl, sleep: async () => {}, log: () => {} }),
+    (error) => error instanceof Refusal && /libpdfium/.test(error.message),
+  );
+  assert.equal(probe.calls.length, 2);
+});
+
+test("each retry writes one line saying why, so a flaky host leaves a trace in the job log", async () => {
+  const { logs } = await runDownload(scripted(new Response("", { status: 502 }), new TypeError("fetch failed"), ok(archive)));
+  assert.equal(logs.length, 2);
+  assert.match(logs[0], /HTTP 502.*attempt 1 of 3/);
+  assert.match(logs[1], /fetch failed.*attempt 2 of 3/);
+});
+
+for (const status of [408, 500]) {
+  test(`HTTP ${status} is retried`, async () => {
+    const { code, calls } = await runDownload(scripted(new Response("", { status }), ok(archive)));
+    assert.equal(code, 0);
+    assert.equal(calls.length, 2);
+  });
+}
+
+async function refusedAtOnce(response, pattern) {
+  const probe = scripted(response, ok(archive));
+  const pauses = [];
+  await assert.rejects(
+    main(["--platform", "test", "--dest", join(root, "out")], { lockPath: lockPath(), fetchImpl: probe.fetchImpl, sleep: async (ms) => pauses.push(ms), log: () => {} }),
+    (error) => error instanceof Refusal && pattern.test(error.message) && !/tried/.test(error.message),
+  );
+  assert.equal(probe.calls.length, 1, "refused on the first sight, with no second request");
+  assert.deepEqual(pauses, []);
+}
+
+test("a clean answer that is shorter than the pin is refused at once, not retried", async () => {
+  await refusedAtOnce(() => new Response(archive.subarray(0, archive.length - 5), { status: 200 }), /refusing/);
+});
+
+test("a clean answer longer than the pin is refused at once, not retried", async () => {
+  await refusedAtOnce(() => new Response(Buffer.concat([archive, Buffer.from("extra bytes")]), { status: 200 }), /refusing/);
+});
+
+test("a 204 with no body is a malformed answer, refused at once, not retried", async () => {
+  await refusedAtOnce(() => new Response(null, { status: 204 }), /no body/);
+});
+
+test("the body of a failed answer is cancelled before the next attempt, so no socket is held open", async () => {
+  let cancelled = 0;
+  const failing = () => new Response(new ReadableStream({ pull(controller) { controller.enqueue(new Uint8Array(4)); }, cancel() { cancelled += 1; } }), { status: 502 });
+  const { code } = await runDownload(scripted(failing, failing, ok(archive)));
+  assert.equal(code, 0);
+  assert.equal(cancelled, 2);
 });

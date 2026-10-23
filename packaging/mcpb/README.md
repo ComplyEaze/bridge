@@ -3,7 +3,7 @@
 Fetch the pinned PDFium build, then build the host `bridge_mcp` binary and assemble an MCPB archive:
 
 ```sh
-python3 scripts/fetch-pdfium.py --platform macos-arm64 --dest /tmp/mcpb-pdfium   # windows-x64 on Windows
+node scripts/fetch-pdfium.mjs --platform macos-arm64 --dest /tmp/mcpb-pdfium   # windows-x64 on Windows
 node scripts/package-mcpb.mjs --pdfium /tmp/mcpb-pdfium
 npx --yes @anthropic-ai/mcpb@2.1.2 validate packaging/mcpb/stage/manifest.json
 npx --yes @anthropic-ai/mcpb@2.1.2 pack packaging/mcpb/stage src-tauri/target/release/bridge-tally.mcpb
@@ -19,7 +19,7 @@ host architecture:
 node scripts/package-mcpb.mjs --binary /path/to/bridge_mcp --pdfium /tmp/mcpb-pdfium
 ```
 
-Staging refuses to run without `--pdfium`: the manifest always enables imports, so every archive lists `parse_bank_statement`, and without the library every call would fail. `fetch-pdfium.py` checks the archive, the extracted library and the licence notice it writes against `packaging/pdfium/pdfium.lock.json` before anything is used.
+Staging refuses to run without `--pdfium`: the manifest always enables imports, so every archive lists `parse_bank_statement`, and without the library every call would fail. `fetch-pdfium.mjs` checks the archive, the extracted library and the licence notice it writes against `packaging/pdfium/pdfium.lock.json` before anything is used.
 
 The committed `manifest.json` is a schema-valid template; it is not an archive manifest. The command builds the host `bridge_mcp` release binary with the locked dependencies, then replaces `packaging/mcpb/stage/` with a clean host-specific stage. Its binary is staged at `bin/<target-triple>/bridge_mcp` (or `.exe` on Windows), alongside `LICENSE`, `NOTICE`, `THIRD_PARTY_LICENSES.txt`, and `THIRD_PARTY_LICENSES_RUST.txt`. The PDFium library is staged beside the binary (`bin/<target-triple>/libpdfium.dylib` or `pdfium.dll`), where `parse_bank_statement` loads it, with `THIRD_PARTY_LICENSES_PDFIUM.txt` at the root: every licence file the pinned PDFium archive ships, byte for byte.
 

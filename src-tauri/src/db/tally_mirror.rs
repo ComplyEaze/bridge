@@ -89,6 +89,7 @@ pub(crate) const REVIEWED_TALLY_TERMINAL_CODES: &[&str] = &[
     "period_report_scope_mismatch",
     "query_profile_not_supported",
     "reconciliation_record_budget_exceeded",
+    "request_deadline_exceeded",
     "request_size_limit_exceeded",
     "response_content_encoding_unsupported",
     "response_encoding_invalid",

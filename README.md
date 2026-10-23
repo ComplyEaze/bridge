@@ -56,7 +56,7 @@ update itself, so look for a newer version on the
 - "Show the trial balance for 1 April to 31 March."
 - "Check these ledger names against the book before I post: …"
 
-**Its tools.** In name order; release 0.6.0 installs 28 of them, and `gst_uncertain_vouchers` is in source, not yet in a published build. None of them changes your TallyPrime books; with posting on, two more appear, described below the table. Every call adds a receipt line,
+**Its tools.** In name order; release 0.6.0 installs 28 of them, and `gst_uncertain_vouchers` and `negative_ledgers` are in source, not yet in a published build. None of them changes your TallyPrime books; with posting on, two more appear, described below the table. Every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
@@ -74,6 +74,7 @@ with no figures, to a log on this computer.
 | `local_data_report` | What ComplyEaze Bridge keeps on this computer | Nothing |
 | `masters` | Voucher types, godowns, units, stock groups, cost centres, cost categories or account groups | Nothing |
 | `month_register` | Tally’s own month-wise Sales Register or Purchase Register for whole months: one row per month with Tally’s debit, credit and closing columns exactly as printed; not tied to the vouchers or the trial balance, and not compared with Tally’s register screen | Nothing |
+| `negative_ledgers` | Tally’s own Negative Ledgers list for a window, as Tally returns it and compared with no other report; an empty list is not a finding | Nothing |
 | `outstandings` | Receivables and payables with ageing, the top parties and the open bills | Nothing |
 | `parse_bank_statement` | Reads a password-protected SBI, HDFC or Union Bank of India statement PDF and proposes Payment, Receipt and Contra vouchers | A private proposals file on this computer |
 | `profit_and_loss` | The Profit and Loss for a date range, by primary group (a book with stock items is expected to be refused) | Nothing |

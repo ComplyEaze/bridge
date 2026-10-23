@@ -31,6 +31,7 @@ DEFAULT_TOOLS = {
     "local_data_report",
     "masters",
     "month_register",
+    "negative_ledgers",
     "outstandings",
     "profit_and_loss",
     "purchase_register",

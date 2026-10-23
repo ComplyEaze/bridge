@@ -109,7 +109,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     each voucher `gst_uncertain_vouchers` lists, the ledgers
     listed under a group total, the ledger named when a group total cannot be
     given, the list of bill-wise ledgers waiting for approval, the suspense ledger
-    named in a build warning and the ledger in a refused cash-or-bank row), stock
+    named in a build warning, the ledger in a refused cash-or-bank row and the
+    ledgers on Tally's Negative Ledgers list), stock
     item names and their parents, godown, stock-group, cost-centre and cost-category
     names and their parents, the category a cost centre belongs to,
     and three fields of a ledger's details: the name on the PAN, the bank account
@@ -205,6 +206,11 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       post-dated and what its status flags read) and whether it was accepted
       as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
+    - The negative ledgers read (`negative_ledgers`) sends the company name and
+      its identifier and the dates, and for each ledger on Tally's Negative
+      Ledgers list, the ledger's name (shortened under `mask_parties`), the side
+      and the closing amount. The side and the amount are not masked under any
+      setting. It holds no narrations.
     - The uncertain-voucher read (`gst_uncertain_vouchers`) sends the company,
       the voucher type name and the dates, the counts of the whole window and
       the pre-filing line, and, only for each voucher it lists as uncertain or

@@ -27,6 +27,7 @@ use bridge_tally_protocol::native_company_features::{parse_company_features, Exp
 use bridge_tally_protocol::native_funds_flow::parse_native_funds_flow;
 use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
 use bridge_tally_protocol::native_month_register::parse_native_month_register;
+use bridge_tally_protocol::native_negative_ledgers::parse_native_negative_ledgers;
 use bridge_tally_protocol::native_negative_stock::parse_native_negative_stock;
 use bridge_tally_protocol::native_outstandings::{
     parse_company_currency, parse_company_currency_name,
@@ -1111,6 +1112,25 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_cash_flow(20250401..20260331)",
         parse: |_, text| cash_flow(text, "20250401", "20260331"),
+    },
+    // Built-in Negative Ledgers report: src/native_negative_ledgers_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_negative_ledgers_bridge_lab_win_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_ledgers",
+        parse: |_, text| typed(parse_native_negative_ledgers(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_ledgers_probe_b_fy_empty_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_ledgers",
+        parse: |_, text| typed(parse_native_negative_ledgers(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_ledgers_shape_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_ledgers",
+        parse: |_, text| typed(parse_native_negative_ledgers(text)),
     },
     // Built-in Negative Stock report: src/native_negative_stock_tests.rs.
     Row {

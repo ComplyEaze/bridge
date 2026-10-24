@@ -204,6 +204,9 @@ base revision.
 <a id="94h-a-ledgers-own-name-can-differ-in-case-or-symbols-from-its-rows-name-attribute"></a>
 
 [9.4h A ledger's own name can differ in case or symbols from its row's `NAME` attribute](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94h-a-ledgers-own-name-can-differ-in-case-or-symbols-from-its-rows-name-attribute)
+<a id="94i-a-ledger-create-on-a-new-name-moved-the-master-mark-by-one-and-changed-nothing-else"></a>
+
+[9.4i A ledger `Create` on a new name moved the master mark by one and changed nothing else](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94i-a-ledger-create-on-a-new-name-moved-the-master-mark-by-one-and-changed-nothing-else)
 <a id="95-identity-after-write"></a>
 
 [9.5 Identity after write](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#95-identity-after-write)

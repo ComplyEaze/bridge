@@ -142,7 +142,7 @@ const TEST_TIMINGS_STEP = [
   FLAG,
   `        uses: ${UPLOAD} # v7.0.1`,
   "        with:",
-  "          name: native-test-timings-macos",
+  "          name: native-test-timings-macos-shard-${{ matrix.shard }}",
   "          path: src-tauri/target/nextest/default/junit.xml",
   "          if-no-files-found: warn",
   "          retention-days: 7",
@@ -181,7 +181,7 @@ test("diagnostics uploads: an allowed step moved to another job is refused altho
     FLAG,
     `        uses: ${UPLOAD} # v7.0.1`,
     "        with:",
-    "          name: native-compiler-timings-${{ matrix.os }}",
+    "          name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}",
     "          path: src-tauri/target/cargo-timings/*.html",
     "          if-no-files-found: warn",
     "          retention-days: 7",
@@ -264,4 +264,60 @@ test("diagnostics uploads: the flag in any other workflow is refused", () => {
 
 test("a quoted mapping key at the start of a line is refused (an escaped spelling would not contain the refused text)", () => {
   refused(withChange(CI_FILE, (text) => text.replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}        "continue\\x2Don-error": true\n`)), "must not start a line with a quoted mapping key");
+});
+
+// The native tests run as two halves (shard 1 and 2). A half that never runs is a green check with half the
+// tests missing, so each way to lose one is a case: the shard list, the partition count, the partition flag,
+// and a once-per-system step whose shard condition is changed, dropped or moved, or a stray use of the shard number.
+const SHARD_ROW = "        shard: [1, 2]";
+const PARTITION = "          --partition count:${{ matrix.shard }}/2";
+const TWO_SHARDS = "native must split its tests into exactly two shards";
+const OWN_HALF = "native: the test step must run nextest on its own half of the tests";
+const ONCE = "so it runs once per operating system";
+const STRAY = "native: matrix.shard may appear only in the pinned lines";
+
+test("native shards: the unmodified workflow carries both shards, the partition flag and nine once-per-system conditions", () => {
+  const text = readFileSync(join(copy, CI_FILE), "utf8");
+  assert.equal(text.split("\n").filter((line) => line === SHARD_ROW).length, 1);
+  assert.equal(text.split("\n").filter((line) => line === PARTITION).length, 1);
+  assert.equal(text.split("\n").filter((line) => line === "        if: matrix.shard == 1").length, 5);
+  assert.equal(text.split("\n").filter((line) => line === "        if: matrix.shard == 2").length, 4);
+});
+
+for (const [name, change, message] of [
+  ["a shard list with one shard runs half the tests", (text) => text.replace(SHARD_ROW, "        shard: [1]"), TWO_SHARDS],
+  ["a shard list with a third shard that the partition does not know", (text) => text.replace(SHARD_ROW, "        shard: [1, 2, 3]"), TWO_SHARDS],
+  ["a second shard row", (text) => text.replace(SHARD_ROW, `${SHARD_ROW}\n        shard: [1, 2]`), TWO_SHARDS],
+  ["a partition count of three", (text) => text.replace(PARTITION, "          --partition count:${{ matrix.shard }}/3"), OWN_HALF],
+  ["the partition flag removed (both shards run every test)", (text) => text.replace(`\n${PARTITION}`, ""), OWN_HALF],
+  ["the partition fixed to shard one", (text) => text.replace(PARTITION, "          --partition count:1/2"), OWN_HALF],
+  ["a retry added to the test step", (text) => text.replace("--retries 0 --test-threads num-cpus --timings", "--retries 2 --test-threads num-cpus --timings"), OWN_HALF],
+  ["the doctests step condition moved to a shard that does not exist", (text) => text.replace("      - name: Test native workspace doctests\n        if: matrix.shard == 1", "      - name: Test native workspace doctests\n        if: matrix.shard == 3"), ONCE],
+  ["the doctests step condition dropped (it would run twice)", (text) => text.replace("      - name: Test native workspace doctests\n        if: matrix.shard == 1\n", "      - name: Test native workspace doctests\n"), ONCE],
+  ["the clippy step moved to shard one", (text) => text.replace("      - name: Lint the native workspace\n        if: matrix.shard == 2", "      - name: Lint the native workspace\n        if: matrix.shard == 1"), ONCE],
+  ["the egress census condition made always true", (text) => text.replace("      - name: Census the Tally-path egress lints\n        if: matrix.shard == 2", "      - name: Census the Tally-path egress lints\n        if: matrix.shard >= 1"), ONCE],
+  ["the PDFium tests step condition dropped", (text) => text.replace("      - name: Test PDF extraction through PDFium\n        if: matrix.shard == 1\n", "      - name: Test PDF extraction through PDFium\n"), ONCE],
+  ["a shard condition on a step that is not pinned (the seam proof would skip a shard)", (text) => text.replace("      - name: Prove the approval-seam scan sees a test build\n", "      - name: Prove the approval-seam scan sees a test build\n        if: matrix.shard == 1\n"), STRAY],
+  ["a shard condition on the native job's own checkout step", (text) => { const at = text.indexOf("\n  native:\n"); assert.ok(at !== -1); const head = text.slice(0, at); const rest = text.slice(at); return head + rest.replace("      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\n", "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\n        if: matrix.shard == 1\n"); }, STRAY],
+]) {
+  test(`native shards: ${name} is refused`, () => {
+    refused(withChange(CI_FILE, change), message);
+  });
+}
+
+for (const [name, change] of [
+  ["an exclude entry that drops half the macOS tests", (text) => text.replace(SHARD_ROW, `${SHARD_ROW}\n        exclude:\n          - os: macos-latest\n            shard: 2`)],
+  ["an include entry that adds a leg", (text) => text.replace(SHARD_ROW, `${SHARD_ROW}\n        include:\n          - os: macos-latest\n            shard: 3`)],
+]) {
+  test(`native shards: ${name} is refused`, () => {
+    refused(withChange(CI_FILE, change), "native: the matrix must not use include: or exclude:");
+  });
+}
+
+test("native shards: the Windows prerequisites cache saved by both shards (the shard condition dropped) is refused", () => {
+  refused(withChange(CI_FILE, (text) => text.replace("          save-cache: ${{ matrix.shard == 1 }}", "          save-cache: true")), "native: the pinned shard line must appear exactly once: save-cache: ${{ matrix.shard == 1 }}");
+});
+
+test("native shards: both shards uploading one artifact name (a name without the shard) is refused", () => {
+  refused(withChange(CI_FILE, (text) => text.replace("          name: native-crash-binaries-macos-shard-${{ matrix.shard }}", "          name: native-crash-binaries-macos")), "native: the pinned shard line must appear exactly once: name: native-crash-binaries-macos-shard-${{ matrix.shard }}");
 });

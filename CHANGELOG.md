@@ -16,6 +16,15 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `audit_test_run`, off by default behind the extension's new **Allow tax-audit test runs (audit_test_run)**
+  setting (`BRIDGE_AGENT_ENABLE_TAX_AUDIT`; off, it is not listed and a call is refused as `audit_tool_disabled`),
+  runs one tax-audit test on a company's own books for a date range, today only `cash_44ab`:
+  figure and finding ids with their values, confidence and clauses, and the count of any failed book check,
+  with no ledger, party or voucher name; you name the cash and bank groups. Books only, not a tax opinion;
+  refused while a redaction setting is on (`audit_redaction_unsupported`), and for a period outside
+  1 April 2025 to 31 March 2026, the year its rules are for (`audit_period_outside_ay_2026_27`). The engine's
+  test passed a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8); the tool
+  is replayed from the engine's synthetic book and not yet run against a live Tally (part of #697).
 - `gst_uncertain_vouchers` lists the vouchers of one voucher type (a Sales type is what was measured) in a window that Tally marks Uncertain in its
   GSTR-1, and the vouchers a person accepted as they stand (Accept As Is), each with its party ledger, its invoice total
   (without its sign, with its side) and Tally's identifiers, and the line a CA reads before filing. It counts the window's

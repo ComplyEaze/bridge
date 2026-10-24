@@ -152,6 +152,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         });
         let company =
             bridge_tally_protocol::parse_companies_from_collection(&cycle[0].fixture.body())

@@ -206,6 +206,15 @@ class BundleSmokeTests(unittest.TestCase):
         enabled = smoke.expected_tools(dict(default, BRIDGE_AGENT_ENABLE_WRITES="true"))
         self.assertEqual(enabled - tools, {"post_import", "acknowledge_post_review"})
 
+    def test_the_tax_audit_tool_is_off_by_default_and_its_switch_adds_only_it(self):
+        template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
+        default = smoke.resolve_environment(json.loads(template.read_text(encoding="utf-8")))
+        self.assertEqual(default["BRIDGE_AGENT_ENABLE_TAX_AUDIT"], "false")
+        tools = smoke.expected_tools(default)
+        self.assertNotIn("audit_test_run", tools)
+        enabled = smoke.expected_tools(dict(default, BRIDGE_AGENT_ENABLE_TAX_AUDIT="true"))
+        self.assertEqual(enabled - tools, {"audit_test_run"})
+
     def test_import_mapping_must_be_the_constant_true(self):
         template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
         for mapping in ("false", "${user_config.enable_posting_2026_10}", "1"):

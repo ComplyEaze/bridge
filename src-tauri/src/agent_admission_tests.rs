@@ -86,6 +86,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     // a new tool must be added to `ToolEffect::of` and to this table to be
     // published.
     const READ_TOOLS: &[&str] = &[
+        "audit_test_run",
         "balance_sheet",
         "cash_flow",
         "company_features",
@@ -305,6 +306,7 @@ async fn voucher_type_selector_is_bounded_before_any_tally_read() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let mut args = json!({"company_guid":"00000000-0000-4000-8000-000000000001",
         "from":"20260901","to":"20260902","voucher_type":"名".repeat(1025)});
@@ -344,6 +346,7 @@ async fn verification_remains_catalogued_and_admitted_when_import_and_writes_are
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server.call_tool_response("verify_import", json!({})).await;
     assert_eq!(response.value["isError"], true);
@@ -368,6 +371,7 @@ async fn master_validation_rejects_unbounded_and_blank_names_before_tally() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     for ledgers in [
         json!([""]),
@@ -414,6 +418,7 @@ async fn ledger_selectors_are_bounded_before_company_or_catalogue_reads() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     for tool in ["vouchers", "ledger_movement"] {
         for ledger in ["x".repeat(1025), " ".into(), String::new()] {
@@ -449,6 +454,7 @@ async fn oversized_unknown_property_cannot_expand_response_or_retained_evidence(
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     for key in ["unknown".to_string(), "x".repeat(1_000_000)] {
         let value = server.call_tool("tally_status", json!({key: null})).await;

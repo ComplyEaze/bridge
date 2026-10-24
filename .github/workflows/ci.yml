@@ -335,7 +335,7 @@ jobs:
         run: node scripts/check-tally-request-builder-hazards.mjs
 
   native:
-    name: Native checks (${{ matrix.os }})
+    name: Native checks (${{ matrix.os }}, shard ${{ matrix.shard }} of 2)
     needs: changes
     # Rust/Tauri changes always receive Windows and macOS coverage on PRs. The
     # check is deliberately skipped only for frontend- and documentation-only PRs, and on a master
@@ -357,6 +357,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
+        # The workspace tests are split in two halves by nextest's own partitioning (the test step below), each half on
+        # its own runner. Each shard compiles the whole workspace for itself and the two share one Rust cache key, which
+        # shard 1 alone saves (so a freshly saved cache holds no clippy-only dependency builds, and shard 2 may check those
+        # once from cold). Shard 1 also runs the PDFium tests, the doctests and the tools tests; shard 2 also runs clippy,
+        # the egress census and the tools lints. The matrix takes no include: or exclude: entries.
+        # scripts/check-ci-workflow-consistency.mjs pins the list, the partition flag and each step's shard.
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -375,7 +382,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: ./.github/actions/setup-windows-native
         with:
-          save-cache: true
+          save-cache: ${{ matrix.shard == 1 }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         id: native-cache
         with:
@@ -388,7 +395,7 @@ jobs:
           env-vars: ${{ runner.os == 'Windows' && 'ImageOS ImageVersion OPENSSL LIBCLANG' || '' }}
           # PRs consume trusted base caches. Manual branch runs can measure cold
           # and warm reuse in their own scope before a change reaches master.
-          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+          save-if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && matrix.shard == 1 }}
       - name: Record Windows prerequisite cache state
         if: runner.os == 'Windows'
         shell: pwsh
@@ -406,6 +413,7 @@ jobs:
         run: >-
           cargo nextest run --locked --manifest-path src-tauri/Cargo.toml
           --workspace --no-fail-fast --retries 0 --test-threads num-cpus --timings
+          --partition count:${{ matrix.shard }}/2
       # Test names, binaries, times and outcomes from nextest's JUnit report (src-tauri/.config/nextest.toml),
       # for choosing which tests to trim or split. The report carries a failing test's panic text whatever
       # the store-*-output settings say, so it is uploaded only when the test step passed. It sits right after
@@ -415,7 +423,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-test-timings-macos
+          name: native-test-timings-macos-shard-${{ matrix.shard }}
           path: src-tauri/target/nextest/default/junit.xml
           if-no-files-found: warn
           retention-days: 7
@@ -431,7 +439,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-crash-stacks-macos
+          name: native-crash-stacks-macos-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/bridge-native-crashes.json
           if-no-files-found: error
           retention-days: 7
@@ -448,7 +456,7 @@ jobs:
         if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'failure' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-crash-binaries-macos
+          name: native-crash-binaries-macos-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/bridge-native-binaries
           if-no-files-found: error
           retention-days: 7
@@ -458,6 +466,7 @@ jobs:
       # in packaging/pdfium/pdfium.lock.json before extraction, and the ignored
       # tests are run on their own. Without the variable they fail, not skip.
       - name: Fetch pinned PDFium
+        if: matrix.shard == 1
         shell: bash
         run: >-
           node scripts/fetch-pdfium.mjs
@@ -479,6 +488,7 @@ jobs:
       # to run them. One command also means a failure is the step's exit code: on Windows the
       # old pair ran under pwsh, which reports only the last command's status.
       - name: Test PDF extraction through PDFium
+        if: matrix.shard == 1
         run: >-
           cargo nextest run --locked --manifest-path src-tauri/Cargo.toml
           --workspace --no-fail-fast --retries 0 --test-threads num-cpus --no-tests fail --run-ignored ignored-only
@@ -491,8 +501,11 @@ jobs:
         shell: bash
         run: node scripts/check-no-test-seam.mjs --test-harness
       - name: Test native workspace doctests
+        if: matrix.shard == 1
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --workspace --doc --no-fail-fast
-      - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --all-targets --timings -- -D warnings -A clippy::pedantic
+      - name: Lint the native workspace
+        if: matrix.shard == 2
+        run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --all-targets --timings -- -D warnings -A clippy::pedantic
       # The Tally-path egress census (scripts/check-tally-egress-boundary.mjs, check 2). The
       # two egress lints are forced to warn, which no group allow, -A or lint table (measured)
       # can silence, over the shipped targets. The messages go to a file first, so a failed run
@@ -503,6 +516,7 @@ jobs:
       # firings. If it ever did not, the firings would be zero and the census would fail loudly. To
       # roll back, delete this step; the static half of the gate still runs in the portable job.
       - name: Census the Tally-path egress lints
+        if: matrix.shard == 2
         shell: bash
         run: |
           cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --lib --bins --message-format=json -- -A clippy::pedantic --force-warn clippy::disallowed_methods --force-warn clippy::disallowed_types > "$RUNNER_TEMP/egress-census.jsonl"
@@ -513,7 +527,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-compiler-timings-${{ matrix.os }}
+          name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}
           path: src-tauri/target/cargo-timings/*.html
           if-no-files-found: warn
           retention-days: 7

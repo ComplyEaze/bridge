@@ -177,7 +177,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "e03fb18145fada3e014982178c8f367d35b600e0db986068e012c12bcf0d8382"],
+  ], "b1e977f6e9201967950729ae919e9b0e037f2a7429b3db6cb8cdd5837a210550"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -230,11 +230,74 @@ if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a85
 // The lookup that decides whether a master push may skip heavy jobs is pinned by its bytes: a change
 // to it is a change to what can be skipped, so it needs this file edited (and acknowledged) with it.
 const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/master-push-reuse.mjs"))).digest("hex");
-if (reuseScriptDigest !== "1cf4382fc71ab7339022544962a5ce55fd8128269fe7bf9f269b022a430d8854") {
+if (reuseScriptDigest !== "61371911fafdcec785d115f07e4fb1cc811fa78a773c289a12ac396fcf179f2d") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
+}
+// The native tests run as two halves, one per shard, by nextest's partitioning. What would silently lose
+// coverage is pinned: a shard list other than [1, 2], a partition count that does not match it, a step
+// that was meant to run once per operating system but never runs (or runs twice), and any other use of the
+// shard number. A half that never runs is a green check with half the tests missing.
+const nativeJob = jobBlock(workflow, "native");
+const shardRows = nativeJob.match(/^ {8}shard:.*$/gm) ?? [];
+if (shardRows.length !== 1 || shardRows[0] !== "        shard: [1, 2]") {
+  failures.push("native must split its tests into exactly two shards: one matrix row `shard: [1, 2]`");
+}
+// An `exclude:` or `include:` entry under the matrix would drop or add a leg without touching the `shard:` row above
+// (for example `exclude: [{os: macos-latest, shard: 2}]` silently runs half the macOS tests), so neither is allowed.
+if (/^ {8}(?:include|exclude)\s*:/m.test(nativeJob)) {
+  failures.push("native: the matrix must not use include: or exclude: (a leg dropped or added there changes which tests run)");
+}
+const nativeTestStep = [
+  "      - name: Test native workspace",
+  "        id: native-tests",
+  "        run: >-",
+  "          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml",
+  "          --workspace --no-fail-fast --retries 0 --test-threads num-cpus --timings",
+  "          --partition count:${{ matrix.shard }}/2",
+].join("\n");
+if (stepBlock(nativeJob, "      - name: Test native workspace") !== nativeTestStep) {
+  failures.push("native: the test step must run nextest on its own half of the tests (`--partition count:${{ matrix.shard }}/2`) and be exactly the pinned text");
+}
+const onceSteps = [
+  ["      - name: Fetch pinned PDFium", 1],
+  ["      - name: Test PDF extraction through PDFium", 1],
+  ["      - name: Test native workspace doctests", 1],
+  ["      - name: Lint the native workspace", 2],
+  ["      - name: Census the Tally-path egress lints", 2],
+];
+for (const [head, shard] of onceSteps) {
+  if (stepBlock(nativeJob, head)?.split("\n")[1] !== `        if: matrix.shard == ${shard}`) {
+    failures.push(`native: step "${head.trim()}" must have \`if: matrix.shard == ${shard}\` as its first key, so it runs once per operating system`);
+  }
+}
+const allowedShardLines = new Set([
+  "    name: Native checks (${{ matrix.os }}, shard ${{ matrix.shard }} of 2)",
+  "          save-if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && matrix.shard == 1 }}",
+  "          --partition count:${{ matrix.shard }}/2",
+  "          save-cache: ${{ matrix.shard == 1 }}",
+  "          name: native-test-timings-macos-shard-${{ matrix.shard }}",
+  "          name: native-crash-stacks-macos-shard-${{ matrix.shard }}",
+  "          name: native-crash-binaries-macos-shard-${{ matrix.shard }}",
+  "          name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}",
+  "        if: matrix.shard == 1",
+  "        if: matrix.shard == 2",
+]);
+const shardUses = nativeJob.split("\n").filter((line) => line.includes("matrix.shard"));
+if (shardUses.some((line) => !allowedShardLines.has(line))
+  || shardUses.filter((line) => line === "        if: matrix.shard == 1").length !== 3
+  || shardUses.filter((line) => line === "        if: matrix.shard == 2").length !== 2) {
+  failures.push("native: matrix.shard may appear only in the pinned lines (job name, cache save, partition flag, artifact names, and five once-per-system step conditions)");
+}
+// Every non-condition line must be present exactly once: an artifact name without the shard would make both
+// shards upload to one name (the second upload fails), and a dropped line would go unseen above.
+for (const line of allowedShardLines) {
+  if (line.startsWith("        if:")) continue;
+  if (nativeJob.split("\n").filter((candidate) => candidate === line).length !== 1) {
+    failures.push(`native: the pinned shard line must appear exactly once: ${line.trim()}`);
+  }
 }
 // `continue-on-error` is refused everywhere (a failure would report success) except on these five
 // diagnostics-only artifact uploads. Each runs under `always()`, has no `id`, and nothing in this
@@ -251,7 +314,7 @@ const diagnosticUploads = [
     "        continue-on-error: true",
     "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
     "        with:",
-    "          name: native-crash-stacks-macos",
+    "          name: native-crash-stacks-macos-shard-${{ matrix.shard }}",
     "          path: ${{ runner.temp }}/bridge-native-crashes.json",
     "          if-no-files-found: error",
     "          retention-days: 7",
@@ -262,7 +325,7 @@ const diagnosticUploads = [
     "        continue-on-error: true",
     "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
     "        with:",
-    "          name: native-compiler-timings-${{ matrix.os }}",
+    "          name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}",
     "          path: src-tauri/target/cargo-timings/*.html",
     "          if-no-files-found: warn",
     "          retention-days: 7",
@@ -273,7 +336,7 @@ const diagnosticUploads = [
     "        continue-on-error: true",
     "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
     "        with:",
-    "          name: native-test-timings-macos",
+    "          name: native-test-timings-macos-shard-${{ matrix.shard }}",
     "          path: src-tauri/target/nextest/default/junit.xml",
     "          if-no-files-found: warn",
     "          retention-days: 7",

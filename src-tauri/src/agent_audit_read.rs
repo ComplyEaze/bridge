@@ -11,13 +11,6 @@
 //! this module.
 //!
 //! [`fetch_audit_part`]: crate::tally::runtime::TallyRuntime::fetch_audit_part
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "called by the audit_test_run tool, the next change"
-    )
-)]
 use super::voucher_window::{
     company_marks, AuditWindowFailure, AuditWindowReader, CompanyMarks, RetainedWindowRead,
     VoucherReadShape, WindowReadKind, WindowReadLimits, WINDOW_CHANGED_DURING_READ,
@@ -61,10 +54,12 @@ pub(super) struct AuditRoles {
     pub(super) bank_groups: Vec<String>,
 }
 
-/// A book the crate admitted, with the engagement it was admitted under.
+/// A book the crate admitted, with the engagement it was admitted under and
+/// the requests and responses it rests on.
 pub(super) struct AuditBook {
     pub(super) engagement: Engagement,
     pub(super) book: Book,
+    pub(super) evidence: Evidence,
 }
 
 /// Why the read was not made or not admitted: a code and whether the same read
@@ -377,7 +372,28 @@ pub(super) async fn read_audit_book(
         engagement.company_pin.as_ref(),
     )?;
     let book = bridge_tax_audit::book::load_book(&admitted, identity.display_name())?;
-    Ok(AuditBook { engagement, book })
+    Ok(AuditBook {
+        engagement,
+        book,
+        evidence: evidence_of(&parts),
+    })
+}
+
+/// Every part's request and response, folded in the order they were read.
+fn evidence_of(parts: &[Collected]) -> Evidence {
+    parts
+        .iter()
+        .map(|part| Evidence {
+            request_sha256: part.request_sha256.clone(),
+            response_sha256: sha256_hex(&part.bytes),
+            bytes: part.bytes.len(),
+            state: "complete",
+            read_at: None,
+            duration_ms: None,
+            reason_code: None,
+        })
+        .reduce(combine_evidence)
+        .expect("a read has parts")
 }
 
 /// Every part of the read, in order, and the marks it opened and closed on.
@@ -577,4 +593,4 @@ fn collect_window(
 
 #[cfg(test)]
 #[path = "agent_audit_read_tests.rs"]
-mod tests;
+pub(in crate::agent) mod tests;

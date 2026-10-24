@@ -1021,17 +1021,23 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Post => post_words(count).1,
         Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
     };
-    format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}")
+    wrapped(
+        &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
+        usize::MAX,
+    )
 }"#;
 
 const ANSWER_TEXT_WINDOWS: &str = r#"#[cfg(windows)]
 fn answer_text(shown: Shown, count: VoucherCount) -> String {
     let (yes, nothing) = answer_effect(shown, count);
-    format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}")
+    wrapped(
+        &format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}"),
+        ANSWER_WIDTH,
+    )
 }"#;
 
 const DISPLAYED_TEXT: &str = r#"fn displayed_text(shown: Shown, count: VoucherCount, preview: &str) -> String {
-    let answer = wrapped(&answer_text(shown, count));
+    let answer = answer_text(shown, count);
     match (shown, preview.split_once("\n\n")) {
         (Shown::StopRelease, Some((statement, rest))) => {
             format!("{statement}\n\n{answer}\n\n{rest}")
@@ -1049,10 +1055,12 @@ const FITS_THE_BOX: &str = r#"fn fits_the_box(shown: Shown, count: VoucherCount,
         Some(_) => (BATCH_LINES, BATCH_CHARS),
     };
     let (extra_lines, extra_chars) = answer_reserve();
+    let answer_lines = answer_text(shown, count).lines().count();
     displayed.lines().count() <= lines + extra_lines
         && displayed.chars().count() <= chars + extra_chars
         && displayed
             .lines()
+            .skip(answer_lines)
             .all(|line| line.chars().count() <= ANSWER_WIDTH)
 }"#;
 
@@ -1176,8 +1184,9 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // #702 ran the parent's seven unix-only test items on every platform.
     ("#[cfg(unix)]", 0),
     ("#[cfg(windows)]", 7),
-    ("#[cfg(not(windows))]", 8),
-    ("cfg", 27),
+    // #1780 follow-up: the Mac one-line answer text test.
+    ("#[cfg(not(windows))]", 9),
+    ("cfg", 28),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {

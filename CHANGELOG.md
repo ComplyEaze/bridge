@@ -12,6 +12,83 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+These changes are in source and not yet in a published build.
+
+**Added**
+
+- `audit_test_run`, off by default behind the extension's new **Allow tax-audit test runs (audit_test_run)**
+  setting (`BRIDGE_AGENT_ENABLE_TAX_AUDIT`; off, it is not listed and a call is refused as `audit_tool_disabled`),
+  runs one tax-audit test on a company's own books for a date range, today only `cash_44ab`:
+  figure and finding ids with their values, confidence and clauses, and the count of any failed book check,
+  with no ledger, party or voucher name; you name the cash and bank groups. Books only, not a tax opinion;
+  refused while a redaction setting is on (`audit_redaction_unsupported`), and for a period outside
+  1 April 2025 to 31 March 2026, the year its rules are for (`audit_period_outside_ay_2026_27`). The engine's
+  test passed a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8); the tool
+  is replayed from the engine's synthetic book and not yet run against a live Tally (part of #697).
+- `gst_uncertain_vouchers` lists the vouchers of one voucher type (a Sales type is what was measured) in a window that Tally marks Uncertain in its
+  GSTR-1, and the vouchers a person accepted as they stand (Accept As Is), each with its party ledger, its invoice total
+  (without its sign, with its side) and Tally's identifiers, and the line a CA reads before filing. It counts the window's
+  vouchers with the status read first and refuses a window above 1,000 vouchers (provisional) before it reads amounts,
+  and refuses an amounts read that returns fewer vouchers than the count found; the
+  line names the voucher type it covers, and is withheld when no voucher was read or none is uncertain, and, with the
+  result partial, when a voucher's flags or a listed voucher's party or amount were not read. Its answer carries party names and amounts
+  to the assistant; `mask_parties` masks the names and not the amounts. The reason for uncertainty is not read, and bills
+  missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one
+  Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not
+  measured.
+
+**Changed**
+
+- The approval window, and the review window, now open with a line that says what each answer does, before any
+  detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
+  voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N
+  vouchers"; the review window says "record that you reviewed" and "recorded"); on a Mac it names the buttons to click.
+  The invoice-stop release, which shares the review window, says that Yes releases the stop, under its own
+  statement. The text is wrapped under 100 characters a line, so the window's caps grew by its size (3 lines and
+  150 characters at most) and every text that fitted before still fits. The `post_import` tool text carries the same
+  sentence, with a note to say it before calling. The keys are unchanged: Y and N still answer the Windows window.
+  Not yet run by us on Windows or in a real box at the new size; on a non-English Windows the box's own button
+  letters may differ, which was not measured.
+- A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
+  `verify_import` reads the company's voucher mark below the floor a natively posted batch had proved (a mark Tally
+  omits twice counts as a company holding no voucher), the import journal records it, a second restore too, and from then on no natively posted batch of that company at that Tally
+  address that it covers reads `posted_verified`, even after vouchers keyed again by hand raise the mark past it:
+  a voucher it finds reads as matching content, one it does not as `book_rolled_back`, and the answer says to check
+  them in Tally. The answer that records it names the company's other native batches it covers, to verify again. Before, a voucher keyed again
+  with the same content could read verified once the mark had risen. Limits: a restore that is keyed or edited past
+  the mark before any check is still not seen; a wrong backup restored and then the right one leaves the batches it
+  covered reading rolled back (as would a repair or rewrite that lowered the mark, not measured); and a covered Sales
+  invoice batch stops that company's invoices until released.
+  **Do not go back to an earlier release after this one has seen a restore:** an earlier release refuses an import
+  journal holding the new record, and stops every build, post and verification until ComplyEaze Bridge is upgraded
+  again.
+
+- `voucher_presence` now checks a voucher type declared `manual` against the book's own numbering before it
+  reads the window, because a voucher number is an identity only where the book's series for the type says
+  Manual and prevents duplicate numbers. A call that declares a type manual now makes 20 more requests (34 become 54 on a small book: the
+  company's master mark, then the voucher-type numbering) and is refused as a whole, with
+  `presence_numbering_method_differs_from_book` and the types in `candidates`, when the book does not number a
+  declared-manual type Manual with exactly one series that prevents duplicate numbers (the check now also reads the
+  duplicate setting, and shows it in `book`) or holds no type of that exact name; a numbering that
+  cannot be read refuses with the read's own code (`masters_education_unqualified` in Education mode, for
+  example) or `presence_numbering_unreadable`. Calls that were answered before are refused in those cases.
+  A sub-method printed on a Manual series is ignored (a sub-method printed twice still refuses the read as
+  `field_invalid`). Names match exactly. Every type declared manual is
+  checked, whether or not a proposal names it. The check reads the book's numbering as it is now and holds for
+  the moment of the read. A call that declares no type manual reads no numbering and its result says
+  `numbering_read` `not_read`; a call that does read it returns what the book said for each declared type, or
+  only their counts when the rows would not fit the response budget.
+
+- `ledger_masters` with `include_gst_details` now names Tally's `GSTINELIGIBLEITC` as `ineligible_itc` (true for Yes,
+  false for No, null when the element is absent), where 0.6.0 named it `itc_eligible` and so told an assistant that
+  an entry with a keyed "Eligible for Input Tax Credit: No" was eligible. Measured on one ledger created
+  under Purchase Accounts in a synthetic book (TallyPrime 7.1): the screen's Yes read as the element absent and
+  its No as Yes, so the element is an ineligibility flag (PARTIAL: one book, one release, one ledger, one dated
+  entry; part of #1741). A Yes on any other ledger says nothing either way: the Sales ledgers of one captured book
+  carry a Yes on their keyed entries, and Tally's own default entry (source `As per Company/Group`) carries one with
+  no keyed No; neither was read against the screen. The value
+  mapping is unchanged: do not read `true` as eligible.
+
 ## [0.6.0] - 2026-10-16
 
 ### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)

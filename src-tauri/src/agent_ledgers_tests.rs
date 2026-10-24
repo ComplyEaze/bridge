@@ -2907,6 +2907,7 @@ mod through_the_tool {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
             bridge_tally_transport::TransportPolicy {
@@ -3213,6 +3214,7 @@ mod through_the_tool {
                 redaction: Redaction::None,
                 import_enabled: false,
                 posting: Posting::Off,
+                audit_enabled: false,
             });
             Self {
                 simulator,
@@ -3724,6 +3726,7 @@ mod through_the_tool {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         let response = server.call_tool("ledger_masters", args).await;
         simulator.cancel();
@@ -4342,6 +4345,7 @@ mod through_the_tool {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         let (client, source) = tokio::io::duplex(1 << 20);
         let (client_read, mut client_write) = tokio::io::split(client);
@@ -4522,6 +4526,7 @@ mod through_the_tool {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         let frames = format!(
             "{}\n{}\n",
@@ -4814,6 +4819,7 @@ mod through_the_tool {
                 redaction,
                 import_enabled: false,
                 posting: crate::agent::Posting::Off,
+                audit_enabled: false,
             });
             let response = server.call_tool("ledger_masters", args).await;
             simulator.cancel();
@@ -4931,6 +4937,13 @@ mod through_the_tool {
                 for entry in entries {
                     assert_eq!(entry["applicable_from"], "20260401");
                     assert_eq!(entry["other_content_skipped"], false);
+                    // Tally's GSTINELIGIBLEITC goes out under the name of its element (#1741),
+                    // and never under the earlier eligibility key.
+                    assert!(entry.get("itc_eligible").is_none(), "{entry}");
+                    assert!(
+                        entry.as_object().unwrap().contains_key("ineligible_itc"),
+                        "{entry}"
+                    );
                     for state in entry["states"].as_array().unwrap() {
                         assert_eq!(
                             state["state_name"],
@@ -4952,6 +4965,13 @@ mod through_the_tool {
             let mut expected = with_entries;
             expected.sort();
             assert_eq!(with_rows, expected);
+            // The captured values, as sent: Yes on the Goods ledger's entry, no element on the
+            // Purchase ledger's (null, never defaulted).
+            let flag = |name: &str| {
+                row(rows, name)["compliance"]["gst_details"]["entries"][0]["ineligible_itc"].clone()
+            };
+            assert_eq!(flag("BRIDGE Goods 18%"), json!(true));
+            assert_eq!(flag("BRIDGE Purchase Svc 5%"), Value::Null);
 
             let rates_of = |name: &str, head: &str| -> Value {
                 let rates = &row(rows, name)["compliance"]["gst_details"]["entries"][0]["states"]
@@ -4991,6 +5011,8 @@ mod through_the_tool {
                 "HSN/SAC and type of supply are not returned",
                 "place of supply is in the registration history",
                 "slab rates are only flagged",
+                "Do not read true as eligible",
+                "says nothing either way",
                 "14-ledger lab book of TallyPrime 7.1 Silver",
                 "not yet run through this tool on a live Tally",
                 "admitted at 8,000 bytes a ledger instead of 3,750",
@@ -5218,7 +5240,7 @@ mod through_the_tool {
                 let limitations = page["structuredContent"]["result"]["limitations"]
                     .as_array()
                     .unwrap_or_else(|| panic!("no limitations: {page}"));
-                assert_eq!(limitations.len(), 5, "{page}");
+                assert_eq!(limitations.len(), 6, "{page}");
             }
             assert_ne!(items(&first)[0]["name"], items(&second)[0]["name"]);
             assert_eq!(one.requests(), total, "the second page reads no ledger");

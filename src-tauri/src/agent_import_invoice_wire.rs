@@ -810,12 +810,15 @@ pub(super) fn parse_company_registration(
 /// synthetic company on 10 Oct 2026, it was answered with the fields (the
 /// `pilot-lab` fixtures). The three fields of the HSN/SAC check
 /// (`HSNDETAILS.LIST`, `GSTTYPEOFSUPPLY`, `GSTAPPLICABLE`) follow them, as
-/// the lab answered them on 12 Oct 2026 (lab request set W16, the
-/// `pilot-lab-ledger-rates-hsn` fixture; `GSTTYPEOFSUPPLY` and `GSTAPPLICABLE`
-/// are for the code warnings that follow). `window` is the financial year's start and the
-/// invoice date, as the request that was measured carried them (a ledger's
-/// rate rows came back whole; whether the window changes them was not tried).
-/// `None` when a date is not eight digits.
+/// the lab answered them on 12 Oct 2026 on the unrestricted request (lab
+/// request set W16, the `pilot-lab-ledger-rates-hsn` fixture;
+/// `GSTTYPEOFSUPPLY` and `GSTAPPLICABLE` are for the code warnings that
+/// follow). Since #1331 the code sends the restricted request
+/// (`render_ledger_rates_request_for_parents`); §9.16, "the rates request the
+/// code sends", says what the lab has and has not answered of it. `window` is
+/// the financial year's start and the invoice date, as the request that was
+/// measured carried them (a ledger's rate rows came back whole; whether the
+/// window changes them was not tried). `None` when a date is not eight digits.
 #[cfg(test)]
 fn render_ledger_rates_request(company: &str, window: (&str, &str)) -> Option<String> {
     render_ledger_rates(company, window, None)

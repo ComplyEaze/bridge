@@ -26,7 +26,7 @@ contain customer data in release artifacts.
 - `scripts/prune-package-compiler-cache.mjs` and its test are project-authored
   cache-retention tooling contributed under Apache-2.0; no upstream
   implementation is copied into them.
-- `scripts/capture-package-log.py` and its test are project-authored CI
+- `scripts/capture-package-log.mjs` and its test are project-authored CI
   diagnostic tooling contributed under Apache-2.0; no upstream implementation
   is copied into them.
 - `src-tauri/app-icon.svg`, the files under `src-tauri/icons/` and the brand
@@ -115,13 +115,13 @@ configuration are not part of the public repository or distributable bundle.
 
 ## macOS test crash evidence
 
-The crash collector and tests in `scripts/collect-macos-test-crashes*.py` are
+The crash collector and tests in `scripts/collect-macos-test-crashes*.mjs` are
 project-authored under this repository's Apache-2.0 license. The
 [privacy-reduced control fixture](../scripts/testdata/macos-sigtrap-control.PROVENANCE.md)
 comes from an owned disposable process, with capture provenance and the retained
 fields documented alongside it. It contains no application or customer data.
 
-`scripts/retain-macos-test-binaries.py` is project-authored diagnostic code. It
+`scripts/retain-macos-test-binaries.mjs` is project-authored diagnostic code. It
 retains at most 256 MiB of executable images matched to fresh crash UUIDs and
 architectures, with staged-copy hashes and checkout/run provenance. Its unit
 tests use explicit adversarial metadata and opaque synthetic bytes; these are

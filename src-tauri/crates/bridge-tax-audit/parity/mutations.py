@@ -651,17 +651,30 @@ def _stop(_signum, _frame):
     raise KeyboardInterrupt
 
 
+def _signal_group(proc: subprocess.Popen, sig: int) -> bool:
+    """Send `sig` to the process group `proc` started; False when the group is already gone. Once its
+    leader is reaped, killpg answers ESRCH; on macOS, while the leader is an unreaped zombie and no
+    other member is left, it answers EPERM. EPERM from a leader still running is raised."""
+    try:
+        os.killpg(proc.pid, sig)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        if proc.poll() is None:
+            raise
+        return False
+
+
 def _kill_group(proc: subprocess.Popen) -> None:
     """End the process group `proc` started (its own session), and nothing else."""
+    if not _signal_group(proc, signal.SIGTERM):
+        return
     try:
-        os.killpg(proc.pid, signal.SIGTERM)
-        try:
-            proc.wait(timeout=KILL_GRACE)
-        except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait(timeout=KILL_GRACE)
+    except subprocess.TimeoutExpired:
+        if _signal_group(proc, signal.SIGKILL):
             proc.wait()
-    except ProcessLookupError:
-        pass
 
 
 def _kill_active() -> None:

@@ -120,7 +120,8 @@ The ordinary default tools, in name order:
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
-release 0.6.0. `gst_uncertain_vouchers` is in the source after release 0.6.0 and is not in a published build yet. `local_data_report` (also
+release 0.6.0. `audit_test_run` is in the source after release 0.6.0 and is not in a published build yet; it is
+not a default tool: it is listed only when its setting is on (below). `gst_uncertain_vouchers` is in the source after release 0.6.0 and is not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -160,7 +161,12 @@ bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
 that import workflow and exposes `post_import` and `acknowledge_post_review`. The MCPB extension always
 sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting, one
 voucher or a batch of up to 50** setting (`enable_posting_2026_10`), off by
-default, to `BRIDGE_AGENT_ENABLE_WRITES`.
+default, to `BRIDGE_AGENT_ENABLE_WRITES`. `BRIDGE_AGENT_ENABLE_TAX_AUDIT=true` lists `audit_test_run`;
+the extension maps its **Allow tax-audit test runs (audit_test_run)** setting
+(`enable_tax_audit_2026_10`), off by default, to it. Off, the tool is absent from `tools/list` and a
+call naming it is refused as `audit_tool_disabled` before any request. The setting takes
+`true`/`false` or `1`/`0`; empty, or the extension's unresolved placeholder, reads as off, and any other
+value stops startup.
 This is a source-configuration inventory, not a claim that an installed client
 uses a particular setting or that a tool is qualified for every runtime. Each
 call returns compact JSON with the
@@ -738,6 +744,75 @@ refused (`gst_status_book_too_large`), because the selection is evaluated on eve
 bound is provisional: the read has been timed only on a book of about thirty vouchers. Measured on one
 synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales invoices (protocol reference
 §9.17 holds the Sales flags and Accept As Is; the by-name selection and the narrow field list are in the fixtures' PROVENANCE.md); a registered buyer, other releases and Gold are not measured, and `excluded` has not been observed.
+
+### Tax-audit test run (`audit_test_run`)
+
+Off by default: the tool is listed only when **Allow tax-audit test runs (audit_test_run)**
+(`BRIDGE_AGENT_ENABLE_TAX_AUDIT`) is on, and refused as `audit_tool_disabled` otherwise.
+
+Use `audit_test_run` with `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD), `test` and the
+two group lists `cash_groups` and `bank_groups` to run one test of ComplyEaze Bridge's tax-audit
+engine on the company's own books. Today `test` can only be `cash_44ab`, the share of cash in the
+books' receipts and payments against the s.44AB(a) limit. A test joins the list only with a real-book
+parity record at a pinned reference commit; a test not on it is refused as `audit_test_not_admitted`.
+The rules the engine holds are those of assessment year 2026-27, so `from` and `to` must lie inside
+1 April 2025 to 31 March 2026; any other period is refused as `audit_period_outside_ay_2026_27` before a
+request, and a part-year inside it is read and judged against the whole year's thresholds.
+
+The group lists are required and have no default: which groups hold cash and which hold bank accounts
+is for the user to say (`masters` with `kind=groups` lists the book's groups), and whether an overdraft
+group counts as a bank is a judgement for the user's accountant. A group left out is not counted, and
+a group named in both lists is refused as `audit_groups_overlap`.
+
+The books are one read made for the call: the company's marks, the company object, the groups, the
+ledgers, the trial balance for the period, the voucher types and every voucher of the period (in as many
+parts as the period needs, at most 128, after a census that counts the period's vouchers, sent for a
+book small enough for one request too), one request at a time, each between two checks that the same
+single company is loaded. The marks are read again at the end; a window the census did not count, such as
+a book that has never held a voucher, is refused as `audit_window_not_counted`. The engine then checks the read as a whole (the company, the period, the marks, that the
+voucher windows cover the period without a gap, that every count agrees) and refuses it by rule code if
+it does not hold. Nothing is written to disk, nothing is written to Tally, and the read is not kept.
+
+What comes back is `result.state`: `completed`, or `completed_with_failed_book_checks` when at least one
+book check failed; `result.test`; `result.figures`, each with its `id`,
+`value` (an integer, or null when the figure has no value, such as a share of nothing), `unit` (`paise`,
+`bp`, `count` or `days`) and the test's fixed `definition_text`;
+`result.findings`, each with its `id`, `confidence` (`computed`, `indicative`, `needs_document` or
+`judgement_required`), `clauses`, the `facts` (a name and the figure id it rests on), and the test's
+fixed `title_text`, `limits_text` and `ask_client_text`; the test's `population_note`; and
+`book_checks`: the checks evaluated, and the code and count of each that failed. A failed book check
+means the books disagree with themselves somewhere (for example the vouchers do not add up to the trial
+balance for a ledger), and a figure may then leave something out: a ledger without a master or without a
+chain of groups to a primary group (`MAP-0`, `MAP-1`) is in no group, so it counts as neither cash nor
+bank. Do not rely on the figures until the failed check is explained. No ledger, group, party or voucher name is returned, and the engine's evidence
+references and the subject and detail of a failed check are left out because they name them. A result
+past 64 figures or 32 findings is refused as `audit_result_too_large`, never cut short.
+
+Everything this tool returns, amounts included, goes to the AI provider like every other read, and no
+redaction setting hides it, so the tool is refused as `audit_redaction_unsupported` while
+`mask_parties` or `drop_narration` is on.
+
+Refusals: `audit_part_deadline_exceeded` (a part ran past the 20 seconds a request is given; the same
+request would be sent again and Tally may still be building the abandoned answer, so do not retry as it
+stands), `audit_part_drain_required` (a previous request was abandoned, in this call or an earlier one,
+and Tally may still be building its answer: nothing was sent. ComplyEaze Bridge does not yet probe Tally to
+clear that, so the refusal stays until ComplyEaze Bridge is restarted; look at Tally first), `C6-moved`
+and `voucher_window_changed_during_read` (someone changed the book during the read: it may be tried
+again), `audit_window_divided_by_alterid` (a day too heavy for one request: the read is refused, because
+the engine's windows must tile the period by date), `BIND-GROUP-UNKNOWN` (a group named in `cash_groups`
+or `bank_groups` is not in the book: check the spelling against `masters` with `kind=groups`), the
+engine's other rule codes for a read it does not admit (`C1-...` to `C11-...`, `CFG-...`), and the
+tool's own: `audit_test_refused` (the test refused the book without a rule code), `audit_book_refused`,
+`audit_part_unparsable`, `audit_window_marks_missing`, `audit_window_not_counted`,
+`audit_window_row_count_differs`, `audit_groups_overlap` and
+`audit_result_not_projectable` (the engine returned something this tool does not project). The call has
+no overall deadline: it is up to 128 parts, each between two checks, so a client that gives up early
+leaves the request it was waiting for abandoned.
+
+Measured on the engine's synthetic book replayed through the simulator. The engine's `cash_44ab` passed
+a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8), on one book
+whose cash payments were zero, so its payments side was checked only at zero. The tool itself
+has not yet run against a live Tally: the lab comparison comes first.
 
 ### Uncertain vouchers of one voucher type (`gst_uncertain_vouchers`)
 
@@ -3020,6 +3095,16 @@ Per tool:
   4. (if `party` with `detail` on a complete read) the ledger
      catalogue and a window read (`outstandings_detail_within` in
      `src-tauri/src/agent_bill_trail.rs`).
+- `audit_test_run` (`read_audit_book` in `src-tauri/src/agent_audit_read.rs`), after the company read, each
+  request a single unpaired read between two company-list checks and its evidence folded in this order:
+  1. the company's two marks;
+  2. the company object (checked against the verified GUID and books-from date);
+  3. the groups, the ledgers for the period, the trial balance for the period and the voucher types;
+  4. the voucher window: its own opening marks, then a census (always, a book that fits one request
+     included; none for a book that has never held a voucher, which is then refused), then the planned
+     parts, then its closing marks. Only the parts kept for the engine are folded into the evidence: the
+     voucher parts and the closing marks, not the window's opening marks or its census. A call refused
+     during the read carries the evidence of the company read only.
 - `stock_summary`:
   1. the company read;
   2. the extent check (if a later page);

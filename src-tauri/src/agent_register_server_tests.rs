@@ -127,6 +127,7 @@ fn server_for(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     })
 }
 

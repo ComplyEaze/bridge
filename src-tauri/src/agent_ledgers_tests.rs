@@ -2907,6 +2907,7 @@ mod through_the_tool {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
             bridge_tally_transport::TransportPolicy {
@@ -3213,6 +3214,7 @@ mod through_the_tool {
                 redaction: Redaction::None,
                 import_enabled: false,
                 posting: Posting::Off,
+                audit_enabled: false,
             });
             Self {
                 simulator,
@@ -3724,6 +3726,7 @@ mod through_the_tool {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         let response = server.call_tool("ledger_masters", args).await;
         simulator.cancel();
@@ -4342,6 +4345,7 @@ mod through_the_tool {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         let (client, source) = tokio::io::duplex(1 << 20);
         let (client_read, mut client_write) = tokio::io::split(client);
@@ -4522,6 +4526,7 @@ mod through_the_tool {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         let frames = format!(
             "{}\n{}\n",
@@ -4814,6 +4819,7 @@ mod through_the_tool {
                 redaction,
                 import_enabled: false,
                 posting: crate::agent::Posting::Off,
+                audit_enabled: false,
             });
             let response = server.call_tool("ledger_masters", args).await;
             simulator.cancel();

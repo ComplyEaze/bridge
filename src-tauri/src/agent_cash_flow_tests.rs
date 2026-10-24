@@ -170,6 +170,7 @@ async fn call_observed_under(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(

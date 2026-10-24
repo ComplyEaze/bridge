@@ -438,6 +438,9 @@ base revision.
 <a id="12a20-a-ledgers-input-tax-credit-flag-on-the-wire-is-the-opposite-of-the-screens-setting-partial"></a>
 
 [12a.20 A ledger's input tax credit flag on the wire is the opposite of the screen's setting (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a20-a-ledgers-input-tax-credit-flag-on-the-wire-is-the-opposite-of-the-screens-setting-partial)
+<a id="12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read"></a>
+
+[12a.22 Stock items carry their own dated HSN and GST lists in a masters read; whether a group's or the company's setting reaches them is not read](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

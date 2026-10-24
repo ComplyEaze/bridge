@@ -279,6 +279,8 @@ fn company_features(text: &str, guid: &str, name: &str, number: &str) -> String 
 
 const FOREX_GUID: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
 const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+/// The second synthetic stock book (BRIDGE TIEOUT B), as in its committed captures.
+const TIEOUT_B_GUID: &str = "d64eda55-da7c-4106-a171-3e3cb6cdd331";
 /// The parity lab book's company GUID, as scrubbed in its captures (`native_masters_tests.rs`).
 const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
 const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
@@ -1206,6 +1208,30 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_masters(StockGroups)",
         parse: |_, text| masters(NativeMasterKind::StockGroups, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_baseline_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_item_created_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_tieout_b_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, TIEOUT_B_GUID),
     },
     Row {
         fixture: "tests/fixtures/masters_units_reads_lab_live.utf16le.xml",

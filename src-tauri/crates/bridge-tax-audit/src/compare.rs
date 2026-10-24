@@ -19,7 +19,7 @@ const NUMERIC_UNITS: [&str; 4] = ["paise", "bp", "count", "days"];
 ///
 /// `cash_payments_40a3` is not, and its 18 here is a DIFFERENT KIND of number from the reference
 /// Python implementation's own `DEFAULT_MIN_FIGURES["cash_payments_40a3"] = 28`
-/// (`tae/parity/compare.py`): that 28 is fixture-anchored -- it is the synthetic fixture's own
+/// (in its parity comparison): that 28 is fixture-anchored -- it is the synthetic fixture's own
 /// actual figure count as of the commit that set it, chosen so the floor fails loudly if the
 /// fixture or the engine ever drifts the count without the constant being updated to match, and
 /// it moves (28 -> some other number) every time this crate's own synthetic fixture gains or

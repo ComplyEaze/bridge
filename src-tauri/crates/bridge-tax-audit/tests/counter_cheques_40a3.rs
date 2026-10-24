@@ -78,7 +78,7 @@ fn figure(doc: &Json, name: &str) -> Json {
 
 #[test]
 fn the_terms_book_golden_holds_the_scenario_it_was_written_for() {
-    let g = common::golden_named("edge.cc_terms.counter_cheques_40a3");
+    let g = common::oracle_named("edge.cc_terms.counter_cheques_40a3");
     assert_eq!(g["figures"].as_array().unwrap().len(), 26);
     assert_eq!(g["findings"].as_array().unwrap().len(), 7);
     // Eight terms from nine entries: the repeat collapses, the empty term counts.
@@ -101,7 +101,7 @@ fn the_terms_book_golden_holds_the_scenario_it_was_written_for() {
 
 #[test]
 fn the_unconfigured_book_golden_looks_at_nothing() {
-    let g = common::golden_named("edge.cc_unconfigured.counter_cheques_40a3");
+    let g = common::oracle_named("edge.cc_unconfigured.counter_cheques_40a3");
     assert_eq!(g["figures"].as_array().unwrap().len(), 12);
     assert!(g["findings"].as_array().unwrap().is_empty());
     assert_eq!(figure(&g, "configured_terms_count"), 0);

@@ -18,7 +18,7 @@
 //! this crate's [`Engagement`] reads. Staff rename ledgers between reads, and a name that stops matching used to drop out of
 //! a role silently: the figures moved and nothing said why. [`bind`] is the one place a
 //! configured name meets the Book; every one of the locations above is bound once, before any
-//! test runs, mirroring the reference implementation's `tae/binding.py` (identifier before name,
+//! test runs, mirroring the reference implementation's binding step (identifier before name,
 //! never a score -- see `docs/tax-audit/config-identity-binding-v1.md`).
 //!
 //! * **Identity.** `[ledger_ids]` (and `[group_ids]`) map a LABEL -- the display name the rest of

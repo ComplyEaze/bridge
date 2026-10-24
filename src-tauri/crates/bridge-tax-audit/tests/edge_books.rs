@@ -813,7 +813,8 @@ fn check(name: &str) {
                     .map(|f| f.id.as_str())
                     .filter(|id| id.starts_with("trial_balance.tb_group_"))
                     .collect();
-                let want: Vec<String> = strs(&common::golden_named(&format!(
+                // Row order is not declarable: it is the oracle's, unpatched.
+                let want: Vec<String> = strs(&common::oracle_named(&format!(
                     "edge.{name}.trial_balance.order"
                 )));
                 assert_eq!(order, want, "{name}: trial_balance row order");

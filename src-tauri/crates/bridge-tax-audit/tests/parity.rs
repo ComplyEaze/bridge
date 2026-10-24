@@ -230,7 +230,8 @@ fn one_paisa_in_the_read_bytes_is_reported() {
         true,
     );
     let rust = common::run(&scratch.dir, false).unwrap();
-    let d = diffs(&rust);
+    // The comparison's own behaviour, against the oracle's figures this test quotes.
+    let d = compare(&common::oracle_named("synthetic.cash_44ab"), &rust, None).unwrap();
     assert!(
         d.iter()
             .any(|l| l.starts_with("cash_44ab.cash_receipts: value differs")
@@ -240,6 +241,6 @@ fn one_paisa_in_the_read_bytes_is_reported() {
     );
     assert_eq!(
         rust["book_invariant_violations"],
-        common::golden()["book_invariant_violations"]
+        common::oracle_named("synthetic.cash_44ab")["book_invariant_violations"]
     );
 }

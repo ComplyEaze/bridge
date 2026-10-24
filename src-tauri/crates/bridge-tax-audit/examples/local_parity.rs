@@ -57,6 +57,16 @@
 //! location the reference implementation reads, not just the ones this port reads), so its
 //! `BIND-ID-UNUSED` check never trips over a label only this side narrowed away.
 //!
+//! **Declared divergences.** The reference is frozen as the FY 2025-26 oracle, and a fix in this
+//! crate may change a test's output only as a declared divergence (`tests/fixtures/divergences.json`,
+//! `src/divergence.rs`). Leading flags `--divergences FILE` and `--expect ID` (repeatable) take
+//! them into account: Rust's dump is set back to the oracle's value at each declared
+//! `real_book_keys` entry of each divergence named by `--expect` (the two go together) before the
+//! comparison, which must then find nothing, and the declared keys that differed are printed. A
+//! divergence not named stays strict, and one named that did not differ on this read fails the run
+//! (a read that holds the case it fixes must show it). The registry's sha256 is printed. The dump written to
+//! `RUST_DUMP_OUT` is Rust's own, unmasked.
+//!
 //! Prints one summary line, and every difference if there are any; exits non-zero on any
 //! difference or refusal.
 
@@ -66,6 +76,7 @@ use std::time::Instant;
 
 use bridge_tax_audit::canonical::hex;
 use bridge_tax_audit::compare::compare;
+use bridge_tax_audit::divergence;
 use bridge_tax_audit::registry::{self, CallerData};
 use bridge_tax_audit::rules::{vendored_blocks_in_source, Rules, SOURCE_SHA256, VENDORED};
 use bridge_tax_audit::{load_book, Engagement};
@@ -266,7 +277,28 @@ fn narrow_identity_tables(cfg: &mut toml::Table, base: &Path) -> Result<(), Stri
 }
 
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    let (mut divergence_file, mut expected_ids) = (None, Vec::new());
+    loop {
+        match args.as_slice() {
+            [flag, value, ..] if flag == "--divergences" => {
+                if divergence_file.replace(value.clone()).is_some() {
+                    return fail("--divergences is given twice");
+                }
+            }
+            [flag, value, ..] if flag == "--expect" => expected_ids.push(value.clone()),
+            _ => break,
+        }
+        args.drain(..2);
+    }
+    if expected_ids.is_empty() != divergence_file.is_none() {
+        return fail(
+            "--divergences and --expect go together: name the divergences this read must show",
+        );
+    }
+    if let Some(flag) = args.iter().find(|arg| arg.starts_with("--")) {
+        return fail(format!("{flag}: flags come before TEST_ID"));
+    }
     let (test_id, rules_toml, client_toml, read_dir, python_dump, rust_out, report_json, eighth) =
         match args.as_slice() {
             [a, b, c, d, e, f] => (a, b, c, d, e, f, None, None),
@@ -274,7 +306,8 @@ fn main() -> ExitCode {
             [a, b, c, d, e, f, g, h] => (a, b, c, d, e, f, Some(g), Some(h)),
             _ => {
                 return fail(
-                    "usage: TEST_ID ENGINE_RULES_TOML CLIENT_TOML READ_DIR PYTHON_DUMP_JSON \
+                    "usage: [--divergences FILE [--expect ID]...] TEST_ID ENGINE_RULES_TOML \
+                     CLIENT_TOML READ_DIR PYTHON_DUMP_JSON \
                      RUST_DUMP_OUT [REPORT_TOTALS_JSON | TURNOVER_INPUTS_JSON | ...] \
                      [TRACES_DOCUMENTS_JSON]",
                 )
@@ -462,8 +495,39 @@ read (parity/python_golden.py --emit-bank-statement)",
         Ok(v) => v,
         Err(e) => return fail(format!("{python_dump}: {e}")),
     };
+    let divergences = match divergence_file.map(|path| {
+        std::fs::read_to_string(&path)
+            .map_err(|e| format!("{path}: {e}"))
+            .and_then(|text| {
+                println!(
+                    "divergences: {path} sha256={}",
+                    bridge_tax_audit::canonical::hex(&Sha256::digest(text.as_bytes()))
+                );
+                divergence::parse(&text)
+            })
+    }) {
+        None => Vec::new(),
+        Some(Ok(d)) => d,
+        Some(Err(e)) => return fail(e),
+    };
+    let (compared, declared) =
+        match divergence::masked(&rust, &python, test_id, &divergences, &expected_ids) {
+            Ok(masked) => masked,
+            Err(e) => return fail(format!("DIVERGENCES REFUSED: {e}")),
+        };
+    let missing =
+        match divergence::expected_missing(&expected_ids, &declared, test_id, &divergences) {
+            Ok(missing) => missing,
+            Err(e) => return fail(format!("DIVERGENCES REFUSED: {e}")),
+        };
+    for d in &declared {
+        println!("  declared: {d}");
+    }
+    for id in &missing {
+        println!("  expected divergence {id} did not show on this read");
+    }
     let count = |key: &str| rust[key].as_array().map_or(0, Vec::len);
-    match compare(&python, &rust, None) {
+    match compare(&python, &compared, None) {
         Err(e) => fail(format!("PARITY REFUSED: {e}")),
         Ok(differences) => {
             println!("test_id={test_id} identical_json={}", python == rust);
@@ -479,7 +543,7 @@ read (parity/python_golden.py --emit-bank-statement)",
             for d in &differences {
                 println!("  - {d}");
             }
-            if differences.is_empty() {
+            if differences.is_empty() && missing.is_empty() {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::FAILURE

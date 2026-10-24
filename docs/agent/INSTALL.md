@@ -291,10 +291,11 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 
 - **Checking the download.** Releases are on [GitHub Releases](https://github.com/ComplyEaze/bridge/releases), the
   newest first. Each archive has a same-named `.sha256` file and a small provenance record on its release, so an
-  organization can identify the downloaded bytes and the source commit. Run `certutil -hashfile <file> SHA256` on
-  Windows or `shasum -a 256 <file>` on a Mac, in the folder that holds the file (a command window opens in your home
-  folder, so `cd Downloads` first), and compare the 64-character code it prints with the code at the start of the
-  `.sha256` file.
+  organization can identify the downloaded bytes and the source commit. Run `certutil -hashfile "<file>" SHA256` on
+  Windows or `shasum -a 256 "<file>"` on a Mac, in the folder that holds the file (a command window opens in your
+  home folder, so `cd Downloads` first), with the file's name in place of `<file>`, brackets included, and keep the quotes (a file
+  downloaded twice can get a name with "(1)" in it, which needs them). Compare the 64-character code it prints with the code
+  at the start of the `.sha256` file (open that file in Notepad or TextEdit).
 - **Build attestation.** From 0.4.0 each archive also has a build attestation, which `gh attestation verify` can
   check. It says which workflow run and commit produced those bytes. It is not a code signature, no client checks it
   yet, and it does not show that the code is safe.

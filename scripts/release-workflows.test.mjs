@@ -520,8 +520,9 @@ test("the release footer states what the release check covers, the true limits, 
 
 test("the release header tells a person how to install and check a download, and does not claim signing", async () => {
   const header = (await readFile(new URL("../packaging/mcpb/INSTALL_AND_CHECK_RELEASE.md", import.meta.url), "utf8")).replace(/\s+/g, " ");
-  assert.match(header, /certutil -hashfile <file> SHA256/);
-  assert.match(header, /shasum -a 256 <file>/);
+  assert.match(header, /certutil -hashfile "<file>" SHA256/);
+  assert.match(header, /shasum -a 256 "<file>"/);
+  assert.match(header, /brackets included, and keep the quotes/);
   assert.match(header, /64-character code it prints must match the code at the start of the `\.sha256` file/);
   assert.match(header, /docs\/agent\/INSTALL\.md/);
   assert.equal(header.match(/type `cd Downloads` and then run/g)?.length, 2, "both commands follow a change to the Downloads folder");
@@ -532,6 +533,18 @@ test("the release header tells a person how to install and check a download, and
   assert.match(header, /not yet code-signed or notarized, so your computer may warn you/);
   const claims = header.replace(/not yet code-signed or notarized/g, "");
   assert.doesNotMatch(claims, /\bpreviews?\b|\bfree\b|\b(?:code-)?signed\b|\bnotarized\b|for evaluation|production/i);
+});
+
+test("the Download page and the install guide quote the file name in both checksum commands", async () => {
+  const page = (await readFile(new URL("../site/download.html", import.meta.url), "utf8")).replaceAll("&quot;", '"').replaceAll("&ldquo;", '"').replaceAll("&rdquo;", '"').replaceAll("&rsquo;", "'").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replace(/\s+/g, " ");
+  const guide = (await readFile(new URL("../docs/agent/INSTALL.md", import.meta.url), "utf8")).replace(/\s+/g, " ");
+  for (const [name, text] of [["the Download page", page], ["the install guide", guide]]) {
+    assert.match(text, /certutil -hashfile "<file>" SHA256/, `${name} does not quote the Windows command`);
+    assert.match(text, /shasum -a 256 "<file>"/, `${name} does not quote the Mac command`);
+    assert.match(text, /brackets included, and keep the quotes/, `${name} does not say to keep the quotes`);
+    assert.match(text, /"\(1\)"/, `${name} does not give the reason for the quotes`);
+  }
+  assert.match(guide, /open that file in Notepad or TextEdit/);
 });
 
 test("the install guide does not call a release a preview or say it is for evaluation", async () => {

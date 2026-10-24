@@ -159,6 +159,7 @@ fn settings(address: std::net::SocketAddr, data_dir: PathBuf) -> Settings {
         redaction: Redaction::MaskParties,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     }
 }
 
@@ -887,10 +888,14 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // months, amounts and the report's name; `statement_tie_out` returns two
     // dates, three signed gaps and fixed sentences, and never a ledger name;
     // `voucher_read_cost` returns only a voucher mark, counts, seconds and
-    // constant text, and the company's own name.
+    // constant text, and the company's own name; `audit_test_run` returns only
+    // figure and finding ids, numbers, the admitted test's fixed wording and the
+    // codes and counts of failed book checks (its own test replays a book and
+    // looks for every group, ledger and company name in the result).
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut without_a_sample = vec![
         "acknowledge_post_review",
+        "audit_test_run",
         "cash_flow",
         "company_features",
         "gst_status",
@@ -1051,6 +1056,7 @@ async fn malformed_tool_name_is_in_band_and_the_same_session_serves_the_next_req
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -1104,6 +1110,7 @@ async fn egress_receipt_uses_the_final_jsonrpc_replacement_when_only_the_envelop
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     };
     let unframed = Server::new(base_settings.clone())
         .call_tool("voucher_schema", json!({}))
@@ -1189,6 +1196,7 @@ async fn tools_call_notifications_are_refused_and_receipted_without_dispatch() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -1249,6 +1257,7 @@ async fn pagination_rejects_present_invalid_values_in_helpers_and_row_tools() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server.call_tool("egress_log", json!({"limit": "10"})).await;
     assert_eq!(
@@ -1502,6 +1511,7 @@ async fn stored_evidence_records_have_individual_timestamps_and_durations() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     server.call_tool("voucher_schema", json!({})).await;
     tokio::time::sleep(std::time::Duration::from_millis(1)).await;
@@ -1620,6 +1630,41 @@ fn the_posting_setting_reads_an_absent_empty_or_unresolved_value_as_off() {
             "{bad:?} must still fail at settings admission"
         );
     }
+}
+
+/// The tax-audit setting: absent, empty or the unresolved placeholder is off, a plain boolean is
+/// read, anything else fails loud; and the manifest maps exactly this key, off by default.
+#[test]
+fn the_tax_audit_setting_is_off_unless_turned_on_and_is_the_manifests_own() {
+    let read = |value: Option<&str>| {
+        audit_from_env(|name| {
+            assert_eq!(name, AUDIT_SETTING_VARIABLE);
+            value.map(std::ffi::OsString::from)
+        })
+    };
+    assert_eq!(read(None), Ok(false));
+    assert_eq!(read(Some("")), Ok(false));
+    assert_eq!(read(Some(AUDIT_PLACEHOLDER)), Ok(false));
+    assert_eq!(read(Some("false")), Ok(false));
+    assert_eq!(read(Some("true")), Ok(true));
+    assert_eq!(read(Some("1")), Ok(true));
+    assert_eq!(
+        read(Some("yes")),
+        Err("boolean_setting_invalid".to_string())
+    );
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    assert_eq!(
+        manifest["server"]["mcp_config"]["env"][AUDIT_SETTING_VARIABLE].as_str(),
+        Some(AUDIT_PLACEHOLDER)
+    );
+    assert_eq!(
+        AUDIT_PLACEHOLDER,
+        format!("${{user_config.{AUDIT_SETTING_KEY}}}")
+    );
+    let setting = &manifest["user_config"][AUDIT_SETTING_KEY];
+    assert_eq!(setting["type"], "boolean");
+    assert_eq!(setting["default"], false);
 }
 
 /// The placeholder the server tolerates is the one the manifest passes for the
@@ -2063,6 +2108,7 @@ async fn imports_are_hidden_and_refused_without_explicit_live_evidence_opt_in() 
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server.call_tool("build_import_xml", json!({})).await;
     assert_eq!(
@@ -2089,6 +2135,7 @@ async fn a_batch_mixing_a_journal_with_a_bank_voucher_says_how_to_split_it() {
         redaction: Redaction::None,
         import_enabled: true,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let mixed = json!({"company_guid":"00000000-0000-4000-8000-000000000001","vouchers":[
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Journal","entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Income","amount":"12.50","side":"Cr"}]},
@@ -2356,6 +2403,7 @@ async fn simulator_company_read_records_evidence_while_down_endpoint_is_typed() 
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let down_response = down.call_tool("tally_status", json!({})).await;
     assert!(down_response["structuredContent"]["result"]["error"]["code"].is_string());
@@ -2686,6 +2734,7 @@ fn evidence_reads_disclose_requested_limits_and_permanent_retention_eviction() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     assert!(!server.read_evidence(&json!({"limit":1})).unwrap().truncated);
     let record = |index: usize| Evidence {
@@ -2748,6 +2797,7 @@ async fn diagnostic_history_reads_honor_the_configured_global_row_cap() {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         for index in 0..3 {
             server.record_evidence(Evidence {

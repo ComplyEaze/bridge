@@ -165,27 +165,68 @@ function paxRecords(data, offset) {
   return records;
 }
 
-async function download(url, limit) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(120_000), redirect: "follow" }).catch((error) => {
-    throw new Refusal(`${url}: ${error.message}; refusing it`);
+// Fetching the archive is retried a bounded number of times when the failure is the transport's or the
+// server's and says nothing about the bytes: the connection failed or timed out, the body stream broke, or the
+// host answered 408, 429 or a 5xx (a GitHub release download answered 502 on 23 October 2026 and failed a CI
+// job). Nothing else is retried: any other HTTP status, a malformed answer, and above all a digest mismatch are
+// refusals on the first sight, because verify() runs on the bytes AFTER the download returns and is not inside
+// this loop, so a retry can never be used to fetch until the pinned digest happens to match.
+export const DOWNLOAD_ATTEMPTS = 3;
+export const RETRY_PAUSES_MS = [1_000, 3_000]; // before the second and before the third attempt
+
+/** A failure worth another try; once the attempts are spent it is reported as the refusal it is. */
+class Transient extends Refusal {}
+
+const pause = (ms) => new Promise((done) => setTimeout(done, ms));
+
+async function downloadOnce(url, limit, fetchImpl) {
+  const response = await fetchImpl(url, { signal: AbortSignal.timeout(120_000), redirect: "follow" }).catch((error) => {
+    throw new Transient(`${url}: ${error.message}; refusing it`);
   });
-  if (!response.ok) throw new Refusal(`${url}: HTTP ${response.status}; refusing it`);
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {}); // release the socket before another attempt
+    const message = `${url}: HTTP ${response.status}; refusing it`;
+    throw response.status === 408 || response.status === 429 || response.status >= 500 ? new Transient(message) : new Refusal(message);
+  }
+  // An answer with no body (a 204, say) is malformed, not transient: refused on the first sight.
+  if (!response.body) throw new Refusal(`${url}: HTTP ${response.status} with no body; refusing it`);
   // Read at most one byte past the pin, so an oversized answer is refused by its count, not read whole.
   // The 120-second signal bounds the whole download, body included, not each read.
   const chunks = [];
   let total = 0;
-  const reader = response.body.getReader();
-  while (total < limit) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    total += value.length;
+  try {
+    const reader = response.body.getReader();
+    while (total < limit) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+    }
+    await reader.cancel().catch(() => {});
+  } catch (error) {
+    throw new Transient(`${url}: ${error.message}; refusing it`);
   }
-  await reader.cancel().catch(() => {});
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).subarray(0, limit);
 }
 
-export async function main(argv = process.argv.slice(2), { lockPath = LOCK, stdout = process.stdout } = {}) {
+async function download(url, limit, { fetchImpl = fetch, sleep = pause, log = (line) => process.stderr.write(`${line}\n`) } = {}) {
+  let last;
+  for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt += 1) {
+    try {
+      return await downloadOnce(url, limit, fetchImpl);
+    } catch (error) {
+      if (!(error instanceof Transient)) throw error;
+      last = error;
+      if (attempt < DOWNLOAD_ATTEMPTS) {
+        log(`retrying after: ${error.message} (attempt ${attempt} of ${DOWNLOAD_ATTEMPTS})`);
+        await sleep(RETRY_PAUSES_MS[attempt - 1]);
+      }
+    }
+  }
+  throw new Refusal(`${last.message} (tried ${DOWNLOAD_ATTEMPTS} times)`);
+}
+
+export async function main(argv = process.argv.slice(2), { lockPath = LOCK, stdout = process.stdout, fetchImpl = fetch, sleep = pause, log } = {}) {
   let values;
   try {
     ({ values } = parseArgs({
@@ -207,7 +248,7 @@ export async function main(argv = process.argv.slice(2), { lockPath = LOCK, stdo
   if (pin === undefined) throw new Refusal(`no pinned PDFium for platform '${values.platform}'`);
   const archive = values.archive
     ? readFileSync(values.archive)
-    : await download(`${lock.source}/releases/download/${lock.release}/${pin.asset}`, pin.bytes + 1);
+    : await download(`${lock.source}/releases/download/${lock.release}/${pin.asset}`, pin.bytes + 1, { fetchImpl, sleep, log });
   verify(pin.asset, archive, pin.bytes, pin.sha256);
 
   const files = new Map();

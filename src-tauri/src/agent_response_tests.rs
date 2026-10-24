@@ -70,6 +70,7 @@ fn standalone_master_and_status_rows_are_counted_in_final_receipts() {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         let mut structured = json!({"result": {}});
         structured["result"][axis] = json!([{"name":"A"}, {"name":"B"}]);

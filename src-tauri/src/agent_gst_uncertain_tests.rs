@@ -674,6 +674,7 @@ fn tool_server(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     })
 }
 

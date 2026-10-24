@@ -990,6 +990,7 @@ fn server_with(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     })
 }
 

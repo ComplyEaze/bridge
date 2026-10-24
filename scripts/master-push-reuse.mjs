@@ -35,7 +35,10 @@ const WORKFLOW_FILE = "ci.yml";
 // The job names a queue run reports when the job ran: ci.yml's `name:` with the matrix expanded.
 // scripts/master-push-reuse.test.mjs derives them from ci.yml and fails if these lists drift.
 export const FAMILIES = {
-  native: ["Native checks (windows-latest)", "Native checks (macos-latest)"],
+  native: [
+    "Native checks (windows-latest, shard 1 of 2)", "Native checks (windows-latest, shard 2 of 2)",
+    "Native checks (macos-latest, shard 1 of 2)", "Native checks (macos-latest, shard 2 of 2)",
+  ],
   bundle: [
     "Bundle smoke (windows-latest)", "Bundle smoke (macos-latest)",
     "Seam positive control (windows-latest)", "Seam positive control (macos-latest)",

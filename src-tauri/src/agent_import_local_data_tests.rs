@@ -375,6 +375,7 @@ fn server_over(directory: &Path) -> crate::agent::Server {
         import_enabled: true,
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 

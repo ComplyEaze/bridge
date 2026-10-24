@@ -53,6 +53,7 @@ fn server(path: &Path) -> Server {
         import_enabled: true,
         posting: Posting::On,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 

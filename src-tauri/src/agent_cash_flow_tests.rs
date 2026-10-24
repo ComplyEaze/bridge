@@ -171,6 +171,7 @@ async fn call_observed_under(
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(

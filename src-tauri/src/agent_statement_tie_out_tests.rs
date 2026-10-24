@@ -1128,6 +1128,7 @@ fn server(directory: &std::path::Path, port: Option<std::net::SocketAddr>) -> Se
         import_enabled: false,
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 

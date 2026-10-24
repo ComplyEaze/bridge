@@ -948,6 +948,7 @@ async fn the_readback_right_after_a_post_never_computes_the_section() {
         import_enabled: true,
         posting: crate::agent::Posting::On,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
@@ -1593,6 +1594,7 @@ fn server_with_cap(directory: &Path, port: u16, max_bytes: usize) -> Server {
         import_enabled: true,
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 

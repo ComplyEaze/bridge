@@ -63,6 +63,7 @@ async fn import_post_read_failures_retain_source_evidence_and_admission_errors_s
             import_enabled: true,
             posting: crate::agent::Posting::Off,
             master_writes_enabled: false,
+            audit_enabled: false,
         });
         let response = if malformed_catalogue {
             server
@@ -165,6 +166,7 @@ async fn a_name_the_core_refuses_costs_no_live_read() {
         import_enabled: true,
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
 
     let refused = server

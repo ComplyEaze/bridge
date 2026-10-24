@@ -31,6 +31,7 @@ fn server(directory: &std::path::Path, port: u16, max_bytes: usize) -> Server {
         import_enabled: true,
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 

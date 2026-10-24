@@ -513,6 +513,7 @@ async fn the_tool_needs_the_posting_opt_in() {
     let server = Server::new(crate::agent::Settings {
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
         ..server_at(simulator.address(), directory.path())
             .settings
             .clone()

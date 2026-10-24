@@ -62,6 +62,7 @@ async fn status_retains_invalid_discovery_reason_and_completed_sources() {
             import_enabled: false,
             posting: Posting::Off,
             master_writes_enabled: false,
+            audit_enabled: false,
         });
         let response = server.call_tool("tally_status", json!({})).await;
         assert_eq!(

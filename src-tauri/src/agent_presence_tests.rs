@@ -24,6 +24,7 @@ fn offline_server(directory: &std::path::Path) -> Server {
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 
@@ -861,6 +862,7 @@ async fn a_small_book_window_is_counted_so_a_proposal_nothing_resembles_is_absen
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(
@@ -935,6 +937,7 @@ async fn an_uncounted_nonempty_window_issues_no_absent() {
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(
@@ -991,6 +994,7 @@ async fn a_nonempty_window_counted_by_its_census_can_issue_absent() {
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(
@@ -1049,6 +1053,7 @@ async fn a_narration_marker_decides_a_present_from_a_nonempty_window() {
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(
@@ -1249,6 +1254,7 @@ async fn a_ledger_missing_from_the_catalogue_fails_closed() {
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let response = server
         .call_tool_response(
@@ -1301,6 +1307,7 @@ async fn a_party_with_too_many_identifiers_costs_no_read() {
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let response = server
         .call_tool_response(
@@ -1485,6 +1492,7 @@ async fn replay_the_twenty_invoice_engagement() {
         // Read-only, and stated in the settings rather than only in a comment.
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
 
     // Scope the read to a manually numbered type. Presence by voucher number is
@@ -1915,6 +1923,7 @@ async fn a_batch_id_the_writer_could_not_have_made_is_refused() {
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     for (batch, refused) in [
         (BATCH, false),
@@ -1980,6 +1989,7 @@ async fn a_transaction_label_outside_the_published_nested_schema_is_refused_befo
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     // A space is the case the writer rejects and the declared pattern names.
     for (label, refused) in [("txn 001", true), ("txn-001", false)] {
@@ -2037,6 +2047,7 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(
@@ -2107,6 +2118,8 @@ fn presence_server(simulator: &SequenceSimulator, directory: &std::path::Path) -
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 

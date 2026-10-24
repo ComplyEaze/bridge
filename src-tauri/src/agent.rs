@@ -119,6 +119,8 @@ mod read_profiles;
 use read_profiles::*;
 #[path = "agent_audit_read.rs"]
 mod audit_read;
+#[path = "agent_audit_run.rs"]
+mod audit_run;
 #[path = "agent_read_cost.rs"]
 mod read_cost;
 #[path = "agent_read_cost_preview.rs"]
@@ -305,6 +307,9 @@ struct Settings {
     /// called. Off by default and not in the extension's settings until a
     /// one-ledger create through Bridge is proved on a live book.
     master_writes_enabled: bool,
+    /// Whether the tax-audit tool (`audit_test_run`) is listed and callable. Off by default:
+    /// the extension's setting turns it on.
+    audit_enabled: bool,
 }
 
 /// Whether this server may post to Tally. One setting governs every post: one
@@ -394,6 +399,7 @@ impl Settings {
                 env::var("BRIDGE_AGENT_ENABLE_MASTER_WRITES"),
                 posting,
             )?,
+            audit_enabled: audit_from_env(process_variable)?,
         })
     }
 }
@@ -450,6 +456,30 @@ const RETIRED_BATCH_POST_SETTING: &str = "BRIDGE_AGENT_ENABLE_BATCH_POST";
 fn posting_setting(value: Option<&str>) -> Result<bool, String> {
     match value {
         Some("" | POSTING_PLACEHOLDER) => Ok(false),
+        other => boolean_setting(other),
+    }
+}
+
+/// The extension's tax-audit setting, named after the version of what it offers, as the posting
+/// one is. A test ties the key and its placeholder to `packaging/mcpb/manifest.json`.
+#[cfg(test)]
+pub(super) const AUDIT_SETTING_KEY: &str = "enable_tax_audit_2026_10";
+const AUDIT_PLACEHOLDER: &str = "${user_config.enable_tax_audit_2026_10}";
+/// The environment variable the setting is mapped to.
+pub(super) const AUDIT_SETTING_VARIABLE: &str = "BRIDGE_AGENT_ENABLE_TAX_AUDIT";
+
+/// The tax-audit setting, read through `var` as [`posting_from_env`] reads posting: absent,
+/// empty or the unresolved placeholder is off; anything but a plain boolean fails loud.
+fn audit_from_env(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<bool, String> {
+    let value = var(AUDIT_SETTING_VARIABLE)
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| "boolean_setting_invalid".to_string())
+        })
+        .transpose()?;
+    match value.as_deref() {
+        Some("" | AUDIT_PLACEHOLDER) => Ok(false),
         other => boolean_setting(other),
     }
 }
@@ -2546,6 +2576,9 @@ impl Server {
         {
             return Err("master_writes_disabled".to_string().into());
         }
+        if name == "audit_test_run" && !self.settings.audit_enabled {
+            return Err("audit_tool_disabled".to_string().into());
+        }
         #[cfg(feature = "lab-writes")]
         if matches!(
             name,
@@ -2556,6 +2589,7 @@ impl Server {
         validate_tool_arguments(name, args)?;
         match name {
             "acknowledge_post_review" => self.acknowledge_post_review(args).await,
+            "audit_test_run" => self.audit_test_run(args).await,
             "balance_sheet" => self.balance_sheet(args).await,
             "build_import_xml" => {
                 self.import_enabled()?;
@@ -2754,6 +2788,7 @@ pub(crate) async fn desktop_selected_vouchers(
             import_enabled: false,
             posting: Posting::Off,
             master_writes_enabled: false,
+            audit_enabled: false,
         },
         runtime.clone(),
     );

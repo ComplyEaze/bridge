@@ -15,6 +15,7 @@ fn server_for(address: std::net::SocketAddr, data_dir: &Path) -> Server {
         import_enabled: false,
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 

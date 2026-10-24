@@ -373,6 +373,7 @@ fn the_identity_is_read_from_the_journal_only_for_an_invoice_batch() {
         import_enabled: true,
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let bank = payment_batch("Rent", "500.00");
     let mut earlier = invoice_batch("INV/1");
@@ -437,6 +438,7 @@ fn a_verification_beside_an_unsettled_batch_matches_the_invoice_by_its_figures()
         import_enabled: true,
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let mut earlier = invoice_batch("INV/26-27/011");
     earlier.batch_id = sentinel_batch_id(0xb);

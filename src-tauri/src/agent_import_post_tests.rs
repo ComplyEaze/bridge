@@ -100,6 +100,7 @@ fn contended_post_returns_without_waiting_or_recording_a_dispatch() {
         import_enabled: true,
         posting: crate::agent::Posting::On,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     server.append_import_ledger(&line).unwrap();
     let journal = directory.path().join("agent-import-ledger.jsonl");
@@ -815,6 +816,7 @@ fn endpoint_lease_contention_keeps_negative_post_and_cancellation_results_uncert
         import_enabled: true,
         posting: crate::agent::Posting::On,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     server.append_import_ledger_while_admitted(&line).unwrap();
     let args = json!({"batch_id":&line.batch_id,"company_guid":&line.company_guid});
@@ -925,6 +927,7 @@ async fn received_response_survives_an_injected_response_journal_failure() {
         import_enabled: true,
         posting: crate::agent::Posting::On,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     server.append_import_ledger(&line).unwrap();
     let admission = server.lock_import_admission().unwrap();
@@ -1977,6 +1980,7 @@ async fn a_saved_xml_file_that_differs_from_the_record_is_refused_before_tally()
         import_enabled: true,
         posting: crate::agent::Posting::On,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     server.append_import_ledger(&line).unwrap();
     let path = server
@@ -3797,6 +3801,7 @@ fn records_server(directory: &std::path::Path) -> Server {
         import_enabled: true,
         posting: crate::agent::Posting::On,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 

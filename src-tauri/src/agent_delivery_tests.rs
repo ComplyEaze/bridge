@@ -21,6 +21,7 @@ fn server(path: &Path) -> Server {
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 
@@ -442,6 +443,7 @@ mod request_trail_receipts {
             import_enabled: false,
             posting: Posting::Off,
             master_writes_enabled: false,
+            audit_enabled: false,
         })
     }
 

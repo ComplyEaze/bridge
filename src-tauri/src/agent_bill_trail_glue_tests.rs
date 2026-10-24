@@ -137,6 +137,7 @@ async fn run(
         import_enabled: false,
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     });
     let (mut company, identity, _) = server.verified_company(CAPTURED_GUID).await.unwrap();
     if call.books_from_missing {

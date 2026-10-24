@@ -83,6 +83,7 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
             import_enabled: true,
             posting: crate::agent::Posting::Off,
             master_writes_enabled: false,
+            audit_enabled: false,
         });
         let error = server
             .build_import_xml(&serde_json::to_value(input).unwrap())

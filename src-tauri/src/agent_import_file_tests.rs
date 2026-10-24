@@ -14,6 +14,7 @@ fn server(path: &Path) -> Server {
         import_enabled: true,
         posting: crate::agent::Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 

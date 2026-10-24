@@ -20,6 +20,7 @@ fn server(path: &Path) -> Server {
         import_enabled: false,
         posting: Posting::Off,
         master_writes_enabled: false,
+        audit_enabled: false,
     })
 }
 
@@ -242,6 +243,8 @@ async fn every_served_description_and_instruction_pairs_its_backticks() {
         served.settings.max_bytes = 4_000_000;
         served.settings.import_enabled = import_enabled;
         served.settings.posting = Posting::from_enabled(writes_enabled);
+        // The tax-audit tool rides with posting here, so its texts are checked too.
+        served.settings.audit_enabled = writes_enabled;
         let responses = session(
             served,
             &[
@@ -274,6 +277,39 @@ async fn every_served_description_and_instruction_pairs_its_backticks() {
     }
     // The flags must change what is served, or the posting-on cases checked nothing new.
     assert!(tool_counts[3] > tool_counts[0], "{tool_counts:?}");
+}
+
+/// The tax-audit tool is served only with its setting on: the default `tools/list` does not carry
+/// it, the same list with the setting on does, and nothing else changes.
+#[tokio::test]
+async fn tools_list_carries_the_tax_audit_tool_only_with_its_setting_on() {
+    let mut names_by_setting = Vec::new();
+    for audit_enabled in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let mut served = server(directory.path());
+        served.settings.audit_enabled = audit_enabled;
+        let responses = session(
+            served,
+            &[
+                initialize("2025-06-18"),
+                json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+            ],
+        )
+        .await;
+        let names: std::collections::BTreeSet<String> = responses[1]["result"]["tools"]
+            .as_array()
+            .expect("tools/list result")
+            .iter()
+            .map(|tool| tool["name"].as_str().unwrap().to_string())
+            .collect();
+        names_by_setting.push(names);
+    }
+    assert!(!names_by_setting[0].contains("audit_test_run"));
+    let added: Vec<&String> = names_by_setting[1]
+        .difference(&names_by_setting[0])
+        .collect();
+    assert_eq!(added, ["audit_test_run"]);
+    assert!(names_by_setting[0].is_subset(&names_by_setting[1]));
 }
 
 /// A client that asked for tiny responses still gets its handshake: below the

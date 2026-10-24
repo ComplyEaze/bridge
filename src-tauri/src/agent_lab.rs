@@ -1674,6 +1674,7 @@ mod tests {
             import_enabled: false,
             posting: Posting::Off,
             master_writes_enabled: false,
+            audit_enabled: false,
         });
         let expected = render_lab_master_collection(
             identity.display_name(),

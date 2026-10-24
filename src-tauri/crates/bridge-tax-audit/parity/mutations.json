@@ -14278,5 +14278,53 @@
   "file": "src/book.rs",
   "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
   "to": ""
+ },
+ {
+  "id": "RY-1",
+  "by": "author",
+  "what": "the rules' year label never compared",
+  "file": "src/lib.rs",
+  "from": "    if engagement.assessment_year != rules.assessment_year {\n",
+  "to": "    if false {\n"
+ },
+ {
+  "id": "RY-2",
+  "by": "author",
+  "what": "a period starting before the rules' year is judged",
+  "file": "src/lib.rs",
+  "from": "    if engagement.period.from < *start || engagement.period.to > *end {\n",
+  "to": "    if engagement.period.to > *end {\n"
+ },
+ {
+  "id": "RY-3",
+  "by": "author",
+  "what": "a period ending after the rules' year is judged",
+  "file": "src/lib.rs",
+  "from": "    if engagement.period.from < *start || engagement.period.to > *end {\n",
+  "to": "    if engagement.period.from < *start {\n"
+ },
+ {
+  "id": "RY-4",
+  "by": "author",
+  "what": "the year's first day refused",
+  "file": "src/lib.rs",
+  "from": "    if engagement.period.from < *start || engagement.period.to > *end {\n",
+  "to": "    if engagement.period.from <= *start || engagement.period.to > *end {\n"
+ },
+ {
+  "id": "RY-5",
+  "by": "author",
+  "what": "the year's last day refused",
+  "file": "src/lib.rs",
+  "from": "    if engagement.period.from < *start || engagement.period.to > *end {\n",
+  "to": "    if engagement.period.from < *start || engagement.period.to >= *end {\n"
+ },
+ {
+  "id": "RY-6",
+  "by": "author",
+  "what": "the year's start read from its end",
+  "file": "src/rules.rs",
+  "from": "                meta_date(\"previous_year_start\")?,\n",
+  "to": "                meta_date(\"previous_year_end\")?,\n"
  }
 ]

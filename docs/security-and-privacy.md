@@ -112,14 +112,17 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     named in a build warning and the ledger in a refused cash-or-bank row), stock
     item names and their parents, godown, stock-group, cost-centre and cost-category
     names and their parents, the category a cost centre belongs to,
-    and three fields of a ledger's details: the name on the PAN, the bank account
-    holder's name and the bank details. A name of four characters or fewer is
+    and five fields of a ledger's details: the name on the PAN, the bank account
+    holder's name, the bank details, the name a mailing address is printed under and the
+    address itself (each line of the mailing address, and the flat address field).
+    A party's PIN code, state and country, which `ledger_masters` returns with
+    `fields=compliance`, are not masked under any mode. A name of four characters or fewer is
     replaced by “…”. The spelling a ledger's vouchers carry, which is returned
     beside its name when the two differ, is left out. It does not mask amounts, company names, the names of
     groups in a group total (shown as the book has them), a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
-    addresses or IFSCs, or the last four digits of a bank statement's account
+    addresses outside a ledger's own address fields, or IFSCs, or the last four digits of a bank statement's account
     number (`account_last4`), and a name written inside a narration or reference
     stays as it is.
   - `drop_narration` removes narrations, and a search of vouchers by a phrase of

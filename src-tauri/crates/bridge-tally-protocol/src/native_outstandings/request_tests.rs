@@ -439,13 +439,18 @@ fn gst_details_period() -> NativeLedgerExportPeriod {
     .expect("mode-agnostic profile accepts valid calendar dates")
 }
 
+/// The request sent live named no mailing details; the GST details read now names
+/// them too, right after the GST registration history and before the GST details
+/// suffix. With that one element taken out, the render is the live bytes.
 #[test]
-fn the_gst_details_request_is_byte_for_byte_the_one_sent_live() {
+fn the_gst_details_request_is_the_one_sent_live_plus_the_mailing_details_element() {
+    let rendered = render_party_ledger_master_request_with_gst_details(
+        "BRIDGE PILOT LAB",
+        &gst_details_period(),
+    );
+    assert!(rendered.contains("LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST, GSTDETAILS.LIST,"));
     assert_eq!(
-        render_party_ledger_master_request_with_gst_details(
-            "BRIDGE PILOT LAB",
-            &gst_details_period()
-        ),
+        rendered.replacen(", LEDMAILINGDETAILS.LIST", "", 1),
         crate::text_encoding::decode_xml_bytes(GST_DETAILS_REQUEST).unwrap()
     );
 }
@@ -455,13 +460,25 @@ fn the_gst_details_request_differs_from_the_production_compliance_request_only_b
 {
     let period = gst_details_period();
     let production = render_party_ledger_master_request("BRIDGE PILOT LAB", &period);
+    let with_mailing =
+        render_party_ledger_master_request_with_mailing_details("BRIDGE PILOT LAB", &period);
     let with_details =
         render_party_ledger_master_request_with_gst_details("BRIDGE PILOT LAB", &period);
     let suffix = ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
+    // The mailing details read is the production request and one element; the
+    // details read is that and the suffix.
     assert_eq!(
         production.replacen(
             "LEDGSTREGDETAILS.LIST</FETCH>",
-            &format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>"),
+            "LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST</FETCH>",
+            1
+        ),
+        with_mailing
+    );
+    assert_eq!(
+        with_mailing.replacen(
+            "LEDMAILINGDETAILS.LIST</FETCH>",
+            &format!("LEDMAILINGDETAILS.LIST{suffix}</FETCH>"),
             1
         ),
         with_details
@@ -507,21 +524,37 @@ fn the_gst_details_parent_part_request_differs_from_the_production_part_request_
         one_part(&["Sundry Debtors", "Duties & Taxes"]),
         complement,
     ] {
-        let production = render_party_ledger_master_request_for_parents("Co", &period, &part);
+        let production = render_party_ledger_master_request_for_parents_with_mailing_details(
+            "Co", &period, &part,
+        );
+        let plain = render_party_ledger_master_request_for_parents("Co", &period, &part);
+        assert_eq!(
+            plain.replacen(
+                "LEDGSTREGDETAILS.LIST</FETCH>",
+                "LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST</FETCH>",
+                1
+            ),
+            production,
+            "a part's mailing details read is the plain part request and one element"
+        );
         let with_details =
             render_party_ledger_master_request_for_parents_with_gst_details("Co", &period, &part);
         let suffix = ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
-        let marker = "LEDGSTREGDETAILS.LIST</FETCH>";
+        let marker = "LEDMAILINGDETAILS.LIST</FETCH>";
         assert_eq!(production.matches(marker).count(), 1);
         assert_eq!(
-            production.replacen(marker, &format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>"), 1),
+            production.replacen(
+                marker,
+                &format!("LEDMAILINGDETAILS.LIST{suffix}</FETCH>"),
+                1
+            ),
             with_details
         );
         assert_ne!(production, with_details);
         // The suffix is the whole-book variant's, byte for byte.
         let whole = render_party_ledger_master_request_with_gst_details("Co", &period);
-        assert!(whole.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
-        assert!(with_details.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
+        assert!(whole.contains(&format!("LEDMAILINGDETAILS.LIST{suffix}</FETCH>")));
+        assert!(with_details.contains(&format!("LEDMAILINGDETAILS.LIST{suffix}</FETCH>")));
         assert_eq!(with_details.matches("<FILTERS>").count(), 1);
         assert_eq!(
             with_details.matches("<SYSTEM ").count(),
@@ -533,4 +566,30 @@ fn the_gst_details_parent_part_request_differs_from_the_production_part_request_
             with_details.matches("<SYSTEM ").count()
         );
     }
+}
+
+const MAILING_DETAILS_REQUEST: &[u8] = include_bytes!(
+    "../../tests/fixtures/agent/native-party-masters-mailing-details.request.utf16le.xml"
+);
+
+/// The party-master request that names the mailing details is the one sent live
+/// when they were first read (bridge#1490); the plain one is the same request
+/// without that element, which the registers keep sending.
+#[test]
+fn the_mailing_details_request_is_byte_for_byte_the_one_sent_live() {
+    let period = NativeLedgerExportPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20260401").unwrap(),
+        TallyDate::parse("20260831").unwrap(),
+    )
+    .expect("mode-agnostic profile accepts valid calendar dates");
+    let live = crate::text_encoding::decode_xml_bytes(MAILING_DETAILS_REQUEST).unwrap();
+    assert_eq!(
+        render_party_ledger_master_request_with_mailing_details("Bridge Lab Win 0.5.1", &period),
+        live
+    );
+    assert_eq!(
+        render_party_ledger_master_request("Bridge Lab Win 0.5.1", &period),
+        live.replacen(", LEDMAILINGDETAILS.LIST", "", 1)
+    );
 }

@@ -287,6 +287,7 @@ const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
+const MAILING_LAB_GUID: &str = "8e34483e-2bd3-472b-ae37-c4b197e8c15a";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
 const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.utf16le.xml";
@@ -1721,6 +1722,18 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_party_ledger_master_records_with_evidence(READS LAB)",
         parse: |_, text| party_masters(text, READS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(MAILING LAB)",
+        parse: |_, text| party_masters(text, MAILING_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/native-party-masters-without-mailing-details.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(MAILING LAB, list not named)",
+        parse: |_, text| party_masters(text, MAILING_LAB_GUID),
     },
     Row {
         fixture: "tests/fixtures/agent/native-party-masters.utf16le.xml",

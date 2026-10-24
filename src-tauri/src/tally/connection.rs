@@ -38,7 +38,9 @@ use bridge_tally_protocol::{
         render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_parents,
         render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
         render_party_ledger_master_request_for_parents_with_gst_details,
-        render_party_ledger_master_request_with_gst_details, BaseCurrencyName,
+        render_party_ledger_master_request_for_parents_with_mailing_details,
+        render_party_ledger_master_request_with_gst_details,
+        render_party_ledger_master_request_with_mailing_details, BaseCurrencyName,
         ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
         NativeLedgerSnapshotPeriod, NativeOutstandingsError,
     },
@@ -350,6 +352,21 @@ fn parent_part_response_error(part: Option<&ParentPart>, error: anyhow::Error) -
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 
 /// Bytes one ledger is estimated to add to the compliance master response when
+/// the request also names each ledger's `LEDMAILINGDETAILS.LIST`
+/// ([`ComplianceRead::WithMailingDetails`], bridge#1490). UNVERIFIED. Naming it
+/// grew the one populated party row of the captured eight-ledger book by 948
+/// bytes (3,010 to 3,958 UTF-16 bytes; one dated entry of two short address
+/// lines) and every other row by 122. The figure is the shared 3,750 plus 950,
+/// which is more than the mean of a mixed book needs and less than a book of
+/// parties with longer addresses or a second entry may: a party row of 3.3 KB
+/// plus a 950-byte entry leaves about 450 bytes under it, and a longer address
+/// or a second entry (about 900 more, extrapolated) goes over it. No such book
+/// has been read. The 20 s request deadline leaves no slack over the 16 MB
+/// budget, so an under-estimate can be an abandoned read, not only a refusal:
+/// the Windows live check of this change names a dense book for this figure.
+const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED: u64 = 4_700;
+
+/// Bytes one ledger is estimated to add to the compliance master response when
 /// the request also names each ledger's `GSTDETAILS.LIST`
 /// ([`ComplianceRead::WithGstDetails`]). UNVERIFIED. The one capture (14
 /// ledgers, a lab book) measured 2,138 to 2,704 bytes for a ledger with an
@@ -364,17 +381,22 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// which most ledgers hold two or more entries could exceed the 16 MB response
 /// budget while still admitted. UNVERIFIED until measured on more books; it is
 /// not a bound. The shared [`COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED`] is
-/// for reads without the details.
-const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_000;
+/// for reads without the details. That capture's request did not name
+/// `LEDMAILINGDETAILS.LIST` (#1490), which this read now names: this figure is
+/// 8,000 plus the 950 bytes the mailing details add to a populated party row,
+/// not a measurement of the two together.
+const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_950;
 
 /// What a compliance master read asks Tally for. [`Self::Standard`] is the
-/// production request, and every caller other than a `ledger_masters` call
-/// that asked for the GST details passes it. [`Self::WithGstDetails`] names
-/// each ledger's dated GST details in the request's `FETCH` and is sized by
-/// its own per-ledger estimate everywhere the standard one would be.
+/// request every reader that does not use a party's mailing address sends (the
+/// registers). [`Self::WithMailingDetails`] also names each ledger's dated
+/// mailing details, as `ledger_masters` and the party/ledger master workbook do.
+/// [`Self::WithGstDetails`] names both that and each ledger's dated GST details.
+/// Each is sized by its own per-ledger estimate wherever the standard one would be.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComplianceRead {
     Standard,
+    WithMailingDetails,
     WithGstDetails,
 }
 
@@ -383,6 +405,9 @@ impl ComplianceRead {
     const fn bytes_per_ledger(self) -> u64 {
         match self {
             Self::Standard => COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
+            Self::WithMailingDetails => {
+                COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED
+            }
             Self::WithGstDetails => COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED,
         }
     }
@@ -492,13 +517,15 @@ const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 /// ledgers than one part may carry is refused as `parent_over_budget`, never
 /// split, because a group cannot be read in pieces by `$Parent`. That figure is
 /// the budget over the read's per-ledger constant, not a measurement: 4,266
-/// ledgers for a [`ComplianceRead::Standard`] read and 2,000 for a
+/// ledgers for a [`ComplianceRead::Standard`] read, 3,404 for a
+/// [`ComplianceRead::WithMailingDetails`] one and 1,787 for a
 /// [`ComplianceRead::WithGstDetails`] one.
 ///
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
 /// the serial requests one call may spend (four per part), not a measured
-/// limit. It admits about 51,000 ledgers (about 24,000 with the GST details),
-/// far past what the mark bound admits.
+/// limit. It admits about 51,000 ledgers (about 40,800 with the mailing
+/// details, about 21,400 with the GST details), far past what the mark bound
+/// admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
 
 /// Most bytes of `NOT` formula text the complement part's request may carry
@@ -1846,6 +1873,12 @@ impl TallyClient {
                             identity.display_name(),
                             &master_period,
                         ),
+                        ComplianceRead::WithMailingDetails => {
+                            render_party_ledger_master_request_with_mailing_details(
+                                identity.display_name(),
+                                &master_period,
+                            )
+                        }
                         ComplianceRead::WithGstDetails => {
                             render_party_ledger_master_request_with_gst_details(
                                 identity.display_name(),
@@ -1863,6 +1896,13 @@ impl TallyClient {
                             match read {
                                 ComplianceRead::Standard => {
                                     render_party_ledger_master_request_for_parents(
+                                        identity.display_name(),
+                                        &master_period,
+                                        part,
+                                    )
+                                }
+                                ComplianceRead::WithMailingDetails => {
+                                    render_party_ledger_master_request_for_parents_with_mailing_details(
                                         identity.display_name(),
                                         &master_period,
                                         part,

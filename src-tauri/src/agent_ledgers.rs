@@ -372,7 +372,7 @@ const GST_DETAILS_LIMITATIONS: [&str; 6] = [
     "A state_name or valuation_type that starts with U+FFFD and #4; is a Tally reserved value (written &#4; on the wire), kept as the parser returned it.",
     "ineligible_itc is Tally's GSTINELIGIBLEITC as sent under its own name: true for Yes, false for No, null when the element is absent. It is an ineligibility flag where measured: on one ledger under Purchase Accounts, with a keyed history row, the screen's Eligible for Input Tax Credit Yes read as the element absent and its No as Yes (PARTIAL: one synthetic book, one release, one ledger, one dated entry; this book is not the 14-ledger one below). Do not read true as eligible. A Yes on any other ledger says nothing either way: the Sales ledgers of one captured book carry a Yes on their keyed entries, and Tally's own default entry (source As per Company/Group) carries one with no keyed No; neither was read against the screen. With several dated entries, read the one in force on the date.",
     "Measured on one 14-ledger lab book of TallyPrime 7.1 Silver; this was not yet run through this tool on a live Tally.",
-    "The read is admitted at 8,000 bytes a ledger instead of 3,750, a margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element), not a measured ratio; a large book may be read in more parts or refused as too large.",
+    "The read is admitted at 8,950 bytes a ledger instead of 4,700, a margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element; that request did not name the mailing details, so 950 bytes were added to each figure), not a measured ratio; a large book may be read in more parts or refused as too large.",
 ];
 
 /// The frame with the GST details' limitations added when the rows hold them,
@@ -818,7 +818,7 @@ impl Server {
                         if gst_details {
                             ComplianceRead::WithGstDetails
                         } else {
-                            ComplianceRead::Standard
+                            ComplianceRead::WithMailingDetails
                         },
                     )
                     .await

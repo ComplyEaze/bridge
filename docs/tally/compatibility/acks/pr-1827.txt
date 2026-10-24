@@ -1,0 +1,4 @@
+docs/adr/0004-tally-write-safety.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md
+src-tauri/src/tally/runtime.rs
+reviewer: lamemustafa

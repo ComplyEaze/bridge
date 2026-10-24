@@ -86,11 +86,13 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     // a new tool must be added to `ToolEffect::of` and to this table to be
     // published.
     const READ_TOOLS: &[&str] = &[
+        "audit_test_run",
         "balance_sheet",
         "cash_flow",
         "company_features",
         "egress_log",
         "gst_status",
+        "gst_uncertain_vouchers",
         "ledger_masters",
         "ledger_movement",
         "list_companies",
@@ -304,6 +306,7 @@ async fn voucher_type_selector_is_bounded_before_any_tally_read() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let mut args = json!({"company_guid":"00000000-0000-4000-8000-000000000001",
         "from":"20260901","to":"20260902","voucher_type":"名".repeat(1025)});
@@ -343,6 +346,7 @@ async fn verification_remains_catalogued_and_admitted_when_import_and_writes_are
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server.call_tool_response("verify_import", json!({})).await;
     assert_eq!(response.value["isError"], true);
@@ -367,6 +371,7 @@ async fn master_validation_rejects_unbounded_and_blank_names_before_tally() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     for ledgers in [
         json!([""]),
@@ -413,6 +418,7 @@ async fn ledger_selectors_are_bounded_before_company_or_catalogue_reads() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     for tool in ["vouchers", "ledger_movement"] {
         for ledger in ["x".repeat(1025), " ".into(), String::new()] {
@@ -448,6 +454,7 @@ async fn oversized_unknown_property_cannot_expand_response_or_retained_evidence(
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     for key in ["unknown".to_string(), "x".repeat(1_000_000)] {
         let value = server.call_tool("tally_status", json!({key: null})).await;
@@ -1339,6 +1346,16 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "the tool names no reason for a status",
         ),
         (
+            "gst_uncertain_vouchers",
+            "The reason for uncertainty is not read",
+            "the tool names no reason for a voucher's uncertainty",
+        ),
+        (
+            "gst_uncertain_vouchers",
+            "not the taxable value of the GSTR-1 tables",
+            "the amount is the invoice total, not a figure of the return",
+        ),
+        (
             "voucher_read_cost",
             "a narrower window does not lower it",
             "the census follows the book's mark, so a shorter window is not a cheaper call",
@@ -1505,4 +1522,59 @@ fn the_transfer_texts_claim_only_what_the_code_does() {
             assert!(!text.contains(phrase), "{phrase}: {text}");
         }
     }
+}
+
+/// The post tool says what the Windows approval window's first lines say for one
+/// voucher, so the assistant tells the person the same thing before the window
+/// opens (#1780).
+#[test]
+fn the_post_tool_says_what_the_approval_window_says() {
+    let definitions = registered_tool_definitions(true, true);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|entry| entry["name"] == "post_import"))
+        .and_then(|tool| tool["description"].as_str())
+        .expect("post_import is registered");
+    assert!(
+        description.contains(
+            "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to \
+             cancel. Nothing is posted until you answer."
+        ),
+        "{description}"
+    );
+}
+
+/// The most bytes the full catalogue may take in its tools/list answer. The
+/// answer is sent whole at the start of every session, so its size is a cost to
+/// every conversation; raising this is argued in the pull request that needs
+/// it. It must also stay under the control-message ceiling, or tools/list
+/// would answer `agent_response_too_large` and leave the server without tools.
+const TOOL_LIST_BUDGET: usize = 225_000;
+const _: () = assert!(TOOL_LIST_BUDGET < super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES);
+
+#[test]
+fn the_full_tool_list_stays_within_its_byte_budget() {
+    let definitions = tool_definitions(true, true);
+    let tools = definitions.as_array().expect("tool definitions");
+    // As `agent_protocol.rs` frames it, with its newline and a short request id;
+    // a longer id takes its own bytes.
+    let total = format!(
+        "{}\n",
+        json!({"jsonrpc":"2.0","id":1,"result":{"tools":definitions}})
+    )
+    .len();
+    let mut sizes = tools
+        .iter()
+        .map(|tool| (tool["name"].as_str().unwrap_or("?"), tool.to_string().len()))
+        .collect::<Vec<_>>();
+    sizes.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+    let report = sizes
+        .iter()
+        .map(|(name, bytes)| format!("{bytes:>7} {name}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        total < TOOL_LIST_BUDGET,
+        "tools/list is {total} bytes, over its budget of {TOOL_LIST_BUDGET}.\n{report}"
+    );
 }

@@ -35,6 +35,7 @@ fn server(directory: &Path, import_enabled: bool, redaction: Redaction) -> Serve
         redaction,
         import_enabled,
         posting: Posting::Off,
+        audit_enabled: false,
     })
 }
 

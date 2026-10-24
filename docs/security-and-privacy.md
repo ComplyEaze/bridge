@@ -105,7 +105,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - `mask_parties` shortens, to their first two and last two characters, the
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase
-    register, bank-statement proposals, voucher totals by ledger, the ledgers
+    register, bank-statement proposals, voucher totals by ledger, the party ledger of
+    each voucher `gst_uncertain_vouchers` lists, the ledgers
     listed under a group total, the ledger named when a group total cannot be
     given, the list of bill-wise ledgers waiting for approval, the suspense ledger
     named in a build warning and the ledger in a refused cash-or-bank row), stock
@@ -133,6 +134,12 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
+  - A tax-audit test run (`audit_test_run`, in source and not yet in a published build) sends the AI
+    provider the test's figures and findings: amounts in paise, figure and finding ids, the test's
+    fixed wording, and the code and count of any failed book check. It names no ledger, group,
+    party or voucher, and it is refused while `mask_parties` or `drop_narration` is on, because
+    those settings mask only marked values and would not hide what is returned here. The books it
+    reads for the test are held in memory for the call and are not written to disk.
   - A bank-statement check over whole calendar months (`statement_tie_out`,
     added in release 0.6.0) can show, with the book's figures,
     the statement's balance at the month ends and its net over those months,
@@ -207,6 +214,17 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       post-dated and what its status flags read) and whether it was accepted
       as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
+    - The uncertain-voucher read (`gst_uncertain_vouchers`) sends the company,
+      the voucher type name and the dates, the counts of the whole window and
+      the pre-filing line, and, only for each voucher it lists as uncertain or
+      as accepted as it stands, its number, date, party ledger's name,
+      invoice total (without its sign) and which side it is on, Tally's two
+      identifiers and its status. It sends no voucher type and no status
+      flags per item.
+      Unlike the status read, its answer therefore carries party names and
+      amounts to the assistant. `mask_parties` shortens the party names in
+      it and does not shorten the amounts. It holds no narrations and no
+      ledger entries of the voucher.
     - Cost-centre allocations of a voucher's ledger entries (in source and not
       yet in a published build): each entry that carries them sends, for each
       allocation, the name of its cost category, the name of its cost centre and

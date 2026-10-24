@@ -13,6 +13,7 @@ fn server(path: &Path) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     })
 }
 

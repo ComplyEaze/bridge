@@ -19,3 +19,14 @@ slow-timeout = { period = "60s", terminate-after = 6 }
 [[profile.default.overrides]]
 filter = 'test(/access::tests::on_windows::/)'
 success-output = "immediate"
+
+# Per-test timings for the native macOS job (bridge#1750): a JUnit report of test names, binaries,
+# times and outcomes. The two store settings keep captured output out of it, passing or failing; a
+# FAILING test's panic text still reaches the report whatever they say, so CI uploads the report from
+# the macOS job (a diagnostics artifact kept 7 days) only when the test step passed. The consistency
+# check pins every line of this file that is not a blank or a comment (nextestLines in
+# scripts/check-ci-workflow-consistency.mjs), so a setting added or changed here is changed there too.
+[profile.default.junit]
+path = "junit.xml"
+store-success-output = false
+store-failure-output = false

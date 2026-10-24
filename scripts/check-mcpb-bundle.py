@@ -24,6 +24,7 @@ DEFAULT_TOOLS = {
     "company_features",
     "egress_log",
     "gst_status",
+    "gst_uncertain_vouchers",
     "ledger_masters",
     "ledger_movement",
     "list_companies",
@@ -58,6 +59,10 @@ POSTING_TOOLS = {
     "acknowledge_post_review",
     "post_import",
 }
+# The tax-audit tool is behind its own switch, off by default.
+AUDIT_TOOLS = {
+    "audit_test_run",
+}
 
 
 def expected_tools(environment):
@@ -67,9 +72,11 @@ def expected_tools(environment):
         tools |= IMPORT_TOOLS
     if environment.get("BRIDGE_AGENT_ENABLE_WRITES") == "true":
         tools |= POSTING_TOOLS
+    if environment.get("BRIDGE_AGENT_ENABLE_TAX_AUDIT") == "true":
+        tools |= AUDIT_TOOLS
     return tools
 # The bundled PDFium: beside the binary, where parse_bank_statement loads it,
-# with the licence notice scripts/fetch-pdfium.py generated at the root. Both are
+# with the licence notice scripts/fetch-pdfium.mjs generated at the root. Both are
 # checked against packaging/pdfium/pdfium.lock.json, not merely present.
 PDFIUM_NOTICE = "THIRD_PARTY_LICENSES_PDFIUM.txt"
 PDFIUM_LIBRARIES = {"darwin": "libpdfium.dylib", "win32": "pdfium.dll"}
@@ -243,7 +250,7 @@ def resolve_environment(manifest):
     mappings = manifest["server"]["mcp_config"]["env"]
     require(set(mappings) == {"BRIDGE_TERMS_ACCEPTED", "BRIDGE_TALLY_HOST", "BRIDGE_TALLY_PORT",
                               "BRIDGE_AGENT_REDACTION", "BRIDGE_AGENT_ENABLE_IMPORT",
-                              "BRIDGE_AGENT_ENABLE_WRITES"},
+                              "BRIDGE_AGENT_ENABLE_WRITES", "BRIDGE_AGENT_ENABLE_TAX_AUDIT"},
             "unexpected_environment_mapping")
     # No setting may be required. Claude Desktop builds no launch command while a required setting
     # has no stored value, and an update that renames the Terms setting leaves it with none, so
@@ -267,6 +274,12 @@ def resolve_environment(manifest):
     # text offered one voucher at a time, must not turn on batch posting, so it is mapped to nothing.
     require(mappings["BRIDGE_AGENT_ENABLE_WRITES"] == "${user_config.enable_posting_2026_10}",
             "writes_environment_mapping_mismatch")
+    # The tax-audit tool ships off by default behind its own versioned switch.
+    audit = manifest["user_config"].get("enable_tax_audit_2026_10", {})
+    require(audit.get("type") == "boolean" and audit.get("default") is False,
+            "tax_audit_setting_must_be_boolean_and_off")
+    require(mappings["BRIDGE_AGENT_ENABLE_TAX_AUDIT"] == "${user_config.enable_tax_audit_2026_10}",
+            "tax_audit_environment_mapping_mismatch")
     # Supply isolated client settings through the manifest itself. Overwriting
     # the resulting environment would hide broken host/port substitutions.
     values = {name: option["default"] for name, option in manifest["user_config"].items()}
@@ -403,6 +416,7 @@ def smoke(archive, repository):
         require(len(names) == len(expected) and set(names) == expected, "default_tools_mismatch")
         require(not POSTING_TOOLS & set(names) and IMPORT_TOOLS <= set(names),
                 "default_bundle_must_prepare_but_not_post")
+        require(not AUDIT_TOOLS & set(names), "default_bundle_must_not_list_the_tax_audit_tool")
         # The user's opt-in adds the posting tools and nothing else; verify_import stays
         # available either way for safe recovery of saved batches.
         enabled_environment = dict(environment, BRIDGE_AGENT_ENABLE_WRITES="true")
@@ -415,6 +429,16 @@ def smoke(archive, repository):
                 and set(enabled_names) == expected_tools(enabled_environment)
                 and set(enabled_names) - set(names) == POSTING_TOOLS,
                 "opt_in_tools_mismatch")
+        # The tax-audit switch, run on the packaged binary: it adds that one tool and nothing else.
+        audit_environment = dict(environment, BRIDGE_AGENT_ENABLE_TAX_AUDIT="true")
+        audit_output, _ = run_bounded([command], catalogue_payload, audit_environment)
+        audit_replies = [json.loads(line) for line in audit_output.splitlines()]
+        require([reply.get("id") for reply in audit_replies] == [1, 2], "audit_opt_in_response_ids")
+        audit_names = [tool["name"] for tool in audit_replies[1]["result"]["tools"]]
+        require(len(audit_names) == len(expected_tools(audit_environment))
+                and set(audit_names) == expected_tools(audit_environment)
+                and set(audit_names) - set(names) == AUDIT_TOOLS,
+                "audit_opt_in_tools_mismatch")
         schema = replies[2]["result"]
         require(schema.get("isError") is False
                 and schema["structuredContent"]["result"]["schema"]["type"] == "object"

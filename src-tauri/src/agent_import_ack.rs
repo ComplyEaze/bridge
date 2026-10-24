@@ -16,7 +16,7 @@
 //! party ledger) is caught only if it moves the ALTERID, which is not yet
 //! measured for an edit made in Tally's own screens.
 use super::*;
-use crate::tally::approved_import::{ReviewAcknowledged, VoucherCount, REVIEW_BUTTON};
+use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount, REVIEW_BUTTON};
 
 /// Names the fields [`voucher_fingerprint`] covers, and in which order. A new
 /// field is a new version, so a record never matches a fingerprint computed
@@ -785,10 +785,10 @@ fn negated_as_written(amount: &ExactDecimal) -> String {
 /// have no scrollable review surface, so a review over any is refused.
 fn caps_exceeded(preview: &str) -> Vec<&'static str> {
     let mut exceeded = Vec::new();
-    if preview.chars().count() > 1_600 {
+    if preview.chars().count() > post::ONE_VOUCHER_MAX_CHARS {
         exceeded.push("characters");
     }
-    if preview.lines().count() > 24 {
+    if preview.lines().count() > post::ONE_VOUCHER_MAX_LINES {
         exceeded.push("lines");
     }
     if preview.lines().any(|line| line.chars().count() > 100) {
@@ -1162,7 +1162,7 @@ impl Server {
         // The dialog's title names how many vouchers it shows (#746).
         let count = VoucherCount::new(reviewed_rows.len())
             .ok_or_else(|| fail("ack_readback_not_matched".to_string()))?;
-        let approval = ReviewAcknowledged::confirm(count, &preview)
+        let approval = ReviewAcknowledged::confirm(ReviewKind::Review, count, &preview)
             .await
             .map_err(fail)?;
 

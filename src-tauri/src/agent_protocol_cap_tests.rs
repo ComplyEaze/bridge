@@ -16,7 +16,7 @@ fn bounded_frames(output: &[u8], cap: usize) -> Vec<Value> {
 }
 
 #[tokio::test]
-async fn control_frames_obey_minimum_cap_and_refusals_keep_session_usable() {
+async fn control_frames_but_the_tool_list_obey_minimum_cap_and_refusals_keep_session_usable() {
     for import_enabled in [false, true] {
         let directory = tempfile::tempdir().unwrap();
         let mut server = server(directory.path());
@@ -57,13 +57,24 @@ async fn control_frames_obey_minimum_cap_and_refusals_keep_session_usable() {
         serve_stdio(server, BufReader::new(input.as_bytes()), &mut output)
             .await
             .unwrap();
-        let frames = bounded_frames(&output, 256);
+        // The tool list is held to the control ceiling, not to this cap: it is
+        // the build's catalogue, whole. Every other frame still fits in 256.
+        let frames = bounded_frames(&output, CONTROL_RESPONSE_MAX_BYTES);
         assert_eq!(frames.len(), 6);
+        let lines = output
+            .split_inclusive(|byte| *byte == b'\n')
+            .collect::<Vec<_>>();
+        for (index, line) in lines.iter().enumerate() {
+            if index != 2 {
+                assert!(line.len() <= 256, "frame {index}: {} bytes", line.len());
+            }
+        }
         assert_eq!(frames[0]["error"]["code"], -32700);
         assert_eq!(frames[1]["result"]["protocolVersion"], "2025-06-18");
-        assert_eq!(frames[2]["error"]["code"], -32000);
-        assert_eq!(frames[2]["error"]["message"], "agent_response_too_large");
-        assert!(frames[2].get("result").is_none());
+        assert_eq!(
+            frames[2]["result"]["tools"],
+            catalog::listed_tool_definitions(import_enabled, false, false)
+        );
         assert_eq!(frames[3]["error"]["code"], -32601);
         assert_eq!(frames[4]["error"]["message"], "request_id_too_large");
         assert!(frames[4]["id"].is_null());
@@ -82,17 +93,18 @@ async fn control_final_frame_counts_newline_and_bounds_error_replacements() {
     server.settings.max_bytes = 256;
     let id = json!("quoted\"é");
     let envelope = json!({"jsonrpc":"2.0","id":id,"result":{"padding":""}});
-    let padding = "x".repeat(256 - envelope.to_string().len());
+    // A control frame is held to its own ceiling, not to the 256-byte cap.
+    let padding = "x".repeat(CONTROL_RESPONSE_MAX_BYTES - envelope.to_string().len());
     let oversized_result = json!({"padding":padding});
     assert_eq!(
         json!({"jsonrpc":"2.0","id":id,"result":oversized_result})
             .to_string()
             .len(),
-        256,
+        CONTROL_RESPONSE_MAX_BYTES,
         "JSON fits but its mandatory newline does not"
     );
     let mut output = Vec::new();
-    for result in [Ok(oversized_result), Err("large error".repeat(100))] {
+    for result in [Ok(oversized_result), Err("large error".repeat(100_000))] {
         finish_response(&server, &mut output, id.clone(), result, None, None, false)
             .await
             .unwrap();

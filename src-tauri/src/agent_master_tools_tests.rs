@@ -252,6 +252,7 @@ fn server_with(
         import_enabled: true,
         posting: Posting::On,
         master_writes_enabled,
+        audit_enabled: false,
     })
 }
 

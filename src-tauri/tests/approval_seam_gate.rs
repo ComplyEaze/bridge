@@ -606,7 +606,7 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "approve_masters(preview).await?;\n        Ok(Self {",
         ),
         source.replace(
-            "approve_review(count, preview).await?;\n        Ok(Self(()))",
+            "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
             "approve_masters(preview).await?;\n        Ok(Self(()))",
         ),
         // A review answer must never build a post approval.

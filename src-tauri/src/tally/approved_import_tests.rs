@@ -371,9 +371,13 @@ async fn the_scripted_dialogs_record_apart() {
             super::approve(VoucherCount::new(1).unwrap(), "Post")
                 .await
                 .unwrap();
-            super::approve_review(VoucherCount::new(1).unwrap(), "Review")
-                .await
-                .unwrap();
+            super::approve_review(
+                super::ReviewKind::Review,
+                VoucherCount::new(1).unwrap(),
+                "Review",
+            )
+            .await
+            .unwrap();
             super::approve_masters("Create").await.unwrap();
         })
         .await;

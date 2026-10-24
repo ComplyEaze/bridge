@@ -629,22 +629,27 @@ blob id), `size`, `sha256`, `capture_id`, `lab_ref` (a note, never resolved), `c
 master ref it fetched, as a regular-file blob, the way it reads the synthetic-UUID registry, so
 a pull request cannot list its own binaries. A binary addition or change is exempt from
 `--binary-review-sha` only if its path and the blob id GitHub reports for it both equal one
-entry, and the bytes of that blob, fetched through the API at merge time, have the entry's
-`size` and `sha256`. One different character in the blob, the same blob at another path, a
-missing blob id, a removed file or differing bytes is not exempt; a blob request that fails or
-answers malformed is reported as "could not check its bytes", apart from "bytes differ", and is
-not exempt either. The gate prints the exempt paths and the manifest's blob id, and anything
-unlisted still needs the attestation above. An invalid manifest, a link instead of a file, or a
-duplicate path means no exemptions, and the gate says why. Changing the manifest matches
-`scripts/merge-gate`, so that pull request is the owner's own merge. There the owner reads each
-sitting's decoded captures (a UTF-16LE file without a byte-order mark included, which a plain
-UTF-8 read shows as noise), their ownership and licence, states `seed_basis`, and confirms
-`sha256` on the file they read (for example `shasum -a 256`), since that is the value the gate
-checks. An entry stays valid for those bytes at that path until it is removed, so remove it
-when the capture is deleted or withdrawn. A lab branch is never read or trusted at gate time:
-lab branches are unprotected and are pushed with the owner's own account, so being on one
-proves nothing about where the bytes came from, and a branch can be moved or deleted later. A
-pointer to a lab branch or commit in a pull request body is ignored.
+entry, and the bytes of that blob, fetched through the API each time the gate runs, hash to
+that blob id and have the entry's `size` and `sha256`. One different character in the blob, the
+same blob at another path, a missing blob id, a removed file or differing bytes is not exempt.
+A blob request that fails, or answers malformed or with bytes that are not that blob, is
+reported as "could not check its bytes", apart from "bytes differ" (which names the size or the
+sha256), and is not exempt either. The file mode is not checked: the bytes are fixed by the
+blob id, so a listed blob committed as executable, or as a link whose target text is those
+bytes, carries nothing the owner did not read. The gate prints the exempt paths and the
+manifest's blob id, and anything unlisted still needs the attestation above. An invalid
+manifest, a link instead of a file, or a duplicate path means no exemptions, and the gate says
+why. Changing the manifest matches `scripts/merge-gate`, so that pull request is the owner's
+own merge. There the owner reads each sitting's decoded captures (a UTF-16LE file without a
+byte-order mark included, which a plain UTF-8 read shows as noise), their ownership and
+licence, their NOTICE obligation and their `PROVENANCE` entry
+(`scripts/check-fixture-provenance.mjs`), states `seed_basis`, and confirms on the file they
+read both `blob` (`git hash-object <file>`) and `sha256` (for example `shasum -a 256`), since
+those are the values the gate checks. An entry stays valid for those bytes at that path until
+it is removed, so remove it when the capture is deleted or withdrawn. A lab branch is never
+read or trusted at gate time: lab branches are unprotected and are pushed with the owner's own
+account, so being on one proves nothing about where the bytes came from, and a branch can be
+moved or deleted later. A pointer to a lab branch or commit in a pull request body is ignored.
 
 ## Signing and publication
 

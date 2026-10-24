@@ -12,6 +12,14 @@
     {
       "uuid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
       "note": "company identifier of the synthetic lab company BRIDGE SHAPE LAB: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-company-extent.utf16le.xml on master (added in f68c43e4b81ff87766cce0373470337497fe3830, #1185) names it BRIDGE SHAPE LAB beside this GUID; the master identifiers of that company's groups, vouchers and other rows in its captures are this value with a suffix"
+    },
+    {
+      "uuid": "8e34483e-2bd3-472b-ae37-c4b197e8c15a",
+      "note": "company identifier of the synthetic company named Bridge Lab Win 0.5.1 in its provenance, as TallyPrime 7.1 returned it in the two party-master captures of 12 October 2026 (agent/native-party-masters-mailing-details.utf16le.xml and agent/native-party-masters-without-mailing-details.utf16le.xml, with their provenance file, in pull request 1675); the decoded answers hold eight synthetic ledgers, a test address and zero-pattern GSTINs, and every ledger identifier in them carries this value as its prefix"
+    },
+    {
+      "uuid": "61c6de69-1748-461c-ad3f-162cb949df9f",
+      "note": "company identifier of the synthetic lab company WR2 Unicode Lab: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml on master, already carried by many tracked fixtures and tests"
     }
   ]
 }

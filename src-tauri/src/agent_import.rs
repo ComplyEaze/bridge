@@ -1972,6 +1972,13 @@ impl Server {
             // replayed (#1241). The checks the replay ran on a read's own rows
             // (each row's date in the window, a GUID and an AlterID) still run
             // on it; they send nothing.
+            // The voucher mark this window's own planner read, kept before the replay consumes the
+            // witness: a mark seen here and omitted twice below is a contradiction, not a book with
+            // no voucher (#1819).
+            let window_voucher_mark = observed_read
+                .witness
+                .as_ref()
+                .map(|witness| witness.marks.vouchers);
             let corroboration_proof = match super::SecondRead::of(
                 observed_read.reads,
                 observed_read.witness,
@@ -2012,14 +2019,23 @@ impl Server {
                     accumulated = combine_evidence(accumulated.clone(), mark_evidence);
                     // An omitted mark is read once more (AGENTS.md P5): omitted
                     // twice, the company holds no voucher, which is below every
-                    // post's floor, and it is recorded as such (fail closed).
+                    // post's floor, and it is recorded as such (fail closed). Unless
+                    // this verification's own window read saw a voucher mark: then the
+                    // answers contradict each other, and nothing is recorded (#1819).
                     let mark = match current {
                         Some(mark) => mark,
                         None => {
                             let (again, again_evidence) =
                                 self.current_voucher_mark(&company, &identity).await?;
                             accumulated = combine_evidence(accumulated.clone(), again_evidence);
-                            again.unwrap_or(0)
+                            match again {
+                                Some(mark) => mark,
+                                // A batch an earlier record already covers reads as rolled back
+                                // whatever the mark: the contradiction changes nothing for it.
+                                None if rollback.covered_by.is_some() => 0,
+                                None => mark_omitted_twice(window_voucher_mark)
+                                    .map_err(|code| ToolFailure::from(code.to_string()))?,
+                            }
                         }
                     };
                     let mut decision = match &rollback.covered_by {
@@ -5033,6 +5049,18 @@ fn render_voucher_xml(
     // native posting uses a separate private REMOTEID and no supplied number.
     // See docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.8 for scope and limits.
     format!("<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{}\" VCHTYPE=\"{}\" ACTION=\"Create\" OBJVIEW=\"Accounting Voucher View\"><DATE>{date}</DATE>{effective_date}<VOUCHERTYPENAME>{}</VOUCHERTYPENAME>{party}{voucher_number}{narration}{reference}{entries}</VOUCHER></TALLYMESSAGE>", remote_id, voucher.voucher_type.as_str(), voucher.voucher_type.as_str())
+}
+
+/// The voucher mark to record when Tally omitted it twice in one verification. The company is read as
+/// holding no voucher (mark 0) unless the same verification's window read saw a voucher mark: then
+/// the answers contradict each other, most likely a transient one, and the verification is refused
+/// retryably with nothing recorded, because a recorded mark 0 covers every native post of the company
+/// for good (#1819).
+fn mark_omitted_twice(window_voucher_mark: Option<u64>) -> Result<u64, &'static str> {
+    match window_voucher_mark {
+        Some(seen) if seen > 0 => Err("voucher_mark_contradiction"),
+        _ => Ok(0),
+    }
 }
 
 /// One verification window as read: the admitted rows, the evidence for the

@@ -5221,9 +5221,10 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
          <GUID>{GUID}</GUID><ALTMSTID>7</ALTMSTID>\
          </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
     );
+    // The window's own marks omit the voucher mark too: the company really holds no voucher (#1819).
     let mut later = probe();
     later.extend(verified_company());
-    later.extend(paired(marks()));
+    later.extend(paired(no_voucher_mark.clone()));
     later.extend(paired(empty_collection()));
     later.extend(paired(empty_collection()));
     later.extend(paired(no_voucher_mark.clone()));
@@ -5260,6 +5261,57 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
         ),
         "{result}"
     );
+}
+
+/// The verification's own window read saw a voucher mark and the two later reads omit it: the answers
+/// contradict each other, so it is refused retryably and nothing is recorded (#1819). A retry that
+/// reads the mark again verifies the post, which it could not if a rollback had been recorded.
+#[tokio::test]
+async fn a_voucher_mark_seen_by_the_window_and_omitted_twice_is_refused_not_recorded() {
+    let no_voucher_mark = format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY>\
+         <GUID>{GUID}</GUID><ALTMSTID>7</ALTMSTID>\
+         </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+    );
+    let mut contradicted = probe();
+    contradicted.extend(verified_company());
+    contradicted.extend(paired(marks()));
+    contradicted.extend(paired(empty_collection()));
+    contradicted.extend(paired(empty_collection()));
+    contradicted.extend(paired(no_voucher_mark.clone()));
+    contradicted.extend(paired(no_voucher_mark));
+    let (_, verified, _) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![contradicted, span_readback(untagged_posted_journal(), 11)],
+    )
+    .await;
+    let refused = &verified[0];
+    assert_eq!(refused["isError"], json!(true), "{refused}");
+    assert_eq!(
+        refused["structuredContent"]["result"]["error"]["code"], "voucher_mark_contradiction",
+        "{refused}"
+    );
+    // Nothing was recorded: the retry is not covered by a rollback, and verifies the post.
+    assert_eq!(verified[1]["isError"], json!(false), "{}", verified[1]);
+    let retry = &verified[1]["structuredContent"]["result"];
+    assert_eq!(retry["post_span_binding"]["state"], "bound", "{retry}");
+    assert_eq!(retry["verification_status"], "posted_verified", "{retry}");
+    assert_ne!(
+        retry["post_span_binding"]["rollback_recorded"], true,
+        "{retry}"
+    );
+}
+
+/// The mark recorded when Tally omits the voucher mark twice (#1819): 0 when the window read saw none
+/// (or saw 0), a contradiction when it saw one.
+#[test]
+fn an_omitted_voucher_mark_is_a_contradiction_only_when_the_window_saw_one() {
+    let omitted_twice = super::super::mark_omitted_twice;
+    assert_eq!(omitted_twice(None), Ok(0));
+    assert_eq!(omitted_twice(Some(0)), Ok(0));
+    assert_eq!(omitted_twice(Some(1)), Err("voucher_mark_contradiction"));
+    assert_eq!(omitted_twice(Some(10)), Err("voucher_mark_contradiction"));
 }
 
 /// An untagged post whose binding was refused cannot be found by a tag, so a

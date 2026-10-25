@@ -20,6 +20,26 @@
     {
       "uuid": "61c6de69-1748-461c-ad3f-162cb949df9f",
       "note": "company identifier of the synthetic lab company WR2 Unicode Lab: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml on master, already carried by many tracked fixtures and tests"
+    },
+    {
+      "uuid": "f107e523-3d6b-4516-bd24-5b1a14498fa6",
+      "note": "company identifier of the synthetic lab company BRIDGE MASTERS LAB, as Tally returned it in the read-only captures src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-*.utf16le.xml (their provenance file masters-lab.PROVENANCE.md names the company beside this GUID), added by pull request #1650 (commit e40ebb65259d135e5c7c5557e7703ab8660a7377); the parse records of those captures carry it too"
+    },
+    {
+      "uuid": "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
+      "note": "company identifier of the synthetic lab company BRIDGE OUTSTANDINGS LAB: the company list capture src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-company-list.utf16le.xml on master (added in cbfb1bb8894abedbcc75b8e688d5b91b0c3d1260, #981) names it beside this GUID; the identifiers of that company's groups and ledgers in its captures are this value with a suffix"
+    },
+    {
+      "uuid": "ae1490be-52c5-4544-9ffc-4b7da85f9797",
+      "note": "company identifier of the synthetic lab company of the register captures (parse records named REGISTER_LAB): src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-register-lab-groups.utf16le.xml on master (added in bcb6509ac8e277b46c9127f9d5bab051e6504d9d, #971) carries its groups' identifiers as this value with a suffix"
+    },
+    {
+      "uuid": "eebb9a9f-1679-4468-9e8f-814c729674cb",
+      "note": "company identifier of the synthetic lab company Bridge Ageing Lab: the capture src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/company-ledger-count.utf16le.xml on master (added in 4979ca38fdd878c2a5fc99f26d31003a83ecbb23, #960) names it beside this GUID"
+    },
+    {
+      "uuid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+      "note": "company identifier of the synthetic lab company BRIDGE PILOT LAB: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml on master (added in 16b934397e28976b3e4ec0ed4a460123dd4d9e95, #1342) names it beside this GUID; the audit-read captures of pull request #1862 carry it too (their PROVENANCE.md names the company and the evidence branches lab/697-s0a-answers at 1c59b0929a47 and lab/697-s1-1605-s1-answers at ba4e119e9b5d)"
     }
   ]
 }

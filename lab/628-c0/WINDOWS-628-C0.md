@@ -9,7 +9,7 @@ Why: issue 628 asks for Purchase vouchers through ComplyEaze Bridge. No Purchase
 
 ## Differences from LAB-COMMON
 - C3: the operator's only request is `requests/marks.utf16le.xml`, size bound 8,192 bytes. A tool answer above 1,000,000 bytes = STOP.
-- C5: one backup, C00, before step 3.
+- C5: one backup, C00, at step 1a, before the first change to THE COMPANY (the GSTIN of step 1b included).
 - OWNER STEPS: every master, voucher and company setting is keyed by the owner himself, one act at a time, with a screenshot before accepting and one MARKS read after.
 
 ## Requests (in requests/; bytes and sha256 in SHA256.txt)
@@ -20,10 +20,11 @@ Before step 0: `python -I check-request-ids.py requests`, EXPECT `census: ok 1, 
 
 ## Steps
 0. LAB-COMMON step 0 with no company loaded; Tally's About screen: EXPECT Release 7.2 (else STOP). EXPECT `BRIDGE GST LEDGER LAB` in Select Company's list (absent = STOP: GS1-L1 has not run).
-1. Load THE COMPANY alone. MARKS: EXPECT one COMPANY row with the GUID GS1-L1 recorded. LOOK ONLY: the company's GST registration screen (F11 or the Statutory Details screen as Tally offers it): record the state, registration type and GSTIN as shown; leave with Ctrl+Q after a screenshot. If it shows GSTIN `08ZZZZZ0000Z1ZQ`, State Rajasthan and type Regular, go to step 2.
-1a. Only if step 1 showed no GSTIN: MARKS -> `ans-c0-marks-gstin-before.xml`. OWNER: on that screen set GST registration State Rajasthan, registration type Regular, GSTIN `08ZZZZZ0000Z1ZQ` (the gate's synthetic identifier; any other = STOP), nothing else; screenshot before accepting. If Tally refuses the GSTIN as invalid: screenshot, leave without saving, STOP (the finding: Tally does not accept the synthetic family as a company GSTIN). Then MARKS -> `ans-c0-marks-gstin-after.xml` and record which mark moved. If step 1 showed a GSTIN other than `08ZZZZZ0000Z1ZQ`: STOP.
+1. Load THE COMPANY alone. MARKS: EXPECT one COMPANY row with the GUID GS1-L1 recorded. LOOK ONLY: the company's GST registration screen (F11 or the Statutory Details screen as Tally offers it): record the state, registration type and GSTIN as shown; leave with Ctrl+Q after a screenshot. If it shows GSTIN `08ZZZZZ0000Z1ZQ`, State Rajasthan and type Regular, step 1b is skipped.
+1a. Backup C00 (C5) into `C:\bridge-lab\628\backups\c00\`, then MARKS. Nothing in THE COMPANY changes before this backup is recorded.
+1b. Only if step 1 showed no GSTIN: MARKS -> `ans-c0-marks-gstin-before.xml`. OWNER: open the GST registration screen of step 1 again and set GST registration State Rajasthan, registration type Regular, GSTIN `08ZZZZZ0000Z1ZQ` (the gate's synthetic identifier; any other = STOP), nothing else; screenshot before accepting. If Tally refuses the GSTIN as invalid: screenshot, leave without saving, STOP (the finding: Tally does not accept the synthetic family as a company GSTIN). Then MARKS -> `ans-c0-marks-gstin-after.xml` and record which mark moved. If step 1 showed a GSTIN other than `08ZZZZZ0000Z1ZQ`: STOP.
 2. MARKS -> `ans-c0-marks-1.xml`. Record both marks.
-3. Backup C00 (C5) into `C:\bridge-lab\628\backups\c00\`, then MARKS.
+3. No backup here: C00 was taken at step 1a. MARKS.
 4. OWNER: create the ledger `SYN GS1 Supplier B` under Sundry Creditors, Maintain balances bill-by-bill Yes, GST registration type Regular, State Rajasthan, GSTIN `08ZZZZZ0000Z2ZP` (the gate's synthetic family; any other identifier = STOP). If Tally refuses the GSTIN as invalid: screenshot, press no key beyond leaving the field as the screen offers, STOP (the finding: Tally does not accept the synthetic family as a party GSTIN). Then MARKS (EXPECT ALTMSTID up).
 5. OWNER: key ONE Purchase in invoice view, Accounting Invoice mode, dated 2-12-2025: Supplier Invoice No. `GS1/P/0001`, Date `1-12-2025`, party `SYN GS1 Supplier B`, ledger `Purchase - Goods` 10,000.00, then `Input CGST` 900.00 and `Input SGST` 900.00 (typed as given), total 11,800.00; on the bill-wise screen a New Ref named `GS1/P/0001`. Let Tally number the voucher. If Tally fills a tax amount by itself: record it; accept only if it is 900.00 and 900.00, else leave the voucher unsaved with Ctrl+Q after a screenshot of its title and STOP. Screenshot before accepting; then MARKS -> `ans-c0-marks-2.xml` (EXPECT ALTVCHID up).
 6. Direct call: `gst_status` with `company_guid` THE COMPANY's GUID, `from` 2025-12-01, `to` 2025-12-31, `voucher_type_name` `Purchase`. EXPECT one voucher, the voucher of step 5; RECORD its `gst_status`, `accepted_as_it_stands` and the window's counts.

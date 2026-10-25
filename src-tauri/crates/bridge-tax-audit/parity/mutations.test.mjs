@@ -1170,6 +1170,54 @@ describe("GitRepo", () => {
     }
   });
 
+  test("concurrent claimants never hold the workdir together, though they start from a dead holder's claim", async () => {
+    // The claim must be exclusive as flock was: made whole (a reader never sees it without its pid), and a
+    // takeover of a dead holder's claim never removes a claim another run has just made.
+    const work = path.join(g.t, "contended");
+    const inside = path.join(work, "inside");
+    fs.mkdirSync(work, { recursive: true });
+    const dead = spawn("/bin/sh", ["-c", "exit 0"], { stdio: "ignore" });
+    await exited(dead);
+    const child = path.join(g.t, "claimant.mjs");
+    fs.writeFileSync(
+      child,
+      `import fs from "node:fs";
+const mu = await import(${JSON.stringify(pathToFileURL(UNDER_TEST).href)});
+const [work, inside] = process.argv.slice(2);
+let held = 0, overlaps = 0, refused = 0;
+for (let i = 0; i < 150; i++) {
+  const claim = mu.lockWorkdir(work);
+  if (claim === null) { refused++; continue; }
+  held++;
+  try { fs.mkdirSync(inside); } catch (e) { if (e.code === "EEXIST") overlaps++; else throw e; }
+  const until = Date.now() + 2;
+  while (Date.now() < until) {}
+  fs.rmdirSync(inside, { recursive: false });
+  claim.release();
+}
+console.log(JSON.stringify({ held, overlaps, refused }));
+`,
+    );
+    for (let round = 0; round < 3; round++) {
+      fs.writeFileSync(path.join(work, ".lock"), `${dead.pid}\n`); // each round starts from a dead holder's claim
+      const runs = Array.from({ length: 4 }, () => {
+        const proc = spawn(process.execPath, [child, work, inside], { stdio: ["ignore", "pipe", "inherit"] });
+        let text = "";
+        proc.stdout.on("data", (chunk) => (text += chunk));
+        return exited(proc).then(() => JSON.parse(text));
+      });
+      const results = await Promise.all(runs);
+      assert.deepEqual(
+        results.map((r) => r.overlaps),
+        [0, 0, 0, 0],
+        `two runs held the workdir at once: ${JSON.stringify(results)}`,
+      );
+      assert.ok(results.reduce((n, r) => n + r.held, 0) > 0, "somebody held it");
+      assert.ok(!fs.existsSync(path.join(work, ".lock")), "every claim was released");
+      assert.ok(!fs.existsSync(path.join(work, ".lock.takeover")), "no takeover gate left behind");
+    }
+  });
+
   test("test_the_copy_holds_the_committed_bytes_and_only_them", () => {
     fs.writeFileSync(path.join(g.root, "src/book.rs"), Buffer.from("// book\r\n"));
     commit("a CR byte");

@@ -999,40 +999,86 @@ export async function baseline(workers, timeout, buildTimeout, details = null) {
   return problems;
 }
 
+const GATE_STALE_MS = 10_000; // a takeover gate older than this was left by a run that died inside it
+let claimSeq = 0;
+
+function pidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
+
+function claimedBy(lock) {
+  try {
+    return Number.parseInt(fs.readFileSync(lock, "utf8"), 10);
+  } catch {
+    return null; // no claim
+  }
+}
+
 /** An exclusive claim on the worker directory for this run, or null when another live run holds it:
- * two runs sharing copies would apply and undo each other's mutations. The claim is a file naming the
- * holder's pid; a claim whose holder is gone is taken over. */
+ * two runs sharing copies would apply and undo each other's mutations.
+ *
+ * The claim is a file named `.lock` that holds the holder's pid. It is created by hard-linking a
+ * finished file of its own, so it appears whole or not at all: no run ever reads a claim that has no
+ * pid yet, and a second claimant cannot overwrite it (link fails when the name exists). A claim whose
+ * holder is gone is taken over, and only inside a short-lived gate (`.lock.takeover`, made with mkdir,
+ * which is atomic): while one run holds the gate, no other run removes a claim, so a run that has just
+ * made a new claim cannot have it removed by a run that read the old one. */
 export function lockWorkdir(workdir) {
   fs.mkdirSync(workdir, { recursive: true });
   const lock = path.join(workdir, ".lock");
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      fs.writeFileSync(lock, `${process.pid}\n`, { flag: "wx" });
-      const release = () => fs.rmSync(lock, { force: true });
-      process.once("exit", release);
-      return { release: () => { process.removeListener("exit", release); release(); } };
-    } catch (e) {
-      if (e.code !== "EEXIST") throw e;
-    }
-    let holder = NaN;
-    try {
-      holder = Number.parseInt(fs.readFileSync(lock, "utf8"), 10);
-    } catch {
-      continue; // released between the two calls
-    }
-    let alive = false;
-    if (Number.isInteger(holder) && holder > 0) {
+  const gate = path.join(workdir, ".lock.takeover");
+  const mine = path.join(workdir, `.lock.${process.pid}.${claimSeq++}.tmp`);
+  fs.writeFileSync(mine, `${process.pid}\n`);
+  const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  try {
+    for (let attempt = 0; attempt < 200; attempt++) {
       try {
-        process.kill(holder, 0);
-        alive = true;
+        fs.linkSync(mine, lock);
+        const release = () => {
+          if (claimedBy(lock) === process.pid) fs.rmSync(lock, { force: true });
+        };
+        process.once("exit", release);
+        return {
+          release: () => {
+            process.removeListener("exit", release);
+            release();
+          },
+        };
       } catch (e) {
-        alive = e.code === "EPERM";
+        if (e.code !== "EEXIST") throw e;
+      }
+      const holder = claimedBy(lock);
+      if (holder !== null && pidAlive(holder)) return null;
+      // A holder that died without releasing (or a claim that holds no pid): take over under the gate.
+      try {
+        fs.mkdirSync(gate);
+      } catch (e) {
+        if (e.code !== "EEXIST") throw e;
+        try {
+          if (Date.now() - fs.statSync(gate).mtimeMs > GATE_STALE_MS) fs.rmdirSync(gate);
+        } catch {
+          // another run removed it first
+        }
+        pause(20);
+        continue;
+      }
+      try {
+        const again = claimedBy(lock);
+        if (again !== null && !pidAlive(again)) fs.rmSync(lock, { force: true });
+      } finally {
+        fs.rmdirSync(gate);
       }
     }
-    if (alive) return null;
-    fs.rmSync(lock, { force: true }); // a holder that died without releasing
+    return null;
+  } finally {
+    fs.rmSync(mine, { force: true });
   }
-  return null;
 }
 
 // ------------------------------------------------------------------------------------ main

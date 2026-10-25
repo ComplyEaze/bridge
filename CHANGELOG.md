@@ -36,6 +36,15 @@ These changes are in source and not yet in a published build.
   missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one
   Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not
   measured.
+- A batch built from a bank statement is checked against the company's skipped rows and Contras when `post_import`
+  sends it, as it was when it was built, with the same refusals (`withdraw_skip_paired`,
+  `skip_row_paired_elsewhere`, `skip_row_already_posted`, `withdraw_skip_invalid`, `transfer_double_booked`,
+  `transfer_view_not_established`): before the post (before the dialog, or in the call that redeems an approval) and
+  again under the admission lock. The refusals at send speak of the saved batch: nothing was sent, any approval of it
+  is withdrawn and, except for `transfer_view_not_established`, the batch must be built again. A row the batch withdrew is judged on the
+  withdrawal it recorded (`withdrawn_skips`), whether it was built from a statement or from vouchers given
+  directly, and it counts only if the batch was built after the newest record of that skip: a skip recorded since
+  refuses the batch (part of #1703).
 
 **Changed**
 

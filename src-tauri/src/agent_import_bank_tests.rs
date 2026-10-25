@@ -3460,7 +3460,7 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
         .import_journal_while_admitted()
         .unwrap()
         .expect("a journal");
-    let found = ledger::transfer_facts(journal, no_skip_file(), CAPTURED_GUID, None).unwrap();
+    let found = ledger::transfer_facts(journal, no_skip_file(), CAPTURED_GUID, None, None).unwrap();
     let [skip, outflow] = &found.skips[..] else {
         panic!("two skips: {found:?}");
     };
@@ -3693,6 +3693,7 @@ async fn a_statement_of_only_skipped_rows_is_recorded_and_builds_nothing() {
         no_skip_file(),
         std::io::BufReader::new(text.as_bytes()),
         CAPTURED_GUID,
+        None,
         None,
     )
     .unwrap();

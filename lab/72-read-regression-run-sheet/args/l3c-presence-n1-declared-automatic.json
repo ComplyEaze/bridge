@@ -1,0 +1,1 @@
+{"company_guid":"<N1 GUID>","from":"2026-07-01","to":"2026-07-31","numbering":[{"voucher_type":"Journal","numbering_method":"automatic"}],"vouchers":[{"date":"2026-07-24","voucher_type":"Journal","entries":[{"ledger":"Lab Charges","amount":"-16.00"},{"ledger":"Suspense","amount":"16.00"}]}]}

@@ -984,6 +984,9 @@ fn the_already_posted_texts_send_a_declined_invoice_again_under_its_number() {
         assert!(text.contains("nothing in ComplyEaze Bridge puts it in the book yet"));
         assert!(!text.contains("enter the voucher in Tally"));
     }
+    let build = super::super::super::BUILD_TXN_ALREADY_POSTED_NEXT_STEP;
+    assert!(build.contains("never build it again under a new bridge_txn_id to retry it"));
+    assert!(build.contains("cannot build the rest of that day from the statement yet"));
     // The post's text no longer forbids the one rebuild it now advises.
     let post = super::super::TXN_ALREADY_POSTED_NEXT_STEP;
     assert!(post.contains(

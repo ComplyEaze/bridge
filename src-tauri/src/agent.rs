@@ -984,9 +984,9 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// Deliberately sparse. A code without a documented, concrete next step returns
 /// `None` and its refusal keeps the general message, because filler guidance is
 /// worse than none: it reads as authoritative while sending the caller nowhere.
-/// This never softens a refusal — it only says what to do about one. The one
-/// exception is `empty_book_first_import`, which states its cause: no step inside
-/// ComplyEaze Bridge exists for it yet, and it must not send anyone to enter a
+/// This never softens a refusal — it only says what to do about one. A few codes
+/// state a cause with no step instead, among them `empty_book_first_import`: no step
+/// inside ComplyEaze Bridge exists for it yet, and it must not send anyone to enter a
 /// voucher another way (#1709).
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {

@@ -873,7 +873,7 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
         "bound_not_in_window" => Some("This voucher was posted, but it is not in the book for these dates now: it may have been deleted or re-dated in Tally, or the company restored from a backup. Check in Tally before posting it again."),
         "book_rolled_back" => Some("This voucher was posted, but the company's books are now older than that post: they were probably restored from a backup or replaced by another copy. Check in Tally before posting it again."),
         "sent_not_attributed" => Some("This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now, for example because it was edited in Tally. Check in Tally before posting it again."),
-        "tally_reported_not_created" => Some("Tally reported this voucher as not created. ComplyEaze Bridge will not send this saved voucher again, and nothing in ComplyEaze Bridge puts it in the book yet; do not import it again through Tally's Import menu. Verify this batch again later to see whether the voucher is in the book."),
+        "tally_reported_not_created" => Some("Tally reported this voucher as not created. ComplyEaze Bridge will not send this saved voucher again, and nothing in ComplyEaze Bridge puts it in the book yet; do not import it again through Tally's Import menu. Verify this batch again later to see whether a voucher with these same details is in the book."),
         _ => None,
     }
 }

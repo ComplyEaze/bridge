@@ -63,14 +63,9 @@ const todayTrees = (root) => {
       "tauri v2.11.5",
     ],
     "src-tauri.hyper": ["hyper v1.11.0", "hyper-rustls v0.27.9", "hyper-util v0.1.20", "reqwest v0.13.5"],
-    "tools.reqwest": [
-      "reqwest v0.13.4",
-      `bridge-tally-transport v0.1.0 (${root}/src-tauri/crates/bridge-tally-transport)`,
-    ],
-    "tools.hyper": ["hyper v1.11.0", "hyper-rustls v0.27.9", "hyper-util v0.1.20", "reqwest v0.13.4"],
   };
   // The lower-level network crates, as printed on 2026-09-28: no first-party dependent in either workspace.
-  for (const [workspace, reqwest] of [["src-tauri", "reqwest v0.13.5"], ["tools", "reqwest v0.13.4"]]) {
+  for (const [workspace, reqwest] of [["src-tauri", "reqwest v0.13.5"]]) {
     EVERY_EDGE[`${workspace}.h2`] = ["h2 v0.4.16", "hyper v1.11.0", reqwest];
     EVERY_EDGE[`${workspace}.hyper-util`] = ["hyper-util v0.1.20", "hyper-rustls v0.27.9", reqwest];
     EVERY_EDGE[`${workspace}.socket2`] = ["socket2 v0.6.5", "hyper-util v0.1.20", "tokio v1.53.1"];
@@ -88,7 +83,7 @@ const todayTrees = (root) => {
 const TODAY = todayTrees(root);
 const APP_LINE = `bridge v0.2.0 (${root}/src-tauri)`;
 const TRANSPORT_LINE = `bridge-tally-transport v0.1.0 (${root}/src-tauri/crates/bridge-tally-transport)`;
-const EVERY_CALL = ["src-tauri", "tools"].flatMap((workspace) =>
+const EVERY_CALL = ["src-tauri"].flatMap((workspace) =>
   ["reqwest", "hyper", "h2", "hyper-util", "socket2", "mio", "tower-service", "tower"].flatMap((name) => [
     `${workspace}.${name}.all`,
     `${workspace}.${name}.shipped`,
@@ -138,11 +133,11 @@ test("an empty tree from a cargo that exits 0 fails closed", { skip }, () => {
 // hyper's pinned set is empty, so the pinned-set comparison cannot tell an
 // empty read from a clean one; only the root-line check refuses this.
 test("an empty hyper tree fails closed although its pinned set is empty", { skip }, () => {
-  const { "tools.hyper.all": _omitted, ...rest } = TODAY;
+  const { "src-tauri.hyper.all": _omitted, ...rest } = TODAY;
   const result = runGate(rest);
-  assertRefused(result, 'dependency tree for hyper (tools/Cargo.toml) did not start with hyper; got "" (0 line(s))');
+  assertRefused(result, 'dependency tree for hyper (src-tauri/Cargo.toml) did not start with hyper; got "" (0 line(s))');
   // It stops at the tree it could not read.
-  assert.deepEqual(result.calls, EVERY_CALL.slice(0, EVERY_CALL.indexOf("tools.hyper.all") + 1));
+  assert.deepEqual(result.calls, EVERY_CALL.slice(0, EVERY_CALL.indexOf("src-tauri.hyper.all") + 1));
 });
 
 test("a tree with only its root line reports every pinned crate as lost", { skip }, () => {
@@ -160,8 +155,8 @@ test("cargo failing, even with 'did not match any packages', is not an empty wor
 
 test("a new first-party dependent is refused", { skip }, () => {
   const extra = `bridge-tally-protocol v0.1.0 (${root}/src-tauri/crates/bridge-tally-protocol)`;
-  const result = runGate({ ...TODAY, "tools.hyper.all": [...TODAY["tools.hyper.all"], extra] });
-  assertRefused(result, "tools: crate(s) gained a direct hyper dependency outside the pinned set (none): bridge-tally-protocol");
+  const result = runGate({ ...TODAY, "src-tauri.hyper.all": [...TODAY["src-tauri.hyper.all"], extra] });
+  assertRefused(result, "src-tauri: crate(s) gained a direct hyper dependency outside the pinned set (none): bridge-tally-protocol");
 });
 
 test("a first-party crate depending on a lower-level network crate is refused", { skip }, () => {
@@ -171,8 +166,8 @@ test("a first-party crate depending on a lower-level network crate is refused", 
 });
 
 test("an unparseable line fails instead of being skipped", { skip }, () => {
-  const result = runGate({ ...TODAY, "tools.reqwest.all": [...TODAY["tools.reqwest.all"], "warning: something else"] });
-  assertRefused(result, 'dependency tree for reqwest (tools/Cargo.toml) printed an unparseable line: "warning: something else"');
+  const result = runGate({ ...TODAY, "src-tauri.reqwest.all": [...TODAY["src-tauri.reqwest.all"], "warning: something else"] });
+  assertRefused(result, 'dependency tree for reqwest (src-tauri/Cargo.toml) printed an unparseable line: "warning: something else"');
 });
 
 // The app crate's reqwest edge is dev-only. Moving it into [dependencies] adds
@@ -213,7 +208,6 @@ function sandbox(extra = {}) {
     "src-tauri/clippy.toml": readFileSync(join(root, "src-tauri/clippy.toml"), "utf8"),
     "src-tauri/build.rs": readFileSync(join(root, "src-tauri/build.rs"), "utf8"),
     "src-tauri/Cargo.lock": '[[package]]\nname = "reqwest"\n',
-    "tools/Cargo.lock": '[[package]]\nname = "reqwest"\n',
     "package.json": "{}\n",
     "pnpm-lock.yaml": "lockfileVersion: 9\n",
     "src-tauri/src/lib.rs": '// clippy is only a word in this comment\n#[expect(clippy::disallowed_methods, reason = "reviewed")]\nfn send() {}\n',

@@ -1,5 +1,7 @@
 # Proposed dependency-security and compatibility-surface CI changes
 
+> **Status note 2026-10-15 (#1745):** the `tools/` Cargo workspace this text refers to (the compatibility crate, the live-read controller and the read transport) was removed after the owner's decision on #609. The text below is kept as written. Where it names `tools/bridge-tally-compatibility` or the compatibility matrix, read it as history.
+
 > **Status note, 30 Sep 2026:** schema 3 removed `scripts/reseal.sh`,
 > `scripts/reseal.test.mjs`, `scripts/reseal-merge-driver.mjs` and its test, and the
 > `rehash-surface` command. The body below still describes them as they were and is

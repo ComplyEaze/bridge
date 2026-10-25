@@ -7,6 +7,9 @@ use bridge_tally_protocol::native_cash_flow::{
 use bridge_tally_protocol::native_statement_reports::{
     parse_native_statement, render_native_statement_request, NativeStatement, NativeStatementKind,
 };
+use bridge_tally_protocol::native_stock_summary::{
+    parse_company_inventory_flags, render_company_inventory_flags_request,
+};
 use bridge_tally_protocol::native_trial_balance::{
     parse_native_trial_balance, parse_native_trial_balance_with_currency,
     render_native_trial_balance_request, render_native_trial_balance_request_with_currency,
@@ -173,7 +176,11 @@ struct StatementSources {
     trial_balance: SingleCurrencyTrialBalance,
     groups: Vec<TallyNamedMaster>,
     balance_sheet: NativeStatement,
+    /// Read for both tools: it is where Tally's own closing stock sits. `None`
+    /// only for a balance sheet whose read of it failed.
     profit_and_loss: Option<NativeStatement>,
+    /// Read only when that Profit and Loss offers a closing stock to use.
+    inventory: crate::reports::statements::InventoryFlags,
 }
 
 /// What a Cash Flow read adds to a Trial Balance read: the group tree that
@@ -308,6 +315,7 @@ impl TallyRuntime {
             &sources.groups,
             &sources.balance_sheet,
             sources.profit_and_loss.as_ref(),
+            sources.inventory,
         )?;
         Ok(StatementsRead {
             trial_balance,
@@ -534,8 +542,9 @@ impl TallyRuntime {
                                 .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
                             let groups =
                                 parse_native_group_snapshot(&xml, identity.company_guid())?;
-                            // Tally's own Balance Sheet gates both tools; its own
-                            // Profit and Loss is read only for a P&L's report.
+                            // Tally's own Balance Sheet gates both tools. Its own
+                            // Profit and Loss is read for both: it is where Tally's
+                            // closing stock sits, and it gates a P&L's gross and net.
                             let request = render_native_statement_request(
                                 NativeStatementKind::BalanceSheet,
                                 identity.display_name(),
@@ -550,9 +559,14 @@ impl TallyRuntime {
                                 .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
                             let balance_sheet =
                                 parse_native_statement(NativeStatementKind::BalanceSheet, &xml)?;
-                            let profit_and_loss = if kind == NativeStatementKind::ProfitAndLoss {
+                            // Tally's own Profit and Loss gates a P&L's gross and net, and
+                            // is where Tally's closing stock sits. A P&L tool cannot
+                            // answer without it; a balance sheet only looks in it for the
+                            // closing stock, so there a Profit and Loss that cannot be
+                            // read means "no closing stock considered", the sheet it always was.
+                            let profit_and_loss_read: anyhow::Result<_> = async {
                                 let request = render_native_statement_request(
-                                    kind,
+                                    NativeStatementKind::ProfitAndLoss,
                                     identity.display_name(),
                                     &period,
                                 );
@@ -560,12 +574,73 @@ impl TallyRuntime {
                                     .fetch_native_report_paired(request.clone())
                                     .await?
                                     .require_stable(PairedReadValidationError::NativeStatement)?;
-                                evidence = evidence
-                                    .clone()
-                                    .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                                Some(parse_native_statement(kind, &xml)?)
+                                let statement = parse_native_statement(
+                                    NativeStatementKind::ProfitAndLoss,
+                                    &xml,
+                                )?;
+                                Ok((request, hash, bytes, statement))
+                            }
+                            .await;
+                            let profit_and_loss = match (profit_and_loss_read, kind) {
+                                (Ok((request, hash, bytes, statement)), _) => {
+                                    evidence = evidence.clone().combine(
+                                        RuntimeReadEvidence::paired(&request, hash, bytes),
+                                    );
+                                    Some(statement)
+                                }
+                                (Err(error), NativeStatementKind::ProfitAndLoss) => {
+                                    return Err(error);
+                                }
+                                (Err(_), NativeStatementKind::BalanceSheet) => None,
+                            };
+                            // The company's inventory flags are read only when that
+                            // Profit and Loss offers a closing stock to use, so a
+                            // book without one sends nothing more. A flags read that
+                            // fails or does not parse is not a failed statement: the
+                            // figure is declined as `inventory_flags_not_read`, and the
+                            // statement is the one it always was.
+                            let offers_closing_stock =
+                                profit_and_loss.as_ref().is_some_and(|statement| {
+                                    matches!(
+                                        crate::reports::statements::TallyClosingStock::from_profit_and_loss(
+                                            statement
+                                        ),
+                                        Ok(Some(_))
+                                    )
+                                });
+                            let inventory = if offers_closing_stock {
+                                let flags_read: anyhow::Result<_> = async {
+                                    let request = render_company_inventory_flags_request(
+                                        identity.display_name(),
+                                        identity.company_guid(),
+                                    )?;
+                                    let (xml, bytes, hash) = client
+                                        .fetch_native_report_paired(request.clone())
+                                        .await?
+                                        .require_stable(
+                                            PairedReadValidationError::StatementInventoryFlags,
+                                        )?;
+                                    let flags = parse_company_inventory_flags(
+                                        &xml,
+                                        identity.company_guid(),
+                                    )?
+                                    .flags;
+                                    Ok((request, hash, bytes, flags))
+                                }
+                                .await;
+                                match flags_read {
+                                    Ok((request, hash, bytes, flags)) => {
+                                        evidence = evidence.clone().combine(
+                                            RuntimeReadEvidence::paired(&request, hash, bytes),
+                                        );
+                                        crate::reports::statements::IntegratedInventory::from_flags(
+                                            &flags,
+                                        )
+                                    }
+                                    Err(_) => crate::reports::statements::InventoryFlags::NotRead,
+                                }
                             } else {
-                                None
+                                crate::reports::statements::InventoryFlags::NotRead
                             };
                             // fetch_statements asks for the single-currency
                             // scope, so a several-currency book was refused
@@ -584,6 +659,7 @@ impl TallyRuntime {
                                 groups,
                                 balance_sheet,
                                 profit_and_loss,
+                                inventory,
                             }))
                         }
                     };

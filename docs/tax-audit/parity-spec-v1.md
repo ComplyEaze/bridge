@@ -278,13 +278,13 @@ the content is complete and correct.
 2. **Refuse empty-vs-empty.** If both sides report zero figures, that is itself a failure
    regardless of anything else being equal. An empty result must never look like success.
 3. **Structure of each side**, a check this crate's `compare` adds and the reference's own
-   `tae/parity/compare.py` does not make. Each side is checked for unknown keys (in the dump, a
+   comparison tool does not make. Each side is checked for unknown keys (in the dump, a
    figure, a finding or an evidence ref) and for a figure or finding id that appears more than
    once (`src/compare.rs:165-197`, called at `:346-347`); the reference's tool ignores unknown keys
    and keeps one of two entries that share an id. These findings are collected with the rest and
    do not stop the comparison.
 4. **`spec_version`, `test_id`, `test_version` and `rules_version` equality.** The reference
-   implementation's own `tae/parity/compare.py` checks `test_id` and `rules_version` only; this
+   implementation's own comparison tool checks `test_id` and `rules_version` only; this
    crate's `compare` also checks the two versions, so a port that bumps a test's version (or
    writes another spec version) without the reference doing the same is reported, not passed.
 5. **Minimum figure count**, per test id. In this crate's `compare` the floor is held per test in

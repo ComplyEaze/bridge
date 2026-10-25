@@ -1,0 +1,11 @@
+l1a-ledger-masters-shape-lab.json	ledger_masters	unknown=[]	missing=[]	placeholders_left=False
+l1b-ledger-masters-pilot-lab.json	ledger_masters	unknown=[]	missing=[]	placeholders_left=False
+l3-n1-ledger-masters-basic.json	ledger_masters	unknown=[]	missing=[]	placeholders_left=False
+l3-n2-ledger-masters-basic.json	ledger_masters	unknown=[]	missing=[]	placeholders_left=False
+l3a-presence-n2-declared-manual.json	voucher_presence	unknown=[]	missing=[]	placeholders_left=False
+l3b-presence-n1-manual-numbered.json	voucher_presence	unknown=[]	missing=[]	placeholders_left=False
+l3c-presence-n1-declared-automatic.json	voucher_presence	unknown=[]	missing=[]	placeholders_left=False
+l3d-presence-n2-type-not-held.json	voucher_presence	unknown=[]	missing=[]	placeholders_left=False
+l4-ledger-masters-not-loaded.json	ledger_masters	unknown=[]	missing=[]	placeholders_left=False
+s0b-n1-masters-voucher-types.json	masters	unknown=[]	missing=[]	placeholders_left=False
+s0b-n2-masters-voucher-types.json	masters	unknown=[]	missing=[]	placeholders_left=False

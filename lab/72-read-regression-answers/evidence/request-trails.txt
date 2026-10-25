@@ -1,0 +1,32 @@
+== l3a
+line 25 tool=voucher_presence error={'code': 'presence_numbering_method_differs_from_book'} response_sha256=5bb7407cfee81e98c35b58b21f25dad59f14bb01b7f7080819a18421ce229ac7 sent=30 failed=0 omitted=0 posts=18 status=12
+   post req 1002 B -> resp 3420 B : x2
+   post req 1116 B -> resp 81970 B : x2
+   post req 1214 B -> resp 45180 B : x2
+   post req 2000 B -> resp 9724 B : x2
+   post req 2524 B -> resp 4052 B : x10
+== l3b
+line 31 tool=voucher_presence error=None response_sha256=a69203eacedd9d55cfe9bde1ce132da9ef24a8babea694757bda5c817dc14881 sent=54 failed=0 omitted=22 posts=20 status=12
+   post req 1002 B -> resp 3418 B : x2
+   post req 1116 B -> resp 81972 B : x2
+   post req 1462 B -> resp 10230 B : x2
+   post req 1766 B -> resp 101014 B : x2
+   post req 2000 B -> resp 9724 B : x2
+   post req 2524 B -> resp 4052 B : x10
+== l3c
+line 33 tool=voucher_presence error=None response_sha256=cdf8338c65e14174ae053cb7457862670ff14e5dbe8429dc8e6855edbb09937b sent=34 failed=0 omitted=2 posts=21 status=11
+   post req 1002 B -> resp 3418 B : x2
+   post req 1462 B -> resp 10230 B : x2
+   post req 1766 B -> resp 101014 B : x2
+   post req 2000 B -> resp 9724 B : x4
+   post req 2524 B -> resp 4052 B : x11
+== l3d
+line 37 tool=voucher_presence error={'code': 'presence_numbering_method_differs_from_book'} response_sha256=c7b6c78b6ea565ab8b1c6d925a5633dbab4954791f4557ba929732807b14973b sent=30 failed=0 omitted=0 posts=18 status=12
+   post req 1002 B -> resp 3420 B : x2
+   post req 1116 B -> resp 81970 B : x2
+   post req 1214 B -> resp 45180 B : x2
+   post req 2000 B -> resp 9724 B : x2
+   post req 2524 B -> resp 4052 B : x10
+== l4
+line 39 tool=ledger_masters error={'code': 'company_identity_not_found'} response_sha256=bb6e9c3274607ceda0ed07200434c0a191cf35443e229d42a12780b472a2201e sent=4 failed=0 omitted=0 posts=2 status=2
+   post req 2524 B -> resp 4052 B : x2

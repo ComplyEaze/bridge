@@ -2035,6 +2035,12 @@ const ROWS: &[Row] = &[
         parser: "parse_native_group_snapshot(TIEOUT B)",
         parse: |_, text| groups(text, TIEOUT_B_GUID),
     },
+    Row {
+        fixture: "tests/fixtures/statement_groups_stock_book_72_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(TIEOUT B, 7.2)",
+        parse: |_, text| groups(text, TIEOUT_B_GUID),
+    },
     // Native voucher and voucher-type collections: tests/native_vouchers.rs,
     // tests/native_core_regressions.rs; src/tally/canonical_window_tests.rs for the dropped bound.
     Row {

@@ -3,7 +3,7 @@
 to see what the native message box does when its text is taller than the screen. Run: python3 -I make-probe-inputs.py OUTDIR
 (OUTDIR new or empty). Each file is `<nonce>\\n<count>\\n<displayed text>`, no final newline: the answer text (wrapped at 100,
 as the parent writes it), a blank line, then N-3 synthetic lines. Line k is `P<k> ` + filler, 100 characters on every third line
-and 52 on the others (60 and 40 for the 120-line file, to stay under the 8,000-byte limit), so the widest line and the line count are both exercised. Probe sizes: 40, 44, 48, 60, 80, 120 displayed lines."""
+and 52 on the others (60 and 40 for the 120-line file, to stay under the 8,000-byte limit), so the widest line and the line count are both exercised. Probe sizes: 29, 33, 40, 44, 48, 60, 80, 120 displayed lines (29 and 33: the height of a ten-payment batch shown as totals only, #1879 follow-up)."""
 import os, sys
 NONCE = "0f9d3c1e-6b7a-4c58-9a21-5d3e8b1c7f40"
 WIDTH = 100
@@ -40,7 +40,7 @@ def main():
     if os.path.exists(out) and os.listdir(out):
         sys.exit("refused: OUTDIR must be new or empty")
     os.makedirs(out, exist_ok=True)
-    for total in (40, 44, 48, 60, 80, 120):
+    for total in (29, 33, 40, 44, 48, 60, 80, 120):
         with open(os.path.join(out, f"probe-{total}.txt"), "w", newline="\n", encoding="utf-8") as f:
             f.write(build(total))
         print("probe-%d" % total)

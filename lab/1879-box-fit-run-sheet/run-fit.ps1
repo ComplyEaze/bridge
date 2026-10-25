@@ -8,12 +8,14 @@
 param(
   [Parameter(Mandatory=$true)][string]$Exe,
   [Parameter(Mandatory=$true)][string]$InputDir,
-  [Parameter(Mandatory=$true)][ValidateSet('probe-40','probe-44','probe-48','probe-60','probe-80','probe-120')][string]$Case,
+  [Parameter(Mandatory=$true)][ValidateSet('probe-29','probe-33','probe-40','probe-44','probe-48','probe-60','probe-80','probe-120')][string]$Case,
   [Parameter(Mandatory=$true)][string]$OutDir,
   [switch]$DryRun
 )
 $ErrorActionPreference = 'Stop'
 $expect = @{
+  'probe-29'  = 'af4bbcdcfb94f3625c217397716ff029c272a7da3ef2e6fcc54392bdcd87c64f'
+  'probe-33'  = '62d9bf2839fe4b7d2b677813db97420ff17c1ce6a2715cd88a5dc28675c982a2'
   'probe-40'  = 'e50eb2cdbb9e62abfc633083dd50f2e3c1584c2cb06aa7cd2e0b6e7adb6cd11f'
   'probe-44'  = 'd4f9f8f5da7b67ff5cd722c1abd9f8c4f6507838c2ddf3fd06cd6a2c7b0b6af5'
   'probe-48'  = 'b97a04097a33fe1c0de29c4e4e193c1f3f3de52f8f24423774ca1c0dcb9d5881'

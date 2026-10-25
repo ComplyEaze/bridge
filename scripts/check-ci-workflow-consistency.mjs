@@ -177,7 +177,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "bbb5adeb42d5ff582270600cd5834cb763298e95f7c018be8ea8dbab6a46bd93"],
+  ], "b1e977f6e9201967950729ae919e9b0e037f2a7429b3db6cb8cdd5837a210550"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -230,11 +230,74 @@ if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a85
 // The lookup that decides whether a master push may skip heavy jobs is pinned by its bytes: a change
 // to it is a change to what can be skipped, so it needs this file edited (and acknowledged) with it.
 const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/master-push-reuse.mjs"))).digest("hex");
-if (reuseScriptDigest !== "1cf4382fc71ab7339022544962a5ce55fd8128269fe7bf9f269b022a430d8854") {
+if (reuseScriptDigest !== "61371911fafdcec785d115f07e4fb1cc811fa78a773c289a12ac396fcf179f2d") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
+}
+// The native tests run as two halves, one per shard, by nextest's partitioning. What would silently lose
+// coverage is pinned: a shard list other than [1, 2], a partition count that does not match it, a step
+// that was meant to run once per operating system but never runs (or runs twice), and any other use of the
+// shard number. A half that never runs is a green check with half the tests missing.
+const nativeJob = jobBlock(workflow, "native");
+const shardRows = nativeJob.match(/^ {8}shard:.*$/gm) ?? [];
+if (shardRows.length !== 1 || shardRows[0] !== "        shard: [1, 2]") {
+  failures.push("native must split its tests into exactly two shards: one matrix row `shard: [1, 2]`");
+}
+// An `exclude:` or `include:` entry under the matrix would drop or add a leg without touching the `shard:` row above
+// (for example `exclude: [{os: macos-latest, shard: 2}]` silently runs half the macOS tests), so neither is allowed.
+if (/^ {8}(?:include|exclude)\s*:/m.test(nativeJob)) {
+  failures.push("native: the matrix must not use include: or exclude: (a leg dropped or added there changes which tests run)");
+}
+const nativeTestStep = [
+  "      - name: Test native workspace",
+  "        id: native-tests",
+  "        run: >-",
+  "          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml",
+  "          --workspace --no-fail-fast --retries 0 --test-threads num-cpus --timings",
+  "          --partition count:${{ matrix.shard }}/2",
+].join("\n");
+if (stepBlock(nativeJob, "      - name: Test native workspace") !== nativeTestStep) {
+  failures.push("native: the test step must run nextest on its own half of the tests (`--partition count:${{ matrix.shard }}/2`) and be exactly the pinned text");
+}
+const onceSteps = [
+  ["      - name: Fetch pinned PDFium", 1],
+  ["      - name: Test PDF extraction through PDFium", 1],
+  ["      - name: Test native workspace doctests", 1],
+  ["      - name: Lint the native workspace", 2],
+  ["      - name: Census the Tally-path egress lints", 2],
+];
+for (const [head, shard] of onceSteps) {
+  if (stepBlock(nativeJob, head)?.split("\n")[1] !== `        if: matrix.shard == ${shard}`) {
+    failures.push(`native: step "${head.trim()}" must have \`if: matrix.shard == ${shard}\` as its first key, so it runs once per operating system`);
+  }
+}
+const allowedShardLines = new Set([
+  "    name: Native checks (${{ matrix.os }}, shard ${{ matrix.shard }} of 2)",
+  "          save-if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && matrix.shard == 1 }}",
+  "          --partition count:${{ matrix.shard }}/2",
+  "          save-cache: ${{ matrix.shard == 1 }}",
+  "          name: native-test-timings-macos-shard-${{ matrix.shard }}",
+  "          name: native-crash-stacks-macos-shard-${{ matrix.shard }}",
+  "          name: native-crash-binaries-macos-shard-${{ matrix.shard }}",
+  "          name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}",
+  "        if: matrix.shard == 1",
+  "        if: matrix.shard == 2",
+]);
+const shardUses = nativeJob.split("\n").filter((line) => line.includes("matrix.shard"));
+if (shardUses.some((line) => !allowedShardLines.has(line))
+  || shardUses.filter((line) => line === "        if: matrix.shard == 1").length !== 3
+  || shardUses.filter((line) => line === "        if: matrix.shard == 2").length !== 2) {
+  failures.push("native: matrix.shard may appear only in the pinned lines (job name, cache save, partition flag, artifact names, and five once-per-system step conditions)");
+}
+// Every non-condition line must be present exactly once: an artifact name without the shard would make both
+// shards upload to one name (the second upload fails), and a dropped line would go unseen above.
+for (const line of allowedShardLines) {
+  if (line.startsWith("        if:")) continue;
+  if (nativeJob.split("\n").filter((candidate) => candidate === line).length !== 1) {
+    failures.push(`native: the pinned shard line must appear exactly once: ${line.trim()}`);
+  }
 }
 // `continue-on-error` is refused everywhere (a failure would report success) except on these five
 // diagnostics-only artifact uploads. Each runs under `always()`, has no `id`, and nothing in this
@@ -251,7 +314,7 @@ const diagnosticUploads = [
     "        continue-on-error: true",
     "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
     "        with:",
-    "          name: native-crash-stacks-macos",
+    "          name: native-crash-stacks-macos-shard-${{ matrix.shard }}",
     "          path: ${{ runner.temp }}/bridge-native-crashes.json",
     "          if-no-files-found: error",
     "          retention-days: 7",
@@ -262,7 +325,7 @@ const diagnosticUploads = [
     "        continue-on-error: true",
     "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
     "        with:",
-    "          name: native-compiler-timings-${{ matrix.os }}",
+    "          name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}",
     "          path: src-tauri/target/cargo-timings/*.html",
     "          if-no-files-found: warn",
     "          retention-days: 7",
@@ -273,7 +336,7 @@ const diagnosticUploads = [
     "        continue-on-error: true",
     "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
     "        with:",
-    "          name: native-test-timings-macos",
+    "          name: native-test-timings-macos-shard-${{ matrix.shard }}",
     "          path: src-tauri/target/nextest/default/junit.xml",
     "          if-no-files-found: warn",
     "          retention-days: 7",
@@ -475,7 +538,7 @@ const expectedChanges = [
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
   "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
-  "          if grep -Eq '^(\\.github/workflows/|\\.github/actions/|rust-toolchain\\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.mjs$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes(\\.test)?\\.mjs$|retain-macos-test-binaries(\\.test)?\\.mjs$))' <<< \"$changed_files\"; then",
+  "          if grep -Eq '^(\\.github/workflows/|\\.github/actions/|rust-toolchain\\.toml|glama/Dockerfile$|src-tauri/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.mjs$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes(\\.test)?\\.mjs$|retain-macos-test-binaries(\\.test)?\\.mjs$))' <<< \"$changed_files\"; then",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
@@ -488,7 +551,6 @@ const expectedChanges = [
   "            echo 'tax_audit=false' >> \"$GITHUB_OUTPUT\"",
   "          fi",
   "",
-  "          # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.",
   "          if grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
@@ -500,10 +562,11 @@ if (jobBlock(workflow, "changes").trimEnd() !== expectedChanges) {
 }
 // The native job runs on a pull request only when the scope above selects it. A test in it that reads
 // a file the scope does not list is skipped, with the file's change, by the queue, and only a master
-// push would find the break. So: every file a Rust test pulls in from outside src-tauri/ and tools/
+// push would find the break. So: every file a Rust test pulls in from outside src-tauri/
 // through include_str!/include_bytes!, and every file listed below that a test or a native-job step
-// reads at run time, must be matched by the native scope's own pattern. Tests in tools/ are not listed: `Tally
-// portable core` runs that workspace on every pull request, whatever the scope selects.
+// reads at run time, must be matched by the native scope's own pattern. A portable-core test that reads the
+// repository at run time (`bridge-tally-core/tests/compatibility_surface_stays_whole.rs`) is not listed:
+// `Tally portable core` runs those crates on every pull request, whatever the scope selects.
 const nativeScope = new RegExp(/grep -Eq '(\^\([^']+\))' <<< "\$changed_files"; then\n\s+echo 'native=true'/.exec(jobBlock(workflow, "changes"))?.[1] ?? "(unreadable)");
 const tracked = trackedFiles();
 const readAtRunTime = [
@@ -533,7 +596,7 @@ for (const [entry, reader, optional] of readAtRunTime) {
   else if (files.length === 0) failures.push(`the run-time read list names ${entry}, which has no tracked file; update the list (${reader})`);
   for (const file of files) if (!nativeScope.test(file)) failures.push(`the native scope omits ${file}, which ${reader} reads`);
 }
-for (const file of tracked.filter((path) => /^(?:src-tauri|tools)\/.+\.rs$/.test(path))) {
+for (const file of tracked.filter((path) => /^src-tauri\/.+\.rs$/.test(path))) {
   const source = readFileSync(resolve(repositoryRoot, file), "utf8").replace(/^\s*\/\/.*$/gm, "");
   for (const opening of source.matchAll(/include_(?:str|bytes)!\(/g)) {
     // The argument runs to the matching parenthesis, so a nested concat!(env!(..), "..") is read whole.
@@ -548,7 +611,7 @@ for (const file of tracked.filter((path) => /^(?:src-tauri|tools)\/.+\.rs$/.test
       continue;
     }
     const resolved = posix.normalize(posix.join(posix.dirname(file), literal));
-    if (!/^(?:src-tauri|tools)\//.test(resolved) && !nativeScope.test(resolved)) {
+    if (!/^src-tauri\//.test(resolved) && !nativeScope.test(resolved)) {
       failures.push(`the native scope omits ${resolved}, which ${file} includes`);
     }
   }
@@ -625,9 +688,9 @@ for (const step of parseWorkflowSteps(workflow)) {
 
 // ADR 0004: `lab-writes` compiles the lab-only Tally write tools. The only way in is an explicit
 // `--features lab-writes`, which no workflow, action or Cargo config (an alias could carry it) may
-// name, so no feature (default included) and no dependency declaration in either workspace may turn
+// name, so no feature (default included) and no dependency declaration in the workspace may turn
 // it on for a build that did not ask.
-for (const manifest of ["src-tauri", "tools"]) {
+for (const manifest of ["src-tauri"]) {
   for (const candidate of workspaceMetadata(resolve(repositoryRoot, manifest, "Cargo.toml")).packages) {
     for (const [feature, members] of Object.entries(candidate.features)) {
       if (members.some((member) => /(?:^|\/)lab-writes$/.test(member))) {
@@ -646,10 +709,6 @@ for (const file of trackedFiles().filter((path) => buildInputs.test(path))) {
   if (/lab[-_]writes|--all-features/i.test(readFileSync(resolve(repositoryRoot, file), "utf8"))) {
     failures.push(`${file} names lab-writes or --all-features; no CI build may compile the lab write tools`);
   }
-}
-
-for (const stalePath of staleToolPaths()) {
-  failures.push(`stale tools-workspace path: ${stalePath.file} references ${stalePath.path}`);
 }
 
 if (failures.length) {
@@ -796,19 +855,6 @@ function workspaceMetadata(manifestPath) {
   const metadata = JSON.parse(result.stdout);
   metadataByWorkspace.set(manifestPath, metadata);
   return metadata;
-}
-
-function staleToolPaths() {
-  const toolsMetadata = workspaceMetadata(resolve(repositoryRoot, "tools", "Cargo.toml"));
-  const legacyPaths = toolsMetadata.packages.map((candidate) => `src-tauri/crates/${candidate.name}`);
-  const stale = [];
-  for (const file of trackedFiles()) {
-    const contents = readFileSync(resolve(repositoryRoot, file), "utf8");
-    for (const path of legacyPaths) {
-      if (contents.includes(path)) stale.push({ file, path });
-    }
-  }
-  return stale;
 }
 
 function trackedFiles() {

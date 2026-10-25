@@ -305,7 +305,7 @@ test("every page that carries a 'Checked against release' stamp carries the mani
 // The page lists what the stamped release installs. The catalog in the source is ahead of the release while a version is being
 // built: the tools it serves that no published build installs are named here, keyed by the release the page is stamped for. When the
 // stamp moves to the release that publishes them the entry is gone, so the page must list them, and until then the page must not.
-const inSourceNotPublished = { "0.6.0": ["gst_uncertain_vouchers"] };
+const inSourceNotPublished = { "0.6.0": ["audit_test_run", "gst_uncertain_vouchers", "negative_stock"] };
 test("the capabilities page names the tools the source's catalog serves, less those in no published build of the stamped release", () => {
   const source = readFileSync(new URL("../src-tauri/src/agent_catalog.rs", import.meta.url), "utf8");
   const names = region(source, "REGISTERED_TOOL_NAMES: &[&str] = &[", "];");
@@ -569,4 +569,22 @@ test("no page tells a visitor to turn on or switch on the Terms setting", () => 
     assert.doesNotMatch(read(name), before, name);
     assert.doesNotMatch(read(name), after, name);
   }
+});
+
+// The Windows package links the Visual C++ runtime dynamically (staticVCRuntime is false in
+// tauri.conf.json) and does not carry it, so the two places a person installs from say so (#1860).
+test("the Download page and the install guide name the Windows Visual C++ runtime prerequisite", () => {
+  const page = visibleText(read("download.html")).replaceAll("&nbsp;", " ").replaceAll("&rsquo;", "'").replace(/\s+/g, " ");
+  const guide = readFileSync(new URL("../docs/agent/INSTALL.md", import.meta.url), "utf8").replace(/\s+/g, " ");
+  assert.match(page, /On Windows, ComplyEaze Bridge also needs Microsoft's Visual C\+\+ Redistributable \(x64\)/);
+  assert.match(guide, /On Windows, ComplyEaze Bridge also needs Microsoft's Visual C\+\+ Redistributable \(x64\)/);
+  assert.ok(guide.includes("<https://aka.ms/vc14/vc_redist.x64.exe>"), "the guide carries Microsoft's x64 installer address");
+  assert.ok(guide.includes("](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)"), "the guide carries Microsoft's page that lists it");
+  assert.match(guide, /or are not sure, download and run Microsoft's installer for the latest supported x64 version.{0,200}before Step 3\. Installing the latest version updates an older one/);
+  assert.match(guide, /On Windows, also check that Microsoft's Visual C\+\+ Redistributable \(x64\) is installed \(see "Before you start"\)/);
+  assert.match(page, /or are not sure, the installation guide has Microsoft's download link, and you install it before you add ComplyEaze Bridge to Claude Desktop/);
+  assert.ok(read("download.html").includes('href="https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md">installation guide</a> has Microsoft'), "the page's entry links the guide");
+  assert.match(guide, /We have not measured what Claude Desktop shows when it is missing/);
+  // the guide claims no more than is measured: nothing on how common the runtime is beyond "many programs"
+  for (const text of [page, guide]) assert.doesNotMatch(text, /(?:every|all|most) (?:Windows )?(?:computers|PCs|machines) (?:already )?(?:have|has)/i);
 });

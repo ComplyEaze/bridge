@@ -34,6 +34,12 @@ other companies' programs and they change, so a screen of yours may differ a lit
   for this. Get it from <https://claude.com/download>, install it, and sign in to your Claude account. In one test on
   Windows, a Claude account with no paid plan worked; we make no claim about other plans.
 
+**On Windows, ComplyEaze Bridge also needs Microsoft's Visual C++ Redistributable (x64).** Many programs install it,
+so you may already have it. If you do not have it, or are not sure, download and run Microsoft's installer for the
+latest supported x64 version, `vc_redist.x64.exe`, from <https://aka.ms/vc14/vc_redist.x64.exe>
+([Microsoft's page](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) lists it), before Step 3.
+Installing the latest version updates an older one. We have not measured what Claude Desktop shows when it is missing.
+
 **Three things to know:**
 
 - **Use a test company first.** Make a new company in TallyPrime with a few made-up entries (press **Alt+K**, choose
@@ -151,10 +157,10 @@ computer cannot confirm who made it. Keep the file only if you got it from the p
 
 ## Step 4. Fill in the settings
 
-A settings window opens with five lines. If none opens, open Settings, then Extensions, click ComplyEaze Bridge, then
+A settings window opens with six lines. If none opens, open Settings, then Extensions, click ComplyEaze Bridge, then
 **Configure**. Go from top to bottom.
 
-![The five settings, drawn as a diagram: the Terms line ticked, Tally host localhost, Tally port 9000, Response redaction none, Allow voucher posting switched off.](./img/install-settings.svg)
+![The first five settings, drawn as a diagram: the Terms line ticked, Tally host localhost, Tally port 9000, Response redaction none, Allow voucher posting switched off. The sixth, Allow tax-audit test runs, is not drawn; leave it off.](./img/install-settings.svg)
 
 | Line | What to do | What it is |
 | --- | --- | --- |
@@ -163,6 +169,7 @@ A settings window opens with five lines. If none opens, open Settings, then Exte
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
 | **Response redaction** | Do not change it. It says `none`. | A way to limit what ComplyEaze Bridge sends to the AI provider. Choose one value. The other two are `mask_parties` (shortens party and ledger names, and the bank account details read from a ledger, to their first two and last two characters; some names are not shortened, and narrations are not changed) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Neither hides, among other things: amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details and references, or the last four digits of a bank statement's account number. [Security and privacy](../security-and-privacy.md) lists the rest. |
 | **Allow voucher posting, one voucher or a batch of up to 50** | Leave it **off**. | Lets Claude make entries in Tally: one voucher, or a saved batch of up to 50, each post only after you approve it in a separate window. |
+| **Allow tax-audit test runs (audit_test_run)** | Leave it **off** unless you want to try a tax-audit test. | Lets Claude run one tax-audit test (today the cash share of receipts and payments against the s.44AB(a) limit) on a company's books for a period inside FY 2025-26. It reads every voucher of the period and writes nothing to Tally; its figures go to your AI provider like any read. |
 
 Click **Save**.
 
@@ -198,7 +205,7 @@ which failed with the same error; after Claude Desktop was quit and reopened the
 | --- | --- |
 | Claude says the Terms of Use are not accepted | Go back to Step 4, tick the first line, click Save, then do Step 5. |
 | Claude says it cannot reach Tally | Check that TallyPrime is open with a company open. Do the browser check in Step 1 again (on a Mac, in Safari on the Mac itself). Check that the Tally port in Step 4 is the same number. |
-| Claude does not seem to know about Tally at all | Open Settings, then Extensions. Check that ComplyEaze Bridge is listed and switched on. Then do Step 5. In a new chat, **Connectors** also shows whether it is connected. If you updated to 0.5.0 from 0.4.2, see "Remove or update it". |
+| Claude does not seem to know about Tally at all | Open Settings, then Extensions. Check that ComplyEaze Bridge is listed and switched on. Then do Step 5. In a new chat, **Connectors** also shows whether it is connected. On Windows, also check that Microsoft's Visual C++ Redistributable (x64) is installed (see "Before you start"). If you updated to 0.5.0 from 0.4.2, see "Remove or update it". |
 | The settings window did not open in Step 4, or you want to change a setting | Open Settings, then Extensions. Click ComplyEaze Bridge, then **Configure**. |
 
 Still stuck? See [Help](#help).

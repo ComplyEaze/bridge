@@ -57,6 +57,8 @@ mod headline;
 mod ledger_candidates;
 #[path = "agent_month_register.rs"]
 mod month_register;
+#[path = "agent_negative_stock.rs"]
+mod negative_stock;
 use ledger_candidates::{
     ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
     CatalogueLedger,
@@ -117,6 +119,8 @@ mod read_profiles;
 use read_profiles::*;
 #[path = "agent_audit_read.rs"]
 mod audit_read;
+#[path = "agent_audit_run.rs"]
+mod audit_run;
 #[path = "agent_read_cost.rs"]
 mod read_cost;
 #[path = "agent_read_cost_preview.rs"]
@@ -134,7 +138,7 @@ use movement_math::*;
 mod egress;
 use egress::{append_egress_line, read_egress_tail};
 #[path = "agent_terms.rs"]
-mod terms;
+pub(crate) mod terms;
 
 use crate::tally::runtime::RuntimeReadEvidence;
 use crate::tally::{
@@ -297,6 +301,9 @@ struct Settings {
     redaction: Redaction,
     import_enabled: bool,
     posting: Posting,
+    /// Whether the tax-audit tool (`audit_test_run`) is listed and callable. Off by default:
+    /// the extension's setting turns it on.
+    audit_enabled: bool,
 }
 
 /// Whether this server may post to Tally. One setting governs every post: one
@@ -382,6 +389,7 @@ impl Settings {
             redaction,
             import_enabled: enabled_setting("BRIDGE_AGENT_ENABLE_IMPORT")? || writes_enabled,
             posting,
+            audit_enabled: audit_from_env(process_variable)?,
         })
     }
 }
@@ -423,6 +431,30 @@ const RETIRED_BATCH_POST_SETTING: &str = "BRIDGE_AGENT_ENABLE_BATCH_POST";
 fn posting_setting(value: Option<&str>) -> Result<bool, String> {
     match value {
         Some("" | POSTING_PLACEHOLDER) => Ok(false),
+        other => boolean_setting(other),
+    }
+}
+
+/// The extension's tax-audit setting, named after the version of what it offers, as the posting
+/// one is. A test ties the key and its placeholder to `packaging/mcpb/manifest.json`.
+#[cfg(test)]
+pub(super) const AUDIT_SETTING_KEY: &str = "enable_tax_audit_2026_10";
+const AUDIT_PLACEHOLDER: &str = "${user_config.enable_tax_audit_2026_10}";
+/// The environment variable the setting is mapped to.
+pub(super) const AUDIT_SETTING_VARIABLE: &str = "BRIDGE_AGENT_ENABLE_TAX_AUDIT";
+
+/// The tax-audit setting, read through `var` as [`posting_from_env`] reads posting: absent,
+/// empty or the unresolved placeholder is off; anything but a plain boolean fails loud.
+fn audit_from_env(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<bool, String> {
+    let value = var(AUDIT_SETTING_VARIABLE)
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| "boolean_setting_invalid".to_string())
+        })
+        .transpose()?;
+    match value.as_deref() {
+        Some("" | AUDIT_PLACEHOLDER) => Ok(false),
         other => boolean_setting(other),
     }
 }
@@ -721,6 +753,20 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 limit_master_alter_id: *limit_master_alter_id,
             });
         }
+        if let Some(crate::tally::runtime::NegativeStockReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
@@ -883,6 +929,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(reason);
         }
+        if let Some(negative_stock) = cause
+            .downcast_ref::<bridge_tally_protocol::native_negative_stock::NativeNegativeStockError>()
+        {
+            return Some(negative_stock.code());
+        }
+        if let Some(crate::tally::runtime::NegativeStockReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        {
+            return Some(reason);
+        }
         if let Some(statement) = cause
             .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
         {
@@ -954,7 +1010,10 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// Deliberately sparse. A code without a documented, concrete next step returns
 /// `None` and its refusal keeps the general message, because filler guidance is
 /// worse than none: it reads as authoritative while sending the caller nowhere.
-/// This never softens a refusal — it only says what to do about one.
+/// This never softens a refusal — it only says what to do about one. A few codes
+/// state a cause with no step instead, among them `empty_book_first_import`: no step
+/// inside ComplyEaze Bridge exists for it yet, and it must not send anyone to enter a
+/// voucher another way (#1709).
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
         "company_identity_absent_or_ambiguous" | "company_identity_not_matched" => Some(
@@ -993,9 +1052,8 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
-             mark and ComplyEaze Bridge has no \"before\" to attribute an import against. Record one \
-             voucher in this company by another route and confirm it in Tally, then build \
-             this batch again.",
+             mark and ComplyEaze Bridge has no \"before\" to attribute an import against, so it \
+             cannot build or post the first voucher into this company yet. Nothing was sent to Tally.",
         ),
         // A cause, reached through `ledger_export_invalid` (#714) and
         // `ledger_movement_read_failed` (#716).
@@ -1097,6 +1155,15 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              worst-case stock-item row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
              so no request for stock items was sent. The mark counts masters of every kind, so \
              a company with few stock items may be refused. A larger book refuses; retrying \
+             this call refuses again.",
+        ),
+        // The Negative Stock read's own size refusal (`size` carries the mark).
+        "negative_stock_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
+             so Tally's Negative Stock was not requested. The mark counts masters of every \
+             kind, so a company with few stock items may be refused, and the ceiling is a \
+             stated guess, not a measurement of this report. A larger book refuses; retrying \
              this call refuses again.",
         ),
         // The stock summary read whose rows differ from Tally's own item count
@@ -1917,6 +1984,10 @@ impl ToolFailure {
         }) {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
         }) {
             error.safe_code()
@@ -2026,7 +2097,7 @@ impl Server {
         let post_approvals = Arc::new(agent_import::PostApprovals::new(&settings.data_dir));
         Self {
             settings,
-            runtime: TallyRuntime::default(),
+            runtime: TallyRuntime::ungated(),
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
             voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
@@ -2514,6 +2585,9 @@ impl Server {
         if name == "post_import" && self.settings.posting == Posting::RetiredSettingPresent {
             return Err("setting_retired".to_string().into());
         }
+        if name == "audit_test_run" && !self.settings.audit_enabled {
+            return Err("audit_tool_disabled".to_string().into());
+        }
         #[cfg(feature = "lab-writes")]
         if matches!(
             name,
@@ -2524,6 +2598,7 @@ impl Server {
         validate_tool_arguments(name, args)?;
         match name {
             "acknowledge_post_review" => self.acknowledge_post_review(args).await,
+            "audit_test_run" => self.audit_test_run(args).await,
             "balance_sheet" => self.balance_sheet(args).await,
             "build_import_xml" => {
                 self.import_enabled()?;
@@ -2552,6 +2627,7 @@ impl Server {
             "local_data_report" => self.local_data_report().map_err(Into::into),
             "masters" => self.masters(args).await,
             "month_register" => self.month_register(args).await,
+            "negative_stock" => self.negative_stock(args).await,
             "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;
@@ -2719,6 +2795,7 @@ pub(crate) async fn desktop_selected_vouchers(
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         },
         runtime.clone(),
     );

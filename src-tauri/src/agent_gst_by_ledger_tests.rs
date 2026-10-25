@@ -38,34 +38,52 @@ fn captured_index() -> MasterIndex {
     MasterIndex::build(records.iter(), &groups, Vec::new()).expect("masters index")
 }
 
-macro_rules! window {
-    ($day:literal) => {
-        include_bytes!(concat!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-",
-            $day,
-            "nov-w-1.utf16le.xml"
-        ))
-    };
-}
-
 /// The one voucher of each captured day, in day order: V1, V4, V5, V6, V7, V4b, V8, V9, V10,
 /// V11, V2, V13, V14, V3.
 fn captured_rows() -> Vec<Value> {
     let windows: [&[u8]; 14] = [
-        window!("03"),
-        window!("04"),
-        window!("05"),
-        window!("06"),
-        window!("07"),
-        window!("08"),
-        window!("10"),
-        window!("11"),
-        window!("12"),
-        window!("13"),
-        window!("14"),
-        window!("15"),
-        window!("16"),
-        window!("17"),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-04nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-05nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-06nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-07nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-08nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-10nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-11nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-12nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-13nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-14nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-15nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-16nov-w-1.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-17nov-w-1.utf16le.xml"
+        ),
     ];
     windows
         .iter()

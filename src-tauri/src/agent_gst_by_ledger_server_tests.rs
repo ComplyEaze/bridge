@@ -43,97 +43,161 @@ struct Day {
     window_request: &'static str,
 }
 
-macro_rules! day {
-    ($day:literal, $census:literal, $window:literal) => {
-        Day {
-            date: concat!("202511", $day),
-            census: include_bytes!(concat!(
-                "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-",
-                $day,
-                "nov-n-1.utf16le.xml"
-            )),
-            window: include_bytes!(concat!(
-                "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-",
-                $day,
-                "nov-w-1.utf16le.xml"
-            )),
-            census_request: $census,
-            window_request: $window,
-        }
-    };
-}
-
 const DAYS: [Day; 14] = [
-    day!(
-        "03",
-        "f1d00a414e67ecadf79ef940a6d2fb5655e5979ed5f1b89f2473ea882fee31e7",
-        "ef037e7d1430b2400c8ac71f32430d0187bb96487eec49da9438dd066bf835cb"
-    ),
-    day!(
-        "04",
-        "2b4d7db0c8ae9927c54aa27ab75548bbd3bc4fdfb48c12b88d33fd55d3a473b6",
-        "2c3a278b46acf9fa80937a4d190fcb49aed3689a4eb4f640a58db4519dc42bd6"
-    ),
-    day!(
-        "05",
-        "4524cd012cee5c27e74bd5666c7962069d143ae2fa287273f1b59b501796a746",
-        "f211010e3762b68157e91cecdbbfa6a0aa4dffb3ea0e4659657036af3ee02c52"
-    ),
-    day!(
-        "06",
-        "3ccc9f76bb4013ea4aef23e6b62e9470cb0a469ee85279dbcba1bc8e690e21b8",
-        "7710b53a5d652b9eba36b94784ed87185b177bf941ef25d7ce1e25e0444b1d80"
-    ),
-    day!(
-        "07",
-        "e128563c16739d4b18423a15031e5f4a3bd0563141ffc477fd68bc2aeb23a5b8",
-        "fee1dcba3d4ad33dbd7da06dc12f2a5bd809036e53d7fc16447ebfffc33be641"
-    ),
-    day!(
-        "08",
-        "b9b54a3d0f382a679b457b82142c2e51fc491cb1d6f12463e8ccd4447ab10f84",
-        "e7916596e128d596e151861cb5bf36b65dfaa904452a4dee53d95f247c58c02b"
-    ),
-    day!(
-        "10",
-        "e21ae27586e5bf728fcc79483849efda3c3c1f75239e00dd3092a87c074435ad",
-        "77712fe7af5bb7bf47200159a228cadd4c3b31b04e02b0180c950cf0adc463c1"
-    ),
-    day!(
-        "11",
-        "aaf4c6a046e16d234f97fbb1c6005884703acbae901f0d33e348540e01cea3fe",
-        "3ee126e3f2d8f94fc0ab862d3f58a28fbc121fb8cc75eb5731d5b78613a893e1"
-    ),
-    day!(
-        "12",
-        "80bdb1914af4375cac19b3a1fcdd20d6a2992b9e34453bf2390fdf8b002706c6",
-        "41d67b0a603653832be1f86efb143284c502aaeae025e7b44fb07d6d04bdf3f5"
-    ),
-    day!(
-        "13",
-        "df2375100f4bc895f2069d288fb239874d947387dbc5ab8c366771117a5f266e",
-        "f821cd7178d275639d128d60e1d1b966289e55ce1c44ab5e7f9f7f4e0ee97e95"
-    ),
-    day!(
-        "14",
-        "58eb1809a808df4ab3d73b608c9a14d7027714979bc8f35d48b2e46f42ec2872",
-        "9328b689ae8d325950fed577e2125919087fc3a9d0fd1b024c96b944c7c48000"
-    ),
-    day!(
-        "15",
-        "f4d7c65190446e9075536ce2b729a9f3a7a0d8e042aad06994dc183f43ebfbc9",
-        "efed621d9721576a76af65081522aa6c1db06f6f9d424fa8d6809b83a3459d1f"
-    ),
-    day!(
-        "16",
-        "d8fc61f234141946e62a9aa9661553f64ad4c7558e2864e2d9364f54cb4a2de1",
-        "15df0de11bd3d06b031f6fa8559f06119fd22e8ab180196c42498dba72327d47"
-    ),
-    day!(
-        "17",
-        "cf33a7bc03efc87d7dcbe454a48258b6cc95007a29b6708a7673759d2707096c",
-        "9da0cbf78e8ba62546d689f4d3a27c8af2d5530e208edaab8bcf455b4806cf16"
-    ),
+    Day {
+        date: "20251103",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-w-1.utf16le.xml"
+        ),
+        census_request: "f1d00a414e67ecadf79ef940a6d2fb5655e5979ed5f1b89f2473ea882fee31e7",
+        window_request: "ef037e7d1430b2400c8ac71f32430d0187bb96487eec49da9438dd066bf835cb",
+    },
+    Day {
+        date: "20251104",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-04nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-04nov-w-1.utf16le.xml"
+        ),
+        census_request: "2b4d7db0c8ae9927c54aa27ab75548bbd3bc4fdfb48c12b88d33fd55d3a473b6",
+        window_request: "2c3a278b46acf9fa80937a4d190fcb49aed3689a4eb4f640a58db4519dc42bd6",
+    },
+    Day {
+        date: "20251105",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-05nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-05nov-w-1.utf16le.xml"
+        ),
+        census_request: "4524cd012cee5c27e74bd5666c7962069d143ae2fa287273f1b59b501796a746",
+        window_request: "f211010e3762b68157e91cecdbbfa6a0aa4dffb3ea0e4659657036af3ee02c52",
+    },
+    Day {
+        date: "20251106",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-06nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-06nov-w-1.utf16le.xml"
+        ),
+        census_request: "3ccc9f76bb4013ea4aef23e6b62e9470cb0a469ee85279dbcba1bc8e690e21b8",
+        window_request: "7710b53a5d652b9eba36b94784ed87185b177bf941ef25d7ce1e25e0444b1d80",
+    },
+    Day {
+        date: "20251107",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-07nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-07nov-w-1.utf16le.xml"
+        ),
+        census_request: "e128563c16739d4b18423a15031e5f4a3bd0563141ffc477fd68bc2aeb23a5b8",
+        window_request: "fee1dcba3d4ad33dbd7da06dc12f2a5bd809036e53d7fc16447ebfffc33be641",
+    },
+    Day {
+        date: "20251108",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-08nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-08nov-w-1.utf16le.xml"
+        ),
+        census_request: "b9b54a3d0f382a679b457b82142c2e51fc491cb1d6f12463e8ccd4447ab10f84",
+        window_request: "e7916596e128d596e151861cb5bf36b65dfaa904452a4dee53d95f247c58c02b",
+    },
+    Day {
+        date: "20251110",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-10nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-10nov-w-1.utf16le.xml"
+        ),
+        census_request: "e21ae27586e5bf728fcc79483849efda3c3c1f75239e00dd3092a87c074435ad",
+        window_request: "77712fe7af5bb7bf47200159a228cadd4c3b31b04e02b0180c950cf0adc463c1",
+    },
+    Day {
+        date: "20251111",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-11nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-11nov-w-1.utf16le.xml"
+        ),
+        census_request: "aaf4c6a046e16d234f97fbb1c6005884703acbae901f0d33e348540e01cea3fe",
+        window_request: "3ee126e3f2d8f94fc0ab862d3f58a28fbc121fb8cc75eb5731d5b78613a893e1",
+    },
+    Day {
+        date: "20251112",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-12nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-12nov-w-1.utf16le.xml"
+        ),
+        census_request: "80bdb1914af4375cac19b3a1fcdd20d6a2992b9e34453bf2390fdf8b002706c6",
+        window_request: "41d67b0a603653832be1f86efb143284c502aaeae025e7b44fb07d6d04bdf3f5",
+    },
+    Day {
+        date: "20251113",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-13nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-13nov-w-1.utf16le.xml"
+        ),
+        census_request: "df2375100f4bc895f2069d288fb239874d947387dbc5ab8c366771117a5f266e",
+        window_request: "f821cd7178d275639d128d60e1d1b966289e55ce1c44ab5e7f9f7f4e0ee97e95",
+    },
+    Day {
+        date: "20251114",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-14nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-14nov-w-1.utf16le.xml"
+        ),
+        census_request: "58eb1809a808df4ab3d73b608c9a14d7027714979bc8f35d48b2e46f42ec2872",
+        window_request: "9328b689ae8d325950fed577e2125919087fc3a9d0fd1b024c96b944c7c48000",
+    },
+    Day {
+        date: "20251115",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-15nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-15nov-w-1.utf16le.xml"
+        ),
+        census_request: "f4d7c65190446e9075536ce2b729a9f3a7a0d8e042aad06994dc183f43ebfbc9",
+        window_request: "efed621d9721576a76af65081522aa6c1db06f6f9d424fa8d6809b83a3459d1f",
+    },
+    Day {
+        date: "20251116",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-16nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-16nov-w-1.utf16le.xml"
+        ),
+        census_request: "d8fc61f234141946e62a9aa9661553f64ad4c7558e2864e2d9364f54cb4a2de1",
+        window_request: "15df0de11bd3d06b031f6fa8559f06119fd22e8ab180196c42498dba72327d47",
+    },
+    Day {
+        date: "20251117",
+        census: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-17nov-n-1.utf16le.xml"
+        ),
+        window: include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-17nov-w-1.utf16le.xml"
+        ),
+        census_request: "cf33a7bc03efc87d7dcbe454a48258b6cc95007a29b6708a7673759d2707096c",
+        window_request: "9da0cbf78e8ba62546d689f4d3a27c8af2d5530e208edaab8bcf455b4806cf16",
+    },
 ];
 
 fn utf16(bytes: &[u8]) -> String {

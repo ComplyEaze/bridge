@@ -1983,7 +1983,8 @@ async fn export_party_ledger_master_once(
                 "Refresh the selected Tally company and retry the export after reviewing its runtime status.",
             )
         })?;
-    let bytes = render_party_ledger_master_xlsx(&workbook).map_err(|_| {
+    // CA grouping decisions are not stored yet (#737), so none is presented.
+    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).map_err(|_| {
         party_ledger_master_local_export_error(
             "party_ledger_master_render_failed",
             "ComplyEaze Bridge could not build the party/ledger master workbook safely.",

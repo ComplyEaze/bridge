@@ -477,9 +477,7 @@ test("an entry still present when a version is built is listed in its notes, wit
     assert.equal(result.status, 0);
     assert.match(result.stdout, /::warning::2 unreleased entries are still in docs\/changelog\/unreleased and were listed in this release's notes \(added\/5-late, changed\/6-later\)/);
     const notes = readFileSync(join(dir, "notes.md"), "utf8");
-    assert.match(notes, /\*\*Added\*\*\n\n- One\.\n- Late \(#5\)\./);
-    assert.match(notes, /\*\*Changed\*\*\n\n- Later \(#6\)\./);
-    assert.equal(notes.split("**Added**").length, 2, "one Added heading");
+    assert.match(notes, /\*\*Added\*\*\n\n- One\.\n\n\*\*Also in this build\*\*\n\n\*\*Added\*\*\n\n- Late \(#5\)\.\n\n\*\*Changed\*\*\n\n- Later \(#6\)\./);
   });
 });
 

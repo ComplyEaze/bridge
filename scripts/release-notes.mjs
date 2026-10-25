@@ -393,7 +393,7 @@ export function main(argv) {
       picked = pickNotes(sections, tag);
       if (picked.mode === "version" && fragments.length > 0) {
         // The build is cut from the head of master, so an entry still present is in this build: list it, and say so.
-        picked.body = mergeFragments(picked.body, fragments);
+        picked.body = `${picked.body}\n\n**Also in this build**\n\n${assembleFragments(fragments)}`;
         warn(`${fragments.length} unreleased entr${fragments.length === 1 ? "y is" : "ies are"} still in ${FRAGMENT_DIRECTORY} and were listed in this release's notes (${fragments.map(({ kind, number, slug }) => `${kind}/${number}-${slug}`).join(", ")}); remove the files and put the entries in the ${versionFromTag(tag)} section of CHANGELOG.md after this release, or the next release lists them again`);
       }
     } catch (error) {

@@ -10,15 +10,25 @@ category of each voucher, ties it to the Trial Balance, and gives the books' mon
 old residual taxable value and reverse-charge tax for a comparison with GSTR-3B; it asks the goods-transport
 question on goods-carriage payments with no duties line. These fixtures cover only an engagement with no GSTR-3B
 document: there the reference classifies every month `no_3b_document_for_month` before it reads GSTR-1 rows or the
-round-off movement, so its dump depends on the book and five ledger roles alone. The crate refuses an engagement
-that names a GSTR-3B. Each period is two months, to keep the goldens small.
+round-off movement, so its dump depends on the book and five ledger roles alone. Each edge book's period is two
+months, to keep its golden small; the synthetic read's is the year.
+
+The crate refuses an engagement whose `[documents].gstr3b` holds anything but an empty string, and a caller that
+holds a GSTR-3B (named as loaded, or as `applicability_44ab`'s GSTR-3B turnover). That refuses more than the
+reference, which is accepted because it fails closed: the reference reads a document only when the key is truthy, so
+`false`, `0`, `[]` or `{}` is no document there, and a GSTR-3B loaded with no row in the period gives the reference
+this same no-GSTR-3B dump. The reverse case runs where the reference does not: a `[documents]` that is not a table
+ends the reference's run, and the crate reads it as no document. Unit tests pin the `false` refusal and the
+not-a-table run.
 
 - `golden/synthetic.gst_ledgers_3b.json` is the test on the synthetic read, through the registry's path from the
   engagement. `synthetic-engagement.toml` gains the two required roles `[roles].payable_ledgers` and
   `[roles].rcm_tax_ledgers`, both empty; its `tax_ledgers` table is already empty, so the dump has no per-head
-  figure and carries the twelve months' Sales Accounts movement and residual. No other test reads either key:
-  `synthetic.clause44`, `synthetic.book_keeping_quality` and `synthetic.cash_44ab` regenerate byte-identical with them
-  (`PROVENANCE.md` carries the engagement's new byte row).
+  figure and carries the twelve months' Sales Accounts movement and residual. No other test's figures read either
+  key, and `synthetic.clause44`, `synthetic.book_keeping_quality` and `synthetic.cash_44ab` regenerate byte-identical
+  with them (`PROVENANCE.md` carries the engagement's new byte row). Binding is shared, though: on any engagement, a
+  name under either key that matches no ledger now refuses every test (`BIND-NAME-UNKNOWN`), and a `[ledger_ids]`
+  label used only there now counts as used.
 - `edge-books/g3b_classify.json`: one voucher per branch of the voucher classifier: Sales, Purchase, a sales-side
   and a purchase-side note, a note with both groups, a note with neither, a note whose Sales line is under a
   sub-group, a note whose Sales line is nil beside a Purchase line, Payment, Receipt, a Journal reclassing among tax

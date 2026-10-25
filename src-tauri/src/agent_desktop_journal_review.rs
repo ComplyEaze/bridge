@@ -83,7 +83,7 @@ impl DesktopJournalError {
             ),
             "import_post_requires_one_journal" => (
                 "ComplyEaze Bridge's desktop review posts one unnumbered Journal, and this saved batch is a different shape.",
-                "With Allow voucher posting on in the extension settings (off by default; Terms of Use section 9.2), ask the assistant to post this saved batch, giving it this file's name: it posts one voucher, or a batch of 2 to 50 Journals or of 2 to 50 Payments, Receipts and Contras, after you approve it in a separate window, and it checks the batch again first and may refuse it. Otherwise import this file in Tally (Gateway of Tally → Import → Vouchers), then verify it, and do not also ask the assistant to post it. The file itself is unchanged and correct.",
+                "With Allow voucher posting on in the extension settings (off by default; Terms of Use section 9.2), ask the assistant to post this saved batch, giving it this batch's id (the file's name without .xml): it posts one voucher, or a batch of 2 to 50 Journals or of 2 to 50 Payments, Receipts and Contras, after you approve it in a separate window, and it checks the batch again first and may refuse it. Otherwise import this file in Tally (Gateway of Tally → Import → Vouchers), then verify it, and do not also ask the assistant to post it. The file itself is unchanged and correct.",
             ),
             "import_post_amendment_requires_file_import" => (
                 "This saved Journal amends an earlier batch, and ComplyEaze Bridge does not post amendments.",

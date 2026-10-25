@@ -3671,7 +3671,7 @@ fn build_import_guidance(
             warnings(&format!(
                 "No import XML was sent to Tally. ComplyEaze Bridge cannot post this saved batch: post_import would refuse it as {code} ({}).{} the written file in Tally, then use verify_import; do not call post_import for this batch.",
                 native_post_refusal_reason(code),
-                native_post_route(code),
+                native_post_route(code, writes_enabled),
             )),
             manual_import_next_step,
         ),
@@ -3680,7 +3680,7 @@ fn build_import_guidance(
         // still refuse.
         (false, None) => (
             warnings(
-                "No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post. With Allow voucher posting on (off by default; it means accepting the limits in Terms of Use section 9.2), post_import would check this saved batch again and ask the local user to approve it in a separate window, and may still refuse it. Until then, import the written file in Tally, then use verify_import; once it is imported, do not also post it.",
+                "No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post. With Allow voucher posting on (off by default; it means accepting the limits in Terms of Use section 9.2), the post_import tool, which that setting adds, would check this saved batch again and ask the local user to approve it in a separate window, and may still refuse it. Until then, import the written file in Tally, then use verify_import; once it is imported, do not also post it.",
             ),
             "Tell the user that this connection cannot post. With Allow voucher posting on in the extension settings (off by default; it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge would offer this saved batch for their approval in a separate window, after checking the book again, and may still refuse it. Do not say that it will be posted from this chat. Until then: confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment",
         ),
@@ -3688,7 +3688,7 @@ fn build_import_guidance(
             warnings(&format!(
                 "No import XML was sent to Tally. Voucher posting is off, and with it on post_import would still refuse this saved batch as {code} ({}).{} the written file in Tally, then use verify_import.",
                 native_post_refusal_reason(code),
-                native_post_route(code),
+                native_post_route(code, writes_enabled),
             )),
             manual_import_next_step,
         ),
@@ -3699,11 +3699,16 @@ fn build_import_guidance(
 /// a sentence that follows the refusal's reason and leads into the file route
 /// ("Otherwise import"), or just "Import" where none exists. Never a changed
 /// voucher text: a row is not edited to pass a check.
-fn native_post_route(code: &str) -> String {
+fn native_post_route(code: &str, writes_enabled: bool) -> String {
     let voucher_limit = ledger::MAX_BATCH_POST_VOUCHERS;
+    let to_post = if writes_enabled {
+        "To post it with ComplyEaze Bridge"
+    } else {
+        "To post it with ComplyEaze Bridge once Allow voucher posting is on"
+    };
     match code {
         "import_post_batch_too_large" => format!(
-            " To post it with ComplyEaze Bridge, build it again in batches of at most {voucher_limit} vouchers, a bank statement by a narrower range of whole days; a single statement day of more than {voucher_limit} rows cannot be split yet, so tell the user so. Otherwise import"
+            " {to_post}, build it again in batches of at most {voucher_limit} vouchers, a bank statement by a narrower range of whole days; a single statement day of more than {voucher_limit} rows cannot be split yet, so tell the user so. Otherwise import"
         ),
         _ => " Import".to_string(),
     }

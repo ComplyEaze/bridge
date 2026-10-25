@@ -43,6 +43,8 @@
 | **No cloud path for Tally data** | Bridge has no upload feature (the document-sync code was removed); Tally data would need a versioned destination contract (fine for now — local-first is the positioning). |
 | **Velocity sink** | ~30 PRs of pre-dispatch safety ritual produced zero rows of evidence. Safety engineering has been optimizing ceremony before dispatch instead of verifiability after dispatch. |
 
+> **DEVIATION 2026-10-21 (#1789):** the IndiaTax, Bills/Outstandings and Inventory pack batches, their canonical models and their reconciliation were removed without being wired: no read ever produced one. Outstandings and stock are read by the `outstandings` and `stock_summary` tools from Tally's own collections and reports instead. A pack for these is rebuilt only from a live capture (AGENTS.md P1).
+
 ---
 
 ## 2. Market research (July 2026: sourced claims, gaps, and hypotheses)

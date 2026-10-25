@@ -211,7 +211,7 @@ for (const [source, job, expected, digest] of [
 // And native, bundle-smoke and package run a local composite action before their scans; a local
 // action can call another, so every tracked file under .github/actions/ is pinned by its bytes.
 for (const [name, source, digest] of [
-  ["ci.yml", workflow, "25526dcdd7691fef35c27e07c0bb0291543cbf3ba55e7ac4ee40bd59f802b1e9"],
+  ["ci.yml", workflow, "4cc0caf64e7500044174bece49141eca24710d6301cd0edafaba73d2e5dfebf8"],
   ["release-mcpb-preview.yml", releaseWorkflow, "c4a747416c492779cfd43305cfd619728d2c9821a17f3efb73da08f67dc56144"],
 ]) {
   const lines = source.split("\n");

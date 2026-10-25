@@ -135,3 +135,32 @@ test("a change list larger than a pipe buffer is still scoped by its first heavy
       { native: "true", bundle: "false", tax_audit: "false" }, `${event} with a heavy path first in a long list`);
   }
 });
+
+// The workflow's concurrency header, evaluated: GitHub's `${{ }}` expressions here are plain `==`, `&&` and `||` over strings,
+// so they run as JavaScript against a stand-in `github` context.
+function concurrencyOf(event, { ref = "refs/pull/1/merge", runId = "100" } = {}) {
+  const text = workflow.join("\n");
+  const block = /^concurrency:\n((?: {2}.*\n| *\n)+)/m.exec(text)?.[1] ?? "";
+  const field = (name) => new RegExp(`^ {2}${name}: (.+)$`, "m").exec(block)?.[1];
+  const github = { workflow: "Bridge CI", event_name: event, ref, run_id: runId };
+  const evaluate = (template) => template.replace(/\$\{\{ (.+?) \}\}/g, (_, expression) => String(new Function("github", `return (${expression});`)(github)));
+  return { group: evaluate(field("group")), cancel: evaluate(field("cancel-in-progress")) };
+}
+
+test("pull requests supersede by branch; master pushes share one group and never cancel a run; every other run has a group of its own", () => {
+  const pr = concurrencyOf("pull_request", { ref: "refs/pull/7/merge", runId: "1" });
+  assert.equal(pr.cancel, "true");
+  assert.equal(pr.group, concurrencyOf("pull_request", { ref: "refs/pull/7/merge", runId: "2" }).group, "a newer push to the same branch is in the same group");
+  assert.notEqual(pr.group, concurrencyOf("pull_request", { ref: "refs/pull/8/merge", runId: "1" }).group);
+  const push = concurrencyOf("push", { ref: "refs/heads/master", runId: "1" });
+  assert.equal(push.cancel, "false", "a master push never cancels a run in progress; only a pending one is replaced");
+  assert.equal(push.group, concurrencyOf("push", { ref: "refs/heads/master", runId: "2" }).group, "two master pushes share a group");
+  assert.notEqual(push.group, pr.group);
+  for (const event of ["merge_group", "schedule", "workflow_dispatch"]) {
+    const first = concurrencyOf(event, { ref: "refs/heads/gh-readonly-queue/master/x", runId: "1" });
+    assert.equal(first.cancel, "false", event);
+    assert.notEqual(first.group, concurrencyOf(event, { ref: "refs/heads/gh-readonly-queue/master/x", runId: "2" }).group, `${event} runs are never in one group`);
+    assert.notEqual(first.group, push.group);
+  }
+});
+

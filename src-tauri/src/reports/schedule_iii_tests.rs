@@ -465,7 +465,7 @@ fn totals(view: &ScheduleIIIView) -> (String, String, String) {
 }
 
 #[test]
-fn without_decisions_an_excluded_ledger_keeps_the_view_not_final_and_every_line_is_group_evidence() {
+fn without_decisions_an_excluded_ledger_keeps_the_view_not_final_and_lines_are_group_evidence() {
     let source = book(vec![
         row("Customer", "Sundry Debtors", "-100"),
         row("Term loan", "Loans (Liability)", "500"),

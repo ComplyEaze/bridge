@@ -1,4 +1,4 @@
-# Windows item GS1-L1 v1: GST per counter ledger read through ComplyEaze Bridge, on vouchers typed on Tally's screen. (25 Oct 2026.) SYNTHETIC ONLY: THE COMPANY is BRIDGE GST RECON LAB (company number: the `COMPANYNUMBER` of the committed capture `src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-book-extent.utf16le.xml`; GUID ae1490be-52c5-4544-9ffc-4b7da85f9797), the book the purchase register's committed captures come from. LAB-COMMON v3 applies in full, except where "Differences" below says otherwise; where the two differ, the stricter holds.
+# Windows item GS1-L1 v2 (v1 plus the two output-GST shapes of the review and the TDS-type rule): GST per counter ledger read through ComplyEaze Bridge, on vouchers typed on Tally's screen. (25 Oct 2026.) SYNTHETIC ONLY: THE COMPANY is BRIDGE GST RECON LAB (company number: the `COMPANYNUMBER` of the committed capture `src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-book-extent.utf16le.xml`; GUID ae1490be-52c5-4544-9ffc-4b7da85f9797), the book the purchase register's committed captures come from. LAB-COMMON v3 applies in full, except where "Differences" below says otherwise; where the two differ, the stricter holds.
 
 Why: the read-only tool `gst_by_counter_ledger` (pull request 1867; in source, not in a published build) has been tested only on that book's committed captures of eight vouchers created by import. This item keys the voucher shapes those captures do not have, on Tally's own screen, and reads them through the tool, one voucher per day and then the whole month, so its answers can be compared with Tally's own ledger screens and the relay's recording can become the pull request's fixtures. Nothing in this item is posted by ComplyEaze Bridge: the tool and `purchase_register` only read. The operator's keying is the only change to the book.
 
@@ -26,11 +26,12 @@ Working folder `C:\bridge-lab\gs1\`, evidence `C:\bridge-lab\gs1\evidence\`, the
 
 ## Steps ("STATE" = a screenshot of the whole Tally window FIRST, then MARKS, then LEDGERS, each kept as a file)
 0. LAB-COMMON step 0. Also: Tally's version (record PRODMAJORREL / PRODMINORREL if shown on the About screen) and licence Silver, not Educational mode; the two request hashes against SHA256.txt; the program file's sha256 equal to the go-ahead's; the data folder listing. LOOK ONLY: F11 (Features) on THE COMPANY: record whether "Maintain inventory" (or "Integrate accounts with inventory") reads Yes. Change nothing on that screen; leave it with Ctrl+Q after a screenshot of its title.
-1. STATE. Record ALTVCHID and ALTMSTID. EXPECT exactly one COMPANY row with THE COMPANY's GUID, and in LEDGERS: `Purchase - Goods`, `Input CGST`, `Input SGST`, `Input IGST`, `Output CGST`, `Output SGST`, `Freight Inward (M2)`, `TDS Payable (M2)`, `SYN Supplier Intra (M2)` and `Cash` present. Any missing = STOP. EXPECT none of `GS1 Rent`, `GS1 Professional Fees`, `GS1 Freight Direct`, `GS1 Computer` present (a present one = STOP).
-2. Backup GS0 (C5), then MARKS. Then key four ledgers (one master screen each, screenshot before accepting): `GS1 Rent` under Indirect Expenses; `GS1 Professional Fees` under Indirect Expenses; `GS1 Freight Direct` under Direct Expenses; `GS1 Computer` under Fixed Assets. STATE. EXPECT exactly those four new GUIDs in LEDGERS, with those parents.
+1. STATE. Record ALTVCHID and ALTMSTID. EXPECT exactly one COMPANY row with THE COMPANY's GUID, and in LEDGERS: `Purchase - Goods`, `Input CGST`, `Input SGST`, `Input IGST`, `Output CGST`, `Output SGST`, `Freight Inward (M2)`, `TDS Payable (M2)`, `SYN Supplier Intra (M2)` and `Cash` present. Any missing = STOP. EXPECT none of `GS1 Rent`, `GS1 Professional Fees`, `GS1 Freight Direct`, `GS1 Computer`, `GS1 Interest on GST`, `GS1 Discount Allowed` present (a present one = STOP). Also present: `Counter Sales - Unregistered` (Sundry Debtors).
+2. Backup GS0 (C5), then MARKS. Then key six ledgers (one master screen each, screenshot before accepting): `GS1 Rent`, `GS1 Professional Fees`, `GS1 Interest on GST` and `GS1 Discount Allowed` under Indirect Expenses; `GS1 Freight Direct` under Direct Expenses; `GS1 Computer` under Fixed Assets. STATE. EXPECT exactly those six new GUIDs in LEDGERS, with those parents.
 3. Key these vouchers, each on its own day of November 2025, in voucher view, party `SYN Supplier Intra (M2)` unless named otherwise. Screenshot each before accepting. After each, MARKS (EXPECT ALTVCHID up by at least one).
    - V1, 3 Nov, Purchase: Dr `GS1 Rent` 10,000.00; Dr `Input CGST` 900.00; Dr `Input SGST` 900.00; Cr party 11,800.00.
-   - V4, 4 Nov, Journal: Dr `GS1 Professional Fees` 20,000.00; Dr `Input IGST` 3,600.00; Cr `TDS Payable (M2)` 2,000.00; Cr party 21,600.00.
+   - V4, 4 Nov, Journal: Dr `GS1 Professional Fees` 20,000.00; Dr `Input IGST` 3,600.00; Cr party 23,600.00.
+   - V4b, 8 Nov, Journal: Dr `GS1 Professional Fees` 10,000.00; Dr `Input IGST` 1,800.00; Cr `TDS Payable (M2)` 1,000.00; Cr party 10,800.00.
    - V5, 5 Nov, Purchase: Dr `GS1 Computer` 40,000.00; Dr `Input CGST` 3,600.00; Dr `Input SGST` 3,600.00; Cr party 47,200.00.
    - V6, 6 Nov, Purchase: Dr `GS1 Freight Direct` 2,000.00; Dr `Input CGST` 180.00; Dr `Input SGST` 180.00; Cr party 2,360.00.
    - V7, 7 Nov, Purchase: Dr `GS1 Rent` 5,000.00; Dr `GS1 Professional Fees` 5,000.00; Dr `Input CGST` 900.00; Dr `Input SGST` 900.00; Cr party 11,800.00.
@@ -38,27 +39,32 @@ Working folder `C:\bridge-lab\gs1\`, evidence `C:\bridge-lab\gs1\evidence\`, the
    - V9, 11 Nov, Journal: Dr `Output CGST` 500.00; Cr `Input CGST` 500.00.
    - V10, 12 Nov, Journal: Dr `GS1 Rent` 180.00; Cr `Input CGST` 90.00; Cr `Input SGST` 90.00.
    - V11, 13 Nov, Payment: Dr `Output CGST` 100.00; Dr `Output SGST` 100.00; Cr `Cash` 200.00.
+   - V13, 15 Nov, Payment (a GST challan that also pays interest): Dr `Output CGST` 90.00; Dr `Output SGST` 90.00; Dr `GS1 Interest on GST` 50.00; Cr `Cash` 230.00.
+   - V14, 16 Nov, Credit Note (a discount allowed with output tax), party `Counter Sales - Unregistered`: Dr `GS1 Discount Allowed` 1,000.00; Dr `Output CGST` 90.00; Dr `Output SGST` 90.00; Cr party 1,180.00.
    - ONLY IF step 0 read inventory Yes: V2, 14 Nov, Purchase in Item Invoice mode: one stock item already in the book (record its name), quantity 1, rate 5,000.00, its purchase ledger `Purchase - Goods`, then `Input CGST` 450.00 and `Input SGST` 450.00, party Cr 5,900.00; and V3, 17 Nov, the same with `Freight Inward (M2)` 100.00 added (party Cr 6,000.00). If step 0 read No: key neither, record "item invoice not keyed: inventory off", and do NOT change the feature.
-4. Key V12, 50 copies of V1, dated 18 to 27 November 2025, five a day, each by Tally's duplicate (Alt+2 on V1) with only the date changed. After the last, STATE. EXPECT ALTVCHID up by at least 59 (61 with V2/V3) over step 1, and LEDGERS unchanged from step 2.
+4. Key V12, 50 copies of V1, dated 18 to 27 November 2025, five a day, each by Tally's duplicate (Alt+2 on V1) with only the date changed. After the last, STATE. EXPECT ALTVCHID up by at least 62 (64 with V2/V3) over step 1, and LEDGERS unchanged from step 2.
 5. Tool calls, one per day, each followed by MARKS (EXPECT both marks unchanged since step 4: the tool writes nothing). Each call: `gst_by_counter_ledger` with `company_guid` THE COMPANY's GUID, `from` = `to` = the day. EXPECT:
    - 3 Nov (V1): `counter_ledgers` holds `GS1 Rent` only: vouchers 1, `debit_side_tax` cgst -900, state_tax -900; `set_aside` empty.
-   - 4 Nov (V4): `GS1 Professional Fees`: vouchers 1, igst -3600 (TDS Payable ignored).
+   - 4 Nov (V4): `GS1 Professional Fees`: vouchers 1, igst -3600.
+   - 8 Nov (V4b): `set_aside.duty_ledger_without_gst_type` 1 voucher, igst -1800 (`TDS Payable (M2)` is typed Others on this book, not TDS; record its type as LEDGERS or Tally's ledger screen shows it).
    - 5 Nov (V5) and 6 Nov (V6): no counter ledger; `set_aside.other_ledgers_present` 1 voucher, with the voucher's tax.
    - 7 Nov (V7): `set_aside.several_counter_ledgers` 1 voucher, cgst -900, state_tax -900.
    - 10 Nov (V8): `GS1 Rent`: vouchers 1, `credit_side_tax` cgst 90, state_tax 90.
    - 11 Nov (V9): `set_aside.gst_on_both_sides` 1 voucher.
-   - 12 Nov (V10): `GS1 Rent`: vouchers 1, `credit_side_tax` cgst 90, state_tax 90.
-   - 13 Nov (V11): `set_aside.no_counter_ledger` 1 voucher, debit cgst -100, state_tax -100.
+   - 12 Nov (V10): `set_aside.no_creditor_party` 1 voucher, `credit_side_tax` cgst 90, state_tax 90 (a reversal journal with no supplier on it is not attributed).
+   - 13 Nov (V11): `set_aside.no_creditor_party` 1 voucher, debit cgst -100, state_tax -100.
+   - 15 Nov (V13): `set_aside.no_creditor_party` 1 voucher, debit cgst -90, state_tax -90; `counter_ledgers` empty (the output tax paid is NOT the interest ledger's tax: any attribution to `GS1 Interest on GST` = FINDING of the first rank).
+   - 16 Nov (V14): `set_aside.class_not_admitted` 1 voucher, debit cgst -90, state_tax -90; `counter_ledgers` empty (any attribution to `GS1 Discount Allowed` = FINDING of the first rank).
    - 14 Nov and 17 Nov (V2, V3), if keyed: RECORD, do not judge: either `set_aside.entries_do_not_balance` (the purchase ledger was not among the ledger entries) or V2 attributed to `Purchase - Goods` and V3 `several_counter_ledgers` (it was). Which one is the finding.
    A different answer is a FINDING (C11: to the run coordinator before the next step), not a STOP, unless the call refused: a refusal = STOP, recorded with its code.
-6. `gst_by_counter_ledger` for 1 to 30 November 2025. MARKS after. EXPECT `state` complete; `GS1 Rent` vouchers 53 (V1, V8, V10 and the 50 copies), `debit_side_tax` cgst -45900, state_tax -45900, `credit_side_tax` cgst 180, state_tax 180; `GS1 Professional Fees` vouchers 1, igst -3600; `set_aside` as the sum of step 5. A refusal on size = record its code and STOP (it measures the tool's year cost); any other refusal = STOP.
+6. `gst_by_counter_ledger` for 1 to 30 November 2025. MARKS after. EXPECT `state` complete; `GS1 Rent` vouchers 52 (V1, V8 and the 50 copies), `debit_side_tax` cgst -45900, state_tax -45900, `credit_side_tax` cgst 90, state_tax 90; `GS1 Professional Fees` vouchers 1, igst -3600; `set_aside` as the sum of step 5. A refusal on size = record its code and STOP (it measures the tool's year cost); any other refusal = STOP.
 7. `purchase_register` for 1 to 30 November 2025 (offset 0, default limit), then MARKS. RECORD its `total` and the side lists' totals; no EXPECT beyond `state` complete (it is the comparison).
 8. BY EYE, from Tally's own screens (Display > Account Books > Ledger, for November 2025): the debit and credit totals of `Input CGST`, `Input SGST`, `Input IGST`, `GS1 Rent` and `GS1 Professional Fees`, each as a screenshot. EXPECT the GST of the vouchers attributed to `GS1 Rent` and `GS1 Professional Fees` in step 6 to be the tax those vouchers carry on these screens.
 9. STATE. EXPECT the marks of step 4 unchanged.
 10. LAB-COMMON C10.
 
 ## What the book holds after each step
-After step 2: four new ledgers. After steps 3 and 4: the vouchers above (61 or 63). Nothing after step 4 changes the book. No restore is made; the book keeps these vouchers (they are dated November 2025, a month the committed captures of this book do not read).
+After step 2: six new ledgers. After steps 3 and 4: the vouchers above (62, or 64 with V2 and V3). Nothing after step 4 changes the book. No restore is made; the book keeps these vouchers (they are dated November 2025, a month the committed captures of this book do not read).
 
 ## Evidence
 Every tool answer whole (the assistant's files), every operator answer, the relay's recording of every request and response for steps 5 to 7 with sizes and sha256, screenshots listed by name, size and sha256 (never pushed), the notes file. The recording of steps 5 to 7 becomes the fixtures of pull request 1867; it carries THE COMPANY's synthetic names only.

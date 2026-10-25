@@ -22,7 +22,10 @@ the crate docs), which is never committed.
 
 `synthetic-read/` is a tally-read-v1 directory: `manifest.json` plus twelve parts, one of them
 gzip-stored. Written by `parity/generate_fixture.py`, deterministically (gzip mtime 0);
-`python3 parity/generate_fixture.py tests/fixtures` from the crate root reproduces these bytes.
+`python3 parity/generate_fixture.py tests/fixtures` from the crate root reproduced these bytes. The
+script was deleted when the repository retired its Python tooling (bridge#1810): the synthetic read
+is frozen data, these bytes and the hashes in `synthetic-read/manifest.json` are the record, and the
+last version of the script is in git history at the commit before the deletion.
 Its manifest declares `producer.kind = "synthetic"` and every part `transformation = "derived"`.
 
 The book is built to make each check fire at least once: a Contra voucher and a custom voucher

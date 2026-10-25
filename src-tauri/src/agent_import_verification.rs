@@ -286,6 +286,61 @@ pub(super) fn observed_fingerprint(
     }
 }
 
+/// An amendment batch reads `posted_verified` only for a voucher that is the
+/// one its build observed, with the amendment applied (#685): the same GUID and
+/// MasterID, and an ALTERID past the one the build pinned (a same-REMOTEID
+/// upsert alters in place and moves the ALTERID: protocol reference 9.14). The
+/// tag and the content alone cannot say so: a file that changes only an
+/// uncompared field (a reference) leaves content equal to the book before
+/// anyone imports it, and a voucher a restore removed can be keyed again with
+/// the same identity (9.15). A voucher that fails the test is demoted to
+/// `matching_content_observed`, which no verdict counts as verified. A build
+/// that is not an amendment holds no pins and is untouched.
+fn demote_unapplied_amendments(
+    rows: &mut [Value],
+    counts: &mut BTreeMap<&'static str, u64>,
+    line: &ImportLedgerLine,
+) {
+    let Some(pins) = &line.amendment_pins else {
+        return;
+    };
+    for row in rows.iter_mut() {
+        if row["status"] != "posted_verified" {
+            continue;
+        }
+        let Some(pin) = pins
+            .iter()
+            .find(|pin| row["bridge_txn_id"].as_str() == Some(pin.bridge_txn_id.as_str()))
+        else {
+            continue;
+        };
+        let reason = match pin.state.applied_in(
+            row["guid"].as_str(),
+            row["master_id"].as_str(),
+            row["alter_id"].as_u64(),
+        ) {
+            amend::AmendmentApplied::Yes => continue,
+            amend::AmendmentApplied::NotYet => "amendment_not_applied",
+            amend::AmendmentApplied::NotTheSameVoucher => "voucher_not_the_one_amended",
+        };
+        row["status"] = json!("matching_content_observed");
+        row["attribution"] = json!("not_established");
+        row["reason"] = json!(reason);
+        for (key, delta) in [
+            ("posted_verified", false),
+            ("matching_content_observed", true),
+        ] {
+            if let Some(count) = counts.get_mut(key) {
+                *count = if delta {
+                    *count + 1
+                } else {
+                    count.saturating_sub(1)
+                };
+            }
+        }
+    }
+}
+
 /// How a batch's vouchers can be attributed to rows of the book.
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Attribution<'a> {
@@ -677,6 +732,7 @@ pub(super) fn verify_batch_as(
                 json!({"count":others.len(),"entries":entries,"attribution":"not_established"});
         }
     }
+    demote_unapplied_amendments(&mut rows, &mut counts, line);
     let (batch_duplicates, unrelated_duplicates_in_window) = batch_duplicate_sets(
         observed,
         &observed_identities,

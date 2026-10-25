@@ -1,13 +1,13 @@
 # C5 (#1832): does the approval window open with a line that says what Y and N do?
 WHY: on Windows the approval box takes the keyboard from a full-screen Tally, so a key typed for Tally can answer it. The box now opens with one plain line. The changelog entry says this was not run on Windows, not in a real box at the new size, and that a non-English Windows is unmeasured.
-COMPANY: BRIDGE APPROVAL LAB (new). It holds a bank ledger (Lab Bank) and two party ledgers under Sundry Debtors, a Receipt voucher type, no voucher on the chosen day D. The company is NEW: if a company or data folder of this name exists on the PC, STOP and report it. Create it with books beginning 1 April 2025, then take backup BK1 into a NEW empty folder (name, size, sha256) before the first keying. Licensed mode only (a post on an ordinary day needs it).
+COMPANY: BRIDGE APPROVAL LAB (new), loaded alone; creating it and taking BK1 are OWNER STEPS, one at a time. It holds a bank ledger (Lab Bank) and two party ledgers under Sundry Debtors, a Receipt voucher type, no voucher on the chosen day D. The company is NEW: if a company or data folder of this name exists on the PC, STOP and report it. Create it with books beginning 1 April 2025 (OWNER STEP), then take backup BK1 into a NEW empty folder (name, size, sha256) before the first keying. Licensed mode only (a post on an ordinary day needs it).
 MODE: B or A. Posting ON (owner types). WINDOWS ONLY: the line differs on a Mac.
 STEPS (one request at a time; Tally full screen on the Gateway of Tally with no dialog before each call):
-1. `list_companies`; GUID. `tally_status`: M0, V0.
+1. `list_companies`: expect exactly BRIDGE APPROVAL LAB, loaded alone; STOP before any call otherwise. GUID. `tally_status`: M0, V0.
 2. `build_import_xml`: ONE Receipt of 1.00 from a party to Lab Bank on day D. `post_import` it. When the box opens, DO NOT answer yet: screenshot the whole screen, then copy the box's text exactly into the record, then answer with Y. Record the result (`posted_verified` expected after `verify_import`).
 3. `build_import_xml`: a saved batch of 2 Receipts of 1.00 on day D (distinct narrations). `post_import`. When the box opens, screenshot and copy its text exactly; answer with the N key. Record the result (nothing posted expected). `tally_status`: V must equal V0 + 1.
 4. If an invoice-stop or post-review window can be reached in this set-up, screenshot it and copy its text; otherwise record "not reachable here".
 EXPECT (the new first line): single voucher: "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." Batch: the same with "these 2 vouchers". The text wraps within the box with no clipped line (screenshot).
 PASS = both lines are as above, the box shows every line, Y posts and N cancels (V as stated). FAIL = a different or missing first line, clipped text, or a key that answers the other way. Wording differences on a non-English Windows are a finding to record, not a failure.
-AFTER: restore BK1 on the run coordinator's explicit RESTORE.
+AFTER: OWNER STEP (the owner works Tally's screen, one step at a time; no lane touches it): restore BK1 on the run coordinator's explicit RESTORE.
 STOP RULES: any dialog before a call; step 2 not `posted_verified` (report whole, do not post again).

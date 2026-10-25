@@ -168,7 +168,7 @@ fn grouping_refusal_error(refusal: GroupingRequestRefusal) -> TallyCommandError 
         GroupingRequestRefusal::Invalid(code) => tally_command_error(
             code,
             "Operation",
-            "Bridge refused the grouping decisions: a field was missing or not valid. Nothing was saved.",
+            "ComplyEaze Bridge refused the grouping decisions: a field was missing or not valid. Nothing was saved.",
             "after_change",
             false,
             "Correct the decision and save again.",

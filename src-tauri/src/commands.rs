@@ -1979,7 +1979,7 @@ pub(crate) fn party_ledger_master_year(
     FinancialYear::containing(&workbook.source().to).ok_or_else(|| {
         party_ledger_master_local_export_error(
             "party_ledger_master_period_invalid",
-            "Bridge could not place the read's balance date in a financial year.",
+            "ComplyEaze Bridge could not place the read's balance date in a financial year.",
             "Refresh the selected Tally company and retry.",
         )
     })

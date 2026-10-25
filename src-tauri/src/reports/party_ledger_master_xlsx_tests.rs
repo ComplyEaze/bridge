@@ -712,6 +712,44 @@ fn decisions_recorded_under_another_book_are_said_and_the_sheet_is_not_final() {
 }
 
 #[test]
+fn decisions_under_another_book_are_said_beside_the_decisions_that_were_read() {
+    use crate::reports::schedule_iii::{
+        Decision, DecisionId, DecisionSet, Derivation, DerivedOutcome, FinancialYear,
+        GroupSubtotalKind, LedgerGuid, ScheduleIIIHead,
+    };
+    let workbook = build_party_ledger_master_workbook(source_with_precision(2)).unwrap();
+    // A decision for last year: listed, needing no attention itself.
+    let last_year = Decision {
+        id: DecisionId(5),
+        ledger: LedgerGuid::new("some-ledger").unwrap(),
+        ledger_name_when_made: "Some ledger".to_string(),
+        made_against: Derivation {
+            outcome: DerivedOutcome::GroupSubtotal(GroupSubtotalKind::SundryDebtors),
+            ancestry: vec!["Sundry Debtors".to_string()],
+        },
+        head: ScheduleIIIHead::TradeReceivables,
+        year: FinancialYear::beginning_in(2025),
+    };
+    let set = DecisionSet::for_tests(&workbook, vec![last_year])
+        .unwrap()
+        .with_elsewhere(1);
+    let bytes = render_party_ledger_master_xlsx(&workbook, DecisionInput::Read(&set)).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut strings,
+    )
+    .unwrap();
+    assert!(strings.contains(
+        "0 applied; 0 not applied and need attention; 1 for another financial year. NOT FINAL:"
+    ));
+    assert!(strings.contains(
+        "1 grouping event(s) for this company and financial year are recorded under another company number or books-from date and were not applied: confirm which book they belong to."
+    ));
+}
+
+#[test]
 fn decisions_that_could_not_be_read_are_never_reported_as_absent() {
     use crate::reports::schedule_iii::DecisionsUnavailable;
     let workbook = build_party_ledger_master_workbook(source_with_precision(2)).unwrap();

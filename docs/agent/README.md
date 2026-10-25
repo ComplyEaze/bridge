@@ -93,6 +93,7 @@ The ordinary default tools, in name order:
 - `cash_flow`
 - `company_features`
 - `egress_log`
+- `gst_by_counter_ledger`
 - `gst_status`
 - `gst_uncertain_vouchers`
 - `ledger_masters`
@@ -121,7 +122,7 @@ The ordinary default tools, in name order:
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
 release 0.6.0. `audit_test_run` is in the source after release 0.6.0 and is not in a published build yet; it is
-not a default tool: it is listed only when its setting is on (below). `gst_uncertain_vouchers` is in the source after release 0.6.0 and is not in a published build yet. `local_data_report` (also
+not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` and `gst_uncertain_vouchers` are in the source after release 0.6.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -813,6 +814,35 @@ Measured on the engine's synthetic book replayed through the simulator. The engi
 a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8), on one book
 whose cash payments were zero, so its payments side was checked only at zero. The tool itself
 has not yet run against a live Tally: the lab comparison comes first.
+
+### GST booked per counter ledger (`gst_by_counter_ledger`)
+
+`gst_by_counter_ledger` takes `company_guid`, `from` and `to` (YYYYMMDD or YYYY-MM-DD). It makes the reads
+`purchase_register` makes, in the same order and with the same drift checks and refusals, and for every voucher with an
+entry on a ledger under Duties & Taxes whose master carries a recognised GST duty head it decides one thing:
+
+- **attributed** to the voucher's one ledger under Purchase Accounts or Indirect Expenses, when the voucher has exactly
+  one such ledger, its class is Purchase, Debit Note, Journal, Payment, Sales or Credit Note, its ledger entries sum to
+  zero, all its GST entries are on one side, and every other entry is on the party, cash, bank or a non-GST duty ledger
+  such as TDS; or
+- **set aside** under the first reason that applies: `class_not_admitted`, `head_conflict`, `unrecognised_head`,
+  `head_absent`, `unresolved_group`, `sign_and_flag_disagree`, `entries_do_not_balance` (an item invoice reads this
+  way: its purchase or sales ledger sits in an inventory allocation the read does not fetch), `sales_ledger_present`,
+  `gst_on_both_sides` (reverse-charge and set-off journals), `other_ledgers_present` (any other group, including Direct
+  Expenses and Fixed Assets until a live capture admits them), `no_counter_ledger` or `several_counter_ledgers`.
+
+`counter_ledgers` gives, per ledger, its predefined `group`, its `parent`, `vouchers`, `debit_side_tax` (negative, as
+the books state it) and `credit_side_tax` (positive) per head, never netted. `set_aside` gives, per reason, the same
+totals and at most 100 vouchers listed. Cancelled, optional and post-dated vouchers are counted and not totalled; a
+window that is not complete is refused as `gst_by_ledger_window_partial`. Every total is folded from one decision per
+voucher, so a voucher's tax is counted once. Nothing is apportioned, and GST booked to a ledger outside Duties & Taxes
+is not seen. It is the books side a CA starts from for expense-head-wise input tax credit (GSTR-9C Table 14); it
+decides no eligibility, availment, input or output side, and no return row.
+
+Measured on one synthetic book of TallyPrime 7.1 Silver, one month of eight vouchers created by import (purchases on
+two Purchase Accounts ledgers, a debit note, a sale, a journal on an Indirect Expenses ledger and a tax payment).
+Not measured: vouchers typed on Tally's screen, item invoices, Direct Expenses and Fixed Assets ledgers, a window
+read in parts, Gold and other releases.
 
 ### Uncertain vouchers of one voucher type (`gst_uncertain_vouchers`)
 

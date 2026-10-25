@@ -105,7 +105,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - `mask_parties` shortens, to their first two and last two characters, the
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase
-    register, bank-statement proposals, voucher totals by ledger, the party ledger of
+    register, the GST totals per counter ledger, bank-statement proposals, voucher totals by ledger, the party ledger of
     each voucher `gst_uncertain_vouchers` lists, the ledgers
     listed under a group total, the ledger named when a group total cannot be
     given, the list of bill-wise ledgers waiting for approval, the suspense ledger
@@ -211,6 +211,12 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       post-dated and what its status flags read) and whether it was accepted
       as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
+    - The GST-by-ledger read (`gst_by_counter_ledger`) sends the company, the
+      dates, each counter ledger's name, group and parent with its voucher count
+      and its GST totals per head, and for each set-aside reason its totals and
+      up to 100 vouchers by number, date, type, class and Tally's identifier.
+      It sends no party names and no narrations; `mask_parties` shortens the
+      ledger names.
     - The uncertain-voucher read (`gst_uncertain_vouchers`) sends the company,
       the voucher type name and the dates, the counts of the whole window and
       the pre-filing line, and, only for each voucher it lists as uncertain or

@@ -25,6 +25,12 @@ These changes are in source and not yet in a published build.
   1 April 2025 to 31 March 2026, the year its rules are for (`audit_period_outside_ay_2026_27`). The engine's
   test passed a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8); the tool
   is replayed from the engine's synthetic book and not yet run against a live Tally (part of #697).
+- `gst_by_counter_ledger` totals, for a period, the GST the books record on ledgers under Duties & Taxes per counter
+  ledger (the one Purchase Accounts or Indirect Expenses ledger on a voucher), debit and credit side apart, per head,
+  and sets every other voucher with GST aside under a named reason with its own totals (an item invoice, a voucher with
+  two such ledgers, a reverse-charge or set-off journal, a sale, a ledger under another group). Books only: not a
+  return figure, and no eligibility or availment decision. Measured on one synthetic month of eight imported vouchers;
+  vouchers typed on Tally's screen, item invoices and Direct Expenses or Fixed Assets ledgers are not measured.
 - `gst_uncertain_vouchers` lists the vouchers of one voucher type (a Sales type is what was measured) in a window that Tally marks Uncertain in its
   GSTR-1, and the vouchers a person accepted as they stand (Accept As Is), each with its party ledger, its invoice total
   (without its sign, with its side) and Tally's identifiers, and the line a CA reads before filing. It counts the window's

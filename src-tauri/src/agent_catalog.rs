@@ -359,6 +359,7 @@ impl ToolEffect {
             "cash_flow" => Self::Read,
             "company_features" => Self::Read,
             "egress_log" => Self::Read,
+            "gst_by_counter_ledger" => Self::Read,
             "gst_status" => Self::Read,
             "gst_uncertain_vouchers" => Self::Read,
             "ledger_masters" => Self::Read,
@@ -414,6 +415,7 @@ pub(super) const REGISTERED_TOOL_NAMES: &[&str] = &[
     "cash_flow",
     "company_features",
     "egress_log",
+    "gst_by_counter_ledger",
     "gst_status",
     "gst_uncertain_vouchers",
     "ledger_masters",
@@ -609,6 +611,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                             "Reading the log changes nothing in it; this call's own receipt lines are added after the read, like every call's."
                         ),
                         json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"default":20,"description":"How many of the most recent receipt lines to return (each completed call writes two): default 20, at most 256 (or the configured row limit, BRIDGE_AGENT_MAX_ROWS, if lower, which can cap the default too), and fewer when the newest receipt lines do not fit in the log read's size bound."}}}),
+                    ),
+                    "gst_by_counter_ledger" => (
+                        super::register::gst_by_ledger::DESCRIPTION,
+                        json!({"type":"object","additionalProperties":false,"required":["company_guid","from","to"],"properties":{"company_guid":{"type":"string","minLength":1},"from":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"to":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"}}}),
                     ),
                     "gst_status" => (
                         "Return Tally's own GSTR-1 status of the vouchers of ONE voucher type in a date window, read from the status flags Tally keeps on each voucher. For each voucher it returns the voucher number, date, voucher type, master_id and alter_id, its `gst_status` (included, uncertain, excluded, not_in_return, all three flags No, which on the lab's Receipts, read before the request fetched the cancelled, optional and post-dated flags, means Tally does not list the voucher, or cancelled, optional or post_dated, decided first from Tally's own cancelled, optional and post-dated flags and never counted as included, uncertain, excluded or not_in_return; such a voucher's item also holds `status_flags`, what its three status flags read, which is not counted) and whether a person accepted it as it stands (`accepted_as_it_stands`, Accept As Is), with the window's counts of each. A status is Tally's own flag and not a judgement of ComplyEaze Bridge: it does not say that a voucher is right or wrong, or that a return is ready to file. The reason for a status is not available: Tally shows it on its screen only, and none is returned. Tally keeps the status a voucher was given when it was saved. included also counts a voucher a person accepted as it stands. post_dated is Tally's flag and not a date still ahead: the lab's one post-dated voucher was marked so by hand and dated the day Tally's current date (set with F2) had been set to, and whether Tally lists a cancelled voucher anywhere in the return, or a post-dated one while Tally's current date is before the voucher's date or once it has reached it, is not measured. A total of 0 may mean the type name matched nothing, and each page is a new read, so a voucher saved between two pages can shift the offsets. A voucher whose flags, or whose cancelled, optional or post-dated flag, are absent or not in a form that was measured, or whose deleted flag reads Yes (never seen: the lab's one deleted voucher left the answer), is returned as unread with a code, never as included, and the result is then partial. Limits: one voucher type by its exact name (a type of the same class under another name is not read), at most 93 days, and a book whose voucher mark is above 25,000 is refused. Measured on one synthetic book of TallyPrime 7.1 Silver only, for the unregistered buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured, and excluded has not been observed. Take company_guid from list_companies and the type name from masters. This first reads the book's voucher mark and then the vouchers of the type in the window, and returns no amount, party or narration.",

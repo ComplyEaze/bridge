@@ -68,10 +68,11 @@ fn the_financial_year_begins_on_1_april() {
 #[test]
 fn the_same_number_in_one_financial_year_is_the_same_invoice_whatever_its_date() {
     let new = incoming("INV/25-26/0001", "20251201");
+    // Case and characters a GSTR-1 number cannot hold do not make another invoice.
     assert_eq!(
         compare(
             &new,
-            &booked("inv-25-26-0001", Some("20251203"), "20251204")
+            &booked("inv/25-26/0001 ", Some("20251203"), "20251204")
         ),
         InvoiceMatch::Booked
     );
@@ -82,6 +83,15 @@ fn the_same_number_in_one_financial_year_is_the_same_invoice_whatever_its_date()
             &booked("INV/25-26/0001", Some("20260415"), "20260416")
         ),
         InvoiceMatch::Different
+    );
+    // `-` and `/` are both GSTR-1 characters: two series may differ only there, so a match that
+    // folding them made is only possible.
+    assert_eq!(
+        compare(
+            &incoming("INV-1", "20251201"),
+            &booked("INV/1", Some("20251203"), "20251204")
+        ),
+        InvoiceMatch::PossiblyBooked
     );
 }
 
@@ -138,4 +148,69 @@ fn numbers_that_only_run_together_or_share_a_serial_are_different_without_a_seco
     let mut series_b = booked("B/1", Some("20251205"), "20251206");
     series_b.value = Some(value("100.00"));
     assert_eq!(compare(&series_a, &series_b), InvoiceMatch::Different);
+}
+
+#[test]
+fn the_voucher_date_fallback_takes_the_year_before_from_april_to_november_only() {
+    let last_year = incoming("GS1/P/0001", "20260310");
+    for (voucher_date, expected) in [
+        ("20260401", InvoiceMatch::PossiblyBooked),
+        ("20261130", InvoiceMatch::PossiblyBooked),
+        ("20261201", InvoiceMatch::Different),
+        ("20270331", InvoiceMatch::Different),
+    ] {
+        assert_eq!(
+            compare(&last_year, &booked("GS1/P/0001", None, voucher_date)),
+            expected,
+            "{voucher_date}"
+        );
+    }
+    // The voucher date's own year is always one of them.
+    let this_year = incoming("GS1/P/0001", "20260610");
+    assert_eq!(
+        compare(&this_year, &booked("GS1/P/0001", None, "20260620")),
+        InvoiceMatch::PossiblyBooked
+    );
+}
+
+#[test]
+fn a_known_other_document_is_different_on_every_path() {
+    let new = incoming("INV/01", "20251201");
+    let mut note = booked("INV/1", Some("20251202"), "20251203");
+    note.document = Some(SupplierDocument::DebitNote);
+    assert_eq!(
+        compare(&new, &note),
+        InvoiceMatch::Different,
+        "loose, same value"
+    );
+    note.invoice_date = None;
+    assert_eq!(
+        compare(&new, &note),
+        InvoiceMatch::Different,
+        "voucher-date year"
+    );
+}
+
+#[test]
+fn no_value_or_a_zero_value_is_no_second_signal() {
+    let mut new = incoming("INV/25-26/0001", "20251201");
+    let mut copy = booked("INV/25-26/1", Some("20251202"), "20251203");
+    new.value = None;
+    copy.value = None;
+    assert_eq!(compare(&new, &copy), InvoiceMatch::Different);
+    new.value = Some(value("0.00"));
+    copy.value = Some(value("-0.00"));
+    assert_eq!(compare(&new, &copy), InvoiceMatch::Different);
+}
+
+#[test]
+fn zeros_and_numbers_without_a_trailing_digit_fold_as_expected() {
+    assert_eq!(loose_form(&reference("000").exact), "0");
+    assert_eq!(loose_form(&reference("A/007/B").exact), "A7B");
+    assert_eq!(serial_form(&reference("000").exact), Some("0".to_string()));
+    assert_eq!(serial_form(&reference("INV/A").exact), None);
+    assert!(
+        reference(" INV/1 ").fits_gstr1(),
+        "surrounding whitespace is not part of it"
+    );
 }

@@ -34,6 +34,9 @@ pub enum SupplierInvoiceRefError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SupplierInvoiceRef {
     raw: String,
+    /// Upper case with `-` and `/` as typed; only what cannot be in a GSTR-1 number (whitespace,
+    /// `.`, `_`, a backslash) is dropped. Two numbers the portal could hold apart differ here.
+    strict: String,
     exact: String,
     loose: String,
     serial: Option<String>,
@@ -61,8 +64,14 @@ impl SupplierInvoiceRef {
         }
         let loose = loose_form(&exact);
         let serial = serial_form(&exact);
+        let strict = raw
+            .chars()
+            .filter(|ch| !(ch.is_whitespace() || matches!(ch, '.' | '_' | '\\')))
+            .flat_map(char::to_uppercase)
+            .collect();
         Ok(Self {
             raw: raw.to_string(),
+            strict,
             exact,
             loose,
             serial,
@@ -221,29 +230,36 @@ pub enum InvoiceMatch {
 /// Whether `booked` is `incoming` already in the books. Both are of the same supplier: the caller
 /// compares only vouchers it tied to the supplier's registration.
 pub fn compare(incoming: &IncomingInvoice, booked: &BookedInvoice) -> InvoiceMatch {
+    // A supplier's debit note and invoice are different documents, whatever their numbers.
+    if matches!(booked.document, Some(document) if document != incoming.document) {
+        return InvoiceMatch::Different;
+    }
     let year = FinancialYear::of(&incoming.invoice_date);
     let (years, from_voucher_date) = booked.financial_years();
     if !years.contains(&year) {
         return InvoiceMatch::Different;
     }
-    let exact = incoming.reference.exact == booked.reference.exact;
-    if !exact {
+    if incoming.reference.exact != booked.reference.exact {
         let second_signal = booked.invoice_date.as_ref() == Some(&incoming.invoice_date)
             || matches!((&incoming.value, &booked.value),
-                (Some(left), Some(right)) if left.magnitude().numeric_eq(&right.magnitude()));
+                (Some(left), Some(right))
+                    if !left.is_zero() && left.magnitude().numeric_eq(&right.magnitude()));
         return if incoming.reference.loose_equal(&booked.reference) && second_signal {
             InvoiceMatch::PossiblyBooked
         } else {
             InvoiceMatch::Different
         };
     }
-    match booked.document {
-        Some(document) if document == incoming.document && !from_voucher_date => {
-            InvoiceMatch::Booked
-        }
-        // A supplier's debit note and invoice of one number are different documents.
-        Some(_) if !from_voucher_date => InvoiceMatch::Different,
-        _ => InvoiceMatch::PossiblyBooked,
+    // Booked only on the number as the portal could hold it, the invoice's own year and a known
+    // document; a match that folding `-` and `/` together made, or that rests on a voucher date
+    // or an unknown document, is only possible.
+    if booked.document.is_some()
+        && !from_voucher_date
+        && incoming.reference.strict == booked.reference.strict
+    {
+        InvoiceMatch::Booked
+    } else {
+        InvoiceMatch::PossiblyBooked
     }
 }
 

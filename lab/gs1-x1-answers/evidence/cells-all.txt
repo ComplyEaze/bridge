@@ -1,0 +1,149 @@
+SHEET Read Me FY 17-18 to FY 23-24: changed 0, formula cells changed 0
+SHEET Read Me FY 24-25: changed 0, formula cells changed 0
+SHEET Read Me FY 25-26: changed 0, formula cells changed 0
+Home | B7 | value | [GSTIN of THE COMPANY]
+Home | D7 | value | 2025-26
+SHEET Home: changed 2, formula cells changed 0
+4 Outward | F7 | value | 0
+4 Outward | G7 | value | 0
+4 Outward | H7 | value | 0
+4 Outward | I7 | value | 0
+4 Outward | J7 | value | 0
+4 Outward | F8 | value | 0
+4 Outward | G8 | value | 0
+4 Outward | H8 | value | 0
+4 Outward | I8 | value | 0
+4 Outward | J8 | value | 0
+4 Outward | F9 | value | 0
+4 Outward | I9 | value | 0
+4 Outward | J9 | value | 0
+4 Outward | F10 | value | 0
+4 Outward | I10 | value | 0
+4 Outward | J10 | value | 0
+4 Outward | F11 | value | 0
+4 Outward | G11 | value | 0
+4 Outward | H11 | value | 0
+4 Outward | I11 | value | 0
+4 Outward | J11 | value | 0
+4 Outward | F13 | value | 0
+4 Outward | G13 | value | 0
+4 Outward | H13 | value | 0
+4 Outward | I13 | value | 0
+4 Outward | J13 | value | 0
+4 Outward | F16 | value | 0
+4 Outward | G16 | value | 0
+4 Outward | H16 | value | 0
+4 Outward | I16 | value | 0
+4 Outward | J16 | value | 0
+4 Outward | F17 | value | 0
+4 Outward | G17 | value | 0
+4 Outward | H17 | value | 0
+4 Outward | I17 | value | 0
+4 Outward | J17 | value | 0
+SHEET 4 Outward: changed 36, formula cells changed 0
+5 Outward | D7 | value | 0
+5 Outward | D8 | value | 0
+5 Outward | D9 | value | 0
+5 Outward | D11 | value | 0
+5 Outward | D12 | value | 0
+5 Outward | D13 | value | 0
+5 Outward | D15 | value | 0
+5 Outward | D16 | value | 0
+SHEET 5 Outward: changed 8, formula cells changed 0
+6 ITC availed | E10 | value | 0
+6 ITC availed | F10 | value | 0
+6 ITC availed | G10 | value | 0
+6 ITC availed | H10 | value | 0
+6 ITC availed | E11 | value | 0
+6 ITC availed | F11 | value | 0
+6 ITC availed | G11 | value | 0
+6 ITC availed | H11 | value | 0
+6 ITC availed | E12 | value | 0
+6 ITC availed | F12 | value | 0
+6 ITC availed | G12 | value | 0
+6 ITC availed | H12 | value | 0
+6 ITC availed | E13 | value | 0
+6 ITC availed | F13 | value | 0
+6 ITC availed | G13 | value | 0
+6 ITC availed | H13 | value | 0
+6 ITC availed | E14 | value | 0
+6 ITC availed | F14 | value | 0
+6 ITC availed | G14 | value | 0
+6 ITC availed | H14 | value | 0
+6 ITC availed | E15 | value | 0
+6 ITC availed | F15 | value | 0
+6 ITC availed | G15 | value | 0
+6 ITC availed | H15 | value | 0
+6 ITC availed | E17 | value | 0
+6 ITC availed | F17 | value | 0
+6 ITC availed | G17 | value | 0
+6 ITC availed | H17 | value | 0
+6 ITC availed | E18 | value | 0
+6 ITC availed | F18 | value | 0
+6 ITC availed | G18 | value | 0
+6 ITC availed | H18 | value | 0
+6 ITC availed | G19 | value | 0
+6 ITC availed | H19 | value | 0
+6 ITC availed | G20 | value | 0
+6 ITC availed | H20 | value | 0
+6 ITC availed | G21 | value | 0
+6 ITC availed | H21 | value | 0
+6 ITC availed | E22 | value | 0
+6 ITC availed | F22 | value | 0
+6 ITC availed | G22 | value | 0
+6 ITC availed | H22 | value | 0
+6 ITC availed | E23 | value | 0
+6 ITC availed | F23 | value | 0
+6 ITC availed | G23 | value | 0
+6 ITC availed | H23 | value | 0
+6 ITC availed | E28 | value | 0
+6 ITC availed | F28 | value | 0
+6 ITC availed | G28 | value | 0
+6 ITC availed | H28 | value | 0
+SHEET 6 ITC availed: changed 50, formula cells changed 0
+7 ITC Rev | D7 | value | 0
+7 ITC Rev | E7 | value | 0
+7 ITC Rev | F7 | value | 0
+7 ITC Rev | G7 | value | 0
+7 ITC Rev | D10 | value | 0
+7 ITC Rev | E10 | value | 0
+7 ITC Rev | F10 | value | 0
+7 ITC Rev | G10 | value | 0
+7 ITC Rev | D11 | value | 0
+7 ITC Rev | E11 | value | 0
+7 ITC Rev | F11 | value | 0
+7 ITC Rev | G11 | value | 0
+7 ITC Rev | D12 | value | 0
+7 ITC Rev | E12 | value | 0
+7 ITC Rev | F12 | value | 0
+7 ITC Rev | G12 | value | 0
+7 ITC Rev | D13 | value | 0
+7 ITC Rev | E13 | value | 0
+7 ITC Rev | F13 | value | 0
+7 ITC Rev | G13 | value | 0
+7 ITC Rev | D16 | value | 0
+7 ITC Rev | E16 | value | 0
+7 ITC Rev | F16 | value | 0
+7 ITC Rev | G16 | value | 0
+7 ITC Rev | D17 | formula | SUM(D7:D16)
+7 ITC Rev | E17 | formula | SUM(E7:E16)
+7 ITC Rev | F17 | formula | SUM(F7:F16)
+7 ITC Rev | G17 | formula | SUM(G7:G16)
+SHEET 7 ITC Rev: changed 28, formula cells changed 4
+SHEET 8 Other ITC: changed 0, formula cells changed 0
+SHEET 9 Tax Paid: changed 0, formula cells changed 0
+10 to 13 PY trans in current FY | E8 | value | 0
+10 to 13 PY trans in current FY | F8 | value | 0
+10 to 13 PY trans in current FY | G8 | value | 0
+10 to 13 PY trans in current FY | H8 | value | 0
+10 to 13 PY trans in current FY | E9 | value | 0
+10 to 13 PY trans in current FY | F9 | value | 0
+10 to 13 PY trans in current FY | G9 | value | 0
+10 to 13 PY trans in current FY | H9 | value | 0
+SHEET 10 to 13 PY trans in current FY: changed 8, formula cells changed 0
+SHEET 14 Differential tax: changed 0, formula cells changed 0
+SHEET 15 Demand & Refunds: changed 0, formula cells changed 0
+SHEET 16 Comp DS & Goods sent on appr: changed 0, formula cells changed 0
+SHEET 17 HSN Outward: changed 0, formula cells changed 0
+SHEET 18 HSN Inward: changed 0, formula cells changed 0
+SHEET Master: changed 0, formula cells changed 0

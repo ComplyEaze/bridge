@@ -1,0 +1,7 @@
+restore-plan (C6), GS1-X1, X0
+folder: the item's backups\x0 folder (must hold one file)
+file: TDBK1800_<company number>.001, 94,275 bytes, sha256 2fef4ba1f24460659fe4f802ead93b624e3cf4e03c7e1b12818f9a985a77f8cc, backed up 25-Oct-26 12:27 IST
+company: BRIDGE GST RECON LAB, GUID ae1490be-52c5-4544-9ffc-4b7da85f9797
+Restore Data Path: Tally's standard data folder
+expected prompts: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Selecting Replace will overwrite the existing folder." = Replace
+after: load THE COMPANY alone; screenshot; MARKS must read ALTVCHID 65, ALTMSTID 293

@@ -1,0 +1,19 @@
+SHEET Read Me FY 17-18 to FY 23-24: changed 0, formula cells changed 0
+SHEET Read Me FY 24-25: changed 0, formula cells changed 0
+SHEET Read Me FY 25-26: changed 0, formula cells changed 0
+Home | B7 | value | [GSTIN of THE COMPANY]
+Home | D7 | value | 2025-26
+SHEET Home: changed 2, formula cells changed 0
+SHEET 4 Outward: changed 0, formula cells changed 0
+SHEET 5 Outward: changed 0, formula cells changed 0
+SHEET 6 ITC availed: changed 0, formula cells changed 0
+SHEET 7 ITC Rev: changed 0, formula cells changed 0
+SHEET 8 Other ITC: changed 0, formula cells changed 0
+SHEET 9 Tax Paid: changed 0, formula cells changed 0
+SHEET 10 to 13 PY trans in current FY: changed 0, formula cells changed 0
+SHEET 14 Differential tax: changed 0, formula cells changed 0
+SHEET 15 Demand & Refunds: changed 0, formula cells changed 0
+SHEET 16 Comp DS & Goods sent on appr: changed 0, formula cells changed 0
+SHEET 17 HSN Outward: changed 0, formula cells changed 0
+SHEET 18 HSN Inward: changed 0, formula cells changed 0
+SHEET Master: changed 0, formula cells changed 0

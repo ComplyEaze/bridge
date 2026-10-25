@@ -1732,20 +1732,23 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// The most bytes each configuration's tools/list answer may take, as
 /// `listed_tool_definitions` serves it: the extension default (the list every
 /// desktop extension user carries, its settings read from the manifest below),
-/// then import and posting on, then import, posting and the tax audit on. The
+/// then import and posting on, then import, posting and the tax audit on, then
+/// all of those and master writes (the two ledger tools) on. The
 /// answer is sent whole at the start of every session, so its size is a cost to
 /// every conversation; raising a budget is argued in the pull request that
 /// needs it. Each must also stay under the control-message ceiling, or
 /// tools/list would answer `agent_response_too_large` and leave the server
 /// without tools. Each was set to its list's size plus the margin the full list
 /// then had under its single budget (18,752 bytes), rounded up to a thousand:
-/// none was raised, and each keeps at least that margin.
-const TOOL_LIST_BUDGETS: [usize; 3] = [200_000, 223_000, 225_000];
+/// none was raised, and each keeps at least that margin. The master-writes list
+/// shares the full list's budget: adding its tools raised no budget.
+const TOOL_LIST_BUDGETS: [usize; 4] = [200_000, 223_000, 225_000, 225_000];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);
     assert!(TOOL_LIST_BUDGETS[1] < ceiling);
     assert!(TOOL_LIST_BUDGETS[2] < ceiling);
+    assert!(TOOL_LIST_BUDGETS[3] < ceiling);
 };
 
 #[test]
@@ -1767,10 +1770,17 @@ fn each_tool_list_stays_within_its_byte_budget() {
         true,
         default_of(super::super::POSTING_SETTING_KEY),
         default_of(super::super::AUDIT_SETTING_KEY),
+        // master writes are not an extension setting
+        false,
     );
-    let settings = [extension_default, (true, true, false), (true, true, true)];
-    let measured = settings.map(|(import, posting, audit)| {
-        let definitions = listed_tool_definitions(import, posting, audit);
+    let settings = [
+        extension_default,
+        (true, true, false, false),
+        (true, true, true, false),
+        (true, true, true, true),
+    ];
+    let measured = settings.map(|(import, posting, audit, masters)| {
+        let definitions = listed_tool_definitions(import, posting, audit, masters);
         // As `agent_protocol.rs` frames it, with its newline and a short request
         // id; a longer id takes its own bytes.
         let total = format!(
@@ -1781,8 +1791,8 @@ fn each_tool_list_stays_within_its_byte_budget() {
         (total, definitions)
     });
     let summary = format!(
-        "extension default {}, import and posting on {}, everything on {} (budgets {TOOL_LIST_BUDGETS:?})",
-        measured[0].0, measured[1].0, measured[2].0
+        "extension default {}, import and posting on {}, everything on {}, master writes as well {} (budgets {TOOL_LIST_BUDGETS:?})",
+        measured[0].0, measured[1].0, measured[2].0, measured[3].0
     );
     for ((total, definitions), budget) in measured.iter().zip(TOOL_LIST_BUDGETS) {
         let mut sizes = definitions

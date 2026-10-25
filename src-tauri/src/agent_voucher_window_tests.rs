@@ -7514,7 +7514,7 @@ fn a_census_holds_a_voucher_between_two_days_including_both_ends() {
     }
     // a window that ends before it starts is refused, not a panic in the range
     let census = census_of(&[("20260803", 1)]);
-    assert_eq!(census.holds_a_voucher_between(&from, &to).unwrap(), true);
+    assert!(census.holds_a_voucher_between(&from, &to).unwrap());
     let failure = census.holds_a_voucher_between(&to, &from).unwrap_err();
     assert_eq!(failure.code, "invalid_date_range");
 }

@@ -51,7 +51,6 @@ fn company_and_catalogue() -> Vec<ScenarioPlan> {
 fn detail_plans(window: ScenarioPlan) -> Vec<ScenarioPlan> {
     let cycle = import_cycle_plans();
     let mut plans = company_and_catalogue();
-    plans.extend(cycle[10..16].iter().cloned());
     plans.extend([
         cycle[0].clone(),
         window.clone(),
@@ -199,7 +198,7 @@ async fn run(
 /// made, the catalogue, the high-water mark, the window and the closing marks, in that order.
 fn detail_evidence_bytes(plans: &[ScenarioPlan]) -> u64 {
     let closing_marks = plans.len() - 5;
-    2 * [5, 11, 17, closing_marks]
+    2 * [5, 11, closing_marks]
         .iter()
         .map(|index| response_bytes(&plans[*index]).len() as u64)
         .sum::<u64>()
@@ -208,7 +207,7 @@ fn detail_evidence_bytes(plans: &[ScenarioPlan]) -> u64 {
 /// The evidence of a detail refused before its window is read: both bodies of the
 /// catalogue, the high-water mark and the census.
 fn evidence_bytes_before_the_window(plans: &[ScenarioPlan]) -> u64 {
-    2 * [5, 11, 17]
+    2 * [5, 11]
         .iter()
         .map(|index| response_bytes(&plans[*index]).len() as u64)
         .sum::<u64>()
@@ -225,7 +224,7 @@ async fn the_handler_reads_and_ties_an_unadjusted_detail_on_a_captured_window() 
     let expected_bytes = detail_evidence_bytes(&plans);
     let (result, served) = run(plans, call).await;
     let (detail, evidence) = result.unwrap();
-    assert_eq!(served, 28);
+    assert_eq!(served, 22);
     assert_eq!(detail["kind"], "unadjusted");
     assert_eq!(detail["party"], PARTY);
     assert_eq!(detail["as_of"], AS_OF);
@@ -372,7 +371,6 @@ async fn a_company_without_a_books_from_date_is_refused_before_the_window_read()
 async fn a_refused_window_read_fails_the_detail_with_its_transport_cause() {
     let cycle = import_cycle_plans();
     let mut plans = company_and_catalogue();
-    plans.extend(cycle[10..16].iter().cloned());
     plans.extend([cycle[0].clone(), captured_window().with_http_status(500)]);
     let (result, _) = run(plans, Call::new(DetailKind::Unadjusted)).await;
     let failure = result.unwrap_err();
@@ -423,7 +421,6 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
     ] {
         let cycle = import_cycle_plans();
         let mut plans = company_and_catalogue();
-        plans.extend(cycle[10..16].iter().cloned());
         plans.extend([
             cycle[0].clone(),
             captured_window(),
@@ -463,7 +460,7 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
             "{code}"
         );
         // The company, the catalogue, the marks and the census: no data part.
-        assert_eq!(served, 22, "{code}");
+        assert_eq!(served, 16, "{code}");
         assert!(
             crate::agent::refusal_remediation(code).is_some(),
             "{code} names its next step"
@@ -681,7 +678,7 @@ async fn a_book_that_moved_between_the_opening_marks_and_the_window_is_refused()
             failure.code, "voucher_window_changed_during_read",
             "{vouchers} {masters}"
         );
-        assert_eq!(served, 28, "every read was made before the check");
+        assert_eq!(served, 22, "every read was made before the check");
         assert!(
             failure.evidence.is_some(),
             "the reads before the refusal keep their evidence"
@@ -702,5 +699,5 @@ async fn a_book_that_did_not_move_is_answered() {
         "{:?}",
         result.err().map(|failure| failure.code)
     );
-    assert_eq!(served, 28);
+    assert_eq!(served, 22);
 }

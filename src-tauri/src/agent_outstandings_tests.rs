@@ -985,8 +985,8 @@ fn add_the_detail_marks_brackets(record: &mut Value) {
             .clone()
     };
     // One paired, identity-bracketed read: an extent read, the pair with its status reads, an
-    // extent read (requests 54, 56 to 59 and 61 of the recording).
-    let block = [54, 56, 57, 58, 59, 61]
+    // extent read (requests 55 to 60 of the recording, the window's pre-flight read of them).
+    let block = [55, 56, 57, 58, 59, 60]
         .into_iter()
         .map(|seq| {
             let mut request = by_seq(seq);
@@ -996,6 +996,11 @@ fn add_the_detail_marks_brackets(record: &mut Value) {
         .collect::<Vec<_>>();
     let mut with = Vec::new();
     for (index, request) in requests.iter().enumerate() {
+        // The window opens on the marks the call already holds, so the recording's own
+        // pre-flight read of them (requests 55 to 60) is not sent any more.
+        if (55..=60).contains(&request["seq"].as_u64().unwrap()) {
+            continue;
+        }
         with.push(request.clone());
         if request["seq"] == 18u64 {
             with.extend(block.iter().cloned());

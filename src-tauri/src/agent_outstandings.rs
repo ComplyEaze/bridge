@@ -44,13 +44,13 @@ impl Server {
             // vouchers read after it, by the party's spelling. A rename between those reads
             // would tie different spellings and answer as a finding, so the company's marks are
             // read before the first of them and again after the last.
-            let detail_marks = match (&detail_request, &party_argument) {
-                (Some(_), Some(_)) => {
+            let detail_target = match (detail_request, &party_argument) {
+                (Some(kind), Some(party)) => {
                     let (marks, evidence) = self
                         .read_company_marks_once(&identity, &company.name)
                         .await?;
                     result_evidence = combine_evidence(result_evidence.clone(), evidence);
-                    Some(marks)
+                    Some((kind, party, marks))
                 }
                 _ => None,
             };
@@ -125,9 +125,7 @@ impl Server {
                     ..
                 } => {
                     let mut detail = None;
-                    if let (Some(kind), Some(party), Some(opening)) =
-                        (detail_request, &party_argument, detail_marks)
-                    {
+                    if let Some((kind, party, opening)) = detail_target {
                         let (value, detail_evidence) = self
                             .outstandings_detail(
                                 &identity,

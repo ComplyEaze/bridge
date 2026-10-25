@@ -906,7 +906,9 @@ impl Server {
                 &from,
                 as_of,
                 VoucherReadShape::EntryWildcard,
-                WindowPlanSource::Estimate { known_marks: None },
+                WindowPlanSource::Estimate {
+                    known_marks: Some(opening),
+                },
                 limits.window,
                 |xml| parse_agent_rows(xml, identity.company_guid()),
             )

@@ -292,6 +292,26 @@
       "size": 16328
     },
     {
+      "blob": "2d5853f7e0617377e85bcc5bfad3195be18c5829",
+      "capture_id": "statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch closing-stock-captures-2 at b237e7c095ef",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md at that commit",
+      "sha256": "f6ccb220551af3ccc25e9d579f8521b932b9da9737bdbeeca8ca9afc3161be66",
+      "size": 1622
+    },
+    {
+      "blob": "0830ca44585859f0dce5da73f3e4c6d0aca5637c",
+      "capture_id": "statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch closing-stock-captures-2 at b237e7c095ef",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md at that commit",
+      "sha256": "a72afe57618cc6488d6920d706f3a4b52100073bcb015622e4f5f8f716bbebdf",
+      "size": 1606
+    },
+    {
       "blob": "aba8c898582745f8e4a70eb4032efa80220a123f",
       "capture_id": "voucher_cost_centre_allocations_shape_lab_live.utf16le.xml",
       "company": "BRIDGE SHAPE LAB",

@@ -561,9 +561,11 @@ promoted.
   - **Residual:** a run configured as `Licensed` against an endpoint that is actually in Education
     still sends `ledgers_v1`. The tool's company read (`CompanyListV1`) carries no `EDUMODE`. Moving
     it to an observed mode means changing its profile sequence, which is not done here.
+  - 2026-10-21: the live-read tool was removed with the rest of the `tools/` workspace (#1745);
+    nothing sends `ledgers_v1` or `CompanyListV1` from it any more.
 - **The native-outstandings qualification.** Accepts only an Education configuration, and its
   identity brackets read through `ledgers_v1`. It therefore refuses on load, so the tool **cannot
-  run** until Phase 2 Unit A.
+  run** until Phase 2 Unit A. (2026-10-21: removed with the live-read tool, #1745.)
 - **`groups_request`.** Had no production caller and compiled only for tests. Deleted 2026-10-12
   together with the Bridge-schema group and voucher-type parsers that read its
   answer; core groups come from the native group collection.
@@ -575,7 +577,7 @@ Reading ledgers and vouchers in Education waits for the Collection-based profile
 - whether Education accepts `$$` functions whose arguments contain no space;
 - whether Education accepts a `COMPUTE` of `$GUID:Company:##SVCurrentCompany`;
 - whether Education accepts `CompanyListV1`, a custom report with no `$$` function that the
-  live-read tool still sends.
+  live-read tool sent before its removal (#1745).
 
 ## 11e. Ledger master read sizes and part reads on two books — **PARTIAL**
 

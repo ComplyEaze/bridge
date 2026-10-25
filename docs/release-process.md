@@ -77,10 +77,9 @@ sorted, unique list:
   (at most 500 characters). There is no `sha256`, and no other key.
 - The top level has exactly `files` and `schema_version`. A schema 2 file, with
   stored hashes, is refused with a message naming the migration.
-- The surface digest that receipts and attestations bind is **computed by the
-  gate from the live bytes of every pinned file**, never stored. Change one byte
-  of a pinned file and the digest moves, so evidence bound to the old digest goes
-  stale. The matrix carries no copy of the digest (bridge#760).
+- No surface digest is stored or computed. The crate that computed one from the
+  live bytes of every pinned file, and the receipts that bound it, were removed
+  (#1745); the acknowledgement file and the review are the control.
 - Because no per-file value is stored, two pull requests that change different
   pinned files, or even the same pinned file, no longer conflict in the surface.
   Each adds its own uniquely named acknowledgement.
@@ -188,39 +187,24 @@ looked at in the review.
   and the merge gate are the control. Only a review that compares the pin list with
   the last reviewed head and a stay-pinned guard test (for the pins it names) can see
   a rewritten history.
-- The `Tally portable core` job still runs the `gate` command, which checks
-  required-file coverage and that every pinned file exists, and computes the
-  digest from the files. It no longer compares a stored hash, so a changed
-  pinned file does not fail it by itself.
+- The `Tally portable core` job runs the `compatibility_surface_stays_whole` test of
+  `bridge-tally-core` (`cargo test -p bridge-tally-core --test compatibility_surface_stays_whole`),
+  which checks required-file coverage and that every pinned file exists as a regular
+  file. It compares no hash, so a changed pinned file does not fail it by itself.
 
-The digest is the same one schema 2 produced for the same bytes, so an
-attestation or receipt made against the old surface stays valid exactly as long
-as no pinned byte changes and the pin list is unchanged (adding or removing a pin
-moves the digest too). Adding four pins (`.gitattributes`, the acknowledgement checker,
-`scripts/merge-gate.sh` and `scripts/check-ci-workflow-consistency.mjs`) in the
-cut-over itself moved the digest once. Print the current digest with
-`cargo run -p bridge-tally-compatibility -- surface-digest docs/tally/compatibility/compatibility-surface.json .`
-(the `surface-digest` subcommand resolves the surface the same way the gate does).
+A surface digest, which receipts and attestations once bound, was computed from the
+live bytes of every pinned file by the `bridge-tally-compatibility` crate. That crate
+and its receipts were removed (#1745); the acknowledgement file and the review are
+the control.
 
 Two byte changes have no pinned path in a diff, and are closed differently. A
 `.gitattributes` below the repository root (end-of-line, `ident` or
 `working-tree-encoding` rules) changes the bytes a pinned file is hashed as, so the
 acknowledgement checks refuse any nested `.gitattributes` outright. A pinned path
-that is, or sits under, a symbolic link would make the digest follow an unpinned
-target, so `resolve` refuses it (`surface_file_symlink`).
+that is, or sits under, a symbolic link would make a pin follow an unpinned
+target, so the surface test refuses it (`surface_file_symlink`).
 
-The live-read collectors (`bridge-tally-live-read` and its native outstandings
-qualification) refuse to start unless every pinned file on disk is byte-identical
-to the blob committed at `HEAD` (`git hash-object --no-filters` against
-`git ls-tree`, so `assume-unchanged`, `skip-worktree`, clean filters, line-ending
-rules and a stale stat cache cannot hide an edit; an untracked or ignored pin, a
-symlink or a tree that is not the repository at the root refuses; git runs
-without `GIT_DIR` and the other redirecting variables). The reference is `HEAD`,
-not reviewed master: this refuses uncommitted edits only. A committed but not yet
-reviewed edit to a pinned request builder runs against live Tally, and is caught
-at `scripts/merge-gate.sh`, where the acknowledgement and the review name the file.
-Schema 2's reference was the stored hash, which a reseal in the same pull request
-moved too, so that case was not caught before either. A pull request stacked on another carries
+A pull request stacked on another carries
 its own acknowledgement, so when the child merges into the parent branch and the
 parent then goes to master, it holds two. Fold them into the parent's `pr-<N>.txt`
 (the union of the two path lists) before the parent merges; both checkers require
@@ -233,14 +217,14 @@ Edit the sorted list by hand.
 1. Insert the entry in sorted path order with a `reason` (required for a pin added
    by a pull request, at most 500 characters): why this file decides what Bridge
    posts or lets leave the machine. Paths are relative, unique and sorted.
-2. Leave `MAX_SURFACE_FILES` in `tools/bridge-tally-compatibility/src/lib.rs`
+2. Leave `MAX_PINS` in `src-tauri/crates/bridge-tally-core/tests/compatibility_surface_stays_whole.rs`
    alone. It is a fixed parse bound against a runaway list (1024), not a count to
    maintain, so adding or removing a pin does not touch it and two pull requests
    that each add a pin no longer collide on it. Only a list that approaches the
    bound would justify raising it, which is a deliberate change to a pinned file
    with its own reason and acknowledgement.
 3. Add the acknowledgement, listing the new pin's path (and a `removed-pin:` line for
-   each removal). Then run the tool's tests.
+   each removal). Then run `cargo test -p bridge-tally-core --test compatibility_surface_stays_whole`.
 
 Removing a pin is done the same way, with a `removed-pin:` line. A malformed list
 is refused by the tool and by CI.
@@ -291,8 +275,8 @@ file that stops being compiled; a test-only or feature-gated module becoming
 production; or a new crate root. The script's docstring keeps the full list.
 
 Read it, then pin each listed file that decides what Bridge posts or lets leave
-the machine, and leave the rest; see the comment on `MAX_SURFACE_FILES` for the
-rule and bridge#416 for the reasoning.
+the machine, and leave the rest; see the module documentation of
+`compatibility_surface_stays_whole` for the rule and bridge#416 for the reasoning.
 
 #### When the surface conflicts in a merge or rebase
 
@@ -308,12 +292,11 @@ unless the acknowledgement has a `removed-pin:` line. A pin that only the branch
 itself added, dropped in a resolution, is not seen by anything.)
 
 **Where a pin matters enough that this is unacceptable, make it REQUIRED.**
-`REQUIRED_SURFACE_FILES` and `REQUIRED_SURFACE_DIRECTORIES` are checked for
-presence, so an entry in either cannot be dropped silently at all.
-`gate_rejects_each_omitted_required_lifecycle_path` iterates that list, so adding
+`REQUIRED_FILES` and `REQUIRED_DIRECTORIES` in the `compatibility_surface_stays_whole`
+test are checked for presence, so an entry in either cannot be dropped silently at all.
+`removing_a_required_file_pin_is_refused` iterates that list, so adding
 a path also tests it. A procedure a maintainer must follow is weaker than a
-constant they cannot circumvent. The matrix is worse: a dropped claim leaves no
-trace at all, so reconcile its claims the same way.
+constant they cannot circumvent.
 
 1. Resolve every non-generated conflict and settle those files completely.
 2. Reconcile the pin list against the merge base. List the pins each side added and
@@ -348,8 +331,8 @@ trace at all, so reconcile its claims the same way.
 
    If the conflict is already resolved and the stages are gone, use `REBASE_HEAD`
    (rebase) or `MERGE_HEAD` (merge) for the incoming side, never `origin/master`.
-3. Leave `MAX_SURFACE_FILES` alone: it is a fixed bound, not a count.
-4. Run the gate, and check the pin count against the union you computed; the gate
+3. Leave `MAX_PINS` alone: it is a fixed bound, not a count.
+4. Run the surface test, and check the pin count against the union you computed; the test
    cannot do this for you. Add or update the acknowledgement so it lists every
    changed pinned path and every added pin.
 
@@ -377,7 +360,7 @@ every row). Merging master into it conflicts on that file. Once per branch:
 3. Re-add the pins the branch itself added. `git diff <merge-base>..HEAD --
    docs/tally/compatibility/compatibility-surface.json` shows them. Insert each as
    `{ "path": "...", "reason": "..." }` in sorted order; do not touch
-   `MAX_SURFACE_FILES`. A branch that only changed the
+   `MAX_PINS`. A branch that only changed the
    contents of already-pinned files has nothing to re-add.
 4. Add `docs/tally/compatibility/acks/pr-<N>.txt` as above if the branch changes any
    pinned path. Until the branch has merged master, its head still holds a schema 2
@@ -389,9 +372,9 @@ every row). Merging master into it conflicts on that file. Once per branch:
 `scripts/reseal.sh`, `rehash-surface` and the merge driver no longer exist. Do not
 recreate them.
 
-#### Running the compatibility tool
+#### Running the surface test
 
-The tool's tests and the `gate` command need the pinned toolchain. A Homebrew
+The surface test (and any cargo command here) needs the pinned toolchain. A Homebrew
 `rustc` earlier on `PATH` shadows rustup, and this project pins the version in
 `rust-toolchain.toml`, so check `rustc --version` first. Setting `RUSTC` alone
 is **not** enough to escape the shadow: `cargo clippy` still resolves the wrong
@@ -433,28 +416,13 @@ corepack pnpm run license:all
    inspect signed candidates again before publication.
 6. Exercise Tally, documents, sync, and persistence using synthetic data;
    attach redacted evidence to the release PR.
-   Keep repository-synthetic parser qualification receipts separate from the
-   live Tally compatibility matrix: they cannot establish a product release,
+   Keep repository-synthetic parser qualification receipts separate from live
+   Tally behaviour: they cannot establish a product release,
    Education/licensed mode, HTTP/runtime behavior, or a performance budget.
    Do not broaden a Tally support claim without current exact-profile live
-   evidence; state missing matrix evidence in the release notes.
-   Run the executable Tally claim gate:
-
-   ```sh
-   cd tools
-   cargo run --locked -p bridge-tally-compatibility -- gate \
-     ../docs/tally/compatibility/compatibility-matrix.json \
-     ../docs/tally/compatibility/compatibility-surface.json \
-     ../docs/tally/compatibility/trusted-evidence-keys.json \
-     ../docs/tally/compatibility/evidence ..
-   ```
-
-   Any positive cell without an exact fresh signed receipt is a release
-   blocker. Unknown cells remain visible limitations; they are not failures
-   unless release notes or product copy claim that scope.
-   Live Education collection, when legitimately available, must follow the
-   [read-only runbook](./tally/compatibility/live-education-runbook.md). Never
-   upload `.bridge-live/` automatically.
+   evidence; state missing live evidence in the release notes. The project keeps no
+   compatibility matrix or claim gate (removed with the `tools/` workspace, #1745):
+   the evidence is the lab items' answers and their reports.
 7. Confirm the release commit and tag contain no PII, machine paths, secrets,
    or unsigned third-party assets. The MCPB's PDFium library is fetched at build
    time, never committed, and admitted only against the SHA-256 digests in

@@ -485,7 +485,7 @@ fn party_ref(ledger: &str, row: &Row<'_>) -> EvidenceRef {
     }
 }
 
-/// The caller's inputs, as the reference's pack passes them.
+/// The caller's inputs, as the reference implementation's pack passes them.
 pub struct Inputs<'c> {
     pub cash: &'c BTreeSet<String>,
     pub bank: &'c BTreeSet<String>,

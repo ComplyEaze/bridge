@@ -99,6 +99,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "local_data_report",
         "masters",
         "month_register",
+        "negative_stock",
         "outstandings",
         "profit_and_loss",
         "purchase_register",
@@ -1461,6 +1462,71 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
     }
 }
 
+/// `build_import_xml`'s description says some things only through its arguments: the proposals
+/// file, the voucher type rules, the ledger name rules and the amendment comparison are stated
+/// once, on the argument they govern, and the description no longer repeats them (#1863). Each argument therefore keeps the phrases below, so shortening one of
+/// them cannot silently drop one of these rules.
+#[test]
+fn the_build_rules_the_description_leaves_to_its_arguments_stay_on_them() {
+    let definitions = tool_definitions(true, true);
+    let schema = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "build_import_xml"))
+        .map(|tool| &tool["inputSchema"])
+        .expect("build_import_xml is registered");
+    for (pointer, phrases) in [
+        (
+            "/properties/proposals_id/description",
+            &["admitted exactly as inline ones", "Requires proposals_sha256"][..],
+        ),
+        (
+            "/properties/proposals_sha256/description",
+            &["refused if the file no longer has it"][..],
+        ),
+        (
+            "/properties/vouchers/items/properties/voucher_type/description",
+            &[
+                "Journal takes any balanced set of entries",
+                "two or more entries",
+                "at least one debit and one credit and no ledger on both sides",
+                "and neither of those fields",
+                "reaches Bank Accounts or Cash-in-Hand",
+                "every credit on a Payment, every debit on a Receipt, every leg on a Contra",
+                "must be established as holding no money",
+                "one three-entry Receipt built by ComplyEaze Bridge has been imported over the gateway and verified",
+            ][..],
+        ),
+        (
+            "/properties/vouchers/items/properties/entries/items/properties/ledger/description",
+            &[
+                "It may end in one CR LF only when the live ledger's stored name does",
+                "case, spacing, dashes, slashes or quotes, a trailing line break",
+                "ledger_has_folded_twin",
+            ][..],
+        ),
+        (
+            "/properties/amends_batch_id/description",
+            &[
+                "so a file import alters the vouchers instead of duplicating them",
+                "Refused if any build of that batch was posted natively",
+                "still in the book as a build of that batch wrote it in the fields compared",
+                "(date, a bank voucher's effective date when Tally returns one, type, number when set, entries' ledger, amount and side, narration)",
+                "checked during this build only, not at import",
+                "the party ledger are not compared",
+                "allocations made in Tally are expected to be lost",
+            ][..],
+        ),
+    ] {
+        let text = schema
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("build_import_xml has no {pointer}"));
+        for phrase in phrases {
+            assert!(text.contains(phrase), "{pointer} lost {phrase:?}");
+        }
+    }
+}
+
 /// A paged tool's `limit` defaults to the configured row limit (`BRIDGE_AGENT_MAX_ROWS`), which an
 /// operator can change, so its schema names no default of its own: a fixed 500 there was false
 /// whenever the row limit was not 500 (#1148). The two evidence reads default to 20 and keep it.
@@ -1482,6 +1548,114 @@ fn a_paged_tools_limit_names_no_default_its_handler_does_not_apply() {
                 limit.get("default").is_none(),
                 "{name}: its limit defaults to the configured row limit, so the schema names no default"
             );
+        }
+    }
+}
+
+/// Some rules of `vouchers`, `outstandings` and `parse_bank_statement` are stated only on the
+/// argument they govern, and the tool descriptions no longer repeat them (#1863). Each argument
+/// therefore keeps the phrases below, so shortening one of them cannot silently drop one of these
+/// rules.
+#[test]
+fn the_rules_three_descriptions_leave_to_their_arguments_stay_on_them() {
+    let definitions = tool_definitions(true, true);
+    let tools = definitions.as_array().expect("tool definitions");
+    for (tool, argument, phrases) in [
+        (
+            "vouchers",
+            "snapshot_id",
+            &["on a later page only", "listing_snapshot_changed"][..],
+        ),
+        (
+            "vouchers",
+            "voucher_class",
+            &[
+                "at most one of voucher_class, voucher_type_guid and voucher_type",
+                "matched however the book has renamed its types, child types included",
+            ][..],
+        ),
+        ("vouchers", "voucher_type", &["matched ignoring ASCII case"][..]),
+        ("vouchers", "voucher_type_guid", &["voucher_type_guid_foreign"][..]),
+        (
+            "vouchers",
+            "ledger",
+            &["spelled as in the book or differing only in ASCII case and spaces"][..],
+        ),
+        (
+            "vouchers",
+            "voucher_number",
+            &["exactly this voucher number, ignoring ASCII case and surrounding spaces"][..],
+        ),
+        (
+            "vouchers",
+            "reference",
+            &["exactly this, ignoring ASCII case and surrounding spaces"][..],
+        ),
+        (
+            "vouchers",
+            "narration_contains",
+            &["(at least 3 characters), ignoring letter case, accent composition and runs of spaces"][..],
+        ),
+        (
+            "vouchers",
+            "suspense_tagged",
+            &[
+                "only together with `ledger`",
+                "matched.suspense_tag",
+                "the same text typed by hand matches",
+                "so also read the ledger without this filter",
+                "Refused without `ledger` (search_suspense_tagged_needs_ledger) and where narrations are withheld from the assistant (search_narration_redacted)",
+            ][..],
+        ),
+        (
+            "vouchers",
+            "summarise_by",
+            &[
+                "ledger, month, voucher_type, group or primary_group",
+                "instead of the vouchers, over the same window, selectors and search; offset and limit page the buckets",
+            ][..],
+        ),
+        (
+            "outstandings",
+            "top",
+            &["It ranks parties only; page the bills with offset and limit."][..],
+        ),
+        (
+            "outstandings",
+            "party",
+            &["spelled as in the book or differing only in ASCII case and spaces"][..],
+        ),
+        (
+            "parse_bank_statement",
+            "account_label",
+            &[
+                "prints its number masked (its first and last three digits clear): give the whole number",
+                "only those six clear digits are compared",
+            ][..],
+        ),
+        (
+            "parse_bank_statement",
+            "total_debits",
+            &["A ubi or bob statement prints no totals: omit both"][..],
+        ),
+        (
+            "parse_bank_statement",
+            "password_file",
+            &[
+                "on a Mac it must be yours with group and other permissions off",
+                "on Windows it must be owned by you or Administrators, with no one but you, SYSTEM and Administrators able to read or change it",
+            ][..],
+        ),
+    ] {
+        let pointer = format!("/inputSchema/properties/{argument}/description");
+        let text = tools
+            .iter()
+            .find(|definition| definition["name"] == tool)
+            .and_then(|definition| definition.pointer(&pointer))
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{tool} has no {pointer}"));
+        for phrase in phrases {
+            assert!(text.contains(phrase), "{tool} {argument} lost {phrase:?}");
         }
     }
 }
@@ -1544,37 +1718,77 @@ fn the_post_tool_says_what_the_approval_window_says() {
     );
 }
 
-/// The most bytes the full catalogue may take in its tools/list answer. The
+/// The most bytes each configuration's tools/list answer may take, as
+/// `listed_tool_definitions` serves it: the extension default (the list every
+/// desktop extension user carries, its settings read from the manifest below),
+/// then import and posting on, then import, posting and the tax audit on. The
 /// answer is sent whole at the start of every session, so its size is a cost to
-/// every conversation; raising this is argued in the pull request that needs
-/// it. It must also stay under the control-message ceiling, or tools/list
-/// would answer `agent_response_too_large` and leave the server without tools.
-const TOOL_LIST_BUDGET: usize = 225_000;
-const _: () = assert!(TOOL_LIST_BUDGET < super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES);
+/// every conversation; raising a budget is argued in the pull request that
+/// needs it. Each must also stay under the control-message ceiling, or
+/// tools/list would answer `agent_response_too_large` and leave the server
+/// without tools. Each was set to its list's size plus the margin the full list
+/// then had under its single budget (18,752 bytes), rounded up to a thousand:
+/// none was raised, and each keeps at least that margin.
+const TOOL_LIST_BUDGETS: [usize; 3] = [200_000, 223_000, 225_000];
+const _: () = {
+    let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
+    assert!(TOOL_LIST_BUDGETS[0] < ceiling);
+    assert!(TOOL_LIST_BUDGETS[1] < ceiling);
+    assert!(TOOL_LIST_BUDGETS[2] < ceiling);
+};
 
 #[test]
-fn the_full_tool_list_stays_within_its_byte_budget() {
-    let definitions = tool_definitions(true, true);
-    let tools = definitions.as_array().expect("tool definitions");
-    // As `agent_protocol.rs` frames it, with its newline and a short request id;
-    // a longer id takes its own bytes.
-    let total = format!(
-        "{}\n",
-        json!({"jsonrpc":"2.0","id":1,"result":{"tools":definitions}})
-    )
-    .len();
-    let mut sizes = tools
-        .iter()
-        .map(|tool| (tool["name"].as_str().unwrap_or("?"), tool.to_string().len()))
-        .collect::<Vec<_>>();
-    sizes.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
-    let report = sizes
-        .iter()
-        .map(|(name, bytes)| format!("{bytes:>7} {name}"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    assert!(
-        total < TOOL_LIST_BUDGET,
-        "tools/list is {total} bytes, over its budget of {TOOL_LIST_BUDGET}.\n{report}"
+fn each_tool_list_stays_within_its_byte_budget() {
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    let default_of = |key: &str| {
+        manifest["user_config"][key]["default"]
+            .as_bool()
+            .unwrap_or_else(|| panic!("the manifest's {key} setting has a boolean default"))
+    };
+    // The extension sets import on outright, not through a setting; any other
+    // form fails here rather than measuring a smaller list.
+    assert_eq!(
+        manifest["server"]["mcp_config"]["env"]["BRIDGE_AGENT_ENABLE_IMPORT"].as_str(),
+        Some("true")
     );
+    let extension_default = (
+        true,
+        default_of(super::super::POSTING_SETTING_KEY),
+        default_of(super::super::AUDIT_SETTING_KEY),
+    );
+    let settings = [extension_default, (true, true, false), (true, true, true)];
+    let measured = settings.map(|(import, posting, audit)| {
+        let definitions = listed_tool_definitions(import, posting, audit);
+        // As `agent_protocol.rs` frames it, with its newline and a short request
+        // id; a longer id takes its own bytes.
+        let total = format!(
+            "{}\n",
+            json!({"jsonrpc":"2.0","id":1,"result":{"tools":definitions}})
+        )
+        .len();
+        (total, definitions)
+    });
+    let summary = format!(
+        "extension default {}, import and posting on {}, everything on {} (budgets {TOOL_LIST_BUDGETS:?})",
+        measured[0].0, measured[1].0, measured[2].0
+    );
+    for ((total, definitions), budget) in measured.iter().zip(TOOL_LIST_BUDGETS) {
+        let mut sizes = definitions
+            .as_array()
+            .expect("tool definitions")
+            .iter()
+            .map(|tool| (tool.to_string().len(), tool["name"].as_str().unwrap_or("?")))
+            .collect::<Vec<_>>();
+        sizes.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(b.1)));
+        let report = sizes
+            .iter()
+            .map(|(bytes, name)| format!("{bytes:>7} {name}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            *total < budget,
+            "a tools/list is {total} bytes, over its budget of {budget}: {summary}\n{report}"
+        );
+    }
 }

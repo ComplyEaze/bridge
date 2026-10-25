@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! The stock inputs the reference's pack reads for `stock` from a read (its stock adapter,
+//! The stock inputs the reference's pack reads for `stock` from a read (its Tally stock adapter,
 //! `read_format.stock_inputs` and `read_format.company_isintegrated`): the stock item masters, the
 //! opening and closing Stock Summaries `[stock]` names, and the company's ISINTEGRATED flag.
 //!

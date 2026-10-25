@@ -4,7 +4,7 @@ Not for merge. The build is NOT named yet: the run coordinator fills the marks b
 
 Written for a lab running TallyPrime 7.2. Earlier measurements in the sheets were taken on 7.1: record the Tally version, the licence mode (licensed, or Education with day-1/2/31 boundaries) and the date at the top of every row, and report any difference from a 7.1 measurement as a finding, not a failure. A row that posts or keys a voucher on an ordinary day needs licensed mode.
 
-Screen actions: every action on Tally's screen or the desktop's settings (renames, restores, hand-keying, backups, the extension restart) is an OWNER STEP, done by the owner one at a time; no lane touches the lab PC. Books: each row names its company exactly and it is small by construction; a row never runs on a book it does not name, and never on a second loaded company unless it says so.
+Screen actions: every action on Tally's screen or the desktop's settings (renames, restores, hand-keying, backups, the extension restart) is an OWNER STEP, done by the owner one at a time; no one else acts on the lab PC. Books: each row names its company exactly and it is small by construction; a row never runs on a book it does not name, and never on a second loaded company unless it says so.
 
 Standing rules for every row: one request at a time and no retry; Gateway of Tally with no dialog before every call; every answer saved whole with its egress line and the data-folder snapshot; marks and counts taken structurally, never by substring, and a failed request reported as failed (never as "0 rows"); backups before any keying and a restore only on the run coordinator's explicit word; STOP at any dialog, any answer outside the stated shape, or any mark that moves where a row says it must not.
 
@@ -14,7 +14,7 @@ RC CONTAINS (per row: "in" or "not in"): C1 #1787 __  C2 #1806 __  C3 #1805 __  
 
 ## Standing checks before any row
 (a) Sales stays switched off: `LIVE_QUALIFIED_VOUCHER_TYPES` does not list Sales in the RC commit, so every Sales build is refused before anything is sent. The cut re-checks it in the code.
-(b) Rows C5 and C7 write to Tally (a native post and a restore); C1 renames the COMPANY (BRIDGE RENAME LAB) and undoes it, which changes what `list_companies` and the All-clients sweep show for that company until undone, and C3 renames one ledger and undoes it; C2, C6 and C8 only read. Another lane's rows cover its own write-path changes.
+(b) Rows C5 and C7 write to Tally (a native post and a restore); C1 renames the COMPANY (BRIDGE RENAME LAB) and undoes it, which changes what `list_companies` and the All-clients sweep show for that company until undone, and C3 renames one ledger and undoes it; C2, C6 and C8 only read. Other write-path changes are covered by their own rows.
 
 ## Order (about 3 hours; cut from the bottom if short)
 | # | Sheet | Company | Change | Writes |
@@ -29,6 +29,6 @@ RC CONTAINS (per row: "in" or "not in"): C1 #1787 __  C2 #1806 __  C3 #1805 __  
 
 Restore each company at its row's end, before the next row.
 
-Not run live, by design: C4 (#1799, a snapshot request that reaches its 20-second deadline is recorded as `request_deadline_exceeded`; no cheap live trigger) and the rebuild wording of #1821; both are covered by tests only and are recorded "not run live" in the release notes. The reads lane's own rows (cost-centre allocations, party mailing details, stock items and the rest) are in its own request file and are not repeated here.
+Not run live, by design: C4 (#1799, a snapshot request that reaches its 20-second deadline is recorded as `request_deadline_exceeded`; no cheap live trigger) and the rebuild wording of #1821; both are covered by tests only and are recorded "not run live" in the release notes. The rows for the new reads (cost-centre allocations, party mailing details, stock items and the rest) are in their own request file and are not repeated here.
 
 `SHA256.txt` lists every file here. Check it before the sitting starts.

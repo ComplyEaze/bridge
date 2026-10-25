@@ -9,5 +9,5 @@ STEPS (one request at a time; Tally full screen on the Gateway of Tally with no 
 4. If an invoice-stop or post-review window can be reached in this set-up, screenshot it and copy its text; otherwise record "not reachable here".
 EXPECT (the new first line): single voucher: "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." Batch: the same with "these 2 vouchers". The text wraps within the box with no clipped line (screenshot).
 PASS = both lines are as above, the box shows every line, Y posts and N cancels (V as stated). FAIL = a different or missing first line, clipped text, or a key that answers the other way. Wording differences on a non-English Windows are a finding to record, not a failure.
-AFTER: OWNER STEP (the owner works Tally's screen, one step at a time; no lane touches it): restore BK1 on the run coordinator's explicit RESTORE.
+AFTER: OWNER STEP (the owner works Tally's screen, one step at a time; no one else acts on it): restore BK1 on the run coordinator's explicit RESTORE.
 STOP RULES: any dialog before a call; step 2 not `posted_verified` (report whole, do not post again).

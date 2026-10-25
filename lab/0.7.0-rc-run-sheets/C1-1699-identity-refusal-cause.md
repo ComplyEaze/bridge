@@ -4,11 +4,11 @@ COMPANY: BRIDGE RENAME LAB (X, new) and BRIDGE RENAME PEER LAB (new): exactly th
 MODE: B (standing config entry).
 STEPS (one request at a time):
 1. `list_companies`; record the GUID and exact name of X and of the other loaded companies. `tally_status` for X: the voucher mark before (egress line).
-2. OWNER STEP (the owner works Tally's screen, one step at a time; no lane touches it): backup BK1 of X into a NEW empty folder (name, size, sha256).
-3. OWNER STEP (the owner works Tally's screen, one step at a time; no lane touches it): alter X's company name (add one letter) and save. While it is renamed `list_companies` and the All-clients sweep show the new name for X. Do NOT call `list_companies` again.
+2. OWNER STEP (the owner works Tally's screen, one step at a time; no one else acts on it): backup BK1 of X into a NEW empty folder (name, size, sha256).
+3. OWNER STEP (the owner works Tally's screen, one step at a time; no one else acts on it): alter X's company name (add one letter) and save. While it is renamed `list_companies` and the All-clients sweep show the new name for X. Do NOT call `list_companies` again.
 4. `ledger_movement` for X's GUID, one calendar month, exactly as the built tool takes it. Save the full answer.
 5. All-companies outstandings from the desktop app (the "All clients" view), once, while X is still renamed; it reads only the two small books above. Note X's row and its reason text.
-6. OWNER STEP (the owner works Tally's screen, one step at a time; no lane touches it): rename X back to BRIDGE RENAME LAB (restore BK1 only on the run coordinator's explicit RESTORE). `tally_status`: the voucher mark after.
+6. OWNER STEP (the owner works Tally's screen, one step at a time; no one else acts on it): rename X back to BRIDGE RENAME LAB (restore BK1 only on the run coordinator's explicit RESTORE). `tally_status`: the voucher mark after.
 EXPECT (record, not predicted): the refusal for X in step 4: its `code`, its `cause` and its `remediation`. A refusal earlier than the identity check (for example the tool cannot find the company by GUID) is a finding, not a failure: record its code.
 PASS = no data is returned for X, and the refusal either carries a `cause` beginning `company_identity_` with a remediation that says to open the company in Tally and call `list_companies` again, or the earlier refusal is recorded with its code. Step 5: X's row shows a reason that names the identity cause in words, not "company read failed", and the other companies' rows are unaffected.
 FAIL = data returned for a company the name no longer matches, or a bare operation code with neither cause nor remediation on the identity path.

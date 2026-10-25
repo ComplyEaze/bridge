@@ -8,10 +8,16 @@
 //! intact under the old name. So a reset is possible only through [`ResettableMirror`], a value
 //! that can be built only by [`ResettableMirror::prove`], which
 //!
-//! - takes the initialization lock and the exclusive use lock (an open mirror holds the shared
-//!   one for its whole life, in any process), and refuses while the mirror is open;
+//! - takes the initialization lock and the exclusive use lock without waiting (an open mirror
+//!   holds the shared one for its whole life, in any process), and refuses while the mirror is
+//!   open or being opened; the initialization lock is let go once the use lock is held, so an
+//!   opener that comes later is refused by the use lock instead of waiting on this proof;
 //! - lists every key the app has stored and tries each on the database, and refuses if any opens
 //!   it, or if it cannot be told whether one does;
+//! - refuses when this database's own entry holds a key of the right length that does not open
+//!   it, or when the file is a plaintext SQLite database: SQLCipher answers "not a database" for
+//!   a damaged first page or a changed cipher setting exactly as it does for a wrong key, so a
+//!   right-length key of this database's own is never discarded on that answer;
 //! - carries the database path and the key store it proved, so a different path or store cannot be
 //!   passed to the deletion.
 //!
@@ -27,9 +33,12 @@ use std::path::{Path, PathBuf};
 use zeroize::Zeroizing;
 
 use super::encrypted::{
-    connect_encrypted, lock_mirror_exclusively, lock_mirror_initialization, EncryptedOpenError,
-    MirrorInitializationLock, MirrorKeyStore, MirrorUseLock, MirrorUseLockError, MIRROR_KEY_BYTES,
+    connect_encrypted, lock_mirror_exclusively, try_lock_mirror_initialization, EncryptedOpenError,
+    MirrorKeyStore, MirrorUseLock, MirrorUseLockError, MIRROR_KEY_BYTES,
 };
+
+/// What every plaintext SQLite file begins with; an encrypted mirror never does.
+const PLAINTEXT_SQLITE_HEADER: &[u8; 16] = b"SQLite format 3\0";
 
 /// A key store a reset can be proved against and delete from.
 pub trait ResettableKeyStore: MirrorKeyStore {
@@ -62,6 +71,14 @@ pub enum ResetRefusal {
     /// Some stored key opens the database: a reset would destroy data that can be read.
     #[error("A stored key opens this Tally mirror, so it is not reset")]
     KeyOpensTheMirror,
+    /// This database's own entry holds a key of the right length that does not open it. That is
+    /// a wrong key, a damaged first page or a changed cipher setting, and the answers cannot be
+    /// told apart; the key may be the only way to recover the data.
+    #[error("The key stored for this Tally mirror does not open it, so it is not reset")]
+    StoredKeyDoesNotOpen,
+    /// The file is a plaintext SQLite database, not an encrypted mirror.
+    #[error("The Tally mirror file is not encrypted, so it is not reset")]
+    NotEncrypted,
     /// Neither permitted state: nothing is wrong that a reset would fix.
     #[error("The Tally mirror is not in a state a reset is offered for")]
     NotInAResettableState,
@@ -120,23 +137,30 @@ pub struct ResettableMirror<S: ResettableKeyStore> {
     // Held until the value is dropped: no mirror can open, and no second reset can start, between
     // the proof and the deletion. Dropped after the files are gone; the lock files stay.
     _use_lock: MirrorUseLock,
-    _initialization_lock: MirrorInitializationLock,
 }
 
 impl<S: ResettableKeyStore> ResettableMirror<S> {
     pub async fn prove(database_path: &Path, key_store: S) -> Result<Self, ResetRefusal> {
-        let initialization_lock =
-            lock_mirror_initialization(database_path).map_err(|_| ResetRefusal::LockUnavailable)?;
-        let use_lock = lock_mirror_exclusively(database_path).map_err(|error| match error {
+        let refusal = |error| match error {
             MirrorUseLockError::Held => ResetRefusal::InUse,
             MirrorUseLockError::Unavailable => ResetRefusal::LockUnavailable,
-        })?;
+        };
+        // Neither lock is waited for: a mirror being opened or in use refuses the reset.
+        let initialization_lock = try_lock_mirror_initialization(database_path).map_err(refusal)?;
+        let use_lock = lock_mirror_exclusively(database_path).map_err(refusal)?;
+        // With the use lock held no opener can get past its shared attempt, so the initialization
+        // lock is let go: a later opener is refused at once rather than waiting on this proof.
+        drop(initialization_lock);
 
         let exists = database_path
             .try_exists()
             .map_err(|_| ResetRefusal::DatabaseStateUnreadable)?;
         let state = if exists {
+            if starts_with_plaintext_header(database_path)? {
+                return Err(ResetRefusal::NotEncrypted);
+            }
             let keys = key_store.all_keys().map_err(ResetRefusal::KeysUnlistable)?;
+            let own_key = key_store.load().map_err(|_| ResetRefusal::Undetermined)?;
             for key in keys.into_iter().filter(|key| key.len() == MIRROR_KEY_BYTES) {
                 match connect_encrypted(database_path, key).await {
                     Ok(pool) => {
@@ -149,6 +173,9 @@ impl<S: ResettableKeyStore> ResettableMirror<S> {
                         _ => return Err(ResetRefusal::Undetermined),
                     },
                 }
+            }
+            if own_key.is_some_and(|key| key.len() == MIRROR_KEY_BYTES) {
+                return Err(ResetRefusal::StoredKeyDoesNotOpen);
             }
             ResettableState::DatabaseNoKeyOpens
         } else {
@@ -165,7 +192,6 @@ impl<S: ResettableKeyStore> ResettableMirror<S> {
             key_store,
             state,
             _use_lock: use_lock,
-            _initialization_lock: initialization_lock,
         })
     }
 
@@ -222,6 +248,20 @@ impl<S: ResettableKeyStore> ResettableMirror<S> {
             }
         }
         Ok(())
+    }
+}
+
+/// Whether the file begins with the plaintext SQLite header. A file that cannot be read says
+/// nothing, so it refuses as undetermined.
+fn starts_with_plaintext_header(database_path: &Path) -> Result<bool, ResetRefusal> {
+    use std::io::Read;
+    let mut header = [0_u8; 16];
+    let mut file = std::fs::File::open(database_path).map_err(|_| ResetRefusal::Undetermined)?;
+    match file.read_exact(&mut header) {
+        Ok(()) => Ok(&header == PLAINTEXT_SQLITE_HEADER),
+        // Shorter than the header: not a plaintext database either.
+        Err(error) if error.kind() == std::io::ErrorKind::UnexpectedEof => Ok(false),
+        Err(_) => Err(ResetRefusal::Undetermined),
     }
 }
 

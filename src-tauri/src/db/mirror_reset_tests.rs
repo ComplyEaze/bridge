@@ -3,7 +3,8 @@ use super::{
     ResettableState,
 };
 use crate::db::encrypted::{
-    connect_encrypted, lock_mirror_in_use, resolve_mirror_key, MirrorKeyStore, MIRROR_KEY_BYTES,
+    connect_encrypted, lock_for_open, lock_mirror_in_use, lock_mirror_initialization,
+    resolve_mirror_key, MirrorKeyStore, MIRROR_KEY_BYTES,
 };
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -302,14 +303,16 @@ async fn a_storage_failure_while_trying_a_key_is_not_a_wrong_key() {
 }
 
 #[tokio::test]
-async fn an_open_mirror_refuses_a_reset_and_a_reset_refuses_an_open() {
+async fn an_open_mirror_refuses_a_reset_and_a_reset_refuses_an_open_at_once() {
     let directory = tempfile::tempdir().unwrap();
     let (database, ..) = paths(directory.path());
     encrypted_mirror(&database, &GOOD_KEY).await;
     let store = FakeStore::new("this-path").with("another-path", &OTHER_KEY);
 
-    // This process has the mirror open: its own shared lock excludes the reset.
-    let open = lock_mirror_in_use(&database).expect("the open mirror's lock");
+    // This process has the mirror open: the opener's locks (the shared use lock is kept) exclude
+    // the reset.
+    let (initialization, open) = lock_for_open(&database).expect("the opener's locks");
+    drop(initialization);
     let refusal = prove(&database, &store).await.err().expect("a refusal");
     assert!(matches!(refusal, ResetRefusal::InUse), "{refusal:?}");
     assert!(database.exists());
@@ -317,11 +320,72 @@ async fn an_open_mirror_refuses_a_reset_and_a_reset_refuses_an_open() {
     let second = lock_mirror_in_use(&database).expect("a second open");
     drop((open, second));
 
-    // While a reset holds the mirror, an open is refused at once instead of racing it.
+    // An opener still initializing refuses the reset too, without the reset waiting for it.
+    let initializing = lock_mirror_initialization(&database).expect("an opener initializing");
+    let refusal = prove(&database, &store).await.err().expect("a refusal");
+    assert!(matches!(refusal, ResetRefusal::InUse), "{refusal:?}");
+    drop(initializing);
+
+    // While a proof holds the mirror, a real opener is refused at once: it must neither wait on
+    // the proof nor get past it.
     let proof = prove(&database, &store).await.expect("a resettable mirror");
-    assert!(lock_mirror_in_use(&database).is_err());
+    let opener_path = database.clone();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(lock_for_open(&opener_path).is_err());
+    });
+    let refused = receiver
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("an opener must not wait on a held proof");
+    assert!(refused);
     drop(proof);
-    lock_mirror_in_use(&database).expect("free again once the proof is dropped");
+    drop(lock_for_open(&database).expect("free again once the proof is dropped"));
+}
+
+#[tokio::test]
+async fn a_plaintext_database_is_not_reset() {
+    let directory = tempfile::tempdir().unwrap();
+    let (database, ..) = paths(directory.path());
+    let mut bytes = b"SQLite format 3\0".to_vec();
+    bytes.extend_from_slice(&[0; 100]);
+    std::fs::write(&database, bytes).unwrap();
+    let store = FakeStore::new("this-path").with("another-path", &OTHER_KEY);
+    let refusal = prove(&database, &store).await.err().expect("a refusal");
+    assert!(matches!(refusal, ResetRefusal::NotEncrypted), "{refusal:?}");
+    assert!(database.exists());
+}
+
+#[tokio::test]
+async fn a_right_length_key_of_this_databases_own_that_does_not_open_it_is_never_discarded() {
+    let directory = tempfile::tempdir().unwrap();
+    let (database, ..) = paths(directory.path());
+    encrypted_mirror(&database, &GOOD_KEY).await;
+    // This path's own entry holds a right-length key that does not open the database: a wrong
+    // key, or the right key and a damaged first page, which SQLCipher answers the same way.
+    let store = FakeStore::new("this-path").with("this-path", &OTHER_KEY);
+    let refusal = prove(&database, &store).await.err().expect("a refusal");
+    assert!(
+        matches!(refusal, ResetRefusal::StoredKeyDoesNotOpen),
+        "{refusal:?}"
+    );
+    assert!(database.exists());
+    assert_eq!(store.accounts(), ["this-path"]);
+
+    // The same holds for a store that belongs to another mirror: its key is never deleted on
+    // the strength of this database failing to open.
+    let other_mirrors_store = FakeStore::new("mirror-b").with(
+        "mirror-b",
+        &GOOD_KEY[..].iter().map(|b| b ^ 1).collect::<Vec<u8>>(),
+    );
+    let refusal = prove(&database, &other_mirrors_store)
+        .await
+        .err()
+        .expect("a refusal");
+    assert!(
+        matches!(refusal, ResetRefusal::StoredKeyDoesNotOpen),
+        "{refusal:?}"
+    );
+    assert_eq!(other_mirrors_store.accounts(), ["mirror-b"]);
 }
 
 #[tokio::test]
@@ -341,8 +405,9 @@ async fn every_crash_point_leaves_no_readable_key_beside_the_database_and_a_reru
             std::fs::write(leftover, b"leftover").unwrap();
         }
         let store = FakeStore::new("this-path").with("another-path", &OTHER_KEY);
-        // A key under this path's own account that does not open the database, as a stale one.
-        store.save(&[4; MIRROR_KEY_BYTES]).unwrap();
+        // A key of the wrong length under this path's own account: the key is invalid, so the
+        // reset may remove it.
+        store.save(&[4; 7]).unwrap();
 
         let proof = prove(&database, &store).await.expect("a resettable mirror");
         let error = proof
@@ -396,7 +461,7 @@ async fn a_key_that_cannot_be_deleted_or_is_still_readable_leaves_every_file_alo
             {
                 let mut store = FakeStore::new("this-path").with("another-path", &OTHER_KEY);
                 store.delete_is_a_lie = true;
-                store.save(&[4; MIRROR_KEY_BYTES]).unwrap();
+                store.save(&[4; 7]).unwrap();
                 store
             },
             false,

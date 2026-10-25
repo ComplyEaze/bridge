@@ -101,25 +101,54 @@ pub struct MirrorInitializationLock {
     _file: File,
 }
 
-pub fn lock_mirror_initialization(
-    database_path: &Path,
-) -> anyhow::Result<MirrorInitializationLock> {
+fn mirror_initialization_lock_file(database_path: &Path) -> anyhow::Result<File> {
     let file_name = database_path
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("The Tally mirror path has no file name"))?;
     let mut lock_name = file_name.to_os_string();
     lock_name.push(".init.lock");
     let lock_path = database_path.with_file_name(lock_name);
-    let file = OpenOptions::new()
+    OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(false)
         .open(lock_path)
-        .map_err(|_| anyhow::anyhow!("The Tally mirror initialization lock could not be opened"))?;
+        .map_err(|_| anyhow::anyhow!("The Tally mirror initialization lock could not be opened"))
+}
+
+pub fn lock_mirror_initialization(
+    database_path: &Path,
+) -> anyhow::Result<MirrorInitializationLock> {
+    let file = mirror_initialization_lock_file(database_path)?;
     file.lock()
         .map_err(|_| anyhow::anyhow!("The Tally mirror is being initialized by another process"))?;
     Ok(MirrorInitializationLock { _file: file })
+}
+
+/// The initialization lock, refusing at once instead of waiting: a reset must not queue behind
+/// an opener (or hold one up) while it decides.
+pub(crate) fn try_lock_mirror_initialization(
+    database_path: &Path,
+) -> Result<MirrorInitializationLock, MirrorUseLockError> {
+    let file = mirror_initialization_lock_file(database_path)
+        .map_err(|_| MirrorUseLockError::Unavailable)?;
+    match file.try_lock() {
+        Ok(()) => Ok(MirrorInitializationLock { _file: file }),
+        Err(std::fs::TryLockError::WouldBlock) => Err(MirrorUseLockError::Held),
+        Err(std::fs::TryLockError::Error(_)) => Err(MirrorUseLockError::Unavailable),
+    }
+}
+
+/// The locks an opener of the mirror takes, in this order: the initialization lock (waits for
+/// another opener to finish), then the shared use lock, which refuses at once while a reset holds
+/// the mirror. The use lock is kept for as long as the mirror stays open.
+pub fn lock_for_open(
+    database_path: &Path,
+) -> anyhow::Result<(MirrorInitializationLock, MirrorUseLock)> {
+    let initialization = lock_mirror_initialization(database_path)?;
+    let in_use = lock_mirror_in_use(database_path)?;
+    Ok((initialization, in_use))
 }
 
 /// Held by an open mirror for its whole life, and taken exclusively by a reset, so a reset cannot

@@ -484,9 +484,9 @@ fn a_renamed_ledger_and_an_excluded_one_each_say_so_and_the_sheet_is_not_final()
         std::io::Read::read_to_string(&mut archive.by_name(name).unwrap(), &mut text).unwrap();
     }
 
-    assert!(text.contains("Tally now names this ledger"));
-    assert!(text.contains("Term loan from director"));
-    assert!(text.contains("the decision was made for"));
+    assert!(text.contains(
+        r#"Not applied: Tally now names this ledger "Term loan from director", and the decision was made for "Term loan". Confirm it for the ledger as it is named now."#
+    ));
     assert!(text.contains(
         "0 applied; 1 not applied and need attention; 0 for another financial year. NOT FINAL: resolve each decision that needs attention. 1 ledger(s) are excluded: a client mapping decision is required."
     ));

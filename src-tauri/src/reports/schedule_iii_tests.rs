@@ -983,6 +983,33 @@ fn a_renamed_ledger_is_found_by_its_case_folded_guid_but_its_decision_needs_reco
 }
 
 #[test]
+fn a_rename_alone_makes_the_view_not_final_when_no_ledger_is_excluded() {
+    // The ledger sits under Sundry Debtors, so nothing is excluded; the only
+    // thing left for the CA is to reconfirm the renamed ledger's decision.
+    let mut renamed = row("Customer (renamed)", "Sundry Debtors", "-100");
+    renamed.guid = "GUID-CUSTOMER".to_string();
+    let source = book(vec![renamed]);
+    let decisions = [decision(
+        33,
+        "Customer",
+        DerivedOutcome::GroupSubtotal(GroupSubtotalKind::SundryDebtors),
+        ScheduleIIIHead::TradeReceivables,
+    )];
+
+    let view = build_schedule_iii_view(&source, &decisions).unwrap();
+
+    assert!(view.exclusions.is_empty());
+    assert_eq!(
+        not_applied(&view, 33),
+        Some(&NotApplied::Renamed {
+            was: "Customer".to_string(),
+            now: "Customer (renamed)".to_string(),
+        })
+    );
+    assert_eq!(view.finality, Finality::NotFinal);
+}
+
+#[test]
 fn a_decision_for_another_year_is_offered_not_applied_and_needs_no_attention_itself() {
     let source = book(vec![row("Term loan", "Loans (Liability)", "500")]);
     let mut last_year = decision(

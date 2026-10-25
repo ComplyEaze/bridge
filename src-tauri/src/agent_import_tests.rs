@@ -3299,7 +3299,10 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
         } else {
             assert!(first.contains("Voucher posting is off"), "{first}");
             assert_eq!(first.contains("would still refuse"), numbered, "{first}");
-            assert!(!first.contains("import_post_requires_one_voucher"), "{first}");
+            assert!(
+                !first.contains("import_post_requires_one_voucher"),
+                "{first}"
+            );
         }
         // The company-identity warning is unconditional: present for this
         // Journal-only batch exactly as it would be for a bank one.

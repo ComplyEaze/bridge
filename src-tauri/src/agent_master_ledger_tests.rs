@@ -1,10 +1,10 @@
 //! Master journal tests: local files and synthetic identifiers only.
 use super::*;
+use crate::agent::agent_import::tests::{sentinel_batch_id, sentinel_uuid};
 use serde_json::json;
 use std::io::Cursor;
 use std::path::Path;
 use uuid::Uuid;
-use crate::agent::agent_import::tests::{sentinel_batch_id, sentinel_uuid};
 
 /// The merge gate's one registered synthetic company GUID.
 const COMPANY_GUID: &str = "00000000-0000-4000-8000-000000000002";
@@ -898,7 +898,10 @@ fn a_sidecar_that_is_not_the_sorted_lower_case_map_is_refused_even_with_its_dige
     let directory = tempfile::tempdir().unwrap();
     let id = batch_id();
     let path = directory.path().join(format!("master-pre-image-{id}.json"));
-    let upper_key = format!("{{\"{}\":1}}", sentinel_uuid(0xaa01).to_string().to_uppercase());
+    let upper_key = format!(
+        "{{\"{}\":1}}",
+        sentinel_uuid(0xaa01).to_string().to_uppercase()
+    );
     for (bytes, expected) in [
         (&b"[1,2]"[..], PreImageError::Malformed),
         (upper_key.as_bytes(), PreImageError::Malformed),

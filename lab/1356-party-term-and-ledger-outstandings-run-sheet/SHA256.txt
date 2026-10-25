@@ -1,0 +1,8 @@
+# sha256  bytes  file  (source of each request)
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md  byte for byte from lab/626-1038-1050-run-sheets at 8c602c15
+d524e780cd9605fe512c55d3c15253b7a07fe2aca43b0cb2ddf04ea83f26191f  5936  RUN-SHEET.md  
+501c3094407612a082bd1518518276bcdd97af77ddcc358d4b7da2387fc84910  984  requests/r01_marks.request.utf16le.xml  committed note-days/shape_lab_company_marks_request.utf16le.xml, company changed
+de90752d735e696032512d49bb3c3cedb1cf2500411d690bd7b34408606e038b  3096  requests/r02_vouchers_fy_unfiltered.request.utf16le.xml  committed note-days/credit_note_day_voucher_window_request.utf16le.xml, company and dates changed
+3b07b07af806078155bc344380af1970b0ee9faad330d30d9b5ef6126e035345  3172  requests/r03_vouchers_fy_party_term.request.utf16le.xml  r02 plus a $PartyLedgerName term in its filter formula
+f560dba1651ca4b4d89359feffd8e4f6058ee15ae380c05929cca072313d95dc  1198  requests/r04_ledger_outstandings_p1_to_20260331.request.utf16le.xml  the Ledger Outstandings probe template, bills_native_outstandings_probe.rs at bc5077bff^ (byte-checked), rendered
+7c093656c55f14dd9f0164d6b9cd4806aafb3e5139a7d315f79794a3263942ad  1198  requests/r05_ledger_outstandings_p1_to_20250731.request.utf16le.xml  the Ledger Outstandings probe template, bills_native_outstandings_probe.rs at bc5077bff^ (byte-checked), rendered

@@ -144,7 +144,7 @@ B3. `read_evidence` with `limit` 40. Keep the result as a file. It lists each re
 B4. `vouchers` for `2025-04-01` to `2026-03-31` (every page). Keep each page as a file. EXPECT 34 vouchers: 11 for S1-S6 and 23
     for S7-S18, and the types and dates A5 recorded.
 
-B5. Run C2 step 0 again, WITHOUT its MARKS request, and the same `trial_balance` call (offset 0; `snapshot.reused` false). Its two snapshot marks equal
+B5. Run C2 step 0 again, WITHOUT its MARKS request, and the same `trial_balance` call (offset 0; `snapshot.reused` must be false; true = STOP). Its two snapshot marks equal
     B0's, and B4's snapshot marks equal them too (nothing was written in Phase B). Then C10.
 
 What Phase B does not give: Tally's raw answers. The tools keep none (B3 holds fingerprints and sizes only), so no committed

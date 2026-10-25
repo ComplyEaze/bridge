@@ -12692,8 +12692,8 @@
   "by": "author",
   "what": "clause44: the no-supplier ledgers are not bound",
   "file": "src/binding.rs",
-  "from": "            Some(lbinder.bind_list(&names_at(value, location)?, location)?)\n        }\n    };\n    // `[roles].narration_payee_ledgers`",
-  "to": "            Some(names_at(value, location)?)\n        }\n    };\n    // `[roles].narration_payee_ledgers`"
+  "from": "            Some(lbinder.bind_list(&names_at(value, location)?, location)?)\n        }\n    };\n    // `[roles].rcm_tax_ledgers`",
+  "to": "            Some(names_at(value, location)?)\n        }\n    };\n    // `[roles].rcm_tax_ledgers`"
  },
  {
   "id": "CL44-46",

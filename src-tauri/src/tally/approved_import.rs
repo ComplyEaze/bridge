@@ -1804,24 +1804,25 @@ pub(crate) mod test_seam {
             "ComplyEaze Bridge — record that you reviewed these 50 vouchers?"
         );
         // What each window's answer text says: Y and N answer a message box
-        // that has the keyboard (#1780).
+        // that has the keyboard (#1780). The text is wrapped at 100 characters,
+        // so its words are compared with the breaks read as spaces.
         assert_eq!(
-            super::answer_text(super::Shown::Post, ONE),
+            super::answer_text(super::Shown::Post, ONE).replace('\n', " "),
             "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to \
              cancel. Nothing is posted until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::Post, count(200)),
+            super::answer_text(super::Shown::Post, count(200)).replace('\n', " "),
             "Press Y (or click Yes) to post these 200 vouchers into Tally. Press N (or click No) \
              to cancel. Nothing is posted until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::Review, count(50)),
+            super::answer_text(super::Shown::Review, count(50)).replace('\n', " "),
             "Press Y (or click Yes) to record that you reviewed these 50 vouchers. Press N (or \
              click No) to cancel. Nothing is recorded until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::StopRelease, ONE),
+            super::answer_text(super::Shown::StopRelease, ONE).replace('\n', " "),
             "Press Y (or click Yes) to release the invoice stop for this company, so that \
              ComplyEaze Bridge builds and posts invoices for it again. Press N (or click No) to \
              cancel. Nothing is released until you answer."
@@ -1834,9 +1835,11 @@ pub(crate) mod test_seam {
     }
 
     /// The answer text is wrapped under the dialog's line width without losing
-    /// a word, and adds no more than three lines and 150 characters above a
-    /// post or review text, the size the dialog's caps were raised by (#1780).
-    /// A wording that outgrows it fails here, so the box does not grow unseen.
+    /// a word where the box needs it (Windows), is one line on the Mac, where
+    /// the alert wraps its own text, and adds no more than three lines and 150
+    /// characters above a post or review text, the size the dialog's caps were
+    /// raised by (#1780). A wording that outgrows it fails here, so the box
+    /// does not grow unseen.
     #[test]
     fn the_answer_text_is_wrapped_and_stays_within_the_size_the_caps_allow() {
         for shown in [
@@ -1847,11 +1850,14 @@ pub(crate) mod test_seam {
         ] {
             for n in [1, 2, 9, 10, 50] {
                 let text = super::answer_text(shown, count(n));
-                let wrapped = super::wrapped(&text);
-                assert_eq!(wrapped.replace('\n', " "), text, "{shown:?} {n}");
+                let joined = text.replace('\n', " ");
+                assert_eq!(super::wrapped(&joined, 100).replace('\n', " "), joined);
+                // The box's own text: Windows lines are within the width; the Mac
+                // text is a single line and stays one.
                 assert!(
-                    wrapped.lines().all(|line| line.chars().count() <= 100),
-                    "{wrapped}"
+                    text.lines().count() == 1
+                        || text.lines().all(|line| line.chars().count() <= 100),
+                    "{text}"
                 );
             }
         }
@@ -1884,9 +1890,7 @@ pub(crate) mod test_seam {
                 );
                 let shown_text = super::displayed_text(shown, count(n), &at_cap);
                 assert!(super::fits_the_box(shown, count(n), &shown_text), "{n}");
-                assert!(
-                    shown_text.starts_with(&super::wrapped(&super::answer_text(shown, count(n))))
-                );
+                assert!(shown_text.starts_with(&super::answer_text(shown, count(n))));
                 assert!(shown_text.ends_with(&at_cap));
                 // One line more, or characters past what the box has room for.
                 let over = super::displayed_text(shown, count(n), &preview(lines + 1, chars));
@@ -1898,6 +1902,25 @@ pub(crate) mod test_seam {
         }
     }
 
+    /// The Mac alert wraps its own text, so the parent does not break the
+    /// answer text: it is one line, shown whole and first (a break of ours
+    /// would be wrapped again by the alert and leave a ragged second row).
+    #[cfg(not(windows))]
+    #[test]
+    fn the_mac_answer_text_is_one_unbroken_line() {
+        for shown in [super::Shown::Post, super::Shown::Review] {
+            for n in [1, 2, 10, 50] {
+                let text = super::answer_text(shown, count(n));
+                assert!(!text.contains('\n'), "{text}");
+                let displayed = super::displayed_text(shown, count(n), "Details");
+                assert_eq!(displayed.lines().next(), Some(text.as_str()));
+                assert!(super::fits_the_box(shown, count(n), &displayed), "{n}");
+            }
+        }
+        let (lines, _) = super::answer_reserve();
+        assert_eq!(lines, 2, "one answer line and the blank line");
+    }
+
     /// Each use of the review dialog writes its own first lines, and a stop
     /// release keeps its statement first (#1780).
     #[test]
@@ -1906,7 +1929,7 @@ pub(crate) mod test_seam {
         let post = super::displayed_text(super::Shown::Post, ONE, "Details");
         let review = super::displayed_text(super::Shown::Review, ONE, "Details");
         let release = super::displayed_text(super::Shown::StopRelease, ONE, preview);
-        let wrapped = |shown| super::wrapped(&super::answer_text(shown, ONE));
+        let wrapped = |shown| super::answer_text(shown, ONE);
         assert_eq!(post, format!("{}\n\nDetails", wrapped(super::Shown::Post)));
         assert_eq!(
             review,
@@ -2036,7 +2059,10 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
 #[cfg(windows)]
 fn answer_text(shown: Shown, count: VoucherCount) -> String {
     let (yes, nothing) = answer_effect(shown, count);
-    format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}")
+    wrapped(
+        &format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}"),
+        ANSWER_WIDTH,
+    )
 }
 
 /// The answer text of a Mac alert, which names its buttons and claims no key.
@@ -2048,21 +2074,27 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
         Shown::Masters => MASTERS_BUTTON.to_string(),
     };
-    format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}")
+    wrapped(
+        &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
+        usize::MAX,
+    )
 }
 
 /// The most characters a line of a dialog's text takes (the post dialog's cap).
 const ANSWER_WIDTH: usize = 100;
 
-/// `text` broken at spaces into lines of at most [`ANSWER_WIDTH`] characters.
-fn wrapped(text: &str) -> String {
+/// `text` broken at spaces into lines of at most `limit` characters. The
+/// Windows box needs it, to keep the box's width bounded; the Mac passes no
+/// limit, because the alert wraps its own text and a break of ours would be
+/// wrapped a second time.
+fn wrapped(text: &str, limit: usize) -> String {
     let (mut lines, mut width) = (String::new(), 0);
     for word in text.split(' ') {
         let length = word.chars().count();
         if width == 0 {
             lines.push_str(word);
             width = length;
-        } else if width + 1 + length <= ANSWER_WIDTH {
+        } else if width + 1 + length <= limit {
             lines.push(' ');
             lines.push_str(word);
             width += 1 + length;
@@ -2095,7 +2127,7 @@ fn answer_reserve() -> (usize, usize) {
     let mut reserve = (0, 0);
     for shown in [Shown::Post, Shown::Review] {
         for count in (1..=MOST_VOUCHERS).filter_map(VoucherCount::new) {
-            let answer = wrapped(&answer_text(shown, count));
+            let answer = answer_text(shown, count);
             let added = (answer.lines().count() + 1, answer.chars().count() + 2);
             reserve = (reserve.0.max(added.0), reserve.1.max(added.1));
         }
@@ -2104,8 +2136,10 @@ fn answer_reserve() -> (usize, usize) {
 }
 
 /// Whether the text the box will show is within the box's caps (#1780): the
-/// preview's own caps and room for the answer text, with no line over 100
-/// characters. The parent measures what is shown, so a text that does not fit
+/// preview's own caps and room for the answer text, with no preview line over
+/// 100 characters (the answer text's own lines are the Windows box's, wrapped
+/// at that width, or the Mac alert's one line, which the alert wraps itself).
+/// The parent measures what is shown, so a text that does not fit
 /// is refused before a window opens, never cut. A stop release has no caps
 /// beyond the byte limit.
 fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
@@ -2117,10 +2151,12 @@ fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
         Some(_) => (BATCH_LINES, BATCH_CHARS),
     };
     let (extra_lines, extra_chars) = answer_reserve();
+    let answer_lines = answer_text(shown, count).lines().count();
     displayed.lines().count() <= lines + extra_lines
         && displayed.chars().count() <= chars + extra_chars
         && displayed
             .lines()
+            .skip(answer_lines)
             .all(|line| line.chars().count() <= ANSWER_WIDTH)
 }
 
@@ -2134,7 +2170,7 @@ pub(crate) fn review_text(kind: ReviewKind, count: VoucherCount, preview: &str) 
 /// keeps its own statement first, because the title of the shared review
 /// dialog names only a review, and puts the answer text under it.
 fn displayed_text(shown: Shown, count: VoucherCount, preview: &str) -> String {
-    let answer = wrapped(&answer_text(shown, count));
+    let answer = answer_text(shown, count);
     match (shown, preview.split_once("\n\n")) {
         (Shown::StopRelease, Some((statement, rest))) => {
             format!("{statement}\n\n{answer}\n\n{rest}")

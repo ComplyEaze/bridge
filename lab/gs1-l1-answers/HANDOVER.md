@@ -21,6 +21,7 @@
 | GS1-L1 (partial) | lab/gs1-l1-answers | this commit |
 
 ## GS1-L1: where it stopped
+(26 Oct 2026: finished in the next lab session, steps 5 to 10 and C10, the tail deferred; see RESULTS.md. The lines below are the hand-over as it was.)
 See RESULTS.md. In short:
 - BRIDGE GST LEDGER LAB, GUID aae372c5-a894-491c-8843-5532e43d2d2f.
 - Marks 54 / 225.

@@ -1,0 +1,2 @@
+﻿self-test: ok (10 forwarded, 41 refused, none of the refused reached the target)
+exit=0

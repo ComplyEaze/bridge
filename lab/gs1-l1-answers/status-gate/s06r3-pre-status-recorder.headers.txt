@@ -1,0 +1,9 @@
+HTTP/1.1 200 OK
+Server: BaseHTTP/0.6 Python/3.10.11
+Date: Sun, 25 Oct 2026 18:24:49 GMT
+Unicode: No
+CONTENT-TYPE: text/xml; charset=utf-8
+RESPSTATUS: 1
+Content-Length: 51
+Connection: close
+

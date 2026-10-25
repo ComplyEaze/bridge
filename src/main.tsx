@@ -36,6 +36,7 @@ import { JournalPostingScreen } from "./JournalPostingScreen";
 import { SourceDraftScreen } from "./SourceDraftScreen";
 import { NativeLifecycleController, hasNativeWindowRuntime, type NativeLifecycleRequest } from "./NativeLifecycleController";
 import { TrialBalanceScreen } from "./TrialBalanceScreen";
+import { TermsGate } from "./TermsGate";
 import { LedgerEntriesScreen } from "./LedgerEntriesScreen";
 import { createDrawerFocusLifecycle, ensureDrawerFocus, shouldFocusMainContentAfterViewTransition, trapDrawerTabKeydown } from "./evidence-drawer-focus";
 import { loadEndpointReconnectHint, saveEndpointReconnectHint } from "./tally-endpoint-reconnect-hint";
@@ -1991,7 +1992,11 @@ type RootContainer = HTMLElement & {
 const rootContainer = document.getElementById("root") as RootContainer;
 const root = rootContainer.bridgeRoot ?? ReactDOM.createRoot(rootContainer);
 rootContainer.bridgeRoot = root;
-root.render(<App />);
+root.render(
+  <TermsGate>
+    <App />
+  </TermsGate>,
+);
 
 function toTallyDate(value: string): string {
   return value.replace(/-/g, "");

@@ -3311,3 +3311,7 @@ button.outstandings-party {
   color: var(--muted-text);
   font-size: 0.92rem;
 }
+
+.terms-gate { max-width: 40rem; margin: 10vh auto; padding: 0 1rem; line-height: 1.5; }
+.terms-gate .terms-address { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+.terms-gate label { display: block; margin: 1rem 0; }

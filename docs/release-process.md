@@ -593,7 +593,8 @@ the first eight binary paths in its message so the merger knows what to read. Th
 **Lab-capture manifest.** `scripts/merge-gate-lab-captures.json` (schema 1, at most 1000
 entries) lists captures the owner has already read, one entry for each: `path`, `blob` (the git
 blob id), `size`, `sha256`, `capture_id`, `lab_ref` (a note, never resolved), `company` and
-`seed_basis` (how the lab company's books were built). The gate reads the file only from the
+`seed_basis` (how the lab company's books were built: the owner's statement that the book is
+synthetic, which the gate does not check). The gate reads the file only from the
 master ref it fetched, as a regular-file blob, the way it reads the synthetic-UUID registry, so
 a pull request cannot list its own binaries. A binary addition or change is exempt from
 `--binary-review-sha` only if its path and the blob id GitHub reports for it both equal one
@@ -602,9 +603,10 @@ that blob id and have the entry's `size` and `sha256`. One different character i
 same blob at another path, a missing blob id, a removed file or differing bytes is not exempt.
 A blob request that fails, or answers malformed or with bytes that are not that blob, is
 reported as "could not check its bytes", apart from "bytes differ" (which names the size or the
-sha256), and is not exempt either. The file mode is not checked: the bytes are fixed by the
-blob id, so a listed blob committed as executable, or as a link whose target text is those
-bytes, carries nothing the owner did not read. The gate prints the exempt paths and the
+sha256), and is not exempt either. The file mode is not checked. A listed blob committed as
+executable carries exactly the bytes the owner read; committed as a link (mode 120000) it
+points at the path its bytes name up to their first NUL, a path the owner did not read, so a
+capture is committed as a regular file. The gate prints the exempt paths and the
 manifest's blob id, and anything unlisted still needs the attestation above. An invalid
 manifest, a link instead of a file, or a duplicate path means no exemptions, and the gate says
 why. Changing the manifest matches `scripts/merge-gate`, so that pull request is the owner's
@@ -612,7 +614,7 @@ own merge. There the owner reads each sitting's decoded captures (a UTF-16LE fil
 byte-order mark included, which a plain UTF-8 read shows as noise), their ownership and
 licence, their NOTICE obligation and their `PROVENANCE` entry
 (`scripts/check-fixture-provenance.mjs`), states `seed_basis`, and confirms on the file they
-read both `blob` (`git hash-object <file>`) and `sha256` (for example `shasum -a 256`), since
+read both `blob` (`git hash-object --no-filters <file>`) and `sha256` (for example `shasum -a 256`), since
 those are the values the gate checks. An entry stays valid for those bytes at that path until
 it is removed, so remove it when the capture is deleted or withdrawn. A lab branch is never
 read or trusted at gate time: lab branches are unprotected and are pushed with the owner's own

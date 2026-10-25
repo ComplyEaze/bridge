@@ -544,6 +544,25 @@ async fn a_right_length_key_under_another_name_that_fails_to_open_it_is_never_ta
 }
 
 #[tokio::test]
+async fn a_wrong_length_own_entry_does_not_excuse_a_right_length_key_under_another_name() {
+    let directory = tempfile::tempdir().unwrap();
+    let (database, ..) = paths(directory.path());
+    encrypted_mirror(&database, &GOOD_KEY).await;
+    // This database's own entry is not a key of the mirror's length, so the own-key refusal does not
+    // apply; the right-length key beside it still has to be proven wrong, and it cannot be.
+    let store = FakeStore::new("this-path")
+        .with("this-path", &[3; 7])
+        .with("another-path", &OTHER_KEY);
+    let refusal = prove(&database, &store).await.err().expect("a refusal");
+    assert!(
+        matches!(refusal, ResetRefusal::AnotherKeyNotProvenWrong),
+        "{refusal:?}"
+    );
+    assert!(database.exists());
+    assert_eq!(store.accounts(), ["this-path", "another-path"]);
+}
+
+#[tokio::test]
 async fn the_right_key_under_another_name_with_a_damaged_first_page_is_never_taken_as_wrong() {
     use std::io::{Seek, SeekFrom, Write};
     let directory = tempfile::tempdir().unwrap();

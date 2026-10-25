@@ -18,6 +18,9 @@
 //!   it, or when the file is a plaintext SQLite database: SQLCipher answers "not a database" for
 //!   a damaged first page or a changed cipher setting exactly as it does for a wrong key, so a
 //!   right-length key of this database's own is never discarded on that answer;
+//! - refuses when a right-length key kept under another account name fails to open it, for the same
+//!   reason: that answer cannot tell a wrong key from this mirror's own key after a profile move, so
+//!   a reset is offered for a database only when every stored key is of another length;
 //! - carries the database path and the key store it proved, so a different path or store cannot be
 //!   passed to the deletion.
 //!

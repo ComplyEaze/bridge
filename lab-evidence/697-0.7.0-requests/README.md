@@ -52,7 +52,7 @@ Not claimed and not tested here: Gold / multi-user, other releases than the lab'
   - A, B, C: `BRIDGE_AGENT_ENABLE_TAX_AUDIT=true`;
   - D: the variable unset;
   - E: `BRIDGE_AGENT_ENABLE_TAX_AUDIT=true` and `BRIDGE_AGENT_REDACTION=mask_parties`.
-- Send each file as stdin, one line per request; keep stdout and stderr byte for byte (`answers/<file>.out`, `.err`). In each TEMPLATE,
+- Send each file as stdin, one line per request, one file at a time; keep stdout and stderr byte for byte (`answers/<file>.out`, `.err`). In each TEMPLATE,
   replace `<GUID>` with the GUID from A's `list_companies`; if the book's cash or bank ledgers sit under other groups than
   `Cash-in-Hand` and `Bank Accounts`, change the group names and say so.
 - Tally: the lab's TallyPrime 7.2, licensed, Education mode No (else STOP), one company loaded alone on port 9001. Record the
@@ -66,7 +66,11 @@ BRIDGE SHAPE LAB (FY 2025-26 book, every standard voucher type; the only lab boo
    Account Books > Cash/Bank Book(s): the Debit and Credit totals of the Cash-in-Hand group and of the Bank Accounts group;
    Contra Register: the Contra debits and credits to cash and to bank ledgers; and the count and cash/bank amounts of optional,
    cancelled and post-dated vouchers touching them. If both groups show no transaction in the year: STOP (vacuous).
-3. List the data folder (names, sizes). B `b-shape-lab.TEMPLATE.jsonl` (filled). List the data folder again.
+3. List the data folder (names, sizes). First B1 `b1-shape-lab-h1.TEMPLATE.jsonl` (filled): the first half-year alone, a read of
+   about half the size, timed (record the wall-clock seconds of the whole send). STOP before B2 if id 11 is refused with any code
+   but `C6-moved` / `voucher_window_changed_during_read`, if the send took more than 120 s, if id 18 (egress_log) shows any request
+   that is not an Export, or if Tally shows any dialog: report B1 whole; the full year is not sent. Otherwise send
+   B2 `b2-shape-lab.TEMPLATE.jsonl` (filled: the full year and the refusals), timed. List the data folder again.
 4. EXPECT (checked from the answers afterwards; the lab only records):
    - id 10 (full year) and id 11 (H1): `result.state` completed or completed_with_failed_book_checks (failed codes listed);
      cash_receipts = Cash-in-Hand debits - Contra debits to cash - excluded vouchers' cash debits, in paise; likewise cash_payments
@@ -75,7 +79,7 @@ BRIDGE SHAPE LAB (FY 2025-26 book, every standard voucher type; the only lab boo
      A non-Contra voucher with both a cash and a bank line counts in both legs: note any.
    - id 12: refused `BIND-GROUP-UNKNOWN`. id 13: refused `audit_groups_overlap`. id 14: `audit_test_not_admitted`.
      ids 15, 16: `audit_period_outside_ay_2026_27`.
-   - id 17 (egress_log): requests to Tally only for ids 10, 11, 12 (and only Exports); none for ids 13-16.
+   - ids 18 and 17 (egress_log): requests to Tally only for ids 11 (in B1) and 10, 12 (in B2), and only Exports; none for ids 13-16.
    - The data folder holds nothing new but the receipt journal.
 5. Repeat id 10 once only if it was refused `C6-moved` or `voucher_window_changed_during_read`; any other refusal is a FINDING with its code.
 6. Leak check (afterwards, on the saved answers): no ledger, group, party name, voucher number or GUID of the book appears in any

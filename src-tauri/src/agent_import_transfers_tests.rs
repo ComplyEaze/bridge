@@ -190,6 +190,7 @@ fn every_state() -> TransferFacts {
         fact: skip("st-held", "20260104", "100.00"),
         holder: BatchId::new("batch-9"),
         by: HeldBy::UnverifiedBatch,
+        pairs: true,
     }];
     facts
 }
@@ -675,8 +676,8 @@ fn a_budget_cuts_the_open_rows_and_counts_what_it_left_out() {
 
 /// A row that names a batch a recorded rollback covers is marked restored, and
 /// the note that says what that means is in the frame whenever such a row is
-/// open, listed or not, so the budget pays for it (#1050). Both rows of a pair
-/// booked twice are marked when either batch is restored. Nothing is marked,
+/// open, listed or not, so the budget pays for it (#1050). Of a pair booked
+/// twice, the row naming the restored batch is marked. Nothing is marked,
 /// and there is no note, when no batch is restored.
 #[test]
 fn a_row_naming_a_restored_batch_is_marked_and_the_note_is_paid_for() {
@@ -709,7 +710,6 @@ fn a_row_naming_a_restored_batch_is_marked_and_the_note_is_paid_for() {
         [
             ("st-unverified", "batch-2"),
             ("st-held", "batch-9"),
-            ("t5", "batch-6"),
             ("t6", "batch-5"),
         ]
         .into()
@@ -1129,6 +1129,7 @@ fn a_skip_a_posted_voucher_contradicts_is_listed_open_with_the_batch_that_posts_
         fact: skip("st-posted", "20260105", "100.00"),
         holder: BatchId::new("batch-4"),
         by: HeldBy::PostedBatch,
+        pairs: true,
     }];
     let summary = summary_of(&facts);
     let TransferSummary::Computed {
@@ -1274,6 +1275,7 @@ fn a_held_skip_is_judged_without_the_skips_in_the_main_view() {
         fact: skip("st-held", "20260105", "100.00"),
         holder: BatchId::new("batch-9"),
         by: HeldBy::UnverifiedBatch,
+        pairs: true,
     }];
     let alone = held_carrier_view(&facts).unwrap();
     assert!(

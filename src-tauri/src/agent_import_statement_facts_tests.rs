@@ -902,6 +902,59 @@ fn a_skip_a_restored_batch_would_retire_stays_held_by_it() {
     }
 }
 
+/// A skip held only because a rollback covers the batch that retired it pairs
+/// with nothing: the view a withdrawal is judged against is the one master
+/// had, so a second skip of the same day and amount still meets the other
+/// account's Contra alone, and a withdrawal of it is still refused (#1050).
+#[test]
+fn a_skip_held_only_by_the_cover_is_left_out_of_the_withdrawal_view() {
+    let skipped = build(94).facts(
+        facts(B1)
+            .skip(skip_row(&st(6), "500.00", B2, None))
+            .skip(skip_row(&st(7), "500.00", B2, None)),
+    );
+    let posted = build(95)
+        .placed()
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
+    let other = build(96).voucher(payment(&st(7), "500.00"));
+    let contra_side = build(97)
+        .voucher(contra(&st(8), N2, N1, "500.00"))
+        .facts(facts(B2).contra(&st(8), None))
+        .status("posted_verified");
+    let before = Journal::default()
+        .batch(&skipped)
+        .batch(&posted)
+        .sent_natively(&posted)
+        .status(&posted, "posted_verified")
+        .batch(&other)
+        .batch(&contra_side);
+    let master = before.read().unwrap();
+    let restored = before.restored(&posted).read().unwrap();
+    // listed: the cover-only skip is held, naming the covered batch
+    assert_eq!(master.held.len(), 1);
+    assert_eq!(restored.held.len(), 2);
+    let cover_only = restored
+        .held
+        .iter()
+        .find(|held| held.fact.key == key(B1, 6))
+        .unwrap();
+    assert!(!cover_only.pairs);
+    assert_eq!(cover_only.holder, BatchId::new(batch_id(95)));
+    // judged: the withdrawal view is master's, row for row
+    let view = |facts: &TransferFacts| {
+        crate::agent::agent_import::transfers::held_carrier_view(facts)
+            .unwrap()
+            .skips
+            .into_iter()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(view(&restored), view(&master));
+    // and the skip is no skip to name in withdraw_skips, as on master
+    assert_eq!(restored.skip_mentions, master.skip_mentions);
+    assert_eq!(restored.live_skips, master.live_skips);
+}
+
 /// A restored batch that posted a skipped row without its withdrawal is held
 /// elsewhere, not posted against the skip: whether its voucher is still in
 /// Tally is not known.

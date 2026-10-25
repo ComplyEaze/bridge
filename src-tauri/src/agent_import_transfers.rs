@@ -209,10 +209,6 @@ impl TransferSummary {
             .map(|contra| (&contra.key, &contra.date))
             .collect();
         for booked in &view.double_booked {
-            // both rows of a pair are marked when either batch is restored
-            let restored = [&booked.first, &booked.second]
-                .iter()
-                .any(|contra| facts.restored.contains(contra.batch.as_str()));
             for (this, other) in [
                 (&booked.first, &booked.second),
                 (&booked.second, &booked.first),
@@ -222,7 +218,8 @@ impl TransferSummary {
                         id: this.txn.as_str().to_string(),
                         date: (*date).clone(),
                         state: OpenState::DoubleBooked,
-                        restored,
+                        // the row names the other batch, so the marker is its
+                        restored: facts.restored.contains(other.batch.as_str()),
                         batch: Some(other.batch.as_str().to_string()),
                     });
                 }
@@ -257,7 +254,7 @@ impl TransferSummary {
                 .or_insert_with(|| json!(row.state.step()));
         }
         // paid for in the frame, like the state steps, whether or not the
-        // marked row is listed
+        // marked row is listed; a section cut to its counts drops it with them
         if open.iter().any(|row| row.restored) {
             next_steps.insert("restored".into(), json!(RESTORED_NOTE));
         }
@@ -554,7 +551,12 @@ fn rows_listed_json(rows: Vec<Value>) -> (Vec<Value>, usize) {
 pub(super) fn held_carrier_view(
     facts: &TransferFacts,
 ) -> Result<TransferView, crate::agent::transfer_pairing::PairingInputError> {
-    let held: Vec<SkipFact> = facts.held.iter().map(|held| held.fact.clone()).collect();
+    let held: Vec<SkipFact> = facts
+        .held
+        .iter()
+        .filter(|held| held.pairs)
+        .map(|held| held.fact.clone())
+        .collect();
     transfer_pairing_view(&held, &facts.contras, &facts.coverage, TRANSFER_K_DAYS)
 }
 

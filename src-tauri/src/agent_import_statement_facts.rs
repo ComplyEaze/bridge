@@ -676,6 +676,11 @@ pub(super) struct HeldSkip {
     /// the first found posted that did not record the withdrawal.
     pub(super) holder: BatchId,
     pub(super) by: HeldBy,
+    /// Whether the skip is judged against the Contras when a person names it
+    /// in `withdraw_skips`. Not for a skip held only because a recorded
+    /// rollback covers the batch that would have retired it (#1050): master
+    /// retired it, so it pairs with nothing and is no skip to withdraw.
+    pub(super) pairs: bool,
 }
 
 /// A batch as the journal leaves it.
@@ -687,6 +692,8 @@ struct Batch {
     sent: bool,
     /// Ever read `posted_verified`, and not covered by a recorded rollback.
     found: bool,
+    /// Ever read `posted_verified`, covered or not.
+    ever_found: bool,
     /// A recorded rollback covers it (#1050): its vouchers may have been
     /// removed, so it is neither found nor verified, whatever its statuses.
     covered: bool,
@@ -766,6 +773,7 @@ fn fold_batches(
                         }
                         // the batch keeps its place, and its content is the latest record's
                         batch.found |= line.status == POSTED_VERIFIED;
+                        batch.ever_found |= line.status == POSTED_VERIFIED;
                         batch.status = line.status.clone();
                         batch.facts = admit_facts(&line)?;
                         batch.line = *line;
@@ -778,6 +786,7 @@ fn fold_batches(
                         batches.push(Batch {
                             status: line.status.clone(),
                             found: line.status == POSTED_VERIFIED,
+                            ever_found: line.status == POSTED_VERIFIED,
                             line,
                             facts,
                             sent: false,
@@ -795,6 +804,7 @@ fn fold_batches(
                 if let Some(&at) = index.get(&batch_id) {
                     let batch = &mut batches[at];
                     batch.found |= status == POSTED_VERIFIED;
+                    batch.ever_found |= status == POSTED_VERIFIED;
                     batch.sent |= sent;
                     batch.status = status;
                 }
@@ -1341,6 +1351,17 @@ pub(super) fn build_transfer_facts(
                             .is_none_or(|recorded| *recorded <= mention.built)
                 });
                 let any_posted = holding.batches.iter().any(|&at| batches[at].found);
+                // What the skip would be with no rollback covering a holder: a
+                // skip retired then stays out of every admission (#1050).
+                let retired_but_for_cover = contradicting.is_none()
+                    && !any_posted
+                    && holding.batches.iter().all(|&at| {
+                        !batches[at].ever_found
+                            || withdrawn_at
+                                .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
+                                .is_some_and(|recorded| *recorded > mention.built)
+                    })
+                    && holding.batches.iter().any(|&at| batches[at].ever_found);
                 match (contradicting, any_posted) {
                     (None, true) => {
                         retired_skips += 1;
@@ -1350,6 +1371,7 @@ pub(super) fn build_transfer_facts(
                         fact: mention.fact,
                         holder: BatchId::new(batches[at].line.batch_id.as_str()),
                         by: HeldBy::PostedBatch,
+                        pairs: true,
                     }),
                     // A batch a recorded rollback covers is named first, so the
                     // row's restored marker and its batch agree (#1050).
@@ -1368,7 +1390,11 @@ pub(super) fn build_transfer_facts(
                             .as_str(),
                         ),
                         by: HeldBy::UnverifiedBatch,
+                        pairs: !retired_but_for_cover,
                     }),
+                }
+                if retired_but_for_cover {
+                    continue;
                 }
             }
         }

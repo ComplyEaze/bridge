@@ -1171,29 +1171,40 @@ mod windows_hook {
         GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
     };
     use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows_sys::Win32::UI::HiDpi::{
+        AreDpiAwarenessContextsEqual, GetThreadDpiAwarenessContext, SetProcessDpiAwarenessContext,
+        DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+    };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         BringWindowToTop, CallNextHookEx, EnumThreadWindows, FlashWindowEx, GetForegroundWindow,
-        GetWindowRect, GetWindowThreadProcessId, IsProcessDPIAware, IsWindowVisible, PostMessageW,
-        SetForegroundWindow, SetProcessDPIAware, SetWindowsHookExW, UnhookWindowsHookEx,
-        FLASHWINFO, FLASHW_ALL, FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT,
-        WM_COMMAND,
+        GetWindowRect, GetWindowThreadProcessId, IsWindowVisible, PostMessageW,
+        SetForegroundWindow, SetWindowsHookExW, UnhookWindowsHookEx, FLASHWINFO, FLASHW_ALL,
+        FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT, WM_COMMAND,
     };
 
-    /// Make this process DPI-aware, before any window exists, so that a
-    /// window's rectangle and its monitor's work area are both physical
-    /// pixels. `false` if the process is still unaware afterwards.
+    /// Make this process per-monitor DPI aware (version 2), before any window
+    /// exists, so that a window's rectangle and its monitor's work area are
+    /// both physical pixels on every monitor. `false` if the process is not
+    /// in that mode afterwards (an older Windows, or an awareness already set
+    /// to something else): no box is then shown.
     pub(super) fn make_dpi_aware() -> bool {
-        // SAFETY: neither call takes an argument; they set and read this
-        // process's own DPI flag.
+        // SAFETY: the calls take a constant context and read this process's
+        // own awareness.
         unsafe {
-            SetProcessDPIAware();
-            IsProcessDPIAware() != 0
+            SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+            AreDpiAwarenessContextsEqual(
+                GetThreadDpiAwarenessContext(),
+                DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+            ) != 0
         }
     }
 
-    /// A helper thread that tries to bring the box to the front while it is
-    /// shown. A background process is often refused the foreground, and a box
-    /// nobody sees is a box nobody answers. It stops when dropped.
+    /// A helper thread that, once, when the box first appears, tries to bring
+    /// it to the front, and flashes its taskbar button if Windows refuses. A
+    /// background process is often refused the foreground, and a box nobody
+    /// sees is a box nobody answers. It never takes the foreground back after
+    /// that single attempt, so a person who moves to another window is not
+    /// pulled away from it. It stops when dropped.
     pub(super) struct Front {
         stop: Arc<AtomicBool>,
         worker: Option<std::thread::JoinHandle<()>>,
@@ -1207,7 +1218,7 @@ mod windows_hook {
             let owner = unsafe { GetCurrentThreadId() };
             let flag = Arc::clone(&stop);
             let worker = std::thread::Builder::new()
-                .spawn(move || raise_until_stopped(owner, &flag))
+                .spawn(move || raise_once_shown(owner, &flag))
                 .ok();
             Front { stop, worker }
         }
@@ -1284,8 +1295,8 @@ mod windows_hook {
         }
     }
 
-    fn raise_until_stopped(owner: u32, stop: &AtomicBool) {
-        // About ten seconds: the box has long appeared by then.
+    fn raise_once_shown(owner: u32, stop: &AtomicBool) {
+        // About ten seconds to appear: the box has long appeared by then.
         for _ in 0..100 {
             if stop.load(Ordering::SeqCst) {
                 return;
@@ -1293,6 +1304,7 @@ mod windows_hook {
             let window = box_of(owner);
             if !window.is_null() {
                 raise(window);
+                return;
             }
             std::thread::sleep(Duration::from_millis(100));
         }
@@ -1491,8 +1503,11 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
         // The process is not made DPI-aware, or the check passes anyway, so
         // the rectangle and the work area may be read in different units.
         source.replacen("if !windows_hook::make_dpi_aware() {", "if false {", 1),
-        source.replacen("IsProcessDPIAware() != 0", "true", 1),
-        source.replacen("SetProcessDPIAware();", "", 1),
+        source.replacen("DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);\n            AreDpiAwarenessContextsEqual(", "DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);\n            1 + AreDpiAwarenessContextsEqual(", 1),
+        source.replacen("SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);", "", 1),
+        // The helper takes the foreground back again and again, so a person
+        // who moves to another window is pulled away from it.
+        source.replacen("                raise(window);\n                return;", "                raise(window);", 1),
         // The helper that brings the box to the front is not started.
         source.replacen("let front = windows_hook::Front::start();", "", 1),
         // A box never measured, or a box that did not fit, returns a result

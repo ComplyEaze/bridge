@@ -17,10 +17,11 @@
 //! percent scale, the box measured physically at 588,116,1353,990 inside a
 //! work area 1030 high) was refused as not fitting, which no consistent pair
 //! of units can explain; so this module does not rely on the virtualisation.
-//! Before it shows anything the dialog process makes itself DPI-aware, so
-//! that the rectangle and the work area are both read in physical pixels,
-//! and a process that cannot be made aware shows no box. A rectangle is
-//! compared as it is given, with no slack either way.
+//! Before it shows anything the dialog process makes itself per-monitor DPI
+//! aware (version 2), so that the rectangle and the work area are both
+//! physical pixels on every monitor, whatever its scale, and a process that
+//! cannot be made so shows no box. A rectangle is compared as it is given,
+//! with no slack either way.
 //!
 //! Three answers leave this module without the person's choosing: the box did
 //! not fit (the child exits [`DOES_NOT_FIT_EXIT`], which the parent reads as a
@@ -147,29 +148,40 @@ mod windows_hook {
         GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
     };
     use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows_sys::Win32::UI::HiDpi::{
+        AreDpiAwarenessContextsEqual, GetThreadDpiAwarenessContext, SetProcessDpiAwarenessContext,
+        DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+    };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         BringWindowToTop, CallNextHookEx, EnumThreadWindows, FlashWindowEx, GetForegroundWindow,
-        GetWindowRect, GetWindowThreadProcessId, IsProcessDPIAware, IsWindowVisible, PostMessageW,
-        SetForegroundWindow, SetProcessDPIAware, SetWindowsHookExW, UnhookWindowsHookEx,
-        FLASHWINFO, FLASHW_ALL, FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT,
-        WM_COMMAND,
+        GetWindowRect, GetWindowThreadProcessId, IsWindowVisible, PostMessageW,
+        SetForegroundWindow, SetWindowsHookExW, UnhookWindowsHookEx, FLASHWINFO, FLASHW_ALL,
+        FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT, WM_COMMAND,
     };
 
-    /// Make this process DPI-aware, before any window exists, so that a
-    /// window's rectangle and its monitor's work area are both physical
-    /// pixels. `false` if the process is still unaware afterwards.
+    /// Make this process per-monitor DPI aware (version 2), before any window
+    /// exists, so that a window's rectangle and its monitor's work area are
+    /// both physical pixels on every monitor. `false` if the process is not
+    /// in that mode afterwards (an older Windows, or an awareness already set
+    /// to something else): no box is then shown.
     pub(super) fn make_dpi_aware() -> bool {
-        // SAFETY: neither call takes an argument; they set and read this
-        // process's own DPI flag.
+        // SAFETY: the calls take a constant context and read this process's
+        // own awareness.
         unsafe {
-            SetProcessDPIAware();
-            IsProcessDPIAware() != 0
+            SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+            AreDpiAwarenessContextsEqual(
+                GetThreadDpiAwarenessContext(),
+                DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+            ) != 0
         }
     }
 
-    /// A helper thread that tries to bring the box to the front while it is
-    /// shown. A background process is often refused the foreground, and a box
-    /// nobody sees is a box nobody answers. It stops when dropped.
+    /// A helper thread that, once, when the box first appears, tries to bring
+    /// it to the front, and flashes its taskbar button if Windows refuses. A
+    /// background process is often refused the foreground, and a box nobody
+    /// sees is a box nobody answers. It never takes the foreground back after
+    /// that single attempt, so a person who moves to another window is not
+    /// pulled away from it. It stops when dropped.
     pub(super) struct Front {
         stop: Arc<AtomicBool>,
         worker: Option<std::thread::JoinHandle<()>>,
@@ -183,7 +195,7 @@ mod windows_hook {
             let owner = unsafe { GetCurrentThreadId() };
             let flag = Arc::clone(&stop);
             let worker = std::thread::Builder::new()
-                .spawn(move || raise_until_stopped(owner, &flag))
+                .spawn(move || raise_once_shown(owner, &flag))
                 .ok();
             Front { stop, worker }
         }
@@ -260,8 +272,8 @@ mod windows_hook {
         }
     }
 
-    fn raise_until_stopped(owner: u32, stop: &AtomicBool) {
-        // About ten seconds: the box has long appeared by then.
+    fn raise_once_shown(owner: u32, stop: &AtomicBool) {
+        // About ten seconds to appear: the box has long appeared by then.
         for _ in 0..100 {
             if stop.load(Ordering::SeqCst) {
                 return;
@@ -269,6 +281,7 @@ mod windows_hook {
             let window = box_of(owner);
             if !window.is_null() {
                 raise(window);
+                return;
             }
             std::thread::sleep(Duration::from_millis(100));
         }

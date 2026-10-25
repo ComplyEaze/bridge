@@ -144,9 +144,11 @@ pub fn render_native_statement_request(
 
 /// The same envelope for any built-in report named by `id`. The Stock Summary
 /// (`native_stock_summary`) is requested through it, so its request is this
-/// shape by construction.
+/// shape by construction. `id` is `&'static str`: a literal, or a literal an
+/// enum's `report_id` selects, fixed in Bridge's code. A run-time string cannot
+/// be passed without being leaked to `'static`.
 pub(crate) fn render_built_in_report_request(
-    id: &str,
+    id: &'static str,
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {

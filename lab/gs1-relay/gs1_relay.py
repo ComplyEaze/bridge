@@ -492,6 +492,21 @@ def self_test():
     census = census.replace('&lt;= $$Date:"20251101"', '&lt;= $$Date:"20251130"')
     assert census.count("20251130") == 2, "the census window was not widened"
     census = census.replace("</SYSTEM>", " AND $AlterID &gt; 120 AND $AlterID &lt;= 182</SYSTEM>")
+
+    def one_day(text, new_day):
+        (old_day,) = set(re.findall(r"(?<![0-9])[0-9]{8}(?![0-9])", text))
+        return text.replace(old_day, new_day)
+
+    # The voucher window as builds before REFERENCEDATE send it, the class-resolved window as builds that name
+    # REFERENCEDATE send it (read in parts here, with an AlterID span), and the plain entry-wildcard window an
+    # empty window's corroboration reads.
+    old_window = one_day(real("cancelled_purchase_day_voucher_window_request.utf16le.xml"), "20251105")
+    class_window = one_day(real("reference_date_class_window_request.utf16le.xml"), "20251105").replace(
+        "</SYSTEM>", " AND $AlterID &gt; 120 AND $AlterID &lt;= 182</SYSTEM>")
+    entry_window = one_day(real("reference_date_entry_window_request.utf16le.xml"), "20251104")
+    assert "REFERENCEDATE" not in old_window and "<COMPUTE>" in old_window, "the older window template changed"
+    assert ",PARTYGSTIN,REFERENCEDATE</FETCH><COMPUTE>" in class_window, "the class window template changed"
+    assert ",PARTYGSTIN,REFERENCEDATE</FETCH><FILTERS>" in entry_window, "the entry window template changed"
     # Each forwarded request must reach the target with the client's own Content-Type lines and no other header but
     # Host (and Content-Length on a POST), and its answer must be the one the target gives that Content-Type.
     cases = [
@@ -502,6 +517,9 @@ def self_test():
         ("POST", "/", b"\xff\xfe" + census.encode("utf-16-le"), "text/xml; charset=utf-16"),
         ("POST", "/", utf16, "text/xml"),
         ("POST", "/", utf16, None),
+        ("POST", "/", b"\xff\xfe" + old_window.encode("utf-16-le"), "text/xml; charset=utf-16"),
+        ("POST", "/", b"\xff\xfe" + class_window.encode("utf-16-le"), "text/xml; charset=utf-16"),
+        ("POST", "/", b"\xff\xfe" + entry_window.encode("utf-16-le"), "text/xml; charset=utf-16"),
     ]
     for index, (method, path, body, content_type) in enumerate(cases):
         sent = [] if content_type is None else [content_type]
@@ -540,6 +558,7 @@ def self_test():
         ("an ID with a trailing space", marks.replace("<ID>Bridge Agent Company High Water</ID>", "<ID>Bridge Agent Company High Water </ID>")),
         ("a span on a read Bridge never spans", ledgers.replace("</FETCH>", " AND $AlterID &gt; 1</FETCH>")),
         ("a wider fetch", ledgers.replace("<FETCH>NAME,", "<FETCH>*, NAME,")),
+        ("a window fetching a field no template names", class_window.replace(",REFERENCEDATE", ",REFERENCEDATE,ISDELETED")),
         ("a span that is not numbers", census.replace("&gt; 120", "&gt; $$Call:F")),
         ("a company slot holding a field", marks.replace("BRIDGE GST LEDGER LAB", "$Name")),
         ("a date slot that is not digits", census.replace("20251101", "2025110x")),

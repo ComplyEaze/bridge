@@ -1130,8 +1130,8 @@ const OPENING_STOCK_BOOK_OCT_MAR: &[u8] = include_bytes!(
 
 #[test]
 fn a_captured_book_with_opening_stock_is_declined_by_its_opening_stock_line() {
-    // Real bytes, not a mutation: the year carries Opening Stock -1000.00 and Closing Stock
-    // -2640.00; the second half-year carries -2640.00 and -2040.00. The slice is for a book whose
+    // Real bytes, not a mutation: the year (read before the October sale) carries Opening Stock
+    // -1000.00 and Closing Stock -2640.00; the second half-year carries -2640.00 and -2040.00. The slice is for a book whose
     // Opening Stock Tally shows empty, so both decline, and the reason is the opening stock.
     for bytes in [OPENING_STOCK_BOOK_YEAR, OPENING_STOCK_BOOK_OCT_MAR] {
         let statement =

@@ -41,7 +41,9 @@ These changes are in source and not yet in a published build.
 
 - A native post refuses before it sends anything (`post_mark_unrecorded`) when its last read before the send does
   not show the company's voucher mark, instead of reading the missing mark as zero and binding its vouchers from it;
-  the voucher was never misattributed, but it could be posted and then left for reconciliation (fixes #1945).
+  the voucher was never misattributed, but it could be posted and then left for reconciliation. A read after the
+  post that omits the mark is likewise no mark, so the post is bound from its own answer instead of being refused as a
+  mark that went back (fixes #1945).
 - The next steps for five situations no longer send a person to enter a voucher in Tally themselves; each now says what
   ComplyEaze Bridge does and that it cannot put the voucher in the book yet: a voucher Tally reported as not
   created (and one later not found after that report), a row a rejected batch carried, a statement day that is

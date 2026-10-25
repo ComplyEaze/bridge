@@ -406,7 +406,8 @@ async fn a_rule_code_or_an_argument_code_is_kept_and_no_other_text_is() {
     let codes = [
         "BIND-GROUP-UNKNOWN",
         "C5-books-from",
-        "POP-1",
+        "C10-education-date",
+        "SPECIFIED-missing-figure",
         "argument_invalid:test",
         "company_guid_required",
     ];
@@ -427,6 +428,17 @@ async fn a_rule_code_or_an_argument_code_is_kept_and_no_other_text_is() {
         "PRIVATE",
         "Private",
         "Private-7",
+        "ABC-Traders",
+        "HDFC-Bank",
+        "PAN-ZZZZZ0000Z",
+        "C5-Books",
+        "C5-books1",
+        "C5-books-1a",
+        "C12345-x",
+        "ABCDEFGHIJ-x",
+        // An upper-case GUID, one that starts with a letter and one that does not.
+        "ABCDEF12-3456-7890-ABCD-EF1234567890",
+        "8F3B2C1A-5D4E-4F6A-9B7C-1E2D3F4A5B6C",
         "Private Ledger",
         "C5-books from",
         "C5-books_from",
@@ -454,6 +466,65 @@ async fn a_rule_code_or_an_argument_code_is_kept_and_no_other_text_is() {
         );
         let receipt = late_receipt_for(Err(text.to_string())).await;
         assert!(receipt.get("error").is_none(), "{text}: {receipt}");
+    }
+}
+
+/// Every rule code the tax-audit crate emits: the literal first argument of
+/// each `refused(` call and each `BIND_` constant, in the code above the
+/// crate's first test module. Read from the sources, so a code added later is
+/// held to the receipt's grammar without anyone listing it here.
+fn emitted_rule_codes() -> Vec<String> {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("crates/bridge-tax-audit/src");
+    let mut codes = Vec::new();
+    let mut files = 0;
+    for entry in std::fs::read_dir(&directory).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
+            continue;
+        }
+        files += 1;
+        let text = std::fs::read_to_string(&path).unwrap();
+        let code = text.split("#[cfg(test)]").next().unwrap();
+        for call in code.split("refused(").skip(1) {
+            if let Some(literal) = call.trim_start().strip_prefix('"') {
+                codes.push(literal.split('"').next().unwrap().to_string());
+            }
+        }
+        for line in code
+            .lines()
+            .filter(|line| line.starts_with("pub const BIND_"))
+        {
+            codes.push(line.split('"').nth(1).unwrap().to_string());
+        }
+    }
+    assert!(files > 20, "only {files} source files were read");
+    codes.sort();
+    codes.dedup();
+    codes
+}
+
+/// Each code the crate emits keeps its place in a receipt. A new code that the
+/// grammar would drop fails here rather than going missing from a receipt.
+#[test]
+fn every_rule_code_the_tax_audit_crate_emits_is_kept_in_the_receipt() {
+    let codes = emitted_rule_codes();
+    for known in [
+        "BIND-GROUP-UNKNOWN",
+        "BIND-BOOK-DUPLICATE-ID",
+        "C1-date",
+        "C10-education-date",
+        "C5-books-from",
+        "CFG-legacy-for-read",
+        "FX-1",
+        "PARTY-chain-incomplete",
+        "RELATED-table-shape",
+        "SPECIFIED-missing-figure",
+    ] {
+        assert!(codes.iter().any(|code| code == known), "{known} not found");
+    }
+    assert!(codes.len() > 50, "only {} codes found", codes.len());
+    for code in codes {
+        assert_eq!(receipt_code(&json!(code)), Some(json!(code)), "{code}");
     }
 }
 

@@ -61,9 +61,8 @@ fn receipt_error(structured: &Value) -> Option<Value> {
 /// A code is one of the three shapes Bridge's own codes take, at most 64
 /// bytes: a tool code (`vouchers_window_part_failed`), a tool code naming the
 /// argument it refused (`argument_invalid:test`), or a tax-audit rule code
-/// (`BIND-GROUP-UNKNOWN`, `C5-books-from`: upper-case letters or digits, then
-/// one or more hyphenated parts). Anything else, a word with no hyphen or a
-/// space included, is not a code.
+/// (`BIND-GROUP-UNKNOWN`, `C5-books-from`; see [`is_rule_code`]). Anything
+/// else, a word with no hyphen or a space included, is not a code.
 fn receipt_code(value: &Value) -> Option<Value> {
     value
         .as_str()
@@ -78,23 +77,41 @@ fn is_code(text: &str) -> bool {
                 .bytes()
                 .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
     };
-    let rule_code = |text: &str| {
-        let mut parts = text.split('-');
-        let head = parts.next().unwrap_or_default();
-        let mut rest = parts.peekable();
-        head.as_bytes().first().is_some_and(u8::is_ascii_uppercase)
-            && head
-                .bytes()
-                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
-            && rest.peek().is_some()
-            && rest.all(|part| {
-                !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_alphanumeric())
-            })
-    };
     match text.split_once(':') {
         Some((code, key)) => tool_code(code) && tool_code(key),
-        None => tool_code(text) || rule_code(text),
+        None => tool_code(text) || is_rule_code(text),
     }
+}
+
+/// A tax-audit rule code: a head of one to nine upper-case letters and up to
+/// three digits (`C5`, `BIND`, `SPECIFIED`), then one or more hyphenated
+/// parts, each wholly lower-case letters, wholly upper-case letters or wholly
+/// digits. A part that mixes case, or letters with digits, is how a name, a
+/// PAN or a GUID looks (`HDFC-Bank`, `PAN-ZZZZZ0000Z`), so it is not a code.
+fn is_rule_code(text: &str) -> bool {
+    let mut parts = text.split('-');
+    let head = parts.next().unwrap_or_default().as_bytes();
+    let letters = head
+        .iter()
+        .take_while(|byte| byte.is_ascii_uppercase())
+        .count();
+    let digits = &head[letters..];
+    let rest = parts.collect::<Vec<_>>();
+    (1..=9).contains(&letters)
+        && digits.len() <= 3
+        && digits.iter().all(u8::is_ascii_digit)
+        && !rest.is_empty()
+        && rest.iter().all(|part| {
+            let part = part.as_bytes();
+            !part.is_empty()
+                && [
+                    u8::is_ascii_lowercase,
+                    u8::is_ascii_uppercase,
+                    u8::is_ascii_digit,
+                ]
+                .iter()
+                .any(|kind| part.iter().all(kind))
+        })
 }
 
 fn receipt_date(value: &Value) -> Option<Value> {

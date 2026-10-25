@@ -1538,7 +1538,7 @@ fn the_rules_three_descriptions_leave_to_their_arguments_stay_on_them() {
                 "matched.suspense_tag",
                 "the same text typed by hand matches",
                 "so also read the ledger without this filter",
-                "Refused without `ledger` (search_suspense_tagged_needs_ledger) and where narrations are withheld from the assistant",
+                "Refused without `ledger` (search_suspense_tagged_needs_ledger) and where narrations are withheld from the assistant (search_narration_redacted)",
             ][..],
         ),
         (

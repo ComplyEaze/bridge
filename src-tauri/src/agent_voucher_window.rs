@@ -521,6 +521,9 @@ impl WindowCensus {
         to: &TallyDate,
     ) -> Result<bool, ToolFailure> {
         let (from, to) = (day_of(from)?, day_of(to)?);
+        if from > to {
+            return Err(ToolFailure::from("invalid_date_range".to_string()));
+        }
         Ok(self.days.range(from..=to).next().is_some())
     }
 

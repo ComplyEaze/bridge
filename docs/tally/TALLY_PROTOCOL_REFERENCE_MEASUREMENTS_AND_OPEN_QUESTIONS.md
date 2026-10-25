@@ -349,7 +349,7 @@ request is predicted over a budget well below the cap.
   still refuse mid-census when its count passes the allowance). A book that fits one request is read whole, uncounted, as before. Either way a voucher in the
   window refuses the read as `window_contradicted` (a census of several requests whose marks moved refuses as
   `voucher_window_changed_during_read` first), and otherwise the empty result is corroborated or
-  reported partial by the existing empty-window control. **Confidence: PARTIAL**: the request counts are
+  reported partial by the existing empty-window control. **Confidence: UNVERIFIED**: the request counts are
   from scripted doubles through the tool call, not from a live Tally; for a neighbour-empty widened window
   a census of one request replaces one paired window read and so saves six requests (a census of
   several requests adds a closing marks read, so a small widened window saves none), and with vouchers on the

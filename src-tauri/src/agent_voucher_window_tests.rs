@@ -4020,7 +4020,7 @@ async fn the_corroborations_census_is_its_own_read() {
 /// mark is just past one, is bracketed as a divided window read is: the marks
 /// are read again after its last request, and marks that moved refuse it.
 /// `closing_mark` is the mark read after the census.
-async fn empty_window_over_a_two_span_book(closing_mark: u64) -> Value {
+async fn empty_window_over_a_two_span_book(closing_mark: u64, hit: Option<&str>) -> Value {
     let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
     let opened = capacity + 1;
     let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
@@ -4031,9 +4031,13 @@ async fn empty_window_over_a_two_span_book(closing_mark: u64) -> Value {
     plans.extend(paired(&xml_plan(empty_collection())));
     // the corroboration's census (two spans), then the marks read after it
     plans.extend(paired(&xml_plan(empty_collection())));
-    plans.extend(paired(&xml_plan(empty_collection())));
+    // a voucher the second span counted, on the day beside the window or inside it
+    plans.extend(paired(&xml_plan(match hit {
+        Some(day) => relabelled(&vouchers_kept(1), &[(opened, day)]),
+        None => empty_collection(),
+    })));
     plans.extend(paired(&mark(closing_mark)));
-    if closing_mark == opened {
+    if closing_mark == opened && hit.is_none() {
         // nothing moved and the widened window is empty: the company's mark decides
         plans.extend(paired(&mark(opened)));
     }
@@ -4053,15 +4057,41 @@ async fn empty_window_over_a_two_span_book(closing_mark: u64) -> Value {
 #[tokio::test]
 async fn a_divided_corroboration_census_is_bracketed_by_the_company_marks() {
     let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
-    let moved = empty_window_over_a_two_span_book(capacity + 3).await;
+    let moved = empty_window_over_a_two_span_book(capacity + 3, None).await;
     assert_eq!(
         moved["structuredContent"]["result"]["error"]["code"], WINDOW_CHANGED_DURING_READ,
         "{moved}"
     );
-    let steady = empty_window_over_a_two_span_book(capacity + 1).await;
+    let steady = empty_window_over_a_two_span_book(capacity + 1, None).await;
     let result = &steady["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{steady}");
     assert_eq!(result["reason"], "empty_uncorroborated", "{steady}");
+}
+
+/// #1240: a divided census that counts a voucher on the day beside the window, with the
+/// marks steady, leaves the window `partial` with the wider read's reason; a voucher it counts
+/// inside the window refuses the read, and marks that moved refuse it first.
+#[tokio::test]
+async fn a_divided_corroboration_census_with_a_hit_is_labelled_by_where_the_hit_is() {
+    let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
+    let steady = capacity + 1;
+    let beside = empty_window_over_a_two_span_book(steady, Some("20260731")).await;
+    let result = &beside["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{beside}");
+    assert_eq!(
+        result["reason"], "empty_window_wider_read_nonempty",
+        "{beside}"
+    );
+    let inside = empty_window_over_a_two_span_book(steady, Some("20260815")).await;
+    assert_eq!(
+        inside["structuredContent"]["result"]["error"]["code"], "window_contradicted",
+        "{inside}"
+    );
+    let moved = empty_window_over_a_two_span_book(steady + 2, Some("20260815")).await;
+    assert_eq!(
+        moved["structuredContent"]["result"]["error"]["code"], WINDOW_CHANGED_DURING_READ,
+        "{moved}"
+    );
 }
 
 /// #1240: a small book's corroboration that had to take the company's marks
@@ -7482,4 +7512,9 @@ fn a_census_holds_a_voucher_between_two_days_including_both_ends() {
         );
         assert_eq!(census.is_empty(), days.is_empty(), "{days:?}");
     }
+    // a window that ends before it starts is refused, not a panic in the range
+    let census = census_of(&[("20260803", 1)]);
+    assert_eq!(census.holds_a_voucher_between(&from, &to).unwrap(), true);
+    let failure = census.holds_a_voucher_between(&to, &from).unwrap_err();
+    assert_eq!(failure.code, "invalid_date_range");
 }

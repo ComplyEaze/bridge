@@ -25,8 +25,10 @@
 #![cfg_attr(all(not(windows), not(test)), allow(dead_code))]
 
 /// The exit status of the dialog child when its box did not fit the screen.
-/// The parent reads it, whatever else the child printed, as a refusal.
-pub(crate) const DOES_NOT_FIT_EXIT: i32 = 3;
+/// The parent reads it, whatever else the child printed, as a refusal. It is
+/// not 3, which the C runtime's `abort` also exits with, nor 101, which a Rust
+/// panic exits with: a crashed dialog must not read as a box that was too big.
+pub(crate) const DOES_NOT_FIT_EXIT: i32 = 77;
 
 /// A rectangle in screen pixels, as `GetWindowRect` and a monitor's work area
 /// give them: `right` and `bottom` are one past the last pixel.
@@ -296,7 +298,7 @@ mod tests {
         assert!(!rect(0, 0, 1921, 1030).is_wholly_inside(WORK));
         assert!(!rect(0, 0, 1920, 1031).is_wholly_inside(WORK));
         // The lab's 60-line box: top pinned at 0, bottom well below the area.
-        assert!(!rect(577, 0, 1342, 1134).is_wholly_inside(WORK));
+        assert!(!rect(588, 0, 1353, 1134).is_wholly_inside(WORK));
         // A work area that does not start at the origin (a taskbar on top, a
         // second monitor to the left).
         let offset = rect(-1920, 40, 0, 1080);
@@ -351,9 +353,9 @@ mod tests {
     }
 
     /// The exit status the parent reads must not be one a decline, an
-    /// approval or an unavailable dialog already uses.
+    /// approval, an unavailable dialog, a C `abort` or a Rust panic uses.
     #[test]
     fn the_does_not_fit_status_is_its_own() {
-        assert!(![0, 1].contains(&DOES_NOT_FIT_EXIT));
+        assert!(![0, 1, 2, 3, 101].contains(&DOES_NOT_FIT_EXIT));
     }
 }

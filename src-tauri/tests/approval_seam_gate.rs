@@ -1129,6 +1129,236 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
     }
 }"#;
 
+/// `box_fit::guarded`, the Windows dialog's fit check, verbatim (#1832). Both
+/// Windows dialogs answer through it, so an edit that lets `Unavailable` or a
+/// box that did not fit return a result would approve with no box or a
+/// clipped one.
+const BOX_FIT_GUARDED: &str = r#"#[cfg(windows)]
+pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
+    let Some(hook) = windows_hook::install() else {
+        // No way to measure the box, so none is shown.
+        std::process::exit(0);
+    };
+    let result = show();
+    let seen = windows_hook::seen();
+    drop(hook);
+    match outcome(result, seen) {
+        Outcome::Answered(result) => result,
+        Outcome::DoesNotFit => std::process::exit(DOES_NOT_FIT_EXIT),
+        Outcome::Unavailable => std::process::exit(0),
+    }
+}"#;
+
+/// The hook that measures the box and cancels one that does not fit, verbatim
+/// (#1832). An edit that measured nothing, or always found a fit, would leave
+/// the unit-tested outcome logic intact and measure nothing.
+const BOX_FIT_HOOK: &str = r#"#[cfg(windows)]
+mod windows_hook {
+    use super::{Rect, Seen};
+    use std::sync::atomic::{AtomicU8, Ordering};
+    use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
+    use windows_sys::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    };
+    use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        CallNextHookEx, GetWindowRect, PostMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
+        HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT, WM_COMMAND,
+    };
+
+    /// What the hook has seen, for this process's one box (0 nothing, 1 fits,
+    /// 2 does not fit).
+    static SEEN: AtomicU8 = AtomicU8::new(0);
+
+    pub(super) fn seen() -> Seen {
+        match SEEN.load(Ordering::SeqCst) {
+            1 => Seen::Fits,
+            2 => Seen::DoesNotFit,
+            _ => Seen::Nothing,
+        }
+    }
+
+    fn remember(seen: Seen) {
+        SEEN.store(
+            match seen {
+                Seen::Nothing => 0,
+                Seen::Fits => 1,
+                Seen::DoesNotFit => 2,
+            },
+            Ordering::SeqCst,
+        );
+    }
+
+    /// The hook, removed when it is dropped.
+    pub(super) struct Hook(HHOOK);
+
+    impl Drop for Hook {
+        fn drop(&mut self) {
+            // SAFETY: the handle came from `SetWindowsHookExW` and is removed
+            // once, here.
+            unsafe {
+                UnhookWindowsHookEx(self.0);
+            }
+        }
+    }
+
+    /// Install a computer-based-training hook on this thread, the one that is
+    /// about to show the box. `None` if Windows refuses.
+    pub(super) fn install() -> Option<Hook> {
+        remember(Seen::Nothing);
+        // SAFETY: `on_activate` is an `extern "system"` function with the
+        // hook procedure's signature; a null module handle with this thread's
+        // id hooks this thread only.
+        let handle = unsafe {
+            SetWindowsHookExW(
+                WH_CBT,
+                Some(on_activate),
+                std::ptr::null_mut(),
+                GetCurrentThreadId(),
+            )
+        };
+        (!handle.is_null()).then_some(Hook(handle))
+    }
+
+    /// Whether `window` lies wholly inside the work area of the monitor
+    /// nearest to it. Any failure to read either is "does not fit".
+    fn fits(window: HWND) -> bool {
+        let mut rect = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
+        // SAFETY: `window` is the window being activated and `rect` is a
+        // live out-parameter of the right type.
+        if unsafe { GetWindowRect(window, &mut rect) } == 0 {
+            return false;
+        }
+        // SAFETY: as above.
+        let monitor = unsafe { MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST) };
+        if monitor.is_null() {
+            return false;
+        }
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            rcMonitor: RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
+            rcWork: RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
+            dwFlags: 0,
+        };
+        // SAFETY: `monitor` is a handle just returned for this window and
+        // `info` has its `cbSize` set, as the call requires.
+        if unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {
+            return false;
+        }
+        let rect = Rect {
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+        };
+        let work = Rect {
+            left: info.rcWork.left,
+            top: info.rcWork.top,
+            right: info.rcWork.right,
+            bottom: info.rcWork.bottom,
+        };
+        rect.is_wholly_inside(work)
+    }
+
+    /// The hook procedure: when the box is about to be activated, measure it;
+    /// if it does not fit, post it a Cancel and remember that it did not.
+    unsafe extern "system" fn on_activate(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        if code == HCBT_ACTIVATE as i32 {
+            let window = wparam as HWND;
+            let fitted = fits(window);
+            remember(seen().after(fitted));
+            if !fitted {
+                // SAFETY: `window` is the box being activated; Cancel is a
+                // button every box this module guards has.
+                unsafe {
+                    PostMessageW(window, WM_COMMAND, IDCANCEL as WPARAM, 0);
+                }
+            }
+        }
+        // SAFETY: passing the hook's own arguments on, with no hook handle,
+        // is what the documentation prescribes.
+        unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
+    }
+}"#;
+
+/// Every `cfg` in box_fit.rs: the inner attribute, the two Windows items and
+/// the test module. The last entry counts the bare text `cfg`.
+const BOX_FIT_CFG_CENSUS: [(&str, usize); 4] = [
+    (
+        "#![cfg_attr(all(not(windows), not(test)), allow(dead_code))]",
+        1,
+    ),
+    ("#[cfg(windows)]", 2),
+    ("#[cfg(test)]", 1),
+    ("cfg", 4),
+];
+
+fn box_fit_problems(source: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (pin, expected) in [(BOX_FIT_GUARDED, 1), (BOX_FIT_HOOK, 1)]
+        .iter()
+        .chain(BOX_FIT_CFG_CENSUS.iter())
+    {
+        if source.matches(pin).count() != *expected {
+            problems.push(format!("expected {expected} of `{pin}`"));
+        }
+    }
+    problems
+}
+
+fn replace_last(source: &str, from: &str, to: &str) -> String {
+    let at = source.rfind(from).expect("the text to replace is there");
+    format!("{}{to}{}", &source[..at], &source[at + from.len()..])
+}
+
+#[test]
+fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
+    let source = read("src-tauri/src/tally/box_fit.rs");
+    assert_eq!(box_fit_problems(&source), Vec::<String>::new());
+    for broken in [
+        // A box never measured, or a box that did not fit, returns a result
+        // instead of ending the process.
+        source.replacen("Outcome::Unavailable => std::process::exit(0),", "Outcome::Unavailable => result,", 1),
+        source.replacen("Outcome::DoesNotFit => std::process::exit(DOES_NOT_FIT_EXIT),", "Outcome::DoesNotFit => result,", 1),
+        source.replacen("Outcome::Answered(result) => result,", "Outcome::Answered(_) => 6,", 1),
+        // No hook: the box is shown unmeasured, or the answer is made up.
+        source.replacen("        std::process::exit(0);\n    };\n    let result", "        return show();\n    };\n    let result", 1),
+        source.replacen("let result = show();", "let result = { show(); 6 };", 1),
+        source.replacen("let seen = windows_hook::seen();", "let seen = Seen::Fits;", 1),
+        // The measurement always finds a fit, or never cancels.
+        source.replacen("rect.is_wholly_inside(work)\n    }", "true\n    }", 1),
+        source.replacen("if !fitted {", "if false {", 1),
+        source.replacen("remember(seen().after(fitted));", "remember(Seen::Fits);", 1),
+        source.replacen("== 0 {\n            return false;", "== 0 {\n            return true;", 1),
+        // The guard made non-Windows beside a Windows twin that approves.
+        source.replacen(
+            "#[cfg(windows)]\npub(crate) fn guarded",
+            "#[cfg(not(windows))]\npub(crate) fn guarded",
+            1,
+        ),
+        format!("{source}\n#[cfg(windows)]\npub(crate) fn guarded_twin(show: impl FnOnce() -> i32) -> i32 {{\n    show()\n}}\n"),
+        format!("{source}\n#[cfg_attr(windows, allow(unused))]\nfn extra() {{}}\n"),
+    ] {
+        assert_ne!(broken, source);
+        assert!(!box_fit_problems(&broken).is_empty());
+    }
+}
+
 const DIALOG_ANSWER_PINS: [(&str, usize); 21] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
@@ -1287,6 +1517,7 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("super::box_fit::guarded(|| {", "(|| {", 1),
+        replace_last(&source, "super::box_fit::guarded(|| {", "(|| {"),
         source.replacen(
             "box_did_not_fit: status.code() == Some(super::box_fit::DOES_NOT_FIT_EXIT),",
             "box_did_not_fit: false,",

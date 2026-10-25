@@ -754,10 +754,14 @@ pub(crate) fn render_company_book_extent_v2(company: &str) -> String {
     )
 }
 
+/// The Company collection request under `collection` with `fetch`. Both are
+/// `&'static str` and go into the request unescaped, so each must be a literal
+/// fixed in Bridge's code; a run-time string cannot be passed without leaking it
+/// or holding it in a static.
 fn render_company_book_extent_with_contract(
     company: &str,
-    collection: &str,
-    fetch: &str,
+    collection: &'static str,
+    fetch: &'static str,
 ) -> String {
     format!(
         r#"<ENVELOPE>

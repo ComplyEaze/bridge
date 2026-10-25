@@ -57,6 +57,8 @@ mod headline;
 mod ledger_candidates;
 #[path = "agent_month_register.rs"]
 mod month_register;
+#[path = "agent_negative_stock.rs"]
+mod negative_stock;
 use ledger_candidates::{
     ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
     CatalogueLedger,
@@ -136,7 +138,7 @@ use movement_math::*;
 mod egress;
 use egress::{append_egress_line, read_egress_tail};
 #[path = "agent_terms.rs"]
-mod terms;
+pub(crate) mod terms;
 
 use crate::tally::runtime::RuntimeReadEvidence;
 use crate::tally::{
@@ -751,6 +753,20 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 limit_master_alter_id: *limit_master_alter_id,
             });
         }
+        if let Some(crate::tally::runtime::NegativeStockReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
@@ -913,6 +929,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(reason);
         }
+        if let Some(negative_stock) = cause
+            .downcast_ref::<bridge_tally_protocol::native_negative_stock::NativeNegativeStockError>()
+        {
+            return Some(negative_stock.code());
+        }
+        if let Some(crate::tally::runtime::NegativeStockReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        {
+            return Some(reason);
+        }
         if let Some(statement) = cause
             .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
         {
@@ -984,7 +1010,10 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// Deliberately sparse. A code without a documented, concrete next step returns
 /// `None` and its refusal keeps the general message, because filler guidance is
 /// worse than none: it reads as authoritative while sending the caller nowhere.
-/// This never softens a refusal — it only says what to do about one.
+/// This never softens a refusal — it only says what to do about one. A few codes
+/// state a cause with no step instead, among them `empty_book_first_import`: no step
+/// inside ComplyEaze Bridge exists for it yet, and it must not send anyone to enter a
+/// voucher another way (#1709).
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
         "company_identity_absent_or_ambiguous" | "company_identity_not_matched" => Some(
@@ -1023,9 +1052,8 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
-             mark and ComplyEaze Bridge has no \"before\" to attribute an import against. Record one \
-             voucher in this company by another route and confirm it in Tally, then build \
-             this batch again.",
+             mark and ComplyEaze Bridge has no \"before\" to attribute an import against, so it \
+             cannot build or post the first voucher into this company yet. Nothing was sent to Tally.",
         ),
         // A cause, reached through `ledger_export_invalid` (#714) and
         // `ledger_movement_read_failed` (#716).
@@ -1127,6 +1155,15 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              worst-case stock-item row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
              so no request for stock items was sent. The mark counts masters of every kind, so \
              a company with few stock items may be refused. A larger book refuses; retrying \
+             this call refuses again.",
+        ),
+        // The Negative Stock read's own size refusal (`size` carries the mark).
+        "negative_stock_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
+             so Tally's Negative Stock was not requested. The mark counts masters of every \
+             kind, so a company with few stock items may be refused, and the ceiling is a \
+             stated guess, not a measurement of this report. A larger book refuses; retrying \
              this call refuses again.",
         ),
         // The stock summary read whose rows differ from Tally's own item count
@@ -1947,6 +1984,10 @@ impl ToolFailure {
         }) {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
         }) {
             error.safe_code()
@@ -2056,7 +2097,7 @@ impl Server {
         let post_approvals = Arc::new(agent_import::PostApprovals::new(&settings.data_dir));
         Self {
             settings,
-            runtime: TallyRuntime::default(),
+            runtime: TallyRuntime::ungated(),
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
             voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
@@ -2586,6 +2627,7 @@ impl Server {
             "local_data_report" => self.local_data_report().map_err(Into::into),
             "masters" => self.masters(args).await,
             "month_register" => self.month_register(args).await,
+            "negative_stock" => self.negative_stock(args).await,
             "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;

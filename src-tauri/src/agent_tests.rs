@@ -955,15 +955,15 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             }),
         ));
     }
-    // `lab_read_purchase_identity` returns no name at all: a difference names the voucher's GUID and
+    // `lab_read_purchase_identity` returns no name beyond the company: a difference names the voucher's GUID and
     // the field, never its values (they stay in the exchange the lab keeps).
     #[cfg(feature = "lab-writes")]
     if registered.contains("lab_read_purchase_identity") {
         lab_samples.push((
             "lab_read_purchase_identity",
             json!({
-                "agent": {"rows": 2, "response_chars": 120_000, "chars_per_row": 60_000},
-                "narrow": {"rows": 2, "response_chars": 16_000, "chars_per_row": 8_000},
+                "agent": {"rows": 2, "response_chars": 120_000, "response_chars_per_row": 60_000},
+                "narrow": {"rows": 2, "response_chars": 16_000, "response_chars_per_row": 8_000},
                 "differences": {
                     "total": 1,
                     "listed": [{"guid": "synthetic-guid-00000001", "field": "party"}],

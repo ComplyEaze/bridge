@@ -891,20 +891,29 @@ pub(super) async fn lab_read_inventory(
 /// Differences listed at most, so a read that differs everywhere stays a small answer.
 const MAX_IDENTITY_DIFFERENCES: usize = 100;
 
-/// Where two parsed reads of one window differ, keyed by the voucher's GUID: a GUID one read has
-/// and the other lacks, a GUID that repeats or is missing within a read, and every row field whose
-/// value differs (`amounts` holds each entry's ledger, amount, side and bill allocations). An empty
-/// list means the narrow read returned every field of every voucher exactly as the agent read did.
-/// Only the field's name is listed, never its values, which can be names from the book: the values
-/// are in the exchange this tool persists on the lab machine.
+/// The widest window this tool reads, in days: both reads go out whole, unplanned, where the
+/// production read would plan a heavy window from a census and divide it, so the tool stays on
+/// windows the production read sends whole on a lab book.
+const MAX_IDENTITY_WINDOW_DAYS: usize = 31;
+
+/// Where two parsed reads of one window differ, keyed by the voucher's GUID (the parser refuses a
+/// repeated or missing one): a GUID one read has and the other lacks, and every row field whose
+/// value differs (`amounts` holds each entry's ledger, amount and side and its bill allocations).
+/// Only the fields the parser keeps are compared. Only the field's name is listed, never its
+/// values, which can be names from the book: the values are in the exchange this tool persists on
+/// the lab machine.
 fn purchase_identity_differences(agent: &[Value], narrow: &[Value]) -> Vec<Value> {
-    let mut out = Vec::new();
-    let agent = rows_by_guid(agent, "agent", &mut out);
-    let narrow = rows_by_guid(narrow, "narrow", &mut out);
+    let by_guid = |rows: &[Value]| {
+        rows.iter()
+            .filter_map(|row| Some((row["guid"].as_str()?.to_string(), row.clone())))
+            .collect::<BTreeMap<_, _>>()
+    };
+    let (agent, narrow) = (by_guid(agent), by_guid(narrow));
     let guids = agent
         .keys()
         .chain(narrow.keys())
         .collect::<std::collections::BTreeSet<_>>();
+    let mut out = Vec::new();
     for guid in guids {
         match (agent.get(guid), narrow.get(guid)) {
             (Some(_), None) => out.push(json!({"guid": guid, "only_in": "agent"})),
@@ -928,33 +937,33 @@ fn purchase_identity_differences(agent: &[Value], narrow: &[Value]) -> Vec<Value
     out
 }
 
-/// One read's rows by GUID; a repeated or missing GUID is reported into `problems`.
-fn rows_by_guid<'a>(
-    rows: &'a [Value],
-    read: &str,
-    problems: &mut Vec<Value>,
-) -> BTreeMap<String, &'a Value> {
-    let mut by_guid = BTreeMap::new();
-    for row in rows {
-        match row["guid"].as_str().filter(|guid| !guid.is_empty()) {
-            Some(guid) if by_guid.insert(guid.to_string(), row).is_some() => {
-                problems.push(json!({"read": read, "guid": guid, "problem": "guid_repeated"}));
-            }
-            Some(_) => {}
-            None => problems.push(json!({"read": read, "problem": "guid_missing"})),
-        }
-    }
-    by_guid
-}
-
-/// One read's size: its rows and the characters of its decoded answer, per row.
+/// One read's size: its rows and the characters of its decoded answer (the whole answer, envelope
+/// included; the wire carries it as UTF-16), per row.
 fn identity_read_size(xml: &str, rows: usize) -> Value {
     let chars = xml.chars().count();
     json!({
         "rows": rows,
         "response_chars": chars,
-        "chars_per_row": (rows > 0).then(|| chars / rows),
+        "response_chars_per_row": (rows > 0).then(|| chars / rows),
     })
+}
+
+/// Whether `from..=to` spans at most [`MAX_IDENTITY_WINDOW_DAYS`] days.
+fn identity_window_fits(
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
+) -> bool {
+    let mut day = from.clone();
+    for _ in 1..MAX_IDENTITY_WINDOW_DAYS {
+        if &day >= to {
+            return true;
+        }
+        match day.next_day() {
+            Ok(next) => day = next,
+            Err(_) => return false,
+        }
+    }
+    &day >= to
 }
 
 /// LAB-ONLY: the candidate narrow read for a supplier invoice already in the books (#1904), sent
@@ -971,6 +980,9 @@ pub(super) async fn lab_read_purchase_identity(
     let (from, to) = (date("from")?, date("to")?);
     if from > to {
         return Err("invalid_date_range".to_string().into());
+    }
+    if !identity_window_fits(&from, &to) {
+        return Err("lab_identity_window_too_wide".to_string().into());
     }
     require_lab_read_guards(server)?;
     let (company, identity, mut evidence) = server.verified_company(guid).await?;
@@ -989,33 +1001,42 @@ pub(super) async fn lab_read_purchase_identity(
             let request = request.map_err(ToolFailure::from)?;
             let (xml, read_evidence) = lab_post_read(server, &identity, label, request).await?;
             evidence = combine_evidence(evidence.clone(), read_evidence);
-            let rows = parse_agent_rows(&xml, identity.company_guid())
-                .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
-            if !window_honoured(&rows, from.as_str(), to.as_str()) {
-                return Err(ToolFailure::from("window_not_honoured".to_string())
-                    .with_prior_evidence(evidence.clone()));
+            // A refusal of the narrow answer by the parser is a finding of this tool, not a
+            // failure of it: it is returned beside the agent read's size.
+            let parsed = parse_agent_rows(&xml, identity.company_guid());
+            if let Ok(rows) = &parsed {
+                if !window_honoured(rows, from.as_str(), to.as_str()) {
+                    return Err(ToolFailure::from("window_not_honoured".to_string())
+                        .with_prior_evidence(evidence.clone()));
+                }
             }
-            reads.push((xml, rows));
+            reads.push((xml, parsed));
         }
         let (narrow_xml, narrow) = reads.pop().expect("two reads");
         let (agent_xml, agent) = reads.pop().expect("two reads");
-        let differences = purchase_identity_differences(&agent, &narrow);
-        let listed = differences
-            .iter()
-            .take(MAX_IDENTITY_DIFFERENCES)
-            .cloned()
-            .collect::<Vec<_>>();
-        let result = json!({
+        let agent =
+            agent.map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+        let mut result = json!({
             "profile": "lab_read_purchase_identity_v1",
             "agent": identity_read_size(&agent_xml, agent.len()),
-            "narrow": identity_read_size(&narrow_xml, narrow.len()),
-            "differences": {
-                "total": differences.len(),
-                "listed": listed,
-                "listed_truncated": differences.len() > MAX_IDENTITY_DIFFERENCES,
-            },
             "window_honoured": true,
         });
+        match narrow {
+            Err(code) => {
+                result["narrow"] = json!({"refused": code});
+            }
+            Ok(narrow) => {
+                let differences = purchase_identity_differences(&agent, &narrow);
+                result["narrow"] = identity_read_size(&narrow_xml, narrow.len());
+                // Two empty answers agree vacuously: no voucher was compared.
+                result["inconclusive"] = json!(agent.is_empty() && narrow.is_empty());
+                result["differences"] = json!({
+                    "total": differences.len(),
+                    "listed": differences.iter().take(MAX_IDENTITY_DIFFERENCES).collect::<Vec<_>>(),
+                    "listed_truncated": differences.len() > MAX_IDENTITY_DIFFERENCES,
+                });
+            }
+        }
         Ok(ToolOutcome {
             payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
             evidence: evidence.clone(),
@@ -1978,12 +1999,15 @@ ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,ALLLEDGERENTRIES.BILLALLOCATIONS.*,";
         assert!(!found
             .iter()
             .any(|item| item.to_string().contains("SYN GS1")));
-        // A GUID repeated or missing within one read is reported, not compared.
-        let repeated = vec![agent[0].clone(), agent[0].clone(), json!({"party": "SYN"})];
-        let found = purchase_identity_differences(&repeated, &agent);
-        assert!(
-            found.contains(&json!({"read": "agent", "guid": "g-1", "problem": "guid_repeated"}))
-        );
-        assert!(found.contains(&json!({"read": "agent", "problem": "guid_missing"})));
+    }
+
+    #[test]
+    fn the_identity_read_takes_a_window_of_at_most_31_days() {
+        let date = |text: &str| bridge_tally_core::TallyDate::parse(text).unwrap();
+        assert!(identity_window_fits(&date("20251201"), &date("20251201")));
+        assert!(identity_window_fits(&date("20251201"), &date("20251231")));
+        assert!(!identity_window_fits(&date("20251201"), &date("20260101")));
+        assert!(identity_window_fits(&date("20250201"), &date("20250303")));
+        assert!(!identity_window_fits(&date("20250401"), &date("20260331")));
     }
 }

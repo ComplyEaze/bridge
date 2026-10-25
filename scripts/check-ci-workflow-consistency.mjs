@@ -233,6 +233,16 @@ const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repos
 if (reuseScriptDigest !== "fed907ab68fe52ebd7eb227a377f546a51127303eef48d6cee560fa6e2560c6a") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
+// The merge gate's test (about 6.5 of the Workflow consistency job's 7.5 minutes) runs on a pull request only when the diff
+// touches what it reads, which the merge-gate-scope step decides; the test step must stay wired to that output and nothing
+// else, or the test silently stops running on every event, the merge queue included.
+{
+  const consistencyJob = jobBlock(workflow, "workflow-consistency");
+  const wiring = "      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/merge-gate.test.py\n";
+  if ((consistencyJob + "\n").split(wiring).length !== 2 || (consistencyJob.match(/^ *(?:- )?run: .*merge-gate\.test\.py/gm) ?? []).length !== 1 || (consistencyJob.match(/^      - id: merge-gate-scope$/gm) ?? []).length !== 1) {
+    failures.push("the merge gate's test must run once, exactly when the merge-gate-scope step says so");
+  }
+}
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }

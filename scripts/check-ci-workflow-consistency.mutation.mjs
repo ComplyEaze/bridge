@@ -347,3 +347,17 @@ for (const [name, replacement] of [
   });
 }
 
+// The merge gate's test is wired to the merge-gate-scope step's output. A step that runs it always, never, or twice, or that
+// loses the scope step, changes what a merge-queue run proves.
+for (const [name, change] of [
+  ["its condition inverted", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/merge-gate.test.py", "      - if: steps.merge-gate-scope.outputs.run != 'true'\n        run: python3 scripts/merge-gate.test.py")],
+  ["its condition dropped", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/merge-gate.test.py", "      - run: python3 scripts/merge-gate.test.py")],
+  ["its condition made always()", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n", "      - if: always()\n")],
+  ["the test step deleted", (text) => text.replace("      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/merge-gate.test.py\n", "")],
+  ["the scope step renamed", (text) => text.replace("      - id: merge-gate-scope\n", "      - id: merge-gate-scoped\n")],
+]) {
+  test(`merge gate test wiring: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/ci.yml", change), "the merge gate's test must run once, exactly when the merge-gate-scope step says so");
+  });
+}
+

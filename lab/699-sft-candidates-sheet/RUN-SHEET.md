@@ -1,6 +1,6 @@
 # 699 SFT-013 candidates (#699): a new synthetic book of cash-receipt shapes, and its audit read. WRITE sitting, then READ-ONLY.
 
-Not for merge. Written 25 Oct 2026.
+Not for merge. Written 25 Oct 2026. `SHA256.txt` lists every file here with its bytes; check it before step A0.
 
 ## Rules and company
 `LAB-COMMON.md` in this folder applies in full. It is v3, a byte copy from `lab/626-1038-1050-run-sheets` at 8c602c15, sha256
@@ -19,7 +19,7 @@ Because the company is new, this item differs from LAB-COMMON in four places, an
 The owner is at the PC for the whole sitting and approves every native window.
 
 ## Request files (Phase B)
-They are added to this folder in a second commit once Phase A has given the GUID: requests/ plus SHA256.txt. They will be the audit
+They are added to this folder in a later commit once Phase A has given the GUID: requests/, each listed in SHA256.txt. They will be the audit
 read's own requests for THE COMPANY over 1-Apr-2025 to 31-Mar-2026. Each is preflighted: its header ID equals the COLLECTION NAME it
 defines.
 

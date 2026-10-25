@@ -1,0 +1,15 @@
+Screenshots kept on the lab PC (not pushed): sha256, bytes, name
+c559a5f20a525e2c9501988f3193b7ae21e761706e6ba1cd937ea8015c788f3c  48381  bk1b-gateway-after.jpg
+eabbbfd626c480b4d9f380c3cd4522432841bb1c1d2cd33af60b7dffb95f5ff5  36637  bk1b-screen-before-accept.jpg
+c06238c0b3c9f169e75cb55ec1b3f60a6c76fd53c70edec337f288bd9f8fe8a5  48272  bk1-gateway-after.jpg
+803cac793a874e7d649c6ba300c5b754e117c0f2191637a5aec42942cee194d4  64318  bk1-screen-before-accept.jpg
+0adacf97ce3c4eb340f6ef8938b75f9a7a26983e7d3f4a84bc747906bf47a792  44870  m1-ledger-bank-before-accept.jpg
+6e3c9438409ceb4188942f9dc31ce3ee51137e938e44fbd3f1acf8c1c7467c14  45606  m2-ledger-customer-before-accept.jpg
+2891b418ff9947c3243505ed54786e2b0cca722c12724f2f98f8bdb93500a3e4  119638  m3-receipt-type-as-found.jpg
+8d2a6bf0f1c1a5a0d5df3943a2ba38de284a3a3b5d3b9ee53b1b45d87d36bc69  42618  s0-create-company-before-accept.jpg
+c581f15021c172c76a5c60520fb110c5ea5bec38d6de5b1d3a95e3c813ccbd59  143178  s0-features-as-offered.jpg
+c67703f5307949c9aa894e2494ea673309eb101dbdd99d1e46b43534d7bdb186  49204  s0-gateway-created.jpg
+61b6b9176cc45a6ad81d75dc03b4485dee9b069f283a6e9ed5eb064e0044dd2a  40260  s0-numberadm-absent.jpg
+54c07f63f09b617047d2d3862f376bf8f7db6e47dcc0af1bd119e24de111678f  43747  s2-receipt1-before-accept.jpg
+3b0848b05492eea79ba32b183761825e95b94fb9d389349d56f706ad0eda3dd5  44020  s2-receipt2-before-accept.jpg
+0befc53c664d2faa2e63e19a8f5be2b289b533fca011119d8dc022fffac4cfb4  34445  s3-gateway-before-vouchers.jpg

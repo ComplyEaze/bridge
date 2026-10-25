@@ -295,8 +295,7 @@ fi
 # unrelated nested `path` must not turn an incomplete manifest into an empty
 # pin set.
 #
-# A pinned file is not hash-checked here (CI computes the digest from live
-# bytes). Instead, a PR that touches a pinned path must ADD exactly one
+# A pinned file is not hash-checked here. Instead, a PR that touches a pinned path must ADD exactly one
 # acknowledgement file, docs/tally/compatibility/acks/pr-<PR>.txt, listing the
 # touched paths. (The acknowledgement's reviewer line is still read for its shape,
 # but no review is matched against it any more: the owner's merge verdict, checked
@@ -686,10 +685,11 @@ else
     count=$(wc -l <"$lab_captures_file" | tr -d ' ')
     say "note" "lab-capture manifest: $count listed capture(s) (blob $(git -C "$gate_tree" rev-parse --short=12 "$tip:$lab_capture_path" 2>/dev/null))"
   }
-  # Reads the blob answer from a file (the bytes never pass through a shell variable) and says match, differ or malformed.
+  # Reads the blob answer from a file (the bytes never pass through a shell variable) and says match, size, sha256, not-that-blob or
+  # malformed. The decoded bytes must hash, as git hashes a blob, to the id that was asked for, so an answer for other bytes is caught.
   read -r -d '' lab_blob_check_py <<'PY' || true
 import base64, binascii, hashlib, json, sys
-path, want_size, want_sha = sys.argv[1], sys.argv[2], sys.argv[3]
+path, want_blob, want_size, want_sha = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 try:
     with open(path, "rb") as handle:
         doc = json.load(handle)
@@ -702,10 +702,18 @@ try:
 except (OSError, ValueError, binascii.Error):
     print("malformed")
     sys.exit(0)
-print("match" if str(len(data)) == want_size and hashlib.sha256(data).hexdigest() == want_sha else "differ")
+if hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest() != want_blob:
+    print("not-that-blob")
+elif str(len(data)) != want_size:
+    print("size")
+elif hashlib.sha256(data).hexdigest() != want_sha:
+    print("sha256")
+else:
+    print("match")
 PY
   # True only when this record's REST name and REST blob id equal one manifest entry's path and blob, and the bytes of that blob
-  # (fetched through the API, never held in a shell variable) have the size and sha256 the owner recorded. A removed file has no new
+  # (fetched through the API, never held in a shell variable) hash to that id and have the size and sha256 the owner recorded. The file
+  # mode is not read: the blob id fixes the bytes, whatever the mode (docs/release-process.md). A removed file has no new
   # blob, so it is never listed by this rule; a missing, malformed or ambiguous REST id lists nothing. Strings are compared as
   # strings: an awk would otherwise compare "100" and "1e2" as numbers. A failed or mismatching byte check is a note, not an
   # exemption, and the two are told apart (P5).
@@ -723,10 +731,12 @@ PY
     if ! gh api "repos/$REPO/git/blobs/$blob" >"$blob_json" 2>"$errfile"; then
       say "note" "listed capture '$shown' not exempt: could not check its bytes (the blob request failed)"; return 1
     fi
-    verdict=$(python3 -I -c "$lab_blob_check_py" "$blob_json" "$want_size" "$want_sha" 2>/dev/null) || verdict=""
+    verdict=$(python3 -I -c "$lab_blob_check_py" "$blob_json" "$blob" "$want_size" "$want_sha" 2>/dev/null) || verdict=""
     case "$verdict" in
       match) return 0 ;;
-      differ) say "note" "listed capture '$shown' not exempt: its bytes differ from the size or sha256 in the manifest" ;;
+      size) say "note" "listed capture '$shown' not exempt: its bytes differ from the manifest (the size differs)" ;;
+      sha256) say "note" "listed capture '$shown' not exempt: its bytes differ from the manifest (the sha256 differs)" ;;
+      not-that-blob) say "note" "listed capture '$shown' not exempt: could not check its bytes (the blob answer does not hash to its blob id)" ;;
       *) say "note" "listed capture '$shown' not exempt: could not check its bytes (the blob answer was malformed)" ;;
     esac
     return 1

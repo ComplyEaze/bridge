@@ -2121,7 +2121,6 @@ where
                         source_identity: &plan.company.identity,
                         query_profile: &planned.query_profile,
                         filters_sha256: &planned.filters_sha256,
-                        external_references: &plan.external_references,
                         window_id: &planned.id,
                         requested_window: &planned.range,
                     },
@@ -2494,7 +2493,6 @@ where
                     source_identity: &plan.company.identity,
                     query_profile: &planned.query_profile,
                     filters_sha256: &planned.filters_sha256,
-                    external_references: &plan.external_references,
                     window_id: &planned.id,
                     requested_window: &planned.range,
                 },
@@ -2525,17 +2523,16 @@ where
                 }
             };
             let mut attempt_warning_codes = BTreeSet::new();
-            if let PackBatch::CoreAccounting(core) = &source_window.batch {
-                if core.has_foreign_master_text_diagnostics() {
-                    attempt_warning_codes.insert(WarningCode::ForeignMasterTextRenderingDegraded);
-                }
-                // The corroborating period-balance report is not sent: some
-                // Tally builds cannot evaluate it. The run records the tie-out
-                // as unavailable, so it cannot claim the report agreed.
-                state
-                    .gap_codes
-                    .insert("report_tie_out_unavailable".to_string());
+            let PackBatch::CoreAccounting(core) = &source_window.batch;
+            if core.has_foreign_master_text_diagnostics() {
+                attempt_warning_codes.insert(WarningCode::ForeignMasterTextRenderingDegraded);
             }
+            // The corroborating period-balance report is not sent: some
+            // Tally builds cannot evaluate it. The run records the tie-out
+            // as unavailable, so it cannot claim the report agreed.
+            state
+                .gap_codes
+                .insert("report_tie_out_unavailable".to_string());
             set_window_phase(
                 &mut state,
                 planned,

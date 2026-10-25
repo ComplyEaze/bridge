@@ -39,6 +39,10 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- The three cash-line answers ComplyEaze Bridge cannot build yet (cash paid straight to someone, a deposit from
+  the cash box, unbooked cash sales) no longer say to record the line by hand or to record the sales in Tally
+  first; each keeps its reason and offers `dont_know`, which builds the line to the suspense ledger, marked for
+  the CA to move (part of #1709).
 - The approval window, and the review window, now open with a line that says what each answer does, before any
   detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
   voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N

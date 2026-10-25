@@ -22,7 +22,6 @@ const PHRASES: [&str; 4] = ["entry screen", "by hand", "manually", "gateway of t
 
 /// Hits per production source file, relative to the crate directory. May only shrink.
 const PINNED: &[(&str, usize)] = &[
-    ("crates/bridge-bank-statement/src/cash.rs", 2),
     ("crates/bridge-tax-audit/src/financial_statements.rs", 1),
     ("src/agent_bank_statement.rs", 1),
     ("src/agent_catalog.rs", 22),

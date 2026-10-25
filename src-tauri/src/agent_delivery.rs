@@ -58,11 +58,11 @@ fn receipt_error(structured: &Value) -> Option<Value> {
     Some(kept)
 }
 
-/// A code is one of the three shapes Bridge's own codes take, at most 64
-/// bytes: a tool code (`vouchers_window_part_failed`), a tool code naming the
-/// argument it refused (`argument_invalid:test`), or a tax-audit rule code
-/// (`BIND-GROUP-UNKNOWN`, `C5-books-from`; see [`is_rule_code`]). Anything
-/// else, a word with no hyphen or a space included, is not a code.
+/// A code is one of the three kinds Bridge's own codes are, at most 64 bytes:
+/// a tool code (`vouchers_window_part_failed`), a tool code naming the
+/// argument it refused (`argument_invalid:test`; see [`is_argument_key`]), or
+/// one of the tax-audit engine's rule codes ([`RULE_CODES`]). Anything else, a
+/// word in capitals or a space included, is not a code.
 fn receipt_code(value: &Value) -> Option<Value> {
     value
         .as_str()
@@ -78,41 +78,93 @@ fn is_code(text: &str) -> bool {
                 .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
     };
     match text.split_once(':') {
-        Some((code, key)) => tool_code(code) && tool_code(key),
-        None => tool_code(text) || is_rule_code(text),
+        Some((code, key)) => tool_code(code) && is_argument_key(key),
+        None => tool_code(text) || RULE_CODES.contains(&text),
     }
 }
 
-/// A tax-audit rule code: a head of one to nine upper-case letters and up to
-/// three digits (`C5`, `BIND`, `SPECIFIED`), then one or more hyphenated
-/// parts, each wholly lower-case letters, wholly upper-case letters or wholly
-/// digits. A part that mixes case, or letters with digits, is how a name, a
-/// PAN or a GUID looks (`HDFC-Bank`, `PAN-ZZZZZ0000Z`), so it is not a code.
-fn is_rule_code(text: &str) -> bool {
-    let mut parts = text.split('-');
-    let head = parts.next().unwrap_or_default().as_bytes();
-    let letters = head
-        .iter()
-        .take_while(|byte| byte.is_ascii_uppercase())
-        .count();
-    let digits = &head[letters..];
-    let rest = parts.collect::<Vec<_>>();
-    (1..=9).contains(&letters)
-        && digits.len() <= 3
-        && digits.iter().all(u8::is_ascii_digit)
-        && !rest.is_empty()
-        && rest.iter().all(|part| {
-            let part = part.as_bytes();
-            !part.is_empty()
-                && [
-                    u8::is_ascii_lowercase,
-                    u8::is_ascii_uppercase,
-                    u8::is_ascii_digit,
-                ]
-                .iter()
-                .any(|kind| part.iter().all(kind))
-        })
+/// The name after a code's colon, as a schema property is named (`test`,
+/// `proposals_sha256`): each `_`-separated part lower-case letters, then at
+/// most three digits. A run of digits, such as an account or a phone number,
+/// is not a name. Nor is a second colon, which keeps out the ledger name
+/// `agent_voucher_summary` writes after its gap code.
+fn is_argument_key(key: &str) -> bool {
+    key.split('_').all(|part| {
+        let letters = part.bytes().take_while(u8::is_ascii_lowercase).count();
+        let digits = &part.as_bytes()[letters..];
+        letters > 0 && digits.len() <= 3 && digits.iter().all(u8::is_ascii_digit)
+    })
 }
+
+/// The rule codes the tax-audit engine refuses with: the only codes in
+/// capitals a receipt keeps. A list, not a shape, because any shape that
+/// admits `BIND-GROUP-UNKNOWN` also admits a voucher number or a name written
+/// in capitals. `every_rule_code_the_tax_audit_crate_emits_is_listed` holds it
+/// equal to the codes the engine's sources emit, so a new code fails that test
+/// rather than going missing from a receipt.
+const RULE_CODES: [&str; 61] = [
+    "BIND-BOOK-DUPLICATE-ID",
+    "BIND-COLLISION",
+    "BIND-GROUP-UNKNOWN",
+    "BIND-GUID-UNKNOWN",
+    "BIND-ID-MALFORMED",
+    "BIND-ID-UNUSED",
+    "BIND-MASTERID-MISMATCH",
+    "BIND-MASTERID-UNKNOWN",
+    "BIND-NAME-UNKNOWN",
+    "BIND-NO-MASTERID",
+    "C1-date",
+    "C1-format",
+    "C1-handle",
+    "C1-major",
+    "C1-schema",
+    "C1-size",
+    "C10-education-date",
+    "C11-blank-guid",
+    "C11-repeated-guid",
+    "C2-manifest",
+    "C2-name",
+    "C2-path",
+    "C2-storage",
+    "C2-symlink",
+    "C3-content-hash",
+    "C3-missing",
+    "C3-size",
+    "C3-stored-hash",
+    "C4-dangling",
+    "C4-duplicate-id",
+    "C4-required",
+    "C4-singleton",
+    "C4-status-list",
+    "C4-stock-summary",
+    "C4-vtype-unresolved",
+    "C5-books-from",
+    "C5-client",
+    "C5-identity",
+    "C5-period",
+    "C6-moved",
+    "C6-status",
+    "C6-unbracketed",
+    "C7-coverage",
+    "C7-gap",
+    "C7-overlap",
+    "C7-window",
+    "C8-window",
+    "C9-high-water",
+    "C9-rows",
+    "CFG-legacy-for-read",
+    "CFG-mixed",
+    "CFG-no-directory",
+    "CFG-path",
+    "CFG-snapshot-for-read",
+    "CFG-stock",
+    "CFG-tally-pin",
+    "FX-1",
+    "PARTY-chain-incomplete",
+    "RELATED-table-shape",
+    "RELATED-tag-collision",
+    "SPECIFIED-missing-figure",
+];
 
 fn receipt_date(value: &Value) -> Option<Value> {
     value

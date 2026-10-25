@@ -400,7 +400,8 @@ async fn a_late_response_keeps_only_its_whitelisted_error_in_the_receipt() {
 
 /// bridge#1916: a tax-audit rule code and an argument refusal are codes too,
 /// so their receipts keep them, as a code or a cause and from a JSON-RPC
-/// message; text of any other shape still never passes.
+/// message; no other text passes, nor anything in capitals the engine does
+/// not emit, however code-like.
 #[tokio::test]
 async fn a_rule_code_or_an_argument_code_is_kept_and_no_other_text_is() {
     let codes = [
@@ -409,6 +410,8 @@ async fn a_rule_code_or_an_argument_code_is_kept_and_no_other_text_is() {
         "C10-education-date",
         "SPECIFIED-missing-figure",
         "argument_invalid:test",
+        "argument_invalid:proposals_sha256",
+        "summary_group_unresolved:no_placements",
         "company_guid_required",
     ];
     for code in codes {
@@ -436,6 +439,17 @@ async fn a_rule_code_or_an_argument_code_is_kept_and_no_other_text_is() {
         "C5-books-1a",
         "C12345-x",
         "ABCDEFGHIJ-x",
+        // Code-shaped text in capitals the engine does not emit: voucher
+        // numbers, names, a prefix and a run of digits, a split identifier.
+        "INV-2025-0042",
+        "SI-25-26-0042",
+        "ACME-INDUSTRIES",
+        "CASH-IN-HAND",
+        "HDFC-00000000000000",
+        "M-0000000000",
+        "PAN-ZZZZZ-0000-Z",
+        "BIND-GROUP",
+        "C5-BOOKS-FROM",
         // An upper-case GUID, one that starts with a letter and one that does not.
         "ABCDEF12-3456-7890-ABCD-EF1234567890",
         "8F3B2C1A-5D4E-4F6A-9B7C-1E2D3F4A5B6C",
@@ -449,6 +463,11 @@ async fn a_rule_code_or_an_argument_code_is_kept_and_no_other_text_is() {
         ":test",
         "argument_invalid:Test",
         "argument_invalid:a:b",
+        "argument_invalid:00000000000000",
+        "account:a0000000000",
+        "argument_invalid:sha2560",
+        "statement_x:row_3",
+        "argument_invalid:test_",
         "Ä1-x",
         "C1-é",
         long_rule.as_str(),
@@ -503,26 +522,23 @@ fn emitted_rule_codes() -> Vec<String> {
     codes
 }
 
-/// Each code the crate emits keeps its place in a receipt. A new code that the
-/// grammar would drop fails here rather than going missing from a receipt.
+/// The receipt's list of rule codes is the codes the crate emits, no more
+/// and no fewer, and each keeps its place in a receipt. A new code fails here
+/// until it is listed, rather than going missing from a receipt.
 #[test]
-fn every_rule_code_the_tax_audit_crate_emits_is_kept_in_the_receipt() {
+fn every_rule_code_the_tax_audit_crate_emits_is_listed() {
     let codes = emitted_rule_codes();
     for known in [
         "BIND-GROUP-UNKNOWN",
-        "BIND-BOOK-DUPLICATE-ID",
-        "C1-date",
-        "C10-education-date",
         "C5-books-from",
-        "CFG-legacy-for-read",
         "FX-1",
-        "PARTY-chain-incomplete",
-        "RELATED-table-shape",
         "SPECIFIED-missing-figure",
     ] {
         assert!(codes.iter().any(|code| code == known), "{known} not found");
     }
-    assert!(codes.len() > 50, "only {} codes found", codes.len());
+    let mut listed = RULE_CODES.map(str::to_string).to_vec();
+    listed.sort();
+    assert_eq!(listed, codes);
     for code in codes {
         assert_eq!(receipt_code(&json!(code)), Some(json!(code)), "{code}");
     }

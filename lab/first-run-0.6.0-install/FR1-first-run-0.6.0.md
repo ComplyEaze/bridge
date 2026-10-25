@@ -1,0 +1,61 @@
+# FR1: first run of the PUBLISHED 0.6.0 file on a Windows install (read-only)
+
+Written 21 Oct 2026, brought onto a lab branch 26 Oct 2026. Not for merge. Nothing here writes to Tally or to any company. `SHA256.txt` lists every file here with its bytes; check it first.
+
+**Who acts (26 Oct).** The lab's operator itself runs inside Claude Desktop, so it cannot quit or reopen Claude Desktop, and the desktop-control tool cannot act on Claude Desktop's own window. Every act in Claude Desktop (installing or removing the extension, its settings window, quitting and reopening it, the chat questions of A7 to A9 and B1 to B3) is done by the owner at the PC, one act at a time, with the lab recording each screen. Everything else (Tally, the browser, the hashes, the registry reads, the files) the lab does itself. This item runs only while the owner is at the PC.
+
+**Guide version (26 Oct).** The guide is `docs/agent/INSTALL.md` at master `532c35f2612ec27ab075337fe3c8ad1c36a65263`, not at 9263657bf as first written: #1837 (where to run the checksum command) and #1861 (the Visual C++ runtime) changed it since. The steps below are unchanged.
+Purpose: measure what a non-technical CA actually sees from "click Download" to "Claude answers a first question", so the install text can say what is true (the install-text audit's points F2, F3, F5 and F6). Nothing in it is a pass/fail of the product; it is a measurement of the path. P6: change one thing at a time; P5: write every observation to a file, never recall it.
+
+## 0. Scope, grants, limits
+- Build: the PUBLISHED release file only, `bridge-tally-mcp-v0.6.0-windows-x64.mcpb`, from the public release page, downloaded in a browser like a user does (not by script, not from CI). Expected SHA-256 `7bf81f08e058fc7ae00ccc51b3dceec10dc50d45dca8477a0438fd9b5a2852ca` (13,821,474 bytes). Anything else is a different test: stop and tell the run coordinator.
+- Tally: TallyPrime on port 9001 only (lab rule), the BOARD LAB line taken for the duration. Company: a synthetic BRIDGE company already loaded (BRIDGE PILOT LAB or BRIDGE SHAPE LAB). Never REGISTER LAB. Never a client book.
+- Reads only: the only Bridge tool calls are `tally_status`, `list_companies` and the first question of INSTALL Step 6 ("Which company is open in Tally?"). Posting stays OFF everywhere; do not tick the posting setting at any point; no `post_import`, no `build_import_xml`.
+- No change to Tally settings except the Step 1 gateway setting if (and only if) the lab PC does not already have it on, recorded and restored per the standing rule (14 Oct).
+- Preserve the standing lab configuration: before anything, record the current lab config entry for Bridge (path + hash of the build it points at, the settings, the Terms value). This request needs a clean extension state; the operator chooses the method that does not lose the standing entry (a second Windows user profile or a restorable snapshot is preferable to uninstalling). If neither exists, uninstall, run, and put back the previous entry, with its hash re-checked. Record which method was used.
+- Cost: about 45 minutes for Branch A; Branch B about 20 more.
+
+## 1. Before you touch anything (capture to `fr1/00-state.md`)
+1. Date/time (run `date`-equivalent), Windows edition and build (`winver` text), 64-bit.
+2. Smart App Control state: registry value `HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy`, name `VerifiedAndReputablePolicyState` (0 off, 1 on, 2 evaluation), plus the Windows Security > App & browser control screen (screenshot). If the value is absent, say so.
+3. SmartScreen setting (same screen): "Check apps and files" on/off; Microsoft Defender SmartScreen for Edge on/off.
+4. Browser used for the download (Edge default; also repeat the download click in Chrome if installed, Branch A2). Browser version.
+5. Claude Desktop: how it is installed (Microsoft Store/MSIX or the claude.com installer), exact version (Settings > About), signed in with which plan type (no account name in the file).
+6. TallyPrime release and licence tier (as shown), the company open, the Tally gateway setting now ("TallyPrime acts as", Port).
+7. Whether any Bridge extension is already installed (name, version), its settings and the data folder `%LOCALAPPDATA%\Bridge\agent` (exists? and, if the Store build, the package-folder equivalent from issue #1459).
+
+## 1b. Visual C++ runtime (added 25 Oct; read-only)
+`bridge_mcp.exe` of 0.6.0 imports `vcruntime140.dll` and the `api-ms-win-crt-*` forwarders (measured from the published file's import table), so it needs the Microsoft Visual C++ 2015-2022 x64 Redistributable on the PC; the bundle does not carry it. Before step A1 record: (a) `HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64` value `Installed` and `Version` (absent = not installed); (b) whether `C:\Windows\System32\vcruntime140.dll` exists. If the PC has it, say which program most likely installed it. If a clean profile or VM without it exists, A7 on that machine is the measurement that matters: record the exact words of the failure Claude Desktop shows (expected shape from Microsoft's docs: "...failed to start because VCRUNTIME140.dll was not found") and whether any tool answers.
+
+## 2. Branch A: fresh install by the book (follow `docs/agent/INSTALL.md` at master 532c35f2 EXACTLY; do not use knowledge the page does not give)
+For every step record: the screenshot, the exact words of every dialog, button or warning, and "matches INSTALL.md / differs: how". Nobody clicks through a warning that has not first been screenshotted.
+
+A1. INSTALL Step 1 (Tally gateway): do each numbered action as written. Record whether each screen matches the words (F1, Settings, Connectivity, Client/Server configuration, "acts as" Both, Port) and the browser check `http://localhost:9001/status` (use the lab port; the guide says 9000). EXPECT the short Tally answer line.
+A2. INSTALL Step 2 (download): open `https://bridge.complyeaze.com/download.html` in the browser; note which card is primary and whether the page detected Windows; click "Download for Windows". Record: any browser prompt ("not commonly downloaded", "keep/discard"), any SmartScreen or Defender message on the file, the file name and size in Downloads, and the Mark-of-the-Web state (`Get-Item -Stream Zone.Identifier` content, ZoneId value only). Repeat the click in a second browser if available (A2b), deleting the first file before.
+A3. Verify the file as a CA would, using only what the download page gives (F3): note whether the page tells you how. Then run `certutil -hashfile <file> SHA256` as in INSTALL "For IT staff" and compare with the `.sha256` file the page links. EXPECT the hash in section 0. Record how long it took to find those instructions (steps / clicks).
+A4. INSTALL Step 3 (Claude Desktop > Settings > Extensions > Advanced settings > Install Extension…): record the menu names as they are on THIS Claude Desktop version (is there an "Extension Developer" section? is drag-and-drop or double-clicking the file also offered? F6). Choose the file. Record the red/orange notice word for word and the two Install confirmations. Does Windows raise any UAC, SmartScreen or Smart App Control block when Claude Desktop unpacks or first starts `bridge_mcp.exe`? (The first launch is when it would show.) Screenshot Event Viewer > Windows Logs > Application and Microsoft-Windows-CodeIntegrity/Operational for the minute of install and first launch, if any block is suspected.
+A5. INSTALL Step 4 (settings window): are there five lines, in the order the guide gives? Is the Terms line first? Tick Terms, leave host `localhost`, set port to the lab port, redaction none, posting OFF. Save. Record anything the guide does not say.
+A6. INSTALL Step 5 (quit completely, reopen): follow the Windows words (tray icon, Quit). Record whether the tray behaviour matches.
+A7. INSTALL Step 6: new chat, type "Which company is open in Tally?". Record the permission box (button names), choose Allow once, then the answer. EXPECT the name of the loaded synthetic company. Also record which tools the chat shows being called (expect `tally_status`/`list_companies`).
+A8. Negative control (one variable): untick the Terms line, Save, quit and reopen, ask the same question. EXPECT the "Terms of Use are not accepted" answer naming the setting (0.5.1+ behaviour). Re-tick it. This checks the table row "Claude says the Terms of Use are not accepted".
+A9. Negative control: close TallyPrime, ask again. EXPECT a plain "cannot reach Tally" answer. Reopen TallyPrime and the company.
+A10. Remove it: Settings > Extensions > ComplyEaze Bridge > uninstall (INSTALL "Remove or update it"). Record what remains: data folder yes/no, settings yes/no. No file is deleted.
+
+## 3. Branch B (separate sitting, after A): update from 0.5.1 to 0.6.0 (audit F5; the open "R11a" item)
+B1. Install the PUBLISHED `bridge-tally-mcp-v0.5.1-windows-x64.mcpb` (hash from its release `.sha256` file; download as a user would), set Terms ticked, port, and POSTING ON, quit/reopen, ask the Step 6 question (a read). Record it.
+B2. Without removing anything, install the 0.6.0 file over it (INSTALL "Update"). Record: does Claude Desktop show an Update button, or a second extension entry (as 0.4.2 did beside an older release)? Which settings were kept: port, redaction, Terms (compare the 0.5.1 and 0.6.0 manifests' key names first and write both down), posting (0.6.0's key is `enable_posting_2026_10`; whether it is empty or off after the update is the measurement). Quote the settings window.
+B3. Quit and reopen, ask the Step 6 question. Record the first answer. If the Terms line is empty, expect the "Terms not accepted" answer until it is ticked; tick it, Save, quit/reopen, ask again.
+B4. EXPECT (the claim being tested): posting is OFF after the update and the release text's "turn it on again" is therefore true. If posting is ON after the update, say so plainly: the text must change.
+B5. Leave posting OFF. Uninstall. Restore the standing lab entry (section 0) and re-check its hash.
+
+## 4. What proves pass / fail (this measures the text, not the product)
+- A-pass: A7 answered with the synthetic company's name, and every step A1-A6 either matches INSTALL.md or the differences are written down. A8 and A9 give the expected plain refusals.
+- A-text-fail (the useful result): any warning, block, button or menu the guide does not name, or any step that needed knowledge the guide did not give. Each is a line in `01-differences.md` with a screenshot, and becomes a text fix.
+- Hard stops (tell the run coordinator at once, do not continue): Smart App Control or SmartScreen blocks `bridge_mcp.exe` (that is the finding: record the exact message and the Code Integrity event, then try the single documented bypass the OS offers only if the run coordinator says so); Tally shows any dialog; any write to a company; the downloaded hash differs from section 0.
+- B-pass: B2/B4 recorded exactly (any outcome is a valid measurement; "posting stayed on" is a finding, not a failure of the run).
+
+## 5. Return (on a new branch `lab/first-run-0.6.0-install-answers` with `SHA256.txt`; send its SHA to the run coordinator before pushing, and push only after the pre-push scan and the coordinator's yes)
+`00-state.md`, `01-differences.md` (one line per deviation, screenshot file name), `02-warnings.md` (every OS/browser/Claude warning verbatim), `03-hashes.txt` (file hash, Zone.Identifier, bridge_mcp.exe hash after unpack, the extension's folder path), screenshots, and a one-line verdict per step A1-A10, B1-B5 using VERIFIED / PARTIAL / UNVERIFIED. Raw Event Viewer exports only if a block occurred. Delete nothing from the PC beyond what the steps ask; restore the standing lab entry and say so.
+
+## 6. Mac variant (not for the Windows lab; the run coordinator routes it to a Mac with Tally in a VM)
+Same Branch A with INSTALL "Step 0": Safari check on the Mac of `http://localhost:<port>/status`, download in Safari, `shasum -a 256`, and record Gatekeeper/quarantine behaviour (`xattr` on the downloaded file and on the unpacked `bridge_mcp` and `libpdfium.dylib`), the Claude Desktop notice, and the first answer. The 8 Oct Mac run covers 0.5.1 only.

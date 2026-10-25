@@ -154,6 +154,8 @@ test("pull requests supersede by branch; master pushes share one group and never
   assert.notEqual(pr.group, concurrencyOf("pull_request", { ref: "refs/pull/8/merge", runId: "1" }).group);
   const push = concurrencyOf("push", { ref: "refs/heads/master", runId: "1" });
   assert.equal(push.cancel, "false", "a master push never cancels a run in progress; only a pending one is replaced");
+  // Every `push` run is a master push only because the trigger says so: widen it and other branches would share this group.
+  assert.match(workflow.join("\n"), /^on:\n {2}push:\n(?: {4}#.*\n)* {4}branches: \[master\]$/m);
   assert.equal(push.group, concurrencyOf("push", { ref: "refs/heads/master", runId: "2" }).group, "two master pushes share a group");
   assert.notEqual(push.group, pr.group);
   for (const event of ["merge_group", "schedule", "workflow_dispatch"]) {
@@ -163,4 +165,3 @@ test("pull requests supersede by branch; master pushes share one group and never
     assert.notEqual(first.group, push.group);
   }
 });
-

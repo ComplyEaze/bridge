@@ -182,7 +182,7 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
   },
   snapshot_commit_refused: {
     title: "The local mirror refused to commit this run",
-    action: "Resuming will not help: the run's saved batch holds something the mirror will never accept, and the same commit is refused every time. Nothing was lost from the last verified baseline. Start a new read, and keep the support artifact for this run.",
+    action: "Resuming will not help: the run's saved batch holds something the mirror will never accept, and the same commit is refused every time. Nothing was lost from the last verified baseline. Start a new read.",
     retry: "not_useful",
   },
   adaptive_window_limit_reached: {

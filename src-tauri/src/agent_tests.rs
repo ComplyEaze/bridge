@@ -962,14 +962,14 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         lab_samples.push((
             "lab_read_purchase_identity",
             json!({
-                "agent": {"rows": 2, "response_chars": 120_000, "response_chars_per_row": 60_000},
-                "narrow": {"rows": 2, "response_chars": 16_000, "response_chars_per_row": 8_000},
+                "agent": {"rows": 2, "response_chars": 120_000, "response_chars_per_row": 60_000, "window_honoured": true},
+                "narrow": {"rows": 2, "response_chars": 16_000, "response_chars_per_row": 8_000, "window_honoured": true},
                 "differences": {
                     "total": 1,
                     "listed": [{"guid": "synthetic-guid-00000001", "field": "party"}],
                     "listed_truncated": false,
                 },
-                "window_honoured": true,
+                "inconclusive": false,
             }),
         ));
     }

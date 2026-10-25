@@ -1016,10 +1016,12 @@ pub(super) async fn lab_read_purchase_identity(
         let (agent_xml, agent) = reads.pop().expect("two reads");
         let agent =
             agent.map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+        // Each read's window was checked against its own rows; a refused narrow answer was not.
+        let mut agent_size = identity_read_size(&agent_xml, agent.len());
+        agent_size["window_honoured"] = json!(true);
         let mut result = json!({
             "profile": "lab_read_purchase_identity_v1",
-            "agent": identity_read_size(&agent_xml, agent.len()),
-            "window_honoured": true,
+            "agent": agent_size,
         });
         match narrow {
             Err(code) => {
@@ -1027,7 +1029,9 @@ pub(super) async fn lab_read_purchase_identity(
             }
             Ok(narrow) => {
                 let differences = purchase_identity_differences(&agent, &narrow);
-                result["narrow"] = identity_read_size(&narrow_xml, narrow.len());
+                let mut narrow_size = identity_read_size(&narrow_xml, narrow.len());
+                narrow_size["window_honoured"] = json!(true);
+                result["narrow"] = narrow_size;
                 // Two empty answers agree vacuously: no voucher was compared.
                 result["inconclusive"] = json!(agent.is_empty() && narrow.is_empty());
                 result["differences"] = json!({

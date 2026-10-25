@@ -330,6 +330,66 @@
       "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_CAPTURE_PROVENANCE.md at that head",
       "sha256": "783a89f96e6c28ee9b575a1d871fbdcadcada8f7a44122b153d001a167ee71a8",
       "size": 1740
+    },
+    {
+      "blob": "3473a00f48dd6229502aa83f52c92af58e2e394d",
+      "capture_id": "masters-lab-ledger-index.request.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f",
+      "size": 2232
+    },
+    {
+      "blob": "9daa49232d3c3c73e3f7e3b346f7acf3c5b8d894",
+      "capture_id": "masters-lab-ledger-index-baseline.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index-baseline.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "268040ba3927e31222aefead1e49dbef744bf60417918362c18a9e08d1e5c6eb",
+      "size": 13610
+    },
+    {
+      "blob": "578e351d9ede0c6acfe7d2f6b408dd9ee881add2",
+      "capture_id": "masters-lab-ledger-index-after-name-cases.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index-after-name-cases.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "f875beee3ec7f3f1b94c0da7af075d682d560668c38454996b774ba6774dd853",
+      "size": 16256
+    },
+    {
+      "blob": "4453444e4c29eba0dd42f5c8216bdba5124b9afb",
+      "capture_id": "masters-lab-ledger-index-after-fold-cases.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index-after-fold-cases.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "6ee39a99c4855fb3944391b7fc50a3ff8fc37a5a25bb6c398a0decb3a72736a8",
+      "size": 28054
+    },
+    {
+      "blob": "54531728717b9c775446f69f44512d5ff986b481",
+      "capture_id": "masters-lab-groups.request.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-groups.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0",
+      "size": 1070
+    },
+    {
+      "blob": "79e6a5ec5f39ffd92843b8a9d440aa8157c293ac",
+      "capture_id": "masters-lab-groups-baseline.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-groups-baseline.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "7131aa4566ea5d630fa4506af5165319d261abe087e3a1b614b62080d2c4e3aa",
+      "size": 56068
     }
   ]
 }

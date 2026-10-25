@@ -6,6 +6,7 @@ pub(crate) mod client_group_label_migration;
 pub(crate) mod client_groups;
 pub(crate) mod commands;
 pub(crate) mod db;
+pub(crate) mod desktop_terms;
 pub(crate) mod endpoint_coordination;
 pub(crate) mod endpoint_wire;
 pub(crate) mod exported_files;
@@ -107,7 +108,6 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
     tracing_subscriber::fmt::init();
 
     let builder = tauri::Builder::default()
-        .manage(tally::TallyRuntime::default())
         .manage(exported_files::ExportedFiles::default())
         .manage(source_draft::SourceDraftStore::default())
         .manage(source_draft::SourceDraftLifecycleGuard::default())
@@ -118,6 +118,12 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
         .manage(sync::coordinator::SnapshotCoordinator::default())
         .setup(|app| {
             let app_data_directory = app.path().app_data_dir()?;
+            // The runtime is built here, with the app's terms record, so it never exists without
+            // its gate (bridge#1106).
+            let terms =
+                std::sync::Arc::new(desktop_terms::DesktopTerms::new(app_data_directory.clone()));
+            app.manage(std::sync::Arc::clone(&terms));
+            app.manage(tally::TallyRuntime::desktop(terms));
             app.manage(LazyTallyMirror::new(app_data_directory));
             #[cfg(target_os = "macos")]
             install_macos_cocoa_termination_guard(app.handle())?;
@@ -144,6 +150,8 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
 
     let app = builder
         .invoke_handler(tauri::generate_handler![
+            commands::terms::desktop_terms_status,
+            commands::terms::desktop_accept_terms,
             commands::probe_tally,
             commands::bootstrap_direct_tally_company,
             commands::save_tally_setup,

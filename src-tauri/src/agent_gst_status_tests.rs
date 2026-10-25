@@ -127,10 +127,13 @@ const FLAG_VALUES: [Option<&str>; 6] = [
 #[test]
 fn exactly_the_four_measured_flag_combinations_state_a_status() {
     let measured = [
-        ((Some("Yes"), Some("No"), Some("No")), GstStatus::Included),
-        ((Some("No"), Some("Yes"), Some("No")), GstStatus::Uncertain),
-        ((Some("No"), Some("No"), Some("Yes")), GstStatus::Excluded),
-        ((Some("No"), Some("No"), Some("No")), GstStatus::NotInReturn),
+        ((Some("Yes"), Some("No"), Some("No")), FlagStatus::Included),
+        ((Some("No"), Some("Yes"), Some("No")), FlagStatus::Uncertain),
+        ((Some("No"), Some("No"), Some("Yes")), FlagStatus::Excluded),
+        (
+            (Some("No"), Some("No"), Some("No")),
+            FlagStatus::NotInReturn,
+        ),
     ];
     let (mut states, mut not_reported, mut unreadable) = (0, 0, 0);
     for included in FLAG_VALUES {
@@ -238,7 +241,9 @@ fn cancelled_optional_and_post_dated_are_decided_before_the_three_flags_and_only
                                 (Some("No"), Some("No"), Some("Yes")) => {
                                     ("post_dated", flags.map(|_| GstStatus::PostDated))
                                 }
-                                (Some("No"), Some("No"), Some("No")) => ("by_flags", flags),
+                                (Some("No"), Some("No"), Some("No")) => {
+                                    ("by_flags", flags.map(GstStatus::from))
+                                }
                                 (None, None, None) => ("not_reported", Err(NOT_REPORTED)),
                                 _ => ("unreadable", Err(UNREADABLE)),
                             };
@@ -518,10 +523,10 @@ fn earlier_rows(expected: &[Expected], code: &'static str) -> Vec<StatusRow> {
 
 /// What the three status flags read on the one cancelled, optional and post-dated voucher of the
 /// committed answers (`BP/26-27/0041` and `0045` the included flag Yes, `0042` all three No).
-fn flags_beside(status: GstStatus) -> Option<GstStatus> {
+fn flags_beside(status: GstStatus) -> Option<FlagStatus> {
     match status {
-        GstStatus::Cancelled | GstStatus::PostDated => Some(GstStatus::Included),
-        GstStatus::Optional => Some(GstStatus::NotInReturn),
+        GstStatus::Cancelled | GstStatus::PostDated => Some(FlagStatus::Included),
+        GstStatus::Optional => Some(FlagStatus::NotInReturn),
         _ => None,
     }
 }
@@ -784,7 +789,7 @@ fn a_cancelled_optional_or_post_dated_flag_decides_the_state_and_an_unreadable_o
         assert_eq!((target.status, target.overridden), (Ok(state), Ok(false)));
         // What the three flags read is kept beside the state: here included, and uncertain when
         // they read so.
-        assert_eq!(target.status_flags, Some(GstStatus::Included), "{kind}");
+        assert_eq!(target.status_flags, Some(FlagStatus::Included), "{kind}");
         let target = target_after(|block| {
             let block = once(&block, kind, &yes(kind));
             let block = once(&block, INCLUDED, &INCLUDED.replace(">Yes<", ">No<"));
@@ -792,7 +797,7 @@ fn a_cancelled_optional_or_post_dated_flag_decides_the_state_and_an_unreadable_o
         });
         assert_eq!(
             (target.status, target.status_flags),
-            (Ok(state), Some(GstStatus::Uncertain)),
+            (Ok(state), Some(FlagStatus::Uncertain)),
             "{kind}"
         );
         // Such a voucher whose three status flags are absent is not reported, and one spelt
@@ -1531,7 +1536,7 @@ fn item(expected: &Expected) -> Value {
         "accepted_as_it_stands": expected.6,
     });
     if let Some(flags) = flags_beside(expected.5) {
-        item["status_flags"] = json!(status_name(flags));
+        item["status_flags"] = json!(status_name(flags.into()));
     }
     item
 }

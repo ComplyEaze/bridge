@@ -456,7 +456,7 @@ fn an_empty_book_refusal_carries_its_remediation_through_the_real_payload() {
         error["remediation"]
             .as_str()
             .expect("remediation attached to the refusal payload")
-            .contains("Record one voucher in this company by another route"),
+            .contains("cannot build or post the first voucher into this company yet"),
         "{error}"
     );
     assert_eq!(response.value["isError"], true);
@@ -529,12 +529,19 @@ async fn every_date_refusal_names_the_dates_it_accepts() {
 
 #[test]
 fn remediation_is_present_only_where_a_concrete_next_step_exists() {
-    let guidance = refusal_remediation("empty_book_first_import").expect("empty book guidance");
+    let guidance = refusal_remediation("statement_password_file_permissions").expect("a next step");
     // The guidance must name the action to take, not restate the refusal.
+    assert!(guidance.contains("(chmod 600)"), "{guidance}");
+    // An exception: a company that has never held a voucher has no step ComplyEaze Bridge
+    // can offer yet, so its guidance states the cause and sends no one to enter a voucher another
+    // way (#1709).
+    let empty = refusal_remediation("empty_book_first_import").expect("empty book guidance");
     assert!(
-        guidance.contains("Record one voucher in this company by another route"),
-        "{guidance}"
+        empty.contains("cannot build or post the first voucher into this company yet"),
+        "{empty}"
     );
+    assert!(empty.contains("Nothing was sent to Tally"), "{empty}");
+    assert!(!empty.contains("another route"), "{empty}");
     // Sparse by design. A code with no documented step gets None rather than
     // filler, because guidance that reads as authoritative and sends the caller
     // nowhere is worse than the general message.
@@ -807,6 +814,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "masters",
             json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
+        ),
+        (
+            "negative_stock",
+            json!({"result":{"listed_items":[{"item":party_name("Stock Item One"),"quantity":{"state":"read","amount":"-3","unit":"Nos"},"rate":{"state":"present","value":"120.00"},"value":{"state":"present","value":"360.00"}}]}}),
         ),
         (
             "outstandings",

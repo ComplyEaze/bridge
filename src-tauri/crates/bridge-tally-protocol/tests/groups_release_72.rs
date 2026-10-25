@@ -88,6 +88,22 @@ fn the_computed_field_moves_between_the_releases_and_no_other_child_does() {
     }
 }
 
+/// The text without the lines that hold the computed `BRIDGECOMPANYGUID`, and how many there were.
+fn without_computed_field(text: &str) -> (String, usize) {
+    let (kept, removed): (Vec<&str>, Vec<&str>) = text
+        .lines()
+        .partition(|line| !line.contains("BRIDGECOMPANYGUID"));
+    (kept.join("\n"), removed.len())
+}
+
+#[test]
+fn the_two_captures_are_equal_once_the_computed_field_is_removed() {
+    let (old, old_removed) = without_computed_field(&decode(RELEASE_71));
+    let (new, new_removed) = without_computed_field(&decode(RELEASE_72));
+    assert_eq!((old_removed, new_removed), (28, 28));
+    assert_eq!(old, new);
+}
+
 #[test]
 fn both_releases_give_the_same_group_records_and_different_row_hashes() {
     let (old, new) = (decode(RELEASE_71), decode(RELEASE_72));

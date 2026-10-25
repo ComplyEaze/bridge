@@ -3172,10 +3172,12 @@ async fn a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_
     assert_eq!(held.counts(), [2], "nobody was asked a third time");
 }
 
-/// The same refusal, then the totals box does not fit either: refused again,
-/// nothing posted, and no third dialog (#1832).
+/// The same refusal, then the totals box does not fit either: refused again and
+/// nothing posted. The totals ask notes nothing of its own, and the first
+/// refusal's note stands, so the next ask is the totals again until the note
+/// runs out (#1832).
 #[tokio::test]
-async fn a_totals_box_that_does_not_fit_either_is_refused_and_asks_no_third_time() {
+async fn a_totals_box_that_does_not_fit_either_is_refused_and_the_next_ask_is_the_totals_again() {
     let mut plans = before_approval();
     plans.extend(before_approval());
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
@@ -3202,8 +3204,8 @@ async fn a_totals_box_that_does_not_fit_either_is_refused_and_asks_no_third_time
     assert!(previews[1].contains(VOUCHER_LINES_DO_NOT_FIT));
     assert_eq!(intents(directory.path()), 0);
     assert!(!server.post_approvals.holds(&line.batch_id));
-    // Refused a third time with the totals again: the fact is not re-recorded by
-    // the totals ask, and is still there from the first.
+    // The totals ask recorded nothing of its own, and the note from the first
+    // refusal is still there: the next ask is the totals again.
     assert!(matches!(
         server.post_approvals.begin(&line.batch_id),
         Begin::Ask(PreviewForm::TotalsOnly)

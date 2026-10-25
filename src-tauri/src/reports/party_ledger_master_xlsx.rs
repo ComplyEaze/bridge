@@ -436,7 +436,14 @@ fn decisions_summary(
     finality: Finality,
 ) -> String {
     if statuses.is_empty() {
-        return "None were applied to this export.".to_string();
+        // With no decision given, the only thing that can keep the view from being final is a
+        // ledger still excluded.
+        return match finality {
+            Finality::Final => "None were applied to this export.".to_string(),
+            Finality::NotFinal => format!(
+                "None were applied to this export. NOT FINAL: {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
+            ),
+        };
     }
     let applied = statuses
         .iter()
@@ -455,8 +462,25 @@ fn decisions_summary(
         })
         .count();
     let attention = statuses.len() - applied - other_year;
+    // An applied decision whose ledger moved between subgroups stays applied, but its reason may
+    // have rested on the subgroup the ledger has left, so the verdict says to look at it.
+    let moved = statuses
+        .iter()
+        .filter(|status| {
+            matches!(
+                status,
+                DecisionStatus::Applied {
+                    ancestry_changed: Some(_),
+                    ..
+                }
+            )
+        })
+        .count();
     let verdict = match finality {
-        Finality::Final => "Nothing needs attention.".to_string(),
+        Finality::Final if moved == 0 => "Nothing needs attention.".to_string(),
+        Finality::Final => format!(
+            "Applied, but {moved} decided ledger(s) now sit under other groups than when decided: review each decision's status."
+        ),
         Finality::NotFinal => {
             let mut text = String::from("NOT FINAL:");
             if attention > 0 {

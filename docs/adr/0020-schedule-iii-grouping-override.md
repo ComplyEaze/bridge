@@ -82,9 +82,10 @@ applies those that still fit, and reports the rest without applying them. No dec
    - **for another financial year:** offered, never applied;
    - **ledger missing;**
    - **renamed:** the GUID is found, but Tally now names the ledger otherwise than when the decision was made.
-     A GUID is not established as a ledger's identity for good, and a restore can hand an identifier to another
-     record (ADR 0016: an identifier match is never auto-resolved), so the decision is offered, not applied,
-     until the CA confirms it for the ledger as it is named now;
+     An identifier that now carries another name is the case ADR 0016 will not settle silently in the
+     identifier's favour (`IdentifierNameConflict`), so the decision is offered, not applied, until the CA
+     confirms it for the ledger as it is named now. Whether a restore can hand a GUID to another ledger is
+     recorded for vouchers only and is unverified for ledgers; the rule does not depend on it;
    - **balance not established;**
    - **group read incomplete:** no parent, a gap in the group read, or a group whose parent Tally did not return.
      None of these gives the ledger a standing, so no decision may rest on it;
@@ -96,9 +97,11 @@ applies those that still fit, and reports the rest without applying them. No dec
    on the subgroup the ledger has left.
 
    Any status other than applied or another year makes the view `NotFinal`, and so does any ledger left
-   excluded (one that still needs a client mapping decision), whether or not a decision was offered for it. A
-   view is final only when nothing remains for the client to decide. It is printed as NOT FINAL, not withheld,
-   so the CA can see what to resolve. Two decisions for one ledger in one year are an error: the export
+   excluded (one that still needs a client mapping decision), whether or not a decision was offered for it.
+   A view is final only when no decision it was given needs attention and no ledger is excluded. An applied
+   decision whose ledger moved between subgroups keeps the view final, but the sheet then says that, and names
+   how many, instead of "Nothing needs attention." It is printed as NOT FINAL, not withheld, so the CA can see
+   what to resolve. Two decisions for one ledger in one year are an error: the export
    fails rather than render.
 5. **Amounts are not an input.**
    - A decision moves a row index between lines, and every line total is summed from the read's own rows. Amounts

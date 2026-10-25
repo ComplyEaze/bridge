@@ -518,10 +518,10 @@ pub(crate) enum NotApplied {
     /// For another financial year: offered, not stale.
     OtherYear,
     LedgerMissing,
-    /// Tally now names the ledger something else than when the decision was made.
-    /// A GUID is not established as a ledger's identity for good (a restore can hand
-    /// an identifier to another record; ADR 0016), so the decision is not applied
-    /// until the CA confirms it for the ledger as it is named now.
+    /// Tally now names the ledger something else than when the decision was made. An identifier
+    /// that now carries another name is the case ADR 0016 will not settle silently in the
+    /// identifier's favour (`IdentifierNameConflict`), so the decision is not applied until the
+    /// CA confirms it for the ledger as it is named now.
     Renamed {
         was: String,
         now: String,

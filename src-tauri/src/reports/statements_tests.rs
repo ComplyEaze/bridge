@@ -16,6 +16,7 @@ use super::*;
 use bridge_tally_protocol::{
     native_outstandings::parse_native_group_snapshot,
     native_statement_reports::{parse_native_statement, NativeStatementLine},
+    native_stock_summary::parse_company_inventory_flags,
     native_trial_balance::{parse_native_trial_balance, NativeTrialBalance},
     PartyLedgerMasterFieldObservation,
 };
@@ -84,7 +85,14 @@ fn known_lab_balance_sheet() -> NativeStatement {
 }
 
 fn derive(report: NativeTrialBalance, tally: &NativeStatement) -> DerivedStatements {
-    derive_statements(&admitted(report), &groups(), tally, None).unwrap()
+    derive_statements(
+        &admitted(report),
+        &groups(),
+        tally,
+        None,
+        InventoryFlags::NotRead,
+    )
+    .unwrap()
 }
 
 fn assert_sum(sum: &StatementSum, value: &str, present: usize, empty: usize) {
@@ -273,8 +281,14 @@ fn a_ledger_under_a_user_created_primary_group_blocks_every_result() {
     row(&mut report, "Ageing Sales").parent =
         PartyLedgerMasterFieldObservation::Returned("BRIDGE Synthetic Primary".to_string());
 
-    let derived =
-        derive_statements(&admitted(report), &groups, &known_lab_balance_sheet(), None).unwrap();
+    let derived = derive_statements(
+        &admitted(report),
+        &groups,
+        &known_lab_balance_sheet(),
+        None,
+        InventoryFlags::NotRead,
+    )
+    .unwrap();
     assert_eq!(
         line(&derived.profit_and_loss, "Sales Accounts").ledger_count,
         0
@@ -398,7 +412,8 @@ fn a_row_whose_columns_do_not_add_up_is_refused() {
             &admitted(report),
             &groups(),
             &known_lab_balance_sheet(),
-            None
+            None,
+            InventoryFlags::NotRead
         )
         .unwrap_err(),
         StatementsError::RowInconsistent
@@ -416,7 +431,8 @@ fn a_closing_that_no_movement_explains_is_refused_even_with_empty_columns() {
             &admitted(report),
             &groups(),
             &known_lab_balance_sheet(),
-            None
+            None,
+            InventoryFlags::NotRead
         )
         .unwrap_err(),
         StatementsError::RowInconsistent
@@ -434,7 +450,8 @@ fn a_second_root_ledger_is_refused() {
             &admitted(report),
             &groups(),
             &known_lab_balance_sheet(),
-            None
+            None,
+            InventoryFlags::NotRead
         )
         .unwrap_err(),
         StatementsError::RootLedgerRepeated
@@ -448,7 +465,14 @@ fn each_gate_takes_only_its_own_statement() {
         &[("Sales Accounts", "", "4027.00")],
     );
     assert_eq!(
-        derive_statements(&admitted(known_lab()), &groups(), &profit_and_loss, None).unwrap_err(),
+        derive_statements(
+            &admitted(known_lab()),
+            &groups(),
+            &profit_and_loss,
+            None,
+            InventoryFlags::NotRead
+        )
+        .unwrap_err(),
         StatementsError::GateNotABalanceSheet
     );
     assert_eq!(
@@ -456,7 +480,8 @@ fn each_gate_takes_only_its_own_statement() {
             &admitted(known_lab()),
             &groups(),
             &known_lab_balance_sheet(),
-            Some(&known_lab_balance_sheet())
+            Some(&known_lab_balance_sheet()),
+            InventoryFlags::NotRead
         )
         .unwrap_err(),
         StatementsError::GateNotAProfitAndLoss
@@ -477,6 +502,7 @@ fn derive_with_profit_and_loss(
         &groups(),
         &known_lab_balance_sheet(),
         Some(tally),
+        InventoryFlags::NotRead,
     )
     .unwrap()
 }
@@ -593,6 +619,7 @@ impl Capture {
             &groups,
             &balance_sheet,
             Some(&profit_and_loss),
+            InventoryFlags::NotRead,
         )
         .unwrap();
         let tie = derived.profit_and_loss_tie.clone().unwrap();
@@ -625,6 +652,7 @@ fn reads_lab_with_profit_and_loss(lines: &[(&str, &str, &str)]) -> DerivedStatem
         &groups,
         &balance_sheet,
         Some(&profit_and_loss(lines)),
+        InventoryFlags::NotRead,
     )
     .unwrap()
 }
@@ -904,4 +932,414 @@ fn a_present_zero_over_a_derived_zero_ties_and_a_present_amount_still_refuses() 
                 == TieStatus::NotCompared {
                     reason: "both_tally_columns_present"
                 }));
+}
+
+// Tally's own closing stock on an integrated inventory book (#692). The four
+// sources are the captures of `BRIDGE TIEOUT B`: no opening stock, three items,
+// one purchase and one sale. Tests marked "synthetic mutation" edit a captured
+// Profit and Loss line to reach a branch the capture does not; they make no
+// claim about Tally output.
+
+const TIEOUT_B: Capture = Capture {
+    guid: "d64eda55-da7c-4106-a171-3e3cb6cdd331",
+    trial_balance: include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/statement_trial_balance_stock_book_fy_live.utf16le.xml"
+    ),
+    groups: include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/statement_groups_stock_book_live.utf16le.xml"
+    ),
+    balance_sheet: include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/statement_balance_sheet_stock_book_fy_live.utf16le.xml"
+    ),
+    profit_and_loss: include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_stock_book_fy_live.utf16le.xml"
+    ),
+};
+
+/// The flags Tally gave for the book (its captured answer), as
+/// `IntegratedInventory` reads them.
+fn integrated() -> InventoryFlags {
+    let flags = parse_company_inventory_flags(
+        &utf16(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_stock_book_live.utf16le.xml"
+        )),
+        TIEOUT_B.guid,
+    )
+    .unwrap()
+    .flags;
+    IntegratedInventory::from_flags(&flags)
+}
+
+/// The inventory book with `profit_and_loss` as Tally's own P&L (`None`: not read).
+fn tieout_b_with(
+    profit_and_loss: Option<&NativeStatement>,
+    inventory: InventoryFlags,
+) -> DerivedStatements {
+    let (report, groups, balance_sheet, _) = TIEOUT_B.parts();
+    derive_statements(
+        &admitted(report),
+        &groups,
+        &balance_sheet,
+        profit_and_loss,
+        inventory,
+    )
+    .unwrap()
+}
+
+/// The inventory book's captured P&L lines, edited by `edit`.
+fn captured_stock_lines() -> Vec<(&'static str, &'static str, &'static str)> {
+    vec![
+        ("Sales Accounts", "", "1400.00"),
+        ("Cost of Sales :", "", "-900.00"),
+        ("Opening Stock", "", ""),
+        ("Add: Purchase Accounts", "-3000.00", ""),
+        ("Less: Closing Stock", "-2100.00", ""),
+        ("Indirect Expenses", "", "-500.00"),
+    ]
+}
+
+fn tieout_b_edited(
+    edit: impl FnOnce(&mut Vec<(&'static str, &'static str, &'static str)>),
+    inventory: InventoryFlags,
+) -> DerivedStatements {
+    let mut lines = captured_stock_lines();
+    edit(&mut lines);
+    tieout_b_with(Some(&profit_and_loss(&lines)), inventory)
+}
+
+fn replace_line(
+    lines: &mut [(&'static str, &'static str, &'static str)],
+    name: &str,
+    sub: &'static str,
+    main: &'static str,
+) {
+    let slot = lines.iter_mut().find(|line| line.0 == name).unwrap();
+    slot.1 = sub;
+    slot.2 = main;
+}
+
+fn declined(derived: &DerivedStatements) -> ClosingStockDeclined {
+    match &derived.closing_stock {
+        ClosingStockUse::Declined { why, .. } => *why,
+        other => panic!("expected a declined closing stock, got {other:?}"),
+    }
+}
+
+#[test]
+fn the_edited_lines_are_the_captured_ones() {
+    // The mutation tests below start from these lines; this ties them to the capture.
+    let (_, _, _, captured) = TIEOUT_B.parts();
+    assert_eq!(captured, profit_and_loss(&captured_stock_lines()));
+}
+
+#[test]
+fn tallys_closing_stock_closes_every_gap_on_the_inventory_book() {
+    let (_, _, _, tally) = TIEOUT_B.parts();
+    let derived = tieout_b_with(Some(&tally), integrated());
+    match &derived.closing_stock {
+        ClosingStockUse::Applied { value } => assert!(value.numeric_eq(&decimal("-2100.00"))),
+        other => panic!("expected Applied, got {other:?}"),
+    }
+    // Gross 500 and net 0 as Tally's screen shows them, the carried line 0.
+    assert_established(&derived.gross_result, "500.00");
+    assert_established(&derived.net_result, "0");
+    assert_established(&derived.balance_sheet_profit_and_loss, "0");
+    // The derived Current Assets line is still the Trial Balance's: the amount
+    // is a line of its own, not folded into a group.
+    assert!(line(&derived.balance_sheet, "Current Assets")
+        .amount
+        .sum
+        .numeric_eq(&decimal("-50900.00")));
+    let tie = derived.profit_and_loss_tie.unwrap();
+    let stock = tie
+        .lines
+        .iter()
+        .find(|line| line.name == "Less: Closing Stock")
+        .unwrap();
+    assert_eq!(
+        stock.status,
+        TieStatus::NotCompared {
+            reason: "tally_closing_stock_used"
+        }
+    );
+    let purchase = tie
+        .lines
+        .iter()
+        .find(|line| line.name == "Add: Purchase Accounts")
+        .unwrap();
+    assert_eq!(purchase.status, TieStatus::Matched);
+    assert!(tie.derived_only.is_empty());
+}
+
+#[test]
+fn without_the_flags_the_inventory_book_keeps_todays_refusal() {
+    let (_, _, _, tally) = TIEOUT_B.parts();
+    let derived = tieout_b_with(Some(&tally), InventoryFlags::NotShownIntegrated);
+    assert_eq!(
+        declined(&derived),
+        ClosingStockDeclined::BookNotShownIntegrated
+    );
+    // A declined read is the result of a book without the figure.
+    let expected = differs(&["Profit & Loss A/c", "Current Assets"]);
+    assert_every_result(&derived, &expected);
+}
+
+#[test]
+fn without_a_profit_and_loss_the_inventory_book_keeps_todays_refusal() {
+    let derived = tieout_b_with(None, integrated());
+    assert_eq!(derived.closing_stock, ClosingStockUse::NotApplicable);
+    assert_every_result(&derived, &differs(&["Profit & Loss A/c", "Current Assets"]));
+}
+
+#[test]
+fn a_stock_book_whose_figure_does_not_close_every_gap_names_the_lines() {
+    // synthetic mutation: closing stock off by a paisa closes the Cost of Sales
+    // heading only approximately and Current Assets not at all.
+    let derived = tieout_b_edited(
+        |lines| replace_line(lines, "Less: Closing Stock", "-2100.01", ""),
+        integrated(),
+    );
+    let ClosingStockUse::Declined { why, lines } = &derived.closing_stock else {
+        panic!("expected a declined closing stock");
+    };
+    assert_eq!(*why, ClosingStockDeclined::DoesNotCloseEveryGap);
+    assert!(lines.contains(&"Current Assets".to_string()), "{lines:?}");
+    assert!(lines.contains(&"Cost of Sales :".to_string()), "{lines:?}");
+    assert_every_result(&derived, &differs(&["Profit & Loss A/c", "Current Assets"]));
+
+    // synthetic mutation: only the heading is off.
+    let derived = tieout_b_edited(
+        |lines| replace_line(lines, "Cost of Sales :", "", "-900.01"),
+        integrated(),
+    );
+    let ClosingStockUse::Declined { why, lines } = &derived.closing_stock else {
+        panic!("expected a declined closing stock");
+    };
+    assert_eq!(*why, ClosingStockDeclined::DoesNotCloseEveryGap);
+    assert_eq!(lines, &vec!["Cost of Sales :".to_string()]);
+}
+
+#[test]
+fn a_closing_stock_not_as_captured_is_declined_by_its_shape() {
+    // synthetic mutation: opening stock carrying an amount.
+    let derived = tieout_b_edited(
+        |lines| replace_line(lines, "Opening Stock", "-100.00", ""),
+        integrated(),
+    );
+    assert_eq!(
+        declined(&derived),
+        ClosingStockDeclined::OpeningStockNotShownEmpty
+    );
+    // synthetic mutation: no Opening Stock line at all.
+    let derived = tieout_b_edited(
+        |lines| lines.retain(|line| line.0 != "Opening Stock"),
+        integrated(),
+    );
+    assert_eq!(
+        declined(&derived),
+        ClosingStockDeclined::OpeningStockNotShownEmpty
+    );
+    // synthetic mutation: a credit.
+    let derived = tieout_b_edited(
+        |lines| replace_line(lines, "Less: Closing Stock", "2100.00", ""),
+        integrated(),
+    );
+    assert_eq!(declined(&derived), ClosingStockDeclined::NotADebit);
+    // synthetic mutation: the amount in the main column.
+    let derived = tieout_b_edited(
+        |lines| replace_line(lines, "Less: Closing Stock", "", "-2100.00"),
+        integrated(),
+    );
+    assert_eq!(declined(&derived), ClosingStockDeclined::ShapeNotAsSeen);
+    // synthetic mutation: both columns.
+    let derived = tieout_b_edited(
+        |lines| replace_line(lines, "Less: Closing Stock", "-2100.00", "-2100.00"),
+        integrated(),
+    );
+    assert_eq!(declined(&derived), ClosingStockDeclined::ShapeNotAsSeen);
+}
+
+#[test]
+fn only_the_captured_spelling_of_the_line_is_the_figure() {
+    // synthetic mutation: another spelling is not the line, so nothing is offered.
+    for spelling in [
+        "Closing Stock",
+        "less: closing stock",
+        "Less: Closing Stock ",
+    ] {
+        let mut lines = captured_stock_lines();
+        lines
+            .iter_mut()
+            .find(|line| line.0 == "Less: Closing Stock")
+            .unwrap()
+            .0 = spelling;
+        let derived = tieout_b_with(Some(&profit_and_loss(&lines)), integrated());
+        assert_eq!(
+            derived.closing_stock,
+            ClosingStockUse::NotApplicable,
+            "{spelling}"
+        );
+    }
+    // An empty or zero line offers nothing either.
+    for sub in ["", "0.00"] {
+        let derived = tieout_b_edited(
+            |lines| replace_line(lines, "Less: Closing Stock", sub, ""),
+            integrated(),
+        );
+        assert_eq!(
+            derived.closing_stock,
+            ClosingStockUse::NotApplicable,
+            "{sub:?}"
+        );
+    }
+}
+
+#[test]
+fn a_stock_in_hand_balance_still_blocks_before_the_figure_is_considered() {
+    // synthetic mutation: a ledger under Stock-in-Hand carrying an amount.
+    let (mut report, groups, balance_sheet, tally) = TIEOUT_B.parts();
+    let stock_group = groups
+        .iter()
+        .find(|group| group.reserved_name.as_deref().map(str::trim) == Some("Stock-in-Hand"))
+        .expect("the group tree holds Stock-in-Hand");
+    let row = report
+        .rows
+        .iter_mut()
+        .find(|row| row.name == "Lab Freight")
+        .unwrap();
+    row.parent = PartyLedgerMasterFieldObservation::Returned(stock_group.name.clone());
+    let derived = derive_statements(
+        &admitted(report),
+        &groups,
+        &balance_sheet,
+        Some(&tally),
+        integrated(),
+    )
+    .unwrap();
+    assert_eq!(derived.closing_stock, ClosingStockUse::NotApplicable);
+    assert_every_result(
+        &derived,
+        &blocked(NotEstablishedReason::ClosingStockNotDerivableFromTrialBalance),
+    );
+}
+
+#[test]
+fn a_book_with_no_stock_is_untouched_by_the_flags() {
+    // READS LAB has no closing-stock line: the flags change nothing.
+    let (report, groups, balance_sheet, tally) = READS_LAB.parts();
+    let with = derive_statements(
+        &admitted(report.clone()),
+        &groups,
+        &balance_sheet,
+        Some(&tally),
+        integrated(),
+    )
+    .unwrap();
+    let without = derive_statements(
+        &admitted(report),
+        &groups,
+        &balance_sheet,
+        Some(&tally),
+        InventoryFlags::NotRead,
+    )
+    .unwrap();
+    assert_eq!(with, without);
+    assert_eq!(with.closing_stock, ClosingStockUse::NotApplicable);
+}
+
+#[test]
+fn the_stock_books_purchase_line_name_is_not_an_alias_without_closing_stock() {
+    // synthetic mutation: READS LAB's purchase line under the name a stock book
+    // uses. With no closing stock used it names no derived line, so it is an
+    // uncompared line with an amount, and the results are refused.
+    let derived = reads_lab_with_profit_and_loss(&[
+        ("Cost of Sales :", "", "-4250.00"),
+        ("Add: Purchase Accounts", "-4250.00", ""),
+    ]);
+    let Established::NotEstablished { reason, lines } = &derived.net_result else {
+        panic!("expected a refusal, got {:?}", derived.net_result);
+    };
+    assert_eq!(*reason, NotEstablishedReason::TallyProfitAndLossDiffers);
+    assert!(
+        lines.contains(&"Add: Purchase Accounts".to_string()),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn only_both_flags_yes_show_an_integrated_inventory() {
+    let flags = |integrated, inventory_on| NativeInventoryFlags {
+        integrated,
+        inventory_on,
+        batchwise: NativeFlag::No,
+    };
+    assert!(matches!(
+        IntegratedInventory::from_flags(&flags(NativeFlag::Yes, NativeFlag::Yes)),
+        InventoryFlags::Integrated(_)
+    ));
+    for (integrated, inventory_on) in [
+        (NativeFlag::No, NativeFlag::Yes),
+        (NativeFlag::Unknown, NativeFlag::Yes),
+        (NativeFlag::Yes, NativeFlag::No),
+        (NativeFlag::Yes, NativeFlag::Unknown),
+    ] {
+        assert!(
+            matches!(
+                IntegratedInventory::from_flags(&flags(integrated, inventory_on)),
+                InventoryFlags::NotShownIntegrated
+            ),
+            "{integrated:?} {inventory_on:?}"
+        );
+    }
+}
+
+#[test]
+fn a_closing_stock_without_the_cost_of_sales_heading_is_declined() {
+    // synthetic mutation: the heading the figure is checked against is missing.
+    let derived = tieout_b_edited(
+        |lines| lines.retain(|line| line.0 != "Cost of Sales :"),
+        integrated(),
+    );
+    assert_eq!(declined(&derived), ClosingStockDeclined::ShapeNotAsSeen);
+}
+
+#[test]
+fn flags_that_could_not_be_read_are_their_own_reason() {
+    let (_, _, _, tally) = TIEOUT_B.parts();
+    let derived = tieout_b_with(Some(&tally), InventoryFlags::NotRead);
+    assert_eq!(
+        declined(&derived),
+        ClosingStockDeclined::InventoryFlagsNotRead
+    );
+    assert_every_result(&derived, &differs(&["Profit & Loss A/c", "Current Assets"]));
+}
+
+#[test]
+fn a_book_whose_trial_balance_does_not_balance_does_not_use_the_figure() {
+    // synthetic mutation: the Bank ledger opens 1,000 higher and Tally's Current
+    // Assets are made to tie to it, so every compared line ties with the figure
+    // while the derived lines no longer sum to zero: a difference in opening
+    // balances this book's Balance Sheet export would not show.
+    let (mut report, groups, mut balance_sheet, tally) = TIEOUT_B.parts();
+    let bank = row(&mut report, "Lab Bank");
+    bank.opening = NativeTrialBalanceAmount::Present(decimal("-49000.00"));
+    bank.closing = NativeTrialBalanceAmount::Present(decimal("-48500.00"));
+    let current_assets = balance_sheet
+        .lines
+        .iter_mut()
+        .find(|line| line.name == "Current Assets")
+        .unwrap();
+    current_assets.main = NativeStatementAmount::Present(decimal("-52000.00"));
+    let derived = derive_statements(
+        &admitted(report),
+        &groups,
+        &balance_sheet,
+        Some(&tally),
+        integrated(),
+    )
+    .unwrap();
+    assert_eq!(
+        declined(&derived),
+        ClosingStockDeclined::BalanceSheetDoesNotBalance
+    );
 }

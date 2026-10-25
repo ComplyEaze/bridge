@@ -204,6 +204,9 @@ base revision.
 <a id="94h-a-ledgers-own-name-can-differ-in-case-or-symbols-from-its-rows-name-attribute"></a>
 
 [9.4h A ledger's own name can differ in case or symbols from its row's `NAME` attribute](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94h-a-ledgers-own-name-can-differ-in-case-or-symbols-from-its-rows-name-attribute)
+<a id="94i-a-ledger-create-on-a-new-name-moved-the-master-mark-by-one-and-changed-nothing-else"></a>
+
+[9.4i A ledger `Create` on a new name moved the master mark by one and changed nothing else](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94i-a-ledger-create-on-a-new-name-moved-the-master-mark-by-one-and-changed-nothing-else)
 <a id="95-identity-after-write"></a>
 
 [9.5 Identity after write](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#95-identity-after-write)
@@ -435,6 +438,9 @@ base revision.
 <a id="12a20-a-ledgers-input-tax-credit-flag-on-the-wire-is-the-opposite-of-the-screens-setting-partial"></a>
 
 [12a.20 A ledger's input tax credit flag on the wire is the opposite of the screen's setting (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a20-a-ledgers-input-tax-credit-flag-on-the-wire-is-the-opposite-of-the-screens-setting-partial)
+<a id="12a21-tallys-own-profit-and-loss-carries-closing-stock-as-a-line-of-its-own-on-an-integrated-inventory-book"></a>
+
+[12a.21 Tally's own Profit and Loss carries closing stock as a line of its own on an integrated inventory book](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a21-tallys-own-profit-and-loss-carries-closing-stock-as-a-line-of-its-own-on-an-integrated-inventory-book)
 <a id="12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read"></a>
 
 [12a.22 Stock items carry their own dated HSN and GST lists in a masters read; whether a group's or the company's setting reaches them is not read](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read)

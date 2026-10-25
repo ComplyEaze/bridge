@@ -18,7 +18,7 @@ use tally_protocol_simulator::{
 
 /// The synthetic read's own company GUID, read from its marks part: every part of that read names
 /// it, so the replay's company must carry the same value.
-fn fixture_guid() -> &'static str {
+pub(in crate::agent) fn fixture_guid() -> &'static str {
     static GUID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     GUID.get_or_init(|| {
         let marks = text_of(include_bytes!(
@@ -33,10 +33,10 @@ fn fixture_guid() -> &'static str {
             .to_string()
     })
 }
-const FIXTURE_NAME: &str = "Lakeview Hardware Demo";
+pub(in crate::agent) const FIXTURE_NAME: &str = "Lakeview Hardware Demo";
 
 /// A fixture part as text: UTF-16LE parts are decoded, UTF-8 ones kept.
-fn text_of(bytes: &[u8]) -> String {
+pub(in crate::agent) fn text_of(bytes: &[u8]) -> String {
     let bytes = bytes.strip_prefix(&[0xFF, 0xFE]).unwrap_or(bytes);
     if bytes.get(1) == Some(&0) {
         String::from_utf16(
@@ -51,13 +51,13 @@ fn text_of(bytes: &[u8]) -> String {
     }
 }
 
-fn plan(xml: String) -> ScenarioPlan {
+pub(in crate::agent) fn plan(xml: String) -> ScenarioPlan {
     ScenarioPlan::new(Fixture::SyntheticXml(xml))
         .with_encoding(WireEncoding::Utf16Le)
         .with_framing(ResponseFraming::ContentLength)
 }
 
-fn companies_xml(guid: &str) -> String {
+pub(in crate::agent) fn companies_xml(guid: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO>\
          <COMPANY>0</COMPANY></CMPINFO></DESC><DATA><COLLECTION>\
@@ -70,7 +70,7 @@ fn companies_xml(guid: &str) -> String {
     )
 }
 
-fn identity() -> VerifiedCompanyIdentity {
+pub(in crate::agent) fn identity() -> VerifiedCompanyIdentity {
     let companies =
         bridge_tally_protocol::parse_companies_from_collection(&companies_xml(fixture_guid()))
             .unwrap();
@@ -116,15 +116,15 @@ fn period_vouchers() -> String {
     ))
 }
 
-struct Replay {
-    marks_before: String,
-    company: String,
-    marks_in_window: (String, String),
+pub(in crate::agent) struct Replay {
+    pub(in crate::agent) marks_before: String,
+    pub(in crate::agent) company: String,
+    pub(in crate::agent) marks_in_window: (String, String),
     /// The window's census. The census parser takes only each voucher's DATE,
     /// ALTERID and GUID, so the voucher part itself serves as the census of
     /// the same vouchers.
-    census: String,
-    vouchers: String,
+    pub(in crate::agent) census: String,
+    pub(in crate::agent) vouchers: String,
 }
 
 impl Replay {
@@ -141,7 +141,41 @@ impl Replay {
         }
     }
 
-    fn plans(&self) -> Vec<ScenarioPlan> {
+    /// The same book cut to its first thirty vouchers, numbered 1 to 30 with a
+    /// voucher mark of 30: small enough that the production window limits read
+    /// it as one request, so the tool can be run end to end.
+    pub(in crate::agent) fn small() -> Self {
+        let whole = period_vouchers();
+        let first = whole.find("<VOUCHER ").unwrap();
+        let blocks: Vec<&str> = whole[first..]
+            .split_inclusive("</VOUCHER>")
+            .filter(|block| block.contains("<VOUCHER "))
+            .take(30)
+            .collect();
+        assert_eq!(blocks.len(), 30);
+        let tail = whole.rfind("</VOUCHER>").unwrap() + "</VOUCHER>".len();
+        let mut vouchers = whole[..first].to_string();
+        for (index, block) in blocks.iter().enumerate() {
+            let at = block.find("<ALTERID").unwrap();
+            let end = at + block[at..].find("</ALTERID>").unwrap() + "</ALTERID>".len();
+            vouchers.push_str(&block[..at]);
+            vouchers.push_str(&format!(
+                "<ALTERID TYPE=\"Number\"> {}</ALTERID>",
+                index + 1
+            ));
+            vouchers.push_str(&block[end..]);
+        }
+        vouchers.push_str(&whole[tail..]);
+        let mut replay = Self::clean();
+        let marks = replay.marks_before.replace("> 153<", "> 30<");
+        replay.marks_before = marks.clone();
+        replay.marks_in_window = (marks.clone(), marks);
+        replay.census = vouchers.clone();
+        replay.vouchers = vouchers;
+        replay
+    }
+
+    pub(in crate::agent) fn plans(&self) -> Vec<ScenarioPlan> {
         [
             self.marks_before.clone(),
             self.company.clone(),

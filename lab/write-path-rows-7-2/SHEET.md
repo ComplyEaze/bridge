@@ -7,7 +7,7 @@ never REGISTER LAB.
 ## Rules for every row
 
 - **A fresh backup first.** Before a row's first call, back the company up into a NEW empty folder; record the
-  backup's name, size and SHA-256. Restore only on the coordinator's order, by Tally's own Restore.
+  backup's name, size and SHA-256. The owner restores, only on the coordinator's order, by Tally's own Restore.
 - **The owner is at the PC for every native window.** ComplyEaze Bridge's approval and review windows are answered
   only by the owner, after the call that opened them has returned. Do not type in Tally while such a window is open:
   a key typed for Tally can answer it.
@@ -34,32 +34,35 @@ absent. A fresh data folder for each row.
 ## W1. A restore once seen keeps a re-keyed post from reading posted_verified (#1050, #1814)
 
 Decides that the 12 Oct finding (a voucher keyed again by hand after a restore read `posted_verified`) no longer
-reproduces. Company: a synthetic BRIDGE company with a bank ledger and a party ledger and AT LEAST ONE voucher on
-another day (an empty company omits the voucher mark, and an omitted mark records nothing: STOP if `tally_status`
-shows no voucher mark). No voucher on day D. Backup BK0 first.
+reproduces. Company: BRIDGE TRANSFER PAIR LAB, loaded alone (ledgers TLab Bank A and TLab Suspense; at least one
+voucher on another day, such as its seed Journal of 1 Apr 2026: an empty company omits the voucher mark, and an
+omitted mark records nothing). Day D is 20 Aug 2026. Backup BK0 first.
 
-0. `list_companies`; `tally_status` (record the voucher mark V0); `vouchers` day D: EXPECT none.
-1. `build_import_xml`: batch P1, one Receipt, 1.00 from the party to the bank, narration "W1 P1". `post_import` P1
+0. `list_companies`: EXPECT exactly one company, BRIDGE TRANSFER PAIR LAB; STOP otherwise. `tally_status`: record
+   the voucher mark V0; STOP if it shows no voucher mark. `vouchers` day D: EXPECT none.
+1. `build_import_xml`: batch P1, one Receipt, 1.00, Dr TLab Bank A, Cr TLab Suspense, narration "W1 P1". `post_import` P1
    (the owner approves); `verify_import` P1: EXPECT `posted_verified`, post_span_binding bound. `tally_status`: V1 =
    V0 + 1.
 2. The same for batch P2, one Receipt, 2.00, narration "W1 P2": EXPECT `posted_verified`; V2 = V0 + 2. `vouchers`
    day D: record both (MasterID, AlterID, GUID, number).
-3. The coordinator restores BK0 on screen. `tally_status`: V3. EXPECT V3 = V0; STOP otherwise.
+3. OWNER STEP: the owner restores BK0 by Tally's own Restore, on the coordinator's word. `tally_status`: V3. EXPECT V3 = V0; STOP otherwise.
 4. Hash `agent-import-ledger.jsonl`; count its records whose status is `rollback_seen` with a JSON parser: EXPECT 0.
 5. `verify_import` P2. EXPECT not `posted_verified`; `post_span_binding.state` `book_rolled_back`;
    `post_span_binding.rollback_recorded` true; `post_span_binding.other_batches_covered.count` 1, naming P1.
    Journal: exactly one `rollback_seen` record, on P2's batch id.
-6. The owner keys K1 by hand in Tally: a Receipt on day D with P1's content (same ledgers, 1.00, narration
+6. OWNER STEP: the owner keys K1 by hand in Tally: a Receipt on day D with P1's content (same ledgers, 1.00, narration
    "W1 P1"). `tally_status`: V4 = V3 + 1. `vouchers` day D: record K1, and whether K1's GUID equals P1's.
 7. `verify_import` P1. EXPECT not `posted_verified`; `post_span_binding.state` `book_rolled_back`, with `mark_read`
    and `seen_by` (P2's batch id); the plain line says the books were restored after this post. Journal: still one
    `rollback_seen`.
 8. `verify_import` P1 again: EXPECT the same, and no second record.
-9. Quit and restart Claude Desktop. `verify_import` P1: EXPECT the same.
+9. OWNER STEP: the owner quits and restarts Claude Desktop. `verify_import` P1: EXPECT the same.
+10. OWNER STEP: the owner restores BK0. `tally_status`: EXPECT the voucher mark V0 again. `vouchers` day D: EXPECT
+    none (P1, P2 and K1 gone).
 
 PASS: 5, 7, 8 and 9 as above. FAIL: 7, 8 or 9 reads `posted_verified`; 5 records nothing although the mark was
-present; a second `rollback_seen` record. Writes: two native posts and one voucher keyed by hand, all removed by the
-final restore of BK0.
+present; a second `rollback_seen` record. Writes: two native posts and one voucher keyed by hand, all removed at
+step 10.
 
 ## W2. One ledger created through the approved dispatch, near names refused, the window's answer line (#1650, #1545)
 
@@ -87,10 +90,12 @@ alone. Backup BKM first.
 8. `ledger_masters`: EXPECT the list of step 1 plus exactly one ledger, `MLab Live Suspense 72`, under Suspense
    A/c; every other ledger unchanged by GUID and AlterID.
 9. `local_data_report`: EXPECT the master journal read, one batch, settled.
+10. OWNER STEP: the owner restores BKM. `tally_status`: EXPECT the master mark M0 again. `ledger_masters`: EXPECT the
+    list of step 1, with no `MLab Live Suspense 72`.
 
 PASS: 2 refused all three; 4 shows the line; 5 sends nothing; 6 to 8 as above. FAIL: a near name accepted or
 sent; the window behind Tally or without the line; more than one ledger created; any existing ledger changed.
-Writes: one ledger, removed by the final restore of BKM.
+Writes: one ledger, removed at step 10.
 
 ## W3. A batch whose row was skipped after it was built is refused at send (#1714)
 
@@ -104,9 +109,10 @@ control), a fresh data folder, backup SD0 first. Core: 14 calls, one write.
    If a window opens for X, the owner presses No: that is the FAIL signature.
 4. Control: parse for 8 Aug with `contra`; build batch Y; `post_import` Y; the owner approves; `verify_import` Y:
    EXPECT `posted_verified` and exactly one Contra on 8 Aug.
+5. OWNER STEP: the owner restores SD0. `vouchers` Contra 3 to 9 Aug 2026: EXPECT none.
 
 PASS: 3 refuses as above with no window; 4 posts one Contra. Writes: one voucher (Y), removed by the final restore
-of SD0.
+at step 5.
 
 ## Not covered here
 

@@ -5135,6 +5135,113 @@ async fn a_rollback_once_seen_outlasts_the_mark_rising_again() {
     assert_eq!(verdicts.len(), 1, "the post's own binding, and no other");
 }
 
+/// A second post of the same company and address, recorded after the first: its own batch,
+/// dispatch intent (pre-POST mark 11) and Tally's answer, copied from the first post's records
+/// with the id `later`, its own digest and REMOTEID. Appended once.
+fn append_later_post(text: String, later: &str) -> String {
+    if text.contains(later) {
+        return text;
+    }
+    let records: Vec<Value> = text
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let batch = records
+        .iter()
+        .find(|record| record.get("record_type").is_none())
+        .unwrap();
+    let of = |kind: &str| {
+        records
+            .iter()
+            .find(|record| record["record_type"] == kind)
+            .unwrap()
+            .clone()
+    };
+    let sha = "f".repeat(64);
+    let mut later_batch = batch.clone();
+    later_batch["batch_id"] = json!(later);
+    later_batch["sha256"] = json!(sha);
+    let mut intent = of("dispatch_intent");
+    intent["batch_id"] = json!(later);
+    intent["batch_sha256"] = json!(sha);
+    intent["pre_post_voucher_mark"] = json!(11);
+    intent["native_remote_id"] =
+        json!(crate::agent::agent_import::tests::sentinel_uuid(0x10b1).to_string());
+    let mut response = of("dispatch_response");
+    response["batch_id"] = json!(later);
+    response["batch_sha256"] = json!(sha);
+    let mut out = text;
+    for record in [later_batch, intent, response] {
+        out.push_str(&serde_json::to_string(&record).unwrap());
+        out.push('\n');
+    }
+    out
+}
+
+/// #1819: a batch an earlier record already covers is refused the same way: a contradicted double
+/// omission must not become a mark 0 that is recorded, because that record would cover a second
+/// post sent after the first record was written. The retry still reads the first post as rolled back
+/// and the second post is not covered.
+#[tokio::test]
+async fn a_contradicted_omission_for_a_covered_batch_records_nothing_that_covers_a_later_post() {
+    let later = crate::agent::agent_import::tests::sentinel_batch_id(0x1052);
+    let no_voucher_mark = format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY>\
+         <GUID>{GUID}</GUID><ALTMSTID>7</ALTMSTID>\
+         </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+    );
+    let mut contradicted = probe();
+    contradicted.extend(verified_company());
+    contradicted.extend(paired(marks()));
+    contradicted.extend(paired(empty_collection()));
+    contradicted.extend(paired(empty_collection()));
+    contradicted.extend(paired(no_voucher_mark.clone()));
+    contradicted.extend(paired(no_voucher_mark));
+    // The second post exists only from the second verification on, so the first record cannot cover it.
+    let checks = std::cell::Cell::new(0);
+    let (_, verified, _) = post_and_verify_with_journal(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![
+            span_readback(empty_collection(), 10),
+            contradicted,
+            span_readback(untagged_posted_journal(), 12),
+        ],
+        |text| {
+            checks.set(checks.get() + 1);
+            if checks.get() > 1 {
+                append_later_post(text, &later)
+            } else {
+                text
+            }
+        },
+    )
+    .await;
+    let first = &verified[0]["structuredContent"]["result"];
+    assert_eq!(
+        first["post_span_binding"]["rollback_recorded"], true,
+        "{first}"
+    );
+    let refused = &verified[1];
+    assert_eq!(refused["isError"], json!(true), "{refused}");
+    assert_eq!(
+        refused["structuredContent"]["result"]["error"]["code"], "voucher_mark_contradiction",
+        "{refused}"
+    );
+    let retry = &verified[2]["structuredContent"]["result"];
+    assert_eq!(
+        retry["post_span_binding"]["state"], "book_rolled_back",
+        "{retry}"
+    );
+    assert_eq!(retry["post_span_binding"]["mark_read"], 10, "{retry}");
+    assert!(
+        retry["post_span_binding"]
+            .get("rollback_recorded")
+            .is_none(),
+        "{retry}"
+    );
+}
+
 /// #1050: a check of a post that reads intact can still see a restore that
 /// reaches another post of the company: here a second post, sent after this
 /// one, had proved the mark at 12, and this post's check reads 11. The record
@@ -5143,53 +5250,11 @@ async fn a_rollback_once_seen_outlasts_the_mark_rising_again() {
 #[tokio::test]
 async fn an_intact_posts_check_records_a_restore_that_reaches_a_later_post() {
     let later = crate::agent::agent_import::tests::sentinel_batch_id(0x1051);
-    // A second post of the same company and address, recorded after this one:
-    // its own batch, dispatch intent (pre-POST mark 11) and Tally's answer,
-    // copied from this post's records with its own id, digest and REMOTEID.
-    let add_later_post = |text: String| {
-        if text.contains(later.as_str()) {
-            return text;
-        }
-        let records: Vec<Value> = text
-            .lines()
-            .map(|line| serde_json::from_str(line).unwrap())
-            .collect();
-        let batch = records
-            .iter()
-            .find(|record| record.get("record_type").is_none())
-            .unwrap();
-        let of = |kind: &str| {
-            records
-                .iter()
-                .find(|record| record["record_type"] == kind)
-                .unwrap()
-                .clone()
-        };
-        let sha = "f".repeat(64);
-        let mut later_batch = batch.clone();
-        later_batch["batch_id"] = json!(later);
-        later_batch["sha256"] = json!(sha);
-        let mut intent = of("dispatch_intent");
-        intent["batch_id"] = json!(later);
-        intent["batch_sha256"] = json!(sha);
-        intent["pre_post_voucher_mark"] = json!(11);
-        intent["native_remote_id"] =
-            json!(crate::agent::agent_import::tests::sentinel_uuid(0x10b1).to_string());
-        let mut response = of("dispatch_response");
-        response["batch_id"] = json!(later);
-        response["batch_sha256"] = json!(sha);
-        let mut out = text;
-        for record in [later_batch, intent, response] {
-            out.push_str(&serde_json::to_string(&record).unwrap());
-            out.push('\n');
-        }
-        out
-    };
     let (_, verified, _) = post_and_verify_with_journal(
         company_marks(11, 50, "WR2 Unicode Lab"),
         span_readback(untagged_posted_journal(), 11),
         vec![span_readback(untagged_posted_journal(), 11)],
-        add_later_post,
+        |text| append_later_post(text, &later),
     )
     .await;
     let result = &verified[0]["structuredContent"]["result"];
@@ -5290,6 +5355,12 @@ async fn a_voucher_mark_seen_by_the_window_and_omitted_twice_is_refused_not_reco
     assert_eq!(refused["isError"], json!(true), "{refused}");
     assert_eq!(
         refused["structuredContent"]["result"]["error"]["code"], "voucher_mark_contradiction",
+        "{refused}"
+    );
+    assert!(
+        refused["structuredContent"]["result"]["error"]["remediation"]
+            .as_str()
+            .is_some_and(|step| step.contains("Run the same call again once")),
         "{refused}"
     );
     // Nothing was recorded: the retry is not covered by a rollback, and verifies the post.

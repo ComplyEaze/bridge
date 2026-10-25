@@ -2030,9 +2030,8 @@ impl Server {
                             accumulated = combine_evidence(accumulated.clone(), again_evidence);
                             match again {
                                 Some(mark) => mark,
-                                // A batch an earlier record already covers reads as rolled back
-                                // whatever the mark: the contradiction changes nothing for it.
-                                None if rollback.covered_by.is_some() => 0,
+                                // Refused for a covered batch too: a mark 0 would still reach
+                                // the record below and cover the company's later posts.
                                 None => mark_omitted_twice(window_voucher_mark)
                                     .map_err(|code| ToolFailure::from(code.to_string()))?,
                             }

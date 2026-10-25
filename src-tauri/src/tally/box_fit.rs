@@ -11,11 +11,16 @@
 //! the screen; this measures the real box when it opens, in the dialog's own
 //! process, and refuses when it is not wholly on the screen.
 //!
-//! The process draws no DPI-aware window (the manifest declares no DPI
-//! awareness; measured by the lab, W1), so Windows virtualises both numbers
-//! below by the same factor: a box's rectangle and its monitor's work area are
-//! read in the same units, and the comparison needs no scale. A rectangle is
-//! therefore compared as it is given, with no slack either way.
+//! Units. The executable's manifest declares no DPI awareness, so Windows
+//! would draw the box DPI-unaware and report its rectangle and its monitor's
+//! work area in virtualised units. The first run on a real machine (125
+//! percent scale, the box measured physically at 588,116,1353,990 inside a
+//! work area 1030 high) was refused as not fitting, which no consistent pair
+//! of units can explain; so this module does not rely on the virtualisation.
+//! Before it shows anything the dialog process makes itself DPI-aware, so
+//! that the rectangle and the work area are both read in physical pixels,
+//! and a process that cannot be made aware shows no box. A rectangle is
+//! compared as it is given, with no slack either way.
 //!
 //! Three answers leave this module without the person's choosing: the box did
 //! not fit (the child exits [`DOES_NOT_FIT_EXIT`], which the parent reads as a
@@ -109,12 +114,18 @@ pub(crate) fn outcome(result: i32, seen: Seen) -> Outcome {
 /// for one that did not: the process exits with a status the parent reads.
 #[cfg(windows)]
 pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
+    if !windows_hook::make_dpi_aware() {
+        // Rectangles could not be read in one unit, so no box is shown.
+        std::process::exit(0);
+    }
     let Some(hook) = windows_hook::install() else {
         // No way to measure the box, so none is shown.
         std::process::exit(0);
     };
+    let front = windows_hook::Front::start();
     let result = show();
     let seen = windows_hook::seen();
+    drop(front);
     drop(hook);
     match outcome(result, seen) {
         Outcome::Answered(result) => result,
@@ -126,16 +137,142 @@ pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
 #[cfg(windows)]
 mod windows_hook {
     use super::{Rect, Seen};
-    use std::sync::atomic::{AtomicU8, Ordering};
+    use std::io::Write;
+    use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use windows_sys::core::BOOL;
     use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
     use windows_sys::Win32::Graphics::Gdi::{
         GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
     };
-    use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+    use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CallNextHookEx, GetWindowRect, PostMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-        HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT, WM_COMMAND,
+        BringWindowToTop, CallNextHookEx, EnumThreadWindows, FlashWindowEx, GetForegroundWindow,
+        GetWindowRect, GetWindowThreadProcessId, IsProcessDPIAware, IsWindowVisible, PostMessageW,
+        SetForegroundWindow, SetProcessDPIAware, SetWindowsHookExW, UnhookWindowsHookEx,
+        FLASHWINFO, FLASHW_ALL, FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT,
+        WM_COMMAND,
     };
+
+    /// Make this process DPI-aware, before any window exists, so that a
+    /// window's rectangle and its monitor's work area are both physical
+    /// pixels. `false` if the process is still unaware afterwards.
+    pub(super) fn make_dpi_aware() -> bool {
+        // SAFETY: neither call takes an argument; they set and read this
+        // process's own DPI flag.
+        unsafe {
+            SetProcessDPIAware();
+            IsProcessDPIAware() != 0
+        }
+    }
+
+    /// A helper thread that tries to bring the box to the front while it is
+    /// shown. A background process is often refused the foreground, and a box
+    /// nobody sees is a box nobody answers. It stops when dropped.
+    pub(super) struct Front {
+        stop: Arc<AtomicBool>,
+        worker: Option<std::thread::JoinHandle<()>>,
+    }
+
+    impl Front {
+        /// Start the helper for the box this thread is about to show.
+        pub(super) fn start() -> Front {
+            let stop = Arc::new(AtomicBool::new(false));
+            // SAFETY: no arguments; reads this thread's id.
+            let owner = unsafe { GetCurrentThreadId() };
+            let flag = Arc::clone(&stop);
+            let worker = std::thread::Builder::new()
+                .spawn(move || raise_until_stopped(owner, &flag))
+                .ok();
+            Front { stop, worker }
+        }
+    }
+
+    impl Drop for Front {
+        fn drop(&mut self) {
+            self.stop.store(true, Ordering::SeqCst);
+            if let Some(worker) = self.worker.take() {
+                let _ = worker.join();
+            }
+        }
+    }
+
+    unsafe extern "system" fn first_visible(window: HWND, found: LPARAM) -> BOOL {
+        // SAFETY: `found` is the address of the `HWND` slot `box_of` passed.
+        let slot = unsafe { &mut *(found as *mut HWND) };
+        // SAFETY: `window` is a handle Windows is enumerating.
+        if unsafe { IsWindowVisible(window) } != 0 {
+            *slot = window;
+            0
+        } else {
+            1
+        }
+    }
+
+    /// The first visible top-level window of `thread`, or null.
+    fn box_of(thread: u32) -> HWND {
+        let mut found: HWND = std::ptr::null_mut();
+        // SAFETY: the callback only writes the slot whose address is passed,
+        // which outlives the call.
+        unsafe {
+            EnumThreadWindows(
+                thread,
+                Some(first_visible),
+                &mut found as *mut HWND as LPARAM,
+            );
+        }
+        found
+    }
+
+    /// Try to make `window` the foreground window; if Windows refuses, flash
+    /// its taskbar button until it is.
+    fn raise(window: HWND) {
+        // SAFETY: every handle is one just read from Windows; the input
+        // attachment is undone before returning.
+        unsafe {
+            let foreground = GetForegroundWindow();
+            if foreground == window {
+                return;
+            }
+            let me = GetCurrentThreadId();
+            let other = if foreground.is_null() {
+                0
+            } else {
+                GetWindowThreadProcessId(foreground, std::ptr::null_mut())
+            };
+            let attached = other != 0 && other != me && AttachThreadInput(me, other, 1) != 0;
+            SetForegroundWindow(window);
+            BringWindowToTop(window);
+            if attached {
+                AttachThreadInput(me, other, 0);
+            }
+            if GetForegroundWindow() != window {
+                let flash = FLASHWINFO {
+                    cbSize: std::mem::size_of::<FLASHWINFO>() as u32,
+                    hwnd: window,
+                    dwFlags: FLASHW_ALL | FLASHW_TIMERNOFG,
+                    uCount: 0,
+                    dwTimeout: 0,
+                };
+                FlashWindowEx(&flash);
+            }
+        }
+    }
+
+    fn raise_until_stopped(owner: u32, stop: &AtomicBool) {
+        // About ten seconds: the box has long appeared by then.
+        for _ in 0..100 {
+            if stop.load(Ordering::SeqCst) {
+                return;
+            }
+            let window = box_of(owner);
+            if !window.is_null() {
+                raise(window);
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
 
     /// What the hook has seen, for this process's one box (0 nothing, 1 fits,
     /// 2 does not fit).
@@ -191,9 +328,9 @@ mod windows_hook {
         (!handle.is_null()).then_some(Hook(handle))
     }
 
-    /// Whether `window` lies wholly inside the work area of the monitor
-    /// nearest to it. Any failure to read either is "does not fit".
-    fn fits(window: HWND) -> bool {
+    /// The rectangle of `window` and the work area of the monitor nearest to
+    /// it, in the same unit. `None` if either cannot be read.
+    fn measure(window: HWND) -> Option<(Rect, Rect)> {
         let mut rect = RECT {
             left: 0,
             top: 0,
@@ -203,12 +340,12 @@ mod windows_hook {
         // SAFETY: `window` is the window being activated and `rect` is a
         // live out-parameter of the right type.
         if unsafe { GetWindowRect(window, &mut rect) } == 0 {
-            return false;
+            return None;
         }
         // SAFETY: as above.
         let monitor = unsafe { MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST) };
         if monitor.is_null() {
-            return false;
+            return None;
         }
         let mut info = MONITORINFO {
             cbSize: std::mem::size_of::<MONITORINFO>() as u32,
@@ -229,7 +366,7 @@ mod windows_hook {
         // SAFETY: `monitor` is a handle just returned for this window and
         // `info` has its `cbSize` set, as the call requires.
         if unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {
-            return false;
+            return None;
         }
         let rect = Rect {
             left: rect.left,
@@ -243,7 +380,32 @@ mod windows_hook {
             right: info.rcWork.right,
             bottom: info.rcWork.bottom,
         };
-        rect.is_wholly_inside(work)
+        Some((rect, work))
+    }
+
+    /// Whether `window` lies wholly inside the work area of the monitor
+    /// nearest to it. Any failure to read either is "does not fit". One line
+    /// of the numbers goes to the process's own error output (the parent
+    /// discards it; a person running the dialog by hand can read it).
+    fn fits(window: HWND) -> bool {
+        let measured = measure(window);
+        let fitted = measured.is_some_and(|(rect, work)| rect.is_wholly_inside(work));
+        let _ = match measured {
+            Some((r, w)) => writeln!(
+                std::io::stderr(),
+                "box-fit: box=({},{},{},{}) work=({},{},{},{}) fits={fitted}",
+                r.left,
+                r.top,
+                r.right,
+                r.bottom,
+                w.left,
+                w.top,
+                w.right,
+                w.bottom
+            ),
+            None => writeln!(std::io::stderr(), "box-fit: not readable fits=false"),
+        };
+        fitted
     }
 
     /// The hook procedure: when the box is about to be activated, measure it;
@@ -357,5 +519,33 @@ mod tests {
     #[test]
     fn the_does_not_fit_status_is_its_own() {
         assert!(![0, 1, 2, 3, 101].contains(&DOES_NOT_FIT_EXIT));
+    }
+    /// The first live run (125 percent scale): the 44-line box, measured
+    /// physically at 588,116,1353,990 inside a work area 1920x1030. In one
+    /// unit it fits, in physical pixels or divided by the scale; at 100
+    /// percent the same shape fits a 1040-high area and the 60-line box does
+    /// not. A rectangle in one unit against an area in the other gives either
+    /// a refusal of a fitting box (physical box, scaled area) or, worse, the
+    /// approval of a box that is too tall (scaled box, physical area): which
+    /// is why the module reads both in one unit and shows no box if it cannot.
+    #[test]
+    fn a_box_is_compared_in_one_unit_at_100_and_125_percent() {
+        // 125 percent, physical.
+        let work = rect(0, 0, 1920, 1030);
+        assert!(rect(588, 116, 1353, 990).is_wholly_inside(work));
+        assert!(rect(588, 84, 1353, 1023).is_wholly_inside(work));
+        assert!(!rect(588, 0, 1353, 1134).is_wholly_inside(work));
+        // 125 percent, the same boxes and area divided by the scale.
+        let scaled = rect(0, 0, 1536, 824);
+        assert!(rect(470, 93, 1082, 792).is_wholly_inside(scaled));
+        assert!(rect(470, 67, 1082, 818).is_wholly_inside(scaled));
+        assert!(!rect(470, 0, 1082, 907).is_wholly_inside(scaled));
+        // 100 percent.
+        let plain = rect(0, 0, 1920, 1040);
+        assert!(rect(577, 83, 1342, 957).is_wholly_inside(plain));
+        assert!(!rect(577, 0, 1342, 1134).is_wholly_inside(plain));
+        // Mixed units: what the module must never compare.
+        assert!(!rect(588, 116, 1353, 990).is_wholly_inside(scaled));
+        assert!(rect(470, 0, 1082, 907).is_wholly_inside(work));
     }
 }

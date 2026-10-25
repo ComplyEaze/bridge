@@ -1135,12 +1135,18 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
 /// clipped one.
 const BOX_FIT_GUARDED: &str = r#"#[cfg(windows)]
 pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
+    if !windows_hook::make_dpi_aware() {
+        // Rectangles could not be read in one unit, so no box is shown.
+        std::process::exit(0);
+    }
     let Some(hook) = windows_hook::install() else {
         // No way to measure the box, so none is shown.
         std::process::exit(0);
     };
+    let front = windows_hook::Front::start();
     let result = show();
     let seen = windows_hook::seen();
+    drop(front);
     drop(hook);
     match outcome(result, seen) {
         Outcome::Answered(result) => result,
@@ -1155,16 +1161,142 @@ pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
 const BOX_FIT_HOOK: &str = r#"#[cfg(windows)]
 mod windows_hook {
     use super::{Rect, Seen};
-    use std::sync::atomic::{AtomicU8, Ordering};
+    use std::io::Write;
+    use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use windows_sys::core::BOOL;
     use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
     use windows_sys::Win32::Graphics::Gdi::{
         GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
     };
-    use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+    use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CallNextHookEx, GetWindowRect, PostMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-        HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT, WM_COMMAND,
+        BringWindowToTop, CallNextHookEx, EnumThreadWindows, FlashWindowEx, GetForegroundWindow,
+        GetWindowRect, GetWindowThreadProcessId, IsProcessDPIAware, IsWindowVisible, PostMessageW,
+        SetForegroundWindow, SetProcessDPIAware, SetWindowsHookExW, UnhookWindowsHookEx,
+        FLASHWINFO, FLASHW_ALL, FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT,
+        WM_COMMAND,
     };
+
+    /// Make this process DPI-aware, before any window exists, so that a
+    /// window's rectangle and its monitor's work area are both physical
+    /// pixels. `false` if the process is still unaware afterwards.
+    pub(super) fn make_dpi_aware() -> bool {
+        // SAFETY: neither call takes an argument; they set and read this
+        // process's own DPI flag.
+        unsafe {
+            SetProcessDPIAware();
+            IsProcessDPIAware() != 0
+        }
+    }
+
+    /// A helper thread that tries to bring the box to the front while it is
+    /// shown. A background process is often refused the foreground, and a box
+    /// nobody sees is a box nobody answers. It stops when dropped.
+    pub(super) struct Front {
+        stop: Arc<AtomicBool>,
+        worker: Option<std::thread::JoinHandle<()>>,
+    }
+
+    impl Front {
+        /// Start the helper for the box this thread is about to show.
+        pub(super) fn start() -> Front {
+            let stop = Arc::new(AtomicBool::new(false));
+            // SAFETY: no arguments; reads this thread's id.
+            let owner = unsafe { GetCurrentThreadId() };
+            let flag = Arc::clone(&stop);
+            let worker = std::thread::Builder::new()
+                .spawn(move || raise_until_stopped(owner, &flag))
+                .ok();
+            Front { stop, worker }
+        }
+    }
+
+    impl Drop for Front {
+        fn drop(&mut self) {
+            self.stop.store(true, Ordering::SeqCst);
+            if let Some(worker) = self.worker.take() {
+                let _ = worker.join();
+            }
+        }
+    }
+
+    unsafe extern "system" fn first_visible(window: HWND, found: LPARAM) -> BOOL {
+        // SAFETY: `found` is the address of the `HWND` slot `box_of` passed.
+        let slot = unsafe { &mut *(found as *mut HWND) };
+        // SAFETY: `window` is a handle Windows is enumerating.
+        if unsafe { IsWindowVisible(window) } != 0 {
+            *slot = window;
+            0
+        } else {
+            1
+        }
+    }
+
+    /// The first visible top-level window of `thread`, or null.
+    fn box_of(thread: u32) -> HWND {
+        let mut found: HWND = std::ptr::null_mut();
+        // SAFETY: the callback only writes the slot whose address is passed,
+        // which outlives the call.
+        unsafe {
+            EnumThreadWindows(
+                thread,
+                Some(first_visible),
+                &mut found as *mut HWND as LPARAM,
+            );
+        }
+        found
+    }
+
+    /// Try to make `window` the foreground window; if Windows refuses, flash
+    /// its taskbar button until it is.
+    fn raise(window: HWND) {
+        // SAFETY: every handle is one just read from Windows; the input
+        // attachment is undone before returning.
+        unsafe {
+            let foreground = GetForegroundWindow();
+            if foreground == window {
+                return;
+            }
+            let me = GetCurrentThreadId();
+            let other = if foreground.is_null() {
+                0
+            } else {
+                GetWindowThreadProcessId(foreground, std::ptr::null_mut())
+            };
+            let attached = other != 0 && other != me && AttachThreadInput(me, other, 1) != 0;
+            SetForegroundWindow(window);
+            BringWindowToTop(window);
+            if attached {
+                AttachThreadInput(me, other, 0);
+            }
+            if GetForegroundWindow() != window {
+                let flash = FLASHWINFO {
+                    cbSize: std::mem::size_of::<FLASHWINFO>() as u32,
+                    hwnd: window,
+                    dwFlags: FLASHW_ALL | FLASHW_TIMERNOFG,
+                    uCount: 0,
+                    dwTimeout: 0,
+                };
+                FlashWindowEx(&flash);
+            }
+        }
+    }
+
+    fn raise_until_stopped(owner: u32, stop: &AtomicBool) {
+        // About ten seconds: the box has long appeared by then.
+        for _ in 0..100 {
+            if stop.load(Ordering::SeqCst) {
+                return;
+            }
+            let window = box_of(owner);
+            if !window.is_null() {
+                raise(window);
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
 
     /// What the hook has seen, for this process's one box (0 nothing, 1 fits,
     /// 2 does not fit).
@@ -1220,9 +1352,9 @@ mod windows_hook {
         (!handle.is_null()).then_some(Hook(handle))
     }
 
-    /// Whether `window` lies wholly inside the work area of the monitor
-    /// nearest to it. Any failure to read either is "does not fit".
-    fn fits(window: HWND) -> bool {
+    /// The rectangle of `window` and the work area of the monitor nearest to
+    /// it, in the same unit. `None` if either cannot be read.
+    fn measure(window: HWND) -> Option<(Rect, Rect)> {
         let mut rect = RECT {
             left: 0,
             top: 0,
@@ -1232,12 +1364,12 @@ mod windows_hook {
         // SAFETY: `window` is the window being activated and `rect` is a
         // live out-parameter of the right type.
         if unsafe { GetWindowRect(window, &mut rect) } == 0 {
-            return false;
+            return None;
         }
         // SAFETY: as above.
         let monitor = unsafe { MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST) };
         if monitor.is_null() {
-            return false;
+            return None;
         }
         let mut info = MONITORINFO {
             cbSize: std::mem::size_of::<MONITORINFO>() as u32,
@@ -1258,7 +1390,7 @@ mod windows_hook {
         // SAFETY: `monitor` is a handle just returned for this window and
         // `info` has its `cbSize` set, as the call requires.
         if unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {
-            return false;
+            return None;
         }
         let rect = Rect {
             left: rect.left,
@@ -1272,7 +1404,32 @@ mod windows_hook {
             right: info.rcWork.right,
             bottom: info.rcWork.bottom,
         };
-        rect.is_wholly_inside(work)
+        Some((rect, work))
+    }
+
+    /// Whether `window` lies wholly inside the work area of the monitor
+    /// nearest to it. Any failure to read either is "does not fit". One line
+    /// of the numbers goes to the process's own error output (the parent
+    /// discards it; a person running the dialog by hand can read it).
+    fn fits(window: HWND) -> bool {
+        let measured = measure(window);
+        let fitted = measured.is_some_and(|(rect, work)| rect.is_wholly_inside(work));
+        let _ = match measured {
+            Some((r, w)) => writeln!(
+                std::io::stderr(),
+                "box-fit: box=({},{},{},{}) work=({},{},{},{}) fits={fitted}",
+                r.left,
+                r.top,
+                r.right,
+                r.bottom,
+                w.left,
+                w.top,
+                w.right,
+                w.bottom
+            ),
+            None => writeln!(std::io::stderr(), "box-fit: not readable fits=false"),
+        };
+        fitted
     }
 
     /// The hook procedure: when the box is about to be activated, measure it;
@@ -1331,20 +1488,28 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
     let source = read("src-tauri/src/tally/box_fit.rs");
     assert_eq!(box_fit_problems(&source), Vec::<String>::new());
     for broken in [
+        // The process is not made DPI-aware, or the check passes anyway, so
+        // the rectangle and the work area may be read in different units.
+        source.replacen("if !windows_hook::make_dpi_aware() {", "if false {", 1),
+        source.replacen("IsProcessDPIAware() != 0", "true", 1),
+        source.replacen("SetProcessDPIAware();", "", 1),
+        // The helper that brings the box to the front is not started.
+        source.replacen("let front = windows_hook::Front::start();", "", 1),
         // A box never measured, or a box that did not fit, returns a result
         // instead of ending the process.
         source.replacen("Outcome::Unavailable => std::process::exit(0),", "Outcome::Unavailable => result,", 1),
         source.replacen("Outcome::DoesNotFit => std::process::exit(DOES_NOT_FIT_EXIT),", "Outcome::DoesNotFit => result,", 1),
         source.replacen("Outcome::Answered(result) => result,", "Outcome::Answered(_) => 6,", 1),
         // No hook: the box is shown unmeasured, or the answer is made up.
-        source.replacen("        std::process::exit(0);\n    };\n    let result", "        return show();\n    };\n    let result", 1),
+        source.replacen("        std::process::exit(0);\n    };\n    let front", "        return show();\n    };\n    let front", 1),
         source.replacen("let result = show();", "let result = { show(); 6 };", 1),
         source.replacen("let seen = windows_hook::seen();", "let seen = Seen::Fits;", 1),
         // The measurement always finds a fit, or never cancels.
-        source.replacen("rect.is_wholly_inside(work)\n    }", "true\n    }", 1),
+        source.replacen("rect.is_wholly_inside(work));", "true);", 1),
         source.replacen("if !fitted {", "if false {", 1),
         source.replacen("remember(seen().after(fitted));", "remember(Seen::Fits);", 1),
-        source.replacen("== 0 {\n            return false;", "== 0 {\n            return true;", 1),
+        source.replacen("let fitted = measured.is_some_and(", "let fitted = measured.is_none() || measured.is_some_and(", 1),
+        source.replacen("== 0 {\n            return None;", "== 0 {\n            return Some((Rect { left: 0, top: 0, right: 1, bottom: 1 }, Rect { left: 0, top: 0, right: 2, bottom: 2 }));", 1),
         // The guard made non-Windows beside a Windows twin that approves.
         source.replacen(
             "#[cfg(windows)]\npub(crate) fn guarded",

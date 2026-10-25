@@ -25,12 +25,20 @@
 // a job that was never given the tool. See docs/proposed-dependency-policy.md
 // for the proposed CI wiring that would let them actually run.
 //
+// The scans read a one-advisory database built here (RUSTSEC-2026-0285, with
+// the version ranges its published entry gives), never the live RustSec
+// database: the fixed lockfile at 9558a316 is later flagged by other, newer
+// advisories, so a live read would turn the removal case into a failure that
+// says nothing about the script.
+//
 // Run: node scripts/check-advisory-delta.test.mjs
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -63,6 +71,34 @@ const commits = audit.ok ? commitsPresent() : { ok: false, reason: null };
 const unavailable = !audit.ok ? audit.reason : !commits.ok ? commits.reason : null;
 const skip = unavailable ? `prerequisite unavailable: ${unavailable}` : false;
 
+const ADVISORY_0285 = `\`\`\`toml
+[advisory]
+id = "RUSTSEC-2026-0285"
+package = "rustls"
+date = "2026-09-14"
+url = "https://github.com/rustls/rustls/pull/3265"
+categories = ["crypto-failure"]
+
+[versions]
+patched = [">= 0.23.45"]
+unaffected = ["< 0.23.13"]
+\`\`\`
+
+# TLS 1.3 handshake messages incorrectly accepted across encryption level boundaries
+`;
+
+let advisoryDb = null;
+function pinnedAdvisoryDb() {
+  if (advisoryDb) return advisoryDb;
+  advisoryDb = mkdtempSync(join(tmpdir(), "bridge-advisory-db-"));
+  mkdirSync(join(advisoryDb, "crates", "rustls"), { recursive: true });
+  writeFileSync(join(advisoryDb, "crates", "rustls", "RUSTSEC-2026-0285.md"), ADVISORY_0285);
+  return advisoryDb;
+}
+after(() => {
+  if (advisoryDb) rmSync(advisoryDb, { recursive: true, force: true });
+});
+
 function run(args) {
   return spawnSync(process.execPath, [SCRIPT, ...args], {
     cwd: repoRoot,
@@ -82,7 +118,7 @@ test(
     // direction of "which side lacks the finding" is what the script checks,
     // and this is the one real pair of commits on this repository's history
     // that differs by exactly one known, named advisory.)
-    const result = run(["--base", FIX_COMMIT, "--head", PRE_FIX_COMMIT]);
+    const result = run(["--base", FIX_COMMIT, "--head", PRE_FIX_COMMIT, "--db", pinnedAdvisoryDb()]);
     assert.notEqual(result.status, 0, `expected failure; stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
     assert.match(result.stderr, /RUSTSEC-2026-0285/);
     assert.match(result.stderr, /introduces 1 new advisory finding/);
@@ -93,11 +129,11 @@ test("passes in the real chronological direction, where the advisory is only rem
   // base = PRE-FIX, head = FIXED: this is the actual PR, and it must not be
   // reported as introducing anything -- it removes a finding, which is
   // informational (logged) but not a failure.
-  const result = run(["--base", PRE_FIX_COMMIT, "--head", FIX_COMMIT]);
+  const result = run(["--base", PRE_FIX_COMMIT, "--head", FIX_COMMIT, "--db", pinnedAdvisoryDb()]);
   assert.equal(result.status, 0, `expected success; stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
   assert.match(result.stdout, /no longer present at HEAD/);
   assert.match(result.stdout, /RUSTSEC-2026-0285/);
-  assert.match(result.stdout, /no new advisory findings/);
+  assert.match(result.stdout, /no new advisory findings \(base has 1, head has 0/);
 });
 
 test("passes with no findings to report when base and head share the same lockfile", { skip }, () => {

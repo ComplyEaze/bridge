@@ -37,7 +37,10 @@
 // matched pair, not two independent gates.
 //
 // Run: node scripts/check-advisory-delta.mjs [--base <ref>] [--head <ref>]
-//        [--lockfile <path>] [--allow-missing-git]
+//        [--lockfile <path>] [--db <advisory-db dir>] [--allow-missing-git]
+// With --db both scans read that advisory database and nothing else: no fetch
+// of the live database and no crates.io yanked lookup. The contract tests use
+// it so their verdicts cannot change when RustSec publishes a new advisory.
 // In CI, run with no arguments: base defaults to the merge base of HEAD and
 // the pull request's target branch (GITHUB_BASE_REF, else origin/master).
 
@@ -52,12 +55,13 @@ const DEFAULT_LOCKFILE = "src-tauri/Cargo.lock";
 const MAX_REPORTED_IDS = 30;
 
 function parseArgs(argv) {
-  const args = { base: null, head: "HEAD", lockfile: DEFAULT_LOCKFILE };
+  const args = { base: null, head: "HEAD", lockfile: DEFAULT_LOCKFILE, db: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--base") args.base = requireValue(argv, ++i, "--base");
     else if (arg === "--head") args.head = requireValue(argv, ++i, "--head");
     else if (arg === "--lockfile") args.lockfile = requireValue(argv, ++i, "--lockfile");
+    else if (arg === "--db") args.db = requireValue(argv, ++i, "--db");
     else throw new Error(`check-advisory-delta: unknown argument: ${arg}`);
   }
   return args;
@@ -114,13 +118,14 @@ function lockfileAt(commit, lockfilePath) {
   return show.stdout;
 }
 
-function runCargoAudit(lockfileContents, { fetch }) {
+function runCargoAudit(lockfileContents, { fetch, db }) {
   const scratchDir = mkdtempSync(join(tmpdir(), "bridge-advisory-delta-"));
   const scratchLockfile = join(scratchDir, "Cargo.lock");
   writeFileSync(scratchLockfile, lockfileContents);
   try {
     const args = ["audit", "--file", scratchLockfile, "--json"];
-    if (!fetch) args.push("--no-fetch");
+    if (db) args.push("--db", db, "--no-fetch", "--stale", "--no-yanked");
+    else if (!fetch) args.push("--no-fetch");
     const result = spawnSync("cargo", args, {
       cwd: REPO_ROOT, // so ./.cargo/audit.toml resolves the same way it does in CI
       encoding: "utf8",
@@ -214,8 +219,8 @@ function main() {
   // difference between the two id sets is caused by the Cargo.lock content
   // difference alone, never by the advisory database changing between the
   // two `cargo audit` invocations.
-  const baseReport = runCargoAudit(baseLockfile, { fetch: true });
-  const headReport = runCargoAudit(headLockfile, { fetch: false });
+  const baseReport = runCargoAudit(baseLockfile, { fetch: true, db: args.db });
+  const headReport = runCargoAudit(headLockfile, { fetch: false, db: args.db });
 
   const baseDetails = idsAndDetails(baseReport);
   const headDetails = idsAndDetails(headReport);

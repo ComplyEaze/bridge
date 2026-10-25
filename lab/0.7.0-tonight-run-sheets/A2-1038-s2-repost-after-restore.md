@@ -6,7 +6,7 @@ STEPS (one request at a time):
 1. `list_companies`; GUID. `tally_status`: M0, V0. `vouchers` day D: N0 (expected 0).
 2. `build_import_xml`: ONE saved batch B1 of 2 Receipts (each 1.00 from a synthetic party to the bank ledger, distinct narrations). Record batch id, the two REMOTEIDs/GUIDs the build reports.
 3. `post_import` B1 (owner approves). Record result. `verify_import` B1: expect `posted_verified`. `tally_status`: M1, V1 (expect V1 = V0 + 2). `vouchers` day D: record both vouchers with MasterID, AlterID, GUID, number.
-4. THE COORDINATOR restores BK1 on the screen (company back to before step 3). `tally_status`: M2, V2 (expect V2 = V0). `verify_import` B1: record the full result (expect rolled back / not attributable).
+4. The operator restores BK1 by Tally's own Restore screen, identified as the standing restore rule says (company back to before step 3); this step is the run coordinator's RESTORE for BK1 at this point, and no other restore is made without that word. `tally_status`: M2, V2 (expect V2 = V0). `verify_import` B1: record the full result (expect rolled back / not attributable).
 5. `build_import_xml`: a NEW batch B2 with the same two Receipts (new batch id; new REMOTEIDs). `post_import` B2 (owner approves). Record result.
 6. `verify_import` B2 and `verify_import` B1 again. `vouchers` day D again: both vouchers with MasterID, AlterID, GUID, number. `tally_status`: M3, V3.
 EXPECT (record, not predicted): V3 = V0 + 2.

@@ -39,6 +39,9 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- A read for a company that is not among those open in Tally, refused as `company_identity_not_found`, now carries
+  a next step: call `list_companies`, use an ID it returns, and ask the user to open the company in Tally if it is
+  not listed. The refusal itself is unchanged. Checked on a test double, not a live Tally.
 - The approval window, and the review window, now open with a line that says what each answer does, before any
   detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
   voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N

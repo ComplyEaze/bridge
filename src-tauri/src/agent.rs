@@ -994,6 +994,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              in Tally, then call list_companies again and repeat the request with the \
              company_guid it returns.",
         ),
+        // The company list Tally returned held no company with the GUID given (or, after a read
+        // began, none with the identity it began on). The 7.2 read regression passed the GUID of a
+        // company that was not open and got this code with no step.
+        "company_identity_not_found" => Some(
+            "The company list Tally returned held no company with this company_guid, so nothing \
+             from its books was returned. The company may not be open in Tally, or may have been \
+             closed while the read ran. Call list_companies and use a company_guid it returns; if \
+             the company the user named is not listed, ask the user to open it in Tally, then call \
+             list_companies again before repeating the request.",
+        ),
         "setting_retired" => Some(
             "BRIDGE_AGENT_ENABLE_BATCH_POST was retired: batch posting now follows the posting \
              setting (BRIDGE_AGENT_ENABLE_WRITES), which covers one voucher or a saved batch of \

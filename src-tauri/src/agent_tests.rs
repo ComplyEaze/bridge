@@ -753,6 +753,15 @@ fn a_read_refused_for_the_company_identity_names_that_cause_and_the_next_step() 
     }
 }
 
+/// A read for a company that is not among those open is refused as
+/// `company_identity_not_found`, and the refusal says what to do about it.
+#[test]
+fn a_company_identity_not_found_names_the_next_step() {
+    let step = remediation_for("company_identity_not_found", None).expect("a next step");
+    assert!(step.contains("list_companies"), "{step}");
+    assert!(step.contains("open it in Tally"), "{step}");
+}
+
 #[test]
 fn ledger_master_fields_reject_unknown_schema_values() {
     assert_eq!(

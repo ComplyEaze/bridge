@@ -5381,13 +5381,14 @@ fn assert_reported_not_created(posted: &Value) {
     // Safety phrases, pinned before any shortening.
     for phrase in [
         "Tally reported this voucher as not created",
-        "Check that it is not in Tally",
-        "enter this one voucher",
-        "do not import it again through Tally's Import menu",
         "will not send this saved voucher again",
+        "nothing in ComplyEaze Bridge puts it in the book yet",
+        "do not import it again through Tally's Import menu",
     ] {
         assert!(next_step.contains(phrase), "{phrase}: {next_step}");
     }
+    // It sends no one to key the voucher into Tally (#1709).
+    assert!(!next_step.contains("voucher entry screen"), "{next_step}");
 }
 
 /// A single voucher Tally rejected (Education answer) reads as not created by
@@ -5467,7 +5468,7 @@ async fn a_rejected_single_voucher_verified_later_keeps_its_status_and_says_what
     assert_eq!(voucher["status"], "sent_not_attributed", "{later}");
     assert_eq!(
         voucher["next_step"],
-        "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered by hand with a different date, voucher type, ledger or amount: look for it in Tally first, and enter it in Tally's voucher entry screen only if it is not there; do not import its file through Tally's Import menu. ComplyEaze Bridge will not send this saved voucher again.",
+        super::super::verification::REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP,
         "{later}"
     );
     assert_eq!(result["post_span_binding"]["state"], "refused", "{later}");

@@ -1010,7 +1010,10 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// Deliberately sparse. A code without a documented, concrete next step returns
 /// `None` and its refusal keeps the general message, because filler guidance is
 /// worse than none: it reads as authoritative while sending the caller nowhere.
-/// This never softens a refusal — it only says what to do about one.
+/// This never softens a refusal — it only says what to do about one. A few codes
+/// state a cause with no step instead, among them `empty_book_first_import`: no step
+/// inside ComplyEaze Bridge exists for it yet, and it must not send anyone to enter a
+/// voucher another way (#1709).
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
         "company_identity_absent_or_ambiguous" | "company_identity_not_matched" => Some(
@@ -1049,9 +1052,8 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
-             mark and ComplyEaze Bridge has no \"before\" to attribute an import against. Record one \
-             voucher in this company by another route and confirm it in Tally, then build \
-             this batch again.",
+             mark and ComplyEaze Bridge has no \"before\" to attribute an import against, so it \
+             cannot build or post the first voucher into this company yet. Nothing was sent to Tally.",
         ),
         // A cause, reached through `ledger_export_invalid` (#714) and
         // `ledger_movement_read_failed` (#716).

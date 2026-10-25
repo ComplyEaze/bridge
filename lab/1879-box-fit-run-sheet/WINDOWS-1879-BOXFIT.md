@@ -10,9 +10,11 @@ The new gate installs a WH_CBT hook on the dialog's thread, measures the box's r
 4. The units agree: the product is DPI-unaware, so its window rectangle and the monitor's work area are both read in virtualised units; a box that fits by the lab's physical numbers must still count as fitting, at the edge (48 lines: bottom 1023 of 1030) as well as well inside.
 
 ## Build
-The `bridge_mcp.exe` from the Bridge CI pull_request run for PR #1879 at the head named below, artifact `unsigned-bundle-smoke-windows-latest` (the PR run builds the Windows bundle; if the artifact is missing for that head the item does not start). Filled in by whoever relays this sheet, before it goes to the lab:
+The `bridge_mcp.exe` from the Bridge CI pull_request run for PR #1879 at the head named below, artifact `unsigned-bundle-smoke-windows-latest` (the PR run builds the Windows bundle; if the artifact is missing for that head the item does not start). Filled in on 25 Oct 2026 from the run named:
 
-- head sha: ______  run id: ______  artifact id: ______  zip digest: ______  `bridge_mcp.exe` sha256: ______
+- head sha: `dafa1c9fcb3040b1ab8888a07f7c6821ecdb2d3c` (the PR's head when the run started); run id: `40171649980` (event `pull_request`, conclusion `success`); artifact id: `12591232885` (`unsigned-bundle-smoke-windows-latest`, 61,131,103 bytes, expires 2026-11-01 07:46 UTC); zip digest: `sha256:77f1c4ccc4de8ef22dd45b97a9b21f5fb902aa2165bb0ea1a314c6201033cb32`.
+- Inside it: `bridge-tally.mcpb` 16,327,659 bytes, sha256 `5a2351d9db5fdc6137c4821c7856d80761d8d225d8b90f24798114e9f5fa5326` (equal to `archive_sha256` in its `mcpb-smoke.json`); `bridge_mcp.exe` inside the `.mcpb`, 33,627,136 bytes, sha256 `d50abce7eaf9ce06b48563cc4b01ce8a013eac11071ab687390c0e79639b7014` (equal to `binary_sha256`); manifest version 0.6.0. These were measured on a Mac from the downloaded artifact on 25 Oct 2026. To get the exe: unpack a COPY of the `.mcpb` with a zip tool into a new folder (the exe is under `bin\x86_64-pc-windows-msvc\`).
+- COMPILED TREE: a `pull_request` run builds GitHub's merge of the head into `master` as it stood when the run started, not the head alone; the hashes above, not the commit, decide whether the file is the build.
 
 The lab records the hash of the file it stages and compares it with the line above; a different hash, or a head that is not the PR's current head, is a STOP. Stage it; install nothing.
 

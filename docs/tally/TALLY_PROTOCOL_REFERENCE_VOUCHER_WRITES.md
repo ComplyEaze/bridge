@@ -1377,7 +1377,7 @@ The bound GUIDs are journaled and verified first. Content and `LASTVCHID` only r
 
 **Not established:**
 - another Gold client process writing during the post;
-- whether a voucher keeps its GUID and MasterID through a screen edit, or through an upsert that changes more than the narration (section 9.14 measured a narration-only upsert);
+- whether a voucher keeps its GUID and MasterID through a screen edit, and its MasterID through an upsert that changes more than the narration (§9.3 measured the GUID kept through a changed amount and date; the MasterID was not read);
 - a concurrent save tripping the step;
 - Payment, Receipt and Contra batches other than 10;
 - a `$GUID` filter without a date clause;

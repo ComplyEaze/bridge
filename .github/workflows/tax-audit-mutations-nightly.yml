@@ -37,6 +37,10 @@ jobs:
     timeout-minutes: 350
     strategy:
       fail-fast: false
+      # A shard runs 1 to 2 hours. Eight at once would hold 8 of the 20 runner slots the whole
+      # account shares (a pull request's checks wait behind them); four at a time takes two
+      # waves, the same job-minutes, a longer wall time.
+      max-parallel: 4
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:

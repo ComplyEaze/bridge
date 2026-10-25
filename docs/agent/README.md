@@ -2528,10 +2528,14 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    measured for ledger renames and creates made through the gateway, and each
    of thirteen saves of a voucher type's screen in Tally moved it by 2 (nine of
    a type holding no vouchers, and two in each of two runs on a type holding
-   vouchers, all on one synthetic book, TallyPrime 7.1 Silver). A regroup, any
-   other edit made in Tally's own screens, and whether posting a voucher moves
-   it are not yet measured. A queue catalogue re-read that does not parse as this
-   company's catalogue refuses with `post_catalogue_unreadable`, whose `cause`
+   vouchers, all on one synthetic book, TallyPrime 7.1 Silver), and a ledger
+   regrouped, created or deleted, or its opening balance changed, on Tally's
+   own screens moved it by 1 (VERIFIED, one run each, protocol reference
+   §11c.5); enabling cost centres, creating one and making a ledger applicable
+   moved it by 3 (PARTIAL). Other screen edits, and whether posting a voucher
+   moves it, are not yet measured. A queue catalogue re-read that does not
+   parse as this company's catalogue refuses with `post_catalogue_unreadable`,
+   whose `cause`
    names why, and nothing is sent; a repeated or unusable ledger name refuses
    again until it is corrected in Tally. A queue re-read of the group collection
    (for a Payment, Receipt or Contra) that does not parse refuses with

@@ -13,8 +13,11 @@
 //! the verification read returns, including its REMOTEID). The fingerprint catches an edit to any of
 //! those fields whether or not it moved the ALTERID; an edit only to a field
 //! that read does not return (a reference, an allocation, GST detail, the
-//! party ledger) is caught only if it moves the ALTERID, which is not yet
-//! measured for an edit made in Tally's own screens.
+//! party ledger) is caught only if it moves the ALTERID. On Tally's own
+//! screens, saving a voucher unchanged and cancelling it moved it (VERIFIED),
+//! and so did changing a bill allocation's reference, adding a cost-centre
+//! allocation and setting a bank-reconciliation date (PARTIAL): one run each,
+//! protocol reference §11c.5.
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount, REVIEW_BUTTON};
 

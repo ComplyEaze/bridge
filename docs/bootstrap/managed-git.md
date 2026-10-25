@@ -38,10 +38,11 @@ personal information.
   and `Bundle smoke (*)` (on a master
   push, for a commit the merge queue already ran the Windows jobs on, through
   that queue run: `scripts/master-push-reuse.mjs`; a pull request and the queue
-  run the native tests on Windows only, and a master push, the nightly run and
-  a manual run add macOS; a pull request runs the bundle and seam jobs on Windows only, and
-  the queue and a push add macOS only when a packaging path changes, named in
-  the scope job; a draft pull request runs no native, bundle or seam job, reports
+  run the native tests on Windows only, and a master push, the nightly run, a
+  manual run and a release pull request (one that changes the version in
+  `src-tauri/tauri.conf.json`) add macOS; a pull request runs the bundle and seam
+  jobs on Windows only unless it is a release pull request, and the queue and a
+  push add macOS only when a packaging path changes, named in the scope job; a draft pull request runs no native, bundle or seam job, reports
   its gate as `Required checks (draft)`, which is not a required context, and
   marking it ready starts a run that does); require the
   gate rather than those individual matrix contexts, because they are

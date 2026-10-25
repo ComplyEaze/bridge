@@ -228,7 +228,9 @@ behaviour, the comment cites the reference section rather than restating it.
   pull request runs none of them until it is marked ready. macOS evidence for the bundle
   and seam jobs comes from the merge queue run when the change touches a packaging path,
   and for the native tests from the master push and the nightly run, so say so in the PR
-  and cite that run once it exists. To have macOS native evidence before the merge, run
+  and cite that run once it exists. A release pull request (the version pull request of
+  `docs/release-process.md`, recognised by a changed version in `src-tauri/tauri.conf.json`)
+  runs all three on both systems. To have macOS native evidence before the merge, run
   the workflow by hand on the branch (`gh workflow run ci.yml --ref <branch>`), which runs
   every job on both systems.
 - Never merge a PR that introduces destructive DB migrations without rollback notes.

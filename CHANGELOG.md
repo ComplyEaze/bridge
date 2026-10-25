@@ -143,6 +143,23 @@ These changes are in source and not yet in a published build.
   read declines the figure as `inventory_flags_not_read`). The derived lines must also sum to zero. Measured on one synthetic book; opening stock, a costing
   method, a book that is not integrated and a window spanning two years are not measured.
 
+- `masters` can list a company's stock items (`kind` `stock_items`): each row carries the item's own dated HSN
+  entries (`hsn`) and GST rate entries (`gst`) as Tally sent them, nothing choosing the code or the rate for a date
+  (part of #1233). An empty or missing list is not "no HSN or GST": after a code was keyed on a stock group, the group's four other items still carried empty lists
+  (one book); a GST rate or an HSN code on the company, and whether an item that defers to a coded group inherits its code, were not measured; the group's and the company's setting is not read, and every row says so
+  (`inherited_from_group_or_company: not_read`). A defect in one item's list marks that list `unreadable` with its
+  defect and the read stands; a Tally `ERROR`, markup inside a value or a cut-off list refuses the read. Item names
+  and parents are masked under `mask_parties`, and so are HSN descriptions (a person can edit them); HSN codes and rates are returned as sent. Tally's
+  `GSTINELIGIBLEITC` is returned as sent under `ineligible_itc`: it was Yes where the screen read
+  `Eligible for Input Tax Credit: No` and absent where it read Yes (one item, two rows, PARTIAL), which fits an
+  ineligibility flag; null is neither eligible nor ineligible, and what an absent element means for the tax is
+  not known. On an entry whose source is `As per Company/Stock Group` (the entry Tally adds itself on a first save; a person can also choose that source) a flag Tally sent is withheld:
+  `ineligible_itc` is null and `ineligible_itc_withheld` is `tally_default_entry`, because the Yes seen on such an
+  entry was never compared with the screen; a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is. `ledger_masters` names the same element the same way (#1741). A book is read only up to a master mark of 489 (a limit of 489 refuses, by arithmetic, both client
+  books measured; not tried on them). Measured on one synthetic book of TallyPrime 7.1 Silver (three captures, one item
+  with two dated entries in each list); a state row other than `Any`, slab rates, another release, a larger book
+  and a zero-row stock-item answer are not measured. `stock_summary` is unchanged.
+
 - `negative_stock` (new tool; part of #1358): Tally's own Negative Stock list for a window, as `item`, `quantity`,
   `rate` and `value` per listed stock item, returned as Tally prints them and compared with no other report
   (`checks` says so). Being listed is not a finding that the quantity is below zero, and an empty answer is

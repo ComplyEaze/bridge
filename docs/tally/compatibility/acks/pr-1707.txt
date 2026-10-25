@@ -6,5 +6,7 @@ src-tauri/src/agent_masters.rs
 src-tauri/src/agent_register.rs
 src-tauri/src/agent_register_tests.rs
 src-tauri/src/agent_tests.rs
+src-tauri/src/agent_voucher_cost_centres.rs
+src-tauri/src/agent_voucher_cost_centres_tests.rs
 src-tauri/src/agent_voucher_parse.rs
 reviewer: lamemustafa

@@ -386,3 +386,41 @@ fn two_categories_that_name_themselves_after_their_centres_do_not_collide() {
         ]
     );
 }
+
+#[test]
+fn a_category_met_twice_in_one_entry_is_unreadable_not_returned_twice() {
+    let xml = captured();
+    let (first, end) = first_category_block(&xml);
+    let doubled = format!("{}{}{}", &xml[..end], &xml[first..end], &xml[end..]);
+    assert_unreadable(&doubled, "cost_category_repeated");
+    // The names are compared without case, as Tally compares them.
+    let block = xml[first..end].replace("Business Line", "BUSINESS LINE");
+    let doubled = format!("{}{}{}", &xml[..end], block, &xml[end..]);
+    assert_unreadable(&doubled, "cost_category_repeated");
+}
+
+#[test]
+fn a_centre_name_repeated_in_another_case_in_one_category_is_unreadable() {
+    assert_unreadable(
+        &changed("<NAME>Assembly</NAME>", "<NAME>TRADING</NAME>"),
+        "cost_centre_duplicate",
+    );
+}
+
+#[test]
+fn an_allocation_list_at_a_depth_the_reader_does_not_take_is_flagged_not_silent() {
+    // Centres directly under the entry (no category), and a category nested in a category.
+    let xml = captured();
+    let (first, end) = first_category_block(&xml);
+    let centres_only = "<COSTCENTREALLOCATIONS.LIST><NAME>Trading</NAME><AMOUNT>-5.00</AMOUNT></COSTCENTREALLOCATIONS.LIST>";
+    let direct = format!("{}{}{}", &xml[..first], centres_only, &xml[end..]);
+    assert_unreadable(&direct, "cost_centre_allocation_shape_unrecognised");
+    let block = &xml[first..end];
+    let nested = format!(
+        "{}{}{}",
+        &xml[..end - "</CATEGORYALLOCATIONS.LIST>".len()],
+        block,
+        &xml[end - "</CATEGORYALLOCATIONS.LIST>".len()..]
+    );
+    assert_unreadable(&nested, "cost_centre_allocation_shape_unrecognised");
+}

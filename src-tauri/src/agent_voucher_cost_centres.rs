@@ -26,6 +26,10 @@ pub(in crate::agent) enum CostCentreProblem {
     FieldDuplicated,
     TextUndecodable,
     CategoryEmpty,
+    /// A category name met twice in one entry: the same centre would be returned twice.
+    CategoryRepeated,
+    /// An allocation list at a depth the reader does not take.
+    ShapeUnrecognised,
 }
 
 impl CostCentreProblem {
@@ -40,6 +44,8 @@ impl CostCentreProblem {
             Self::FieldDuplicated => "cost_centre_field_duplicated",
             Self::TextUndecodable => "cost_centre_text_undecodable",
             Self::CategoryEmpty => "cost_category_present_but_empty",
+            Self::CategoryRepeated => "cost_category_repeated",
+            Self::ShapeUnrecognised => "cost_centre_allocation_shape_unrecognised",
         }
     }
 }
@@ -60,9 +66,11 @@ pub(in crate::agent) struct CostCentreCollector {
     /// its centres, so its rows get the name when the category ends.
     category_rows_from: usize,
     rows: Vec<Value>,
-    /// The centre names seen in the current category: a name may repeat under another
-    /// category, never within one.
+    /// The centre names seen in the current category (lower case: Tally compares names
+    /// without case): a name may repeat under another category, never within one.
     seen: BTreeSet<String>,
+    /// The category names seen in this entry, in the same form: a category is met once.
+    categories: BTreeSet<String>,
     problem: Option<CostCentreProblem>,
 }
 
@@ -82,6 +90,13 @@ impl CostCentreCollector {
 
     /// `tail` is the path of the PARENT of the element that starts.
     pub(in crate::agent) fn start(&mut self, tail: &[String], tag: &str) {
+        // An allocation list anywhere but where the capture shows it is not read, and the
+        // entry says so: no key must never read as "not allocated" when a list was there.
+        let recognised = matches!((tail, tag), ([], CATEGORY_LIST))
+            || (matches!(tail, [c] if c == CATEGORY_LIST) && tag == CENTRE_LIST);
+        if !recognised && (tag == CATEGORY_LIST || tag == CENTRE_LIST) {
+            self.note(CostCentreProblem::ShapeUnrecognised);
+        }
         match (tail, tag) {
             ([], CATEGORY_LIST) => {
                 self.category = Some(Draft::default());
@@ -167,7 +182,7 @@ impl CostCentreCollector {
             self.note(CostCentreProblem::AmountUnparsable);
             return;
         }
-        if !self.seen.insert(name.clone()) {
+        if !self.seen.insert(name.to_lowercase()) {
             self.note(CostCentreProblem::CentreDuplicate);
             return;
         }
@@ -209,6 +224,10 @@ impl CostCentreCollector {
             .get("CATEGORY")
             .map(|value| value.trim().to_string())
             .unwrap_or_default();
+        if !self.categories.insert(name.to_lowercase()) {
+            self.note(CostCentreProblem::CategoryRepeated);
+            return;
+        }
         for row in self.rows.iter_mut().skip(self.category_rows_from) {
             row["category"] = json!(name);
         }

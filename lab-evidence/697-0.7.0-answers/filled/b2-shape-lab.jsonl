@@ -1,0 +1,9 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"lr5","version":"1"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"audit_test_run","arguments":{"company_guid":"3a6bd6e1-b835-4bff-89dd-8a6af138c346","from":"20250401","to":"20260331","test":"cash_44ab","cash_groups":["Cash-in-Hand"],"bank_groups":["Bank Accounts"]}}}
+{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"audit_test_run","arguments":{"company_guid":"3a6bd6e1-b835-4bff-89dd-8a6af138c346","from":"20250401","to":"20260331","test":"cash_44ab","cash_groups":["Cash-in-Hand X"],"bank_groups":["Bank Accounts"]}}}
+{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"audit_test_run","arguments":{"company_guid":"3a6bd6e1-b835-4bff-89dd-8a6af138c346","from":"20250401","to":"20260331","test":"cash_44ab","cash_groups":["Cash-in-Hand"],"bank_groups":["Bank Accounts","Cash-in-Hand"]}}}
+{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"audit_test_run","arguments":{"company_guid":"3a6bd6e1-b835-4bff-89dd-8a6af138c346","from":"20250401","to":"20260331","test":"cash_payments_40a3","cash_groups":["Cash-in-Hand"],"bank_groups":["Bank Accounts"]}}}
+{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"audit_test_run","arguments":{"company_guid":"3a6bd6e1-b835-4bff-89dd-8a6af138c346","from":"20240401","to":"20250331","test":"cash_44ab","cash_groups":["Cash-in-Hand"],"bank_groups":["Bank Accounts"]}}}
+{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"audit_test_run","arguments":{"company_guid":"3a6bd6e1-b835-4bff-89dd-8a6af138c346","from":"20250401","to":"20260401","test":"cash_44ab","cash_groups":["Cash-in-Hand"],"bank_groups":["Bank Accounts"]}}}
+{"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"egress_log","arguments":{"limit":20}}}

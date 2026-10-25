@@ -4,8 +4,10 @@ Not for merge. This is the ONE sheet of the sitting. It holds the order, the bui
 
 ## What the sitting decides
 1. PART 1, #1459: on a Store install, whether `build_import_xml` prints a path that File Explorer opens (`result.path`, `result.path_state`); which data folder the extension really uses; what `local_data_report` names against that folder; and what the 1,403 lock files of the plain-shell folder are (counted, names grouped by pattern only, nothing opened or deleted). The fix (#1569) is merged; this is its live row.
-2. PART 3, #293: the seven steps of the packaged desktop app on Windows against live Tally, with the first-run behaviour recorded, failures included.
+2. PART 3, #293 (OPTIONAL, see below): the seven steps of the packaged desktop app on Windows against live Tally, with the first-run behaviour recorded, failures included.
 3. PART 2, #1584: whether a Tally port lock held on one side of the package boundary refuses a request from the other. The fix (#1641) is merged; its Windows row has never run.
+
+**PART 3 IS OPTIONAL.** It stays in the sheet but is run only when the owner is at the screen and the time is there; Parts 1 and 2 and CLOSE decide #1459 and #1584 without it, and a sitting that skips it is complete. If it is skipped: (a) in ORDER below steps 4 and 6 are not run and step 5, the COMPANY SWITCH, follows O5; (b) O5 still runs, because Part 2 needs the desktop app installed and not running; (c) the Part 2 row "0g" below does not apply: Part 2's 0g and C2 run as its source says (the endpoint is NOT set, C2 sets it and records it); (d) the report says "Part 3 (#293): not run". #293 stays open.
 
 ## What was stale in the two source sheets, and what this sheet puts in its place
 | in the source | stale because | in its place |
@@ -66,7 +68,7 @@ Run S0 to S5, B1 to B6 (OWNER at B1 to B4), C0 to C3, D1 to D6b as written, then
 ## OWNER STEP O5, between Parts 1 and 3
 The lab operator hashes the `*-setup.exe` against the Build block BEFORE the owner runs it (a mismatch = STOP, nothing installed). The owner runs it (UAC) and unticks "start". RECORD: each installer prompt as a screenshot before the owner answers it; whether the install is per-user or per-machine (the Programs and Features entry and the install folder, by name); `Get-Process` by the app's process name: NONE running. A running desktop app at this point = STOP.
 
-## PART 3: #293, the packaged desktop app against live Tally (OWNER at the screen)
+## PART 3 (OPTIONAL): #293, the packaged desktop app against live Tally (OWNER at the screen)
 The owner (or the person he names) is at the screen; the operator reads each step aloud and records; it drives the screen itself only if the owner granted screen control at O7's rehearsal. The OS prompts are the owner's alone.
 
 Preconditions: Part 1 done; the desktop app installed (O5) and NOT running; Tally with BRIDGE BATCH LAB loaded alone (LAB-COMMON C1 and C2 a to d first, with the screenshot of the whole Tally window first; any dialog = STOP); the file of Part 1's D1 exists (its path and sha256 from `d1-build-answer.json`: `result.path`, `result.sha256`); nothing typed in Tally. A STEP-LOG.txt line per step in `p3\` (step, UTC to the second, one word).

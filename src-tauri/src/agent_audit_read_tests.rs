@@ -600,3 +600,128 @@ fn group_names_that_need_escaping_reach_the_engagement_whole() {
         fixture_guid().to_string()
     );
 }
+
+/// The audit read over live answers: every part as a licensed TallyPrime 7.1 Silver served it for
+/// the synthetic company BRIDGE PILOT LAB, 1 April 2026 to 31 March 2027 (lab items 697-S0A and
+/// 697-S1; the bytes and their provenance are in the protocol crate's
+/// `tests/fixtures/agent/audit-read-pilot-lab/PROVENANCE.md`).
+mod live_pilot_lab {
+    use super::*;
+
+    const FIXTURES: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/crates/bridge-tally-protocol/tests/fixtures/agent/"
+    );
+    const GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+
+    fn bytes(name: &str) -> Vec<u8> {
+        std::fs::read(format!("{FIXTURES}{name}")).unwrap()
+    }
+
+    fn part(name: &str) -> String {
+        text_of(&bytes(&format!(
+            "audit-read-pilot-lab/pilot-lab-audit-{name}.utf16le.xml"
+        )))
+    }
+
+    /// The loaded companies (one) and the marks, as the same Tally answered them in both
+    /// sittings: the two answers are byte-identical to fixtures already committed.
+    fn companies() -> String {
+        text_of(&bytes("pilot-lab/pilot-lab-company-extent.utf16le.xml"))
+    }
+
+    fn marks() -> String {
+        text_of(&bytes(
+            "gst-status/pilot-lab-gst-uncertain-august-marks.utf16le.xml",
+        ))
+    }
+
+    fn identity() -> VerifiedCompanyIdentity {
+        let companies =
+            bridge_tally_protocol::parse_companies_from_collection(&companies()).unwrap();
+        let observed = &companies[0];
+        assert_eq!(observed.guid.as_deref(), Some(GUID));
+        VerifiedCompanyIdentity::from_observed_companies(
+            observed.name.clone(),
+            crate::tally::test_company_guid(GUID),
+            observed.company_number.clone().unwrap(),
+            observed.books_from.clone().unwrap(),
+            &companies,
+        )
+        .unwrap()
+    }
+
+    /// The reader's parts in the order it asks for them, each named by its fixture
+    /// (`None` for the marks, whose request is not one of these fixtures).
+    const PARTS: [Option<&str>; 10] = [
+        None,
+        Some("company-object"),
+        Some("groups"),
+        Some("ledgers"),
+        Some("trial-balance"),
+        Some("voucher-types"),
+        None,
+        Some("census"),
+        Some("vouchers"),
+        None,
+    ];
+
+    async fn read() -> (Result<AuditBook, AuditReadFailure>, Vec<ObservedRequest>) {
+        let plans = PARTS
+            .iter()
+            .flat_map(|name| {
+                let body = name.map_or_else(marks, part);
+                [plan(companies()), plan(body), plan(companies())]
+            })
+            .collect();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let config = TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        };
+        let book = read_audit_book(
+            &TallyRuntime::default(),
+            &config,
+            &identity(),
+            (&date("20260401"), &date("20270331")),
+            &roles(),
+            one_request_window(),
+        )
+        .await;
+        (book, simulator.finish().unwrap_or_default())
+    }
+
+    #[tokio::test]
+    async fn every_part_a_live_tally_served_is_admitted_whole() {
+        let (book, observed) = read().await;
+        let audit = book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        assert_eq!(audit.book.company_guid, GUID);
+        // The counts the lab recorded from the same answers (697-S0A, 697-S1).
+        assert_eq!(audit.book.vouchers.len(), 41);
+        assert_eq!(audit.book.ledgers.len(), 18);
+        assert_eq!(audit.book.groups.len(), 29);
+        assert_eq!(audit.book.tb.len(), 18);
+        assert_eq!(observed.len(), 30);
+    }
+
+    /// The answers prove something about today's reader only while it still sends the
+    /// requests they answered: each part's request is byte for byte the one the lab sent.
+    #[tokio::test]
+    async fn each_part_request_is_byte_for_byte_the_one_sent_live() {
+        let (book, observed) = read().await;
+        book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        for (index, name) in PARTS.iter().enumerate() {
+            let Some(name) = name else { continue };
+            let sent = &observed[index * 3 + 1].request_body;
+            let live = bytes(&format!(
+                "audit-read-pilot-lab/pilot-lab-audit-{name}.request.utf16le.xml"
+            ));
+            assert!(
+                *sent == live,
+                "the {name} request differs from the one sent live:\n{}\n{}",
+                text_of(sent),
+                text_of(&live)
+            );
+        }
+    }
+}

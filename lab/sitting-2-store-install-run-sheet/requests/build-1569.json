@@ -1,0 +1,1 @@
+{"company_guid":"a30f23c3-4819-4334-96ab-ffa6fba70976","vouchers":[{"bridge_txn_id":"lab1569p-w29-1","date":"2026-09-13","voucher_type":"Receipt","narration":"Lab path probe 1569","entries":[{"ledger":"Synthetic Bank Ledger","amount":"1.00","side":"Dr"},{"ledger":"Party A","amount":"1.00","side":"Cr"}]}]}

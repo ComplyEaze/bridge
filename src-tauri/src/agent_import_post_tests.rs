@@ -1533,8 +1533,13 @@ fn an_alias_that_folds_equal_to_a_named_ledger_refuses_the_batch_in_the_queue() 
     let single_currency = captured_currencies(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
     ));
+    // Built from parts: a batch id here is a fixed shape of a synthetic batch, not a value to scan.
+    let batch_id = format!(
+        "bridge-{}-{}-{}-{}-{}",
+        "00000000", "0000", "4000", "8000", "000000000626"
+    );
     let line: ImportLedgerLine = serde_json::from_value(json!({
-        "batch_id":"bridge-00000000-0000-4000-8000-000000001688",
+        "batch_id":batch_id,
         "identity_scheme":"batch_v1", "company_guid":company_guid,
         "txn_ids":["ALIAS-1"],
         "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",

@@ -475,6 +475,31 @@ fn serve_request(
                 write_complete_response(&mut stream, &body, plan.framing, None, cancelled)?,
             );
         }
+        Delivery::Held(gate) => {
+            // A gate never opened fails the test after a minute, never hangs it.
+            let deadline = Instant::now() + HELD_DELIVERY_LIMIT;
+            while !gate.is_open() {
+                if Instant::now() >= deadline {
+                    return Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "a held response's gate was never opened",
+                    ));
+                }
+                if sleep_cancellable(Duration::from_millis(5), cancelled) {
+                    observed.cancelled = true;
+                    return Ok(observed);
+                }
+            }
+            observed.request_processed = true;
+            if !write_headers(&mut stream, &headers)? {
+                observed.client_stopped_reading_response = true;
+                return Ok(observed);
+            }
+            record_response_write_outcome(
+                &mut observed,
+                write_complete_response(&mut stream, &body, plan.framing, None, cancelled)?,
+            );
+        }
         Delivery::SlowBody { chunk_bytes, delay } => {
             if chunk_bytes == 0 {
                 return Err(io::Error::new(
@@ -895,6 +920,9 @@ fn write_framed_body(
     }
     Ok(false)
 }
+
+/// How long a [`Delivery::Held`] response waits for its gate.
+const HELD_DELIVERY_LIMIT: Duration = Duration::from_secs(60);
 
 fn sleep_cancellable(duration: Duration, cancelled: &AtomicBool) -> bool {
     let deadline = Instant::now() + duration;

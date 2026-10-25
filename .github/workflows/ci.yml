@@ -56,6 +56,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
           MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
         run: |
@@ -103,6 +104,13 @@ jobs:
             base="$MERGE_GROUP_BASE_SHA"
           fi
 
+          # A draft pull request runs no native, bundle or seam job; every other job is scoped as below. Marking it ready
+          # (`ready_for_review`, a trigger above) starts a new run of the same head that is scoped in full and cancels this
+          # one, and Required checks there needs those jobs again. The merge queue's run is never a draft run. Only the
+          # exact payload value `true` is a draft.
+          draft=false
+          if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then draft=true; fi
+
           # A missing base has no useful predecessor. Keep the conservative path.
           if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
             full_run
@@ -111,7 +119,7 @@ jobs:
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.mjs$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes(\.test)?\.mjs$|retain-macos-test-binaries(\.test)?\.mjs$))' <<< "$changed_files"; then
+          if [[ "$draft" == false ]] && grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.mjs$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes(\.test)?\.mjs$|retain-macos-test-binaries(\.test)?\.mjs$))' <<< "$changed_files"; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
@@ -124,7 +132,7 @@ jobs:
             echo 'tax_audit=false' >> "$GITHUB_OUTPUT"
           fi
 
-          if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
+          if [[ "$draft" == false ]] && grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
           else
             echo 'bundle=false' >> "$GITHUB_OUTPUT"
@@ -883,15 +891,15 @@ jobs:
   required-checks:
     name: Required checks
     # Always runs so it can report a single, stable required status for branch
-    # protection. Workflow consistency is unconditional and must succeed. Other
-    # upstream jobs may be legitimately skipped (e.g. native/bundle on docs-only
-    # PRs), but any failure or cancellation fails this job. Point branch
-    # protection at this context instead of the individual matrix jobs so
-    # docs-only PRs are not blocked by skipped native/bundle checks.
-    # tax-audit-mutations is required too, on pull requests that touch the
-    # crate: it runs the mutation runner's tests and `--verify` (no build), so a
-    # bridge-tax-audit change merges only with its selected mutations proven on
-    # the merged tree. Skipped on other pull requests, which is a pass here.
+    # protection. Point branch protection at this context instead of the
+    # individual matrix jobs, which report `skipped` when they are not selected.
+    # Each job it needs has one rule below. A job with no condition must succeed.
+    # native, bundle-smoke, seam-control and tax-audit-mutations run exactly when
+    # the scope job's output for them is 'true' (a draft pull request, a change
+    # outside their paths and a reused master push set it 'false'): each must
+    # succeed then and be skipped otherwise, so a job that should have run and
+    # did not fails this job. compiler-cache-retention runs on master only and
+    # may be skipped. A failure or cancellation fails every rule.
     if: ${{ always() }}
     needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, seam-control, compiler-cache-retention, tax-audit-mutations]
     runs-on: ubuntu-latest
@@ -899,19 +907,54 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Verify no required job failed
+      - name: Verify every job that should have run passed
         shell: bash
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
           set -euo pipefail
           printf '%s\n' "$NEEDS_JSON"
-          failed="$(
-            printf '%s' "$NEEDS_JSON" \
-              | node -e 'const d = JSON.parse(require("fs").readFileSync(0, "utf8")); const failed = Object.keys(d).filter((k) => ["failure", "cancelled"].includes(d[k].result)); if (d["workflow-consistency"]?.result !== "success") failed.push("workflow-consistency"); console.log([...new Set(failed)].join(" "))'
-          )"
-          if [[ -n "$failed" ]]; then
-            echo "Required jobs did not pass: $failed"
-            exit 1
-          fi
-          echo "All required jobs succeeded or were legitimately skipped."
+          node --input-type=module <<'JS'
+          // A rule is one of three kinds: { kind: 'always' }, { kind: 'scope', output } or { kind: 'optional' }.
+          const rules = new Map([
+            ['changes', { kind: 'always' }],
+            ['frontend', { kind: 'always' }],
+            ['rust-format', { kind: 'always' }],
+            ['workflow-consistency', { kind: 'always' }],
+            ['tally-portable', { kind: 'always' }],
+            ['native', { kind: 'scope', output: 'native' }],
+            ['bundle-smoke', { kind: 'scope', output: 'bundle' }],
+            ['seam-control', { kind: 'scope', output: 'bundle' }],
+            ['tax-audit-mutations', { kind: 'scope', output: 'tax_audit' }],
+            ['compiler-cache-retention', { kind: 'optional' }],
+          ]);
+          const RESULTS = new Set(['success', 'failure', 'cancelled', 'skipped']);
+          const needs = JSON.parse(process.env.NEEDS_JSON);
+          const scope = needs.changes?.outputs ?? {};
+          // What this job requires of each result: the set of results that pass, or a reason it cannot judge.
+          function expected(rule) {
+            if (rule.kind === 'always') return { pass: ['success'] };
+            if (rule.kind === 'optional') return { pass: ['success', 'skipped'] };
+            if (rule.kind !== 'scope') return { error: `rule kind ${JSON.stringify(rule.kind)} is unknown` };
+            const selected = scope[rule.output];
+            if (selected === 'true') return { pass: ['success'] };
+            if (selected === 'false') return { pass: ['skipped'] };
+            return { error: `scope output ${rule.output} is ${JSON.stringify(selected)}, neither 'true' nor 'false'` };
+          }
+          const problems = [];
+          for (const job of [...new Set([...Object.keys(needs), ...rules.keys()])].sort()) {
+            const result = Object.hasOwn(needs, job) ? needs[job]?.result : undefined;
+            const rule = rules.get(job);
+            if (!rule) { problems.push(`${job}: no rule says whether it must run`); continue; }
+            if (!RESULTS.has(result)) { problems.push(`${job}: result ${JSON.stringify(result)} is not one of GitHub's four`); continue; }
+            const want = expected(rule);
+            if (want.error) { problems.push(`${job}: ${want.error}`); continue; }
+            console.log(`${job}: ${result} (passes as ${want.pass.join(' or ')})`);
+            if (!want.pass.includes(result)) problems.push(`${job}: ${result}, required ${want.pass.join(' or ')}`);
+          }
+          if (problems.length) {
+            console.log(`Required jobs did not pass:\n${problems.join('\n')}`);
+            process.exit(1);
+          }
+          console.log('Every job that should have run passed, and every skipped job was not selected.');
+          JS

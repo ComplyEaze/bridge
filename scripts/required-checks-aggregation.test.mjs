@@ -5,12 +5,16 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+// Runs the real aggregation step of ci.yml's Required checks job under bash, with a synthetic
+// `toJSON(needs)`, and reads its exit status and output. The consistency check pins the step's text;
+// this proves what the text decides: a job the scope selected must succeed, a job it did not select
+// must be skipped, a job without a condition must succeed, and anything the rules cannot judge fails.
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowPath = join(repoRoot, ".github", "workflows", "ci.yml");
 
 function requiredChecksCommand() {
   const lines = readFileSync(workflowPath, "utf8").split("\n");
-  const stepStart = lines.findIndex((line) => line === "      - name: Verify no required job failed");
+  const stepStart = lines.findIndex((line) => line === "      - name: Verify every job that should have run passed");
   assert.notEqual(stepStart, -1, "required-checks aggregation step is missing");
 
   const stepEndOffset = lines.slice(stepStart + 1).findIndex(
@@ -38,8 +42,8 @@ function requiredChecksCommand() {
 }
 
 // Built from required-checks' own needs, which check-ci-workflow-consistency.mjs pins to every
-// other job, so a new job's failure and cancellation are covered without editing this file. A job
-// that may legitimately be skipped must still be added to conditionalJobs by hand.
+// other job, so a new job is in every case below without editing this file, and the step fails it
+// until the step gives it a rule.
 function requiredChecksNeeds() {
   const lines = readFileSync(workflowPath, "utf8").split("\n");
   const job = lines.indexOf("  required-checks:");
@@ -48,51 +52,94 @@ function requiredChecksNeeds() {
   return needs.slice("    needs: [".length, -1).split(", ");
 }
 
-const conditionalJobs = new Set(["native", "bundle-smoke", "seam-control", "compiler-cache-retention", "tax-audit-mutations"]);
-const baseNeeds = Object.fromEntries(
-  requiredChecksNeeds().map((job) => [job, { result: conditionalJobs.has(job) ? "skipped" : "success" }]),
-);
-
 function runRequiredChecks(needs) {
-  return spawnSync("bash", ["-c", requiredChecksCommand()], {
+  const result = spawnSync("bash", ["-c", requiredChecksCommand()], {
     cwd: repoRoot,
     encoding: "utf8",
     env: { ...process.env, NEEDS_JSON: JSON.stringify(needs) },
   });
+  return { status: result.status, output: result.stdout + result.stderr };
 }
 
-test("required checks accept workflow consistency success and legitimate conditional skips", () => {
-  const result = runRequiredChecks(baseNeeds);
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /All required jobs succeeded or were legitimately skipped/);
+// The jobs gated on a scope output, and the output that gates each.
+const SCOPED = { native: "native", "bundle-smoke": "bundle", "seam-control": "bundle", "tax-audit-mutations": "tax_audit" };
+const UNCONDITIONAL = ["changes", "frontend", "rust-format", "workflow-consistency", "tally-portable"];
+// A run in which every job did what its scope said: selected jobs succeeded, the rest were skipped.
+function run(scope, { results = {}, master = false } = {}) {
+  const needs = {};
+  for (const job of requiredChecksNeeds()) {
+    const result = Object.hasOwn(SCOPED, job) ? (scope[SCOPED[job]] === "true" ? "success" : "skipped")
+      : job === "compiler-cache-retention" ? (master ? "success" : "skipped") : "success";
+    needs[job] = { result, outputs: {} };
+  }
+  needs.changes.outputs = { ...scope };
+  for (const [job, result] of Object.entries(results)) needs[job] = { ...needs[job], result };
+  return needs;
+}
+const NOTHING = { native: "false", bundle: "false", tax_audit: "false" };
+const FULL = { native: "true", bundle: "true", tax_audit: "true" };
+const passes = (needs, label) => {
+  const { status, output } = runRequiredChecks(needs);
+  assert.equal(status, 0, `${label}\n${output}`);
+  assert.match(output, /Every job that should have run passed, and every skipped job was not selected/);
+};
+const fails = (needs, message, label) => {
+  const { status, output } = runRequiredChecks(needs);
+  assert.equal(status, 1, `${label}\n${output}`);
+  assert.ok(output.includes(message), `${label}: expected "${message}" in\n${output}`);
+};
+
+test("every job required-checks needs is classified here, so each case below covers it", () => {
+  const classified = new Set([...Object.keys(SCOPED), ...UNCONDITIONAL, "compiler-cache-retention"]);
+  assert.deepEqual(requiredChecksNeeds().filter((job) => !classified.has(job)), []);
 });
 
-for (const resultName of ["skipped", "failure", "cancelled", "neutral"]) {
-  test(`required checks reject workflow consistency result ${resultName}`, () => {
-    const result = runRequiredChecks({
-      ...baseNeeds,
-      "workflow-consistency": { result: resultName },
-    });
-    assert.equal(result.status, 1, result.stderr);
-    assert.match(result.stdout, /Required jobs did not pass: .*workflow-consistency/);
-  });
-}
-
-test("required checks reject a missing workflow consistency result", () => {
-  const needs = { ...baseNeeds };
-  delete needs["workflow-consistency"];
-  const result = runRequiredChecks(needs);
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stdout, /Required jobs did not pass: .*workflow-consistency/);
+test("a run whose jobs all did what the scope said passes, selected or not", () => {
+  passes(run(NOTHING), "a draft or docs-only pull request: native, bundle, seam and tax-audit skipped");
+  passes(run(FULL), "a full run");
+  passes(run(FULL, { master: true }), "a master run with the cache pruner");
+  passes(run({ native: "true", bundle: "false", tax_audit: "false" }), "native only");
 });
 
-for (const [job, resultName] of Object.keys(baseNeeds).flatMap((job) => [[job, "failure"], [job, "cancelled"]])) {
-  test(`required checks retain normal ${resultName} propagation for ${job}`, () => {
-    const result = runRequiredChecks({
-      ...baseNeeds,
-      [job]: { result: resultName },
-    });
-    assert.equal(result.status, 1, result.stderr);
-    assert.match(result.stdout, new RegExp(`Required jobs did not pass: .*${job}`));
-  });
-}
+test("a selected job that was skipped, failed or cancelled fails the aggregator", () => {
+  for (const job of Object.keys(SCOPED)) {
+    for (const result of ["skipped", "failure", "cancelled"]) {
+      fails(run(FULL, { results: { [job]: result } }), `${job}: ${result}, required success`, `${job} ${result}`);
+    }
+  }
+});
+
+test("a job the scope did not select must be skipped: a success there means its condition and the scope disagree", () => {
+  fails(run(NOTHING, { results: { native: "success" } }), "native: success, required skipped", "native ran unselected");
+  fails(run(NOTHING, { results: { "seam-control": "failure" } }), "seam-control: failure, required skipped", "seam failed unselected");
+});
+
+test("a job without a condition must succeed", () => {
+  for (const job of UNCONDITIONAL) {
+    for (const result of ["skipped", "failure", "cancelled"]) {
+      fails(run(FULL, { results: { [job]: result } }), `${job}: ${result}, required success`, `${job} ${result}`);
+    }
+  }
+});
+
+test("the cache pruner may succeed or be skipped, never fail or be cancelled", () => {
+  for (const result of ["failure", "cancelled"]) {
+    fails(run(FULL, { results: { "compiler-cache-retention": result } }), `compiler-cache-retention: ${result}, required success or skipped`, result);
+  }
+});
+
+test("what the rules cannot judge fails: a missing or odd scope output, an unknown result, a job without a rule or a missing job", () => {
+  const noScope = run(FULL);
+  noScope.changes.outputs = {};
+  fails(noScope, "native: scope output native is undefined, neither 'true' nor 'false'", "no outputs");
+  fails(run({ ...FULL, bundle: "TRUE" }), `bundle-smoke: scope output bundle is "TRUE"`, "odd output");
+  fails(run(FULL, { results: { frontend: "neutral" } }), `frontend: result "neutral" is not one of GitHub's four`, "unknown result");
+  const extra = run(FULL);
+  extra["new-job"] = { result: "success", outputs: {} };
+  fails(extra, "new-job: no rule says whether it must run", "a job the rules do not name");
+  for (const job of requiredChecksNeeds()) {
+    const missing = run(FULL);
+    delete missing[job];
+    fails(missing, `${job}: result undefined is not one of GitHub's four`, `${job} missing from needs`);
+  }
+});

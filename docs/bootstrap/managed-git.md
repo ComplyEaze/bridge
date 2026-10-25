@@ -38,10 +38,14 @@ personal information.
   and `Bundle smoke (*)` (on a master
   push, for a commit the merge queue already ran those jobs on, through that
   queue run: `scripts/master-push-reuse.mjs`; a pull request runs the bundle and
-  seam jobs on Windows only, and the queue and a push run both systems); require the
+  seam jobs on Windows only, and the queue and a push run both systems; a draft
+  pull request runs no native, bundle or seam job, and marking it ready starts
+  a run that does); require the
   gate rather than those individual matrix contexts, because they are
   path-filtered and report `skipped` on docs-only changes — requiring them
-  directly makes documentation pull requests permanently unmergeable.
+  directly makes documentation pull requests permanently unmergeable. The gate
+  fails when a job the scope selected was skipped, so a skip it accepts is
+  always one the scope chose.
 - Enable private vulnerability reporting.
 - Restrict merge permissions to maintainers.
 - Require issue and pull-request templates.

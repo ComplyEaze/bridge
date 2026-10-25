@@ -32,7 +32,7 @@ const stand = {
   silent: ["", 0],
 };
 
-function runScope(event, { script = "silent", changed = [] } = {}) {
+function runScope(event, { script = "silent", changed = [], draft = "" } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "scope-step-"));
   try {
     const sh = (command) => {
@@ -63,7 +63,7 @@ function runScope(event, { script = "silent", changed = [] } = {}) {
       env: {
         PATH: `${join(dir, "bin")}:${process.env.PATH}`, HOME: dir,
         GITHUB_OUTPUT: outputFile, GITHUB_STEP_SUMMARY: summaryFile, STUB_ARGS: join(dir, "args"), GITHUB_SHA: head, GH_TOKEN: "synthetic",
-        EVENT_NAME: event, BEFORE_SHA: base, PR_BASE_SHA: base, MERGE_GROUP_BASE_SHA: base,
+        EVENT_NAME: event, BEFORE_SHA: base, PR_BASE_SHA: base, PR_DRAFT: draft, MERGE_GROUP_BASE_SHA: base,
       },
     });
     assert.equal(result.status, 0, result.stderr);
@@ -134,4 +134,23 @@ test("a change list larger than a pipe buffer is still scoped by its first heavy
     assert.deepEqual(heavy(runScope(event, { script: "both", changed }).outputs),
       { native: "true", bundle: "false", tax_audit: "false" }, `${event} with a heavy path first in a long list`);
   }
+});
+
+test("a draft pull request runs no native or bundle job, and keeps the tax-audit scope", () => {
+  const changed = ["src-tauri/crates/bridge-tax-audit/src/lib.rs"];
+  assert.deepEqual(heavy(runScope("pull_request", { changed, draft: "true" }).outputs),
+    { native: "false", bundle: "false", tax_audit: "true" }, "draft");
+  // Only the exact payload value `true` is a draft; ready_for_review and every later push carry `false`.
+  for (const draft of ["false", "", "TRUE", "true "]) {
+    assert.deepEqual(heavy(runScope("pull_request", { changed, draft }).outputs),
+      { native: "true", bundle: "true", tax_audit: "true" }, `draft=${JSON.stringify(draft)}`);
+  }
+  // The flag is read on a pull request alone: no other event is a draft run, whatever the variable holds.
+  for (const event of ["merge_group", "push", "schedule", "workflow_dispatch"]) {
+    assert.deepEqual(heavy(runScope(event, { changed, draft: "true" }).outputs), ALL, event);
+  }
+});
+
+test("ready_for_review is a pull_request trigger, so marking a draft ready starts a run scoped in full", () => {
+  assert.ok(workflow.includes("    types: [opened, reopened, synchronize, ready_for_review]"));
 });

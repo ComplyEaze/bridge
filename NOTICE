@@ -87,7 +87,8 @@ licence file (aws-lc/LICENSE) states:
 The Apache License 2.0 is in LICENSE; the MIT License text is in
 THIRD_PARTY_LICENSES_RUST.txt. The ISC License, as the crate's licence file
 states it, and the licence text in the Jitter Entropy library's own source files
-follow.
+follow. The library's 19 files carry four distinct copyright notices, reproduced
+below exactly as they stand.
 
 ISC License (code from BoringSSL):
 
@@ -106,10 +107,16 @@ PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
 TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 
-Jitter Entropy library (its source files carry this text):
+Jitter Entropy library. Its source files carry these copyright notices:
 
+Copyright Stephan Mueller <smueller@chronox.de>, 2013 - 2025
 Copyright Stephan Mueller <smueller@chronox.de>, 2014 - 2025
-Copyright (C) 2021 - 2025, Joshua E. Hill <josh@keypair.us> (some files)
+Copyright (C) 2021 - 2025, Stephan Mueller <smueller@chronox.de>
+Copyright (C) 2021 - 2025, Joshua E. Hill <josh@keypair.us>
+
+Some of its source files carry the licence text below; the others refer to a
+LICENSE file in the library's root directory, which the aws-lc-sys crate does not
+ship.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions

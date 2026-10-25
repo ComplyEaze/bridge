@@ -888,18 +888,24 @@ voucher, so a voucher's tax is counted once. Nothing is apportioned, and GST boo
 is not seen. It is the books side a CA starts from for expense-head-wise input tax credit (GSTR-9C Table 14); it
 decides no eligibility, availment, input or output side, and no return row.
 
-For a GSTR-9C Table 14 working: `debit_side_tax` of a counter ledger is the GST booked against it, the material for
-the table's total-ITC column of the expense head the CA maps that ledger to; the `set_aside` totals are GST the CA
-still has to place, so a working built from `counter_ledgers` alone is short by exactly those totals. A ledger's value
-for the year is read separately, from `trial_balance` for the same dates, found by `ledger_guid` (a masked name is
-not a key). That value covers every voucher on the ledger, set-aside ones included, so it is never divided into this
-tax as a rate. The mapping of ledgers to the table's heads, eligibility, what was availed, and the GSTR-9 figure the
-table is compared with are the CA's.
+For a GSTR-9C Table 14 working: a counter ledger's `debit_side_tax` is the GST booked against it and its
+`credit_side_tax` the GST booked back (a debit note or a return), both as the books state them and never netted here;
+the CA nets them for the expense head that ledger is mapped to. Credit-side tax can also be output tax, for an asset or
+goods returned or sold to a supplier: the tool does not tell the two apart. `set_aside` holds every voucher with GST
+the tool could not place, of every kind: input tax on a voucher with two counter ledgers or an untyped duty ledger, but
+also output tax, set-offs and tax payments. The CA places them voucher by voucher from the vouchers listed, so a
+working built from `counter_ledgers` alone misses at least the input tax among them. Cancelled, optional and
+post-dated vouchers are counted, not totalled, and GST booked outside Duties & Taxes is not seen. A ledger's value for
+the year is read separately, from `trial_balance` for the same dates, where the same GUID is the ledger's `guid` (a
+masked name is not a key). That value covers every voucher on the ledger, set-aside ones included, so it is never
+divided into this tax as a rate. The mapping of ledgers to the table's heads, eligibility, what was availed, and the
+GSTR-9 figure the table is compared with are the CA's.
 
 Measured on two synthetic books. On TallyPrime 7.1 Silver, one month of eight vouchers created by import (purchases on
 two Purchase Accounts ledgers, a debit note, a sale, a journal on an Indirect Expenses ledger with a supplier on it and
-a tax payment). On TallyPrime 7.2 Silver, fourteen vouchers typed on Tally's screen, read a day at a time and as one
-month of 64 vouchers that the window read in two parts: purchases on Indirect Expenses, Direct Expenses and Fixed
+a tax payment). On TallyPrime 7.2 Silver, fourteen vouchers typed on Tally's screen, read a day at a time and, by the
+build before Direct Expenses and Fixed Assets were admitted, as one month of 64 vouchers that the window read in two
+parts: purchases on Indirect Expenses, Direct Expenses and Fixed
 Assets ledgers and on two expense ledgers at once, two item invoices whose purchase ledger was among their entries
 (one with freight), journals with input IGST, with a TDS ledger typed Others, a set-off and a reversal with no
 supplier, a debit note, two tax payments (one also paying interest) and a credit note with output tax.

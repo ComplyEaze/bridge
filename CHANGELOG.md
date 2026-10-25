@@ -31,8 +31,8 @@ These changes are in source and not yet in a published build.
   every other voucher with GST aside under a named reason with its own totals (a voucher with two such ledgers, a
   reverse-charge or set-off journal, a sale or credit note, a tax payment with no supplier, a duty ledger not typed GST,
   TDS or TCS, a ledger under another group). Books only: not a return figure, and no eligibility or availment decision.
-  Measured on a synthetic month of eight imported vouchers on TallyPrime 7.1 and on fourteen vouchers typed on
-  TallyPrime 7.2's screen, item invoices among them; Gold and books with registered GSTINs are not measured.
+  Measured on fourteen vouchers typed on TallyPrime 7.2's screen in a synthetic book, item invoices among them; Gold
+  and books with registered GSTINs are not measured.
 - `gst_uncertain_vouchers` lists the vouchers of one voucher type (a Sales type is what was measured) in a window that Tally marks Uncertain in its
   GSTR-1, and the vouchers a person accepted as they stand (Accept As Is), each with its party ledger, its invoice total
   (without its sign, with its side) and Tally's identifiers, and the line a CA reads before filing. It counts the window's

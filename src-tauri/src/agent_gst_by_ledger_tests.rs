@@ -3,8 +3,8 @@ use bridge_tally_protocol::parse_native_party_ledger_master_records_with_evidenc
 
 use super::*;
 
-/// The disposable GST lab book the captures below were read from.
-const COMPANY_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+/// The synthetic lab book the captures below were read from (the `gst-ledger-l1` PROVENANCE table).
+const COMPANY_GUID: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 
 fn utf16(bytes: &[u8]) -> String {
     String::from_utf16(
@@ -16,17 +16,15 @@ fn utf16(bytes: &[u8]) -> String {
     .unwrap()
 }
 
-/// The same live captures the purchase register's tests read: TallyPrime 7.1 Silver's answers
-/// to Bridge's compliance master, group and class-shaped window requests on the lab book, one
-/// month (September 2025) of eight vouchers created by import. Every expected figure below was
-/// worked out by hand from those bytes (entry amounts, and each tax ledger's GSTDUTYHEAD in the
-/// master capture), not from this code's output.
+/// TallyPrime 7.2's answers to Bridge's compliance master and group requests on the lab book,
+/// whose masters and vouchers were typed on Tally's screen. Every expected figure below is the one
+/// the lab item expected of the voucher keyed, which the live run confirmed.
 fn captured_index() -> MasterIndex {
     let masters = utf16(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-register-lab-ledger-masters.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-L-1.utf16le.xml"
     ));
     let groups = utf16(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-register-lab-groups.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-g-1.utf16le.xml"
     ));
     let records = parse_native_party_ledger_master_records_with_evidence(&masters, COMPANY_GUID)
         .expect("the live master capture parses")
@@ -40,11 +38,53 @@ fn captured_index() -> MasterIndex {
     MasterIndex::build(records.iter(), &groups, Vec::new()).expect("masters index")
 }
 
+macro_rules! window {
+    ($day:literal) => {
+        include_bytes!(concat!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-",
+            $day,
+            "nov-w-1.utf16le.xml"
+        ))
+    };
+}
+
+/// The one voucher of each captured day, in day order: V1, V4, V5, V6, V7, V4b, V8, V9, V10,
+/// V11, V2, V13, V14, V3.
 fn captured_rows() -> Vec<Value> {
-    let xml = utf16(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-register-lab-vouchers-class.utf16le.xml"
-    ));
-    parse_agent_rows(&xml, COMPANY_GUID).expect("the live voucher window parses")
+    let windows: [&[u8]; 14] = [
+        window!("03"),
+        window!("04"),
+        window!("05"),
+        window!("06"),
+        window!("07"),
+        window!("08"),
+        window!("10"),
+        window!("11"),
+        window!("12"),
+        window!("13"),
+        window!("14"),
+        window!("15"),
+        window!("16"),
+        window!("17"),
+    ];
+    windows
+        .iter()
+        .flat_map(|bytes| {
+            let rows =
+                parse_agent_rows(&utf16(bytes), COMPANY_GUID).expect("the live window parses");
+            assert_eq!(rows.len(), 1, "one voucher a day");
+            rows
+        })
+        .collect()
+}
+
+/// The voucher dated that day of November 2025.
+fn on(day: &str) -> Value {
+    let date = format!("202511{day}");
+    captured_rows()
+        .into_iter()
+        .find(|row| row["date"] == date)
+        .unwrap_or_else(|| panic!("no voucher on {date}"))
 }
 
 fn heads(totals: &HeadTotals) -> Vec<(String, String)> {
@@ -58,213 +98,13 @@ fn heads(totals: &HeadTotals) -> Vec<(String, String)> {
 fn pairs(items: &[(&str, &str)]) -> Vec<(String, String)> {
     items
         .iter()
-        .map(|(head, amount)| (head.to_string(), amount.to_string()))
+        .map(|(head, amount)| ((*head).to_string(), (*amount).to_string()))
         .collect()
 }
 
-fn row_of_type<'a>(rows: &'a [Value], voucher_type: &str) -> &'a Value {
-    rows.iter()
-        .find(|row| row["voucher_type"] == voucher_type)
-        .unwrap_or_else(|| panic!("no {voucher_type} voucher in the window"))
-}
-
-#[test]
-fn the_captured_month_attributes_purchases_and_the_debit_note_to_their_purchase_ledgers() {
-    let totals = fold(&captured_index(), &captured_rows()).unwrap();
-    assert_eq!(totals.observed, 8);
-    assert_eq!(totals.not_in_books, 0);
-    assert_eq!(totals.without_gst_entry, 0);
-    assert_eq!(
-        totals.ledgers.keys().collect::<Vec<_>>(),
-        ["Purchase - Goods", "Purchase - Services"]
-    );
-    // Two purchases (intra and inter) and the debit note, whose tax is on the credit side. The
-    // third purchase on this ledger carries a TDS entry on a ledger typed Others, which may be a
-    // GST ledger left untyped, so it is set aside (next test).
-    let goods = &totals.ledgers["Purchase - Goods"];
-    assert_eq!(goods.vouchers, 3);
-    assert_eq!(
-        heads(&goods.debit),
-        pairs(&[("cgst", "-900"), ("igst", "-3600"), ("state_tax", "-900")])
-    );
-    assert_eq!(
-        heads(&goods.credit),
-        pairs(&[("cgst", "90"), ("state_tax", "90")])
-    );
-    // The services purchase's state-side ledger carries SGST/UTGST, kept apart from State Tax.
-    let services = &totals.ledgers["Purchase - Services"];
-    assert_eq!(services.vouchers, 1);
-    assert_eq!(
-        heads(&services.debit),
-        pairs(&[("cgst", "-450"), ("sgst_utgst", "-450")])
-    );
-    assert!(services.credit.0.is_empty());
-}
-
-#[test]
-fn the_sale_the_untyped_duty_ledger_the_journal_and_the_tax_payment_are_set_aside_with_their_tax() {
-    let totals = fold(&captured_index(), &captured_rows()).unwrap();
-    assert_eq!(
-        totals.set_aside.keys().copied().collect::<Vec<_>>(),
-        [
-            SetAside::ClassNotAdmitted,
-            SetAside::DutyLedgerWithoutGstType,
-            SetAside::GstOnBothSides,
-            SetAside::NoCreditorParty
-        ]
-    );
-    // A sale is never attributed: its class is not one whose GST can be input tax.
-    let sale = &totals.set_aside[&SetAside::ClassNotAdmitted];
-    assert_eq!(sale.vouchers, 1);
-    assert_eq!(sale.listed[0]["voucher_class"], "Sales");
-    assert!(sale.debit.0.is_empty());
-    assert_eq!(
-        heads(&sale.credit),
-        pairs(&[("cgst", "900"), ("state_tax", "900")])
-    );
-    // TDS Payable (M2) is typed Others on this book, not TDS.
-    let untyped = &totals.set_aside[&SetAside::DutyLedgerWithoutGstType];
-    assert_eq!(untyped.vouchers, 1);
-    assert_eq!(
-        heads(&untyped.debit),
-        pairs(&[("cgst", "-90"), ("state_tax", "-90")])
-    );
-    // Freight Inward under Indirect Expenses is the one counter ledger, but the journal books
-    // output tax as well as input tax, so its input tax is not given to the freight ledger.
-    let journal = &totals.set_aside[&SetAside::GstOnBothSides];
-    assert_eq!(journal.vouchers, 1);
-    assert_eq!(journal.listed[0]["voucher_class"], "Journal");
-    assert_eq!(
-        heads(&journal.debit),
-        pairs(&[("cgst", "-90"), ("state_tax", "-90")])
-    );
-    assert_eq!(
-        heads(&journal.credit),
-        pairs(&[("cgst", "90"), ("state_tax", "90")])
-    );
-    // The tax payment against cash has no supplier on it.
-    let payment = &totals.set_aside[&SetAside::NoCreditorParty];
-    assert_eq!(payment.listed[0]["voucher_class"], "Payment");
-    assert_eq!(
-        heads(&payment.debit),
-        pairs(&[("cgst", "-90"), ("state_tax", "-90")])
-    );
-}
-
-/// The captured tax payment (Output CGST and Output SGST debited against Cash), as a GST challan
-/// that also pays interest: Freight Inward (M2), under Indirect Expenses, stands in for an
-/// interest ledger, and the cash credit is raised by its amount. Output tax must never be
-/// reported as an expense ledger's tax.
-#[test]
-fn a_gst_challan_that_also_pays_interest_is_never_attributed_to_the_interest_ledger() {
-    let index = captured_index();
-    let mut row = row_of_type(&captured_rows(), "Payment").clone();
-    let entries = row["amounts"].as_array_mut().unwrap();
-    for entry in entries.iter_mut() {
-        if entry["ledger"] == "Cash" {
-            entry["amount"] = json!("230.00");
-        }
-    }
-    entries.push(json!({"ledger": "Freight Inward (M2)", "amount": "-50.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
-    assert_eq!(reason(&index, &row), SetAside::NoCreditorParty);
-}
-
-/// The same payment's entries as a credit note for a discount allowed with output tax: the
-/// Indirect Expenses ledger debited and the customer credited.
-#[test]
-fn a_discount_credit_note_with_output_tax_is_never_attributed_to_the_discount_ledger() {
-    let index = captured_index();
-    let mut row = row_of_type(&captured_rows(), "Payment").clone();
-    row["voucher_class"] = json!("Credit Note");
-    let entries = row["amounts"].as_array_mut().unwrap();
-    entries.retain(|entry| entry["ledger"] != "Cash");
-    entries.push(json!({"ledger": "Freight Inward (M2)", "amount": "-1000.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
-    entries.push(json!({"ledger": "Counter Sales - Unregistered", "amount": "1180.00", "is_deemed_positive": "No", "bill_allocations": []}));
-    assert_eq!(reason(&index, &row), SetAside::ClassNotAdmitted);
-}
-
-#[test]
-fn a_purchase_whose_gst_ledgers_have_an_unresolved_group_is_set_aside_not_counted_as_untaxed() {
-    let mut index = captured_index();
-    for name in ["Input CGST", "Input SGST"] {
-        index.by_name.get_mut(name).unwrap().group =
-            LedgerGroup::Unresolved(AncestryGap::GroupAbsent);
-    }
-    let rows = captured_rows();
-    let intra = rows
-        .iter()
-        .find(|row| {
-            let entries = row["amounts"].as_array().unwrap();
-            row["voucher_type"] == "Purchase"
-                && entries.len() == 4
-                && entries.iter().any(|entry| entry["ledger"] == "Input SGST")
-        })
-        .expect("the intra-state purchase");
-    assert_eq!(reason(&index, intra), SetAside::UnresolvedGroup);
-}
-
-#[test]
-fn a_duty_ledger_typed_tds_does_not_stop_the_attribution_and_one_typed_others_does() {
-    let rows = captured_rows();
-    let with_tds = rows
-        .iter()
-        .find(|row| {
-            row["amounts"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|entry| entry["ledger"] == "TDS Payable (M2)")
-        })
-        .expect("the purchase with a TDS entry");
-    let index = captured_index();
-    assert_eq!(reason(&index, with_tds), SetAside::DutyLedgerWithoutGstType);
-    let mut typed = index.clone();
-    typed.by_name.get_mut("TDS Payable (M2)").unwrap().head =
-        GstDutyHeadObservation::NotTaxLedger {
-            tax_type: "TDS".to_string(),
-        };
-    match dispose(&typed, with_tds).unwrap() {
-        Disposition::Attributed { ledger, debit, .. } => {
-            assert_eq!(ledger, "Purchase - Goods");
-            assert_eq!(
-                heads(&debit),
-                pairs(&[("cgst", "-90"), ("state_tax", "-90")])
-            );
-        }
-        other => panic!("expected the purchase ledger, got {other:?}"),
-    }
-}
-
-#[test]
-fn an_expense_journal_with_input_tax_only_is_attributed_to_the_expense_ledger() {
-    let index = captured_index();
-    let rows = captured_rows();
-    let mut journal = row_of_type(&rows, "Journal").clone();
-    // The captured journal without its two output-tax entries and with the supplier's credit
-    // raised by their amount: an expense booked with input tax, which this book has no capture of
-    // on its own.
-    let entries = journal["amounts"].as_array_mut().unwrap();
-    entries.retain(|entry| !entry["ledger"].as_str().unwrap().starts_with("Output"));
-    for entry in entries.iter_mut() {
-        if entry["ledger"] == "SYN Supplier Intra (M2)" {
-            entry["amount"] = json!("1180.00");
-        }
-    }
-    match dispose(&index, &journal).unwrap() {
-        Disposition::Attributed {
-            ledger,
-            debit,
-            credit,
-        } => {
-            assert_eq!(ledger, "Freight Inward (M2)");
-            assert_eq!(
-                heads(&debit),
-                pairs(&[("cgst", "-90"), ("state_tax", "-90")])
-            );
-            assert!(credit.0.is_empty());
-        }
-        other => panic!("expected the freight ledger, got {other:?}"),
-    }
+/// The state-side head this book's ledgers carry is SGST/UTGST.
+fn both(amount: &str) -> Vec<(String, String)> {
+    pairs(&[("cgst", amount), ("sgst_utgst", amount)])
 }
 
 fn reason(index: &MasterIndex, row: &Value) -> SetAside {
@@ -274,73 +114,199 @@ fn reason(index: &MasterIndex, row: &Value) -> SetAside {
     }
 }
 
-fn purchase(rows: &[Value]) -> Value {
-    rows.iter()
-        .find(|row| {
-            row["voucher_type"] == "Purchase"
-                && row["amounts"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .any(|entry| entry["ledger"] == "Input IGST")
-        })
-        .expect("the inter-state purchase")
-        .clone()
+fn attributed(index: &MasterIndex, row: &Value) -> (String, HeadTotals, HeadTotals) {
+    match dispose(index, row).unwrap() {
+        Disposition::Attributed {
+            ledger,
+            debit,
+            credit,
+        } => (ledger, debit, credit),
+        other => panic!("expected an attributed voucher, got {other:?}"),
+    }
+}
+
+#[test]
+fn the_captured_days_attribute_to_five_counter_ledgers_and_set_the_rest_aside() {
+    let totals = fold(&captured_index(), &captured_rows()).unwrap();
+    assert_eq!(totals.observed, 14);
+    assert_eq!(totals.not_in_books, 0);
+    assert_eq!(totals.without_gst_entry, 0);
+    assert_eq!(
+        totals.ledgers.keys().collect::<Vec<_>>(),
+        [
+            "GS1 Computer",
+            "GS1 Freight Direct",
+            "GS1 Professional Fees",
+            "GS1 Rent",
+            "Purchase - Goods"
+        ]
+    );
+    // V1, a purchase, and V8, a debit note whose tax is on the credit side.
+    let rent = &totals.ledgers["GS1 Rent"];
+    assert_eq!(rent.vouchers, 2);
+    assert_eq!(heads(&rent.debit), both("-900"));
+    assert_eq!(heads(&rent.credit), both("90"));
+    // V4, a journal: an expense with input IGST and the supplier credited.
+    let fees = &totals.ledgers["GS1 Professional Fees"];
+    assert_eq!(fees.vouchers, 1);
+    assert_eq!(heads(&fees.debit), pairs(&[("igst", "-3600")]));
+    // V5 and V6: a Fixed Assets and a Direct Expenses ledger.
+    assert_eq!(heads(&totals.ledgers["GS1 Computer"].debit), both("-3600"));
+    assert_eq!(
+        heads(&totals.ledgers["GS1 Freight Direct"].debit),
+        both("-180")
+    );
+    // V2, an item invoice whose purchase ledger is among its entries.
+    assert_eq!(
+        heads(&totals.ledgers["Purchase - Goods"].debit),
+        both("-450")
+    );
+}
+
+#[test]
+fn the_vouchers_no_single_ledger_takes_are_set_aside_with_their_tax() {
+    let totals = fold(&captured_index(), &captured_rows()).unwrap();
+    assert_eq!(
+        totals.set_aside.keys().copied().collect::<Vec<_>>(),
+        [
+            SetAside::ClassNotAdmitted,
+            SetAside::DutyLedgerWithoutGstType,
+            SetAside::GstOnBothSides,
+            SetAside::NoCreditorParty,
+            SetAside::SeveralCounterLedgers
+        ]
+    );
+    // V14, a credit note: its class is never one whose GST is attributed.
+    let note = &totals.set_aside[&SetAside::ClassNotAdmitted];
+    assert_eq!(note.vouchers, 1);
+    assert_eq!(note.listed[0]["voucher_class"], "Credit Note");
+    assert_eq!(heads(&note.debit), both("-90"));
+    // V4b: GS1 TDS Payable is typed Others, which may be a GST ledger left untyped.
+    let untyped = &totals.set_aside[&SetAside::DutyLedgerWithoutGstType];
+    assert_eq!(heads(&untyped.debit), pairs(&[("igst", "-1800")]));
+    // V9, a set-off journal.
+    let set_off = &totals.set_aside[&SetAside::GstOnBothSides];
+    assert_eq!(heads(&set_off.debit), pairs(&[("cgst", "-500")]));
+    assert_eq!(heads(&set_off.credit), pairs(&[("cgst", "500")]));
+    // V10 (a reversal with no supplier), V11 and V13 (tax payments).
+    let no_supplier = &totals.set_aside[&SetAside::NoCreditorParty];
+    assert_eq!(no_supplier.vouchers, 3);
+    assert_eq!(heads(&no_supplier.debit), both("-190"));
+    assert_eq!(heads(&no_supplier.credit), both("90"));
+    // V7 (two expense ledgers) and V3 (an item invoice with freight).
+    let several = &totals.set_aside[&SetAside::SeveralCounterLedgers];
+    assert_eq!(several.vouchers, 2);
+    assert_eq!(heads(&several.debit), both("-1350"));
+}
+
+#[test]
+fn a_gst_challan_that_also_pays_interest_is_never_attributed_to_the_interest_ledger() {
+    // V13: Output CGST and SGST and GS1 Interest on GST (Indirect Expenses) against Cash.
+    assert_eq!(
+        reason(&captured_index(), &on("15")),
+        SetAside::NoCreditorParty
+    );
+}
+
+#[test]
+fn a_discount_credit_note_with_output_tax_is_never_attributed_to_the_discount_ledger() {
+    // V14: GS1 Discount Allowed (Indirect Expenses) and output tax against the customer.
+    assert_eq!(
+        reason(&captured_index(), &on("16")),
+        SetAside::ClassNotAdmitted
+    );
+}
+
+#[test]
+fn a_purchase_whose_gst_ledgers_have_an_unresolved_group_is_set_aside_not_counted_as_untaxed() {
+    let mut index = captured_index();
+    for name in ["Input CGST", "Input SGST"] {
+        index.by_name.get_mut(name).unwrap().group =
+            LedgerGroup::Unresolved(AncestryGap::GroupAbsent);
+    }
+    assert_eq!(reason(&index, &on("03")), SetAside::UnresolvedGroup);
+}
+
+#[test]
+fn a_duty_ledger_typed_tds_does_not_stop_the_attribution_and_one_typed_others_does() {
+    let index = captured_index();
+    let with_tds = on("08");
+    assert_eq!(
+        reason(&index, &with_tds),
+        SetAside::DutyLedgerWithoutGstType
+    );
+    let mut typed = index.clone();
+    typed.by_name.get_mut("GS1 TDS Payable").unwrap().head = GstDutyHeadObservation::NotTaxLedger {
+        tax_type: "TDS".to_string(),
+    };
+    let (ledger, debit, _) = attributed(&typed, &with_tds);
+    assert_eq!(ledger, "GS1 Professional Fees");
+    assert_eq!(heads(&debit), pairs(&[("igst", "-1800")]));
+}
+
+#[test]
+fn an_expense_journal_with_input_tax_only_is_attributed_to_the_expense_ledger() {
+    let (ledger, debit, credit) = attributed(&captured_index(), &on("04"));
+    assert_eq!(ledger, "GS1 Professional Fees");
+    assert_eq!(heads(&debit), pairs(&[("igst", "-3600")]));
+    assert!(credit.0.is_empty());
 }
 
 #[test]
 fn a_purchase_whose_ledger_entries_do_not_balance_is_never_attributed() {
     let index = captured_index();
-    let mut row = purchase(&captured_rows());
-    // As an item invoice reads: the purchase ledger is not among the ledger entries.
+    let mut row = on("03");
+    // As an item invoice of a shape not measured would read: the purchase ledger is not among
+    // the ledger entries.
     row["amounts"]
         .as_array_mut()
         .unwrap()
-        .retain(|entry| entry["ledger"] != "Purchase - Goods");
+        .retain(|entry| entry["ledger"] != "GS1 Rent");
     assert_eq!(reason(&index, &row), SetAside::EntriesDoNotBalance);
     // And with a freight ledger on it, which must not take the invoice's tax.
     row["amounts"]
         .as_array_mut()
         .unwrap()
-        .push(json!({"ledger": "Freight Inward (M2)", "amount": "-500.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
+        .push(json!({"ledger": "GS1 Freight Inward", "amount": "-500.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
     assert_eq!(reason(&index, &row), SetAside::EntriesDoNotBalance);
 }
 
 #[test]
-fn two_counter_ledgers_or_another_group_set_the_voucher_aside() {
+fn two_counter_ledgers_another_group_or_a_sales_ledger_set_the_voucher_aside() {
     let index = captured_index();
-    let base = purchase(&captured_rows());
-    let mut two = base.clone();
-    let entries = two["amounts"].as_array_mut().unwrap();
+    // V7, typed with two expense ledgers.
+    assert_eq!(reason(&index, &on("07")), SetAside::SeveralCounterLedgers);
+    // V1 with part of its expense on a ledger outside the counter and settlement groups: this
+    // book has none, so one ledger's group is changed in the index (Current Assets here).
+    let mut row = on("03");
+    let entries = row["amounts"].as_array_mut().unwrap();
     for entry in entries.iter_mut() {
-        if entry["ledger"] == "Purchase - Goods" {
-            entry["amount"] = json!("-15000.00");
+        if entry["ledger"] == "GS1 Rent" {
+            entry["amount"] = json!("-9000.00");
         }
     }
-    entries.push(json!({"ledger": "Purchase - Services", "amount": "-5000.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
-    assert_eq!(reason(&index, &two), SetAside::SeveralCounterLedgers);
-    let mut other = base;
-    let entries = other["amounts"].as_array_mut().unwrap();
-    for entry in entries.iter_mut() {
-        if entry["ledger"] == "Purchase - Goods" {
-            entry["amount"] = json!("-19000.00");
-        }
-    }
-    // The book's Suspense ledger stands in for any ledger outside the counter and settlement
-    // groups (Current Assets, Stock-in-Hand and so on).
-    entries.push(json!({"ledger": "Suspense", "amount": "-1000.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
-    assert_eq!(reason(&index, &other), SetAside::OtherLedgersPresent);
+    entries.push(json!({"ledger": "GS1 Interest on GST", "amount": "-1000.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
+    let mut other = index.clone();
+    other
+        .by_name
+        .get_mut("GS1 Interest on GST")
+        .unwrap()
+        .reserved = Some("Current Assets".to_string());
+    assert_eq!(reason(&other, &row), SetAside::OtherLedgersPresent);
     // A sales ledger on a purchase is its own reason, ahead of the others.
-    let entries = other["amounts"].as_array_mut().unwrap();
-    entries.retain(|entry| entry["ledger"] != "Suspense");
-    entries.push(json!({"ledger": "Sales - Goods", "amount": "-1000.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
-    assert_eq!(reason(&index, &other), SetAside::SalesLedgerPresent);
+    let mut sales = index;
+    sales
+        .by_name
+        .get_mut("GS1 Interest on GST")
+        .unwrap()
+        .reserved = Some("Sales Accounts".to_string());
+    assert_eq!(reason(&sales, &row), SetAside::SalesLedgerPresent);
 }
 
 #[test]
 fn a_class_outside_the_captured_ones_is_set_aside_first() {
     let index = captured_index();
-    let mut row = purchase(&captured_rows());
+    let mut row = on("03");
     row["voucher_class"] = json!("Memorandum");
     assert_eq!(reason(&index, &row), SetAside::ClassNotAdmitted);
     row.as_object_mut().unwrap().remove("voucher_class");
@@ -350,9 +316,9 @@ fn a_class_outside_the_captured_ones_is_set_aside_first() {
 #[test]
 fn a_tax_entry_whose_sign_and_deemed_positive_flag_disagree_is_set_aside() {
     let index = captured_index();
-    let mut row = purchase(&captured_rows());
+    let mut row = on("03");
     for entry in row["amounts"].as_array_mut().unwrap() {
-        if entry["ledger"] == "Input IGST" {
+        if entry["ledger"] == "Input CGST" {
             entry["is_deemed_positive"] = json!("No");
         }
     }
@@ -362,7 +328,7 @@ fn a_tax_entry_whose_sign_and_deemed_positive_flag_disagree_is_set_aside() {
 #[test]
 fn cancelled_optional_and_post_dated_vouchers_are_counted_not_totalled() {
     let index = captured_index();
-    let base = purchase(&captured_rows());
+    let base = on("03");
     for key in ["cancelled", "optional", "post_dated"] {
         let mut row = base.clone();
         row[key] = json!(true);
@@ -373,7 +339,7 @@ fn cancelled_optional_and_post_dated_vouchers_are_counted_not_totalled() {
 #[test]
 fn a_voucher_naming_a_ledger_the_masters_do_not_list_refuses() {
     let index = captured_index();
-    let mut row = purchase(&captured_rows());
+    let mut row = on("03");
     row["amounts"][0]["ledger"] = json!("A ledger not in the masters");
     assert_eq!(
         dispose(&index, &row).unwrap_err(),
@@ -384,7 +350,7 @@ fn a_voucher_naming_a_ledger_the_masters_do_not_list_refuses() {
 #[test]
 fn an_amount_that_is_not_an_exact_decimal_refuses() {
     let index = captured_index();
-    let mut row = purchase(&captured_rows());
+    let mut row = on("03");
     row["amounts"][0]["amount"] = json!("1,000.00");
     assert_eq!(dispose(&index, &row).unwrap_err(), "voucher_amount_invalid");
 }
@@ -409,10 +375,10 @@ fn the_answer_lists_each_counter_ledger_and_each_reason_by_its_code() {
     let totals = fold(&index, &captured_rows()).unwrap();
     let result = gst_by_ledger_result(&index, &totals, Redaction::None);
     let first = &result["counter_ledgers"][0];
-    assert_eq!(first["group"], "Purchase Accounts");
-    assert_eq!(first["parent"], "Purchase Accounts");
-    assert_eq!(first["vouchers"], 3);
-    assert_eq!(first["ledger"], "Purchase - Goods");
+    assert_eq!(first["ledger"], "GS1 Computer");
+    assert_eq!(first["group"], "Fixed Assets");
+    assert_eq!(first["parent"], "Fixed Assets");
+    assert_eq!(first["vouchers"], 1);
     assert_eq!(
         result["set_aside"]
             .as_object()
@@ -423,12 +389,13 @@ fn the_answer_lists_each_counter_ledger_and_each_reason_by_its_code() {
             "class_not_admitted",
             "duty_ledger_without_gst_type",
             "gst_on_both_sides",
-            "no_creditor_party"
+            "no_creditor_party",
+            "several_counter_ledgers"
         ]
     );
     assert_eq!(
         result["set_aside"]["no_creditor_party"]["listed"]["total"],
-        1
+        3
     );
 }
 
@@ -438,15 +405,15 @@ fn under_mask_parties_a_ledger_and_a_parent_the_book_named_are_masked_and_a_pred
     let mut index = captured_index();
     let totals = fold(&index, &captured_rows()).unwrap();
     let masked = gst_by_ledger_result(&index, &totals, Redaction::MaskParties);
-    let goods = &masked["counter_ledgers"][0];
-    assert_ne!(goods["ledger"], "Purchase - Goods");
-    assert_eq!(goods["parent"], "Purchase Accounts");
-    index.by_name.get_mut("Purchase - Goods").unwrap().parent =
-        Some("SYN Own Purchases Group".to_string());
+    let computer = &masked["counter_ledgers"][0];
+    assert_ne!(computer["ledger"], "GS1 Computer");
+    assert_eq!(computer["parent"], "Fixed Assets");
+    index.by_name.get_mut("GS1 Computer").unwrap().parent =
+        Some("SYN Own Assets Group".to_string());
     let masked = gst_by_ledger_result(&index, &totals, Redaction::MaskParties);
     assert_ne!(
         masked["counter_ledgers"][0]["parent"],
-        "SYN Own Purchases Group"
+        "SYN Own Assets Group"
     );
-    assert_eq!(masked["counter_ledgers"][0]["group"], "Purchase Accounts");
+    assert_eq!(masked["counter_ledgers"][0]["group"], "Fixed Assets");
 }

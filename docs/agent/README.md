@@ -901,15 +901,13 @@ masked name is not a key). That value covers every voucher on the ledger, set-as
 divided into this tax as a rate. The mapping of ledgers to the table's heads, eligibility, what was availed, and the
 GSTR-9 figure the table is compared with are the CA's.
 
-Measured on two synthetic books. On TallyPrime 7.1 Silver, one month of eight vouchers created by import (purchases on
-two Purchase Accounts ledgers, a debit note, a sale, a journal on an Indirect Expenses ledger with a supplier on it and
-a tax payment). On TallyPrime 7.2 Silver, fourteen vouchers typed on Tally's screen, read a day at a time and, by the
+Measured on one synthetic book of TallyPrime 7.2 Silver: fourteen vouchers typed on Tally's screen, read a day at a time and, by the
 build before Direct Expenses and Fixed Assets were admitted, as one month of 64 vouchers that the window read in two
 parts: purchases on Indirect Expenses, Direct Expenses and Fixed
 Assets ledgers and on two expense ledgers at once, two item invoices whose purchase ledger was among their entries
 (one with freight), journals with input IGST, with a TDS ledger typed Others, a set-off and a reversal with no
 supplier, a debit note, two tax payments (one also paying interest) and a credit note with output tax.
-Not measured: Gold and other releases, a book with registered GSTINs, other item-invoice shapes, more than 64 vouchers
+Not measured: vouchers created by import, Gold and other releases, a book with registered GSTINs, other item-invoice shapes, more than 64 vouchers
 in a window.
 
 ### Uncertain vouchers of one voucher type (`gst_uncertain_vouchers`)

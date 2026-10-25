@@ -2709,6 +2709,15 @@ such as Devanagari or the rupee sign, is admitted, and whether it reads back
 byte for byte is not yet measured: a narration that reads back changed refuses
 that post's binding for good.
 
+A batch whose binding was refused (`post_span_binding` state `refused`) is not closed by anything ComplyEaze
+Bridge offers: a refusal is final for the batch, `verify_import` on it again reads the same unless the book
+changes, `acknowledge_post_review` reviews only a doubt beside vouchers that read back verified, and an
+amendment of it is unavailable because it never read back verified. The summary of such a post says so; the
+vouchers are checked, and corrected if they are wrong, in Tally by hand. Its rows stay refused in any other
+batch (`import_txn_already_posted`), and `local_data_report` counts it as `not_settled_binding_refused`.
+A multi-voucher batch whose voucher mark step was not confirmed has the same property: the review of
+`acknowledge_post_review` is kept on this computer and does not change its status.
+
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an
 edit in Tally), is `sent_not_attributed`, never `not_found`. In the post's own

@@ -1,0 +1,3 @@
+dc239b4905404cbfedc2db96e5cef39681092e5b69a006601e40afcb1acad698  README.md
+9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8  requests/c0-company-list.utf16le.xml
+4bcdcfd4b06f60fb6ee705cb3cb05c73037345a0ac123077071392f011d64c37  requests/c1-marks-TEMPLATE.utf16le.xml

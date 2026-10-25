@@ -1,0 +1,4 @@
+  TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       18504
+  TCP    [::]:9001              [::]:0                 LISTENING       18504
+LISTENING lines in full output: 37
+exit=0 

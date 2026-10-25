@@ -202,3 +202,40 @@ fn the_status_names_the_terms_version_of_the_build() {
     assert_eq!(status.terms_version, TERMS_VERSION);
     assert_eq!(status.state, "not_accepted");
 }
+
+#[test]
+fn only_the_mcp_server_builds_a_runtime_without_the_gate() {
+    // The desktop app obtains its runtime from `TallyRuntime::desktop` in `.setup`. The runtime
+    // without the gate is for the MCP server, whose own gate is `agent/terms`; a new caller of
+    // either must be added here on purpose, so a desktop path cannot skip the gate unseen.
+    fn walk(directory: &Path, out: &mut Vec<(String, String)>) {
+        for entry in std::fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                out.push((
+                    path.file_name().unwrap().to_string_lossy().to_string(),
+                    std::fs::read_to_string(&path).unwrap(),
+                ));
+            }
+        }
+    }
+    let mut files = Vec::new();
+    walk(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+        &mut files,
+    );
+    let callers = |needle: &str| {
+        let mut names: Vec<String> = files
+            .iter()
+            .filter(|(name, text)| !name.ends_with("_tests.rs") && text.contains(needle))
+            .map(|(name, _)| name.clone())
+            .collect();
+        names.sort();
+        names
+    };
+    assert_eq!(callers("ungated()"), ["agent.rs", "runtime.rs"]);
+    assert_eq!(callers("Server::new("), ["agent_lab.rs"]);
+    assert_eq!(callers("TallyRuntime::desktop("), ["lib.rs"]);
+}

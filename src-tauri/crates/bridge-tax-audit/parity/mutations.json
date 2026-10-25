@@ -14636,15 +14636,15 @@
   "by": "author",
   "what": "gst refusal: a named GSTR-3B accepted",
   "file": "src/gst_ledgers_3b.rs",
-  "from": "    if named || caller_holds_one {\n",
-  "to": "    if caller_holds_one {\n"
+  "from": "    if named || caller.holds_gstr3b() {\n",
+  "to": "    if caller.holds_gstr3b() {\n"
  },
  {
   "id": "G3B-46",
   "by": "author",
   "what": "gst refusal: a GSTR-3B the caller holds accepted",
   "file": "src/gst_ledgers_3b.rs",
-  "from": "    if named || caller_holds_one {\n",
+  "from": "    if named || caller.holds_gstr3b() {\n",
   "to": "    if named {\n"
  },
  {
@@ -14652,8 +14652,8 @@
   "by": "author",
   "what": "gst refusal: an empty GSTR-3B name refused",
   "file": "src/gst_ledgers_3b.rs",
-  "from": ".is_some_and(|v| v.as_str() != Some(\"\"));",
-  "to": ".is_some();"
+  "from": ".is_some_and(|v| v.as_str() != Some(\"\")),",
+  "to": ".is_some(),"
  },
  {
   "id": "G3B-48",
@@ -14726,5 +14726,13 @@
   "file": "src/lib.rs",
   "from": "                if other != *head {\n",
   "to": "                if false {\n"
+ },
+ {
+  "id": "G3B-57",
+  "by": "author",
+  "what": "gst refusal: a [documents] that is not a table read as no document",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "        Some(_) => {\n            return Err(AuditError::Config(\n                \"client config [documents] is not a table\".to_string(),\n            ))\n        }\n",
+  "to": "        Some(_) => false,\n"
  }
 ]

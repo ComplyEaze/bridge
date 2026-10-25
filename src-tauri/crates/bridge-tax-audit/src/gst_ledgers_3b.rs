@@ -18,7 +18,8 @@
 //! (`gst_ledgers_3b.py:355-357` outward, `:202-203` reverse charge), so its dump depends on the
 //! book and the roles above alone. [`Inputs`] holds no GSTR-3B or GSTR-1 row, and [`run`] takes a
 //! [`NoGstr3b`], which only [`no_gstr3b`] makes, after refusing an engagement or caller that holds
-//! a GSTR-3B (`AuditError::DocumentNotPorted`). The monthly tie to GSTR-3B is a later port.
+//! a GSTR-3B (`AuditError::DocumentNotPorted`) and an engagement whose `[documents]` is not a
+//! table (`AuditError::Config`). The monthly tie to GSTR-3B is a later port.
 //!
 //! **One owner of the category.** [`classify_voucher`] is this crate's only reading of a
 //! voucher as input, output or payment for GST. The one other reading of base type for GST,
@@ -39,8 +40,10 @@ use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value}
 use crate::gst_outward_books::{books_outward_rows, year_month};
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::{iso, Window};
+use crate::registry::CallerData;
 use crate::rules::Rules;
 use crate::support;
+use crate::Engagement;
 
 pub const TEST_ID: &str = "gst_ledgers_3b";
 pub const VERSION: &str = "1";
@@ -99,28 +102,35 @@ pub struct Inputs {
     pub goods_carriage_ledgers: BTreeSet<String>,
 }
 
-/// Proof that no GSTR-3B reaches this test: [`run`] requires one, and only [`no_gstr3b`] makes one.
+/// Proof that no GSTR-3B reaches this test: [`run`] requires one, and only [`no_gstr3b`] makes one,
+/// from an engagement and its caller's data that hold none.
 #[derive(Debug, Clone, Copy)]
 pub struct NoGstr3b(());
 
-/// Refuse a GSTR-3B, or give the proof that there is none. `cfg` is the engagement's client config;
-/// `caller_holds_one` says the caller loaded a GSTR-3B (`registry::CallerData::holds_gstr3b`). The
-/// comparison with one is not ported, and the reference reads its rows into every month's figures
+/// Refuse a GSTR-3B, or give the proof that there is none. A GSTR-3B is named in the engagement's
+/// `[documents].gstr3b`, or held by the caller ([`CallerData::holds_gstr3b`]). The comparison with
+/// one is not ported, and the reference reads its rows into every month's figures
 /// (`gst_ledgers_3b.py:486-498`), so the test refuses rather than give a part of its result.
 ///
 /// It refuses more than the reference, and so fails closed: the reference reads a document only
 /// when `[documents].gstr3b` is truthy (`config.py:93-100`), so `false`, `0`, `[]` or `{}` is no
 /// document there and refused here (only an empty string is no document here); and a GSTR-3B
 /// loaded with no row in the period gives the reference's no-GSTR-3B dump (`pack.py:496-498`),
-/// refused here too. The reverse case: a `[documents]` that is not a table ends the reference's
-/// run (`.get` on it raises), and runs here as no document.
-pub fn no_gstr3b(cfg: &toml::Table, caller_holds_one: bool) -> Result<NoGstr3b> {
-    let named = cfg
-        .get("documents")
-        .and_then(toml::Value::as_table)
-        .and_then(|d| d.get("gstr3b"))
-        .is_some_and(|v| v.as_str() != Some(""));
-    if named || caller_holds_one {
+/// refused here too. A `[documents]` that is not a table ends the reference's run (`.get` on it
+/// raises), and is refused here (`AuditError::Config`).
+pub fn no_gstr3b(engagement: &Engagement, caller: &CallerData) -> Result<NoGstr3b> {
+    let named = match engagement.raw_cfg.get("documents") {
+        None => false,
+        Some(toml::Value::Table(documents)) => documents
+            .get("gstr3b")
+            .is_some_and(|v| v.as_str() != Some("")),
+        Some(_) => {
+            return Err(AuditError::Config(
+                "client config [documents] is not a table".to_string(),
+            ))
+        }
+    };
+    if named || caller.holds_gstr3b() {
         return Err(AuditError::DocumentNotPorted {
             test: TEST_ID,
             document: "GSTR-3B",
@@ -875,7 +885,13 @@ mod tests {
         };
         let mut rules = Rules::vendored().unwrap();
         rules.version = "v".to_string();
-        let none = no_gstr3b(&toml::Table::new(), false).unwrap();
+        let e = Engagement::from_toml_for_read(
+            "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n[period]\n\
+             start = \"2025-04-01\"\nend = \"2026-03-31\"\n[roles]\ncash_groups = []\n\
+             bank_groups = []\n",
+        )
+        .unwrap();
+        let none = no_gstr3b(&e, &CallerData::default()).unwrap();
         let r = run(
             &book,
             &rules,

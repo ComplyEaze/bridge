@@ -89,8 +89,10 @@ default none: the reference's pack passes none, but `run()` takes them); and for
 `narration_payees`: `narration_payee_ledgers` (a list of text, default []), `bank` (also passed to the
 module invariant) and the keys `tds_payees` reads, whose result gives the 194C ledgers it adds; and for
 `gst_ledgers_3b`: `gst_ledgers_3b` ({tax_ledgers?: {head: [ledger, ...]}, round_off_ledgers?, payable_ledgers?,
-rcm_tax_ledgers?, goods_carriage_ledgers?}, each default empty, the four roles read through the reference's own
-`tae.config` readers, as for `clause44`), with no GSTR-3B or GSTR-1 rows: the crate ports that case only.
+rcm_tax_ledgers?, goods_carriage_ledgers?, gstr1?}, each default empty, the four roles read through the reference's own
+`tae.config` readers, as for `clause44`), with no GSTR-3B rows: the crate ports that case only. `gstr1` is the rows of
+a named GSTR-1 ([{section, counterparty_gstin, doc_no, doc_date (ISO or null), taxable_paise, tax_paise}]), passed as
+the pack passes them; `tests/edge_books.rs` does not read it, as the crate's test takes no GSTR-1.
 """
 from __future__ import annotations
 
@@ -238,14 +240,29 @@ def main() -> int:
     def gst_ledgers_3b_run():
         # As tae/pack.py passes them for an engagement with no GSTR-3B document, each role through the reference's own
         # reader from a client config built out of the spec's keys (each default empty), and the goods-carriage ledgers
-        # as given; no GSTR-3B or GSTR-1 rows.
+        # as given; no GSTR-3B rows. The GSTR-1 rows are the spec's `gstr1` (default none), set on the engagement and
+        # passed as the pack passes a named GSTR-1's rows, with gstr1_not_supplied left at its default (a GSTR-1 named).
         from tae import config as tc
+        from tae.model import Gstr1Row
         g = spec.get("gst_ledgers_3b", {})
         cfg = {"roles": {"tax_ledgers": g.get("tax_ledgers", {}),
                          **{k: g.get(k, []) for k in ("round_off_ledgers", "payable_ledgers", "rcm_tax_ledgers")}}}
+        text, paise = (lambda x: isinstance(x, str)), (lambda x: isinstance(x, int) and not isinstance(x, bool))
+        gstr1 = []
+        for i, t in enumerate(g.get("gstr1", [])):
+            for key, ok, what in (("section", text, "text"), ("counterparty_gstin", text, "text"),
+                                  ("doc_no", text, "text"), ("taxable_paise", paise, "integer paise"),
+                                  ("tax_paise", paise, "integer paise")):
+                if not ok(t.get(key)):
+                    raise SystemExit(f"{spec_path.name}: gstr1[{i}].{key} must be {what}, got {t.get(key)!r}")
+            gstr1.append(Gstr1Row(doc=f"gstr1:{name}", row=i + 1, section=t["section"],
+                                  counterparty_gstin=t["counterparty_gstin"], doc_no=t["doc_no"],
+                                  doc_date=day(t.get("doc_date")), taxable_paise=t["taxable_paise"],
+                                  tax_paise=t["tax_paise"]))
+        eng.gstr1 = gstr1
         return gst_ledgers_3b, gst_ledgers_3b.run(
             eng, rules, tc.tax_ledgers_by_head(cfg), tc.role_ledger_set(cfg, "payable_ledgers"),
-            tc.role_ledger_set(cfg, "rcm_tax_ledgers"), tc.role_ledger_set(cfg, "round_off_ledgers"), [], [], [],
+            tc.role_ledger_set(cfg, "rcm_tax_ledgers"), tc.role_ledger_set(cfg, "round_off_ledgers"), [], [], gstr1,
             goods_carriage_ledgers=frozenset(g.get("goods_carriage_ledgers", [])))
 
     def loans_interest_run():

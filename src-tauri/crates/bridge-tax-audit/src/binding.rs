@@ -482,8 +482,6 @@ fn raw_at<'a>(cfg: &'a toml::Table, path: &[&str]) -> Option<&'a toml::Value> {
     Some(node)
 }
 
-/// The names a list location holds (empty when absent), or `BIND-ID-MALFORMED` when it is not a
-/// list of names -- the reference's `names_at(..., "list", ...)`.
 /// A `[roles]` list of ledger names, bound when present; `None` when absent (a test that needs it
 /// then refuses). A value that is not a list of names is refused `BIND-ID-MALFORMED`.
 fn bind_role_list(
@@ -500,6 +498,8 @@ fn bind_role_list(
         .transpose()
 }
 
+/// The names a list location holds (empty when absent), or `BIND-ID-MALFORMED` when it is not a
+/// list of names -- the reference's `names_at(..., "list", ...)`.
 fn list_at(cfg: &toml::Table, path: &[&str]) -> Result<Vec<String>> {
     let Some(v) = raw_at(cfg, path) else {
         return Ok(Vec::new());

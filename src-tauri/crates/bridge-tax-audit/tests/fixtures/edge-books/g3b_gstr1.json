@@ -1,0 +1,796 @@
+{
+ "comment": "gst_ledgers_3b, no GSTR-3B, with a GSTR-1 named: the book of g3b_classify, with GSTR-1 rows the reference would read for a month's gap if a GSTR-3B were supplied: b2b invoices dated in another month (c01, c20) and in the same month (c18, after the period), a cdnr note in another month (c04), an amendment of an invoice (b2ba, c02) and of a note (cdnra, c16), a b2cs row, a row with no date and a row naming no voucher. With no GSTR-3B row the reference reads none of them: its dump is byte for byte g3b_classify's (the ledger GUIDs are kept, so the ledger tags agree), and the crate's test, which takes no GSTR-1, gives it.",
+ "period": [
+  "2025-04-01",
+  "2025-05-31"
+ ],
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Export Sales": "Sales Accounts",
+  "Direct Incomes": null,
+  "Indirect Incomes": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-g3b_classify-000"
+  },
+  {
+   "name": "CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_classify-001"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-g3b_classify-002"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-g3b_classify-003"
+  },
+  {
+   "name": "Export Sales",
+   "chain": [
+    "Export Sales",
+    "Sales Accounts"
+   ],
+   "guid": "edge-g3b_classify-004"
+  },
+  {
+   "name": "GST Clearing",
+   "chain": [
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_classify-005"
+  },
+  {
+   "name": "GST Paid",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_classify-006"
+  },
+  {
+   "name": "IGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_classify-007"
+  },
+  {
+   "name": "Legal Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-g3b_classify-008"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-g3b_classify-009"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-g3b_classify-010"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-g3b_classify-011"
+  },
+  {
+   "name": "SGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_classify-012"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-g3b_classify-013"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-g3b_classify-014"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 100,
+   "credit": 540,
+   "closing": -440
+  },
+  {
+   "ledger": "CGST",
+   "opening": -5000,
+   "debit": 3050,
+   "credit": 1135,
+   "closing": -3085
+  },
+  {
+   "ledger": "Capital",
+   "opening": 2000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 1999
+  },
+  {
+   "ledger": "Customer A",
+   "opening": 0,
+   "debit": 18571,
+   "credit": 1652,
+   "closing": 16919
+  },
+  {
+   "ledger": "Export Sales",
+   "opening": 0,
+   "debit": 200,
+   "credit": 5000,
+   "closing": -4800
+  },
+  {
+   "ledger": "GST Clearing",
+   "opening": 0,
+   "debit": 0,
+   "credit": 250,
+   "closing": -250
+  },
+  {
+   "ledger": "GST Paid",
+   "opening": 0,
+   "debit": 0,
+   "credit": 300,
+   "closing": -300
+  },
+  {
+   "ledger": "IGST",
+   "opening": 0,
+   "debit": 262,
+   "credit": 100,
+   "closing": 263
+  },
+  {
+   "ledger": "Legal Fees",
+   "opening": 0,
+   "debit": 1000,
+   "credit": 0,
+   "closing": 1000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 20100,
+   "credit": 1300,
+   "closing": 18800
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 400,
+   "credit": 0,
+   "closing": 400
+  },
+  {
+   "ledger": "Round Off",
+   "opening": 0,
+   "debit": 10,
+   "credit": 1,
+   "closing": 9
+  },
+  {
+   "ledger": "SGST",
+   "opening": 3000,
+   "debit": 2140,
+   "credit": 1395,
+   "closing": 3645
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 1500,
+   "credit": 11500,
+   "closing": -10000
+  },
+  {
+   "ledger": "Supplier B",
+   "opening": 0,
+   "debit": 1180,
+   "credit": 25280,
+   "closing": -24100
+  },
+  {
+   "ledger": "Unmastered Ledger",
+   "opening": 0,
+   "debit": 0,
+   "credit": 60,
+   "closing": -60
+  },
+  {
+   "ledger": "Unmastered Ledger",
+   "opening": 0,
+   "debit": 0,
+   "credit": 60,
+   "closing": -60
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "c01",
+   "date": "2025-04-05",
+   "base_type": "Sales",
+   "party": "Customer A",
+   "lines": [
+    [
+     "Customer A",
+     11801
+    ],
+    [
+     "Sales",
+     -10000
+    ],
+    [
+     "CGST",
+     -900
+    ],
+    [
+     "SGST",
+     -900
+    ],
+    [
+     "Round Off",
+     -1
+    ]
+   ]
+  },
+  {
+   "guid": "c02",
+   "date": "2025-04-12",
+   "base_type": "Sales",
+   "party": "Customer A",
+   "lines": [
+    [
+     "Customer A",
+     5000
+    ],
+    [
+     "Export Sales",
+     -5000
+    ],
+    [
+     "IGST",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "c03",
+   "date": "2025-04-08",
+   "base_type": "Purchase",
+   "party": "Supplier B",
+   "lines": [
+    [
+     "Purchases",
+     20000
+    ],
+    [
+     "CGST",
+     1800
+    ],
+    [
+     "SGST",
+     1800
+    ],
+    [
+     "Supplier B",
+     -23600
+    ]
+   ]
+  },
+  {
+   "guid": "c04",
+   "date": "2025-04-20",
+   "base_type": "Credit Note",
+   "party": "Customer A",
+   "lines": [
+    [
+     "Sales",
+     1000
+    ],
+    [
+     "CGST",
+     90
+    ],
+    [
+     "SGST",
+     90
+    ],
+    [
+     "Customer A",
+     -1180
+    ]
+   ]
+  },
+  {
+   "guid": "c05",
+   "date": "2025-04-22",
+   "base_type": "Debit Note",
+   "party": "Supplier B",
+   "lines": [
+    [
+     "Supplier B",
+     1180
+    ],
+    [
+     "Purchases",
+     -1000
+    ],
+    [
+     "CGST",
+     -90
+    ],
+    [
+     "SGST",
+     -90
+    ]
+   ]
+  },
+  {
+   "guid": "c06",
+   "date": "2025-04-25",
+   "base_type": "Credit Note",
+   "party": "Customer A",
+   "lines": [
+    [
+     "Sales",
+     500
+    ],
+    [
+     "Purchases",
+     -300
+    ],
+    [
+     "IGST",
+     36
+    ],
+    [
+     "Customer A",
+     -236
+    ]
+   ]
+  },
+  {
+   "guid": "c07",
+   "date": "2025-04-26",
+   "base_type": "Debit Note",
+   "party": "",
+   "lines": [
+    [
+     "Rent",
+     400
+    ],
+    [
+     "IGST",
+     72
+    ],
+    [
+     "Supplier B",
+     -472
+    ]
+   ]
+  },
+  {
+   "guid": "c08",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "party": "",
+   "lines": [
+    [
+     "CGST",
+     500
+    ],
+    [
+     "Bank",
+     -500
+    ]
+   ]
+  },
+  {
+   "guid": "c09",
+   "date": "2025-05-04",
+   "base_type": "Receipt",
+   "party": "",
+   "lines": [
+    [
+     "Bank",
+     100
+    ],
+    [
+     "IGST",
+     -100
+    ]
+   ]
+  },
+  {
+   "guid": "c10",
+   "date": "2025-05-06",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "CGST",
+     200
+    ],
+    [
+     "SGST",
+     -200
+    ]
+   ]
+  },
+  {
+   "guid": "c11",
+   "date": "2025-05-07",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "CGST",
+     300
+    ],
+    [
+     "GST Paid",
+     -300
+    ]
+   ]
+  },
+  {
+   "guid": "c12",
+   "date": "2025-05-08",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "SGST",
+     250
+    ],
+    [
+     "GST Clearing",
+     -250
+    ]
+   ]
+  },
+  {
+   "guid": "c13",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Legal Fees",
+     1000
+    ],
+    [
+     "CGST",
+     90
+    ],
+    [
+     "Supplier B",
+     -1090
+    ]
+   ]
+  },
+  {
+   "guid": "c14",
+   "date": "2025-05-11",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "IGST",
+     60
+    ],
+    [
+     "Unmastered Ledger",
+     -60
+    ]
+   ]
+  },
+  {
+   "guid": "c15",
+   "date": "2025-05-12",
+   "base_type": "Contra",
+   "party": "",
+   "lines": [
+    [
+     "IGST",
+     40
+    ],
+    [
+     "Bank",
+     -40
+    ]
+   ]
+  },
+  {
+   "guid": "c16",
+   "date": "2025-05-13",
+   "base_type": "Credit Note",
+   "party": "Customer A",
+   "lines": [
+    [
+     "Export Sales",
+     200
+    ],
+    [
+     "IGST",
+     36
+    ],
+    [
+     "Customer A",
+     -236
+    ]
+   ]
+  },
+  {
+   "guid": "c17",
+   "date": "2025-05-15",
+   "base_type": "Sales",
+   "party": "Customer A",
+   "lines": [
+    [
+     "Customer A",
+     1180
+    ],
+    [
+     "Sales",
+     -1000
+    ],
+    [
+     "CGST",
+     -180
+    ]
+   ],
+   "status": "cancelled"
+  },
+  {
+   "guid": "c18",
+   "date": "2025-06-05",
+   "base_type": "Sales",
+   "party": "Customer A",
+   "lines": [
+    [
+     "Customer A",
+     1180
+    ],
+    [
+     "Sales",
+     -1000
+    ],
+    [
+     "CGST",
+     -90
+    ],
+    [
+     "SGST",
+     -90
+    ]
+   ]
+  },
+  {
+   "guid": "c19",
+   "date": "2025-05-20",
+   "base_type": "Sales",
+   "party": "",
+   "lines": [
+    [
+     "CGST",
+     -10
+    ],
+    [
+     "Round Off",
+     10
+    ]
+   ]
+  },
+  {
+   "guid": "c20",
+   "date": "2025-05-21",
+   "base_type": "Sales",
+   "party": "Walk-in Party",
+   "lines": [
+    [
+     "Customer A",
+     590
+    ],
+    [
+     "Sales",
+     -500
+    ],
+    [
+     "CGST",
+     -45
+    ],
+    [
+     "SGST",
+     -45
+    ]
+   ]
+  },
+  {
+   "guid": "c21",
+   "date": "2025-05-22",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "CGST",
+     70
+    ],
+    [
+     "SGST",
+     -70
+    ],
+    [
+     "Rent",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "c22",
+   "date": "2025-05-23",
+   "base_type": "Credit Note",
+   "party": "Supplier B",
+   "lines": [
+    [
+     "Sales",
+     0
+    ],
+    [
+     "Purchases",
+     100
+    ],
+    [
+     "IGST",
+     18
+    ],
+    [
+     "Supplier B",
+     -118
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "gst_ledgers_3b"
+ ],
+ "gst_ledgers_3b": {
+  "tax_ledgers": {
+   "cgst": [
+    "CGST"
+   ],
+   "sgst": [
+    "SGST"
+   ],
+   "igst": [
+    "IGST"
+   ]
+  },
+  "payable_ledgers": [
+   "GST Clearing"
+  ],
+  "rcm_tax_ledgers": [],
+  "round_off_ledgers": [
+   "Round Off"
+  ],
+  "gstr1": [
+   {
+    "section": "b2b",
+    "counterparty_gstin": "",
+    "doc_no": "c01",
+    "doc_date": "2025-05-02",
+    "taxable_paise": 10000,
+    "tax_paise": 1800
+   },
+   {
+    "section": "b2b",
+    "counterparty_gstin": "",
+    "doc_no": "c20",
+    "doc_date": "2025-04-30",
+    "taxable_paise": 500,
+    "tax_paise": 90
+   },
+   {
+    "section": "b2b",
+    "counterparty_gstin": "",
+    "doc_no": "c18",
+    "doc_date": "2025-06-05",
+    "taxable_paise": 1000,
+    "tax_paise": 180
+   },
+   {
+    "section": "cdnr",
+    "counterparty_gstin": "",
+    "doc_no": "c04",
+    "doc_date": "2025-05-05",
+    "taxable_paise": 1000,
+    "tax_paise": 180
+   },
+   {
+    "section": "b2ba",
+    "counterparty_gstin": "",
+    "doc_no": "c02",
+    "doc_date": "2025-04-12",
+    "taxable_paise": 5000,
+    "tax_paise": 0
+   },
+   {
+    "section": "cdnra",
+    "counterparty_gstin": "",
+    "doc_no": "c16",
+    "doc_date": "2025-05-13",
+    "taxable_paise": 200,
+    "tax_paise": 36
+   },
+   {
+    "section": "b2cs",
+    "counterparty_gstin": "",
+    "doc_no": "",
+    "doc_date": null,
+    "taxable_paise": 700,
+    "tax_paise": 126
+   },
+   {
+    "section": "b2b",
+    "counterparty_gstin": "",
+    "doc_no": "c99",
+    "doc_date": "2025-04-15",
+    "taxable_paise": 300,
+    "tax_paise": 54
+   }
+  ]
+ }
+}

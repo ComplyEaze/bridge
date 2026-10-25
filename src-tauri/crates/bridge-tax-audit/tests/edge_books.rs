@@ -646,6 +646,8 @@ fn clause44_inputs(s: &Value) -> clause44::Inputs {
 
 /// `gst_ledgers_3b`'s inputs from the spec's `gst_ledgers_3b` table, as `parity/edge_golden.py`
 /// passes them: every key optional and empty when absent, `tax_ledgers` flattened to ledger -> head.
+/// `gstr1`, the rows of a named GSTR-1 the reference is given, is not read: the crate's test takes no
+/// GSTR-1 (`a_named_gstr1_leaves_the_no_gstr3b_dump_unchanged`).
 fn gst_ledgers_3b_inputs(s: &Value) -> gst_ledgers_3b::Inputs {
     let g = &s["gst_ledgers_3b"];
     let set = |k: &str| strs(&g[k]).into_iter().collect();
@@ -845,7 +847,16 @@ fn check(name: &str) {
             }
             "gst_ledgers_3b" => {
                 let inputs = gst_ledgers_3b_inputs(&s);
-                let none = gst_ledgers_3b::no_gstr3b(&toml::Table::new(), false).unwrap();
+                // An engagement with no [documents] and a caller with no document: the proof that
+                // no GSTR-3B reaches the test, as the edge books carry none.
+                let e = bridge_tax_audit::Engagement::from_toml_for_read(
+                    "[client]\nlabel = \"E\"\nassessment_year = \"2026-27\"\n[period]\n\
+                     start = \"2025-04-01\"\nend = \"2026-03-31\"\n[roles]\ncash_groups = []\n\
+                     bank_groups = []\n",
+                )
+                .unwrap();
+                let caller = bridge_tax_audit::registry::CallerData::default();
+                let none = gst_ledgers_3b::no_gstr3b(&e, &caller).unwrap();
                 let r = gst_ledgers_3b::run(&book, &rules, &period(&s), &inputs, none).unwrap();
                 let c = gst_ledgers_3b::check_invariants(&book, &r).unwrap();
                 (r, c)
@@ -1404,6 +1415,28 @@ fn every_edge_book_matches_the_reference() {
         })
         .collect();
     assert!(failed.is_empty(), "{}", failed.join("\n\n"));
+}
+
+/// With no GSTR-3B, a named GSTR-1 leaves the reference's `gst_ledgers_3b` dump unchanged:
+/// `g3b_gstr1` is `g3b_classify`'s book with GSTR-1 rows given to the reference, and the reference's
+/// golden for it is `g3b_classify`'s byte for byte. The crate's test, which takes no GSTR-1, is
+/// compared with both goldens by `every_edge_book_matches_the_reference`.
+#[test]
+fn a_named_gstr1_leaves_the_no_gstr3b_dump_unchanged() {
+    let strip = |mut s: Value| {
+        let rows = s["gst_ledgers_3b"].as_object_mut().unwrap().remove("gstr1");
+        s.as_object_mut().unwrap().remove("comment");
+        (s, rows.map_or(0, |r| r.as_array().unwrap().len()))
+    };
+    let (named, rows) = strip(spec("g3b_gstr1"));
+    let (plain, none) = strip(spec("g3b_classify"));
+    assert_eq!((rows, none), (8, 0));
+    assert_eq!(named, plain, "the two books differ beyond the GSTR-1 rows");
+    let golden = |name: &str| {
+        let file = format!("golden/edge.{name}.gst_ledgers_3b.json");
+        std::fs::read(common::fixtures().join(file)).unwrap()
+    };
+    assert!(golden("g3b_gstr1") == golden("g3b_classify"));
 }
 
 /// Every edge golden belongs to a book that names its test, and every test a book names has its

@@ -2094,9 +2094,9 @@ pub fn clause44_on(
 /// reads them: `[roles].tax_ledgers`, `.round_off_ledgers`, `.payable_ledgers` (before any test),
 /// `.rcm_tax_ledgers`, the GSTR-3B document, then `[tds].goods_carriage_ledgers` (each mapped to
 /// 194C). An engagement whose `[documents].gstr3b` holds anything but an empty string, or whose
-/// caller holds a GSTR-3B, is refused ([`gst_ledgers_3b::no_gstr3b`], which also records where
-/// that refuses more than the reference: a falsy `[documents].gstr3b`, a GSTR-3B with no row in
-/// the period).
+/// caller holds a GSTR-3B, is refused, and so is one whose `[documents]` is not a table
+/// ([`gst_ledgers_3b::no_gstr3b`], which also records where that refuses more than the reference:
+/// a falsy `[documents].gstr3b`, a GSTR-3B with no row in the period).
 fn gst_ledgers_3b_inputs(
     bound: &Engagement,
     caller: &registry::CallerData,
@@ -2120,7 +2120,7 @@ fn gst_ledgers_3b_inputs(
     };
     let payable_ledgers = set(&bound.gst_ledgers_3b.payable_ledgers, "payable_ledgers")?;
     let rcm_tax_ledgers = set(&bound.gst_ledgers_3b.rcm_tax_ledgers, "rcm_tax_ledgers")?;
-    let none = gst_ledgers_3b::no_gstr3b(&bound.raw_cfg, caller.holds_gstr3b())?;
+    let none = gst_ledgers_3b::no_gstr3b(bound, caller)?;
     let goods_carriage_ledgers = match &bound.tds {
         None => BTreeSet::new(),
         Some(tds) => tds_payees::goods_carriage_ledgers(tds)?.clone(),
@@ -2596,17 +2596,26 @@ mod gst_ledgers_3b_inputs_tests {
     }
 
     /// A GSTR-3B named in `[documents]` is refused, failing closed on a falsy value the reference
-    /// reads as no document (`false`); an empty name is no document; a `[documents]` that is not
-    /// a table, which ends the reference's run, runs here as no document. A GSTR-3B the caller
-    /// holds, named as loaded or as a comparison turnover, is refused.
+    /// reads as no document (`false`); an empty name is no document. A `[documents]` that is not a
+    /// table (a value, or an array of tables), which ends the reference's run, is refused as a
+    /// client config error. A GSTR-3B the caller holds, named as loaded or as a comparison
+    /// turnover, is refused.
     #[test]
     fn a_gstr3b_named_or_held_is_refused() {
         let named = |value: &str| inputs(ROLES, &format!("[documents]\ngstr3b = {value}\n"));
         assert!(refused_3b(named("\"gst/3b.xls\"")));
         assert!(refused_3b(named("false")));
         assert!(named("\"\"").is_ok());
-        let e = engagement(&format!("documents = \"x\"\n{HEAD}{ROLES}\n"));
-        assert!(gst_ledgers_3b_inputs(&e, &registry::CallerData::default()).is_ok());
+        for text in [
+            format!("documents = \"x\"\n{HEAD}{ROLES}\n"),
+            format!("{HEAD}{ROLES}\n[[documents]]\ngstr3b = \"\"\n"),
+        ] {
+            let e = engagement(&text);
+            assert!(matches!(
+                gst_ledgers_3b_inputs(&e, &registry::CallerData::default()),
+                Err(AuditError::Config(m)) if m == "client config [documents] is not a table"
+            ));
+        }
         let e = engagement(&format!("{HEAD}{ROLES}\n"));
         let caller = registry::CallerData {
             named_documents: [books_examined::CallerNamedDocument::Gstr3b].into(),

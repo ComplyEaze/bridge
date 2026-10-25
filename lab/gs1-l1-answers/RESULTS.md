@@ -145,4 +145,5 @@ STATE: MARKS ALTVCHID 64, ALTMSTID 225 (= step 5); LEDGERS 18 rows equal to step
 - `egress/agent-egress.jsonl`: the build's receipt log.
 - `recorder/`: the three self-test outputs; `run-1-status-header/` and `run-2-referencedate/` in full with their sha256 lists; `run-3/manifest.tsv` and `run-3-SHA256.txt`.
 - `status-gate/`: `/status` direct and through the recorder before steps 6 of run-2 and run-3, and step 0's direct answer (all 51 B, 65541597…).
-- Screenshots, the About capture, the data-folder listing, the GS0 backup, run-3's message bodies and the stdio client stay on the lab PC.
+- `run-3-fixtures/` (follow-up commit): the run-3 response bodies the PR-1867 fixture specification asks for (36 files: every kind once from step 6's first call, and each step-6 call's voucher census and window bodies), with `FIXTURE-ROWS.md` (every request of steps 6 and 7, the per-call comparison with call 1, the trim record). Step 7's bodies are over the size limit and are not committed.
+- Screenshots, the About capture, the data-folder listing, the GS0 backup, run-3's other message bodies and the stdio client stay on the lab PC.

@@ -625,6 +625,9 @@ pub(super) struct TransferFacts {
     pub(super) retired_skips: usize,
     /// Skips whose row a batch holds as a voucher, and that are not retired.
     pub(super) held: Vec<HeldSkip>,
+    /// The company's batches a recorded rollback covers (#1050): any row that
+    /// names one is marked restored.
+    pub(super) restored: BTreeSet<String>,
     /// Statement Contras left out because they are not two ledgers with equal
     /// positive amounts, or have no leg on the statement's bank.
     // Counted for the tests; no tool reports it, since the coverage rule already
@@ -682,12 +685,16 @@ struct Batch {
     facts: Option<(ValidFacts, DateTime<FixedOffset>)>,
     status: String,
     sent: bool,
+    /// Ever read `posted_verified`, and not covered by a recorded rollback.
     found: bool,
+    /// A recorded rollback covers it (#1050): its vouchers may have been
+    /// removed, so it is neither found nor verified, whatever its statuses.
+    covered: bool,
 }
 
 impl Batch {
     fn is_verified(&self) -> bool {
-        self.status == POSTED_VERIFIED
+        self.status == POSTED_VERIFIED && !self.covered
     }
 
     fn endpoint(&self) -> Result<&str, TransferFactsError> {
@@ -739,6 +746,7 @@ fn admit_facts(
 fn fold_batches(
     events: Vec<JournalEvent>,
     company_guid: &str,
+    covered: &BTreeSet<String>,
 ) -> Result<Vec<Batch>, TransferFactsError> {
     let mut batches: Vec<Batch> = Vec::new();
     let mut index: BTreeMap<String, usize> = BTreeMap::new();
@@ -773,6 +781,7 @@ fn fold_batches(
                             line,
                             facts,
                             sent: false,
+                            covered: false,
                         });
                     }
                 }
@@ -790,6 +799,12 @@ fn fold_batches(
                     batch.status = status;
                 }
             }
+        }
+    }
+    for batch in &mut batches {
+        if covered.contains(&batch.line.batch_id) {
+            batch.covered = true;
+            batch.found = false;
         }
     }
     Ok(batches)
@@ -1156,9 +1171,10 @@ pub(super) fn build_transfer_facts(
     events: Vec<JournalEvent>,
     skip_records: Vec<SkipOnlyRecord>,
     company_guid: &str,
+    covered: &BTreeSet<String>,
 ) -> Result<TransferFacts, TransferFactsError> {
     let company = CompanyGuid::new(canonical_batch_guid(company_guid));
-    let batches = fold_batches(events, company_guid)?;
+    let batches = fold_batches(events, company_guid, covered)?;
     let mut lineages: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
     for (at, batch) in batches.iter().enumerate() {
         lineages
@@ -1335,9 +1351,22 @@ pub(super) fn build_transfer_facts(
                         holder: BatchId::new(batches[at].line.batch_id.as_str()),
                         by: HeldBy::PostedBatch,
                     }),
+                    // A batch a recorded rollback covers is named first, so the
+                    // row's restored marker and its batch agree (#1050).
                     (None, false) => held.push(HeldSkip {
                         fact: mention.fact,
-                        holder: BatchId::new(batches[holding.latest].line.batch_id.as_str()),
+                        holder: BatchId::new(
+                            batches[holding
+                                .batches
+                                .iter()
+                                .rev()
+                                .copied()
+                                .find(|&at| batches[at].covered)
+                                .unwrap_or(holding.latest)]
+                            .line
+                            .batch_id
+                            .as_str(),
+                        ),
                         by: HeldBy::UnverifiedBatch,
                     }),
                 }
@@ -1394,12 +1423,18 @@ pub(super) fn build_transfer_facts(
             coverage.add(company.clone(), endpoint, bank_ledger, window)?;
         }
     }
+    let restored = batches
+        .iter()
+        .filter(|batch| batch.covered)
+        .map(|batch| batch.line.batch_id.clone())
+        .collect();
     Ok(TransferFacts {
         skips,
         contras: kept,
         coverage,
         retired_skips,
         held,
+        restored,
         contras_not_two_leg,
         contras_without_facts,
         contras_superseded,

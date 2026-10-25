@@ -122,6 +122,8 @@ pub(super) struct OpenRow {
     date: TallyDate,
     state: OpenState,
     batch: Option<String>,
+    /// A batch it names is one a recorded rollback covers (#1050).
+    restored: bool,
 }
 
 /// What the view said, as counts and open rows, before it is cut to a budget.
@@ -182,6 +184,7 @@ impl TransferSummary {
                     id: key.row.as_str().to_string(),
                     date: (*date).clone(),
                     state,
+                    restored: batch.is_some_and(|batch| facts.restored.contains(batch.as_str())),
                     batch: batch.map(|batch| batch.as_str().to_string()),
                 }));
             }
@@ -194,6 +197,7 @@ impl TransferSummary {
                     HeldBy::UnverifiedBatch => OpenState::HeldElsewhere,
                     HeldBy::PostedBatch => OpenState::PostedAgainstSkip,
                 },
+                restored: facts.restored.contains(held.holder.as_str()),
                 batch: Some(held.holder.as_str().to_string()),
             });
         }
@@ -205,6 +209,10 @@ impl TransferSummary {
             .map(|contra| (&contra.key, &contra.date))
             .collect();
         for booked in &view.double_booked {
+            // both rows of a pair are marked when either batch is restored
+            let restored = [&booked.first, &booked.second]
+                .iter()
+                .any(|contra| facts.restored.contains(contra.batch.as_str()));
             for (this, other) in [
                 (&booked.first, &booked.second),
                 (&booked.second, &booked.first),
@@ -214,6 +222,7 @@ impl TransferSummary {
                         id: this.txn.as_str().to_string(),
                         date: (*date).clone(),
                         state: OpenState::DoubleBooked,
+                        restored,
                         batch: Some(other.batch.as_str().to_string()),
                     });
                 }
@@ -247,6 +256,11 @@ impl TransferSummary {
                 .entry(row.state.label())
                 .or_insert_with(|| json!(row.state.step()));
         }
+        // paid for in the frame, like the state steps, whether or not the
+        // marked row is listed
+        if open.iter().any(|row| row.restored) {
+            next_steps.insert("restored".into(), json!(RESTORED_NOTE));
+        }
         let frame = json!({
             "state": "computed", "skips_paired": paired, "skips_open": skips_open,
             "open": [], "open_omitted": open.len(), "retired": retired,
@@ -257,13 +271,16 @@ impl TransferSummary {
         let mut room = available.saturating_sub(frame_len);
         let mut rows = Vec::new();
         for row in open {
-            let rendered = match &row.batch {
+            let mut rendered = match &row.batch {
                 Some(batch) => json!({"bridge_txn_id": row.id, "date": row.date,
                     "state": row.state.label(), "batch_id": batch}),
                 None => {
                     json!({"bridge_txn_id": row.id, "date": row.date, "state": row.state.label()})
                 }
             };
+            if row.restored {
+                rendered["restored"] = json!(true);
+            }
             // `,` between rows
             let cost = rendered.to_string().len() + 1;
             if cost > room {
@@ -291,6 +308,9 @@ const CHECK_NOT_RUN_STEP: &str =
     "Not run, or cut to fit: verify again; if it repeats, raise BRIDGE_AGENT_MAX_BYTES.";
 /// A statement of only skipped rows has no batch to verify.
 const CHECK_NOT_RUN_RECORDED_STEP: &str = "The skipped rows are recorded; the transfer check will show on the next build or verification for this company.";
+/// What a row marked restored means, whatever its state (#1050): the batch it
+/// names is one a recorded rollback covers, which no step settles.
+pub(super) const RESTORED_NOTE: &str = "A row marked restored names a batch whose vouchers a restore that ComplyEaze Bridge recorded may have removed from Tally. Whatever the row's state says, that batch stays unverified here even after verify_import, and no step inside ComplyEaze Bridge frees the row. Check in Tally whether that batch's voucher for the row is there, and tell the person. Do not enter this transfer in Tally by hand, and never import that batch's file: a later re-post of its rows would book it twice.";
 const OPEN_OMITTED_STEP: &str =
     "Some open rows are not listed because the response is full. Raise BRIDGE_AGENT_MAX_BYTES to list every open row.";
 
@@ -481,6 +501,17 @@ impl Carrier {
             Self::Paired => "the other account's statement already carries it as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: that skip is judged alone, and another skipped row could share that Contra): if that Contra is wrong, correct that statement's batch first.",
             Self::OtherSideUnverified => "the other account's statement may carry it as a Contra in a batch named, which is not verified yet: run verify_import on every batch named for this row first; build the other account's statement for this row's date again only if every batch named for this row was never sent to Tally, verify_import listed every one of their vouchers as not_found, and the person confirms none of their files was ever imported into Tally; then post the new build, verify it, and never import an old batch's file; if verify_import found any voucher of a batch named for this row, or refused to read one, or a file of one was imported, do not build the other account's statement again: check in Tally which of their vouchers are there, and no step inside ComplyEaze Bridge frees this row yet; if Tally rejected the send of a batch named for this row, building the other account's statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet.",
             Self::MatchedUnconfirmed => "a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is.",
+        }
+    }
+
+    /// [`Self::refusal_step`], with [`RESTORED_NOTE`] after it when a row it
+    /// refuses names a batch a recorded rollback covers.
+    pub(super) fn refusal_step_restored(kinds: &BTreeSet<Self>, restored: bool) -> String {
+        let step = Self::refusal_step(kinds);
+        if restored {
+            format!("{step} {RESTORED_NOTE}")
+        } else {
+            step
         }
     }
 
@@ -702,12 +733,20 @@ impl Server {
             .collect();
         if !carried.is_empty() {
             let kinds = carried.iter().map(|&(_, _, carrier)| carrier).collect();
-            let next_step = Carrier::refusal_step(&kinds);
+            // the rows left out count too
+            let restored = carried
+                .iter()
+                .any(|(_, batch, _)| before.restored.contains(batch.as_str()));
+            let next_step = Carrier::refusal_step_restored(&kinds, restored);
             let rows = carried
                 .into_iter()
                 .map(|(row, batch, carrier)| {
-                    json!({"bridge_txn_id": row, "batch_id": batch.as_str(),
-                        "state": carrier.label()})
+                    let mut listed = json!({"bridge_txn_id": row, "batch_id": batch.as_str(),
+                        "state": carrier.label()});
+                    if before.restored.contains(batch.as_str()) {
+                        listed["restored"] = json!(true);
+                    }
+                    listed
                 })
                 .collect();
             let (listed, omitted) = rows_listed_json(rows);

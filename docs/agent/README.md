@@ -2110,6 +2110,15 @@ refused as `proposals_legacy` (parse the statement again).
   equal reference, or by an equal date (k = 0 until two real statements of one
   transfer have been measured), so a Contra the other bank printed on another
   day is not matched.
+- **What `restored` means.** A batch that a restore ComplyEaze Bridge recorded
+  covers (see `verify_import`, `book_rolled_back`) is never found posted or
+  verified for the transfer check, whatever its last status: a row it holds
+  reads `held_elsewhere` naming it, its Contra is an unverified candidate, and
+  its days give no coverage. Every row naming such a batch carries
+  `"restored": true`, and `next_steps.restored` says what that means: no step
+  inside ComplyEaze Bridge frees the row; check in Tally whether that batch's
+  voucher for it is there and tell the person, and do not enter the transfer by
+  hand or import that batch's file.
 - **What `held_elsewhere` and `posted_against_skip` mean.** A skipped row that
   a batch holds as a voucher is not a skip to pair. While no batch holding the
   row is found posted it reads `held_elsewhere`, with the batch to verify. Once

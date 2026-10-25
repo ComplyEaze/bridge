@@ -324,6 +324,21 @@ fn the_catalog_lists_exactly_the_admitted_tests() {
     for test in ADMITTED {
         assert!(registry::find(test).is_some());
     }
+    // The description names the tests it admits by hand: it names each one,
+    // and no ported test it does not admit.
+    let words: std::collections::BTreeSet<&str> = tool["description"]
+        .as_str()
+        .unwrap()
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .collect();
+    for ported in registry::PORTED {
+        assert_eq!(
+            words.contains(ported.id),
+            ADMITTED.contains(&ported.id),
+            "{}",
+            ported.id
+        );
+    }
 }
 
 /// A test the crate has ported but this tool has not admitted, and a name the

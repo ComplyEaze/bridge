@@ -1,0 +1,252 @@
+//! A supplier's invoice as the books record it, and whether two of them are the same invoice
+//! (#1904): the rule a check reads before a purchase is posted, so input tax credit is not
+//! claimed twice. Pure: it reads no book. Which vouchers are compared, and how they are read, is
+//! the caller's.
+//!
+//! The rules (CGST Rules r.46(b), r.36, r.54; the issue's design notes):
+//! - A number is never refused for its form: an invoice number that does not meet rule 46(b),
+//!   or a document of rule 54(2) to (4) that need not be serially numbered, still carries credit.
+//!   [`SupplierInvoiceRef::fits_gstr1`] says only whether it could be a GSTR-1 number, so a
+//!   caller can warn that a copy keyed with the supplier's own number would not be found.
+//! - Rule 46(b) makes a number unique within a financial year. Two invoices of one supplier and
+//!   one document type with the same number and both invoice dates in one financial year are the
+//!   same invoice, whatever their dates ([`InvoiceMatch::Booked`]); in different financial years
+//!   they are different invoices.
+//! - A match that rests on a financial year taken from a voucher date (no invoice date in the
+//!   books), on a document type that is not known, or on a loose form of the number, is never
+//!   more than [`InvoiceMatch::PossiblyBooked`], which only a person may release. A loose form
+//!   counts only with a second signal: the same invoice date or the same invoice value.
+use crate::{ExactDecimal, TallyDate};
+
+/// The separators a supplier writes between the parts of a number, folded to one form.
+const SEPARATORS: [char; 5] = ['-', '/', '\\', '.', '_'];
+/// Rule 46(b): at most sixteen characters.
+const GSTR1_MAX_CHARS: usize = 16;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SupplierInvoiceRefError {
+    /// Nothing but separators and whitespace: no number to compare.
+    Empty,
+}
+
+/// A supplier invoice number with the forms a duplicate check compares. Built only by
+/// [`SupplierInvoiceRef::parse`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SupplierInvoiceRef {
+    raw: String,
+    exact: String,
+    loose: String,
+    serial: Option<String>,
+}
+
+impl SupplierInvoiceRef {
+    /// Upper case; every run of whitespace and separators folded to one `/`, none at either end.
+    /// Refused only when nothing else is left.
+    pub fn parse(raw: &str) -> Result<Self, SupplierInvoiceRefError> {
+        let mut exact = String::new();
+        let mut pending_separator = false;
+        for ch in raw.chars() {
+            if ch.is_whitespace() || SEPARATORS.contains(&ch) {
+                pending_separator = !exact.is_empty();
+                continue;
+            }
+            if pending_separator {
+                exact.push('/');
+                pending_separator = false;
+            }
+            exact.extend(ch.to_uppercase());
+        }
+        if exact.is_empty() {
+            return Err(SupplierInvoiceRefError::Empty);
+        }
+        let loose = loose_form(&exact);
+        let serial = serial_form(&exact);
+        Ok(Self {
+            raw: raw.to_string(),
+            exact,
+            loose,
+            serial,
+        })
+    }
+
+    /// The number as the books hold it.
+    pub fn raw(&self) -> &str {
+        &self.raw
+    }
+
+    /// The form two numbers are the same invoice in.
+    pub fn exact(&self) -> &str {
+        &self.exact
+    }
+
+    /// Whether the number as keyed could be a GSTR-1 invoice number: at most sixteen characters,
+    /// only letters, digits, `-` and `/` (rule 46(b)). Never a reason to refuse.
+    pub fn fits_gstr1(&self) -> bool {
+        let trimmed = self.raw.trim();
+        trimmed.chars().count() <= GSTR1_MAX_CHARS
+            && trimmed
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '/')
+    }
+
+    fn loose_equal(&self, other: &Self) -> bool {
+        self.loose == other.loose
+            || matches!((&self.serial, &other.serial), (Some(left), Some(right)) if left == right)
+    }
+}
+
+/// The exact form without separators, each run of digits without its leading zeros (`0` for a
+/// run of zeros only).
+fn loose_form(exact: &str) -> String {
+    let mut out = String::new();
+    let mut digits = String::new();
+    let flush = |digits: &mut String, out: &mut String| {
+        if !digits.is_empty() {
+            let trimmed = digits.trim_start_matches('0');
+            out.push_str(if trimmed.is_empty() { "0" } else { trimmed });
+            digits.clear();
+        }
+    };
+    for ch in exact.chars().filter(|ch| *ch != '/') {
+        if ch.is_ascii_digit() {
+            digits.push(ch);
+        } else {
+            flush(&mut digits, &mut out);
+            out.push(ch);
+        }
+    }
+    flush(&mut digits, &mut out);
+    out
+}
+
+/// The trailing run of digits without its leading zeros, `0` for a run of zeros only; none when
+/// the number does not end in a digit.
+fn serial_form(exact: &str) -> Option<String> {
+    let digits = exact
+        .chars()
+        .rev()
+        .take_while(char::is_ascii_digit)
+        .collect::<Vec<_>>();
+    if digits.is_empty() {
+        return None;
+    }
+    let serial = digits.iter().rev().collect::<String>();
+    let trimmed = serial.trim_start_matches('0');
+    Some(if trimmed.is_empty() {
+        "0".to_string()
+    } else {
+        trimmed.to_string()
+    })
+}
+
+/// An Indian financial year, named by the calendar year it begins in (1 April).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FinancialYear(u16);
+
+impl FinancialYear {
+    pub fn of(date: &TallyDate) -> Self {
+        let text = date.as_str();
+        let year: u16 = text[0..4].parse().expect("a TallyDate holds YYYYMMDD");
+        let month: u8 = text[4..6].parse().expect("a TallyDate holds YYYYMMDD");
+        Self(if month >= 4 { year } else { year - 1 })
+    }
+
+    pub fn starting_year(self) -> u16 {
+        self.0
+    }
+}
+
+/// The document a supplier issued, as far as the books show it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SupplierDocument {
+    Invoice,
+    /// A supplier's debit note (s.34(3)): its own series may share numbers with the invoices.
+    DebitNote,
+}
+
+/// A purchase about to be posted: its supplier invoice date is required (rule 46(c)); a purchase
+/// without one is not a tax invoice and is refused before this type is built.
+#[derive(Debug, Clone)]
+pub struct IncomingInvoice {
+    pub reference: SupplierInvoiceRef,
+    pub invoice_date: TallyDate,
+    pub document: SupplierDocument,
+    pub value: Option<ExactDecimal>,
+}
+
+/// A voucher already in the books with the same supplier. Its invoice date is optional: without
+/// one its financial year is taken from the voucher date, which makes any match only possible.
+#[derive(Debug, Clone)]
+pub struct BookedInvoice {
+    pub reference: SupplierInvoiceRef,
+    pub invoice_date: Option<TallyDate>,
+    pub voucher_date: TallyDate,
+    /// `None` when the books do not say which document it is.
+    pub document: Option<SupplierDocument>,
+    pub value: Option<ExactDecimal>,
+}
+
+impl BookedInvoice {
+    /// The financial years the copy can belong to. From the invoice date, one. From the voucher
+    /// date, also the year before when the voucher falls between April and November (an invoice
+    /// of the previous year can still be booked until 30 November, s.16(4)).
+    fn financial_years(&self) -> (Vec<FinancialYear>, bool) {
+        match &self.invoice_date {
+            Some(date) => (vec![FinancialYear::of(date)], false),
+            None => {
+                let year = FinancialYear::of(&self.voucher_date);
+                let month: u8 = self.voucher_date.as_str()[4..6]
+                    .parse()
+                    .expect("a TallyDate holds YYYYMMDD");
+                let mut years = vec![year];
+                if (4..=11).contains(&month) && year.0 > 0 {
+                    years.push(FinancialYear(year.0 - 1));
+                }
+                (years, true)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InvoiceMatch {
+    /// The same invoice: refused.
+    Booked,
+    /// Perhaps the same invoice: refused unless a person releases it, naming the copy.
+    PossiblyBooked,
+    /// A different invoice.
+    Different,
+}
+
+/// Whether `booked` is `incoming` already in the books. Both are of the same supplier: the caller
+/// compares only vouchers it tied to the supplier's registration.
+pub fn compare(incoming: &IncomingInvoice, booked: &BookedInvoice) -> InvoiceMatch {
+    let year = FinancialYear::of(&incoming.invoice_date);
+    let (years, from_voucher_date) = booked.financial_years();
+    if !years.contains(&year) {
+        return InvoiceMatch::Different;
+    }
+    let exact = incoming.reference.exact == booked.reference.exact;
+    if !exact {
+        let second_signal = booked.invoice_date.as_ref() == Some(&incoming.invoice_date)
+            || matches!((&incoming.value, &booked.value),
+                (Some(left), Some(right)) if left.magnitude().numeric_eq(&right.magnitude()));
+        return if incoming.reference.loose_equal(&booked.reference) && second_signal {
+            InvoiceMatch::PossiblyBooked
+        } else {
+            InvoiceMatch::Different
+        };
+    }
+    match booked.document {
+        Some(document) if document == incoming.document && !from_voucher_date => {
+            InvoiceMatch::Booked
+        }
+        // A supplier's debit note and invoice of one number are different documents.
+        Some(_) if !from_voucher_date => InvoiceMatch::Different,
+        _ => InvoiceMatch::PossiblyBooked,
+    }
+}
+
+#[cfg(test)]
+#[path = "supplier_invoice_tests.rs"]
+mod tests;

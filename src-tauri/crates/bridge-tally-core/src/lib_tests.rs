@@ -71,26 +71,25 @@ fn record_evidence(object_type: &str, source_id: &str) -> SourceRecordEvidence {
 
 #[test]
 fn record_provenance_must_bind_one_to_one_to_canonical_records() {
-    let batch = PackBatch::Inventory(InventoryBatch {
-        stock_items: vec![StockItemRecord {
-            source_id: SourceRecordId::parse("stock:1").unwrap(),
-            name: CanonicalText::parse("Synthetic Item").unwrap(),
-            base_unit: CanonicalText::parse("nos").unwrap(),
+    let batch = PackBatch::CoreAccounting(CoreAccountingBatch {
+        groups: vec![GroupRecord {
+            source_id: "group:1".to_string(),
+            name: "Synthetic Group".to_string(),
+            parent_source_id: None,
         }],
-        godowns: Vec::new(),
-        inventory_entries: Vec::new(),
+        ..CoreAccountingBatch::default()
     });
     let valid = CanonicalPackWindow {
         batch: batch.clone(),
         source_counts: None,
-        record_evidence: Some(vec![record_evidence("stock_item", "stock:1")]),
+        record_evidence: Some(vec![record_evidence("group", "group:1")]),
     };
     valid.validate_record_evidence_binding().unwrap();
 
     let missing = CanonicalPackWindow {
         batch: batch.clone(),
         source_counts: None,
-        record_evidence: Some(vec![record_evidence("godown", "stock:1")]),
+        record_evidence: Some(vec![record_evidence("ledger", "group:1")]),
     };
     assert!(matches!(
         missing.validate_record_evidence_binding(),
@@ -102,8 +101,8 @@ fn record_provenance_must_bind_one_to_one_to_canonical_records() {
         batch,
         source_counts: None,
         record_evidence: Some(vec![
-            record_evidence("stock_item", "stock:1"),
-            record_evidence("stock_item", "stock:1"),
+            record_evidence("group", "group:1"),
+            record_evidence("group", "group:1"),
         ]),
     };
     assert!(matches!(

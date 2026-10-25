@@ -207,9 +207,7 @@ fn captured_wr2_native_core_window_builds_without_report_field_amounts() {
         vouchers,
     )
     .expect("captured native core window builds");
-    let PackBatch::CoreAccounting(batch) = window.batch else {
-        panic!("wrong pack");
-    };
+    let PackBatch::CoreAccounting(batch) = window.batch;
     assert_eq!(
         (
             batch.groups.len(),
@@ -1113,9 +1111,7 @@ async fn core_window_unedited_captured_sequence_succeeds_in_eighteen_posts() {
     let extent = seq::EXTENTS;
     let (result, methods) = seq::run(seq::posts([(extent, extent); seq::EXTENT_BRACKETS])).await;
     let window = result.expect("the unedited captured core window must build");
-    let PackBatch::CoreAccounting(batch) = window.batch else {
-        panic!("wrong pack");
-    };
+    let PackBatch::CoreAccounting(batch) = window.batch;
     assert_eq!(batch.vouchers.len(), 3);
     assert_eq!(methods, vec!["POST"; seq::POSTS_IN_A_SUCCESSFUL_WINDOW]);
 }
@@ -1747,9 +1743,7 @@ async fn same_context_snapshot_read_does_not_reuse_pre_run_canary_rows() {
         .extract_core_window(&context, DateBoundaryProfile::ModeAgnostic, &identity)
         .await
         .unwrap();
-    let PackBatch::CoreAccounting(pre_run_batch) = pre_run_canary.batch else {
-        panic!("expected core canary batch");
-    };
+    let PackBatch::CoreAccounting(pre_run_batch) = pre_run_canary.batch;
     assert_eq!(pre_run_batch.groups.len(), 1);
     assert_eq!(pre_run_batch.groups[0].name, "Primary");
 
@@ -1757,9 +1751,7 @@ async fn same_context_snapshot_read_does_not_reuse_pre_run_canary_rows() {
         .extract_core_window(&context, DateBoundaryProfile::ModeAgnostic, &identity)
         .await
         .unwrap();
-    let PackBatch::CoreAccounting(snapshot_batch) = snapshot_window.batch else {
-        panic!("expected core snapshot batch");
-    };
+    let PackBatch::CoreAccounting(snapshot_batch) = snapshot_window.batch;
     assert_eq!(snapshot_batch.groups.len(), 1);
     assert_eq!(snapshot_batch.groups[0].name, "Post-start Assets");
     assert_eq!(

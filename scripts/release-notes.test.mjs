@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { parseDocument } from "yaml";
-import { FRAGMENT_DIRECTORY, TEMPLATE_MARKER, assembleFragments, composeBody, fallbackPage, fragmentProblems, parseChangelog, parseChangelogWithProblems, pickNotes, readFragments, renderBody, renderPage, versionFromTag, withFragments } from "./release-notes.mjs";
+import { FRAGMENT_DIRECTORY, TEMPLATE_MARKER, assembleFragments, composeBody, fallbackPage, fragmentProblems, mergeFragments, parseChangelog, parseChangelogWithProblems, pickNotes, readFragments, renderBody, renderPage, versionFromTag, withFragments } from "./release-notes.mjs";
 import { loadRules, tierOf } from "./review-tier.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -378,8 +378,8 @@ test("entries are read in the order they are listed, and a bad file is reported 
     const read = readFragments(join(dir, FRAGMENT_DIRECTORY));
     assert.deepEqual(read.fragments.map(({ kind, number, slug }) => `${kind}/${number}-${slug}`), ["added/5-new-tool", "changed/9-zeta", "changed/30-alpha", "changed/30-beta", "removed/7-old"]);
     assert.equal(read.problems.length, 4);
-    assert.match(read.problems.join("\n"), /unreleased\/fixed is not one of added, changed, removed/);
-    assert.match(read.problems.join("\n"), /unreleased\/9-root\.md is not one of/);
+    assert.match(read.problems.join("\n"), /unreleased\/"fixed" is not one of added, changed, removed/);
+    assert.match(read.problems.join("\n"), /unreleased\/"9-root\.md" is not one of/);
     assert.match(read.problems.join("\n"), /changed\/"notes\.md" is not named/);
     assert.match(read.problems.join("\n"), /changed\/31-bad\.md is not listed: its text must cite #31/);
     assert.equal(assembleFragments(read.fragments), "**Added**\n\n- New tool (part of #5).\n  Second line.\n\n**Changed**\n\n- Zeta (#9).\n- Alpha (#30).\n- Beta (#30).\n\n**Removed**\n\n- Old (#7).");
@@ -439,5 +439,58 @@ test("every unreleased entry in the repository is well formed and in the one rev
   for (const { kind, number, slug } of entries.fragments) {
     const path = `${FRAGMENT_DIRECTORY}/${kind}/${number}-${slug}.md`;
     assert.equal(tierOf([path], rules).tier, "one", `${path} must not be named with privacy, security, redact or egress, which the review tiers send to the full tier`);
+  }
+});
+
+test("entries join the groups the text already has, so no heading appears twice", () => {
+  const entries = [
+    { kind: "added", number: 5, slug: "a", text: "- New (#5)." },
+    { kind: "changed", number: 6, slug: "b", text: "- Moved (#6).\n  More." },
+    { kind: "removed", number: 7, slug: "c", text: "- Gone (#7)." },
+  ];
+  const body = ["Intro.", "", "**Added**", "", "- Old added.", "", "**Changed**", "", "- Old changed.", "  wrapped", "", "Closing words.", ""].join("\n").trim();
+  const merged = mergeFragments(body, entries);
+  assert.equal(merged, ["Intro.", "", "**Added**", "", "- Old added.", "- New (#5).", "", "**Changed**", "", "- Old changed.", "  wrapped", "", "Closing words.", "- Moved (#6).", "  More.", "", "**Removed**", "", "- Gone (#7)."].join("\n"));
+  for (const heading of ["Added", "Changed", "Removed"]) assert.equal(merged.split(`**${heading}**`).length, 2, heading);
+  assert.equal(mergeFragments("", entries.slice(0, 1)), "**Added**\n\n- New (#5).");
+  assert.equal(mergeFragments("Words.", []), "Words.");
+});
+
+test("a dotfile is ignored, and a link or a folder is reported and not listed", () => {
+  inTemporaryRepository((dir) => {
+    writeEntries(dir, { "added/5-real.md": "- Real (#5).\n", "added/.DS_Store": "x", "changed/.hidden": "x" });
+    mkdirSync(join(dir, FRAGMENT_DIRECTORY, "added", "6-folder.md"));
+    symlinkSync(join(dir, FRAGMENT_DIRECTORY, "added", "5-real.md"), join(dir, FRAGMENT_DIRECTORY, "added", "7-link.md"));
+    const read = readFragments(join(dir, FRAGMENT_DIRECTORY));
+    assert.deepEqual(read.fragments.map(({ number }) => number), [5]);
+    assert.equal(read.problems.length, 2);
+    assert.match(read.problems.join("\n"), /added\/6-folder\.md is not a plain file/);
+    assert.match(read.problems.join("\n"), /added\/7-link\.md is not a plain file/);
+  });
+});
+
+test("an entry still present when a version is built is listed in its notes, with a warning that names it", () => {
+  inTemporaryRepository((dir) => {
+    writeFileSync(join(dir, "CHANGELOG.md"), "## [Unreleased]\n\nNext words.\n\n## [1.0.0] - 2026-10-01\n\n**Added**\n\n- One.\n");
+    writeEntries(dir, { "added/5-late.md": "- Late (#5).\n", "changed/6-later.md": "- Later (#6).\n" });
+    const result = spawnSync("node", ["scripts/release-notes.mjs", "notes", "--tag", "mcp-v1.0.0", "--changelog", join(dir, "CHANGELOG.md"), "--footer", join(dir, "packaging", "mcpb", "UNSIGNED_PREVIEW_RELEASE.md"), "--out", join(dir, "notes.md")], { cwd: root, encoding: "utf8" });
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /::warning::2 unreleased entries are still in docs\/changelog\/unreleased and were listed in this release's notes \(added\/5-late, changed\/6-later\)/);
+    const notes = readFileSync(join(dir, "notes.md"), "utf8");
+    assert.match(notes, /\*\*Added\*\*\n\n- One\.\n- Late \(#5\)\./);
+    assert.match(notes, /\*\*Changed\*\*\n\n- Later \(#6\)\./);
+    assert.equal(notes.split("**Added**").length, 2, "one Added heading");
+  });
+});
+
+test("no entry in the repository is misplaced, or already written into a released section", () => {
+  const listed = spawnSync("git", ["ls-files", "-z", "docs/changelog"], { cwd: root, encoding: "utf8" });
+  assert.equal(listed.status, 0, listed.stderr);
+  const misplaced = listed.stdout.split("\0").filter(Boolean).filter((path) => !path.startsWith(`${FRAGMENT_DIRECTORY}/`));
+  assert.deepEqual(misplaced, []);
+  const released = parseChangelog(read("CHANGELOG.md")).filter((section) => section.label.toLowerCase() !== "unreleased");
+  for (const { kind, number, slug, text } of readFragments(join(root, FRAGMENT_DIRECTORY)).fragments) {
+    const section = released.find((candidate) => candidate.body.includes(text));
+    assert.equal(section, undefined, `${kind}/${number}-${slug} is already in the ${section?.label} section: remove its file`);
   }
 });

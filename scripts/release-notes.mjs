@@ -102,8 +102,8 @@ export function readFragments(directory) {
   const fragments = [];
   const problems = [];
   try {
-    for (const name of readdirSync(directory).sort()) {
-      if (!FRAGMENT_KINDS.some(([kind]) => kind === name)) problems.push(`${FRAGMENT_DIRECTORY}/${name} is not one of ${FRAGMENT_KINDS.map(([kind]) => kind).join(", ")}, so it is not listed`);
+    for (const name of readdirSync(directory).filter((entry) => !entry.startsWith(".")).sort()) {
+      if (!FRAGMENT_KINDS.some(([kind]) => kind === name)) problems.push(`${FRAGMENT_DIRECTORY}/${JSON.stringify(name)} is not one of ${FRAGMENT_KINDS.map(([kind]) => kind).join(", ")}, so it is not listed`);
     }
   } catch (error) {
     if (error.code !== "ENOENT") problems.push(`${FRAGMENT_DIRECTORY} could not be read (${error.message})`);
@@ -111,16 +111,21 @@ export function readFragments(directory) {
   for (const [kind] of FRAGMENT_KINDS) {
     let names;
     try {
-      names = readdirSync(join(directory, kind));
+      names = readdirSync(join(directory, kind), { withFileTypes: true }).filter((entry) => !entry.name.startsWith("."));
     } catch (error) {
       if (error.code !== "ENOENT") problems.push(`${FRAGMENT_DIRECTORY}/${kind} could not be read (${error.message})`);
       continue;
     }
-    for (const name of names.sort()) {
+    for (const entry of names.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      const name = entry.name;
       const where = `${FRAGMENT_DIRECTORY}/${kind}/${name}`;
       const parts = fragmentName.exec(name);
       if (!parts) {
         problems.push(`${FRAGMENT_DIRECTORY}/${kind}/${JSON.stringify(name)} is not named <issue number>-<up to six lowercase words joined by hyphens>.md, so it is not listed`);
+        continue;
+      }
+      if (!entry.isFile()) {
+        problems.push(`${where} is not a plain file (a folder or a link), so it is not listed`);
         continue;
       }
       let text;
@@ -148,13 +153,34 @@ export function assembleFragments(fragments) {
   }).join("\n\n");
 }
 
-// The [Unreleased] section with the entries after its own text, or one made for them when the file has none.
+// A section's text with the entries added to its own **Added**, **Changed** and **Removed** groups (a group is the bold line
+// and everything up to the next bold line), so no heading appears twice; a kind the text has no group for gets one at the end.
+export function mergeFragments(body, fragments) {
+  const lines = body === "" ? [] : body.split("\n");
+  const created = [];
+  for (const [kind, heading] of FRAGMENT_KINDS) {
+    const own = fragments.filter((fragment) => fragment.kind === kind);
+    if (own.length === 0) continue;
+    const entries = own.map((fragment) => fragment.text).join("\n");
+    const at = lines.indexOf(`**${heading}**`);
+    if (at < 0) {
+      created.push(`**${heading}**\n\n${entries}`);
+      continue;
+    }
+    let end = at + 1;
+    while (end < lines.length && !/^\*\*[^*\n]+\*\*\s*$/.test(lines[end])) end += 1;
+    while (end > at + 1 && lines[end - 1].trim() === "") end -= 1;
+    lines.splice(end, 0, ...entries.split("\n"));
+  }
+  return [lines.join("\n"), ...created].filter((part) => part !== "").join("\n\n");
+}
+
+// The [Unreleased] section with the entries added to it, or one made for them when the file has none.
 export function withFragments(sections, fragments) {
-  const block = assembleFragments(fragments);
-  if (block === "") return sections;
+  if (fragments.length === 0) return sections;
   const at = sections.findIndex(({ label }) => isUnreleased(label));
-  if (at < 0) return [{ label: "Unreleased", date: undefined, body: block }, ...sections];
-  return sections.map((section, index) => (index === at ? { ...section, body: [section.body, block].filter((part) => part !== "").join("\n\n") } : section));
+  if (at < 0) return [{ label: "Unreleased", date: undefined, body: mergeFragments("", fragments) }, ...sections];
+  return sections.map((section, index) => (index === at ? { ...section, body: mergeFragments(section.body, fragments) } : section));
 }
 
 export function pickNotes(sections, tag) {
@@ -339,7 +365,7 @@ function sectionsFrom(args) {
   for (const problem of problems) warn(problem);
   const read = readFragments(join(dirname(changelogPath), FRAGMENT_DIRECTORY));
   for (const problem of read.problems) warn(problem);
-  return withFragments(sections, read.fragments);
+  return { sections: withFragments(sections, read.fragments), fragments: read.fragments };
 }
 
 function argument(args, name) {
@@ -363,7 +389,13 @@ export function main(argv) {
     }
     let picked = { mode: "none", body: "" };
     try {
-      picked = pickNotes(sectionsFrom(args), tag);
+      const { sections, fragments } = sectionsFrom(args);
+      picked = pickNotes(sections, tag);
+      if (picked.mode === "version" && fragments.length > 0) {
+        // The build is cut from the head of master, so an entry still present is in this build: list it, and say so.
+        picked.body = mergeFragments(picked.body, fragments);
+        warn(`${fragments.length} unreleased entr${fragments.length === 1 ? "y is" : "ies are"} still in ${FRAGMENT_DIRECTORY} and were listed in this release's notes (${fragments.map(({ kind, number, slug }) => `${kind}/${number}-${slug}`).join(", ")}); remove the files and put the entries in the ${versionFromTag(tag)} section of CHANGELOG.md after this release, or the next release lists them again`);
+      }
     } catch (error) {
       warn(`could not read release notes from CHANGELOG.md (${error.message})`);
     }
@@ -389,7 +421,7 @@ export function main(argv) {
     }
     let html;
     try {
-      html = renderPage(sectionsFrom(args), template);
+      html = renderPage(sectionsFrom(args).sections, template);
     } catch (error) {
       warn(`could not render CHANGELOG.md for the site (${error.message}); the page links to the releases instead`);
       html = fallbackPage(template);

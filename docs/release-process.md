@@ -864,8 +864,8 @@ disagree.
   `scripts/release-notes.test.mjs` fails on a file that is malformed, misplaced (anything
   outside the three folders is reported) or not in the one review tier. The install page lists the files after
   the text of `[Unreleased]`, and a malformed file is left out with a warning, so a bad entry
-  cannot stop a release or a deploy. The release notes list them only when the tag has no
-  section of its own. Entries already in `CHANGELOG.md` stay where they are
+  cannot stop a release or a deploy. The release notes list them when the tag has no
+  section of its own and, with a warning, when it has one (see "At cut time"). Entries already in `CHANGELOG.md` stay where they are
   until a release moves them.
 - `CHANGELOG.md` is the one source for the notes. The publish workflow takes
   the `## [X.Y.Z]` section that matches the tag (for `mcp-vX.Y.Z` or `mcp-preview-X.Y.Z`),
@@ -888,11 +888,13 @@ disagree.
   now" and its "in source since" title to name the new build, and leave a fresh
   `## [Unreleased]` above it. In the same pull request, run
   `node scripts/release-notes.mjs unreleased --changelog CHANGELOG.md` (it stops with a
-  message on a malformed file), put what it prints under the new section, and `git rm` the
-  files under `docs/changelog/unreleased/`. Run the command again after the last merge of
-  master into that pull request, because the build is cut from the head of master: an
-  entry merged between that pull request and the dispatch belongs to this build and must
-  be in the section too. If the section is missing, the
+  message on a malformed, misplaced or unreadable file), add what it prints to the matching
+  **Added**, **Changed** and **Removed** groups of the new section, and `git rm` the files
+  under `docs/changelog/unreleased/`. Run the command again after the last merge of master
+  into that pull request, because the build is cut from the head of master. An entry merged
+  after that, before the dispatch, is in the build: the release notes then list it too and
+  warn in the run, and its file must be removed, and the entry put in the section, in the pull
+  request after the release, or the next release lists it again. If the section is missing, the
   release carries the `[Unreleased]` text instead (with a warning), which may
   describe changes that build does not have, so read the release body; if that
   is empty too, only the standard text and GitHub's list. Headings must read

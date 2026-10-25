@@ -18,6 +18,9 @@ It forwards ONLY:
     byte) with only the company name, 8-digit dates and a read planner's AlterID span allowed to differ.
 Everything else is answered 403 by the relay itself, recorded, and NOT forwarded: an Import, any other request type,
 another ID, a TDL with a FUNCTION, REPORT, OBJECT or any other definition, a body that does not decode or parse.
+A forwarded request carries the client's own Content-Type lines unchanged (none when the client sent none, as a
+GET /status may), because Tally picks its answer's encoding from them; the relay adds only Host and, on a POST,
+Content-Length, and no other header.
 
 It records every request it receives and every answer it returns, byte for byte, as NNNN-request.bin,
 NNNN-response.bin and NNNN-response-headers.txt in DIR, and appends one line per request to DIR/manifest.tsv:
@@ -318,11 +321,17 @@ def make_handler(recorder, target_port):
 
         def forward(self, method, request_id, request):
             connection = http.client.HTTPConnection(TARGET_HOST, target_port, timeout=None)
-            headers = {"Content-Type": "text/xml; charset=utf-16"}
-            if method == "POST":
-                headers["Content-Length"] = str(len(request))
             try:
-                connection.request(method, self.path, body=request if method == "POST" else None, headers=headers)
+                # Tally chooses the answer's encoding from the request's Content-Type (a /status asked with
+                # charset=utf-16 is answered in UTF-16), so the client's own Content-Type lines go on unchanged, in
+                # order, and none when it sent none. The relay adds only Host (HTTP/1.1 requires it) and, on a POST,
+                # Content-Length (the client's own length: exactly that many bytes were read and are forwarded).
+                connection.putrequest(method, self.path, skip_accept_encoding=True)
+                for value in self.headers.get_all("Content-Type") or []:
+                    connection.putheader("Content-Type", value)
+                if method == "POST":
+                    connection.putheader("Content-Length", str(len(request)))
+                connection.endheaders(request if method == "POST" else None)
                 answer = connection.getresponse()
                 body = answer.read()
                 pairs = answer.getheaders()
@@ -421,28 +430,37 @@ def self_test():
     CLIENT_DEADLINE_SECONDS = 2
     target_log = []
 
+    def target_answer(method, content_types):
+        """What the fake Tally answers: like Tally, UTF-16 when the request's Content-Type names charset=utf-16 and
+        ASCII otherwise, naming every Content-Type it received, so a relay that changes, adds or drops one changes
+        the answer."""
+        text = "<RESPONSE>TallyPrime Server is Running</RESPONSE>" if method == "GET" else "<ENVELOPE/>"
+        text += "<!-- content-type: %s -->" % (" | ".join(content_types) or "none")
+        if "charset=utf-16" in " ".join(content_types).lower():
+            return b"\xff\xfe" + text.encode("utf-16-le")
+        return text.encode("ascii")
+
     class Target(http.server.BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
         def log_message(self, *args):
             pass
 
-        def do_GET(self):
-            target_log.append(("GET", self.path, b""))
-            body = b"<RESPONSE>TallyPrime Server is Running</RESPONSE>"
-            self.send_response(200)
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def do_POST(self):
-            body = self.rfile.read(int(self.headers["Content-Length"]))
-            target_log.append(("POST", self.path, body))
-            answer = "<ENVELOPE><BODY><DATA/></BODY></ENVELOPE>".encode("utf-16-le")
+        def answer(self, body):
+            content_types = self.headers.get_all("Content-Type") or []
+            names = [name.lower() for name in self.headers.keys()]
+            target_log.append((self.command, self.path, body, content_types, names))
+            answer = target_answer(self.command, content_types)
             self.send_response(200)
             self.send_header("Content-Length", str(len(answer)))
             self.end_headers()
             self.wfile.write(answer)
+
+        def do_GET(self):
+            self.answer(b"")
+
+        def do_POST(self):
+            self.answer(self.rfile.read(int(self.headers["Content-Length"])))
 
     target = http.server.HTTPServer(("127.0.0.1", 0), Target)
     threading.Thread(target=target.serve_forever, daemon=True).start()
@@ -451,9 +469,11 @@ def self_test():
     threading.Thread(target=relay.serve_forever, daemon=True).start()
     port = relay.server_address[1]
 
-    def send(method, path, body=None):
+    def send(method, path, body=None, content_type="text/xml; charset=utf-16"):
+        """(status, answer) for one request; content_type None sends no Content-Type at all."""
         connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-        connection.request(method, path, body=body, headers={"Content-Type": "text/xml; charset=utf-16"})
+        connection.request(method, path, body=body, headers={} if content_type is None else {
+            "Content-Type": content_type})
         answer = connection.getresponse()
         return answer.status, answer.read()
 
@@ -472,11 +492,31 @@ def self_test():
     census = census.replace('&lt;= $$Date:"20251101"', '&lt;= $$Date:"20251130"')
     assert census.count("20251130") == 2, "the census window was not widened"
     census = census.replace("</SYSTEM>", " AND $AlterID &gt; 120 AND $AlterID &lt;= 182</SYSTEM>")
-    assert send("GET", "/status")[0] == 200
-    assert send("POST", "/", b"\xff\xfe" + ledgers.encode("utf-16-le"))[0] == 200
-    assert send("POST", "/", utf16)[0] == 200
-    assert send("POST", "/", b"\xff\xfe" + census.encode("utf-16-le"))[0] == 200
+    # Each forwarded request must reach the target with the client's own Content-Type lines and no other header but
+    # Host (and Content-Length on a POST), and its answer must be the one the target gives that Content-Type.
+    cases = [
+        ("GET", "/status", None, None),
+        ("GET", "/status", None, "text/xml"),
+        ("POST", "/", b"\xff\xfe" + ledgers.encode("utf-16-le"), "text/xml; charset=utf-16"),
+        ("POST", "/", utf16, "text/xml; charset=utf-16"),
+        ("POST", "/", b"\xff\xfe" + census.encode("utf-16-le"), "text/xml; charset=utf-16"),
+        ("POST", "/", utf16, "text/xml"),
+        ("POST", "/", utf16, None),
+    ]
+    for index, (method, path, body, content_type) in enumerate(cases):
+        sent = [] if content_type is None else [content_type]
+        status, answer = send(method, path, body, content_type)
+        assert status == 200, "%s %s was not forwarded" % (method, path)
+        seen = target_log[index]
+        assert seen[:3] == (method, path, body or b""), "%s %s did not reach the target as sent" % (method, path)
+        assert seen[3] == sent, "%s %s reached the target with Content-Type %r, not the client's %r" % (
+            method, path, seen[3], sent)
+        expected_names = ["host"] + ["content-type"] * len(sent) + (["content-length"] if method == "POST" else [])
+        assert sorted(seen[4]) == sorted(expected_names), "%s %s reached the target with headers %r" % (
+            method, path, seen[4])
+        assert answer == target_answer(method, sent), "%s %s got the answer to another Content-Type" % (method, path)
     forwarded = len(target_log)
+    assert forwarded == len(cases), forwarded
     controls = [
         ("an import", marks.replace("<TALLYREQUEST>Export", "<TALLYREQUEST>Import")),
         ("another ID", marks.replace("<ID>Bridge Agent Company High Water", "<ID>All Masters")),
@@ -540,13 +580,14 @@ def self_test():
         assert raw.recv(64).startswith(b"HTTP/1.1 403"), "an oversized body was not refused before it was read"
     assert len(target_log) == forwarded, "a refused request reached the target"
     lines = open(os.path.join(folder, "manifest.tsv"), encoding="utf-8").read().splitlines()
-    assert len(lines) == 4 + len(controls) + 4, len(lines)
-    assert sum(1 for line in lines if "\tforwarded\t" in line) == 4
-    first = open(os.path.join(folder, "0003-request.bin"), "rb").read()
-    assert first == utf16 and target_log[2][2] == utf16, "the forwarded bytes are not the bytes received"
+    assert len(lines) == forwarded + len(controls) + 4, len(lines)
+    assert sum(1 for line in lines if "\tforwarded\t" in line) == forwarded
+    first = open(os.path.join(folder, "0004-request.bin"), "rb").read()
+    assert first == utf16 and target_log[3][2] == utf16, "the forwarded bytes are not the bytes received"
     relay.shutdown()
     target.shutdown()
-    print("self-test: ok (4 forwarded, %d refused, none of the refused reached the target)" % (len(lines) - 4))
+    print("self-test: ok (%d forwarded, %d refused, none of the refused reached the target)"
+          % (forwarded, len(lines) - forwarded))
     return 0
 
 

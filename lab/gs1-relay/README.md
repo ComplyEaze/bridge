@@ -11,9 +11,15 @@ the company name, 8-digit dates and a read planner's AlterID span allowed to dif
 client that stops mid-request for 60 seconds, is refused. The request to Tally itself has no time limit (an
 abandoned request can leave the gateway stuck), so a stuck Tally holds the relay: that is a STOP under the sheet.
 
+Headers: a forwarded request carries the client's own `Content-Type` lines unchanged, and none when the client sent
+none (a `GET /status` may send none). Tally chooses its answer's encoding from that header (a `/status` asked with
+`charset=utf-16` is answered in UTF-16), so the relay never substitutes its own. It adds only `Host` and, on a POST,
+`Content-Length` (the client's own length), and no other header. The self-test's fake Tally answers differently for
+each `Content-Type` and fails the test if the relay changes, adds or drops one, on `GET /status` and on POSTs.
+
 ## Before the sitting
 1. Check the two files against `SHA256.txt` (`Get-FileHash -Algorithm SHA256 FILE`).
-2. `python -I gs1_relay.py --self-test`. EXPECT `self-test: ok (4 forwarded, 40 refused, none of the refused reached
+2. `python -I gs1_relay.py --self-test`. EXPECT `self-test: ok (7 forwarded, 40 refused, none of the refused reached
    the target)` and exit 0; anything else = do not use the relay.
 
 ## Running it (steps 6 to 8 of GS1-L1)

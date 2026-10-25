@@ -5314,6 +5314,48 @@ fn a_step_or_count_refusal_names_a_concurrent_change_after_what_to_check() {
             "{code}"
         );
     }
+    // With no voucher matched by content, the line follows the plain refusal.
+    let plain = with_post_span_summary(
+        json!({ "state": "refused", "code": "span_step_not_created" }),
+        &json!([]),
+    )["summary"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(
+        plain,
+        format!("ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. {line}")
+    );
+    // A mark that moved by less than the post created refuses with the same
+    // code, so it reads the same line.
+    assert_eq!(
+        super::span_identity::concurrent_change_line_for(
+            super::span_identity::SpanRefusal::StepNotCreated {
+                step: 0,
+                created: 2
+            }
+            .code()
+        ),
+        Some(line)
+    );
+    // A restore recorded by the same check is named after the line.
+    let restored = with_post_span_summary(
+        json!({
+            "state": "refused",
+            "code": "span_count_mismatch",
+            "rollback_recorded": true,
+            "other_batches_covered": {"count": 1},
+        }),
+        &matched,
+    )["summary"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let at_line = restored.find(line).expect("the line");
+    let at_restore = restored
+        .find("This check also found the company's books restored")
+        .expect("the restore sentence");
+    assert!(at_line < at_restore, "{restored}");
     for (state, code) in [
         ("refused", "span_position_mismatch"),
         ("refused", "span_content_mismatch"),

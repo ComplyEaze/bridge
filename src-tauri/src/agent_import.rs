@@ -710,12 +710,10 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     } else {
         "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
     };
-    // A check that recorded a restore while its own post reads intact names
-    // it: the restore reaches other posts of the company, and the posts it
-    // covers keep their status until each is verified again (#1050).
     let mut summary = summary.to_string();
-    // A refusal whose likely cause is another change during the post says so,
-    // as an example, after the line that says what to check (#1633).
+    // A refusal by the mark's step or the span's count says what was observed
+    // and what can do that, as examples, after the line that says what to
+    // check (#1633).
     if report["state"] == "refused" {
         if let Some(line) = report["code"]
             .as_str()
@@ -725,6 +723,9 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
             summary.push_str(line);
         }
     }
+    // A check that recorded a restore while its own post reads intact names
+    // it: the restore reaches other posts of the company, and the posts it
+    // covers keep their status until each is verified again (#1050).
     if report["rollback_recorded"] == true && report["state"] != "book_rolled_back" {
         let count = report["other_batches_covered"]["count"]
             .as_u64()

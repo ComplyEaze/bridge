@@ -8,6 +8,20 @@ use std::{io::Read, num::NonZeroUsize, process::Stdio, time::Duration};
 use tokio::io::AsyncWriteExt;
 
 const MAX_PREVIEW_BYTES: usize = 8_000;
+
+tokio::task_local! {
+    /// Whether the post dialog of the task it is scoped to showed a box that did
+    /// not fit the screen (#1832): set by [`note_box_did_not_fit`] when the
+    /// dialog child exits with the status that says so, and read once by that
+    /// task when the dialog ends. Scoped only by [`PendingPostApproval::ask`];
+    /// anywhere else noting it does nothing.
+    static BOX_DID_NOT_FIT: std::cell::Cell<bool>;
+}
+
+/// Record, for the dialog task this runs in, that its box did not fit.
+fn note_box_did_not_fit() {
+    let _ = BOX_DID_NOT_FIT.try_with(|noted| noted.set(true));
+}
 #[cfg(not(windows))]
 const POST_LABEL: &str = "Post voucher";
 /// The review dialog's positive button, as the person sees it. Windows shows
@@ -321,7 +335,8 @@ impl Answered {
 /// A post dialog left open after the MCP call that asked it returned (#725).
 /// It is [`ApprovedImport::confirm`] itself, unchanged, run on its own task so
 /// that the dialog's time limit and its child's exit are observed while no call
-/// is waiting. Dropping this aborts that task, which drops the dialog child:
+/// is waiting. When its box did not fit the screen (#1832) the task also runs
+/// the one note the asking call gave it, before the answer is stamped. Dropping this aborts that task, which drops the dialog child:
 /// `kill_on_drop` closes the dialog, and a token it prints afterwards is never
 /// read, so a late click approves nothing.
 pub(crate) struct PendingPostApproval {
@@ -334,7 +349,8 @@ pub(crate) struct PendingPostApproval {
 impl PendingPostApproval {
     /// Ask the person in a dialog that may outlive the calling call:
     /// [`ApprovedImport::confirm`] with exactly these arguments, on its own
-    /// task. Nothing else can be run there.
+    /// task. Nothing else can be run there but the one note of a box that did
+    /// not fit, which the caller gives and only the dialog task calls.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn ask(
         xml: String,
@@ -346,22 +362,33 @@ impl PendingPostApproval {
         group_collection_request: Option<AgentReadRequest>,
         currency_request: AgentReadRequest,
         company_marks_request: AgentReadRequest,
+        on_box_did_not_fit: Option<Box<dyn FnOnce() + Send>>,
     ) -> Self {
         let answered = std::sync::Arc::new(std::sync::OnceLock::new());
         let stamp = std::sync::Arc::clone(&answered);
         let dialog = async move {
-            let answer = ApprovedImport::confirm(
-                xml,
-                &preview,
-                voucher_dates,
-                verification_request,
-                ledger_catalogue_request,
-                ledger_binding,
-                group_collection_request,
-                currency_request,
-                company_marks_request,
-            )
-            .await;
+            let (answer, too_tall) = BOX_DID_NOT_FIT
+                .scope(std::cell::Cell::new(false), async {
+                    let answer = ApprovedImport::confirm(
+                        xml,
+                        &preview,
+                        voucher_dates,
+                        verification_request,
+                        ledger_catalogue_request,
+                        ledger_binding,
+                        group_collection_request,
+                        currency_request,
+                        company_marks_request,
+                    )
+                    .await;
+                    (answer, BOX_DID_NOT_FIT.with(std::cell::Cell::get))
+                })
+                .await;
+            // Told before the answer is stamped, so a call that reads the
+            // refusal finds the fact already recorded.
+            if let (true, Some(note)) = (too_tall, on_box_did_not_fit) {
+                note();
+            }
             // Stamped before the task ends, never after: a task seen finished
             // with no stamp is one that ended without an answer. A refusal's
             // code is stamped with it, so it can be read without the task.
@@ -727,6 +754,10 @@ pub(crate) mod test_seam {
         /// Signalled when a held post dialog opens, so a test waits for that
         /// event rather than polling for it against a clock.
         opened: Arc<tokio::sync::Notify>,
+        /// How many of the next post dialogs show a box that does not fit the
+        /// screen, as the real dialog child would report with its exit status
+        /// (#1832): each is refused as `import_review_too_large` and noted.
+        too_tall: Arc<std::sync::atomic::AtomicUsize>,
     }
 
     impl ScriptedApproval {
@@ -744,6 +775,16 @@ pub(crate) mod test_seam {
                 while_pending: Some(Arc::new(while_pending)),
                 ..Self::new(true)
             }
+        }
+
+        /// Approves, except that the first `times` post dialogs show a box that
+        /// does not fit the screen.
+        pub(crate) fn too_tall_first(times: usize) -> Self {
+            let scripted = Self::new(true);
+            scripted
+                .too_tall
+                .store(times, std::sync::atomic::Ordering::SeqCst);
+            scripted
         }
 
         /// A post dialog that stays open until [`ScriptedApproval::answer`].
@@ -797,6 +838,7 @@ pub(crate) mod test_seam {
                 while_pending: None,
                 held: None,
                 opened: Arc::default(),
+                too_tall: Arc::default(),
             }
         }
 
@@ -861,6 +903,22 @@ pub(crate) mod test_seam {
             }
         };
         std::hint::black_box(SEAM_MARKER);
+        let too_tall = SCRIPTED_APPROVAL
+            .try_with(|scripted| {
+                scripted
+                    .too_tall
+                    .fetch_update(
+                        std::sync::atomic::Ordering::SeqCst,
+                        std::sync::atomic::Ordering::SeqCst,
+                        |left| left.checked_sub(1),
+                    )
+                    .is_ok()
+            })
+            .unwrap_or(false);
+        if too_tall {
+            super::note_box_did_not_fit();
+            return Err("import_review_too_large".into());
+        }
         if decision {
             Ok(())
         } else {
@@ -1742,7 +1800,10 @@ async fn confirm_with(
     {
         // A box that did not fit the screen is a refusal whatever else the
         // child printed: the text is too large for this person's screen.
-        Ok(answer) if answer.box_did_not_fit => Err("import_review_too_large".into()),
+        Ok(answer) if answer.box_did_not_fit => {
+            note_box_did_not_fit();
+            Err("import_review_too_large".into())
+        }
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is

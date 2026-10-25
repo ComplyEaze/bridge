@@ -5,8 +5,8 @@
 //! test-only seam, held open until a test answers it.
 use super::*;
 use crate::agent::agent_import::approval::{
-    ApprovalBinding, Begin, Joined, PostApprovals, CALL_CEILING, MAX_KEPT_REFUSALS, MEASURED_POST,
-    MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
+    ApprovalBinding, Begin, Joined, PostApprovals, PreviewForm, CALL_CEILING, MAX_KEPT_REFUSALS,
+    MEASURED_POST, MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
 };
 use crate::agent::agent_protocol::{run_post, serve_stdio, Framer, ToolCallEnd};
 use crate::tally::agent_read_request::AgentReadRequest;
@@ -790,6 +790,7 @@ async fn the_wait_stops_at_a_withdrawal() {
                 None,
                 high_water_read(),
                 high_water_read(),
+                None,
             )
         })
         .await;
@@ -832,7 +833,7 @@ async fn nothing_is_held_for_a_withdrawn_call() {
         })
         .await;
     assert_eq!(held.err().as_deref(), Some("request_cancelled"));
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask(_)));
     let (request, answered, native) = granted(&line, 1).await;
     let held = crate::tally::runtime::TOOL_CANCELLATION
         .scope(withdrawn, async {
@@ -840,7 +841,7 @@ async fn nothing_is_held_for_a_withdrawn_call() {
         })
         .await;
     assert_eq!(held.err().as_deref(), Some("request_cancelled"));
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask(_)));
 }
 
 /// A held dialog whose task ended with no answer (it panicked or was aborted)
@@ -874,7 +875,7 @@ async fn a_dialog_that_ended_unanswered_does_not_block_another_batch() {
         .unwrap();
     assert!(matches!(
         approvals.begin("bridge-00000000-0000-4000-8000-000000000586"),
-        Begin::Ask
+        Begin::Ask(_)
     ));
     assert!(!approvals.holds(&line.batch_id));
     assert!(
@@ -922,7 +923,7 @@ async fn a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it() {
     let approvals = PostApprovals::new(directory.path());
     hold_declined(&approvals, &line, &line.batch_id).await;
     assert!(
-        matches!(approvals.begin(OTHER), Begin::Ask),
+        matches!(approvals.begin(OTHER), Begin::Ask(_)),
         "it blocks no other batch"
     );
     assert!(matches!(
@@ -930,20 +931,20 @@ async fn a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it() {
         Begin::Refused(code) if code == "import_approval_declined"
     ));
     assert!(
-        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
         "returned once"
     );
 
     hold_declined(&approvals, &line, &line.batch_id).await;
-    assert!(matches!(approvals.begin(OTHER), Begin::Ask));
+    assert!(matches!(approvals.begin(OTHER), Begin::Ask(_)));
     approvals.revoke(&line.batch_id, "request_cancelled");
     assert!(
-        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
         "a withdrawal drops it"
     );
     assert!(!approvals.holds(&line.batch_id));
     assert!(
-        matches!(approvals.begin(OTHER), Begin::Ask),
+        matches!(approvals.begin(OTHER), Begin::Ask(_)),
         "nothing is left held"
     );
 }
@@ -957,17 +958,17 @@ async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
     let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_millis(100));
     // Kept while fresh, then aged out.
     hold_declined(&approvals, &line, &line.batch_id).await;
-    assert!(matches!(approvals.begin(OTHER), Begin::Ask));
+    assert!(matches!(approvals.begin(OTHER), Begin::Ask(_)));
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert!(
-        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
         "aged out"
     );
     // The age runs from the click, not from the later call that notices it.
     hold_declined(&approvals, &line, &line.batch_id).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert!(
-        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
         "aged from the click"
     );
     assert!(!approvals.holds(&line.batch_id));
@@ -976,10 +977,10 @@ async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
     let batch = |i: usize| format!("bridge-00000000-0000-4000-8000-{i:012}");
     for i in 0..=MAX_KEPT_REFUSALS {
         hold_declined(&approvals, &line, &batch(i)).await;
-        assert!(matches!(approvals.begin(OTHER), Begin::Ask));
+        assert!(matches!(approvals.begin(OTHER), Begin::Ask(_)));
     }
     assert!(
-        matches!(approvals.begin(&batch(0)), Begin::Ask),
+        matches!(approvals.begin(&batch(0)), Begin::Ask(_)),
         "the oldest was dropped"
     );
     for kept in [batch(1), batch(MAX_KEPT_REFUSALS)] {
@@ -1497,7 +1498,7 @@ async fn a_redemption_ended_before_its_intent_is_not_left_taken() {
     assert!(!server.post_approvals.holds(&line.batch_id), "not stranded");
     assert!(matches!(
         server.post_approvals.begin(&line.batch_id),
-        Begin::Ask
+        Begin::Ask(_)
     ));
     assert_eq!(
         server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
@@ -1542,6 +1543,7 @@ async fn dialog_with(scripted: ScriptedApproval, vouchers: usize) -> PendingPost
                 None,
                 high_water_read(),
                 high_water_read(),
+                None,
             )
         })
         .await
@@ -1576,7 +1578,7 @@ fn binding_of(line: &ImportLedgerLine, preview: &str) -> ApprovalBinding {
         amends_batch_id: None,
     }))
     .unwrap();
-    ApprovalBinding::new(line, preview, &binding)
+    ApprovalBinding::new(line, preview, &binding, PreviewForm::Listed)
 }
 
 fn held_line(directory: &std::path::Path) -> (Server, ImportLedgerLine) {
@@ -1652,7 +1654,7 @@ async fn a_redemption_for_anything_else_is_refused_and_lapses() {
         assert_eq!(note["reason"], "approval_binding_changed", "{case}");
         assert_eq!(note["redeemable"], false, "{case}");
         assert!(
-            matches!(approvals.begin(&line.batch_id), Begin::Ask),
+            matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
             "{case}"
         );
     }
@@ -1723,7 +1725,7 @@ async fn an_expired_approval_lapses_with_a_note() {
         .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
         .unwrap();
     std::thread::sleep(Duration::from_millis(5));
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask(_)));
     let note = approvals.lapse_note(&line.batch_id).unwrap();
     assert_eq!(note["reason"], "approval_expired");
     assert_eq!(note["state"], "approval_lapsed_unposted");
@@ -1762,7 +1764,7 @@ async fn an_approval_does_not_survive_its_process() {
         .unwrap();
     drop(approvals);
     let restarted = PostApprovals::new(directory.path());
-    assert!(matches!(restarted.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(restarted.begin(&line.batch_id), Begin::Ask(_)));
     let note = restarted.lapse_note(&line.batch_id).unwrap();
     assert_eq!(note["reason"], "process_ended");
     assert_eq!(note["redeemable"], false);
@@ -1793,7 +1795,7 @@ async fn an_answer_revoked_before_its_redemption_is_never_spent() {
         .unwrap();
     tokio::time::sleep(Duration::from_millis(20)).await;
     approvals.revoke(&line.batch_id, "request_cancelled");
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask(_)));
     assert!(approvals
         .take_for_dispatch(&line.batch_id, &binding)
         .is_err());
@@ -1825,7 +1827,7 @@ async fn an_answer_revoked_before_its_redemption_is_never_spent() {
         approvals.settle_join(&line.batch_id, Ok(answer)),
         Joined::Refused(code) if code == "import_approval_revoked"
     ));
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask(_)));
     assert!(approvals
         .take_for_dispatch(&line.batch_id, &binding)
         .is_err());
@@ -2191,7 +2193,10 @@ async fn a_redeem_only_begin_goes_on_only_for_this_batchs_live_approval() {
     approvals
         .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
         .unwrap();
-    assert_eq!(approvals.begin_redeem(&line.batch_id), Ok(()));
+    assert_eq!(
+        approvals.begin_redeem(&line.batch_id),
+        Ok(PreviewForm::Listed)
+    );
     let (taken, _, _) = approvals
         .take_for_dispatch(&line.batch_id, &binding)
         .unwrap();
@@ -2626,7 +2631,7 @@ fn assert_refused_and_slot_freed(clicked: Clicked, refused: &Value, code: &str) 
     let approvals = &clicked.server.post_approvals;
     assert!(!approvals.holds(&clicked.line.batch_id), "not stranded");
     assert!(
-        matches!(approvals.begin(OTHER), Begin::Ask),
+        matches!(approvals.begin(OTHER), Begin::Ask(_)),
         "another batch is asked, not refused as busy"
     );
     assert_eq!(
@@ -2820,7 +2825,7 @@ async fn a_batch_lost_between_the_passes_does_not_strand_its_approval() {
     assert_eq!(scripted.counts(), [1], "no second dialog: {answer}");
     assert_eq!(intents(directory.path()), 0);
     assert!(!server.post_approvals.holds(&line.batch_id), "not stranded");
-    assert!(matches!(server.post_approvals.begin(OTHER), Begin::Ask));
+    assert!(matches!(server.post_approvals.begin(OTHER), Begin::Ask(_)));
     assert_eq!(
         server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
         "post_refused_before_intent"
@@ -2869,4 +2874,403 @@ async fn a_skip_recorded_after_the_click_is_refused_in_the_redeeming_call_and_wi
     // the redeeming call read nothing: only the first call's reads were made
     assert_eq!(observed.len(), before_approval().len());
     assert_eq!(intents(directory.path()), 0);
+}
+
+/// A dialog for `vouchers` vouchers, answered as `scripted` decides, that
+/// tells `note` if its box did not fit the screen (#1832).
+async fn dialog_noting(
+    scripted: ScriptedApproval,
+    vouchers: usize,
+    note: Option<Box<dyn FnOnce() + Send>>,
+) -> PendingPostApproval {
+    SCRIPTED_APPROVAL
+        .scope(scripted, async {
+            PendingPostApproval::ask(
+                "<ENVELOPE/>".into(),
+                "Synthetic preview".into(),
+                vec![bridge_tally_core::TallyDate::parse("20260901").unwrap(); vouchers],
+                high_water_read(),
+                high_water_read(),
+                cash_binding(),
+                None,
+                high_water_read(),
+                high_water_read(),
+                note,
+            )
+        })
+        .await
+}
+
+/// A batch of `count` Journals made from the saved one.
+fn batch_of(one: &ImportLedgerLine, count: usize) -> ImportLedgerLine {
+    let mut batch = one.clone();
+    for at in 1..count {
+        let mut next = one.vouchers[0].clone();
+        next.bridge_txn_id = format!("journal-583-{}", at + 1);
+        batch.vouchers.push(next);
+    }
+    batch
+}
+
+/// The totals form leaves out the voucher lines and says why, the listed form
+/// shows them, and one voucher has no other form (#1832).
+#[test]
+fn the_totals_form_is_the_listed_forms_fallback_text_and_nothing_else() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let (one, _) = saved_batch(&server);
+    let endpoint = server.settings.endpoint.clone();
+    let footer = agent_post_timing_lines();
+    let form = |line: &ImportLedgerLine, form| {
+        review_preview_with_form(line, &endpoint, &footer, form).unwrap()
+    };
+    let two = batch_of(&one, 2);
+    let listed = form(&two, PreviewForm::Listed);
+    let totals = form(&two, PreviewForm::TotalsOnly);
+    let voucher_line =
+        "Journal 20260901  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Synthetic test only\"";
+    assert!(listed.lines().any(|text| text == voucher_line), "{listed}");
+    assert!(!listed.contains(VOUCHER_LINES_DO_NOT_FIT), "{listed}");
+    assert!(!totals.lines().any(|text| text == voucher_line), "{totals}");
+    assert!(totals.contains(VOUCHER_LINES_DO_NOT_FIT), "{totals}");
+    assert!(totals.lines().count() < listed.lines().count());
+    // Everything the person checks first is the same in both.
+    let head = |text: &str| text.lines().take(6).collect::<Vec<_>>().join("\n");
+    assert_eq!(head(&listed), head(&totals));
+    // The same text the cap fallback gives a batch whose lines do not fit.
+    assert_eq!(totals, form(&two, PreviewForm::TotalsOnly), "deterministic");
+    // One voucher has no shorter form.
+    assert_eq!(
+        form(&one, PreviewForm::Listed),
+        form(&one, PreviewForm::TotalsOnly)
+    );
+    // A refusal before the lines is kept: a batch past the limit shows its
+    // sentence in both forms.
+    let many = batch_of(&one, BATCH_REVIEW_MAX_VOUCHER_LINES + 1);
+    assert_eq!(
+        form(&many, PreviewForm::Listed),
+        form(&many, PreviewForm::TotalsOnly)
+    );
+}
+
+/// What the person was shown includes which form: the same preview bound as
+/// the other form is another binding (#1832).
+#[test]
+fn a_binding_names_its_form() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let ledgers = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue(),
+        "WR2 Unicode Lab",
+        GUID,
+    )
+    .unwrap()
+    .bind_selected(["Cash".to_string()])
+    .unwrap();
+    let listed = ApprovalBinding::new(&line, "Preview", &ledgers, PreviewForm::Listed);
+    let totals = ApprovalBinding::new(&line, "Preview", &ledgers, PreviewForm::TotalsOnly);
+    assert_eq!(
+        listed,
+        ApprovalBinding::new(&line, "Preview", &ledgers, PreviewForm::Listed)
+    );
+    assert_ne!(listed, totals);
+}
+
+/// A batch whose listed box did not fit the screen is asked again as totals
+/// only; another batch is not; a withdrawal, its time running out, and the cap
+/// end it (#1832).
+#[tokio::test]
+async fn a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Ask(PreviewForm::Listed)
+    ));
+    approvals.note_listed_did_not_fit(&line.batch_id)();
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Ask(PreviewForm::TotalsOnly)
+    ));
+    assert!(matches!(
+        approvals.begin(OTHER),
+        Begin::Ask(PreviewForm::Listed)
+    ));
+    // Asked as often as it is asked: nothing but a withdrawal or time ends it.
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Ask(PreviewForm::TotalsOnly)
+    ));
+    approvals.revoke(&line.batch_id, "test");
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Ask(PreviewForm::Listed)
+    ));
+
+    let brief = PostApprovals::with_ttl(directory.path(), Duration::from_millis(100));
+    brief.note_listed_did_not_fit(&line.batch_id)();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(
+        matches!(brief.begin(&line.batch_id), Begin::Ask(PreviewForm::Listed)),
+        "aged out"
+    );
+
+    // Noting a batch again replaces its note, so repeats never crowd out
+    // another batch's.
+    let again = PostApprovals::new(directory.path());
+    again.note_listed_did_not_fit(OTHER)();
+    for _ in 0..=MAX_KEPT_REFUSALS + 8 {
+        again.note_listed_did_not_fit(&line.batch_id)();
+    }
+    assert!(matches!(
+        again.begin(OTHER),
+        Begin::Ask(PreviewForm::TotalsOnly)
+    ));
+
+    let batch = |i: usize| format!("bridge-00000000-0000-4000-8000-{i:012}");
+    for i in 0..=MAX_KEPT_REFUSALS {
+        approvals.note_listed_did_not_fit(&batch(i))();
+    }
+    assert!(
+        matches!(approvals.begin(&batch(0)), Begin::Ask(PreviewForm::Listed)),
+        "the oldest was dropped"
+    );
+    for kept in [batch(1), batch(MAX_KEPT_REFUSALS)] {
+        assert!(matches!(
+            approvals.begin(&kept),
+            Begin::Ask(PreviewForm::TotalsOnly)
+        ));
+    }
+}
+
+/// Only a dialog that reports a box that did not fit, and only one given the
+/// note, makes a batch remembered; the dialog still refuses as it did (#1832).
+#[tokio::test]
+async fn only_a_box_that_did_not_fit_notes_its_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let wait = Duration::from_secs(5);
+    let batch = line.batch_id.as_str();
+
+    // A box that did not fit: refused as too large, and noted.
+    let approvals = PostApprovals::new(directory.path());
+    let note = approvals.note_listed_did_not_fit(batch);
+    let dialog = dialog_noting(ScriptedApproval::too_tall_first(1), 2, Some(note)).await;
+    let (answer, answered) = dialog.answer_within(wait).await.ok().expect("answered");
+    assert_eq!(answer.err().as_deref(), Some("import_review_too_large"));
+    assert!(!answered.approved);
+    assert!(matches!(
+        approvals.begin(batch),
+        Begin::Ask(PreviewForm::TotalsOnly)
+    ));
+
+    // The totals box, asked with no note, is approved or refused on its own.
+    let again = dialog_noting(ScriptedApproval::approving(), 2, None).await;
+    assert!(again.answer_within(wait).await.ok().unwrap().0.is_ok());
+
+    // An approval, a decline, and a box that did not fit but was given no note
+    // (the totals box, one voucher) record nothing.
+    for (scripted, vouchers, note_given, noted) in [
+        (ScriptedApproval::approving(), 2, true, false),
+        (ScriptedApproval::declining(), 2, true, false),
+        (ScriptedApproval::too_tall_first(1), 2, false, false),
+        (ScriptedApproval::too_tall_first(1), 2, true, true),
+    ] {
+        let approvals = PostApprovals::new(directory.path());
+        let note = note_given.then(|| approvals.note_listed_did_not_fit(batch));
+        let dialog = dialog_noting(scripted, vouchers, note).await;
+        let _ = dialog.answer_within(wait).await.ok().expect("answered");
+        let form = if noted {
+            PreviewForm::TotalsOnly
+        } else {
+            PreviewForm::Listed
+        };
+        assert!(
+            matches!(approvals.begin(batch), Begin::Ask(shown) if shown == form),
+            "{noted}"
+        );
+    }
+}
+
+/// A batch of two whose box with the voucher lines does not fit the screen
+/// (#1832): the first call is refused as too large and posts nothing, the
+/// second asks the person for the totals only, and a later call posts what the
+/// person approved. The three calls run the whole path, so a form lost between
+/// the ask, the held approval and the redemption fails here.
+#[tokio::test]
+async fn a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    plans.extend(before_approval());
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_of_two(&server);
+
+    // 1. The box with the voucher lines does not fit: refused, nothing held.
+    let too_tall = ScriptedApproval::too_tall_first(1);
+    let refused = SCRIPTED_APPROVAL
+        .scope(
+            too_tall.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(
+        result(&refused)["error"]["code"],
+        "import_review_too_large",
+        "{refused}"
+    );
+    assert_eq!(intents(directory.path()), 0);
+    assert!(!server.post_approvals.holds(&line.batch_id));
+    let listed = too_tall.previews();
+    assert_eq!(listed.len(), 1);
+    assert!(
+        !listed[0].contains(VOUCHER_LINES_DO_NOT_FIT),
+        "{}",
+        listed[0]
+    );
+
+    // 2. Asked again: the totals only, and the dialog stays open for the person.
+    let held = ScriptedApproval::held();
+    let pending = SCRIPTED_APPROVAL
+        .scope(held.clone(), server.call_tool("post_import", args.clone()))
+        .await;
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    let totals = held.previews();
+    assert_eq!(totals.len(), 1);
+    assert!(
+        totals[0].contains(VOUCHER_LINES_DO_NOT_FIT),
+        "{}",
+        totals[0]
+    );
+    assert_ne!(totals[0], listed[0]);
+    assert_eq!(
+        held.counts(),
+        [2],
+        "the person was asked about both vouchers"
+    );
+
+    // 3. The person approves it; the next call posts it, once, as the batch
+    // the person approved.
+    held.answer(true);
+    until_answered(&server, &line.batch_id).await;
+    let posted = server.call_tool("post_import", args).await;
+    let observed = sent(simulator);
+    assert_eq!(result(&posted)["attempt_recorded"], true, "{posted}");
+    assert_eq!(
+        dispatch_intent(directory.path())["batch_id"],
+        line.batch_id.as_str()
+    );
+    assert!(observed.len() > post_at, "the POST was sent: {posted}");
+    assert_eq!(held.counts(), [2], "nobody was asked a third time");
+}
+
+/// The same refusal, then the totals box does not fit either: refused again,
+/// nothing posted, and no third dialog (#1832).
+#[tokio::test]
+async fn a_totals_box_that_does_not_fit_either_is_refused_and_asks_no_third_time() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_of_two(&server);
+    let scripted = ScriptedApproval::too_tall_first(2);
+    for _ in 0..2 {
+        let refused = SCRIPTED_APPROVAL
+            .scope(
+                scripted.clone(),
+                server.call_tool("post_import", args.clone()),
+            )
+            .await;
+        assert_eq!(
+            result(&refused)["error"]["code"],
+            "import_review_too_large",
+            "{refused}"
+        );
+    }
+    let previews = scripted.previews();
+    assert_eq!(previews.len(), 2);
+    assert!(!previews[0].contains(VOUCHER_LINES_DO_NOT_FIT));
+    assert!(previews[1].contains(VOUCHER_LINES_DO_NOT_FIT));
+    assert_eq!(intents(directory.path()), 0);
+    assert!(!server.post_approvals.holds(&line.batch_id));
+    // Refused a third time with the totals again: the fact is not re-recorded by
+    // the totals ask, and is still there from the first.
+    assert!(matches!(
+        server.post_approvals.begin(&line.batch_id),
+        Begin::Ask(PreviewForm::TotalsOnly)
+    ));
+    drop(simulator);
+}
+
+/// The totals form's approval answered too late for its call to post it is held
+/// and redeemed by the next call as the same form: the redeem rebuilds the
+/// totals text, not the voucher lines, and posts exactly the batch (#1832).
+#[tokio::test]
+async fn a_totals_approval_held_for_the_next_call_is_redeemed_as_totals() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    plans.extend(before_approval());
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    // A post measured at the whole ceiling never fits in the answering call.
+    server.post_approvals = std::sync::Arc::new(PostApprovals::with_measured_post(
+        directory.path(),
+        CALL_CEILING,
+    ));
+    let (line, args) = saved_batch_of_two(&server);
+    let too_tall = ScriptedApproval::too_tall_first(1);
+    let refused = SCRIPTED_APPROVAL
+        .scope(
+            too_tall.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(
+        result(&refused)["error"]["code"],
+        "import_review_too_large",
+        "{refused}"
+    );
+
+    let approving = ScriptedApproval::approving();
+    let approved = SCRIPTED_APPROVAL
+        .scope(
+            approving.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(
+        result(&approved)["approval"]["state"],
+        "approved",
+        "{approved}"
+    );
+    assert!(approving.previews()[0].contains(VOUCHER_LINES_DO_NOT_FIT));
+    assert_eq!(intents(directory.path()), 0);
+    assert!(server.post_approvals.holds(&line.batch_id));
+
+    // A call that is given a dialog that would approve the voucher lines, and
+    // would show them: it must not be reached, the held approval is redeemed.
+    let again = ScriptedApproval::approving();
+    let posted = SCRIPTED_APPROVAL
+        .scope(again.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(result(&posted)["attempt_recorded"], true, "{posted}");
+    assert!(again.previews().is_empty(), "nobody was asked again");
+    assert_eq!(
+        dispatch_intent(directory.path())["batch_id"],
+        line.batch_id.as_str()
+    );
+    assert!(observed.len() > post_at, "{posted}");
 }

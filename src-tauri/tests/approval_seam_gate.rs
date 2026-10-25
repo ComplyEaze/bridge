@@ -1094,7 +1094,10 @@ const CONFIRM_WITH: &str = r#"async fn confirm_with(
     {
         // A box that did not fit the screen is a refusal whatever else the
         // child printed: the text is too large for this person's screen.
-        Ok(answer) if answer.box_did_not_fit => Err("import_review_too_large".into()),
+        Ok(answer) if answer.box_did_not_fit => {
+            note_box_did_not_fit();
+            Err("import_review_too_large".into())
+        }
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1728,10 +1731,13 @@ fn each_dialog_answers_only_on_its_positive_button() {
         // The parent stops reading a box that did not fit as a refusal, or
         // the dialog stops measuring its box (#1832).
         source.replacen(
-            "        Ok(answer) if answer.box_did_not_fit => Err(\"import_review_too_large\".into()),\n",
+            "        Ok(answer) if answer.box_did_not_fit => {\n            note_box_did_not_fit();\n            Err(\"import_review_too_large\".into())\n        }\n",
             "",
             1,
         ),
+        // The box that did not fit is refused but no longer noted for the
+        // batch's next ask (#1832).
+        source.replacen("            note_box_did_not_fit();\n", "", 1),
         source.replacen(
             "        Ok(answer) if answer.box_did_not_fit => Err(\"ack_review_too_large\".into()),\n",
             "",
@@ -2091,4 +2097,121 @@ fn every_shipped_build_runs_the_seam_scan() {
     assert!(read(".github/workflows/release-mcpb-preview.yml").contains(
         "node scripts/check-no-test-seam.mjs src-tauri/target/release/${{ matrix.binary }}"
     ));
+}
+
+/// Problems with who may make the totals form of a post's preview (#1832): a
+/// batch is shown it only after its box with the voucher lines did not fit the
+/// screen, and only the approvals holder remembers that, so no other module
+/// names it. `others` is every other source file of the crate that is not a
+/// test file, as (name, text).
+fn totals_form_problems(post: &str, approval: &str, others: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (name, text) in others {
+        if text.contains("TotalsOnly") {
+            problems.push(format!("{name} must not name PreviewForm::TotalsOnly"));
+        }
+    }
+    let made =
+        "            PreviewForm::TotalsOnly\n        } else {\n            PreviewForm::Listed";
+    if approval.matches(made).count() != 1 {
+        problems.push("expected the one place that makes PreviewForm::TotalsOnly".into());
+    }
+    // Its variant, its doc comment and its one maker: no `Self::TotalsOnly`,
+    // no glob import, no second maker.
+    if approval.matches("TotalsOnly").count() != 3 || approval.contains("PreviewForm::*") {
+        problems
+            .push("TotalsOnly is named in its definition, its doc and its one maker only".into());
+    }
+    // The note that remembers a batch is given only to a dialog asking the
+    // listed form of a batch, so the totals form can never note itself.
+    let given = "(form == PreviewForm::Listed && line.vouchers.len() > 1)\n                                .then(|| self.post_approvals.note_listed_did_not_fit(batch_id)),";
+    if post.matches(given).count() != 1 {
+        problems.push("the note must be given only for a batch's listed form".into());
+    }
+    problems
+}
+
+/// Every non-test source file of the crate but the approvals holder and the
+/// post path, as (path, text).
+fn other_sources() -> Vec<(String, String)> {
+    let mut found = Vec::new();
+    let mut directories = vec![repo().join("src-tauri/src")];
+    while let Some(directory) = directories.pop() {
+        for entry in fs::read_dir(&directory).expect("src-tauri/src is readable") {
+            let path = entry.expect("a directory entry").path();
+            if path.is_dir() {
+                directories.push(path);
+                continue;
+            }
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            let is_rust = name.ends_with(".rs");
+            let is_test =
+                name.ends_with("_tests.rs") || name.contains("_tests_") || name == "tests.rs";
+            if is_rust && !is_test && name != "agent_import_approval.rs" {
+                let text = fs::read_to_string(&path).expect("a readable source file");
+                found.push((path.display().to_string(), text));
+            }
+        }
+    }
+    found
+}
+
+#[test]
+fn only_the_approvals_holder_makes_the_totals_form() {
+    let post = read("src-tauri/src/agent_import_post.rs");
+    let approval = read("src-tauri/src/agent_import_approval.rs");
+    let others = other_sources();
+    assert!(
+        others.len() > 50,
+        "the scan reads the crate: {}",
+        others.len()
+    );
+    assert_eq!(
+        totals_form_problems(&post, &approval, &others),
+        Vec::<String>::new()
+    );
+    // The check itself: each way of widening it is caught.
+    let mut named_elsewhere = others.clone();
+    named_elsewhere[0]
+        .1
+        .push_str("\nconst X: u8 = 0; // PreviewForm::TotalsOnly\n");
+    for (broken_post, broken_approval, broken_others) in [
+        (post.clone(), approval.clone(), named_elsewhere),
+        (
+            post.clone(),
+            format!("{approval}\nconst Y: PreviewForm = PreviewForm::TotalsOnly;\n"),
+            others.clone(),
+        ),
+        (
+            post.clone(),
+            format!("{approval}\nuse PreviewForm::*;\n"),
+            others.clone(),
+        ),
+        (
+            post.replace(
+                "(form == PreviewForm::Listed && line.vouchers.len() > 1)",
+                "(line.vouchers.len() > 1)",
+            ),
+            approval.clone(),
+            others.clone(),
+        ),
+        (
+            post.replace(
+                "(form == PreviewForm::Listed && line.vouchers.len() > 1)",
+                "(form == PreviewForm::Listed)",
+            ),
+            approval.clone(),
+            others.clone(),
+        ),
+        (
+            post.replace(
+                ".then(|| self.post_approvals.note_listed_did_not_fit(batch_id)),",
+                ".then(|| Box::new(|| {}) as Box<dyn FnOnce() + Send>),",
+            ),
+            approval.clone(),
+            others.clone(),
+        ),
+    ] {
+        assert!(!totals_form_problems(&broken_post, &broken_approval, &broken_others).is_empty());
+    }
 }

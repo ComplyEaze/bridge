@@ -5058,18 +5058,27 @@ fn the_approval_binding_covers_the_on_account_record() {
     let (mut line, endpoint) = batch();
     let ledgers = captured_binding(&["Cash"]);
     let plain = agent_review_preview(&line, &endpoint).unwrap();
-    let before = ApprovalBinding::new(&line, &plain, &ledgers);
+    let before = ApprovalBinding::new(&line, &plain, &ledgers, PreviewForm::Listed);
     approve_on_account(&mut line, &["Expense"]);
     let marked = agent_review_preview(&line, &endpoint).unwrap();
-    assert_ne!(ApprovalBinding::new(&line, &marked, &ledgers), before);
-    assert_eq!(ApprovalBinding::new(&line, &plain, &ledgers), before);
+    assert_ne!(
+        ApprovalBinding::new(&line, &marked, &ledgers, PreviewForm::Listed),
+        before
+    );
+    assert_eq!(
+        ApprovalBinding::new(&line, &plain, &ledgers, PreviewForm::Listed),
+        before
+    );
 
     let (mut batch_line, endpoint) = batch_of_every_type();
     let plain = agent_review_preview(&batch_line, &endpoint).unwrap();
-    let before = ApprovalBinding::new(&batch_line, &plain, &ledgers);
+    let before = ApprovalBinding::new(&batch_line, &plain, &ledgers, PreviewForm::Listed);
     approve_on_account(&mut batch_line, &["Party A"]);
     let marked = agent_review_preview(&batch_line, &endpoint).unwrap();
-    assert_ne!(ApprovalBinding::new(&batch_line, &marked, &ledgers), before);
+    assert_ne!(
+        ApprovalBinding::new(&batch_line, &marked, &ledgers, PreviewForm::Listed),
+        before
+    );
 }
 
 /// The mark is part of the line the caps measure: a marked entry line of 100

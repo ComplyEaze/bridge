@@ -307,7 +307,7 @@ const CHECK_NOT_RUN_STEP: &str =
 const CHECK_NOT_RUN_RECORDED_STEP: &str = "The skipped rows are recorded; the transfer check will show on the next build or verification for this company.";
 /// What a row marked restored means, whatever its state (#1050): the batch it
 /// names is one a recorded rollback covers, which no step settles.
-pub(super) const RESTORED_NOTE: &str = "A row marked restored names a batch whose vouchers a restore that ComplyEaze Bridge recorded may have removed from Tally. Whatever the row's state says, that batch stays unverified here even after verify_import, and no step inside ComplyEaze Bridge frees the row. Check in Tally whether that batch's voucher for the row is there, and tell the person. Do not enter this transfer in Tally by hand, and never import that batch's file: a later re-post of its rows would book it twice.";
+pub(super) const RESTORED_NOTE: &str = "A row marked restored names a batch whose vouchers a restore that ComplyEaze Bridge recorded may have removed from Tally. Whatever the row's state says, that batch stays unverified here even after verify_import, and no step inside ComplyEaze Bridge settles the row: do not name it in withdraw_skips, and do not build or amend its rows. Check in Tally whether that batch's voucher for the row is there, and tell the person. Do not enter this transfer in Tally by hand, and never import that batch's file: a later re-post of its rows would book it twice.";
 const OPEN_OMITTED_STEP: &str =
     "Some open rows are not listed because the response is full. Raise BRIDGE_AGENT_MAX_BYTES to list every open row.";
 

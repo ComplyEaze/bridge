@@ -1344,26 +1344,30 @@ pub(super) fn build_transfer_facts(
         match holders.get(mention.row.as_str()) {
             None => skips.push(mention.fact),
             Some(holding) => {
-                let contradicting = holding.batches.iter().copied().find(|&at| {
-                    batches[at].found
-                        && withdrawn_at
-                            .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
-                            .is_none_or(|recorded| *recorded <= mention.built)
-                });
+                let unwithdrawn = |at: usize| {
+                    withdrawn_at
+                        .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
+                        .is_none_or(|recorded| *recorded <= mention.built)
+                };
+                let contradicting = holding
+                    .batches
+                    .iter()
+                    .copied()
+                    .find(|&at| batches[at].found && unwithdrawn(at));
                 let any_posted = holding.batches.iter().any(|&at| batches[at].found);
-                // What the skip would be with no rollback covering a holder: a
-                // skip retired then stays out of every admission (#1050).
-                let retired_but_for_cover = contradicting.is_none()
-                    && !any_posted
-                    && holding.batches.iter().all(|&at| {
-                        !batches[at].ever_found
-                            || withdrawn_at
-                                .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
-                                .is_some_and(|recorded| *recorded > mention.built)
-                    })
-                    && holding.batches.iter().any(|&at| batches[at].ever_found);
-                match (contradicting, any_posted) {
-                    (None, true) => {
+                // What the skip would be with no rollback covering a holder,
+                // every batch ever read posted counting as found (#1050): a
+                // rollback never retires a skip that would otherwise be held,
+                // and a skip retired then stays out of every admission.
+                let retired_without_cover =
+                    holding.batches.iter().any(|&at| batches[at].ever_found)
+                        && !holding
+                            .batches
+                            .iter()
+                            .any(|&at| batches[at].ever_found && unwithdrawn(at));
+                let retired_but_for_cover = retired_without_cover && !any_posted;
+                match (contradicting, retired_without_cover && any_posted) {
+                    (_, true) => {
                         retired_skips += 1;
                         continue;
                     }

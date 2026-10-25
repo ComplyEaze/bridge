@@ -955,6 +955,43 @@ fn a_skip_held_only_by_the_cover_is_left_out_of_the_withdrawal_view() {
     assert_eq!(restored.live_skips, master.live_skips);
 }
 
+/// The mirror of a skip held only by the cover: a covered batch that never
+/// recorded the withdrawal, beside an uncovered batch found posted that did.
+/// Master holds the row against the covered batch; a rollback must not turn
+/// that into a retirement, which would drop the row from the live skips and
+/// name the covered batch nowhere (#1050).
+#[test]
+fn a_rollback_never_retires_a_skip_master_holds() {
+    let skipped = build(70)
+        .facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)))
+        .status("posted_verified");
+    let covered = build(71).placed().voucher(payment(&st(6), "500.00"));
+    let withdrew = build(72)
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)])
+        .status("posted_verified");
+    let before = Journal::default()
+        .batch(&skipped)
+        .batch(&covered)
+        .sent_natively(&covered)
+        .status(&covered, "posted_verified")
+        .batch(&withdrew);
+    let master = before.read().unwrap();
+    assert_eq!(master.retired_skips, 0, "master holds it");
+    assert!(master.live_skips.contains(&key(B1, 6)));
+    let restored = before.restored(&covered).read().unwrap();
+    assert_eq!(restored.retired_skips, 0);
+    assert_eq!(
+        held_tuples(&restored),
+        vec![(key(B1, 6), BatchId::new(batch_id(71)), date("20260901"))]
+    );
+    assert!(matches!(restored.held[0].by, HeldBy::UnverifiedBatch));
+    assert!(restored.held[0].pairs);
+    assert_eq!(restored.restored, [batch_id(71)].into());
+    assert_eq!(restored.skip_mentions, master.skip_mentions);
+    assert_eq!(restored.live_skips, master.live_skips);
+}
+
 /// A restored batch that posted a skipped row without its withdrawal is held
 /// elsewhere, not posted against the skip: whether its voucher is still in
 /// Tally is not known.

@@ -2116,9 +2116,12 @@ refused as `proposals_legacy` (parse the statement again).
   reads `held_elsewhere` naming it, its Contra is an unverified candidate, and
   its days give no coverage. Every row naming such a batch carries
   `"restored": true`, and `next_steps.restored` says what that means: no step
-  inside ComplyEaze Bridge frees the row; check in Tally whether that batch's
-  voucher for it is there and tell the person, and do not enter the transfer by
-  hand or import that batch's file.
+  inside ComplyEaze Bridge settles the row, so do not name it in
+  `withdraw_skips` or build or amend its rows (that is advice: a withdrawal is
+  refused only when a Contra carries the row); check in Tally whether that
+  batch's voucher for it is there and tell the person, and do not enter the
+  transfer by hand or import that batch's file. A rollback never retires a skip
+  that would be held without it.
 - **What `held_elsewhere` and `posted_against_skip` mean.** A skipped row that
   a batch holds as a voucher is not a skip to pair. While no batch holding the
   row is found posted it reads `held_elsewhere`, with the batch to verify. Once

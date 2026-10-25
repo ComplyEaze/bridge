@@ -387,8 +387,6 @@ code-signed.
   delete the original, because moving a file keeps who can read it. A password file on a drive
   that keeps no access list, such as a FAT or exFAT stick, is expected to be refused as well;
   that is not yet measured.
-- The hand-import script `scripts/bank_statement_import.py` (not part of the downloaded package, #1430) now writes the same
-  `| Statement party: <name>` segment under the same rules as the app, and
 - When `vouchers`, `voucher_presence`, `ledger_movement` or a register comes back empty for a window on a large
   book, the second look at the window widened by a day each side now counts it instead of reading its vouchers,
   so it usually sends fewer requests (#1240; the same number where the count takes several requests and the
@@ -401,6 +399,8 @@ code-signed.
   could not be made or went over its allowance, a disagreement between the count and the read) no longer happens;
   a count of several requests can still pass its own allowance. A book that fits one request is read as before. The request counts
   come from test doubles, not from a live Tally.
+- The hand-import script `scripts/bank_statement_import.py` (not part of the downloaded package, #1430) now writes the same
+  `| Statement party: <name>` segment under the same rules as the app, and
   refuses a run whose narration holds a control character or the reserved marker, or runs past 2,000 characters, as
   `narration_not_admissible`, as the app does (`party_not_admissible` when the party's own segment is what breaks
   the rule). Importing its file again for a statement already imported is expected to rewrite those vouchers'

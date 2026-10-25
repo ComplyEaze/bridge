@@ -1499,15 +1499,16 @@ covers only the identity and marks reads it sent.
   is written, `2026-08-01` or `20260801`), the same voucher-type selector, search and grouping and the
   `ledger` argument exactly as typed on the first page; a differently spelled
   `ledger` is a different question and reads the whole window again.
-- **What a page cannot see.** A change that moves neither mark. Of the screen
-  actions measured on TallyPrime 7.1 each moved a mark (§11c.5, one run each: a voucher
+- **What a page cannot see.** A change that moves neither mark. Each screen
+  action measured on TallyPrime 7.1 moved a mark (§11c.5, one run each: a voucher
   delete moved `ALTVCHID` by 2, a cancel and a save with no change by 1, a
   regroup, an opening change and a ledger create or delete `ALTMSTID` by 1).
   One run on TallyPrime 7.2 did not (PARTIAL, reported by the lab, §11c.5): opening
-  Tally's GST Annual Computation report and answering Yes to its prompt to update
-  the GST status of 20 vouchers changed stored data while neither mark moved. So a
+  Tally's GST Annual Computation report showed a prompt that it would update the
+  GST status of 20 vouchers; answered Yes, neither mark moved, and no read of the
+  status was made before and after. If the update did change a status, a
   held page of a read that carries a voucher's GST status (`gst_status`,
-  `gst_uncertain_vouchers`, and any page with GST fields) can be stale on 7.2 with
+  `gst_uncertain_vouchers`, and any page with GST fields) could be stale on 7.2 with
   both marks unchanged. Open until a lab row runs: whether a read through the
   gateway can cause that update, and whether 7.1 does the same.
   Not shown or not established: the second `ALTVCHID` step seen on marking a

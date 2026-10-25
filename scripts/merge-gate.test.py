@@ -754,6 +754,51 @@ class MergeGateControls(unittest.TestCase):
         self.assertIn(self.STALE + " '<home>/cap.bin'", result.stdout)
         self.assertNotIn("someone", result.stdout)
 
+    COULD_NOT_RUN = "lab-capture manifest: the stale-entry check could not run (git could not look up an entry's path on master)"
+
+    def test_a_git_failure_on_the_first_entry_says_the_check_could_not_run_and_changes_nothing_else(self):
+        # git refuses a path outside the repository (exit 128); the schema allows "docs/../../x" because it does not start with ".."
+        manifest = self.lab_manifest(self.lab_entry(path="docs/../../outside.bin"), self.lab_entry())
+        with self.master_state(tracked={self.LAB_PATH: manifest}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn(self.COULD_NOT_RUN, result.stdout)
+        self.assertNotIn(self.PENDING, result.stdout)
+        self.assertNotIn(self.STALE, result.stdout)
+
+    def test_a_git_failure_after_some_entries_says_the_check_stopped_partway(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="docs/../../outside.bin"))
+        with self.master_state(tracked={self.LAB_PATH: manifest}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn("lab-capture manifest: the stale-entry check stopped partway, after 1 of 2 entries", result.stdout)
+        self.assertNotIn(self.COULD_NOT_RUN, result.stdout)
+
+    def run_with_failing_git(self, subcommand, manifest):
+        # a git stub that fails only the stale check's own lookups (git --literal-pathspecs ... <subcommand>); every other call is real
+        real_git = shutil.which("git")
+        with tempfile.TemporaryDirectory() as stub_dir:
+            stub = Path(stub_dir) / "git"
+            stub.write_text("#!/bin/sh\n"
+                            "case \" $* \" in *\" --literal-pathspecs \"*\" %s \"*) echo 'stub: refused' >&2; exit 128 ;; esac\n"
+                            "exec %s \"$@\"\n" % (subcommand, shlex.quote(real_git)))
+            stub.chmod(0o755)
+            old_path = os.environ["PATH"]
+            os.environ["PATH"] = stub_dir + os.pathsep + old_path
+            try:
+                with self.master_state(tracked={self.LAB_PATH: manifest}):
+                    return self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+            finally:
+                os.environ["PATH"] = old_path
+
+    def test_a_failing_history_lookup_is_not_counted_as_pending(self):
+        result = self.run_with_failing_git("log", self.lab_manifest(self.lab_entry()))
+        self.assertIn(self.COULD_NOT_RUN, result.stdout)
+        self.assertNotIn(self.PENDING, result.stdout)
+
+    def test_a_failing_tree_lookup_is_not_counted_as_pending(self):
+        result = self.run_with_failing_git("ls-tree", self.lab_manifest(self.lab_entry()))
+        self.assertIn(self.COULD_NOT_RUN, result.stdout)
+        self.assertNotIn(self.PENDING, result.stdout)
+
     def test_more_than_eight_stale_entries_are_named_eight_times_and_counted(self):
         paths = ["docs/s%d.bin" % i for i in range(10)]
         manifest = self.lab_manifest(self.lab_entry(), *[self.lab_entry(path=p) for p in paths])

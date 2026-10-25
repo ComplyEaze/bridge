@@ -692,7 +692,8 @@ else
   # master never held is pending (its pull request has not merged) and only counted. Paths are read literally (no pathspec magic),
   # names are redacted like any gate output, and at most eight are named.
   lab_capture_stale_rows() {
-    local tip="$1" path blob _size _sha listing master_blob gone shown pending=0 stale=0 failed=0
+    local tip="$1" path blob _size _sha listing master_blob gone shown pending=0 stale=0 failed=0 checked=0 total
+    total=$(wc -l <"$lab_captures_file" | tr -d ' ')
     while IFS=$'\t' read -r path blob _size _sha; do
       listing=$(git --literal-pathspecs -C "$gate_tree" ls-tree "$tip" -- "$path" 2>/dev/null) || { failed=1; break; }
       if [ -n "$listing" ]; then
@@ -715,9 +716,12 @@ else
           pending=$((pending + 1))
         fi
       fi
+      checked=$((checked + 1))
     done <"$lab_captures_file"
-    if [ "$failed" -ne 0 ]; then
+    if [ "$failed" -ne 0 ] && [ "$checked" -eq 0 ]; then
       say "note" "lab-capture manifest: the stale-entry check could not run (git could not look up an entry's path on master)"; return 0
+    elif [ "$failed" -ne 0 ]; then
+      say "note" "lab-capture manifest: the stale-entry check stopped partway, after $checked of $total entries (git could not look up an entry's path on master); the notes above may be incomplete"; return 0
     fi
     [ "$stale" -le 8 ] || say "note" "lab-capture manifest: $stale stale entries in all (eight named above)"
     [ "$pending" -eq 0 ] || say "note" "lab-capture manifest: $pending entr(ies) not yet on master (pending)"

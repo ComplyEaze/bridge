@@ -450,9 +450,10 @@ async fn a_rule_code_or_an_argument_code_is_kept_and_no_other_text_is() {
         "PAN-ZZZZZ-0000-Z",
         "BIND-GROUP",
         "C5-BOOKS-FROM",
-        // An upper-case GUID, one that starts with a letter and one that does not.
-        "ABCDEF12-3456-7890-ABCD-EF1234567890",
-        "8F3B2C1A-5D4E-4F6A-9B7C-1E2D3F4A5B6C",
+        // An upper-case GUID, one that starts with a letter and one that does
+        // not (two synthetic lab companies' identifiers, in upper case).
+        "D64EDA55-DA7C-4106-A171-3E3CB6CDD331",
+        "3A6BD6E1-B835-4BFF-89DD-8A6AF138C346",
         "Private Ledger",
         "C5-books from",
         "C5-books_from",

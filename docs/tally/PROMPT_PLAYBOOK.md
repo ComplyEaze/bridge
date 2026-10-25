@@ -292,6 +292,8 @@ Implement:
    matrix, the UI, or ADR 0015.
 3. Wire the existing feature-gated IndiaTax and Bills/Outstandings parser
    packs into the runtime read path as normal (non-default-off) profiles.
+   (DEVIATION 2026-10-21, #1789: those packs were removed unbuilt; see
+   IMPROVEMENT_PLAN_2026H2.md §1.)
 4. Canonical model: extend fail-closed canonicalization for the new KNOWN
    fields; add a QUARANTINE lane for unknown TDL/UDF fields — a quarantined
    voucher lands in the mirror flagged with the unknown field names as

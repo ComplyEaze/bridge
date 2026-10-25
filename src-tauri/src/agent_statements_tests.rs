@@ -80,12 +80,23 @@ fn pair(plans: &mut Vec<ScenarioPlan>, response: ScenarioPlan) {
 }
 
 /// A whole call: identity, then the Trial Balance bracket with the group tree,
-/// Tally's Balance Sheet and, for a P&L, Tally's Profit and Loss inside it.
-fn plans(current_assets: &str, with_profit_and_loss: bool) -> Vec<ScenarioPlan> {
-    plans_with(current_assets, with_profit_and_loss.then(profit_and_loss))
+/// Tally's Balance Sheet and Tally's Profit and Loss inside it (both tools read
+/// both: the Profit and Loss is where Tally's closing stock sits).
+fn plans(current_assets: &str) -> Vec<ScenarioPlan> {
+    plans_with(current_assets, profit_and_loss())
 }
 
-fn plans_with(current_assets: &str, profit_and_loss: Option<String>) -> Vec<ScenarioPlan> {
+fn plans_with(current_assets: &str, profit_and_loss: String) -> Vec<ScenarioPlan> {
+    plans_full(balance_sheet(current_assets), profit_and_loss, None)
+}
+
+/// The same call with the statements given as text, and the company's inventory
+/// flags read after the Profit and Loss when that statement offers a closing stock.
+fn plans_full(
+    balance_sheet: String,
+    profit_and_loss: String,
+    inventory_flags: Option<String>,
+) -> Vec<ScenarioPlan> {
     let companies = xml(companies());
     let currency = decode(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
@@ -101,9 +112,10 @@ fn plans_with(current_assets: &str, profit_and_loss: Option<String>) -> Vec<Scen
     pair(&mut plans, xml(currency));
     pair(&mut plans, xml(report));
     pair(&mut plans, xml(groups()));
-    pair(&mut plans, xml(balance_sheet(current_assets)));
-    if let Some(profit_and_loss) = profit_and_loss {
-        pair(&mut plans, xml(profit_and_loss));
+    pair(&mut plans, xml(balance_sheet));
+    pair(&mut plans, xml(profit_and_loss));
+    if let Some(flags) = inventory_flags {
+        pair(&mut plans, xml(flags));
     }
     pair(&mut plans, xml(extents()));
     plans.extend([companies.clone(), status(), companies]);
@@ -165,7 +177,7 @@ fn value(result: &Value) -> bridge_tally_core::ExactDecimal {
 
 #[tokio::test]
 async fn profit_and_loss_reads_both_statements_and_reports_gated_results() {
-    let (response, sent, expected) = call("profit_and_loss", plans("-11027.00", true)).await;
+    let (response, sent, expected) = call("profit_and_loss", plans("-11027.00")).await;
     let result = result(&response);
     assert_eq!(sent, expected);
     assert!(value(&result["result"]["net_result"])
@@ -195,15 +207,16 @@ async fn profit_and_loss_reads_both_statements_and_reports_gated_results() {
 }
 
 #[tokio::test]
-async fn balance_sheet_reads_only_the_balance_sheet_and_reports_the_carried_line() {
-    let (response, sent, expected) = call("balance_sheet", plans("-11027.00", false)).await;
+async fn balance_sheet_reads_both_statements_and_reports_the_carried_line() {
+    let (response, sent, expected) = call("balance_sheet", plans("-11027.00")).await;
     let result = result(&response);
     assert_eq!(sent, expected);
     let carried = &result["result"]["profit_and_loss"]["carried"];
     assert!(value(carried).numeric_eq(&bridge_tally_core::ExactDecimal::parse("11027.00").unwrap()));
     assert!(result["tie_out"].is_null());
     assert_eq!(result["lines"].as_array().unwrap().len(), 9);
-    // No Profit and Loss was read, so none is claimed.
+    // Tally's Profit and Loss was read, but no closing stock was offered, so no
+    // comparison with it is claimed or shown.
     let lead = lead(&response);
     assert!(lead.starts_with("Balance sheet for \u{201c}"), "{lead}");
     assert!(
@@ -215,7 +228,7 @@ async fn balance_sheet_reads_only_the_balance_sheet_and_reports_the_carried_line
 
 #[tokio::test]
 async fn a_balance_sheet_that_does_not_tie_names_the_line_and_establishes_nothing() {
-    let (response, sent, expected) = call("profit_and_loss", plans("-11026.00", true)).await;
+    let (response, sent, expected) = call("profit_and_loss", plans("-11026.00")).await;
     let result = result(&response);
     assert_eq!(sent, expected);
     for figure in ["gross_result", "net_result"] {
@@ -247,7 +260,7 @@ async fn a_balance_sheet_that_does_not_tie_names_the_line_and_establishes_nothin
 
 #[tokio::test]
 async fn a_balance_sheet_that_does_not_tie_withholds_its_lines() {
-    let (response, sent, expected) = call("balance_sheet", plans("-11026.00", false)).await;
+    let (response, sent, expected) = call("balance_sheet", plans("-11026.00")).await;
     let result = result(&response);
     assert_eq!(sent, expected);
     let carried = &result["result"]["profit_and_loss"]["carried"];
@@ -269,7 +282,7 @@ async fn a_balance_sheet_that_does_not_tie_withholds_its_lines() {
 async fn a_masked_refusal_hides_the_lines_it_names() {
     let (response, sent, expected) = call_with(
         "profit_and_loss",
-        plans("-11026.00", true),
+        plans("-11026.00"),
         Redaction::MaskParties,
     )
     .await;
@@ -285,12 +298,8 @@ async fn a_masked_refusal_hides_the_lines_it_names() {
 
 #[tokio::test]
 async fn a_masked_response_hides_the_line_names_a_ledger_can_carry() {
-    let (response, sent, expected) = call_with(
-        "balance_sheet",
-        plans("-11027.00", false),
-        Redaction::MaskParties,
-    )
-    .await;
+    let (response, sent, expected) =
+        call_with("balance_sheet", plans("-11027.00"), Redaction::MaskParties).await;
     assert_eq!(sent, expected);
     let text = result(&response).to_string();
     assert!(
@@ -313,7 +322,7 @@ fn assert_top_level(result: &Value, state: &str, reason: Option<&str>) {
 
 #[tokio::test]
 async fn an_established_profit_and_loss_is_observed_with_no_reason() {
-    let (response, _, _) = call("profit_and_loss", plans("-11027.00", true)).await;
+    let (response, _, _) = call("profit_and_loss", plans("-11027.00")).await;
     let result = result(&response);
     assert_top_level(result, "observed", None);
     assert_eq!(result["result"]["net_result"]["state"], "established");
@@ -321,7 +330,7 @@ async fn an_established_profit_and_loss_is_observed_with_no_reason() {
 
 #[tokio::test]
 async fn an_established_balance_sheet_is_observed_with_no_reason() {
-    let (response, _, _) = call("balance_sheet", plans("-11027.00", false)).await;
+    let (response, _, _) = call("balance_sheet", plans("-11027.00")).await;
     let result = result(&response);
     assert_top_level(result, "observed", None);
     assert_eq!(
@@ -332,7 +341,7 @@ async fn an_established_balance_sheet_is_observed_with_no_reason() {
 
 #[tokio::test]
 async fn a_profit_and_loss_whose_balance_sheet_differs_is_not_established_at_the_top() {
-    let (response, _, _) = call("profit_and_loss", plans("-11026.00", true)).await;
+    let (response, _, _) = call("profit_and_loss", plans("-11026.00")).await;
     let result = result(&response);
     assert_top_level(
         result,
@@ -344,7 +353,7 @@ async fn a_profit_and_loss_whose_balance_sheet_differs_is_not_established_at_the
 
 #[tokio::test]
 async fn a_balance_sheet_that_does_not_tie_is_not_established_at_the_top() {
-    let (response, _, _) = call("balance_sheet", plans("-11026.00", false)).await;
+    let (response, _, _) = call("balance_sheet", plans("-11026.00")).await;
     let result = result(&response);
     assert_top_level(
         result,
@@ -357,7 +366,7 @@ async fn a_balance_sheet_that_does_not_tie_is_not_established_at_the_top() {
 
 #[tokio::test]
 async fn a_profit_and_loss_that_differs_from_tallys_own_is_not_established_at_the_top() {
-    let plans = plans_with("-11027.00", Some(profit_and_loss_sales("4028.00")));
+    let plans = plans_with("-11027.00", profit_and_loss_sales("4028.00"));
     let (response, _, _) = call("profit_and_loss", plans).await;
     let result = result(&response);
     assert_top_level(
@@ -456,4 +465,139 @@ fn the_not_established_codes_are_unchanged() {
         assert_eq!(reason.as_str(), code);
         assert_eq!(serde_json::to_value(reason).unwrap(), json!(code));
     }
+}
+
+// Tally's own closing stock through the tools (#692). The sources are the known
+// lab's, as above, with a Profit and Loss and a Balance Sheet in the captured
+// stock-book shape that move Current Assets, the carried line and the trading
+// result by one closing stock of 500; the company's flags are the captured
+// answer of the inventory book with its GUID rewritten to this one's.
+
+fn stock_profit_and_loss() -> String {
+    "<ENVELOPE><DSPACCNAME><DSPDISPNAME>Sales Accounts</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT><BSMAINAMT>4027.00</BSMAINAMT></PLAMT><DSPACCNAME><DSPDISPNAME>Cost of Sales :</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT><BSMAINAMT>500.00</BSMAINAMT></PLAMT><DSPACCNAME><DSPDISPNAME>Opening Stock</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT><BSMAINAMT></BSMAINAMT></PLAMT><DSPACCNAME><DSPDISPNAME>Less: Closing Stock</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT>-500.00</PLSUBAMT><BSMAINAMT></BSMAINAMT></PLAMT></ENVELOPE>".to_string()
+}
+
+fn stock_balance_sheet() -> String {
+    "<ENVELOPE><BSNAME><DSPACCNAME><DSPDISPNAME>Current Assets</DSPDISPNAME></DSPACCNAME></BSNAME><BSAMT><BSSUBAMT></BSSUBAMT><BSMAINAMT>-11527.00</BSMAINAMT></BSAMT><BSNAME><DSPACCNAME><DSPDISPNAME>Profit &amp; Loss A/c</DSPDISPNAME></DSPACCNAME></BSNAME><BSAMT><BSSUBAMT></BSSUBAMT><BSMAINAMT>11527.00</BSMAINAMT></BSAMT></ENVELOPE>".to_string()
+}
+
+fn inventory_flags(integrated: &str) -> String {
+    let answer = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_stock_book_live.utf16le.xml"
+    ))
+    .replace("d64eda55-da7c-4106-a171-3e3cb6cdd331", GUID);
+    assert!(answer.contains("<ISINTEGRATED TYPE=\"Logical\">Yes</ISINTEGRATED>"));
+    answer.replace(
+        "<ISINTEGRATED TYPE=\"Logical\">Yes</ISINTEGRATED>",
+        &format!("<ISINTEGRATED TYPE=\"Logical\">{integrated}</ISINTEGRATED>"),
+    )
+}
+
+fn stock_plans(flags: String) -> Vec<ScenarioPlan> {
+    plans_full(stock_balance_sheet(), stock_profit_and_loss(), Some(flags))
+}
+
+#[tokio::test]
+async fn profit_and_loss_uses_tallys_closing_stock_and_names_it() {
+    let plans = stock_plans(inventory_flags("Yes"));
+    let (response, sent, expected) = call("profit_and_loss", plans).await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert!(value(&result["result"]["net_result"])
+        .numeric_eq(&bridge_tally_core::ExactDecimal::parse("4527.00").unwrap()));
+    assert_eq!(result["closing_stock"]["state"], "applied");
+    assert_eq!(
+        result["closing_stock"]["source"],
+        "tally_profit_and_loss_less_closing_stock"
+    );
+    assert!(
+        value(&json!({"state": "established", "value": result["closing_stock"]["value"]}))
+            .numeric_eq(&bridge_tally_core::ExactDecimal::parse("-500.00").unwrap())
+    );
+    assert!(
+        lead(&response).contains("Closing stock is Tally's own"),
+        "{}",
+        lead(&response)
+    );
+}
+
+#[tokio::test]
+async fn balance_sheet_uses_tallys_closing_stock_and_names_it() {
+    let plans = stock_plans(inventory_flags("Yes"));
+    let (response, sent, expected) = call("balance_sheet", plans).await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert!(value(&result["result"]["profit_and_loss"]["carried"])
+        .numeric_eq(&bridge_tally_core::ExactDecimal::parse("11527.00").unwrap()));
+    assert_eq!(result["closing_stock"]["state"], "applied");
+    // The comparison with Tally's Profit and Loss is shown once its closing stock is offered.
+    assert!(!result["tie_out"].is_null());
+}
+
+#[tokio::test]
+async fn flags_that_do_not_show_an_integrated_book_decline_the_figure() {
+    let plans = stock_plans(inventory_flags("No"));
+    let (response, sent, expected) = call("profit_and_loss", plans).await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["state"], "not_established");
+    assert_eq!(result["reason"], "tally_balance_sheet_differs");
+    assert_eq!(result["closing_stock"]["state"], "declined");
+    assert_eq!(result["closing_stock"]["why"], "book_not_shown_integrated");
+}
+
+#[tokio::test]
+async fn a_book_whose_profit_and_loss_offers_no_closing_stock_reads_no_flags() {
+    // The ordinary plans end at the closing extent: a flags read would be one
+    // request too many and stall the simulator's sequence.
+    let (response, sent, expected) = call("profit_and_loss", plans("-11027.00")).await;
+    assert_eq!(sent, expected);
+    assert!(result(&response)["closing_stock"].is_null());
+}
+
+#[tokio::test]
+async fn a_flags_read_that_does_not_bind_to_the_company_declines_the_figure_and_keeps_the_statement(
+) {
+    // The flags answer names another company: the read is not a failed
+    // statement, the book is simply not shown integrated.
+    let flags = inventory_flags("Yes").replace(GUID, "00000000-0000-4000-8000-000000000002");
+    let (response, sent, expected) = call("profit_and_loss", stock_plans(flags)).await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["closing_stock"]["why"], "inventory_flags_not_read");
+    assert_eq!(result["state"], "not_established");
+}
+
+fn unreadable_profit_and_loss() -> String {
+    // A bare RESPONSE is Tally not recognising the report (§12a.1).
+    "<RESPONSE></RESPONSE>".to_string()
+}
+
+#[tokio::test]
+async fn a_balance_sheet_whose_profit_and_loss_cannot_be_read_is_the_sheet_it_always_was() {
+    let plans = plans_full(
+        balance_sheet("-11027.00"),
+        unreadable_profit_and_loss(),
+        None,
+    );
+    let (response, sent, expected) = call("balance_sheet", plans).await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert!(value(&result["result"]["profit_and_loss"]["carried"])
+        .numeric_eq(&bridge_tally_core::ExactDecimal::parse("11027.00").unwrap()));
+    assert!(result["closing_stock"].is_null());
+    assert!(result["tie_out"].is_null());
+}
+
+#[tokio::test]
+async fn a_profit_and_loss_whose_own_statement_cannot_be_read_is_refused() {
+    // Its gross and net are gated on Tally's Profit and Loss: no answer without it.
+    let mut plans = plans_full(
+        balance_sheet("-11027.00"),
+        unreadable_profit_and_loss(),
+        None,
+    );
+    plans.truncate(plans.len() - 8);
+    let (response, _, _) = call("profit_and_loss", plans).await;
+    assert_eq!(response["isError"], true, "{response}");
 }

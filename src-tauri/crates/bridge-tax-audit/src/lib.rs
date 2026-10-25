@@ -2094,12 +2094,13 @@ pub fn clause44_on(
 /// reads them: `[roles].tax_ledgers`, `.round_off_ledgers`, `.payable_ledgers` (before any test),
 /// `.rcm_tax_ledgers`, the GSTR-3B document, then `[tds].goods_carriage_ledgers` (each mapped to
 /// 194C). An engagement whose `[documents].gstr3b` holds anything but an empty string, or whose
-/// caller loaded a GSTR-3B (`gstr3b_loaded`), is refused: the comparison with it is not ported,
-/// and the reference reads its rows into every month's figures (`gst_ledgers_3b.py:486-498`).
+/// caller holds a GSTR-3B, is refused ([`gst_ledgers_3b::no_gstr3b`], which also records where
+/// that refuses more than the reference: a falsy `[documents].gstr3b`, a GSTR-3B with no row in
+/// the period).
 fn gst_ledgers_3b_inputs(
     bound: &Engagement,
-    gstr3b_loaded: bool,
-) -> Result<gst_ledgers_3b::Inputs> {
+    caller: &registry::CallerData,
+) -> Result<(gst_ledgers_3b::Inputs, gst_ledgers_3b::NoGstr3b)> {
     let missing =
         |key: &str| AuditError::Config(format!("client config missing required key 'roles.{key}'"));
     let tax_ledgers = tax_ledgers_by_head(
@@ -2119,29 +2120,19 @@ fn gst_ledgers_3b_inputs(
     };
     let payable_ledgers = set(&bound.gst_ledgers_3b.payable_ledgers, "payable_ledgers")?;
     let rcm_tax_ledgers = set(&bound.gst_ledgers_3b.rcm_tax_ledgers, "rcm_tax_ledgers")?;
-    let named = bound
-        .raw_cfg
-        .get("documents")
-        .and_then(toml::Value::as_table)
-        .and_then(|d| d.get("gstr3b"))
-        .is_some_and(|v| v.as_str() != Some(""));
-    if gstr3b_loaded || named {
-        return Err(AuditError::DocumentNotPorted {
-            test: gst_ledgers_3b::TEST_ID,
-            document: "GSTR-3B",
-        });
-    }
+    let none = gst_ledgers_3b::no_gstr3b(&bound.raw_cfg, caller.holds_gstr3b())?;
     let goods_carriage_ledgers = match &bound.tds {
         None => BTreeSet::new(),
         Some(tds) => tds_payees::goods_carriage_ledgers(tds)?.clone(),
     };
-    Ok(gst_ledgers_3b::Inputs {
+    let inputs = gst_ledgers_3b::Inputs {
         tax_ledgers,
         payable_ledgers,
         rcm_tax_ledgers,
         round_off_ledgers: bound.round_off_ledgers.iter().cloned().collect(),
         goods_carriage_ledgers,
-    })
+    };
+    Ok((inputs, none))
 }
 
 /// Run `gst_ledgers_3b` on an already-built book, for an engagement with no GSTR-3B: its
@@ -2151,11 +2142,11 @@ pub fn gst_ledgers_3b_on(
     engagement: &Engagement,
     book: &book::Book,
     rules: &Rules,
-    gstr3b_loaded: bool,
+    caller: &registry::CallerData,
 ) -> Result<serde_json::Value> {
     let (bound, _report) = engagement.bind(book)?;
-    let inputs = gst_ledgers_3b_inputs(&bound, gstr3b_loaded)?;
-    let result = gst_ledgers_3b::run(book, rules, &bound.period, &inputs)?;
+    let (inputs, none) = gst_ledgers_3b_inputs(&bound, caller)?;
+    let result = gst_ledgers_3b::run(book, rules, &bound.period, &inputs, none)?;
     let module_check = gst_ledgers_3b::check_invariants(book, &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
@@ -2499,7 +2490,11 @@ mod clause44_inputs_tests {
 mod gst_ledgers_3b_inputs_tests {
     use super::*;
 
-    fn bound(roles: &str, tables: &str) -> Result<gst_ledgers_3b::Inputs> {
+    const HEAD: &str = "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
+                        start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
+                        bank_groups = []\n";
+
+    fn engagement(text: &str) -> Engagement {
         let names = ["Cgst", "Pay", "Rcm", "Round", "Freight"];
         let book = book::Book {
             ledgers: names
@@ -2521,13 +2516,13 @@ mod gst_ledgers_3b_inputs_tests {
                 .collect(),
             ..Default::default()
         };
-        let text = format!(
-            "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
-             start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
-             bank_groups = []\n{roles}\n{tables}"
-        );
-        let e = Engagement::from_toml_for_read(&text).unwrap();
-        gst_ledgers_3b_inputs(&e.bind(&book).unwrap().0, false)
+        let e = Engagement::from_toml_for_read(text).unwrap();
+        e.bind(&book).unwrap().0
+    }
+
+    fn inputs(roles: &str, tables: &str) -> Result<gst_ledgers_3b::Inputs> {
+        let e = engagement(&format!("{HEAD}{roles}\n{tables}"));
+        gst_ledgers_3b_inputs(&e, &registry::CallerData::default()).map(|(i, _)| i)
     }
 
     const ROLES: &str = "tax_ledgers = { cgst = [\"Cgst\"] }\nround_off_ledgers = [\"Round\"]\n\
@@ -2535,11 +2530,21 @@ mod gst_ledgers_3b_inputs_tests {
     const TDS: &str = "[tds]\npayee_aliases = {}\ngoods_carriage_ledgers = [\"Freight\"]\n\
                        [tds.nature_by_ledger]\nFreight = \"194C\"\n";
 
+    fn refused_3b(r: Result<gst_ledgers_3b::Inputs>) -> bool {
+        matches!(
+            r,
+            Err(AuditError::DocumentNotPorted {
+                test: "gst_ledgers_3b",
+                document: "GSTR-3B"
+            })
+        )
+    }
+
     /// Each bound role reaches its own input; with no `[tds]` there is no goods-carriage ledger.
     #[test]
     fn each_role_reaches_its_own_input() {
         let set = |n: &str| BTreeSet::from([n.to_string()]);
-        let i = bound(ROLES, TDS).unwrap();
+        let i = inputs(ROLES, TDS).unwrap();
         assert_eq!(
             i.tax_ledgers,
             BTreeMap::from([("Cgst".to_string(), "cgst".to_string())])
@@ -2553,15 +2558,18 @@ mod gst_ledgers_3b_inputs_tests {
             ),
             (set("Pay"), set("Rcm"), set("Round"), set("Freight"))
         );
-        assert!(bound(ROLES, "").unwrap().goods_carriage_ledgers.is_empty());
+        assert!(inputs(ROLES, "").unwrap().goods_carriage_ledgers.is_empty());
     }
 
-    /// The four required keys are refused in the order the reference's pack reads them; a named
-    /// or loaded GSTR-3B is refused with its typed error, an empty name is no document; a
-    /// goods-carriage ledger not mapped to 194C is refused.
+    /// The four required keys are refused in the order the reference's pack reads them; a ledger
+    /// under two heads and a goods-carriage ledger not mapped to 194C are refused.
     #[test]
-    fn missing_roles_a_gstr3b_and_an_unmapped_goods_ledger_are_refused() {
+    fn missing_roles_two_heads_and_an_unmapped_goods_ledger_are_refused() {
         let lines: Vec<&str> = ROLES.lines().collect();
+        let config = |r: Result<gst_ledgers_3b::Inputs>| match r {
+            Err(AuditError::Config(m)) => m,
+            other => panic!("not a config refusal: {other:?}"),
+        };
         for (n, key) in [
             "tax_ledgers",
             "round_off_ledgers",
@@ -2571,44 +2579,49 @@ mod gst_ledgers_3b_inputs_tests {
         .iter()
         .enumerate()
         {
-            match bound(&lines[..n].join("\n"), "").unwrap_err() {
-                AuditError::Config(m) => {
-                    assert_eq!(
-                        m,
-                        format!("client config missing required key 'roles.{key}'")
-                    );
-                }
-                other => panic!("{key}: {other}"),
-            }
+            assert_eq!(
+                config(inputs(&lines[..n].join("\n"), "")),
+                format!("client config missing required key 'roles.{key}'")
+            );
         }
-        let gstr3b = |value: &str| bound(ROLES, &format!("[documents]\ngstr3b = {value}\n"));
-        assert!(matches!(
-            gstr3b("\"gst/3b.xls\""),
-            Err(AuditError::DocumentNotPorted {
-                test: "gst_ledgers_3b",
-                document: "GSTR-3B"
-            })
-        ));
-        assert!(gstr3b("\"\"").is_ok());
-        let book = book::Book::default();
-        let text = "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
-             start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
-             bank_groups = []\ntax_ledgers = {}\nround_off_ledgers = []\npayable_ledgers = []\n\
-             rcm_tax_ledgers = []\n";
-        let e = Engagement::from_toml_for_read(text)
-            .unwrap()
-            .bind(&book)
-            .unwrap()
-            .0;
-        assert!(gst_ledgers_3b_inputs(&e, false).is_ok());
-        assert!(matches!(
-            gst_ledgers_3b_inputs(&e, true),
-            Err(AuditError::DocumentNotPorted { .. })
+        let two = ROLES.replace(
+            "{ cgst = [\"Cgst\"] }",
+            "{ a = [\"Cgst\"], b = [\"Cgst\"] }",
+        );
+        assert!(config(inputs(&two, "")).starts_with(
+            "gst_ledgers_3b: ledger \"Cgst\" is listed under GST heads \"a\" and \"b\""
         ));
         let unmapped = TDS.replace("\"194C\"", "\"194I\"");
-        match bound(ROLES, &unmapped).unwrap_err() {
-            AuditError::Config(m) => assert!(m.contains("not mapped to 194C"), "{m}"),
-            other => panic!("{other}"),
-        }
+        assert!(config(inputs(ROLES, &unmapped)).contains("not mapped to 194C"));
+    }
+
+    /// A GSTR-3B named in `[documents]` is refused, failing closed on a falsy value the reference
+    /// reads as no document (`false`); an empty name is no document; a `[documents]` that is not
+    /// a table, which ends the reference's run, runs here as no document. A GSTR-3B the caller
+    /// holds, named as loaded or as a comparison turnover, is refused.
+    #[test]
+    fn a_gstr3b_named_or_held_is_refused() {
+        let named = |value: &str| inputs(ROLES, &format!("[documents]\ngstr3b = {value}\n"));
+        assert!(refused_3b(named("\"gst/3b.xls\"")));
+        assert!(refused_3b(named("false")));
+        assert!(named("\"\"").is_ok());
+        let e = engagement(&format!("documents = \"x\"\n{HEAD}{ROLES}\n"));
+        assert!(gst_ledgers_3b_inputs(&e, &registry::CallerData::default()).is_ok());
+        let e = engagement(&format!("{HEAD}{ROLES}\n"));
+        let caller = registry::CallerData {
+            named_documents: [books_examined::CallerNamedDocument::Gstr3b].into(),
+            ..Default::default()
+        };
+        assert!(refused_3b(
+            gst_ledgers_3b_inputs(&e, &caller).map(|(i, _)| i)
+        ));
+        let mut caller = registry::CallerData::default();
+        caller.turnover_inputs.gstr3b = Some(applicability_44ab::ComparisonTurnover {
+            turnover_paise: 1,
+            coverage: "full".to_string(),
+        });
+        assert!(refused_3b(
+            gst_ledgers_3b_inputs(&e, &caller).map(|(i, _)| i)
+        ));
     }
 }

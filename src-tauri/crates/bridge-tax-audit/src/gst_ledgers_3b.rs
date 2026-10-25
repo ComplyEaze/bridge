@@ -16,13 +16,16 @@
 //! **Scope.** With no GSTR-3B row, the reference classifies every month
 //! `no_3b_document_for_month` before it reads GSTR-1 rows or the round-off movement
 //! (`gst_ledgers_3b.py:355-357` outward, `:202-203` reverse charge), so its dump depends on the
-//! book and the roles above alone. [`Inputs`] holds no GSTR-3B or GSTR-1 row, so [`run`] can make
-//! only that dump; `crate::gst_ledgers_3b_on` refuses an engagement that names a GSTR-3B
-//! document (`AuditError::DocumentNotPorted`). The monthly tie to GSTR-3B is a later port.
+//! book and the roles above alone. [`Inputs`] holds no GSTR-3B or GSTR-1 row, and [`run`] takes a
+//! [`NoGstr3b`], which only [`no_gstr3b`] makes, after refusing an engagement or caller that holds
+//! a GSTR-3B (`AuditError::DocumentNotPorted`). The monthly tie to GSTR-3B is a later port.
 //!
 //! **One owner of the category.** [`classify_voucher`] is this crate's only reading of a
-//! voucher as input, output or payment for GST. Nothing here attributes GST to a counter-ledger,
-//! and no figure is per ledger beyond the duty head each tax ledger is configured under.
+//! voucher as input, output or payment for GST. The one other reading of base type for GST,
+//! `crate::gst_outward_books`' Sales/Credit Note/Debit Note population, is blind to direction (a
+//! purchase-side note is in it, as in the reference) and feeds only the old residual figure.
+//! Nothing here attributes GST to a counter-ledger, and no figure is per ledger beyond the duty
+//! head each tax ledger is configured under.
 //!
 //! `check_invariants` is LEDGER-1 (each head's figures tie to a fresh Trial Balance read),
 //! LEDGER-2 (each monthly series' reason counts sum to its months) and LEDGER-3 (no month
@@ -31,7 +34,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::book::{Book, Voucher};
-use crate::error::Result;
+use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::gst_outward_books::{books_outward_rows, year_month};
 use crate::ledger_ids::stable_ledger_tag;
@@ -94,6 +97,36 @@ pub struct Inputs {
     pub round_off_ledgers: BTreeSet<String>,
     /// `[tds].goods_carriage_ledgers`.
     pub goods_carriage_ledgers: BTreeSet<String>,
+}
+
+/// Proof that no GSTR-3B reaches this test: [`run`] requires one, and only [`no_gstr3b`] makes one.
+#[derive(Debug, Clone, Copy)]
+pub struct NoGstr3b(());
+
+/// Refuse a GSTR-3B, or give the proof that there is none. `cfg` is the engagement's client config;
+/// `caller_holds_one` says the caller loaded a GSTR-3B (`registry::CallerData::holds_gstr3b`). The
+/// comparison with one is not ported, and the reference reads its rows into every month's figures
+/// (`gst_ledgers_3b.py:486-498`), so the test refuses rather than give a part of its result.
+///
+/// It refuses more than the reference, and so fails closed: the reference reads a document only
+/// when `[documents].gstr3b` is truthy (`config.py:93-100`), so `false`, `0`, `[]` or `{}` is no
+/// document there and refused here (only an empty string is no document here); and a GSTR-3B
+/// loaded with no row in the period gives the reference's no-GSTR-3B dump (`pack.py:496-498`),
+/// refused here too. The reverse case: a `[documents]` that is not a table ends the reference's
+/// run (`.get` on it raises), and runs here as no document.
+pub fn no_gstr3b(cfg: &toml::Table, caller_holds_one: bool) -> Result<NoGstr3b> {
+    let named = cfg
+        .get("documents")
+        .and_then(toml::Value::as_table)
+        .and_then(|d| d.get("gstr3b"))
+        .is_some_and(|v| v.as_str() != Some(""));
+    if named || caller_holds_one {
+        return Err(AuditError::DocumentNotPorted {
+            test: TEST_ID,
+            document: "GSTR-3B",
+        });
+    }
+    Ok(NoGstr3b(()))
 }
 
 /// The reference's `_classify_voucher` (:224-250), by base type, and for a note by the groups of
@@ -224,7 +257,13 @@ fn voucher_refs(vs: &[&Voucher]) -> Vec<EvidenceRef> {
 }
 
 /// Run the test: the reference's `run()` (:392-732) with no GSTR-3B and no GSTR-1 row.
-pub fn run(book: &Book, rules: &Rules, period: &Window, inputs: &Inputs) -> Result<TestResult> {
+pub fn run(
+    book: &Book,
+    rules: &Rules,
+    period: &Window,
+    inputs: &Inputs,
+    _no_gstr3b: NoGstr3b,
+) -> Result<TestResult> {
     let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
     let pop = book.population()?;
     let months = months(period);
@@ -836,7 +875,15 @@ mod tests {
         };
         let mut rules = Rules::vendored().unwrap();
         rules.version = "v".to_string();
-        let r = run(&book, &rules, &window("20250401", "20250531"), &inputs).unwrap();
+        let none = no_gstr3b(&toml::Table::new(), false).unwrap();
+        let r = run(
+            &book,
+            &rules,
+            &window("20250401", "20250531"),
+            &inputs,
+            none,
+        )
+        .unwrap();
         assert!(check_invariants(&book, &r).unwrap().is_empty());
         (book, r)
     }

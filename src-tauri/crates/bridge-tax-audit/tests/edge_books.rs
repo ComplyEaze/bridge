@@ -845,7 +845,8 @@ fn check(name: &str) {
             }
             "gst_ledgers_3b" => {
                 let inputs = gst_ledgers_3b_inputs(&s);
-                let r = gst_ledgers_3b::run(&book, &rules, &period(&s), &inputs).unwrap();
+                let none = gst_ledgers_3b::no_gstr3b(&toml::Table::new(), false).unwrap();
+                let r = gst_ledgers_3b::run(&book, &rules, &period(&s), &inputs, none).unwrap();
                 let c = gst_ledgers_3b::check_invariants(&book, &r).unwrap();
                 (r, c)
             }

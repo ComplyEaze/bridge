@@ -48,7 +48,6 @@ ALLOWED_IDS = frozenset({
     "BridgeCompanyBookExtentV2",
     "BridgeCompanyCurrencies",
     "BridgeCompanyBaseCurrency",
-    "BridgeCompanyLedgerCountV1",
     "List of Ledgers",
     "List of Groups",
     "Bridge Agent Voucher Census",
@@ -90,6 +89,8 @@ ALLOWED_FUNCTIONS = frozenset({"$$Date", "$$IsContra", "$$IsCreditNote", "$$IsDe
                                "$$IsPayment", "$$IsPurchase", "$$IsReceipt", "$$IsSales", "$$LicenseInfo",
                                "$$SysName"})
 MAX_BODY = 1024 * 1024
+# Every date in a forwarded request must be a real date in this range (the sitting's books, FY 2025-26, and the next).
+FIRST_DATE, LAST_DATE = "20250401", "20270331"
 # A whole request (headers and body) must arrive within this many seconds of the connection opening.
 CLIENT_DEADLINE_SECONDS = 60
 
@@ -181,9 +182,44 @@ def verdict_for_post(path, body):
         return reason, request_id
     if "<!" in text or "<?" in text:
         return "markup_not_allowed", request_id
-    if not any(pattern.fullmatch(text.lstrip("\ufeff")) for _, pattern in TEMPLATES):
+    # The bytes forwarded are the bytes matched: a BOM and UTF-16LE, exactly as every template is.
+    if not body.startswith(b"\xff\xfe"):
+        return "encoding_not_template", request_id
+    try:
+        bare = body[2:].decode("utf-16-le")
+    except UnicodeDecodeError:
+        return "encoding_not_template", request_id
+    if "\ufeff" in bare or b"\xff\xfe" + bare.encode("utf-16-le") != body:
+        return "encoding_not_template", request_id
+    if not any(pattern.fullmatch(bare) for _, pattern in TEMPLATES):
         return "not_a_known_bridge_read", request_id
+    reason = date_refusal(bare)
+    if reason:
+        return reason, request_id
     return None, request_id
+
+
+def date_refusal(text):
+    """The first reason the request's dates are not real dates of the allowed range, in order, or None."""
+    import datetime
+    dates = re.findall(r"(?<![0-9])[0-9]{8}(?![0-9])", text)
+    for value in dates:
+        try:
+            datetime.datetime.strptime(value, "%Y%m%d")
+        except ValueError:
+            return "date_not_a_date"
+        if not FIRST_DATE <= value <= LAST_DATE:
+            return "date_out_of_range"
+    from_date = re.search(r"<SVFROMDATE[^>]*>([0-9]{8})<", text)
+    to_date = re.search(r"<SVTODATE[^>]*>([0-9]{8})<", text)
+    if from_date and to_date:
+        if from_date.group(1) > to_date.group(1):
+            return "dates_reversed"
+        formula = re.findall(r'\$\$Date:&quot;([0-9]{8})&quot;|\$\$Date:"([0-9]{8})"', text)
+        formula = [a or b for a, b in formula]
+        if formula and formula != [from_date.group(1), to_date.group(1)]:
+            return "formula_dates_not_the_window"
+    return None
 
 
 def tree_refusal(root, request_id):
@@ -261,14 +297,18 @@ def make_handler(recorder, target_port):
 
         def reply(self, status, headers, body):
             self.close_connection = True
-            self.send_response(status)
-            for name, value in headers:
-                if name.lower() not in ("content-length", "transfer-encoding", "connection"):
-                    self.send_header(name, value)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Connection", "close")
-            self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.send_response(status)
+                for name, value in headers:
+                    if name.lower() not in ("content-length", "transfer-encoding", "connection"):
+                        self.send_header(name, value)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                # The client went away, or the deadline shut its socket; the request is already recorded.
+                pass
 
         def refuse(self, method, reason, request_id, request):
             body = ("refused by the read-only relay: %s" % reason).encode("utf-8")
@@ -316,8 +356,29 @@ def make_handler(recorder, target_port):
             return b"".join(chunks)
 
         def setup(self):
+            import threading
             self.opened = time.monotonic()
             super().setup()
+            # The whole request, headers included, must arrive within the deadline: past it the socket is shut, so
+            # a client trickling header bytes cannot hold the serial relay.
+            self.watchdog = threading.Timer(CLIENT_DEADLINE_SECONDS, self.shut)
+            self.watchdog.daemon = True
+            self.watchdog.start()
+
+        def shut(self):
+            try:
+                self.connection.shutdown(2)
+            except OSError:
+                pass
+
+        def finish(self):
+            self.watchdog.cancel()
+            super().finish()
+
+        def send_error(self, code, message=None, explain=None):
+            recorder.write(self.command or "?", getattr(self, "path", "?"), "refused:http_%d" % code, "", b"",
+                           code, [], (message or "").encode("utf-8", "replace"))
+            super().send_error(code, message, explain)
 
         def do_GET(self):
             if self.path != "/status" or self.headers.get("Content-Length", "0") not in ("", "0"):
@@ -352,9 +413,12 @@ def serve(listen_port, folder, target_port=TARGET_PORT):
 
 
 def self_test():
+    import socket
     import tempfile
     import threading
     TEMPLATES[:] = load_templates()
+    global CLIENT_DEADLINE_SECONDS
+    CLIENT_DEADLINE_SECONDS = 2
     target_log = []
 
     class Target(http.server.BaseHTTPRequestHandler):
@@ -402,12 +466,14 @@ def self_test():
     utf16 = b"\xff\xfe" + marks.encode("utf-16-le")
     ledgers = real("shape_lab_ledgers_1_request.utf16le.xml")
     census = real("credit_note_day_voucher_census_request.utf16le.xml")
-    dates = sorted(set(re.findall(r"(?<![0-9])[0-9]{8}(?![0-9])", census)))
-    for old_date, new_date in zip(dates, ["20251101", "20251130"]):
-        census = census.replace(old_date, new_date)
+    (day,) = set(re.findall(r"(?<![0-9])[0-9]{8}(?![0-9])", census))
+    census = census.replace(day, "20251101")
+    census = census.replace('<SVTODATE TYPE="Date">20251101', '<SVTODATE TYPE="Date">20251130')
+    census = census.replace('&lt;= $$Date:"20251101"', '&lt;= $$Date:"20251130"')
+    assert census.count("20251130") == 2, "the census window was not widened"
     census = census.replace("</SYSTEM>", " AND $AlterID &gt; 120 AND $AlterID &lt;= 182</SYSTEM>")
     assert send("GET", "/status")[0] == 200
-    assert send("POST", "/", ledgers.encode("utf-16-le"))[0] == 200
+    assert send("POST", "/", b"\xff\xfe" + ledgers.encode("utf-16-le"))[0] == 200
     assert send("POST", "/", utf16)[0] == 200
     assert send("POST", "/", b"\xff\xfe" + census.encode("utf-16-le"))[0] == 200
     forwarded = len(target_log)
@@ -435,14 +501,40 @@ def self_test():
         ("a span on a read Bridge never spans", ledgers.replace("</FETCH>", " AND $AlterID &gt; 1</FETCH>")),
         ("a wider fetch", ledgers.replace("<FETCH>NAME,", "<FETCH>*, NAME,")),
         ("a span that is not numbers", census.replace("&gt; 120", "&gt; $$Call:F")),
+        ("a company slot holding a field", marks.replace("BRIDGE GST LEDGER LAB", "$Name")),
+        ("a date slot that is not digits", census.replace("20251101", "2025110x")),
+        ("a span slot with other logic", census.replace(" AND $AlterID &gt; 120 AND $AlterID &lt;= 182", " OR 1=1")),
+        ("a date that is not a date", census.replace("20251101", "20251301")),
+        ("a date out of range", census.replace("20251101", "19000101")),
+        ("dates reversed", census.replace("20251130", "20251001")),
+        ("formula dates not the window", census.replace('$$Date:"20251101"', '$$Date:"20251102"')),
     ]
     for name, body in controls:
-        status, _ = send("POST", "/", body.encode("utf-16-le"))
+        assert body != marks and body != ledgers and body != census, "control unchanged: " + name
+        status, _ = send("POST", "/", b"\xff\xfe" + body.encode("utf-16-le"))
         assert status == 403, name
+    encodings = [
+        ("utf-8", marks.encode("utf-8")),
+        ("utf-8 with a BOM", b"\xef\xbb\xbf" + marks.encode("utf-8")),
+        ("utf-16le without a BOM", marks.encode("utf-16-le")),
+        ("utf-16be with a BOM", b"\xfe\xff" + marks.encode("utf-16-be")),
+        ("a second BOM", b"\xff\xfe" + ("\ufeff" + marks).encode("utf-16-le")),
+    ]
+    for name, body in encodings:
+        assert send("POST", "/", body)[0] == 403, name
+    controls += encodings
+    with socket.create_connection(("127.0.0.1", port), timeout=10) as raw:
+        raw.sendall(b"POST / HTTP/1.1\r\nHost: relay\r\nContent-Length: %d\r\n\r\n" % len(utf16) + utf16[:10])
+        time.sleep(CLIENT_DEADLINE_SECONDS + 1)
+        answer = raw.recv(64)
+        assert answer == b"" or answer.startswith(b"HTTP/1.1 403"), "a slow body held the relay"
+    with socket.create_connection(("127.0.0.1", port), timeout=10) as raw:
+        raw.sendall(b"BREW / HTTP/1.1\r\nHost: relay\r\n\r\n")
+        assert raw.recv(64).startswith(b"HTTP/1.1 501"), "an unknown method was not refused"
+    controls += [("slow body", ""), ("unknown method", "")]
     assert send("GET", "/")[0] == 403
     assert send("PUT", "/", utf16)[0] == 403
     assert send("POST", "/other", utf16)[0] == 403
-    import socket
     with socket.create_connection(("127.0.0.1", port), timeout=10) as raw:
         raw.sendall(b"POST / HTTP/1.1\r\nHost: relay\r\nContent-Length: %d\r\n\r\n" % (MAX_BODY + 1))
         assert raw.recv(64).startswith(b"HTTP/1.1 403"), "an oversized body was not refused before it was read"

@@ -13,7 +13,7 @@ abandoned request can leave the gateway stuck), so a stuck Tally holds the relay
 
 ## Before the sitting
 1. Check the two files against `SHA256.txt` (`Get-FileHash -Algorithm SHA256 FILE`).
-2. `python -I gs1_relay.py --self-test`. EXPECT `self-test: ok (4 forwarded, 26 refused, none of the refused reached
+2. `python -I gs1_relay.py --self-test`. EXPECT `self-test: ok (4 forwarded, 40 refused, none of the refused reached
    the target)` and exit 0; anything else = do not use the relay.
 
 ## Running it (steps 6 to 8 of GS1-L1)

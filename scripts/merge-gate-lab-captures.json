@@ -330,6 +330,16 @@
       "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_CAPTURE_PROVENANCE.md at that head",
       "sha256": "783a89f96e6c28ee9b575a1d871fbdcadcada8f7a44122b153d001a167ee71a8",
       "size": 1740
+    },
+    {
+      "blob": "54d151325798fbb83859abe300f8ea8a9621c369",
+      "capture_id": "statement_groups_stock_book_72_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT B",
+      "lab_ref": "pull request 1912 at f4d1702fd5c7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_groups_stock_book_72_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "493256b22e131097da479f67d4280a272bec855d20c6314c6b37dfad530180c0",
+      "size": 54280
     }
   ]
 }

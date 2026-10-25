@@ -1102,3 +1102,6 @@ async fn a_movements_second_catalogue_read_that_times_out_is_sent_once() {
     assert_eq!(error["cause"], "movement_catalogue_deadline_exceeded");
     simulator.cancel();
 }
+
+#[path = "agent_request_dump_tests.rs"]
+mod request_dump;

@@ -5044,7 +5044,7 @@ async fn a_readback_whose_narration_differs_refuses_the_binding() {
     // never that it is this post's (#1039).
     assert_eq!(
         result["post_span_binding"]["summary"],
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch: checking it again changes nothing unless the book changes, and it cannot be amended, so correct anything that is wrong in Tally by hand.",
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.",
         "{posted}"
     );
 }
@@ -5076,7 +5076,7 @@ async fn a_refused_binding_matched_only_by_an_optional_voucher_keeps_the_open_li
     );
     assert_eq!(
         result["post_span_binding"]["summary"],
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch: checking it again changes nothing unless the book changes, and it cannot be amended, so correct anything that is wrong in Tally by hand.",
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.",
         "{posted}"
     );
 }
@@ -5473,7 +5473,7 @@ async fn a_rejected_single_voucher_verified_later_keeps_its_status_and_says_what
     assert_eq!(result["post_span_binding"]["state"], "refused", "{later}");
     assert_eq!(
         result["post_span_binding"]["summary"],
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch: checking it again changes nothing unless the book changes, and it cannot be amended, so correct anything that is wrong in Tally by hand.",
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.",
         "{later}"
     );
 }
@@ -5685,7 +5685,7 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     // that they are this post's (#1039).
     assert_eq!(
         result["post_span_binding"]["summary"],
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch: checking it again changes nothing unless the book changes, and it cannot be amended, so correct anything that is wrong in Tally by hand.",
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.",
         "{posted}"
     );
     assert_eq!(result["counts"]["not_found"], 0, "{posted}");
@@ -5935,7 +5935,7 @@ fn later_next_steps(later: &Value) -> (Vec<String>, String) {
     (steps, summary)
 }
 
-const LATER_SUMMARY: &str = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch: checking it again changes nothing unless the book changes, and it cannot be amended, so correct anything that is wrong in Tally by hand.";
+const LATER_SUMMARY: &str = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.";
 
 /// A batch Tally rejected whole, checked again later with the book unchanged:
 /// no voucher is read as not created, each keeps `sent_not_attributed`, and

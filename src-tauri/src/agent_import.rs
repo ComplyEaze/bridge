@@ -663,7 +663,7 @@ impl super::WindowRow for ReadVoucher {
 fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     let summary = match report["state"].as_str() {
         Some("bound") => "Each voucher was matched to the Tally voucher this post created.",
-        Some("refused") => "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch: checking it again changes nothing unless the book changes, and it cannot be amended, so correct anything that is wrong in Tally by hand.",
+        Some("refused") => "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.",
         Some("unsettled")
             if report["code"]
                 == span_identity::BindUnsettled::EffectiveDateNotObserved.code() =>
@@ -706,9 +706,9 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
         .as_array()
         .is_some_and(|vouchers| vouchers.len() == matched_by_content)
     {
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch: checking it again changes nothing unless the book changes, and it cannot be amended, so correct anything that is wrong in Tally by hand."
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it."
     } else {
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch: checking it again changes nothing unless the book changes, and it cannot be amended, so correct anything that is wrong in Tally by hand."
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it."
     };
     // A check that recorded a restore while its own post reads intact names
     // it: the restore reaches other posts of the company, and the posts it

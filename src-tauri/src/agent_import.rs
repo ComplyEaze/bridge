@@ -59,6 +59,10 @@ mod approval;
 pub(super) mod ledger;
 #[path = "agent_import_local_data.rs"]
 pub(super) mod local_data;
+// The master write journal; a building block no caller reaches yet.
+#[cfg_attr(not(test), allow(dead_code))]
+#[path = "agent_master_ledger.rs"]
+mod master_ledger;
 #[path = "agent_import_persistence.rs"]
 mod persistence;
 #[path = "agent_import_post.rs"]

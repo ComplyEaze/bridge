@@ -685,6 +685,43 @@ else
     fi
     count=$(wc -l <"$lab_captures_file" | tr -d ' ')
     say "note" "lab-capture manifest: $count listed capture(s) (blob $(git -C "$gate_tree" rev-parse --short=12 "$tip:$lab_capture_path" 2>/dev/null))"
+    lab_capture_stale_rows "$tip"
+  }
+  # Warns, never blocks and never changes an exemption: an entry whose path master now holds with another blob (a directory's
+  # tree id never equals a file's blob id, so a directory there counts too), or whose path master once held and has since deleted, is stale and should be removed. An entry whose path
+  # master never held is pending (its pull request has not merged) and only counted. Paths are read literally (no pathspec magic),
+  # names are redacted like any gate output, and at most eight are named.
+  lab_capture_stale_rows() {
+    local tip="$1" path blob _size _sha listing master_blob gone shown pending=0 stale=0 failed=0
+    while IFS=$'\t' read -r path blob _size _sha; do
+      listing=$(git --literal-pathspecs -C "$gate_tree" ls-tree "$tip" -- "$path" 2>/dev/null) || { failed=1; break; }
+      if [ -n "$listing" ]; then
+        master_blob=$(awk '{ print $3 }' <<<"$listing")
+        [ "$master_blob" = "$blob" ] && continue
+        stale=$((stale + 1))
+        if [ "$stale" -le 8 ]; then
+          shown=$(sed -E 's#/(Users|home)/[^/[:space:]]+#<home>#g; s#^(Users|home)/[^/[:space:]]+#<home>#g; s#[A-Za-z]:[\\/]+Users[\\/]+[^\\/[:space:]]+#<home>#g' <<<"$path" | python3 -I "$script_dir/merge_gate_privacy.py" --redact-shapes 2>/dev/null) || shown="(path not shown)"
+          say "note" "lab-capture manifest: stale entry '${shown:0:160}': master holds another blob there; remove or update the entry, unless a pull request not yet merged replaces that capture"
+        fi
+      else
+        gone=$(git --literal-pathspecs -C "$gate_tree" log -1 --format=%h "$tip" -- "$path" 2>/dev/null) || { failed=1; break; }
+        if [ -n "$gone" ]; then
+          stale=$((stale + 1))
+          if [ "$stale" -le 8 ]; then
+            shown=$(sed -E 's#/(Users|home)/[^/[:space:]]+#<home>#g; s#^(Users|home)/[^/[:space:]]+#<home>#g; s#[A-Za-z]:[\\/]+Users[\\/]+[^\\/[:space:]]+#<home>#g' <<<"$path" | python3 -I "$script_dir/merge_gate_privacy.py" --redact-shapes 2>/dev/null) || shown="(path not shown)"
+            say "note" "lab-capture manifest: stale entry '${shown:0:160}': master deleted it at $gone; remove the entry, unless a pull request not yet merged adds it again"
+          fi
+        else
+          pending=$((pending + 1))
+        fi
+      fi
+    done <"$lab_captures_file"
+    if [ "$failed" -ne 0 ]; then
+      say "note" "lab-capture manifest: the stale-entry check could not run (git could not look up an entry's path on master)"; return 0
+    fi
+    [ "$stale" -le 8 ] || say "note" "lab-capture manifest: $stale stale entries in all (eight named above)"
+    [ "$pending" -eq 0 ] || say "note" "lab-capture manifest: $pending entr(ies) not yet on master (pending)"
+    return 0
   }
   # Reads the blob answer from a file (the bytes never pass through a shell variable) and says match, size, sha256, not-that-blob or
   # malformed. The decoded bytes must hash, as git hashes a blob, to the id that was asked for, so an answer for other bytes is caught.

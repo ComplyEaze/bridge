@@ -646,7 +646,9 @@ licence, their NOTICE obligation and their `PROVENANCE` entry
 (`scripts/check-fixture-provenance.mjs`), states `seed_basis`, and confirms on the file they
 read both `blob` (`git hash-object <file>`) and `sha256` (for example `shasum -a 256`), since
 those are the values the gate checks. An entry stays valid for those bytes at that path until
-it is removed, so remove it when the capture is deleted or withdrawn. A lab branch is never
+it is removed, so remove it when the capture is deleted or withdrawn. The gate warns (never blocks)
+about a stale entry: one whose path master holds with another blob, or once held and has deleted;
+an entry whose path master never held is counted as pending. A lab branch is never
 read or trusted at gate time: lab branches are unprotected and are pushed with the owner's own
 account, so being on one proves nothing about where the bytes came from, and a branch can be
 moved or deleted later. A pointer to a lab branch or commit in a pull request body is ignored.

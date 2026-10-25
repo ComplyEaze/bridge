@@ -18,6 +18,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shlex
 import shutil
 import stat
@@ -126,16 +127,26 @@ class MergeGateControls(unittest.TestCase):
 
     @classmethod
     @contextlib.contextmanager
-    def master_state(cls, tracked=None, symlinks=None, ignored=None, hidden_edits=None):
+    def master_state(cls, tracked=None, symlinks=None, ignored=None, hidden_edits=None, deleted=None):
         """Put files on the throwaway origin/master (and in the gate's checkout), then put it back.
 
         tracked: path -> text, committed. symlinks: path -> target, committed as links. ignored: path -> text, written
         into the checkout only, with a committed .gitignore naming it (git status does not show it). hidden_edits: path -> text
         written over a tracked file in the checkout and hidden from git with skip-worktree (git diff and git status do not show it).
+        deleted: path -> text, committed and then removed in a later commit, so master once held it.
         """
         base = subprocess.run(["git", "-C", str(cls.repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
         try:
+            if deleted:
+                for path, text in deleted.items():
+                    (cls.repo / path).parent.mkdir(parents=True, exist_ok=True)
+                    (cls.repo / path).write_text(text)
+                cls.git_in_repo("add", "-A")
+                cls.git_in_repo("commit", "-q", "-m", "held")
+                cls.git_in_repo("rm", "-q", *deleted)
+                cls.git_in_repo("commit", "-q", "-m", "deleted")
             for path, text in (tracked or {}).items():
+                (cls.repo / path).parent.mkdir(parents=True, exist_ok=True)
                 (cls.repo / path).write_text(text)
             for path, target in (symlinks or {}).items():
                 os.symlink(target, cls.repo / path)
@@ -691,6 +702,65 @@ class MergeGateControls(unittest.TestCase):
             result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
         self.assertIn("lab-capture manifest: 1 listed capture(s) (blob ", result.stdout)
         self.assertNotIn("--binary-review-sha attestation", result.stdout)
+
+    # -- Stale manifest entries: a warning, never a block ---------------------------------------------------------------
+    STALE = "lab-capture manifest: stale entry"
+    PENDING = "entr(ies) not yet on master (pending)"
+
+    def test_an_entry_whose_path_master_never_held_is_only_counted_as_pending(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn("lab-capture manifest: 1 " + self.PENDING, result.stdout)
+        self.assertNotIn(self.STALE, result.stdout)
+
+    def test_an_entry_whose_file_master_holds_at_the_listed_blob_is_neither_stale_nor_pending(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="docs/kept.bin"))
+        with self.master_state(tracked={self.LAB_PATH: manifest, "docs/kept.bin": self.LAB_BYTES.decode()}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertNotIn(self.STALE, result.stdout)
+        self.assertIn("lab-capture manifest: 1 " + self.PENDING, result.stdout)
+
+    def test_an_entry_whose_path_master_holds_with_another_blob_is_stale_but_still_passes(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="docs/changed.bin"))
+        with self.master_state(tracked={self.LAB_PATH: manifest, "docs/changed.bin": "other bytes\n"}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn(self.STALE + " 'docs/changed.bin': master holds another blob there", result.stdout)
+
+    def test_an_entry_whose_path_is_a_directory_on_master_is_stale(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="docs/dir"))
+        with self.master_state(tracked={self.LAB_PATH: manifest, "docs/dir/inner.txt": "x\n"}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn(self.STALE + " 'docs/dir': master holds another blob there", result.stdout)
+
+    def test_an_entry_whose_path_master_deleted_is_stale_and_names_the_commit(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="docs/gone.bin"))
+        with self.master_state(tracked={self.LAB_PATH: manifest}, deleted={"docs/gone.bin": "gone\n"}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertRegex(result.stdout, re.escape(self.STALE + " 'docs/gone.bin': master deleted it at ") + "[0-9a-f]{7,}")
+        self.assertIn("lab-capture manifest: 1 " + self.PENDING, result.stdout)
+
+    def test_a_path_with_pathspec_magic_is_read_literally(self):
+        # ":(glob)docs/*" would match every docs file as a pathspec; read literally it names no file master ever held
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path=":(glob)docs/*"))
+        with self.master_state(tracked={self.LAB_PATH: manifest, "docs/kept.bin": "x\n"}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertNotIn(self.STALE, result.stdout)
+        self.assertIn("lab-capture manifest: 2 " + self.PENDING, result.stdout)
+
+    def test_a_stale_entry_with_a_home_shaped_path_is_named_redacted(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="Users/someone/cap.bin"))
+        with self.master_state(tracked={self.LAB_PATH: manifest, "Users/someone/cap.bin": "other\n"}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn(self.STALE + " '<home>/cap.bin'", result.stdout)
+        self.assertNotIn("someone", result.stdout)
+
+    def test_more_than_eight_stale_entries_are_named_eight_times_and_counted(self):
+        paths = ["docs/s%d.bin" % i for i in range(10)]
+        manifest = self.lab_manifest(self.lab_entry(), *[self.lab_entry(path=p) for p in paths])
+        with self.master_state(tracked=dict({self.LAB_PATH: manifest}, **{p: "other\n" for p in paths})):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertEqual(result.stdout.count(self.STALE + " '"), 8)
+        self.assertIn("lab-capture manifest: 10 stale entries in all (eight named above)", result.stdout)
 
     def test_a_listed_binary_in_a_renamed_file_is_judged_by_its_new_path(self):
         with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):

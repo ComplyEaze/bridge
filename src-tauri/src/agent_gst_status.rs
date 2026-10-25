@@ -60,6 +60,30 @@ pub(super) enum GstStatus {
     PostDated,
 }
 
+/// What the three status flags alone state: the four measured combinations, and
+/// never the three states that come from `ISCANCELLED`, `ISOPTIONAL` and
+/// `ISPOSTDATED`. A caller that reads the three flags only holds this type, so
+/// it cannot be handed a state it did not read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum FlagStatus {
+    Included,
+    Uncertain,
+    Excluded,
+    NotInReturn,
+}
+
+impl From<FlagStatus> for GstStatus {
+    fn from(flags: FlagStatus) -> Self {
+        match flags {
+            FlagStatus::Included => GstStatus::Included,
+            FlagStatus::Uncertain => GstStatus::Uncertain,
+            FlagStatus::Excluded => GstStatus::Excluded,
+            FlagStatus::NotInReturn => GstStatus::NotInReturn,
+        }
+    }
+}
+
 /// The state three flags state, or the code of why they state none: absent
 /// (`gst_status_not_reported`), or not one of the four measured combinations
 /// (`gst_status_unreadable`). A flag that is empty, repeated, spelled another
@@ -68,12 +92,12 @@ pub(super) fn status_of_flags(
     included: Option<&str>,
     uncertain: Option<&str>,
     excluded: Option<&str>,
-) -> Result<GstStatus, &'static str> {
+) -> Result<FlagStatus, &'static str> {
     match (included, uncertain, excluded) {
-        (Some("Yes"), Some("No"), Some("No")) => Ok(GstStatus::Included),
-        (Some("No"), Some("Yes"), Some("No")) => Ok(GstStatus::Uncertain),
-        (Some("No"), Some("No"), Some("Yes")) => Ok(GstStatus::Excluded),
-        (Some("No"), Some("No"), Some("No")) => Ok(GstStatus::NotInReturn),
+        (Some("Yes"), Some("No"), Some("No")) => Ok(FlagStatus::Included),
+        (Some("No"), Some("Yes"), Some("No")) => Ok(FlagStatus::Uncertain),
+        (Some("No"), Some("No"), Some("Yes")) => Ok(FlagStatus::Excluded),
+        (Some("No"), Some("No"), Some("No")) => Ok(FlagStatus::NotInReturn),
         (None, None, None) => Err("gst_status_not_reported"),
         _ => Err("gst_status_unreadable"),
     }
@@ -100,7 +124,7 @@ pub(super) fn status_of_voucher(
         (Some("Yes"), Some("No"), Some("No")) => flags.map(|_| GstStatus::Cancelled),
         (Some("No"), Some("Yes"), Some("No")) => flags.map(|_| GstStatus::Optional),
         (Some("No"), Some("No"), Some("Yes")) => flags.map(|_| GstStatus::PostDated),
-        (Some("No"), Some("No"), Some("No")) => flags,
+        (Some("No"), Some("No"), Some("No")) => flags.map(GstStatus::from),
         (None, None, None) => Err("gst_status_not_reported"),
         _ => Err("gst_status_unreadable"),
     }
@@ -257,7 +281,7 @@ pub(super) struct StatusRow {
     pub(super) status: Result<GstStatus, &'static str>,
     /// What the three status flags read on a cancelled, optional or post-dated
     /// voucher: returned beside its state and never counted.
-    pub(super) status_flags: Option<GstStatus>,
+    pub(super) status_flags: Option<FlagStatus>,
     pub(super) overridden: Result<bool, &'static str>,
 }
 

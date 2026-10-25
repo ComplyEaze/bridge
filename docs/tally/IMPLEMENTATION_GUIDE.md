@@ -115,8 +115,8 @@ company lookups to produce a value that is constant for the entire request.
 > from the client that built the request in the first place. Bridge's existing
 > `company_book_extent_v2` profile already returns the verified company GUID in milliseconds.
 
-This is the same category of error as the self-referential `$$NumItems` in §5.3b: a TDL
-construct that looks like free metadata and is actually per-row work. Both were inherited from
+This is the same category of error as the self-referencing count in §5.3b: a TDL construct
+that looks like costless metadata and is actually per-row work. Both were inherited from
 the original report profiles, which used exactly this pattern.
 
 ### 2.4 Curate the `FETCH` list — never use a wildcard
@@ -1000,69 +1000,38 @@ Even *rejected* requests can occupy Tally well beyond the HTTP response.
 
 ---
 
-### 5.3b A self-referential `$$NumItems` hangs the gateway — I1 restated
+### 5.3b I1 also forbids self-reference
 
-**OBSERVED 2026-07-30, cause not isolated.** A collection whose own `<COMPUTE>` counted its own
-membership (a `$$NumItems` referencing the collection it was defined in) left the gateway
-unresponsive with an *empty reply*. A minimal `Company` collection sent immediately before had
-succeeded, so the instance was healthy.
+**OBSERVED 2026-07-30, cause not isolated.** A collection whose compute counted its own
+membership left the gateway unresponsive with an *empty reply*, on an instance that had answered
+a minimal request a moment before. The identifier involved contained no spaces, so spacing is
+suspected not to be the only way to break I1; the self-reference is the prime suspect, not a
+proven cause. I1 states both conditions: no `$$` function may reference an identifier containing
+spaces, **and no collection may reference itself inside a `$$` function.**
 
-> The exact reproducing request shape is a **restricted crash trigger**. It is held privately
-> and is deliberately not named, linked, or pathed here; the location is supplied out-of-band to
-> people with access. This section keeps the rule and the reasoning; it does not reproduce the
-> payload.
->
-> The self-reference is described in enough detail to *follow* I1 and no further. That is
-> intentional: an invariant nobody can apply protects nothing, and "do not let a collection
-> reference itself in a `$$` function" is unfollowable without saying what self-reference means.
-> What is withheld is the exact TDL, the identifier, and the surrounding request — the parts
-> that turn a rule into a working payload.
+**An empty reply is its own failure class:** TCP connected and the server closed without sending
+anything, distinct from the connection-refused and indefinite-hang signatures seen elsewhere.
 
-**Note the signature is distinct:** *empty reply* means TCP connected and the server closed
-without sending anything — distinct from the connection-refused and indefinite-hang signatures
-seen elsewhere. Treat it as its own failure class.
+**Rule:** count rows client-side after parsing, never inside a collection. That costs nothing and
+cannot block the instance. **What enforces it:** `scripts/check-tally-request-builder-hazards.mjs`
+refuses new instances of the spaced-identifier half of I1 (one legacy profile is quarantined
+there); Unit A's collection profile has no function or compute slots, so it cannot express a
+self-reference (UNIT_A_REPORT.md). No general check covers the
+self-reference half for other builders.
 
-**Why this matters more than the individual defect.** The identifier that triggered it contained
-**no spaces**. It fully complied with I1 as originally written ("no `$$` function may reference
-an identifier containing spaces") and still took the instance down — the fault was the
-self-reference, not the spacing. Only the spaces had been recorded from the earlier crash; the
-self-reference was missed.
+### 5.3a Object and report names come from documentation, never from guessing
 
-**I1 is therefore restated:** no `$$` function may reference an identifier containing spaces,
-**and no collection may reference itself inside a `$$` function.** A collection counting its own
-membership is re-entrant.
+**VERIFIED 2026-07-30.** A collection request naming an object type Tally does not have gets no
+HTTP response. Tally reports the problem in a modal dialog on its own screen instead, and the
+gateway stays blocked until a person acts there: the same asymmetry as §I1 and §3.1a.
 
-**Not isolated:** the failing request also carried two other `<COMPUTE>` fields and two-level
-`BILLALLOCATIONS` sub-paths. The self-reference is the prime suspect by direct analogy with the
-original crash, not a proven cause. If the cause matters, isolate one `<COMPUTE>` at a time —
-but the safer course is simply not to compute counts inside a collection at all: count rows
-client-side after parsing, which is free and cannot hang anything.
+**Rule:** object, collection and report names come only from Tally's documentation or from its
+own UI, never from trying names against a live instance. Bridge's request builders fix every
+name in code or pick it from a closed set, so no name comes from input.
 
-**This is the strongest available argument for AGENTS.md P2.** A rule that can be fully complied
-with while still causing the failure it exists to prevent is a badly-written rule. A type that
-rejects a self-referential collection definition cannot be complied with incorrectly.
-
-### 5.3a An unknown collection `TYPE` hangs the instance — **do not explore by guessing**
-
-**VERIFIED 2026-07-30.** A collection request naming a non-existent object type
-(`<TYPE>EditLog</TYPE>`) produced **no HTTP response at all** and raised a modal dialog:
-
-```
-Internal Error.  Contact Tally Solutions.
-Incorrect Object Type!
-```
-
-Tally **knows** exactly what is wrong and says so on screen. It tells the gateway nothing —
-the same asymmetry as the `$$` crash (§I1) and the current-period edit block (§3.1a).
-
-**Consequence for method:** Tally's object model **cannot be discovered by trying type names.**
-Each wrong guess costs a hung gateway and an operator interruption. Object and report names
-must come from documentation or from Tally's own UI, never from experimentation.
-
-**This rule has been broken before** — several unknown types were sent in a loop after the
-first had already hung the gateway, taking the instance down. That is exactly the
-"never auto-retry a request that caused a hang" rule in §5.4. Recorded because the failure was
-procedural, not technical.
+**Never auto-retry a request that blocked the gateway** (§5.4). Retrying turns one blocked
+request into an outage; this rule has been broken once already, and the cause was procedural,
+not technical.
 
 ### 5.4 Can the dialog be handled, or Tally restarted, programmatically? — **recommendation: no**
 
@@ -1218,16 +1187,16 @@ zero; fail closed or quarantine.
 | `ACTION="Alter"` + `REMOTEID` | Creates a duplicate. `Create` upserts a **byte-identical** repeat; a *corrected* payload is UNVERIFIED and may overwrite, partially update or duplicate | §3.3a |
 | Master name outside an exact or qualified directional comparison | Voucher rejected, master NOT auto-created | §3.3b |
 | Omitting `BILLALLOCATIONS.LIST` | Allocation becomes `On Account` with no bill identity | §3.3c |
-| Self-referential `$$NumItems` in a collection | Gateway hangs, empty reply | §5.3b |
+| A collection that references itself in a `$$` function | Gateway blocked, empty reply | I1, §5.3b |
 | `<COMPUTE>` used for a per-request constant | Per-row work; request exceeds deadline | §2.3a |
-| `<COMPANY Action="Create">` without `SVCURRENTCOMPANY` | **Renames the loaded company**; `CREATED=0, ALTERED=1, ERRORS=0` | I2, §9.10d |
+| A company-level import without a pinned current company | **Alters the loaded company** instead of creating one; `CREATED=0, ALTERED=1, ERRORS=0` | I2, §9.10d |
 | Reading "the company" as row 1 of a `Company` collection | Returns the wrong company; `SVCURRENTCOMPANY` does not filter it | I3, corpus §7.1 |
 | Expecting `ALTVCHID` from the single-object company export | Absent there; only the collection returns it | corpus §7.2 |
 | Identifying the *instance* by company GUID | Backup/restore copies share a GUID across ports | corpus §7.3 |
 | Validating corpus ordering by counting inversions | Condemns a good corpus; measure `AlterID` **locality** | corpus §4 |
 | Narrowing the outstandings wildcard to cut cost | 11–30× faster, `BILLTYPE` silently empty | §2.4a |
 | Date-segmenting a book with a dense single day | No segment size can fit; use `AlterID` ranges | §2.4a, §10.1 |
-| `ORIGINALNAME` as a direct `<COMPANY>` child | Modal dialog; gateway blocked until a human clicks OK | §9.10b |
+| Some company-level import shapes | Modal dialog; gateway blocked until a human clicks OK | §9.10b |
 | Inferring "recovered on its own" from network polling | Attributes an operator's click to elapsed time | §9.10b |
 | Company data path sought as a `COMPANY` field | Not a field; it is the `SVCURRENTPATH` static variable | §9.10a |
 

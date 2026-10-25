@@ -152,8 +152,9 @@ fn a_create_folded_onto_a_ledger_leaves_its_old_spelling_as_the_row_spelling() {
 
 #[test]
 fn another_companys_guid_is_refused() {
+    // Another synthetic lab company's GUID (BRIDGE TIEOUT B, in the merge gate's registry).
     assert_eq!(
-        parse_ledger_name_index(&decode(BASELINE), "11111111-2222-4333-8444-555555555555"),
+        parse_ledger_name_index(&decode(BASELINE), "d64eda55-da7c-4106-a171-3e3cb6cdd331"),
         Err(StandardLedgerCatalogError::CompanyIdentityMismatch)
     );
 }

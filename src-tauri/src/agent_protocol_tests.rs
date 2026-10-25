@@ -538,7 +538,7 @@ fn recovery_egress_error_falls_back_to_the_batch_when_the_compact_response_excee
 
 #[test]
 fn recovery_egress_error_keeps_the_counters_of_a_ledger_create() {
-    let batch_id = "bridge-00000000-0000-0000-0000-000000000001";
+    let batch_id = crate::synthetic_batch_id(1);
     let counters = json!({"created":1,"altered":0,"deleted":0,"ignored":0,"errors":0,"cancelled":0,"exceptions":0});
     let original = |counters: Value| {
         json!({"result":{"structuredContent":{"result":{

@@ -976,7 +976,9 @@ async fn a_master_post_whose_book_turns_to_education_is_refused_at_the_closing_o
     assert_eq!(simulator.finish().unwrap().len(), 31);
 }
 
-const MASTER_BATCH: &str = "bridge-00000000-0000-4000-8000-0000000000a1";
+fn master_batch() -> &'static str {
+    crate::synthetic_batch_id(0xa1)
+}
 
 /// A closure that licenses nothing a master request needs (the unit licence of
 /// the voucher path) lets no master POST through: the intent closure ran, and
@@ -1028,10 +1030,10 @@ async fn a_recorded_intent_of_another_batch_or_other_bytes_sends_nothing() {
     for (case, bound, sha_of_request) in [
         (
             "another batch",
-            Some("bridge-00000000-0000-4000-8000-0000000000b2"),
+            Some(crate::synthetic_batch_id(0xb2)),
             true,
         ),
-        ("other bytes", Some(MASTER_BATCH), false),
+        ("other bytes", Some(master_batch()), false),
         ("no batch", None, true),
     ] {
         let companies = captured_companies();
@@ -1054,9 +1056,9 @@ async fn a_recorded_intent_of_another_batch_or_other_bytes_sends_nothing() {
         } else {
             "e".repeat(64)
         };
-        // The intent is always for MASTER_BATCH; the request is bound elsewhere,
+        // The intent is always for master_batch(); the request is bound elsewhere,
         // to nothing, or carries other bytes.
-        let batch = MASTER_BATCH;
+        let batch = master_batch();
         let error = TallyRuntime::default()
             .post_approved_import(
                 TallyConfig {
@@ -1104,7 +1106,7 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
         Some(companies.clone()),
     );
     let simulator = SequenceSimulator::spawn(plans).unwrap();
-    let approved = approved_masters(&companies).bound_to_batch(MASTER_BATCH);
+    let approved = approved_masters(&companies).bound_to_batch(master_batch());
     assert_eq!(
         approved.post_kind(),
         crate::tally::approved_import::PostKind::Masters
@@ -1152,7 +1154,7 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
                 dispatch_flag.store(true, Ordering::Release);
                 Ok(
                     crate::tally::approved_import::RecordedIntent::issued_for_test(
-                        MASTER_BATCH,
+                        master_batch(),
                         &sent_sha,
                     ),
                 )
@@ -1194,7 +1196,7 @@ async fn a_master_post_for_another_company_is_refused_before_any_request() {
     let companies = captured_companies();
     let other = VerifiedCompanyIdentity::test_fixture(
         "Some Other Company",
-        "11111111-1111-4111-8111-111111111111",
+        crate::synthetic_guid(0x1111),
     );
     let approved = ApprovedImport::approved_masters_for_test(
         LedgerCreateItem::new(

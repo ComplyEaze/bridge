@@ -73,13 +73,16 @@ fn company_marks_of(target_masters: u64, other_masters: u64) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
          <COMPANY NAME=\"{COMPANY}\" RESERVEDNAME=\"\"><GUID>{GUID}</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>{target_masters}</ALTMSTID></COMPANY>\
-         <COMPANY NAME=\"Synthetic Other Lab\" RESERVEDNAME=\"\"><GUID>22222222-2222-4222-8222-222222222222</GUID><ALTVCHID>50</ALTVCHID><ALTMSTID>{other_masters}</ALTMSTID></COMPANY>\
-         </COLLECTION></DATA></BODY></ENVELOPE>"
+         <COMPANY NAME=\"Synthetic Other Lab\" RESERVEDNAME=\"\"><GUID>{other}</GUID><ALTVCHID>50</ALTVCHID><ALTMSTID>{other_masters}</ALTMSTID></COMPANY>\
+         </COLLECTION></DATA></BODY></ENVELOPE>",
+        other = crate::synthetic_guid(0x2222),
     )
 }
 
 const NEW_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f-000000d1";
-const CASH_GUID: &str = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+fn cash_guid() -> &'static str {
+    crate::synthetic_guid(0xaaaa)
+}
 
 /// Values a party-ledger master row carries that no answer or journal record
 /// may ever hold. Synthetic, none of them a real person's.
@@ -297,7 +300,7 @@ fn item(name: &str) -> LedgerCreateItem {
 fn book() -> Vec<IndexedMaster> {
     vec![IndexedMaster {
         kind: MasterKind::Ledger,
-        guid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa".into(),
+        guid: crate::synthetic_guid(0xaaaa).into(),
         alter_id: 9,
         names: vec!["Cash".into()],
     }]
@@ -595,7 +598,7 @@ async fn a_tools_call_for_a_master_tool_with_the_setting_off_is_refused_not_unkn
     let input = format!(
         "{}\n{}\n",
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"post_ledger_creates","arguments":{"batch_id":"bridge-00000000-0000-4000-8000-000000000001"}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"post_ledger_creates","arguments":{"batch_id":format!("bridge-{}", crate::synthetic_guid(1))}}}),
     );
     let mut output = Vec::new();
     serve_stdio(server, BufReader::new(input.as_bytes()), &mut output)
@@ -991,7 +994,7 @@ async fn an_approved_post_sends_exactly_the_bytes_its_intent_recorded() {
     assert_eq!(
         marks,
         [
-            ("22222222-2222-4222-8222-222222222222".to_string(), 3),
+            (crate::synthetic_guid(0x2222).to_string(), 3),
             (GUID.to_string(), 7)
         ]
     );
@@ -1005,7 +1008,7 @@ async fn an_approved_post_sends_exactly_the_bytes_its_intent_recorded() {
     .unwrap();
     assert!(pre_image
         .entries()
-        .contains_key("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"));
+        .contains_key(crate::synthetic_guid(0xaaaa)));
     // One dialog, asked once, about the preview the review text builds.
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     assert_eq!(
@@ -1135,7 +1138,7 @@ async fn a_sent_batch_whose_company_is_not_loaded_says_to_load_the_same_companie
     let simulator = SequenceSimulator::spawn(with_sentinel(verified_company())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
-    let sent_batch = dispatched_batch_in(directory.path(), LEDGER, OTHER_UNLOADED_GUID);
+    let sent_batch = dispatched_batch_in(directory.path(), LEDGER, other_unloaded_guid());
     let before = journal_bytes(directory.path());
     let response = posting(
         &ScriptedApproval::approving(),
@@ -1463,7 +1466,7 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
     // The refusals for a held name.
     let one = BlockingBatch {
         batch_id: "bridge-0001".into(),
-        company_guid: OTHER_LOADED_GUID.into(),
+        company_guid: other_loaded_guid().into(),
     };
     let held_own = OverlapView::Held(BlockerReport {
         ids: vec!["bridge-0000".into()],
@@ -1477,7 +1480,7 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         ids: vec!["bridge-0000".into()],
         other_companies: vec![BlockingBatch {
             batch_id: "bridge-0001".into(),
-            company_guid: OTHER_LOADED_GUID.into(),
+            company_guid: other_loaded_guid().into(),
         }],
     });
     for (path, view, expected, keys) in [
@@ -2000,7 +2003,7 @@ fn record_intent_for_test(server: &Server, batch: &MasterBatch) {
 fn record_intent_in(dir: &std::path::Path, batch: &MasterBatch) {
     let lock = ExclusiveAdmission::acquire(dir).unwrap();
     let pre_image =
-        PreImage::new([("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb".to_string(), 1)]).unwrap();
+        PreImage::new([(crate::synthetic_guid(0xbbbb).to_string(), 1)]).unwrap();
     let written = write_pre_image(dir, &lock, batch, &pre_image).unwrap();
     let intent = MasterDispatchIntent::new(
         batch,
@@ -2085,7 +2088,7 @@ async fn an_unknown_batch_is_refused_and_a_malformed_id_too() {
     let unknown = server
         .call_tool(
             "post_ledger_creates",
-            json!({"batch_id": "bridge-00000000-0000-4000-8000-000000000001"}),
+            json!({"batch_id": format!("bridge-{}", crate::synthetic_guid(1))}),
         )
         .await;
     assert_eq!(error_code(&unknown), "master_batch_not_found", "{unknown}");
@@ -2118,7 +2121,7 @@ async fn an_intent_recorded_while_the_dialog_is_open_stops_the_post() {
     let scripted = ScriptedApproval::approving_after(move || {
         let lock = ExclusiveAdmission::acquire(&data_dir).unwrap();
         let pre_image =
-            PreImage::new([("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb".to_string(), 1)]).unwrap();
+            PreImage::new([(crate::synthetic_guid(0xbbbb).to_string(), 1)]).unwrap();
         let written = write_pre_image(&data_dir, &lock, &rival, &pre_image).unwrap();
         let intent = MasterDispatchIntent::new(
             &rival,
@@ -2159,8 +2162,12 @@ async fn an_intent_recorded_while_the_dialog_is_open_stops_the_post() {
 
 // --- post: a name an open dispatch holds -----------------------------------
 
-const OTHER_LOADED_GUID: &str = "22222222-2222-4222-8222-222222222222";
-const OTHER_UNLOADED_GUID: &str = "33333333-3333-4333-8333-333333333333";
+fn other_loaded_guid() -> &'static str {
+    crate::synthetic_guid(0x2222)
+}
+fn other_unloaded_guid() -> &'static str {
+    crate::synthetic_guid(0x3333)
+}
 
 /// A batch of `name` prepared for the company `company_guid`, left as a call
 /// that sent it would leave it: its intent is recorded and it has no verdict.
@@ -2183,7 +2190,7 @@ fn dispatched_batch_in(dir: &std::path::Path, name: &str, company_guid: &str) ->
     let lock = ExclusiveAdmission::acquire(dir).unwrap();
     append(dir, &lock, MasterRecord::Batch(batch.clone())).unwrap();
     let pre_image =
-        PreImage::new([("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb".to_string(), 1)]).unwrap();
+        PreImage::new([(crate::synthetic_guid(0xbbbb).to_string(), 1)]).unwrap();
     let written = write_pre_image(dir, &lock, &batch, &pre_image).unwrap();
     let intent = MasterDispatchIntent::new(
         &batch,
@@ -2294,7 +2301,7 @@ async fn a_name_held_by_an_open_dispatch_of_the_same_company_is_refused_before_a
 /// the refusal still comes before the dialog.
 #[tokio::test]
 async fn a_name_held_in_another_company_is_listed_with_its_company_loaded_or_not() {
-    for other in [OTHER_LOADED_GUID, OTHER_UNLOADED_GUID] {
+    for other in [other_loaded_guid(), other_unloaded_guid()] {
         let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
         let directory = tempfile::tempdir().unwrap();
         let server = server_at(simulator.address(), directory.path());
@@ -2329,7 +2336,7 @@ async fn a_name_held_in_another_company_is_listed_with_its_company_loaded_or_not
 async fn three_open_dispatches_holding_a_name_are_told_apart_by_company() {
     let alpha = "Holder Alpha";
     let beta = "Holder Beta";
-    for (second_company, ids_of_both) in [(GUID, true), (OTHER_LOADED_GUID, false)] {
+    for (second_company, ids_of_both) in [(GUID, true), (other_loaded_guid(), false)] {
         let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
         let directory = tempfile::tempdir().unwrap();
         let server = server_at(simulator.address(), directory.path());
@@ -2385,9 +2392,9 @@ fn the_ids_a_refusal_names_are_the_same_companys_and_the_rest_are_listed_apart()
     };
     let held = [
         blocking(0, GUID),
-        blocking(1, OTHER_LOADED_GUID),
+        blocking(1, other_loaded_guid()),
         blocking(2, GUID),
-        blocking(3, OTHER_UNLOADED_GUID),
+        blocking(3, other_unloaded_guid()),
     ];
     let told = BlockerReport::of(&held, GUID);
     assert_eq!(told.ids, ["bridge-0000", "bridge-0002"]);
@@ -2397,8 +2404,8 @@ fn the_ids_a_refusal_names_are_the_same_companys_and_the_rest_are_listed_apart()
         error,
         json!({"blocking_batch_ids": ["bridge-0000", "bridge-0002"],
                "blocking_batches_other_companies": [
-                   {"batch_id": "bridge-0001", "company_guid": OTHER_LOADED_GUID},
-                   {"batch_id": "bridge-0003", "company_guid": OTHER_UNLOADED_GUID}]})
+                   {"batch_id": "bridge-0001", "company_guid": other_loaded_guid()},
+                   {"batch_id": "bridge-0003", "company_guid": other_unloaded_guid()}]})
     );
     let shouted = BlockerReport::of(&held[..1], &GUID.to_uppercase());
     assert_eq!(shouted.ids, ["bridge-0000"]);
@@ -2410,7 +2417,7 @@ fn the_ids_a_refusal_names_are_the_same_companys_and_the_rest_are_listed_apart()
 fn each_case_of_the_refusal_for_a_held_name_says_what_to_do_for_what_it_found() {
     let batch = |n: usize| BlockingBatch {
         batch_id: format!("bridge-{n:04}"),
-        company_guid: OTHER_LOADED_GUID.into(),
+        company_guid: other_loaded_guid().into(),
     };
     let own = OverlapView::Held(BlockerReport {
         ids: vec!["bridge-0000".into()],
@@ -3668,7 +3675,7 @@ async fn the_next_step_of_an_approved_answer_names_the_master_tool() {
 
 fn aim_for_test() -> Mutex<Option<MasterAim>> {
     Mutex::new(Some(MasterAim {
-        pre_image: [("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa".to_string(), 9)].into(),
+        pre_image: [(crate::synthetic_guid(0xaaaa).to_string(), 9)].into(),
         marks: vec![super::super::master_ledger::MasterMark {
             company_guid: GUID.into(),
             altmstid: 7,
@@ -4021,7 +4028,7 @@ async fn a_tools_call_runs_the_master_post_through_the_shared_post_path() {
     let input = format!(
         "{}\n{}\n",
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"post_ledger_creates","arguments":{"batch_id":"bridge-00000000-0000-4000-8000-000000000001"}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"post_ledger_creates","arguments":{"batch_id":format!("bridge-{}", crate::synthetic_guid(1))}}}),
     );
     let mut output = Vec::new();
     serve_stdio(server, BufReader::new(input.as_bytes()), &mut output)
@@ -4162,7 +4169,7 @@ async fn a_name_found_on_an_existing_guid_is_posted_into_existing_master_and_is_
     let (batch, args) = saved_batch(&server, LEDGER);
     let into_cash = vec![IndexedMaster {
         kind: MasterKind::Ledger,
-        guid: CASH_GUID.into(),
+        guid: cash_guid().into(),
         alter_id: 9,
         names: vec!["Cash".into(), LEDGER.into()],
     }];
@@ -4188,7 +4195,7 @@ async fn a_name_found_on_an_existing_guid_is_posted_into_existing_master_and_is_
         next.contains("check") && next.contains("Do not retry"),
         "{next}"
     );
-    assert_eq!(result(&response)["verification"]["guid"], CASH_GUID);
+    assert_eq!(result(&response)["verification"]["guid"], cash_guid());
     assert_eq!(result(&response)["verification"]["settled"], true);
     assert!(result(&response)["verification"]["reasons"]
         .as_array()

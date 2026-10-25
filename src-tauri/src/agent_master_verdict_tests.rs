@@ -5,10 +5,18 @@ use crate::tally::ledger_create_item::{AdmittedDutyHead, MasterName, PartySide, 
 use bridge_tally_protocol::GstDutyHead;
 
 const TARGET: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
-const OTHER: &str = "22222222-2222-4222-8222-222222222222";
-const CASH: &str = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const DEBTORS_GROUP: &str = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-const NEW: &str = "dddddddd-dddd-4ddd-8ddd-dddddddd00d1";
+fn other() -> &'static str {
+    crate::synthetic_guid(0x2222)
+}
+fn cash() -> &'static str {
+    crate::synthetic_guid(0xaaaa)
+}
+fn debtors_group() -> &'static str {
+    crate::synthetic_guid(0xbbbb)
+}
+fn new_ledger() -> &'static str {
+    crate::synthetic_guid(0xd0d1)
+}
 const NAME: &str = "Zeta Test Ledger";
 const LAB_GSTIN: &str = "08ZZZZZ0000Z2ZP";
 
@@ -69,7 +77,7 @@ fn counters(created: u64, altered: u64, errors: u64, exceptions: u64) -> MasterC
 }
 
 fn pre_image() -> BTreeMap<String, u64> {
-    BTreeMap::from([(CASH.to_string(), 9), (DEBTORS_GROUP.to_string(), 4)])
+    BTreeMap::from([(cash().to_string(), 9), (debtors_group().to_string(), 4)])
 }
 
 /// The row the verified ledger reads back as, for `item`.
@@ -89,7 +97,7 @@ fn row_for(item: &LedgerCreateItem) -> PartyView {
     };
     PartyView {
         name: NAME.into(),
-        guid: NEW.into(),
+        guid: new_ledger().into(),
         parent: Some(item.parent().into()),
         tax_type,
         duty_head,
@@ -114,15 +122,15 @@ impl World {
         Self {
             item,
             pre_image: pre_image(),
-            pre_marks: vec![mark(TARGET, 7), mark(OTHER, 3)],
+            pre_marks: vec![mark(TARGET, 7), mark(other(), 3)],
             counters: Some(counters(1, 0, 0, 0)),
             moment: Moment::JustPosted,
             read: ReadBack {
-                marks: Some(vec![mark(TARGET, 8), mark(OTHER, 3)]),
+                marks: Some(vec![mark(TARGET, 8), mark(other(), 3)]),
                 masters: Some(vec![
-                    master(MasterKind::Ledger, CASH, 9, &["Cash"]),
-                    master(MasterKind::Group, DEBTORS_GROUP, 4, &["Sundry Debtors"]),
-                    master(MasterKind::Ledger, NEW, 11, &[NAME]),
+                    master(MasterKind::Ledger, cash(), 9, &["Cash"]),
+                    master(MasterKind::Group, debtors_group(), 4, &["Sundry Debtors"]),
+                    master(MasterKind::Ledger, new_ledger(), 11, &[NAME]),
                 ]),
                 party: PartyRead::Rows(vec![row]),
             },
@@ -134,10 +142,10 @@ impl World {
         let mut world = Self::clean(item);
         world.moment = Moment::Reconcile;
         world.counters = None;
-        world.read.marks = Some(vec![mark(TARGET, 7), mark(OTHER, 3)]);
+        world.read.marks = Some(vec![mark(TARGET, 7), mark(other(), 3)]);
         world.read.masters = Some(vec![
-            master(MasterKind::Ledger, CASH, 9, &["Cash"]),
-            master(MasterKind::Group, DEBTORS_GROUP, 4, &["Sundry Debtors"]),
+            master(MasterKind::Ledger, cash(), 9, &["Cash"]),
+            master(MasterKind::Group, debtors_group(), 4, &["Sundry Debtors"]),
         ]);
         world.read.party = PartyRead::NotRead;
         world
@@ -189,7 +197,7 @@ fn assert_verified(world: &World, label: &str) {
         MasterVerdictState::PostedVerified,
         "{label}: {judgement:?}"
     );
-    assert_eq!(judgement.guid.as_deref(), Some(NEW), "{label}");
+    assert_eq!(judgement.guid.as_deref(), Some(new_ledger()), "{label}");
     assert!(judgement.checks.all_passed(), "{label}");
     assert!(judgement.reasons.is_empty(), "{label}");
 }
@@ -255,7 +263,7 @@ fn absent_counters_never_give_posted_verified_whatever_else_holds() {
             judgement.reasons
         );
         // Every other check passed: only the counters keep it unverified.
-        assert_eq!(judgement.guid.as_deref(), Some(NEW), "{label}");
+        assert_eq!(judgement.guid.as_deref(), Some(new_ledger()), "{label}");
         assert_eq!(judgement.checks.name, Check::Passed);
         assert_eq!(judgement.checks.parent, Check::Passed);
         // The same on a reconcile, where an unknown outcome has no counters.
@@ -308,7 +316,7 @@ fn an_unrelated_master_does_not_make_the_name_ambiguous() {
     let mut world = World::clean(suspense());
     world.masters().push(master(
         MasterKind::Ledger,
-        "eeeeeeee-0000-4000-8000-000000000001",
+        crate::synthetic_guid(0xe001),
         1,
         &["Other", "Another"],
     ));
@@ -343,19 +351,19 @@ fn the_name_check_fails_for_a_name_stored_in_another_spelling() {
 fn the_name_check_fails_for_a_second_ledger_or_an_alias_or_a_group() {
     let second = master(
         MasterKind::Ledger,
-        "eeeeeeee-0000-4000-8000-000000000002",
+        crate::synthetic_guid(0xe002),
         12,
         &[NAME],
     );
     let alias = master(
         MasterKind::Ledger,
-        "eeeeeeee-0000-4000-8000-000000000003",
+        crate::synthetic_guid(0xe003),
         12,
         &["Other", NAME],
     );
     let group = master(
         MasterKind::Group,
-        "eeeeeeee-0000-4000-8000-000000000004",
+        crate::synthetic_guid(0xe004),
         12,
         &[NAME],
     );
@@ -392,15 +400,15 @@ fn a_ledger_whose_guid_is_in_the_pre_image_is_into_an_existing_master_never_veri
     let mut world = World::clean(suspense());
     // The name now resolves to Cash's GUID.
     *world.masters() = vec![
-        master(MasterKind::Ledger, CASH, 9, &[NAME]),
-        master(MasterKind::Group, DEBTORS_GROUP, 4, &["Sundry Debtors"]),
+        master(MasterKind::Ledger, cash(), 9, &[NAME]),
+        master(MasterKind::Group, debtors_group(), 4, &["Sundry Debtors"]),
     ];
     let judgement = world.judge();
     assert_eq!(
         judgement.state,
         MasterVerdictState::PostedIntoExistingMaster
     );
-    assert_eq!(judgement.guid.as_deref(), Some(CASH));
+    assert_eq!(judgement.guid.as_deref(), Some(cash()));
     assert_eq!(judgement.checks.guid_new, Check::Failed);
     assert!(judgement
         .reasons
@@ -411,8 +419,8 @@ fn a_ledger_whose_guid_is_in_the_pre_image_is_into_an_existing_master_never_veri
 fn a_name_that_resolves_to_a_pre_image_master_through_an_alias_is_into_an_existing_master() {
     let mut world = World::clean(suspense());
     *world.masters() = vec![
-        master(MasterKind::Ledger, CASH, 9, &["Cash", NAME]),
-        master(MasterKind::Group, DEBTORS_GROUP, 4, &["Sundry Debtors"]),
+        master(MasterKind::Ledger, cash(), 9, &["Cash", NAME]),
+        master(MasterKind::Group, debtors_group(), 4, &["Sundry Debtors"]),
     ];
     assert_eq!(
         world.judge().state,
@@ -426,7 +434,7 @@ fn a_name_that_resolves_to_a_pre_image_master_through_an_alias_is_into_an_existi
 /// never verified.
 #[test]
 fn a_changed_pre_image_alter_id_alone_is_for_a_person_never_verified() {
-    for changed in [CASH, DEBTORS_GROUP] {
+    for changed in [cash(), debtors_group()] {
         let mut world = World::clean(suspense());
         for entry in world.masters().iter_mut() {
             if entry.guid == changed {
@@ -460,7 +468,7 @@ fn altered_above_zero_is_into_an_existing_master() {
 #[test]
 fn a_pre_image_master_missing_after_the_post_is_a_doubt_not_a_verified_create() {
     let mut world = World::clean(suspense());
-    world.masters().retain(|entry| entry.guid != CASH);
+    world.masters().retain(|entry| entry.guid != cash());
     let judgement = world.judge();
     assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
     assert_eq!(judgement.checks.pre_image_unchanged, Check::Failed);
@@ -603,7 +611,7 @@ fn the_target_mark_must_have_moved_forward() {
 #[test]
 fn another_companys_mark_moving_is_located_elsewhere_whatever_else_holds() {
     let mut world = World::clean(suspense());
-    world.marks()[1] = mark(OTHER, 4);
+    world.marks()[1] = mark(other(), 4);
     let judgement = world.judge();
     assert_eq!(
         judgement.state,
@@ -614,7 +622,7 @@ fn another_companys_mark_moving_is_located_elsewhere_whatever_else_holds() {
     // The same when the target did not move at all.
     let mut world = World::clean(suspense());
     world.marks()[0] = mark(TARGET, 7);
-    world.marks()[1] = mark(OTHER, 2);
+    world.marks()[1] = mark(other(), 2);
     assert_eq!(
         world.judge().state,
         MasterVerdictState::MasterWriteLocatedElsewhere
@@ -626,7 +634,7 @@ fn a_company_loaded_or_unloaded_across_the_post_is_a_doubt() {
     let mut added = World::clean(suspense());
     added
         .marks()
-        .push(mark("33333333-3333-4333-8333-333333333333", 1));
+        .push(mark(crate::synthetic_guid(0x3333), 1));
     let judgement = added.judge();
     assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
     assert!(judgement.reasons.contains(&"company_scope_changed"));
@@ -637,7 +645,7 @@ fn a_company_loaded_or_unloaded_across_the_post_is_a_doubt() {
     assert!(judgement.reasons.contains(&"company_scope_changed"));
     // Two rows for one company cannot be told apart.
     let mut doubled = World::clean(suspense());
-    doubled.marks().push(mark(OTHER, 3));
+    doubled.marks().push(mark(other(), 3));
     assert_eq!(
         doubled.judge().state,
         MasterVerdictState::ReconciliationRequired
@@ -669,7 +677,7 @@ fn the_ledger_missing_from_the_parent_read_or_repeated_in_it_is_a_doubt() {
     );
     // A row for another ledger does not describe this one.
     let mut other = World::clean(suspense());
-    other.rows().guid = "eeeeeeee-0000-4000-8000-000000000009".into();
+    other.rows().guid = crate::synthetic_guid(0xe009).into();
     assert!(other
         .judge()
         .reasons
@@ -824,7 +832,7 @@ fn a_moved_target_mark_forbids_confirmed_absent() {
 #[test]
 fn a_moved_other_mark_on_a_reconcile_is_located_elsewhere_not_absent() {
     let mut world = World::untouched(suspense());
-    world.marks()[1] = mark(OTHER, 4);
+    world.marks()[1] = mark(other(), 4);
     assert_eq!(
         world.judge().state,
         MasterVerdictState::MasterWriteLocatedElsewhere
@@ -859,7 +867,7 @@ fn a_name_present_under_either_fold_forbids_confirmed_absent() {
         let mut world = World::untouched(suspense());
         world
             .masters()
-            .push(master(MasterKind::Ledger, NEW, 11, &[stored]));
+            .push(master(MasterKind::Ledger, new_ledger(), 11, &[stored]));
         let judgement = world.judge();
         assert_ne!(
             judgement.state,
@@ -871,12 +879,12 @@ fn a_name_present_under_either_fold_forbids_confirmed_absent() {
     let mut group = World::untouched(suspense());
     group
         .masters()
-        .push(master(MasterKind::Group, NEW, 11, &[NAME]));
+        .push(master(MasterKind::Group, new_ledger(), 11, &[NAME]));
     assert_ne!(group.judge().state, MasterVerdictState::ConfirmedAbsent);
     let mut alias = World::untouched(suspense());
     alias
         .masters()
-        .push(master(MasterKind::Ledger, NEW, 11, &["Other", NAME]));
+        .push(master(MasterKind::Ledger, new_ledger(), 11, &["Other", NAME]));
     assert_ne!(alias.judge().state, MasterVerdictState::ConfirmedAbsent);
 }
 
@@ -945,7 +953,7 @@ fn each_unavailable_read_back_is_masters_after_post_unconfirmed() {
     }
     // Unavailable beats everything the rest would have said, loud states too.
     let mut world = World::clean(suspense());
-    world.marks()[1] = mark(OTHER, 4);
+    world.marks()[1] = mark(other(), 4);
     world.read.party = PartyRead::Unavailable;
     assert_eq!(
         world.judge().state,
@@ -1024,7 +1032,7 @@ fn every_verdict_state_and_reason_is_unchanged_and_the_fact_beside_them_is_exact
         (
             "absent, other mark moved",
             World::untouched(suspense()),
-            |world| world.marks()[1] = mark(OTHER, 4),
+            |world| world.marks()[1] = mark(other(), 4),
             MasterWriteLocatedElsewhere,
             vec!["other_company_mark_moved"],
             true,
@@ -1063,7 +1071,7 @@ fn every_verdict_state_and_reason_is_unchanged_and_the_fact_beside_them_is_exact
         (
             "pre-image master missing",
             World::clean(suspense()),
-            |world| world.masters().retain(|entry| entry.guid != CASH),
+            |world| world.masters().retain(|entry| entry.guid != cash()),
             ReconciliationRequired,
             vec!["pre_image_master_missing"],
             false,
@@ -1127,7 +1135,7 @@ fn the_name_absent_fact_follows_the_index_whatever_the_moment_or_the_marks() {
     // A name present under another spelling is a collision, not an absence.
     let mut twin = World::untouched(suspense());
     twin.masters()
-        .push(master(MasterKind::Ledger, NEW, 11, &["zeta test ledger"]));
+        .push(master(MasterKind::Ledger, new_ledger(), 11, &["zeta test ledger"]));
     assert!(!twin.judge().name_absent_in_read_book);
 }
 
@@ -1150,7 +1158,7 @@ fn the_party_read_is_needed_only_for_one_new_ledger_of_the_item_name() {
     ));
     // The name on a pre-image master needs no field check: it is already a doubt.
     let mut existing = World::clean(item.clone());
-    *existing.masters() = vec![master(MasterKind::Ledger, CASH, 9, &[NAME])];
+    *existing.masters() = vec![master(MasterKind::Ledger, cash(), 9, &[NAME])];
     assert!(!party_read_needed(
         &item,
         &existing.pre_image,
@@ -1160,7 +1168,7 @@ fn the_party_read_is_needed_only_for_one_new_ledger_of_the_item_name() {
     let mut two = World::clean(item.clone());
     two.masters().push(master(
         MasterKind::Ledger,
-        "eeeeeeee-0000-4000-8000-000000000002",
+        crate::synthetic_guid(0xe002),
         1,
         &[NAME],
     ));
@@ -1295,7 +1303,7 @@ fn one_ledger_matching_through_two_of_its_spellings_is_still_verified() {
     let new = world
         .masters()
         .iter_mut()
-        .find(|master| master.guid == NEW)
+        .find(|master| master.guid == new_ledger())
         .unwrap();
     new.names.push(NAME.to_uppercase());
     assert_verified(&world, "two spellings");

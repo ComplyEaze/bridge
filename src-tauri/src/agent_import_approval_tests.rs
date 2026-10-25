@@ -2843,14 +2843,16 @@ mod masters {
     use bridge_tally_protocol::GstDutyHead;
 
     const LAB: &str = "BRIDGE MASTERS LAB";
-    const LAB_GUID: &str = "00000000-0000-4000-8000-000000000001";
+    fn lab_guid() -> &'static str {
+        crate::synthetic_guid(1)
+    }
     const GSTIN: &str = "08ZZZZZ0000Z2ZP";
     const PREVIEW: &str = "Create ledger \"MLab Party\" under Sundry Debtors";
     const SHA: &str = "a2f4c3ea8b6a8c0d1e0b4f3a96d6e1d3c5b8f7a2e0b4c6d8f1a3b5c7d9e0f2a4";
     const ORIGIN: &str = "http://127.0.0.1:9000";
 
     fn company() -> VerifiedCompanyIdentity {
-        VerifiedCompanyIdentity::test_fixture(LAB, LAB_GUID)
+        VerifiedCompanyIdentity::test_fixture(LAB, lab_guid())
     }
 
     fn party(name: &str, gstin: Option<&str>, bill_wise: bool) -> LedgerCreateItem {
@@ -3101,7 +3103,7 @@ mod masters {
         let base = item();
         let other_company =
             VerifiedCompanyIdentity::test_fixture(LAB, "00000000-0000-4000-8000-000000000002");
-        let renamed_company = VerifiedCompanyIdentity::test_fixture("Another Lab", LAB_GUID);
+        let renamed_company = VerifiedCompanyIdentity::test_fixture("Another Lab", lab_guid());
         let fresh_bindings: Vec<(&str, ApprovalBinding)> = vec![
             ("name", binding(&party("MLab Party 2", Some(GSTIN), true))),
             ("gstin absent", binding(&party("MLab Party", None, true))),

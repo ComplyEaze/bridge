@@ -19,7 +19,7 @@ const DUTY_SHA: &str = "4f34aa92404c463a93dd1aa269a837b3f2da632b6545ecc04f600e24
 /// The verified identity the dispatch takes, built with the crate's test
 /// constructor (`VerifiedCompanyIdentity::test_fixture`).
 fn lab() -> VerifiedCompanyIdentity {
-    VerifiedCompanyIdentity::test_fixture(LAB_COMPANY, "00000000-0000-4000-8000-000000000001")
+    VerifiedCompanyIdentity::test_fixture(LAB_COMPANY, crate::synthetic_guid(1))
 }
 
 fn name(value: &str) -> MasterName {

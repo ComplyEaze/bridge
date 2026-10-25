@@ -1052,7 +1052,7 @@ fn the_response_company_guid_must_be_present_and_the_expected_one() {
     );
     assert_eq!(parse(&empty), Err(GroupNameIndexError::CompanyGuidMissing));
     // A different company on one row only.
-    let other = "3a6bd6e1-b835-4bff-89dd-8a6af138c999";
+    let other = format!("{}999", &SHAPE_GUID[..33]);
     let swapped = text.replacen(
         &element,
         &format!("<BRIDGECOMPANYGUID TYPE=\"String\">{other}</BRIDGECOMPANYGUID>"),

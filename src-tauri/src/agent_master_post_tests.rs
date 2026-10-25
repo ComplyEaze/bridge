@@ -22,7 +22,7 @@ static COMPANY: LazyLock<VerifiedCompanyIdentity> =
 static OTHER_COMPANY: LazyLock<VerifiedCompanyIdentity> = LazyLock::new(|| {
     VerifiedCompanyIdentity::test_fixture(
         "Some Other Company",
-        "11111111-1111-4111-8111-111111111111",
+        crate::synthetic_guid(0x1111),
     )
 });
 
@@ -30,8 +30,9 @@ fn marks(masters: u64) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
          <COMPANY NAME=\"{NAME}\" RESERVEDNAME=\"\"><GUID>{GUID}</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>{masters}</ALTMSTID></COMPANY>\
-         <COMPANY NAME=\"Synthetic Other Lab\" RESERVEDNAME=\"\"><GUID>22222222-2222-4222-8222-222222222222</GUID><ALTVCHID>5</ALTVCHID><ALTMSTID>3</ALTMSTID></COMPANY>\
-         </COLLECTION></DATA></BODY></ENVELOPE>"
+         <COMPANY NAME=\"Synthetic Other Lab\" RESERVEDNAME=\"\"><GUID>{other}</GUID><ALTVCHID>5</ALTVCHID><ALTMSTID>3</ALTMSTID></COMPANY>\
+         </COLLECTION></DATA></BODY></ENVELOPE>",
+        other = crate::synthetic_guid(0x2222),
     )
 }
 
@@ -427,7 +428,7 @@ async fn the_readback_parse_refuses_alike_unless_a_seam_scopes_it() {
     // The queue's seam serves the read-back when no later one is scoped.
     let before = vec![master(
         MasterKind::Ledger,
-        "aaaaaaaa-0000-4000-8000-000000000001",
+        crate::synthetic_guid(0xa001),
         1,
         &["Cash"],
     )];
@@ -441,7 +442,7 @@ async fn the_readback_parse_refuses_alike_unless_a_seam_scopes_it() {
     // The read-back's own seam wins, for the read-back alone.
     let after = vec![master(
         MasterKind::Ledger,
-        "aaaaaaaa-0000-4000-8000-000000000002",
+        crate::synthetic_guid(0xa002),
         2,
         &["Zeta"],
     )];

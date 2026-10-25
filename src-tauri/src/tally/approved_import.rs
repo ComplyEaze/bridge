@@ -1600,13 +1600,11 @@ pub(crate) mod test_seam {
             );
             assert_ran_to_its_end(&path, "Create", name);
         }
+        let another_nonce = format!("bridge-create-ledger:{}\n", crate::synthetic_guid(0));
         for (name, answer) in [
             ("an executable ignoring the flag exits 0", ""),
             ("an echo of the input", "{NONCE}\n1\nCreate"),
-            (
-                "a token for another nonce",
-                "bridge-create-ledger:00000000-0000-4000-8000-000000000000\n",
-            ),
+            ("a token for another nonce", another_nonce.as_str()),
             (
                 "the post dialog's token for this nonce",
                 "bridge-post-approved:{NONCE}\n",

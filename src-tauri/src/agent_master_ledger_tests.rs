@@ -1187,7 +1187,7 @@ fn confirmed_absent_is_a_snake_case_terminal_verdict_without_a_guid() {
     assert_eq!(journal.summary().not_settled, 0);
     // A GUID on an absent ledger is a contradiction the journal refuses.
     let mut named = absent_verdict(&batch);
-    named.items[0].guid = Some("00000000-aaaa-bbbb-cccc-000000000000".into());
+    named.items[0].guid = Some(crate::synthetic_guid(0xaabb).into());
     assert_eq!(
         read(&format!("{prefix}{}", line(&MasterRecord::Verdict(named)))).unwrap_err(),
         invalid(Invalid::AbsentWithGuid)

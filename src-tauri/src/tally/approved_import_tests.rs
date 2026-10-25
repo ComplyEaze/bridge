@@ -186,10 +186,12 @@ fn an_input_not_in_the_parents_shape_shows_no_dialog_and_writes_nothing() {
 // through the test-only constructor, since no production path can.
 
 const MASTERS_LAB: &str = "BRIDGE MASTERS LAB";
-const MASTERS_GUID: &str = "00000000-0000-4000-8000-000000000001";
+fn masters_guid() -> &'static str {
+    crate::synthetic_guid(1)
+}
 
 fn masters_identity() -> VerifiedCompanyIdentity {
-    VerifiedCompanyIdentity::test_fixture(MASTERS_LAB, MASTERS_GUID)
+    VerifiedCompanyIdentity::test_fixture(MASTERS_LAB, masters_guid())
 }
 
 fn masters_item(name: &str) -> LedgerCreateItem {

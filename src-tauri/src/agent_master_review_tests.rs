@@ -6,12 +6,14 @@ use crate::tally::ledger_create_item::{
 };
 use bridge_tally_protocol::GstDutyHead;
 
-const GUID: &str = "00000000-0000-4000-8000-000000000001";
+fn guid() -> &'static str {
+    crate::synthetic_guid(1)
+}
 const ORIGIN: &str = "http://127.0.0.1:9000";
 const GSTIN: &str = "08ZZZZZ0000Z2ZP";
 
 fn company(name: &str) -> VerifiedCompanyIdentity {
-    VerifiedCompanyIdentity::test_fixture(name, GUID)
+    VerifiedCompanyIdentity::test_fixture(name, guid())
 }
 
 fn item(name: &str, kind: AdmittedLedgerKind) -> LedgerCreateItem {
@@ -32,7 +34,12 @@ fn duty() -> AdmittedLedgerKind {
     }
 }
 
-const DESTINATION: &str = "Create ONE ledger in \"BRIDGE MASTERS LAB\"\nCompany GUID: 00000000-0000-4000-8000-000000000001\nCompany number: 1  Books from: 20260401\nTally: http://127.0.0.1:9000\n\n";
+fn destination() -> String {
+    format!(
+        "Create ONE ledger in \"BRIDGE MASTERS LAB\"\nCompany GUID: {}\nCompany number: 1  Books from: 20260401\nTally: http://127.0.0.1:9000\n\n",
+        guid()
+    )
+}
 const WARNING: &str = "\n\nDo not create or rename ledgers in Tally until this is done.";
 
 fn text(item: &LedgerCreateItem) -> Result<String, MasterReviewError> {
@@ -74,7 +81,7 @@ fn the_preview_is_exact_for_each_admitted_kind() {
     for (case, item, master) in cases {
         assert_eq!(
             text(&item).unwrap(),
-            format!("{DESTINATION}{master}{WARNING}"),
+            format!("{}{master}{WARNING}", destination()),
             "{case}"
         );
     }

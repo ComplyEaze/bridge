@@ -190,6 +190,18 @@ These changes are in source and not yet in a published build.
   refused before the report is asked for (a stated guess, as for `stock_summary`), and the cost on a large book is not known. Not yet run
   against Tally.
 
+- A ledger name that is an alias of another ledger is now named as one (part of #1688). `validate_masters` and the refusal of a
+  build (`masters_not_exact`) add `alias_of` to a requested name that is, character for character, one alias of exactly one
+  live ledger, naming that ledger as Tally lists it, and say that an operator should confirm it is the ledger meant before
+  the name is replaced; ComplyEaze Bridge still never sends an alias. The check for two ledgers whose names read alike now
+  counts a ledger's aliases too (`through_alias` names the alias). Before, a name that was one ledger's own name and
+  folded equal to another ledger's alias matched the first exactly and could be built and posted; it is now refused as a
+  twin, and so is a batch built or approved before this change that names it, at post or in the queue
+  (`ledger_has_folded_twin`), until the alias or the name is changed in Tally and the batch is built again. A name that is
+  only an alias used to read as missing or near. On Tally's own screen an alias equal to another ledger's name was
+  refused in the cases tried, so such a twin is probably rare (PARTIAL: one company; lowercase not tried). Not yet run
+  against Tally through the built tool.
+
 ## [0.6.0] - 2026-10-16
 
 ### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)

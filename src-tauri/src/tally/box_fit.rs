@@ -138,6 +138,7 @@ pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
 #[cfg(windows)]
 mod windows_hook {
     use super::{Rect, Seen};
+    use std::ffi::c_void;
     use std::io::Write;
     use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
     use std::sync::Arc;
@@ -148,10 +149,6 @@ mod windows_hook {
         GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
     };
     use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
-    use windows_sys::Win32::UI::HiDpi::{
-        AreDpiAwarenessContextsEqual, GetThreadDpiAwarenessContext, SetProcessDpiAwarenessContext,
-        DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
-    };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         BringWindowToTop, CallNextHookEx, EnumThreadWindows, FlashWindowEx, GetForegroundWindow,
         GetWindowRect, GetWindowThreadProcessId, IsWindowVisible, PostMessageW,
@@ -159,20 +156,54 @@ mod windows_hook {
         FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT, WM_COMMAND,
     };
 
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetModuleHandleW(name: *const u16) -> *mut c_void;
+        fn GetProcAddress(module: *mut c_void, name: *const u8) -> *const c_void;
+    }
+
+    /// `DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2`, a pseudo handle.
+    const PER_MONITOR_AWARE_V2: isize = -4;
+
     /// Make this process per-monitor DPI aware (version 2), before any window
     /// exists, so that a window's rectangle and its monitor's work area are
     /// both physical pixels on every monitor. `false` if the process is not
-    /// in that mode afterwards (an older Windows, or an awareness already set
-    /// to something else): no box is then shown.
+    /// in that mode afterwards: the three functions are looked up when they
+    /// are called, so that a Windows that lacks them (before Windows 10
+    /// version 1703) still starts the program and simply shows no box.
     pub(super) fn make_dpi_aware() -> bool {
-        // SAFETY: the calls take a constant context and read this process's
-        // own awareness.
+        let user32: Vec<u16> = "user32.dll\0".encode_utf16().collect();
+        // SAFETY: `user32` is a NUL-terminated wide string that outlives the
+        // call; the module is already loaded by the program's own imports.
+        let module = unsafe { GetModuleHandleW(user32.as_ptr()) };
+        if module.is_null() {
+            return false;
+        }
+        let find = |name: &'static [u8]| -> *const c_void {
+            debug_assert_eq!(name.last(), Some(&0));
+            // SAFETY: `module` is a loaded module and `name` is a
+            // NUL-terminated ASCII name.
+            unsafe { GetProcAddress(module, name.as_ptr()) }
+        };
+        let set = find(b"SetProcessDpiAwarenessContext\0");
+        let get = find(b"GetThreadDpiAwarenessContext\0");
+        let same = find(b"AreDpiAwarenessContextsEqual\0");
+        if set.is_null() || get.is_null() || same.is_null() {
+            return false;
+        }
+        // SAFETY: each pointer is the address of the exported function of
+        // that name, whose signature is the one given here (user32.dll).
         unsafe {
-            SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-            AreDpiAwarenessContextsEqual(
-                GetThreadDpiAwarenessContext(),
-                DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
-            ) != 0
+            let set =
+                std::mem::transmute::<*const c_void, extern "system" fn(*mut c_void) -> i32>(set);
+            let get =
+                std::mem::transmute::<*const c_void, extern "system" fn() -> *mut c_void>(get);
+            let same = std::mem::transmute::<
+                *const c_void,
+                extern "system" fn(*mut c_void, *mut c_void) -> i32,
+            >(same);
+            set(PER_MONITOR_AWARE_V2 as *mut c_void);
+            same(get(), PER_MONITOR_AWARE_V2 as *mut c_void) != 0
         }
     }
 

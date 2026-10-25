@@ -882,23 +882,28 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         .encode_utf16()
         .chain(Some(0))
         .collect();
-    // SAFETY: as for `show_review`: both buffers are NUL-terminated and live
-    // for the synchronous dialog, and no parent HWND is borrowed.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). With
-            // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the parent puts a first line on
-            // its text that says what Y and N do (#1780). No stays the
-            // default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and no parent HWND is borrowed.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // Topmost: a window the connector opens while Tally fills the
+                // screen is otherwise drawn behind it, since a background
+                // process may not take the foreground (#1589). With
+                // MB_SETFOREGROUND the box also takes the foreground, so a key
+                // typed for Tally answers it; the parent puts a first line on
+                // its text that says what Y and N do (#1780). No stays the
+                // default button.
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
 }"#;
 
 const POST_DIALOG: &str = r#"#[cfg(not(windows))]
@@ -928,23 +933,29 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     // Win32 dependency so No is the default and Escape/close remain Cancel.
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
-    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
-    // no parent HWND is borrowed. No application state is exposed to callbacks.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). With
-            // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the parent puts a first line on
-            // its text that says what Y and N do (#1780). No stays the
-            // default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // The box cannot scroll: `guarded` measures it when it opens and, if it is
+    // not wholly on the screen, never returns (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: Both buffers are NUL-terminated and live for the synchronous
+        // dialog; no parent HWND is borrowed. No application state is exposed
+        // to callbacks.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // Topmost: a window the connector opens while Tally fills the
+                // screen is otherwise drawn behind it, since a background
+                // process may not take the foreground (#1589). With
+                // MB_SETFOREGROUND the box also takes the foreground, so a key
+                // typed for Tally answers it; the parent puts a first line on
+                // its text that says what Y and N do (#1780). No stays the
+                // default button.
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
 }"#;
 
 /// The post button a batch sees (#746): what `show_review` shows and
@@ -1073,6 +1084,9 @@ const CONFIRM_WITH: &str = r#"async fn confirm_with(
     )
     .await
     {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed: the text is too large for this person's screen.
+        Ok(answer) if answer.box_did_not_fit => Err("import_review_too_large".into()),
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1102,6 +1116,7 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
     )
     .await
     {
+        Ok(answer) if answer.box_did_not_fit => Err("ack_review_too_large".into()),
         Ok(answer) if answer.token_matched => Ok(()),
         // A person's decline is no token and exit 1: `run_review_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1114,7 +1129,7 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 20] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 21] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -1161,6 +1176,12 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 20] = [
     ),
     (CONFIRM_WITH, 1),
     (CONFIRM_REVIEW_WITH, 1),
+    // The child's "my box did not fit the screen" exit status is read as
+    // that and nothing else (#1832).
+    (
+        "box_did_not_fit: status.code() == Some(super::box_fit::DOES_NOT_FIT_EXIT),",
+        1,
+    ),
     ("pub(crate) const REVIEW_BUTTON: &str = \"Yes\";", 1),
 ];
 
@@ -1200,7 +1221,11 @@ fn discard_answer(dialog: &str) -> String {
             1,
         )
     } else {
-        dialog.replacen("        MessageBoxW(", "        let _ = MessageBoxW(", 1)
+        dialog.replacen(
+            "    answer == IDYES\n}",
+            "    let _ = answer == IDYES;\n    true\n}",
+            1,
+        )
     };
     let discarded = if discarded.ends_with(")\n}") || discarded.ends_with("))\n}") {
         format!("{};\n    true\n}}", discarded.trim_end_matches("\n}"))
@@ -1230,7 +1255,7 @@ fn each_dialog_answers_only_on_its_positive_button() {
             "!= rfd::MessageDialogResult::Custom(REVIEW_BUTTON.into())",
             1,
         ),
-        source.replacen(") == IDYES", ") != IDNO", 1),
+        source.replacen("answer == IDYES", "answer != IDNO", 1),
         source.replacen(
             "MB_YESNOCANCEL | MB_DEFBUTTON2",
             "MB_YESNOCANCEL | MB_DEFBUTTON1",
@@ -1249,6 +1274,24 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("let (extra_lines, extra_chars) = answer_reserve();", "let (extra_lines, extra_chars) = (0, 0);", 1),
+        // The parent stops reading a box that did not fit as a refusal, or
+        // the dialog stops measuring its box (#1832).
+        source.replacen(
+            "        Ok(answer) if answer.box_did_not_fit => Err(\"import_review_too_large\".into()),\n",
+            "",
+            1,
+        ),
+        source.replacen(
+            "        Ok(answer) if answer.box_did_not_fit => Err(\"ack_review_too_large\".into()),\n",
+            "",
+            1,
+        ),
+        source.replacen("super::box_fit::guarded(|| {", "(|| {", 1),
+        source.replacen(
+            "box_did_not_fit: status.code() == Some(super::box_fit::DOES_NOT_FIT_EXIT),",
+            "box_did_not_fit: false,",
+            1,
+        ),
         source.replacen("\"Post voucher\"", "\"Cancel\"", 1),
         source.replacen("\"I reviewed it\"", "\"Cancel\"", 1),
         source.replacen(

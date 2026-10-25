@@ -1183,6 +1183,55 @@ pub(crate) mod test_seam {
         assert_ran_to_its_end(&approves, "Post", "the control");
     }
 
+    /// A dialog whose box did not fit the screen exits with its own status
+    /// (#1832). That is a refusal that says the text is too large, for the
+    /// post and for the review, with or without a token: no answer, a
+    /// printed approval included, passes for a box the person could not see
+    /// whole. It is not a decline, not unavailable and never approved.
+    #[tokio::test]
+    async fn a_box_that_did_not_fit_the_screen_is_refused_whatever_it_printed() {
+        let directory = standin_directory();
+        let status = crate::tally::box_fit::DOES_NOT_FIT_EXIT;
+        for (name, answer) in [
+            ("no token", ""),
+            (
+                "the post token for this nonce",
+                "bridge-post-approved:{NONCE}\n",
+            ),
+            (
+                "the review token for this nonce",
+                "bridge-review-acknowledged:{NONCE}\n",
+            ),
+        ] {
+            let path = standin(directory.path(), status, answer);
+            assert_eq!(
+                super::confirm_with(&path, ONE, "Post").await,
+                Err("import_review_too_large".to_string()),
+                "post: {name}"
+            );
+            assert_ran_to_its_end(&path, "Post", name);
+            let path = standin(directory.path(), status, answer);
+            assert_eq!(
+                super::confirm_review_with(&path, ONE, "Review").await,
+                Err("ack_review_too_large".to_string()),
+                "review: {name}"
+            );
+            assert_ran_to_its_end(&path, "Review", name);
+        }
+        // The statuses next to it keep their meaning: a decline is exit 1, a
+        // clean exit with no token is unavailable.
+        let decline = standin(directory.path(), 1, "");
+        assert_eq!(
+            super::confirm_with(&decline, ONE, "Post").await,
+            Err("import_approval_declined".to_string())
+        );
+        let unavailable = standin(directory.path(), 0, "");
+        assert_eq!(
+            super::confirm_with(&unavailable, ONE, "Post").await,
+            Err("import_approval_unavailable".to_string())
+        );
+    }
+
     /// Each call sends a nonce of its own: a stand-in that answers every call
     /// with the token for the nonce it read sees a different one each time.
     #[tokio::test]
@@ -1649,6 +1698,9 @@ async fn confirm_with(
     )
     .await
     {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed: the text is too large for this person's screen.
+        Ok(answer) if answer.box_did_not_fit => Err("import_review_too_large".into()),
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1695,6 +1747,7 @@ async fn confirm_review_with(
     )
     .await
     {
+        Ok(answer) if answer.box_did_not_fit => Err("ack_review_too_large".into()),
         Ok(answer) if answer.token_matched => Ok(()),
         // A person's decline is no token and exit 1: `run_review_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1708,10 +1761,12 @@ async fn confirm_review_with(
 }
 
 /// What a dialog subprocess answered: whether it printed exactly the token
-/// for this call's nonce, and whether it exited cleanly.
+/// for this call's nonce, whether it exited cleanly, and whether it exited
+/// with the status that says its box did not fit the screen (#1832).
 struct DialogAnswer {
     token_matched: bool,
     exited_cleanly: bool,
+    box_did_not_fit: bool,
 }
 
 enum DialogFailure {
@@ -1770,6 +1825,7 @@ async fn nonce_bound_dialog(
     Ok(DialogAnswer {
         token_matched: answer == dialog_token(prefix, &nonce).as_bytes(),
         exited_cleanly: status.success(),
+        box_did_not_fit: status.code() == Some(super::box_fit::DOES_NOT_FIT_EXIT),
     })
 }
 
@@ -1898,23 +1954,28 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         .encode_utf16()
         .chain(Some(0))
         .collect();
-    // SAFETY: as for `show_review`: both buffers are NUL-terminated and live
-    // for the synchronous dialog, and no parent HWND is borrowed.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). With
-            // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the parent puts a first line on
-            // its text that says what Y and N do (#1780). No stays the
-            // default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and no parent HWND is borrowed.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // Topmost: a window the connector opens while Tally fills the
+                // screen is otherwise drawn behind it, since a background
+                // process may not take the foreground (#1589). With
+                // MB_SETFOREGROUND the box also takes the foreground, so a key
+                // typed for Tally answers it; the parent puts a first line on
+                // its text that says what Y and N do (#1780). No stays the
+                // default button.
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
 }
 
 /// The post dialog's title and positive button. One voucher keeps the
@@ -1971,23 +2032,29 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     // Win32 dependency so No is the default and Escape/close remain Cancel.
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
-    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
-    // no parent HWND is borrowed. No application state is exposed to callbacks.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). With
-            // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the parent puts a first line on
-            // its text that says what Y and N do (#1780). No stays the
-            // default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // The box cannot scroll: `guarded` measures it when it opens and, if it is
+    // not wholly on the screen, never returns (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: Both buffers are NUL-terminated and live for the synchronous
+        // dialog; no parent HWND is borrowed. No application state is exposed
+        // to callbacks.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // Topmost: a window the connector opens while Tally fills the
+                // screen is otherwise drawn behind it, since a background
+                // process may not take the foreground (#1589). With
+                // MB_SETFOREGROUND the box also takes the foreground, so a key
+                // typed for Tally answers it; the parent puts a first line on
+                // its text that says what Y and N do (#1780). No stays the
+                // default button.
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

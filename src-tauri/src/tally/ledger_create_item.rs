@@ -19,7 +19,6 @@
 
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_binding::MAX_NAME_CHARS;
-use bridge_tally_core::Gstin;
 use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::ledger_create::LedgerCreate;
 use bridge_tally_protocol::{sha256_hex, GstDutyHead};
@@ -78,11 +77,11 @@ impl MasterName {
     }
 }
 
-/// A GSTIN whose shape and check character both verify. The shape is
-/// `bridge_tally_core::Gstin`'s; that type does not verify the check
-/// character, so this one does.
+/// A GSTIN whose shape and check character both verify: two digits, five
+/// capital letters, four digits, a capital letter, a letter or digit, `Z`, then
+/// the check character.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct VerifiedGstin(Gstin);
+pub(crate) struct VerifiedGstin(String);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum GstinError {
@@ -92,24 +91,35 @@ pub(crate) enum GstinError {
 
 impl VerifiedGstin {
     pub(crate) fn new(value: &str) -> Result<Self, GstinError> {
-        let gstin = Gstin::parse(value).map_err(|_| GstinError::Shape)?;
-        // `Gstin::parse` admits only fifteen ASCII bytes, so the split is safe.
+        let bytes = value.as_bytes();
+        let shaped = bytes.len() == 15
+            && bytes[0..2].iter().all(u8::is_ascii_digit)
+            && bytes[2..7].iter().all(u8::is_ascii_uppercase)
+            && bytes[7..11].iter().all(u8::is_ascii_digit)
+            && bytes[11].is_ascii_uppercase()
+            && (bytes[12].is_ascii_uppercase() || bytes[12].is_ascii_digit())
+            && bytes[13] == b'Z'
+            && (bytes[14].is_ascii_uppercase() || bytes[14].is_ascii_digit());
+        if !shaped {
+            return Err(GstinError::Shape);
+        }
+        // The shape admits only fifteen ASCII bytes, so the split is safe.
         let (body, check) = value.split_at(14);
         if check.as_bytes()[0] != gstin_check_character(body.as_bytes()) {
             return Err(GstinError::CheckCharacter);
         }
-        Ok(Self(gstin))
+        Ok(Self(value.to_string()))
     }
 
     pub(crate) fn as_str(&self) -> &str {
-        self.0.as_str()
+        &self.0
     }
 }
 
 /// The GSTIN check character: a mod-36 sum over the first fourteen characters,
 /// each weighted 1 then 2 alternately, with the quotient and remainder of the
 /// weighted value added. `body` is fourteen characters of `0-9A-Z`, which
-/// `Gstin::parse` has already established.
+/// the shape check in [`VerifiedGstin::new`] has already established.
 fn gstin_check_character(body: &[u8]) -> u8 {
     const ALPHABET: &[u8; 36] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let sum: usize = body

@@ -103,6 +103,11 @@ fn book(to: &str, rows: Vec<PartyLedgerMasterRow>) -> PartyLedgerMasterWorkbook 
     .unwrap()
 }
 
+/// An event id nothing in the test's store holds, made at run time.
+fn unused_event_id() -> String {
+    uuid::Uuid::new_v4().to_string()
+}
+
 fn key(books_from: &str) -> BookKey {
     BookKey::for_tests("company-guid", "1", books_from)
 }
@@ -452,7 +457,7 @@ async fn a_withdrawal_or_review_must_name_a_decision_of_the_same_book_and_year()
             .record_grouping_events(
                 &context(key("20250401"), 2026),
                 &[NewGroupingEvent::Review {
-                    target: GroupingEventId::parse("00000000-0000-4000-8000-000000000000").unwrap()
+                    target: GroupingEventId::parse(&unused_event_id()).unwrap()
                 }],
             )
             .await,
@@ -592,7 +597,7 @@ async fn a_batch_is_stored_whole_or_not_at_all() {
                     ScheduleIIIHead::OtherCurrentLiabilities,
                 ),
                 NewGroupingEvent::Review {
-                    target: GroupingEventId::parse("00000000-0000-4000-8000-000000000000").unwrap(),
+                    target: GroupingEventId::parse(&unused_event_id()).unwrap(),
                 },
             ],
         )
@@ -618,11 +623,12 @@ async fn a_stored_row_this_build_cannot_read_makes_the_whole_set_unreadable() {
         "INSERT INTO schedule_iii_grouping_events(event_sequence, id, company_guid, company_number, \
            books_from_yyyymmdd, company_display_name, financial_year, kind, ledger_guid, ledger_name, \
            made_against, head, reason, declared_by, recorded_at_unix_ms) \
-         VALUES (1, '11111111-1111-4111-8111-111111111111', 'company-guid', '1', '20250401', \
+         VALUES (1, ?2, 'company-guid', '1', '20250401', \
            'Synthetic Books', 2026, 'set', 'guid-term loan', 'Term loan', ?1, \
            'reserves_and_surplus', 'A newer head', 'Synthetic Preparer AB', 1)",
     )
     .bind(derivation)
+    .bind(unused_event_id())
     .execute(&repository.pool)
     .await
     .unwrap();
@@ -818,7 +824,8 @@ fn a_request_with_an_invalid_field_or_a_repeated_ledger_is_refused_whole() {
 async fn a_row_whose_columns_do_not_fit_its_kind_is_unreadable() {
     let repository = repository().await;
     let derivation = r#"{"outcome":{"undetermined":"account_root"},"ancestry":[]}"#;
-    let target = "11111111-1111-4111-8111-111111111111";
+    let target = unused_event_id();
+    let target = target.as_str();
     for (kind, made_against, head, reason, target) in [
         ("set", None, Some("trade_payables"), Some("Why"), None),
         (
@@ -838,7 +845,7 @@ async fn a_row_whose_columns_do_not_fit_its_kind_is_unreadable() {
         ("review", None, None, Some("Why"), Some(target)),
     ] {
         let row = sqlx::query(
-            "SELECT 1 AS event_sequence, '22222222-2222-4222-8222-222222222222' AS id, \
+            "SELECT 1 AS event_sequence, ?6 AS id, \
                ?1 AS kind, 'Synthetic Books' AS company_display_name, \
                2026 AS financial_year, 'guid-x' AS ledger_guid, 'X' AS ledger_name, \
                ?2 AS made_against, ?3 AS head, ?4 AS reason, NULL AS reference, \
@@ -849,6 +856,7 @@ async fn a_row_whose_columns_do_not_fit_its_kind_is_unreadable() {
         .bind(head)
         .bind(reason)
         .bind(target)
+        .bind(unused_event_id())
         .fetch_one(&repository.pool)
         .await
         .unwrap();

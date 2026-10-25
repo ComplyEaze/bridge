@@ -39,6 +39,11 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- The next steps for five situations no longer send a person to enter a voucher in Tally themselves; each now says what
+  ComplyEaze Bridge does and that it cannot put the voucher in the book yet: a voucher Tally reported as not
+  created (and one later not found after that report), a row a rejected batch carried, a statement day that is
+  partly posted, the extra row of same-day twins, and the first voucher of a company that has never held one
+  (part of #1709).
 - The approval window, and the review window, now open with a line that says what each answer does, before any
   detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
   voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N

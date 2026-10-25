@@ -978,8 +978,11 @@ fn the_already_posted_texts_send_a_declined_invoice_again_under_its_number() {
     ] {
         assert!(text.contains("under a new bridge_txn_id and the SAME invoice number"));
         assert!(text.contains("Never also tell the user to enter that invoice in Tally by hand"));
-        // The hand-entry advice stays, for any other voucher.
+        // Any other voucher a rejected batch carried has no route yet, and is never
+        // rebuilt to get one (#1709).
         assert!(text.contains("For any other voucher: if Tally rejected that batch"));
+        assert!(text.contains("nothing in ComplyEaze Bridge puts it in the book yet"));
+        assert!(!text.contains("enter the voucher in Tally"));
     }
     // The post's text no longer forbids the one rebuild it now advises.
     let post = super::super::TXN_ALREADY_POSTED_NEXT_STEP;

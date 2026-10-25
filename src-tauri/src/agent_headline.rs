@@ -387,6 +387,8 @@ pub(super) struct StatementBasis {
     /// Whether Tally's own Profit and Loss was read as well. It only counts
     /// for a profit and loss: only its results are gated on it.
     read_tally_profit_and_loss: bool,
+    /// Whether the results were established with Tally's own closing stock.
+    closing_stock_from_tally: bool,
 }
 
 impl StatementBasis {
@@ -403,13 +405,23 @@ impl StatementBasis {
             to,
             parts,
             read_tally_profit_and_loss,
+            closing_stock_from_tally: false,
         }
     }
 
+    /// The results were established with Tally's own closing stock, which the
+    /// headline then says is Tally's figure and not a derived one.
+    pub(super) fn with_closing_stock_from_tally(mut self) -> Self {
+        self.closing_stock_from_tally = true;
+        self
+    }
+
     /// Whether the result's own comparison included Tally's Profit and Loss:
-    /// only a profit and loss that read it.
+    /// a profit and loss that read it, and any statement that used Tally's
+    /// closing stock, which comes from it.
     fn compared_with_tally_profit_and_loss(&self) -> bool {
-        self.kind == StatementKind::ProfitAndLoss && self.read_tally_profit_and_loss
+        (self.kind == StatementKind::ProfitAndLoss && self.read_tally_profit_and_loss)
+            || self.closing_stock_from_tally
     }
 
     /// Whether the derived lines are withheld from the result: the tool shows
@@ -452,8 +464,13 @@ impl StatementBasis {
                 "Tally's own Balance Sheet"
             };
             let verb = if self.parts.len() == 1 { "is" } else { "are" };
+            let stock = if self.closing_stock_from_tally {
+                " Closing stock is Tally's own Less: Closing Stock figure from its Profit and Loss, shown separately, not derived here."
+            } else {
+                ""
+            };
             format!(
-                "{}: {established} {verb} established, after the derived lines passed the comparison with {against}.",
+                "{}: {established} {verb} established, after the derived lines passed the comparison with {against}.{stock}",
                 capitalised(&subject)
             )
         } else {

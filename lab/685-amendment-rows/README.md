@@ -1,6 +1,6 @@
 # Run sheet for #685: the captures the posting slice of native amendments waits on
 
-Not for merge. LAB-COMMON v3 (C1 to C11) applies in full. One row (plus an optional hazard row) on a NEW synthetic company, owner steps marked, backup first, restore on the run coordinator's word. The builds and reads are made by the built tools; the one raw send is the amendment file the built tool wrote, sent exactly as written. The release candidate must contain the pinning of #685 for the last verification step to read as described. Record the TallyPrime version and edition, the licence mode and the date. The build is named below.
+Not for merge. LAB-COMMON v3 (C1 to C11) applies in full. One row (plus an optional hazard row) on a NEW synthetic company, owner steps marked, backup first, restore on the run coordinator's word. The builds and reads are made by the built tools. Nothing is sent to Tally except through those tools; the two files the build writes are imported by hand through TallyPrime's own Import menu (owner steps), the route a person uses today. The release candidate must contain the pinning of #685 for the last verification step to read as described. Record the TallyPrime version and edition, the licence mode and the date. The build is named below.
 
 ## Build (filled 26 Oct 2026)
 
@@ -8,6 +8,6 @@ The Windows bundle of pull request #1927 (the pinning of #685) at head `dccbe9ca
 
 RC COMMIT: dccbe9cad4f7cefc752f4cb593dc4e8423737da1 (#1927)  EXE SHA256: the `binary_sha256` of the artifact's `mcpb-smoke.json`, recorded at staging
 
-Run it as the lab runs a staged exe over stdio, with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, a NEW empty `BRIDGE_AGENT_DATA_DIR` for the item (kept for the whole item, so the batch journal carries from the first build to the amendment and its verification), `BRIDGE_TERMS_ACCEPTED=true` (the person responsible for the lab accepting the Terms of Use), `BRIDGE_AGENT_REDACTION` unset, `BRIDGE_AGENT_ENABLE_WRITES` unset (posting OFF: the original is imported by hand and the amendment is sent as step 5 says), and `BRIDGE_AGENT_ENABLE_IMPORT=true` (`build_import_xml` refuses without it).
+Run it as the lab runs a staged exe over stdio, with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, a NEW empty `BRIDGE_AGENT_DATA_DIR` for the item (kept for the whole item, so the batch journal carries from the first build to the amendment and its verification), `BRIDGE_TERMS_ACCEPTED=true` (the person responsible for the lab accepting the Terms of Use), `BRIDGE_AGENT_REDACTION` unset, `BRIDGE_AGENT_ENABLE_WRITES` unset (posting OFF: the original and the amendment are both imported by hand), and `BRIDGE_AGENT_ENABLE_IMPORT=true` (`build_import_xml` refuses without it).
 
 `SHA256.txt` lists every file here.

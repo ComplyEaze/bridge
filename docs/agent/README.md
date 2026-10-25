@@ -2764,7 +2764,9 @@ numbers the post's vouchers held (measured once on a synthetic company,
 bridge#1050), and no identifier a read returns tells the two apart. So a
 rollback, once seen, is recorded: when a check of a native post reads the
 company's voucher mark below the floor any native post of the company had
-proved (a mark Tally omits twice reads as a company holding no voucher), the
+proved (a mark Tally omits twice reads as a company holding no voucher, unless the same
+check's own window read saw a voucher mark: it is then refused as
+`voucher_mark_contradiction` and nothing is recorded), the
 import journal keeps a record of it whenever it covers a post no earlier record
 covers, so a second restore is recorded too (`post_span_binding.rollback_recorded`,
 with `other_batches_covered`: how many of the company's other native posts it

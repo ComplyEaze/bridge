@@ -83,7 +83,7 @@ impl DesktopJournalError {
             ),
             "import_post_requires_one_journal" => (
                 "ComplyEaze Bridge's desktop review posts one unnumbered Journal, and this saved batch is a different shape.",
-                "Import this file in Tally (Gateway of Tally → Import → Vouchers), then verify it. The desktop app posts Journals only. With voucher posting enabled in the extension settings (off by default), a Payment, Receipt or Contra can be posted from the assistant; otherwise, and for a batch holding more than one voucher, import the file. The file itself is unchanged and correct.",
+                "With Allow voucher posting on in the extension settings (off by default; Terms of Use section 9.2), ask the assistant to post this saved batch, giving it this file's name: it posts one voucher, or a batch of 2 to 50 Journals or of 2 to 50 Payments, Receipts and Contras, after you approve it in a separate window, and it checks the batch again first and may refuse it. Otherwise import this file in Tally (Gateway of Tally → Import → Vouchers), then verify it, and do not also ask the assistant to post it. The file itself is unchanged and correct.",
             ),
             "import_post_amendment_requires_file_import" => (
                 "This saved Journal amends an earlier batch, and ComplyEaze Bridge does not post amendments.",
@@ -91,7 +91,7 @@ impl DesktopJournalError {
             ),
             "import_post_numbered_journal_unsupported" => (
                 "ComplyEaze Bridge cannot post a Journal file that specifies a voucher number.",
-                "Import it manually, or choose an unnumbered Journal. A previously dispatched Journal remains available only for reconciliation.",
+                "Import this file in Tally (Gateway of Tally → Import → Vouchers), then verify it. ComplyEaze Bridge posts only vouchers without a number, which Tally numbers, and the voucher number is your decision. A previously dispatched Journal remains available only for reconciliation.",
             ),
             "import_batch_predates_bill_wise_record" => (
                 "This saved Journal was built before ComplyEaze Bridge began checking bill-wise ledgers, so it cannot be posted from here.",
@@ -271,8 +271,15 @@ mod tests {
         assert_ne!(refused.message, fallback.message);
         assert_ne!(refused.remediation, fallback.remediation);
         assert!(refused.message.contains("Journal"));
-        assert!(refused.remediation.contains("Payment, Receipt or Contra"));
-        // Since ADR 0004's 2026-09-22 amendment the assistant can post them.
-        assert!(refused.remediation.contains("from the assistant"));
+        // Since ADR 0004's 2026-09-22 amendment the assistant can post them,
+        // and since #1090 a saved batch of 2 to 50 of one shape too.
+        assert!(refused
+            .remediation
+            .contains("ask the assistant to post this saved batch"));
+        assert!(refused
+            .remediation
+            .contains("2 to 50 Journals or of 2 to 50 Payments, Receipts and Contras"));
+        assert!(refused.remediation.contains("may refuse it"));
+        assert!(!refused.remediation.contains("more than one voucher"));
     }
 }

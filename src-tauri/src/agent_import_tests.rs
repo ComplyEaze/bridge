@@ -3234,12 +3234,16 @@ fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Resul
 
 #[tokio::test]
 async fn built_batch_guidance_matches_the_saved_native_admission() {
-    // Posting on admits a batch of 2 under the same setting (#1090).
+    // Posting on admits a batch of 2 under the same setting (#1090). With
+    // posting off the build still asks at the batch cap, so a batch of 2 is
+    // one the setting would give a route, not a one-voucher refusal.
     for (writes_enabled, voucher_count, numbered, native) in [
         (true, 1, false, true),
         (true, 2, false, true),
         (true, 1, true, false),
         (false, 1, false, false),
+        (false, 2, false, false),
+        (false, 1, true, false),
     ] {
         let simulator = SequenceSimulator::spawn(whole_build(build_numbering_plans(&[])))
             .expect("captured build plan");
@@ -3269,16 +3273,33 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
         let result = &built.payload["result"];
         assert_eq!(result["voucher_count"], voucher_count);
         let next_step = result["next_step"].as_str().unwrap();
+        let first = result["warnings"][0].as_str().unwrap();
+        // Posting off and a batch the setting would admit: the user is told,
+        // and nothing says it will be posted from this chat.
+        let would_post = !writes_enabled && !numbered;
         assert_eq!(next_step.starts_with("Call post_import"), native);
         assert_eq!(
-            next_step.starts_with("Confirm the loaded company matches this batch"),
-            !native
+            next_step.starts_with("Tell the user that this connection cannot post."),
+            would_post,
+            "{next_step}"
         );
+        assert_eq!(
+            next_step.starts_with("Confirm the loaded company matches this batch"),
+            !native && !would_post,
+            "{next_step}"
+        );
+        if would_post {
+            assert!(
+                next_step.contains("Until then: confirm the loaded company matches this batch"),
+                "{next_step}"
+            );
+        }
         if writes_enabled {
-            assert!(result["warnings"][0]
-                .as_str()
-                .unwrap()
-                .contains("do not call post_import"));
+            assert!(first.contains("do not call post_import"), "{first}");
+        } else {
+            assert!(first.contains("Voucher posting is off"), "{first}");
+            assert_eq!(first.contains("would still refuse"), numbered, "{first}");
+            assert!(!first.contains("import_post_requires_one_voucher"), "{first}");
         }
         // The company-identity warning is unconditional: present for this
         // Journal-only batch exactly as it would be for a bank one.
@@ -3386,7 +3407,10 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
         let first = result["warnings"][0].as_str().unwrap();
         let batch_id = result["batch_id"].as_str().unwrap();
         match refusal {
-            None => assert!(first.contains("call post_import; it requires"), "{first}"),
+            None => assert!(
+                first.contains("call post_import; the local user approves it"),
+                "{first}"
+            ),
             Some(code) => {
                 assert!(
                     first.contains(&format!("refuse it as {code} (")),
@@ -3419,8 +3443,8 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
     }
 }
 
-/// The count rule in the warning is the batch cap: the build asks only while
-/// posting is on, and posting on admits a batch (#866, #1090).
+/// The count rule in the warning is the batch cap: the build asks at the cap
+/// whether posting is on or off, and posting on admits a batch (#866, #1090).
 #[test]
 fn refusal_reason_states_the_current_voucher_limit() {
     let on = native_post_refusal_reason("import_post_requires_one_voucher");

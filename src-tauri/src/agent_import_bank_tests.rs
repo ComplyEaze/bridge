@@ -700,10 +700,16 @@ async fn a_payment_and_receipt_batch_builds_against_the_captured_masters() {
             "report":"docs/tally/TALLY_PROTOCOL_REFERENCE.md",
             "voucher_types":["Payment","Receipt"]}])
     );
+    // Posting is off here and the batch is one the setting would admit, so the
+    // user is told of the setting first and the file route follows.
     assert!(result["next_step"]
         .as_str()
         .unwrap()
-        .starts_with("Confirm the loaded company matches this batch"));
+        .starts_with("Tell the user that this connection cannot post."));
+    assert!(result["next_step"]
+        .as_str()
+        .unwrap()
+        .contains("Until then: confirm the loaded company matches this batch"));
     // Its first verification is what a later amendment compares against
     // (#239), so the manual import step asks for it at once.
     assert!(result["next_step"]

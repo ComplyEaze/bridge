@@ -1105,15 +1105,11 @@ impl Server {
                             &company.name,
                             &numbering_admission,
                         )?;
-                        let mark = location::parse_all_company_marks(queued.company_marks)
-                            .ok()
-                            .and_then(|rows| {
-                                location::target_voucher_mark(
-                                    &rows,
-                                    identity.company_guid(),
-                                    &company.name,
-                                )
-                            });
+                        let mark = location::aimed_voucher_mark(
+                            queued.company_marks,
+                            identity.company_guid(),
+                            &company.name,
+                        );
                         if let Ok(mut aimed) = aimed_mark.lock() {
                             *aimed = mark;
                         }
@@ -3804,6 +3800,15 @@ mod numbering_tests;
 
 /// The aim snapshot's target voucher mark, for the journal tests: the post
 /// records it with its intent, and refuses (`post_mark_unrecorded`) without one.
+#[cfg(test)]
+pub(super) fn location_aimed_voucher_mark_for_tests(
+    marks: &str,
+    guid: &str,
+    name: &str,
+) -> Option<u64> {
+    location::aimed_voucher_mark(marks, guid, name)
+}
+
 #[cfg(test)]
 pub(super) fn location_target_voucher_mark_for_tests(
     rows: &[location::LoadedCompanyMarks],

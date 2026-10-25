@@ -17,6 +17,7 @@
 //! Number and books-from are not in this collection; that field set is
 //! unmeasured, so it is not relied on.
 use super::*;
+use crate::agent::change_parse::company_voucher_mark;
 pub(super) use crate::agent::change_parse::{parse_all_company_marks, LoadedCompanyMarks};
 
 fn same_name(left: &str, right: &str) -> bool {
@@ -52,6 +53,20 @@ pub(super) fn target_voucher_mark(
     let mut targets = rows.iter().filter(|row| is_target(row, guid, name));
     match (targets.next(), targets.next()) {
         (Some(row), None) => Some(row.vouchers),
+        _ => None,
+    }
+}
+
+/// The target's voucher mark in the aim snapshot, as the post records it for its span. `None`
+/// when there is not exactly one target row, or when that row omits the voucher mark: an omitted
+/// mark is not a mark of zero (`company_voucher_mark`), so the post records no "before" and
+/// refuses as `post_mark_unrecorded` before anything is sent, rather than binding its span from
+/// a zero it never read.
+pub(super) fn aimed_voucher_mark(marks: &str, guid: &str, name: &str) -> Option<u64> {
+    let rows = parse_all_company_marks(marks).ok()?;
+    let mark = target_voucher_mark(&rows, guid, name)?;
+    match company_voucher_mark(marks, guid) {
+        Ok(Some(observed)) if observed == mark => Some(mark),
         _ => None,
     }
 }

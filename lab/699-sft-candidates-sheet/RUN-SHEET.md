@@ -18,12 +18,10 @@ Because the company is new, this item differs from LAB-COMMON in four places, an
 
 The owner is at the PC for the whole sitting and approves every native window.
 
-## Request files (Phase B)
-They are added to this folder in a later commit once Phase A has given the GUID: requests/, each listed in SHA256.txt. They will be the audit
-read's own requests for THE COMPANY over 1-Apr-2025 to 31-Mar-2026. Each is preflighted: its header ID equals the COLLECTION NAME it
-defines.
-
-**Phase B does not start until that commit is on this branch.**
+## Phase B goes through the build's own tools
+Phase B sends no request file. Every read in it is a call to a ComplyEaze Bridge tool, from the named build the lab's standing
+config points at (record its path and sha256 at B0), with `audit_test_run` enabled and no redaction setting on. A tool call is the
+one dispatch path to Tally; nothing in this item is sent by curl. A tool reads one request at a time on its own.
 
 ## WHY
 A clause 42 candidate list for Form 61A row SFT-013 (Rule 114E(2) Sl.11: cash received for a sale of goods or services) will be built
@@ -123,21 +121,33 @@ STOP:
 - on any feature prompt (GST, inventory, cost centres);
 - if Tally shows a negative cash warning: report it, and continue only on the run coordinator's word.
 
-## Phase B: the read (READ-ONLY)
-B0. Run C2 step 0.
+## Phase B: the read (READ-ONLY, tool calls only)
+B0. Run C2 step 0. Record the build: its path, its sha256, and that `audit_test_run` is listed by the tools list.
 
-B1. Send the requests in requests/ one at a time (C3), each with a size bound of 2,000,000 bytes, in this order:
-    company list, marks, company object, groups, ledgers, trial balance, voucher types, marks, census, vouchers, marks, company list.
+B1. `list_companies`. EXPECT one open company, `BRIDGE SFT LAB`, with the GUID A2 recorded. Anything else: STOP.
 
-EXPECT (recorded, not predicted):
-- every answer is HTTP 200, STATUS 1, with no LINEERROR;
-- the census and the vouchers part both list 34 vouchers: 11 for S1-S6 and 23 for S7-S18;
-- the three marks answers are identical. If they are not, the book changed during the read: report it and repeat once.
+B2. `audit_test_run`, ONCE: `company_guid` = that GUID, `from` = `2025-04-01`, `to` = `2026-03-31`, `test` = `cash_44ab`,
+    `cash_groups` = [`Cash-in-Hand`], `bank_groups` = [`Bank Accounts`]. Keep the whole result as a file, with its size and sha256.
+    - A refusal: record its code. Only `C6-moved` or `voucher_window_changed_during_read` may be called once more, after C2 step 0.
+      `audit_part_deadline_exceeded`: STOP (its own text says not to retry).
+    - EXPECT (recorded, not predicted): `result.state`, each figure and finding id with its value, and the code and count of
+      every failed book check.
 
-B2. Run C10.
+B3. `read_evidence` with `limit` 40. Keep the result as a file. It lists each request the read in B2 made (in memory, since the
+    build started) with its request and response fingerprints, bytes and state. EXPECT: no record in a state other than complete.
+
+B4. `vouchers` for `2025-04-01` to `2026-03-31` (every page). Keep each page as a file. EXPECT 34 vouchers: 11 for S1-S6 and 23
+    for S7-S18, and the types and dates A5 recorded.
+
+B5. Run C2 step 0 again. The MARKS answer equals B0's (nothing was written in Phase B). Then C10.
+
+What Phase B does not give: Tally's raw answers. The tools keep none (B3 holds fingerprints and sizes only), so no committed
+fixture comes from this item. What it gives: the live read of this book admitted end to end, the cash_44ab figures of a book of
+new cash shapes (checked against A5's Cash Book totals afterwards, not here), and the count. A fixture of this book's read needs
+a capture route of its own, decided separately.
 
 ## Evidence and after
-Push branch `lab/699-sft-lab-answers` with SHA256.txt and a MANIFEST (request, company, window, release). Send the SHA to the run
+Push branch `lab/699-sft-lab-answers` with SHA256.txt and a MANIFEST (each tool call with its arguments, company, window, build path and sha256). Send the SHA to the run
 coordinator before pushing.
 
 Restore: none (it is a new company). Keep THE COMPANY for a later re-read.

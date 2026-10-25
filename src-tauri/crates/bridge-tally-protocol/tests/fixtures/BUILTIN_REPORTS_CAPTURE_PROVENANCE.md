@@ -67,3 +67,23 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 | `builtin_sales_register_pilot_lab_fy_live.utf16le.xml` | 5562 | `03208b50260350059a55ac7db39acfa4662da89dc35fb357f06443196ad15861` | Sales Register, 12 month rows, two with amounts (read by `native_month_register`) |
 | `builtin_purchase_register_pilot_lab_fy_request.utf16le.xml` | 766 | `84998b3748069d070f6d900427554e7131bfebe48592e7d1bb00418016364fb1` | request, Purchase Register, 2026-04-01 to 2027-03-31, on the pilot lab |
 | `builtin_purchase_register_pilot_lab_fy_live.utf16le.xml` | 5550 | `dc3d8d424786913b6560e1bffa2217b3b03f307afb30e625b36c77de9bde45c5` | Purchase Register, 12 month rows, one with a month amount (read by `native_month_register`) |
+
+## Added 2026-10-21: Negative Stock on a book with a short item, to a mid-year date, and on a book with none
+
+- **Date and instance:** 2026-10-21, TallyPrime 7.1 Silver on Windows, attended, one request at a time, HTTP 200 on every answer. Responses are BOM-less UTF-16LE exactly as received; the requests are UTF-16LE with a BOM.
+- **Sender:** a lab script (not `bridge_mcp`) sending the request texts tabled below, which are the committed Negative Stock request with only the company and, for one, the end date changed (a test asserts equality with `render_native_negative_stock_request`).
+- **Books:** `BRIDGE NEGSTOCK LAB 2` (synthetic; books from 2025-04-01, inventory on and integrated with accounts, unit Nos, two items with no opening stock; a sale of 5 Nos of `Lab Short Item` on 2025-05-10, a purchase of 10 Nos of `Lab Plain Item` on 2025-05-15 and a purchase of 2 Nos of `Lab Short Item` on 2025-06-20, all raw imports) and `BRIDGE TIEOUT C` (synthetic, read only). A company of a similar name, `BRIDGE NEGSTOCK LAB`, also exists on that instance: a read must not be bound by name alone.
+- **What the captures show:**
+  - 2025-04-01 to 2026-03-31 on `BRIDGE NEGSTOCK LAB 2`: one item row, `Lab Short Item`, closing quantity `-3 Nos`, rate `120.00`, amount `360.00` (positive). Tally's plain Stock Summary for the same window (answer kept by the lab, not committed) printed the same item as `-3 Nos`, `120.00`, `360.00`, and `Lab Plain Item` as `10 Nos`, `100.00`, `-1000.00`; the latter was not listed here.
+  - 2025-04-01 to 2025-05-31 on the same book: one row, the same item, `-5 Nos`, with the rate and the amount present and empty. The quantity is as at the window's end, not the book's.
+  - 2025-04-01 to 2026-03-31 on `BRIDGE TIEOUT C` (which holds stock items and no short one): exactly `<ENVELOPE></ENVELOPE>`, 46 bytes, the same bytes as the empty Negative Ledgers answer. An empty envelope cannot be told from a report that was not rendered (§12a.11), so it is read as not established, never as "no item is negative".
+- **Not established:** that an empty answer means no item is below zero, what Tally lists beyond these books (§12a.16), a batch-wise or multi-godown book, a window crossing a financial year, the cost of the report on a large book, any other release.
+
+| file | bytes | sha256 | content |
+| --- | ---: | --- | --- |
+| `builtin_negative_stock_negstock_lab_2_fy_request.utf16le.xml` | 770 | `4e29535d9d740e7ed89fbecad799c47f3ce0d35a59ad62b5830ae6366a12623e` | request, Negative Stock, 2025-04-01 to 2026-03-31 |
+| `builtin_negative_stock_negstock_lab_2_fy_live.utf16le.xml` | 514 | `0b6fdf155016e065f669dff7e221108789c52d1900528c443f66ad608b1fc20e` | Negative Stock, one item at `-3 Nos` (read by `native_negative_stock`) |
+| `builtin_negative_stock_negstock_lab_2_to_20250531_request.utf16le.xml` | 770 | `5e6811cef1ce108f736c17b420e6ae6ac42362f230161a54705d71640371b0d4` | request, Negative Stock, 2025-04-01 to 2025-05-31 |
+| `builtin_negative_stock_negstock_lab_2_to_20250531_live.utf16le.xml` | 490 | `720cd2f5ecb09138b675d399df3dcca90fafb416a0709738d391ad44161a65c2` | Negative Stock to 31 May, one item at `-5 Nos`, rate and amount empty |
+| `builtin_negative_stock_tieout_c_fy_request.utf16le.xml` | 758 | `6f9ed321654680017caaf3f49fbaa88f3491f9d283ba768579474c95d7017495` | request, Negative Stock, 2025-04-01 to 2026-03-31, on a book with no short item |
+| `builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | Negative Stock, an empty envelope |

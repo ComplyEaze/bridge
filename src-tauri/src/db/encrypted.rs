@@ -1,6 +1,6 @@
 use sha2::{Digest, Sha256};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{ConnectOptions, Executor, SqliteConnection, SqlitePool};
+use sqlx::{ConnectOptions, Connection, Executor, SqliteConnection, SqlitePool};
 use std::fs::{File, OpenOptions};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -333,6 +333,36 @@ pub async fn connect_encrypted(
     }
     drop(connection);
     Ok(pool)
+}
+
+/// Whether `key` opens the existing database: one connection, configured and checked as
+/// [`connect_encrypted`] does, and closed before this returns, on success and on failure alike.
+///
+/// A failed attempt through `connect_encrypted` leaves its connection to SQLx to drop, and SQLx
+/// ends the connection's worker thread without waiting for it. A caller that goes on to delete the
+/// database's files straight away can then find the write-ahead log still open (a sharing violation
+/// on Windows), and a process that exits at that moment races the thread's last calls into the
+/// crypto library (a crash after a passing test on macOS). `Connection::close` waits for the
+/// worker, so neither can happen here. The database is never created.
+pub(crate) async fn probe_encrypted_key(
+    database_path: &Path,
+    key: Zeroizing<Vec<u8>>,
+) -> anyhow::Result<()> {
+    validate_key(&key)?;
+    let mut connection = SqliteConnectOptions::new()
+        .filename(database_path)
+        .create_if_missing(false)
+        .disable_statement_logging()
+        .connect()
+        .await
+        .map_err(encrypted_open_error)?;
+    let checked = match configure_encrypted_connection(&mut connection, &key).await {
+        Ok(()) => validate_encrypted_connection(&mut connection).await,
+        Err(error) => Err(encrypted_open_error(error)),
+    };
+    // The attempt's answer is the result; a close that fails changes nothing about it.
+    let _ = connection.close().await;
+    checked.map_err(Into::into)
 }
 
 async fn configure_encrypted_connection(

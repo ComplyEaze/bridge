@@ -33,8 +33,8 @@ use std::path::{Path, PathBuf};
 use zeroize::Zeroizing;
 
 use super::encrypted::{
-    connect_encrypted, lock_mirror_exclusively, try_lock_mirror_initialization, EncryptedOpenError,
-    MirrorKeyStore, MirrorUseLock, MirrorUseLockError, MIRROR_KEY_BYTES,
+    lock_mirror_exclusively, probe_encrypted_key, try_lock_mirror_initialization,
+    EncryptedOpenError, MirrorKeyStore, MirrorUseLock, MirrorUseLockError, MIRROR_KEY_BYTES,
 };
 
 /// What every plaintext SQLite file begins with; an encrypted mirror never does.
@@ -162,11 +162,8 @@ impl<S: ResettableKeyStore> ResettableMirror<S> {
             let keys = key_store.all_keys().map_err(ResetRefusal::KeysUnlistable)?;
             let own_key = key_store.load().map_err(|_| ResetRefusal::Undetermined)?;
             for key in keys.into_iter().filter(|key| key.len() == MIRROR_KEY_BYTES) {
-                match connect_encrypted(database_path, key).await {
-                    Ok(pool) => {
-                        pool.close().await;
-                        return Err(ResetRefusal::KeyOpensTheMirror);
-                    }
+                match probe_encrypted_key(database_path, key).await {
+                    Ok(()) => return Err(ResetRefusal::KeyOpensTheMirror),
                     Err(error) => match error.downcast_ref::<EncryptedOpenError>() {
                         // SQLCipher says this key is not the one: the only answer that counts.
                         Some(EncryptedOpenError::UnreadableWithSuppliedKey { .. }) => {}

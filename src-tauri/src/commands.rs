@@ -55,6 +55,9 @@ pub(crate) mod trial_balance;
 
 pub mod all_clients;
 
+#[path = "commands_terms.rs"]
+pub(crate) mod terms;
+
 #[derive(Debug, Serialize)]
 pub struct TallyCommandError {
     pub code: &'static str,
@@ -150,6 +153,12 @@ fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> T
 fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
     if let Some(refusal) = crate::endpoint_wire::wire_refusal(&error) {
         return wire_refusal_command_error(refusal);
+    }
+    if let Some(refusal) = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<crate::tally::runtime::TermsRefusal>())
+    {
+        return terms::refusal_command_error(refusal.code);
     }
     if error.chain().any(|cause| {
         cause

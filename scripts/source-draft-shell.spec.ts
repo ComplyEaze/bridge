@@ -21,6 +21,7 @@ test("local proposals survive shell navigation and save without source or Tally 
     window.__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: unknown) => {
         calls.push({ command, args });
+        if (command === "desktop_terms_status") return { terms_version: "2026-10.1", state: "accepted", accepted: true };
         if (command === "desktop_pick_source_draft") return structuredClone(draft);
         if (command === "desktop_save_source_draft") {
           const request = (args as { request: { proposals: typeof draft.rows[number]["proposal"][] } }).request;

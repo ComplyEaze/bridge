@@ -136,7 +136,7 @@ use movement_math::*;
 mod egress;
 use egress::{append_egress_line, read_egress_tail};
 #[path = "agent_terms.rs"]
-mod terms;
+pub(crate) mod terms;
 
 use crate::tally::runtime::RuntimeReadEvidence;
 use crate::tally::{
@@ -2056,7 +2056,7 @@ impl Server {
         let post_approvals = Arc::new(agent_import::PostApprovals::new(&settings.data_dir));
         Self {
             settings,
-            runtime: TallyRuntime::default(),
+            runtime: TallyRuntime::ungated(),
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
             voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),

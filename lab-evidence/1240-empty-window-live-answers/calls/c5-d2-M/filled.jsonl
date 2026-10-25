@@ -1,0 +1,4 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"rd1240","version":"1"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":31,"method":"tools/call","params":{"name":"vouchers","arguments":{"company_guid":"d45bc1b0-e5e3-4261-b3b2-cce3915f42d3","from":"2026-04-30","to":"2026-05-02"}}}
+{"jsonrpc":"2.0","id":32,"method":"tools/call","params":{"name":"egress_log","arguments":{"limit":2}}}

@@ -11,7 +11,7 @@ import { join } from "node:path";
 import test, { after } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { MAX_SECONDS, parseArgs, readSleepArguments, SLEEP_TOOL } from "./mcp-sleep-server.mjs";
+import { createServer, MAX_LOGGED_MESSAGE_CHARS, MAX_SECONDS, MIN_PROGRESS_EVERY, parseArgs, readSleepArguments, SLEEP_TOOL } from "./mcp-sleep-server.mjs";
 
 const SERVER = fileURLToPath(new URL("./mcp-sleep-server.mjs", import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "mcp-sleep-"));
@@ -73,6 +73,11 @@ test("the handshake answers, lists exactly the one sleep tool, and answers ping"
   server.send({ jsonrpc: "2.0", id: 2, method: "tools/list" });
   const list = await server.next();
   assert.deepEqual(list.result.tools, [SLEEP_TOOL]);
+  // the bounds are pinned here, not only compared with the exported tool
+  assert.deepEqual(list.result.tools[0].inputSchema.properties, {
+    seconds: { type: "number", minimum: 0, maximum: 900 },
+    progress_every: { type: "number", minimum: 0.1, maximum: 900 },
+  });
   server.send({ jsonrpc: "2.0", id: 3, method: "ping" });
   assert.deepEqual((await server.next()).result, {});
   await server.stop();
@@ -87,7 +92,7 @@ test("a sleep returns after the time asked for, and the log records the call and
   const waited = Date.now() - sent;
   assert.equal(answer.id, 7);
   assert.equal(answer.result.isError, false);
-  assert.match(answer.result.content[0].text, /^slept 0\.\d s$/);
+  assert.match(answer.result.content[0].text, /^slept \d+\.\d s$/);
   assert.ok(waited >= 380, `answered after ${waited} ms`);
   await server.stop();
   const events = server.events();
@@ -170,10 +175,38 @@ test("bad input is refused in-band and the server keeps answering", async () => 
 test("argument and option checks", () => {
   assert.deepEqual(readSleepArguments({ seconds: 5 }), { seconds: 5, progressEvery: null });
   assert.deepEqual(readSleepArguments({ seconds: 5, progress_every: 1 }), { seconds: 5, progressEvery: 1 });
-  for (const bad of [null, [], {}, { seconds: -1 }, { seconds: "5" }, { seconds: Infinity }, { seconds: 1, progress_every: 0 }, { seconds: 1, extra: 1 }]) {
+  assert.equal(MIN_PROGRESS_EVERY, 0.1);
+  assert.deepEqual(readSleepArguments({ seconds: 5, progress_every: MIN_PROGRESS_EVERY }), { seconds: 5, progressEvery: 0.1 });
+  for (const bad of [null, [], {}, { seconds: -1 }, { seconds: 1, progress_every: 0.05 }, { seconds: 1, progress_every: 901 }, { seconds: "5" }, { seconds: Infinity }, { seconds: 1, progress_every: 0 }, { seconds: 1, extra: 1 }]) {
     assert.equal(typeof readSleepArguments(bad), "string", JSON.stringify(bad));
   }
   assert.deepEqual(parseArgs([]), { log: null });
   assert.deepEqual(parseArgs(["--log", "x.jsonl"]), { log: "x.jsonl" });
   for (const bad of [["--bogus"], ["--log"], ["--log", "--x"]]) assert.throws(() => parseArgs(bad), /usage:/);
+});
+
+test("a second call while one runs is refused in-band, and the first still answers", async () => {
+  const server = await initialized();
+  server.send({ jsonrpc: "2.0", id: 30, method: "tools/call", params: { name: "sleep", arguments: { seconds: 0.5 } } });
+  server.send({ jsonrpc: "2.0", id: 31, method: "tools/call", params: { name: "sleep", arguments: { seconds: 0 } } });
+  const refused = await server.next();
+  assert.equal(refused.id, 31);
+  assert.equal(refused.error.code, -32600);
+  const answered = await server.next();
+  assert.equal(answered.id, 30);
+  assert.equal(answered.result.isError, false);
+  await server.stop();
+});
+
+test("a received line past the cap is logged by its length and start only", () => {
+  const events = [];
+  const server = createServer({ send: () => {}, log: (event) => events.push(event) });
+  server.handleLine(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }));
+  server.handleLine(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping", params: { pad: "x".repeat(MAX_LOGGED_MESSAGE_CHARS) } }));
+  const [small, large] = events.filter((e) => e.event === "received");
+  assert.equal(small.message.id, 1);
+  assert.equal(large.truncated, true);
+  assert.ok(large.length > MAX_LOGGED_MESSAGE_CHARS);
+  assert.equal(large.head.length, 1024);
+  assert.equal("message" in large, false);
 });

@@ -14,8 +14,9 @@
 //
 // The tool: `sleep` with `seconds` (0 to 900) and `progress_every` (seconds, optional). With
 // `progress_every` set and a `progressToken` in the call's `_meta`, it sends
-// `notifications/progress` at that interval while it sleeps. A `notifications/cancelled` naming the
-// call stops it and sends no result, as the protocol asks.
+// `notifications/progress` at that interval while it sleeps (not faster than every 0.1 s, which bounds
+// the log of a 900 s call to 9,000 progress lines). One call runs at a time: a second is refused in-band.
+// A `notifications/cancelled` naming the call stops it and sends no result, as the protocol asks.
 
 import { appendFileSync, existsSync, realpathSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -23,6 +24,8 @@ import { fileURLToPath } from "node:url";
 
 export const PROTOCOL_VERSION = "2025-06-18";
 export const MAX_SECONDS = 900;
+export const MIN_PROGRESS_EVERY = 0.1;
+export const MAX_LOGGED_MESSAGE_CHARS = 8192;
 const USAGE = "usage: node scripts/mcp-sleep-server.mjs [--log <file>]";
 
 export const SLEEP_TOOL = {
@@ -33,7 +36,7 @@ export const SLEEP_TOOL = {
     type: "object",
     properties: {
       seconds: { type: "number", minimum: 0, maximum: MAX_SECONDS },
-      progress_every: { type: "number", exclusiveMinimum: 0, maximum: MAX_SECONDS },
+      progress_every: { type: "number", minimum: MIN_PROGRESS_EVERY, maximum: MAX_SECONDS },
     },
     required: ["seconds"],
     additionalProperties: false,
@@ -59,8 +62,8 @@ export function readSleepArguments(input) {
   if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0 || seconds > MAX_SECONDS) {
     return `seconds must be a number from 0 to ${MAX_SECONDS}`;
   }
-  if (progressEvery !== undefined && (typeof progressEvery !== "number" || !Number.isFinite(progressEvery) || progressEvery <= 0 || progressEvery > MAX_SECONDS)) {
-    return `progress_every must be a number above 0 and at most ${MAX_SECONDS}`;
+  if (progressEvery !== undefined && (typeof progressEvery !== "number" || !Number.isFinite(progressEvery) || progressEvery < MIN_PROGRESS_EVERY || progressEvery > MAX_SECONDS)) {
+    return `progress_every must be a number from ${MIN_PROGRESS_EVERY} to ${MAX_SECONDS}`;
   }
   return { seconds, progressEvery: progressEvery ?? null };
 }
@@ -77,14 +80,14 @@ export function createServer({ send, log }) {
   }
 
   function startSleep(id, args, progressToken) {
-    const started = Date.now();
+    const started = performance.now();
     const timers = [];
     calls.set(key(id), { timers, started });
     if (args.progressEvery !== null && progressToken !== undefined) {
       let count = 0;
       const tick = setInterval(() => {
         count += 1;
-        const elapsed = (Date.now() - started) / 1000;
+        const elapsed = (performance.now() - started) / 1000;
         send({
           jsonrpc: "2.0",
           method: "notifications/progress",
@@ -98,7 +101,7 @@ export function createServer({ send, log }) {
       setTimeout(() => {
         for (const t of timers) clearInterval(t);
         calls.delete(key(id));
-        const elapsed = (Date.now() - started) / 1000;
+        const elapsed = (performance.now() - started) / 1000;
         result(id, { content: [{ type: "text", text: `slept ${elapsed.toFixed(1)} s` }], isError: false });
         log({ event: "result_sent", id, elapsed });
       }, args.seconds * 1000),
@@ -106,7 +109,9 @@ export function createServer({ send, log }) {
   }
 
   function handle(message) {
-    log({ event: "received", message });
+    // A line of any length could otherwise fill the log: past the cap only its start and length are kept.
+    const text = JSON.stringify(message) ?? "";
+    log(text.length <= MAX_LOGGED_MESSAGE_CHARS ? { event: "received", message } : { event: "received", truncated: true, length: text.length, head: text.slice(0, 1024) });
     if (!message || typeof message !== "object" || Array.isArray(message) || message.jsonrpc !== "2.0") {
       return error(message?.id ?? null, -32600, "invalid request");
     }
@@ -118,7 +123,7 @@ export function createServer({ send, log }) {
       if (!call) return log({ event: "cancel_ignored", id: params?.requestId ?? null }); // finished, unknown or already cancelled
       for (const t of call.timers) { clearInterval(t); clearTimeout(t); }
       calls.delete(key(params.requestId));
-      log({ event: "cancelled", id: params.requestId, elapsed: (Date.now() - call.started) / 1000, reason: params?.reason ?? null });
+      log({ event: "cancelled", id: params.requestId, elapsed: (performance.now() - call.started) / 1000, reason: params?.reason ?? null });
       return;
     }
     if (id === undefined) return; // other notifications (notifications/initialized and the rest) need no answer
@@ -137,7 +142,7 @@ export function createServer({ send, log }) {
       if (params?.name !== "sleep") return error(id, -32602, `unknown tool ${params?.name}`);
       const args = readSleepArguments(params.arguments ?? {});
       if (typeof args === "string") return error(id, -32602, args);
-      if (calls.has(key(id))) return error(id, -32600, "a call with this id is already running");
+      if (calls.size > 0) return error(id, -32600, "a call is already running: this server runs one at a time");
       return startSleep(id, args, params?._meta?.progressToken);
     }
     return error(id, -32601, `method not found: ${method}`);

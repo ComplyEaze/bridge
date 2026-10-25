@@ -6,7 +6,7 @@ background job, each supported host is measured with `scripts/mcp-sleep-server.m
 stdio MCP server whose one tool, `sleep`, waits for N seconds. It is not bundled, not part of the
 `bridge` crate and not among Bridge's registered tools, so it cannot ship.
 
-Per host, four things are recorded:
+Per host and per timeout setting, four things are recorded:
 - the largest N that returns;
 - what the host shows when it gives up;
 - whether `notifications/cancelled` arrives;
@@ -22,10 +22,11 @@ Confidence markers follow `docs/tally/TALLY_PROTOCOL_REFERENCE.md`.
 
 | Host | Version, OS | N returned | N abandoned | Shown on abandon | `cancelled` | Progress resets the timer | Confidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Claude Code CLI (`claude -p`) | 2.1.285, macOS | 90, 300, 900 | none up to 900 | not reached | not received | not tested: no timeout reached | verified, one run each |
-| Claude Code in the Claude desktop app | macOS | not measured | | | | | |
-| Claude Desktop | macOS | not measured | | | | | |
-| Claude Desktop | Windows | not measured | | | | | |
+| Claude Code CLI (`claude -p`), default settings | 2.1.285, macOS | 90, 300, 900 (this server); 150 (earlier server, 30 Sep) | none up to 900 | not reached | n/a: no call was abandoned | not tested: no timeout reached | partial, one run each |
+| Claude Code CLI, per-server `timeout` of 60000 ms in `.mcp.json` | 2.1.285, macOS | none (150 s was cut) | 150 s call cut at 60.0 s, with and without progress every 10 s | `MCP server ... timed out after 60s` | received (reason `SdkError: Request timed out`) | no: progress every 10 s did not reset it | partial, one run each (30 Sep, earlier server, see #703) |
+| Claude Code in the Code tab of the Claude desktop app, default settings | 2.1.284, macOS | 150 (earlier server, 30 Sep) | none up to 150 | not reached | n/a: no call was abandoned | not tested | partial, one run, run by hand |
+| Claude Desktop (chat app) | macOS | not measured | | | | | |
+| Claude Desktop (chat app) | Windows | not measured | | | | | |
 | a third-party client | | not measured | | | | | |
 
 **Claude Code, details.** Each call carried `_meta.progressToken` (equal to the request id) and
@@ -33,12 +34,21 @@ Confidence markers follow `docs/tally/TALLY_PROTOCOL_REFERENCE.md`.
 no error and changed nothing visible in the final answer. Every call returned, plain and with
 progress every 10 s, at 90 s, 300 s and 900 s (the server's ceiling): the log shows each
 `result_sent` within 0.1 s of N, and the host's answer quoted the `slept N s` text. The host asked
-for protocol version `2025-11-25`, and no `MCP_TOOL_TIMEOUT` was set in its environment. So this
-host has no call timeout of 900 s or less, and whether progress resets a timer cannot be tested on
-it.
+for protocol version `2025-11-25`, and no `MCP_TOOL_TIMEOUT` was set in its environment. So with default settings
+(no per-server `timeout`, no `MCP_TOOL_TIMEOUT`) this host has no call timeout of 900 s or less.
+That holds for default settings only: the host's timeout is configurable, and the second row of the
+table shows a configured timeout cutting a call exactly when set, sending `notifications/cancelled`,
+and not being reset by progress. Whether progress resets a timer is therefore known for a configured
+wall-clock timeout (it does not) and not for any timeout a host applies by default, because none was
+reached. `MCP_TOOL_TIMEOUT` was not measured.
 
-This does not explain the abandonment at about 60 s that #703 records on another setup. That one
-remains to be found: the open rows of the table are the next hosts to measure.
+The 30 Sep runs (rows 2 and 3 and the 150 s default run) used an earlier dev server, outside the
+repository, with the same one-tool shape; their logs are not kept here, and the figures are quoted
+from the #703 thread (comments of 30 Sep, 09:13 and 09:16 UTC).
+
+This does not explain the abandonment at about 60 s that #703 records on another setup: the
+likeliest explanation is a configured timeout or an older build (unverified; nothing records which
+it was). The open rows of the table are the next hosts to measure.
 
 ## Measuring a host
 
@@ -73,7 +83,12 @@ writes only its own log.
    Then run the first abandoned N with progress. If it now returns, progress resets the timer; to
    be sure, also run twice that N with progress. N is at most 900: above it the server refuses the
    call (`seconds` out of range), which is not a host timeout.
-6. One variable at a time: change only N or only `progress_every` between runs, and repeat any
+6. Repeat steps 2 to 5 with a timeout set, because a host's timeout is configurable and a default
+   run can hide it: for Claude Code, a per-server `"timeout": 60000` in the `.mcp.json` entry, then
+   separately the `MCP_TOOL_TIMEOUT` environment variable (in milliseconds). Run a call longer than
+   the timeout, plain and with progress, and record whether `cancelled` arrives and whether progress
+   changed when the call was cut.
+7. One variable at a time: change only N or only `progress_every` between runs, and repeat any
    surprising result before recording it.
-7. Record each run in the table above with the log's own times. Quote the key log lines in the
+8. Record each run in the table above with the log's own times. Quote the key log lines in the
    pull request that adds the row; the logs themselves stay out of the repository.

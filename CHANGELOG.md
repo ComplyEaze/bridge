@@ -89,6 +89,17 @@ These changes are in source and not yet in a published build.
   no keyed No; neither was read against the screen. The value
   mapping is unchanged: do not read `true` as eligible.
 
+- `profit_and_loss` and `balance_sheet` can now be established on a book with stock items (part of #692), using
+  Tally's own `Less: Closing Stock` figure from its Profit and Loss, shown as `closing_stock` (`applied`, with its
+  value and source, or `declined`, with the reason) and not derived or taken from `stock_summary`. It is used only when
+  that one figure closes every gap at once (Current Assets, the Balance Sheet's Profit & Loss A/c line and the
+  trading result, and the `Cost of Sales :` heading), the company's own flags show inventory on and integrated, the
+  `Opening Stock` line is shown empty and no Stock-in-Hand ledger carries an amount; otherwise the read refuses as it
+  did. Both tools now read Tally's own Profit and Loss (one more pair of requests for `balance_sheet`, which stays the
+  sheet it was if that read fails), and a book that offers a closing stock also has its inventory flags read (a failed
+  read declines the figure as `inventory_flags_not_read`). The derived lines must also sum to zero. Measured on one synthetic book; opening stock, a costing
+  method, a book that is not integrated and a window spanning two years are not measured.
+
 - `negative_stock` (new tool; part of #1358): Tally's own Negative Stock list for a window, as `item`, `quantity`,
   `rate` and `value` per listed stock item, returned as Tally prints them and compared with no other report
   (`checks` says so). Being listed is not a finding that the quantity is below zero, and an empty answer is

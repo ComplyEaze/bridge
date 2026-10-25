@@ -41,7 +41,8 @@ personal information.
   run the native tests on Windows only, and a master push, the nightly run and
   a manual run add macOS; a pull request runs the bundle and seam jobs on Windows only, and
   the queue and a push add macOS only when a packaging path changes, named in
-  the scope job; a draft pull request runs no native, bundle or seam job, and
+  the scope job; a draft pull request runs no native, bundle or seam job, reports
+  its gate as `Required checks (draft)`, which is not a required context, and
   marking it ready starts a run that does); require the
   gate rather than those individual matrix contexts, because they are
   path-filtered and report `skipped` on docs-only changes — requiring them

@@ -333,3 +333,17 @@ for (const [name, replacement] of [
       "native must run on the systems the scope job's native_os names");
   });
 }
+
+// A draft-scoped run must post a name no ruleset requires. If it posted `Required checks`, its green (heavy jobs skipped on
+// purpose) would satisfy the ruleset on a head whose ready run has not started its own gate yet.
+for (const [name, replacement] of [
+  ["a constant name", "name: Required checks"],
+  ["the draft name made the required one", "name: ${{ needs.changes.outputs.draft == 'true' && 'Required checks' || 'Required checks' }}"],
+  ["the condition inverted", "name: ${{ needs.changes.outputs.draft != 'true' && 'Required checks (draft)' || 'Required checks' }}"],
+]) {
+  test(`required checks name: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/ci.yml", (text) => text.replace("    name: ${{ needs.changes.outputs.draft == 'true' && 'Required checks (draft)' || 'Required checks' }}", `    ${replacement}`)),
+      "required-checks changed shape, or does not need every other job");
+  });
+}
+

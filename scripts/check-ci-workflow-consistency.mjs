@@ -680,7 +680,10 @@ for (const file of tracked.filter((path) => /^src-tauri\/.+\.rs$/.test(path))) {
 }
 const expectedRequiredChecks = [
   "  required-checks:",
-  "    name: Required checks",
+  "    # A draft-scoped run posts `Required checks (draft)`, which no ruleset requires, never `Required checks`: its",
+  "    # green means the heavy jobs were skipped on purpose, and must not stand in for the ready run's gate on the same",
+  "    # head. The ready run, the merge queue's run and every other event post `Required checks`.",
+  "    name: ${{ needs.changes.outputs.draft == 'true' && 'Required checks (draft)' || 'Required checks' }}",
   "    # Always runs so it can report a single, stable required status for branch",
   "    # protection. Point branch protection at this context instead of the",
   "    # individual matrix jobs, which report `skipped` when they are not selected.",

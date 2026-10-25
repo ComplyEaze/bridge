@@ -13,11 +13,14 @@ use zeroize::Zeroizing;
 const GOOD_KEY: [u8; MIRROR_KEY_BYTES] = [7; MIRROR_KEY_BYTES];
 const OTHER_KEY: [u8; MIRROR_KEY_BYTES] = [9; MIRROR_KEY_BYTES];
 
+/// One credential-store entry: the account name and the key under it.
+type StoredAccount = (String, Vec<u8>);
+
 /// A credential store with several accounts, of which `own` is the one this database is looked
 /// up under. Clones share one state, so a test can read it after the store has been consumed.
 #[derive(Clone, Default)]
 struct FakeStore {
-    accounts: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
+    accounts: Arc<Mutex<Vec<StoredAccount>>>,
     own: String,
     listing_fails: bool,
     load_fails: bool,

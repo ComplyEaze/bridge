@@ -1065,7 +1065,7 @@ fn the_response_company_guid_must_be_present_and_the_expected_one() {
     );
     // The caller expecting another company.
     assert_eq!(
-        parse_group_name_index(&text, other),
+        parse_group_name_index(&text, &other),
         Err(GroupNameIndexError::CompanyGuidMismatch)
     );
     // Case alone does not make a different company.

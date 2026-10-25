@@ -999,7 +999,7 @@ export async function baseline(workers, timeout, buildTimeout, details = null) {
   return problems;
 }
 
-const GATE_STALE_MS = 10_000; // a takeover gate older than this was left by a run that died inside it
+const GATE_STALE_MS = 10_000; // a takeover gate that names no owner and is older than this was left by a run that died inside it
 let claimSeq = 0;
 
 function pidAlive(pid) {
@@ -1010,6 +1010,16 @@ function pidAlive(pid) {
   } catch (e) {
     return e.code === "EPERM";
   }
+}
+
+/** Whether a takeover gate was left behind. A gate names its owner's pid in a file inside it, so it is stale
+ * exactly when that run is gone, however long a live owner has been stalled (suspended, or asleep with its
+ * machine). A gate with no owner yet is one a run has just made, or one that run died before naming: only the
+ * second is older than GATE_STALE_MS. */
+function gateIsStale(gate) {
+  const owner = Number.parseInt(fs.readFileSync(path.join(gate, "owner"), "utf8"), 10);
+  if (Number.isInteger(owner) && owner > 0) return !pidAlive(owner);
+  throw new Error("no owner named");
 }
 
 function claimedBy(lock) {
@@ -1061,7 +1071,14 @@ export function lockWorkdir(workdir) {
       } catch (e) {
         if (e.code !== "EEXIST") throw e;
         try {
-          if (Date.now() - fs.statSync(gate).mtimeMs > GATE_STALE_MS) fs.rmdirSync(gate);
+          let stale;
+          try {
+            stale = gateIsStale(gate);
+          } catch {
+            // No owner named yet (or the gate just went): old enough means its maker died before naming itself.
+            stale = Date.now() - fs.statSync(gate).mtimeMs > GATE_STALE_MS;
+          }
+          if (stale) fs.rmSync(gate, { recursive: true, force: true });
         } catch {
           // another run removed it first
         }
@@ -1069,10 +1086,11 @@ export function lockWorkdir(workdir) {
         continue;
       }
       try {
+        fs.writeFileSync(path.join(gate, "owner"), `${process.pid}\n`);
         const again = claimedBy(lock);
         if (again !== null && !pidAlive(again)) fs.rmSync(lock, { force: true });
       } finally {
-        fs.rmdirSync(gate);
+        fs.rmSync(gate, { recursive: true, force: true });
       }
     }
     return null;

@@ -1136,7 +1136,13 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
 const BOX_FIT_GUARDED: &str = r#"#[cfg(windows)]
 pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
     if !windows_hook::make_dpi_aware() {
-        // Rectangles could not be read in one unit, so no box is shown.
+        // Rectangles could not be read in one unit, so no box is shown. Said on
+        // the error output, so a run by hand on an older Windows names the cause.
+        use std::io::Write;
+        let _ = writeln!(
+            std::io::stderr(),
+            "box-fit: not per-monitor DPI aware (Windows 10 version 1703 or later is needed): no box shown"
+        );
         std::process::exit(0);
     }
     let Some(hook) = windows_hook::install() else {
@@ -1217,13 +1223,17 @@ mod windows_hook {
         // SAFETY: each pointer is the address of the exported function of
         // that name, whose signature is the one given here (user32.dll).
         unsafe {
-            let set =
-                std::mem::transmute::<*const c_void, extern "system" fn(*mut c_void) -> i32>(set);
-            let get =
-                std::mem::transmute::<*const c_void, extern "system" fn() -> *mut c_void>(get);
+            let set = std::mem::transmute::<
+                *const c_void,
+                unsafe extern "system" fn(*mut c_void) -> i32,
+            >(set);
+            let get = std::mem::transmute::<
+                *const c_void,
+                unsafe extern "system" fn() -> *mut c_void,
+            >(get);
             let same = std::mem::transmute::<
                 *const c_void,
-                extern "system" fn(*mut c_void, *mut c_void) -> i32,
+                unsafe extern "system" fn(*mut c_void, *mut c_void) -> i32,
             >(same);
             set(PER_MONITOR_AWARE_V2 as *mut c_void);
             same(get(), PER_MONITOR_AWARE_V2 as *mut c_void) != 0

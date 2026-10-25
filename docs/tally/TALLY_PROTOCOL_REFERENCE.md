@@ -285,9 +285,12 @@ base revision.
 <a id="910a2-the-companys-currencyname-names-its-base-master-by-originalname--verified-2026-09-23-on-two-synthetic-books-a-rule-not-a-proof"></a>
 
 [9.10a.2 The company's `CURRENCYNAME` names its base master by `ORIGINALNAME` — **VERIFIED 2026-09-23 on two synthetic books; a rule, not a proof**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#910a2-the-companys-currencyname-names-its-base-master-by-originalname--verified-2026-09-23-on-two-synthetic-books-a-rule-not-a-proof)
+<a id="910b-some-company-level-import-shapes-block-the-gateway--trap"></a>
+
+[9.10b Some company-level import shapes block the gateway — **TRAP**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#910b-some-company-level-import-shapes-block-the-gateway--trap)
 <a id="910b-originalname-at-company-level-hangs-the-gateway--trap"></a>
 
-[9.10b `ORIGINALNAME` at `COMPANY` level hangs the gateway — **TRAP**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#910b-originalname-at-company-level-hangs-the-gateway--trap)
+[9.10b Some company-level import shapes block the gateway — **TRAP**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#910b-some-company-level-import-shapes-block-the-gateway--trap)
 <a id="it-raised-the-12-modal-dialog-and-blocked-for-44-minutes-until-a-human-clicked-ok"></a>
 
 [It raised the §1.2 modal dialog and blocked for 44 minutes until a human clicked OK](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#it-raised-the-12-modal-dialog-and-blocked-for-44-minutes-until-a-human-clicked-ok)
@@ -297,9 +300,12 @@ base revision.
 <a id="910c-routes-ruled-out-by-documentation-review"></a>
 
 [9.10c Routes ruled out by documentation review](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#910c-routes-ruled-out-by-documentation-review)
+<a id="910d-a-company-level-import-with-no-pinned-company-alters-the-loaded-company--p0-trap"></a>
+
+[9.10d A company-level import with no pinned company alters the loaded company — **P0 TRAP**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#910d-a-company-level-import-with-no-pinned-company-alters-the-loaded-company--p0-trap)
 <a id="910d-the-legacy-importdata-envelope-is-accepted--and-renames-the-loaded-company--p0-trap"></a>
 
-[9.10d The legacy `IMPORTDATA` envelope is accepted — and renames the loaded company — **P0 TRAP**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#910d-the-legacy-importdata-envelope-is-accepted--and-renames-the-loaded-company--p0-trap)
+[9.10d A company-level import with no pinned company alters the loaded company — **P0 TRAP**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#910d-a-company-level-import-with-no-pinned-company-alters-the-loaded-company--p0-trap)
 <a id="912-item-invoices--allledgerentrieslist-is-silently-discarded--trap"></a>
 
 [9.12 Item invoices — `ALLLEDGERENTRIES.LIST` is silently DISCARDED — **TRAP**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#912-item-invoices--allledgerentrieslist-is-silently-discarded--trap)

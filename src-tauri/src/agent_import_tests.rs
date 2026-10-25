@@ -5283,7 +5283,7 @@ fn the_first_verification_page_masks_ledger_names_under_mask_parties() {
 /// `refused` line unchanged (#1108).
 #[test]
 fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_not_created() {
-    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.";
     let rejected =
         "Tally reported that this post created none of its vouchers: follow each voucher's next step.";
     let summary = |statuses: &[&str]| {
@@ -5312,9 +5312,9 @@ fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_n
 /// refused binding reads so.
 #[test]
 fn a_refused_binding_says_the_book_holds_vouchers_of_the_same_content() {
-    let every = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.";
-    let some = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.";
-    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+    let every = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.";
+    let some = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.";
+    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.";
     // A row is its status, or a content match with whether it counts in the
     // accounts.
     let summary = |state: &str, rows: &[Value]| {

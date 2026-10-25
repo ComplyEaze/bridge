@@ -99,6 +99,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "local_data_report",
         "masters",
         "month_register",
+        "negative_stock",
         "outstandings",
         "profit_and_loss",
         "purchase_register",
@@ -1547,6 +1548,114 @@ fn a_paged_tools_limit_names_no_default_its_handler_does_not_apply() {
                 limit.get("default").is_none(),
                 "{name}: its limit defaults to the configured row limit, so the schema names no default"
             );
+        }
+    }
+}
+
+/// Some rules of `vouchers`, `outstandings` and `parse_bank_statement` are stated only on the
+/// argument they govern, and the tool descriptions no longer repeat them (#1863). Each argument
+/// therefore keeps the phrases below, so shortening one of them cannot silently drop one of these
+/// rules.
+#[test]
+fn the_rules_three_descriptions_leave_to_their_arguments_stay_on_them() {
+    let definitions = tool_definitions(true, true);
+    let tools = definitions.as_array().expect("tool definitions");
+    for (tool, argument, phrases) in [
+        (
+            "vouchers",
+            "snapshot_id",
+            &["on a later page only", "listing_snapshot_changed"][..],
+        ),
+        (
+            "vouchers",
+            "voucher_class",
+            &[
+                "at most one of voucher_class, voucher_type_guid and voucher_type",
+                "matched however the book has renamed its types, child types included",
+            ][..],
+        ),
+        ("vouchers", "voucher_type", &["matched ignoring ASCII case"][..]),
+        ("vouchers", "voucher_type_guid", &["voucher_type_guid_foreign"][..]),
+        (
+            "vouchers",
+            "ledger",
+            &["spelled as in the book or differing only in ASCII case and spaces"][..],
+        ),
+        (
+            "vouchers",
+            "voucher_number",
+            &["exactly this voucher number, ignoring ASCII case and surrounding spaces"][..],
+        ),
+        (
+            "vouchers",
+            "reference",
+            &["exactly this, ignoring ASCII case and surrounding spaces"][..],
+        ),
+        (
+            "vouchers",
+            "narration_contains",
+            &["(at least 3 characters), ignoring letter case, accent composition and runs of spaces"][..],
+        ),
+        (
+            "vouchers",
+            "suspense_tagged",
+            &[
+                "only together with `ledger`",
+                "matched.suspense_tag",
+                "the same text typed by hand matches",
+                "so also read the ledger without this filter",
+                "Refused without `ledger` (search_suspense_tagged_needs_ledger) and where narrations are withheld from the assistant (search_narration_redacted)",
+            ][..],
+        ),
+        (
+            "vouchers",
+            "summarise_by",
+            &[
+                "ledger, month, voucher_type, group or primary_group",
+                "instead of the vouchers, over the same window, selectors and search; offset and limit page the buckets",
+            ][..],
+        ),
+        (
+            "outstandings",
+            "top",
+            &["It ranks parties only; page the bills with offset and limit."][..],
+        ),
+        (
+            "outstandings",
+            "party",
+            &["spelled as in the book or differing only in ASCII case and spaces"][..],
+        ),
+        (
+            "parse_bank_statement",
+            "account_label",
+            &[
+                "prints its number masked (its first and last three digits clear): give the whole number",
+                "only those six clear digits are compared",
+            ][..],
+        ),
+        (
+            "parse_bank_statement",
+            "total_debits",
+            &["A ubi or bob statement prints no totals: omit both"][..],
+        ),
+        (
+            "parse_bank_statement",
+            "password_file",
+            &[
+                "on a Mac it must be yours with group and other permissions off",
+                "on Windows it must be owned by you or Administrators, with no one but you, SYSTEM and Administrators able to read or change it",
+            ][..],
+        ),
+    ] {
+        let pointer = format!("/inputSchema/properties/{argument}/description");
+        let text = tools
+            .iter()
+            .find(|definition| definition["name"] == tool)
+            .and_then(|definition| definition.pointer(&pointer))
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{tool} has no {pointer}"));
+        for phrase in phrases {
+            assert!(text.contains(phrase), "{tool} {argument} lost {phrase:?}");
         }
     }
 }

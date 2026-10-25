@@ -57,6 +57,8 @@ mod headline;
 mod ledger_candidates;
 #[path = "agent_month_register.rs"]
 mod month_register;
+#[path = "agent_negative_stock.rs"]
+mod negative_stock;
 use ledger_candidates::{
     ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
     CatalogueLedger,
@@ -751,6 +753,20 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 limit_master_alter_id: *limit_master_alter_id,
             });
         }
+        if let Some(crate::tally::runtime::NegativeStockReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
@@ -910,6 +926,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         }
         if let Some(crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)) =
             cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        {
+            return Some(reason);
+        }
+        if let Some(negative_stock) = cause
+            .downcast_ref::<bridge_tally_protocol::native_negative_stock::NativeNegativeStockError>()
+        {
+            return Some(negative_stock.code());
+        }
+        if let Some(crate::tally::runtime::NegativeStockReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
         {
             return Some(reason);
         }
@@ -1127,6 +1153,15 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              worst-case stock-item row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
              so no request for stock items was sent. The mark counts masters of every kind, so \
              a company with few stock items may be refused. A larger book refuses; retrying \
+             this call refuses again.",
+        ),
+        // The Negative Stock read's own size refusal (`size` carries the mark).
+        "negative_stock_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
+             so Tally's Negative Stock was not requested. The mark counts masters of every \
+             kind, so a company with few stock items may be refused, and the ceiling is a \
+             stated guess, not a measurement of this report. A larger book refuses; retrying \
              this call refuses again.",
         ),
         // The stock summary read whose rows differ from Tally's own item count
@@ -1947,6 +1982,10 @@ impl ToolFailure {
         }) {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
         }) {
             error.safe_code()
@@ -2586,6 +2625,7 @@ impl Server {
             "local_data_report" => self.local_data_report().map_err(Into::into),
             "masters" => self.masters(args).await,
             "month_register" => self.month_register(args).await,
+            "negative_stock" => self.negative_stock(args).await,
             "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;

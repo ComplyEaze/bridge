@@ -101,6 +101,7 @@ The ordinary default tools, in name order:
 - `local_data_report`
 - `masters`
 - `month_register`
+- `negative_stock`
 - `outstandings`
 - `profit_and_loss`
 - `purchase_register`
@@ -121,7 +122,7 @@ The ordinary default tools, in name order:
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
 release 0.6.0. `audit_test_run` is in the source after release 0.6.0 and is not in a published build yet; it is
-not a default tool: it is listed only when its setting is on (below). `gst_uncertain_vouchers` is in the source after release 0.6.0 and is not in a published build yet. `local_data_report` (also
+not a default tool: it is listed only when its setting is on (below). `gst_uncertain_vouchers` and `negative_stock` are in the source after release 0.6.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -693,6 +694,47 @@ Education mode (`month_register_education_unqualified`); an answer Tally marks a
 empty answer and a book that moved during the read fail the call (`month_register_read_failed` with the
 cause). The Journal Register prints a count of vouchers, not amounts, and is not read; the Receipt and
 Payment Registers have not been captured.
+
+### Negative Stock (`negative_stock`)
+
+Use `negative_stock` with `company_guid`, `from` and `to` for Tally's own Negative Stock list: the
+stock items on that list, each as `item`, `quantity`, `rate` and `value`, in Tally's order. `quantity` is
+`{"state": "read", "amount": ..., "unit": ...}` with the sign Tally sent, or `{"state": "empty"}` or
+`{"state": "unread"}` (text that is not `<number> <unit>`); `rate` and `value` are each
+`{"state": "present", "value": ...}` or `{"state": "empty"}` exactly as Tally printed them, and an empty one
+is not zero. The list is Tally's own and no verdict is added: being listed does not make an item negative
+(on one book Tally also listed items of positive quantity whose closing value was a credit), so read each
+quantity. The rule by which Tally lists an item is not established and is not derived here.
+
+It is **not compared with any other report**: `checks` says `list_complete` and
+`quantities_against_stock_summary` are `not_checked`, so an item Tally did not list is not shown to have a
+quantity of zero or more. A non-empty list is `observed`. An empty answer (Tally answers an empty
+envelope) is returned with `state` `not_established` and `reason`
+`negative_stock_empty_answer_is_not_a_finding`: it cannot be told from a report that was not rendered, so it
+never says that no item is negative. `mask_parties` masks each `item` name.
+
+Measured on synthetic TallyPrime 7.1 Silver books (protocol reference §12a.16): a whole financial year listed
+one item at `-3 Nos` with its rate and value; the same book to 31 May listed it at `-5 Nos`, the quantity as at
+the window's end, with the rate and value present and empty; a book with stock items and none short answered
+an empty envelope. A window that does not start on 1 April, or that runs past the following 31 March, is
+named in `unmeasured_in_this_answer` as `window_other_than_from_1_april_within_one_financial_year`. A
+window starting before the book is `negative_stock_before_books`, a reversed window
+`invalid_date_range`, Education mode `negative_stock_education_unqualified`, and a window the read could
+not build a period for `negative_stock_period_not_honoured`.
+
+Small books only. The report has no size check and its cost on a large book is not known, so the read is
+admitted the way `stock_summary` is: the master-alteration mark (`ALTMSTID`) times the same assumed worst-case row
+(18,296 bytes) must fit 16,000,000 bytes, which admits a mark of at most 874. This ceiling is a stated guess, not a
+measurement of this report, and the mark counts masters of every kind. A larger book is refused before any
+report request as `negative_stock_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
+`limit_bytes` and `limit_master_alter_id`), and retrying refuses again. After a read, the row count and the
+response size are checked against the mark and the admitted size, and a breach refuses the whole read as
+`negative_stock_read_failed` with cause `negative_stock_bound_premise_violated`'s reason, unless the closing extent shows the book moved
+(`negative_stock_extent_changed`). The report is one paired read (two requests), never retried. Any other
+refused answer fails the call as `negative_stock_read_failed` with the specific code in `error.cause`
+(for example `negative_stock_item_duplicated`, `negative_stock_amount_invalid`,
+`negative_stock_tally_reported_failure`, `negative_stock_report_unknown`), as does a report that changed between
+the paired reads (`native_negative_stock_changed`). This tool has not yet been run against Tally.
 
 ### GSTR-1 status of one voucher type (`gst_status`)
 

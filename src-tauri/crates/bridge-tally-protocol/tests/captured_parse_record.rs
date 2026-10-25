@@ -1149,6 +1149,24 @@ const ROWS: &[Row] = &[
         parser: "parse_native_negative_stock",
         parse: |_, text| typed(parse_native_negative_stock(text)),
     },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_negstock_lab_2_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_negstock_lab_2_to_20250531_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
     // Built-in Funds Flow report: src/native_funds_flow_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_funds_flow_probe_b_fy_live.utf16le.xml",

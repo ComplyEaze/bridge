@@ -1857,6 +1857,27 @@ pub(crate) fn row_hash(book: &Book, prefix: &str, entity: &str) -> Result<String
     )))
 }
 
+/// `[tds].goods_carriage_ledgers`, refused unless each is mapped to 194C, as the reference's
+/// `tds_goods_carriage_ledgers` refuses (`tds_payees` and `gst_ledgers_3b` both read it).
+pub(crate) fn goods_carriage_ledgers(cfg: &TdsConfig) -> Result<&BTreeSet<String>> {
+    let bad: Vec<&String> = cfg
+        .goods_carriage_ledgers
+        .iter()
+        .filter(|l| cfg.nature_by_ledger.get(*l).map(String::as_str) != Some("194C"))
+        .collect();
+    if !bad.is_empty() {
+        return Err(AuditError::Config(format!(
+            "[tds].goods_carriage_ledgers lists ledgers not mapped to 194C in \
+[tds].nature_by_ledger: [{}]",
+            bad.iter()
+                .map(|s| crate::support::py_repr_str(s))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )));
+    }
+    Ok(&cfg.goods_carriage_ledgers)
+}
+
 /// Run the test. `entity_type` is `[client].entity_type`; `cfg` is `[tds]`/`[tds_payees]`, bound;
 /// `inputs` is what the reference's pack passes from the other tables.
 #[allow(clippy::too_many_lines)]
@@ -1890,23 +1911,7 @@ pub fn run(
         s194j: s194j_limit,
         s194h: rules.s194h_aggregate_paise,
     };
-    // `[tds].goods_carriage_ledgers` must each be mapped to 194C, as the reference's config
-    // reader refuses otherwise.
-    let bad: Vec<&String> = cfg
-        .goods_carriage_ledgers
-        .iter()
-        .filter(|l| cfg.nature_by_ledger.get(*l).map(String::as_str) != Some("194C"))
-        .collect();
-    if !bad.is_empty() {
-        return Err(AuditError::Config(format!(
-            "[tds].goods_carriage_ledgers lists ledgers not mapped to 194C in \
-[tds].nature_by_ledger: [{}]",
-            bad.iter()
-                .map(|s| crate::support::py_repr_str(s))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )));
-    }
+    goods_carriage_ledgers(cfg)?;
 
     let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
     let pop = book.population()?;

@@ -48,6 +48,8 @@ pub mod entity_269st_gap;
 pub mod error;
 pub mod financial_statements;
 pub mod findings;
+pub mod gst_ledgers_3b;
+pub mod gst_outward_books;
 pub mod high_value_register;
 pub mod invariants;
 pub mod knock_off_candidates;
@@ -231,6 +233,9 @@ pub struct Engagement {
     /// `clause44`-only: its three name locations, bound. Filled by [`Engagement::bind`]; see
     /// [`Clause44Config`].
     pub clause44: Clause44Config,
+    /// `gst_ledgers_3b`-only: its two name locations, bound. Filled by [`Engagement::bind`]; see
+    /// [`GstLedgers3bConfig`].
+    pub gst_ledgers_3b: GstLedgers3bConfig,
     /// The parsed config, kept only so [`Engagement::bind`] can read `[ledger_ids]`/
     /// `[group_ids]` (`binding::bind`) without re-parsing the source text. Not part of this
     /// struct's public contract: a field a caller should read directly (`cash_groups` and the
@@ -412,27 +417,8 @@ impl BookKeepingQualityConfig {
                 .cloned()
                 .collect())
         };
-        let heads = match &self.tax_ledgers {
-            None => return Err(missing("tax_ledgers")),
-            Some(TaxLedgers::NotATable) => {
-                return Err(AuditError::Config(
-                    "book_keeping_quality: [roles].tax_ledgers is not a table".to_string(),
-                ))
-            }
-            Some(TaxLedgers::Heads(heads)) => heads,
-        };
-        let mut tax_ledgers_by_head: BTreeMap<String, String> = BTreeMap::new();
-        for (head, ledgers) in heads {
-            for ledger in ledgers {
-                if let Some(other) = tax_ledgers_by_head.insert(ledger.clone(), head.clone()) {
-                    if other != *head {
-                        return Err(AuditError::Config(format!(
-                            "book_keeping_quality: ledger {ledger:?} is listed under GST heads {other:?} and {head:?}; the reference keeps the one later in the file, which is not known here"
-                        )));
-                    }
-                }
-            }
-        }
+        let tax_ledgers_by_head =
+            tax_ledgers_by_head(self.tax_ledgers.as_ref(), "book_keeping_quality")?;
         let payment_channel_debtors =
             set(&self.payment_channel_debtors, "payment_channel_debtors")?;
         let gst_payment_ledgers = set(&self.gst_payment_ledgers, "gst_payment_ledgers")?;
@@ -464,6 +450,52 @@ impl BookKeepingQualityConfig {
             writeoff_discount_ledgers,
         })
     }
+}
+
+/// `[roles].tax_ledgers` flattened to ledger -> GST head, as the reference's `tax_ledgers_by_head`
+/// flattens it, for `test`: refused when absent or not a table. One divergence, a refusal: a
+/// ledger listed under two different heads. The reference keeps the head that comes last in the
+/// file; the parsed TOML here does not keep the file's order, so which head is last cannot be known.
+fn tax_ledgers_by_head(
+    tax_ledgers: Option<&TaxLedgers>,
+    test: &str,
+) -> Result<BTreeMap<String, String>> {
+    let heads = match tax_ledgers {
+        None => {
+            return Err(AuditError::Config(
+                "client config missing required key 'roles.tax_ledgers'".to_string(),
+            ))
+        }
+        Some(TaxLedgers::NotATable) => {
+            return Err(AuditError::Config(format!(
+                "{test}: [roles].tax_ledgers is not a table"
+            )))
+        }
+        Some(TaxLedgers::Heads(heads)) => heads,
+    };
+    let mut by_head: BTreeMap<String, String> = BTreeMap::new();
+    for (head, ledgers) in heads {
+        for ledger in ledgers {
+            if let Some(other) = by_head.insert(ledger.clone(), head.clone()) {
+                if other != *head {
+                    return Err(AuditError::Config(format!(
+                        "{test}: ledger {ledger:?} is listed under GST heads {other:?} and {head:?}; the reference keeps the one later in the file, which is not known here"
+                    )));
+                }
+            }
+        }
+    }
+    Ok(by_head)
+}
+
+/// `gst_ledgers_3b`'s own name locations, bound by [`Engagement::bind`]; each `None` when absent,
+/// and the test then refuses, as the reference's `role_ledger_set` requires the key.
+#[derive(Debug, Clone, Default)]
+pub struct GstLedgers3bConfig {
+    /// `[roles].payable_ledgers`.
+    pub payable_ledgers: Option<Vec<String>>,
+    /// `[roles].rcm_tax_ledgers`.
+    pub rcm_tax_ledgers: Option<Vec<String>>,
 }
 
 /// `clause44`'s own name locations, bound by [`Engagement::bind`]; empty before binding. The two
@@ -989,6 +1021,7 @@ not YYYY-MM-DD"
             tds,
             book_keeping_quality: BookKeepingQualityConfig::default(),
             clause44: Clause44Config::default(),
+            gst_ledgers_3b: GstLedgers3bConfig::default(),
             client_state: tds_payees::read_client_state(client)?,
             deductor_activity: tds_payees::read_deductor_activity(&cfg)?,
             entity_type: client
@@ -2057,6 +2090,76 @@ pub fn clause44_on(
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
+/// `gst_ledgers_3b`'s inputs from a bound engagement, refused in the order the reference's pack
+/// reads them: `[roles].tax_ledgers`, `.round_off_ledgers`, `.payable_ledgers` (before any test),
+/// `.rcm_tax_ledgers`, the GSTR-3B document, then `[tds].goods_carriage_ledgers` (each mapped to
+/// 194C). An engagement whose `[documents].gstr3b` holds anything but an empty string, or whose
+/// caller loaded a GSTR-3B (`gstr3b_loaded`), is refused: the comparison with it is not ported,
+/// and the reference reads its rows into every month's figures (`gst_ledgers_3b.py:486-498`).
+fn gst_ledgers_3b_inputs(
+    bound: &Engagement,
+    gstr3b_loaded: bool,
+) -> Result<gst_ledgers_3b::Inputs> {
+    let missing =
+        |key: &str| AuditError::Config(format!("client config missing required key 'roles.{key}'"));
+    let tax_ledgers = tax_ledgers_by_head(
+        bound.book_keeping_quality.tax_ledgers.as_ref(),
+        gst_ledgers_3b::TEST_ID,
+    )?;
+    let roles = bound.raw_cfg.get("roles").and_then(toml::Value::as_table);
+    if !roles.is_some_and(|r| r.contains_key("round_off_ledgers")) {
+        return Err(missing("round_off_ledgers"));
+    }
+    let set = |v: &Option<Vec<String>>, key: &str| -> Result<BTreeSet<String>> {
+        Ok(v.as_ref()
+            .ok_or_else(|| missing(key))?
+            .iter()
+            .cloned()
+            .collect())
+    };
+    let payable_ledgers = set(&bound.gst_ledgers_3b.payable_ledgers, "payable_ledgers")?;
+    let rcm_tax_ledgers = set(&bound.gst_ledgers_3b.rcm_tax_ledgers, "rcm_tax_ledgers")?;
+    let named = bound
+        .raw_cfg
+        .get("documents")
+        .and_then(toml::Value::as_table)
+        .and_then(|d| d.get("gstr3b"))
+        .is_some_and(|v| v.as_str() != Some(""));
+    if gstr3b_loaded || named {
+        return Err(AuditError::DocumentNotPorted {
+            test: gst_ledgers_3b::TEST_ID,
+            document: "GSTR-3B",
+        });
+    }
+    let goods_carriage_ledgers = match &bound.tds {
+        None => BTreeSet::new(),
+        Some(tds) => tds_payees::goods_carriage_ledgers(tds)?.clone(),
+    };
+    Ok(gst_ledgers_3b::Inputs {
+        tax_ledgers,
+        payable_ledgers,
+        rcm_tax_ledgers,
+        round_off_ledgers: bound.round_off_ledgers.iter().cloned().collect(),
+        goods_carriage_ledgers,
+    })
+}
+
+/// Run `gst_ledgers_3b` on an already-built book, for an engagement with no GSTR-3B: its
+/// canonical parity dump, with its module check (LEDGER-1 to LEDGER-3). See
+/// `gst_ledgers_3b_inputs` for what is required and refused.
+pub fn gst_ledgers_3b_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+    gstr3b_loaded: bool,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let inputs = gst_ledgers_3b_inputs(&bound, gstr3b_loaded)?;
+    let result = gst_ledgers_3b::run(book, rules, &bound.period, &inputs)?;
+    let module_check = gst_ledgers_3b::check_invariants(book, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
 /// Run `related_parties_cl23` on an already-built book: its canonical parity dump, with its
 /// module check (SUM-1, XCL-1).
 pub fn related_parties_cl23_on(
@@ -2389,5 +2492,123 @@ mod clause44_inputs_tests {
             refused("Composition", "Bank_Charges"),
             ("clause44.money_category_by_ledger", "Bank Int".to_string())
         );
+    }
+}
+
+#[cfg(test)]
+mod gst_ledgers_3b_inputs_tests {
+    use super::*;
+
+    fn bound(roles: &str, tables: &str) -> Result<gst_ledgers_3b::Inputs> {
+        let names = ["Cgst", "Pay", "Rcm", "Round", "Freight"];
+        let book = book::Book {
+            ledgers: names
+                .iter()
+                .map(|n| {
+                    let ledger = book::Ledger {
+                        name: (*n).to_string(),
+                        parent: "Indirect Expenses".to_string(),
+                        chain: vec!["Indirect Expenses".to_string()],
+                        chain_complete: true,
+                        master_opening_paise: 0,
+                        pan: String::new(),
+                        gstin: String::new(),
+                        guid: String::new(),
+                        masterid: None,
+                    };
+                    ((*n).to_string(), ledger)
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let text = format!(
+            "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
+             start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
+             bank_groups = []\n{roles}\n{tables}"
+        );
+        let e = Engagement::from_toml_for_read(&text).unwrap();
+        gst_ledgers_3b_inputs(&e.bind(&book).unwrap().0, false)
+    }
+
+    const ROLES: &str = "tax_ledgers = { cgst = [\"Cgst\"] }\nround_off_ledgers = [\"Round\"]\n\
+                         payable_ledgers = [\"Pay\"]\nrcm_tax_ledgers = [\"Rcm\"]";
+    const TDS: &str = "[tds]\npayee_aliases = {}\ngoods_carriage_ledgers = [\"Freight\"]\n\
+                       [tds.nature_by_ledger]\nFreight = \"194C\"\n";
+
+    /// Each bound role reaches its own input; with no `[tds]` there is no goods-carriage ledger.
+    #[test]
+    fn each_role_reaches_its_own_input() {
+        let set = |n: &str| BTreeSet::from([n.to_string()]);
+        let i = bound(ROLES, TDS).unwrap();
+        assert_eq!(
+            i.tax_ledgers,
+            BTreeMap::from([("Cgst".to_string(), "cgst".to_string())])
+        );
+        assert_eq!(
+            (
+                i.payable_ledgers,
+                i.rcm_tax_ledgers,
+                i.round_off_ledgers,
+                i.goods_carriage_ledgers
+            ),
+            (set("Pay"), set("Rcm"), set("Round"), set("Freight"))
+        );
+        assert!(bound(ROLES, "").unwrap().goods_carriage_ledgers.is_empty());
+    }
+
+    /// The four required keys are refused in the order the reference's pack reads them; a named
+    /// or loaded GSTR-3B is refused with its typed error, an empty name is no document; a
+    /// goods-carriage ledger not mapped to 194C is refused.
+    #[test]
+    fn missing_roles_a_gstr3b_and_an_unmapped_goods_ledger_are_refused() {
+        let lines: Vec<&str> = ROLES.lines().collect();
+        for (n, key) in [
+            "tax_ledgers",
+            "round_off_ledgers",
+            "payable_ledgers",
+            "rcm_tax_ledgers",
+        ]
+        .iter()
+        .enumerate()
+        {
+            match bound(&lines[..n].join("\n"), "").unwrap_err() {
+                AuditError::Config(m) => {
+                    assert_eq!(
+                        m,
+                        format!("client config missing required key 'roles.{key}'")
+                    );
+                }
+                other => panic!("{key}: {other}"),
+            }
+        }
+        let gstr3b = |value: &str| bound(ROLES, &format!("[documents]\ngstr3b = {value}\n"));
+        assert!(matches!(
+            gstr3b("\"gst/3b.xls\""),
+            Err(AuditError::DocumentNotPorted {
+                test: "gst_ledgers_3b",
+                document: "GSTR-3B"
+            })
+        ));
+        assert!(gstr3b("\"\"").is_ok());
+        let book = book::Book::default();
+        let text = "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
+             start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
+             bank_groups = []\ntax_ledgers = {}\nround_off_ledgers = []\npayable_ledgers = []\n\
+             rcm_tax_ledgers = []\n";
+        let e = Engagement::from_toml_for_read(text)
+            .unwrap()
+            .bind(&book)
+            .unwrap()
+            .0;
+        assert!(gst_ledgers_3b_inputs(&e, false).is_ok());
+        assert!(matches!(
+            gst_ledgers_3b_inputs(&e, true),
+            Err(AuditError::DocumentNotPorted { .. })
+        ));
+        let unmapped = TDS.replace("\"194C\"", "\"194I\"");
+        match bound(ROLES, &unmapped).unwrap_err() {
+            AuditError::Config(m) => assert!(m.contains("not mapped to 194C"), "{m}"),
+            other => panic!("{other}"),
+        }
     }
 }

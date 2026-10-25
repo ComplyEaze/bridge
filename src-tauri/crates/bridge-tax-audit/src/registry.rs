@@ -148,6 +148,15 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, c| crate::financial_statements_on(e, b, r, c.report_totals.as_ref()),
     },
     PortedTest {
+        id: "gst_ledgers_3b",
+        // 34 fixed figures and 11 a month with no tax or RCM ledger set: 45 for a one-month period.
+        min_figures: 45,
+        run_on: |e, b, r, c| {
+            let gstr3b = c.named_documents.contains(&CallerNamedDocument::Gstr3b);
+            crate::gst_ledgers_3b_on(e, b, r, gstr3b)
+        },
+    },
+    PortedTest {
         id: "high_value_register",
         // 38 on any book: no row figures, no statement and an unknown recipient type.
         min_figures: 38,

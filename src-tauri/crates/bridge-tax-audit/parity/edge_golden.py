@@ -87,7 +87,10 @@ a negative one from the end, which the Rust `usize` cannot express, so both side
 reference's own `tae.config.depreciation_config` requires it, and `put_to_use_by_voucher` ({voucher GUID: ISO date},
 default none: the reference's pack passes none, but `run()` takes them); and for
 `narration_payees`: `narration_payee_ledgers` (a list of text, default []), `bank` (also passed to the
-module invariant) and the keys `tds_payees` reads, whose result gives the 194C ledgers it adds.
+module invariant) and the keys `tds_payees` reads, whose result gives the 194C ledgers it adds; and for
+`gst_ledgers_3b`: `gst_ledgers_3b` ({tax_ledgers?: {head: [ledger, ...]}, round_off_ledgers?, payable_ledgers?,
+rcm_tax_ledgers?, goods_carriage_ledgers?}, each default empty, the four roles read through the reference's own
+`tae.config` readers, as for `clause44`), with no GSTR-3B or GSTR-1 rows: the crate ports that case only.
 """
 from __future__ import annotations
 
@@ -110,7 +113,7 @@ def main() -> int:
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
     from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined, cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
-                                 creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
+                                 creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements, gst_ledgers_3b, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
     from tae.config import load_rules, related_parties_config
@@ -231,6 +234,19 @@ def main() -> int:
             eng, rules, tc.depreciation_config(cfg)[2], tc.gst_registration_type_by_ledger(cfg), tc.tax_ledgers_by_head(cfg),
             tc.role_ledger_set(cfg, "no_supplier_expense_ledgers"), tc.role_ledger_set(cfg, "round_off_ledgers"),
             tc.clause44_money_category_by_ledger(cfg))
+
+    def gst_ledgers_3b_run():
+        # As tae/pack.py passes them for an engagement with no GSTR-3B document, each role through the reference's own
+        # reader from a client config built out of the spec's keys (each default empty), and the goods-carriage ledgers
+        # as given; no GSTR-3B or GSTR-1 rows.
+        from tae import config as tc
+        g = spec.get("gst_ledgers_3b", {})
+        cfg = {"roles": {"tax_ledgers": g.get("tax_ledgers", {}),
+                         **{k: g.get(k, []) for k in ("round_off_ledgers", "payable_ledgers", "rcm_tax_ledgers")}}}
+        return gst_ledgers_3b, gst_ledgers_3b.run(
+            eng, rules, tc.tax_ledgers_by_head(cfg), tc.role_ledger_set(cfg, "payable_ledgers"),
+            tc.role_ledger_set(cfg, "rcm_tax_ledgers"), tc.role_ledger_set(cfg, "round_off_ledgers"), [], [], [],
+            goods_carriage_ledgers=frozenset(g.get("goods_carriage_ledgers", [])))
 
     def loans_interest_run():
         # The switch is a module global the reference's run() and check_invariants() both read; the
@@ -480,6 +496,7 @@ def main() -> int:
             round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])))),
         # As tests/edge_books.rs runs it: no partners' interest ledgers and no report totals.
         "financial_statements": lambda: (financial_statements, financial_statements.run(eng, rules)),
+        "gst_ledgers_3b": gst_ledgers_3b_run,
         "high_value_register": high_value_register_run,
         "knock_off_candidates": knock_off_candidates_run,
         "ledger_scrutiny": lambda: (ledger_scrutiny, ledger_scrutiny.run(eng, rules, cash)),

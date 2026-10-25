@@ -33,7 +33,7 @@ use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
     cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
-    creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements,
+    creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements, gst_ledgers_3b,
     high_value_register, knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees,
     partners_40b_194t, party_identity, party_monthly, questionnaire_cl13, read_scope,
     related_parties_cl23, specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock,
@@ -644,6 +644,29 @@ fn clause44_inputs(s: &Value) -> clause44::Inputs {
     }
 }
 
+/// `gst_ledgers_3b`'s inputs from the spec's `gst_ledgers_3b` table, as `parity/edge_golden.py`
+/// passes them: every key optional and empty when absent, `tax_ledgers` flattened to ledger -> head.
+fn gst_ledgers_3b_inputs(s: &Value) -> gst_ledgers_3b::Inputs {
+    let g = &s["gst_ledgers_3b"];
+    let set = |k: &str| strs(&g[k]).into_iter().collect();
+    let mut tax_ledgers = BTreeMap::new();
+    for (head, ledgers) in g["tax_ledgers"].as_object().into_iter().flatten() {
+        for ledger in strs(ledgers) {
+            assert!(
+                tax_ledgers.insert(ledger, head.clone()).is_none(),
+                "an edge book lists a ledger under one GST head only"
+            );
+        }
+    }
+    gst_ledgers_3b::Inputs {
+        tax_ledgers,
+        payable_ledgers: set("payable_ledgers"),
+        rcm_tax_ledgers: set("rcm_tax_ledgers"),
+        round_off_ledgers: set("round_off_ledgers"),
+        goods_carriage_ledgers: set("goods_carriage_ledgers"),
+    }
+}
+
 /// `book_keeping_quality`'s inputs from the spec's `book_keeping_quality` table, as
 /// `parity/edge_golden.py` passes them: every key optional and empty when absent, `tax_ledgers`
 /// flattened to ledger -> head.
@@ -818,6 +841,12 @@ fn check(name: &str) {
                 )));
                 assert_eq!(order, want, "{name}: trial_balance row order");
                 let c = trial_balance::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "gst_ledgers_3b" => {
+                let inputs = gst_ledgers_3b_inputs(&s);
+                let r = gst_ledgers_3b::run(&book, &rules, &period(&s), &inputs).unwrap();
+                let c = gst_ledgers_3b::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
             "clause44" => {
@@ -1304,7 +1333,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 31] = [
+const EDGE_TESTS: [&str; 32] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1318,6 +1347,7 @@ const EDGE_TESTS: [&str; 31] = [
     "depreciation",
     "entity_269st_gap",
     "financial_statements",
+    "gst_ledgers_3b",
     "high_value_register",
     "knock_off_candidates",
     "ledger_scrutiny",

@@ -73,7 +73,7 @@ test("anything but a clear accepted keeps the app closed", async () => {
 });
 
 test("a failed check can be tried again", async () => {
-  const loadStatus = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(open);
+  const loadStatus = vi.fn().mockRejectedValueOnce(new Error("the check failed")).mockResolvedValue(open);
   await mount({ loadStatus });
   expect(text()).not.toContain("The Bridge app");
   await act(async () => button("Try again").click());

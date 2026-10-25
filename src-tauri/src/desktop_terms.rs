@@ -106,7 +106,11 @@ impl DesktopTerms {
                 Ok(self.snapshot())
             }
             Err(_) => {
-                *gate = TermsGate::Required(TermsState::RecordUnavailable);
+                // A write that failed does not close a gate another instance's acceptance has
+                // just opened (a concurrent status() re-read can have seen it).
+                if *gate != TermsGate::Required(TermsState::Accepted) {
+                    *gate = TermsGate::Required(TermsState::RecordUnavailable);
+                }
                 Err(AcceptRefusal::RecordUnavailable)
             }
         }

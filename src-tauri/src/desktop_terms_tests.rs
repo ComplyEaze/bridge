@@ -157,7 +157,23 @@ fn a_record_that_cannot_be_read_or_written_refuses_and_says_so() {
         terms.accept(TERMS_VERSION),
         Err(AcceptRefusal::RecordUnavailable)
     );
-    assert_ne!(terms.refusal(), None);
+    assert_eq!(terms.refusal(), Some("terms_record_unavailable"));
+}
+
+#[test]
+fn a_failed_write_does_not_close_a_gate_that_is_already_open() {
+    let parent = tempfile::tempdir().unwrap();
+    let folder = parent.path().join("data");
+    let terms = DesktopTerms::new(folder.clone());
+    terms.accept(TERMS_VERSION).unwrap();
+    // The folder is replaced by a file, so a second acceptance cannot be written or read.
+    std::fs::remove_dir_all(&folder).unwrap();
+    std::fs::write(&folder, "not a folder").unwrap();
+    assert_eq!(
+        terms.accept(TERMS_VERSION),
+        Err(AcceptRefusal::RecordUnavailable)
+    );
+    assert_eq!(terms.refusal(), None, "an open gate stays open");
 }
 
 #[test]

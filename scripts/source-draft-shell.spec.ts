@@ -63,3 +63,19 @@ test("local proposals survive shell navigation and save without source or Tally 
   await expect(page.getByLabel("Preparation notes", { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("narrow.png"), fullPage: true });
 });
+
+// The Terms of Use come first: until the backend says they are accepted the shell is not shown.
+test("the shell is not shown until the Terms of Use are accepted", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__TAURI_INTERNALS__ = {
+      invoke: async (command: string) => {
+        if (command === "desktop_terms_status") return { terms_version: "2026-10.1", state: "not_accepted", accepted: false };
+        return [];
+      },
+    } as typeof window.__TAURI_INTERNALS__;
+  });
+  await page.goto("/");
+  await expect(page.getByLabel("I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Prepare file", exact: true })).toHaveCount(0);
+});

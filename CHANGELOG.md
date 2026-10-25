@@ -152,6 +152,15 @@ These changes are in source and not yet in a published build.
   refused before the report is asked for (a stated guess, as for `stock_summary`), and the cost on a large book is not known. Not yet run
   against Tally.
 
+- The `outstandings` party detail now reads the company's two change marks before the statement of open bills and again after
+  the voucher window, and refuses (`voucher_window_changed_during_read`, the same refusal and next step as every read
+  that brackets the book) when either moved. Before, the statement, the ledger catalogue and the vouchers were tied by the
+  party's spelling with nothing checking that the book was the same between them, so a ledger renamed in Tally between two of
+  those reads could answer as a finding (for example no bill for the party). It adds two small reads, and any voucher or
+  master edit in Tally during the call refuses it; run the same request again once. A change that moves neither mark is not
+  seen. Measured: a rename moves the master mark and a voucher edit moves the voucher mark (TallyPrime 7.1 Silver, 21
+  Sep 2026); this read has not been run against Tally.
+
 ## [0.6.0] - 2026-10-16
 
 ### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)

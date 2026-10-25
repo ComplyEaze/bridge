@@ -3471,9 +3471,14 @@ the response size refusal (`agent_response_too_large`) instead. A reference neit
 nor Tally's report know for the party is refused (`bill_reference_not_found`). The detail ignores
 `direction`, `top`, `offset` and `limit`; `window.company_vouchers_read` counts the company's
 vouchers in the window, not the party's. A named bill's window never starts before the books.
-The vouchers and the bills reports are two reads whose extents are not compared: a voucher posted
-between them usually shows as `trail_does_not_tie`, but two changes that compensate, or
-allocations that net to zero, can still read `tied`. Measured on one synthetic book only
+The company's two change marks are read before the statement of open bills and again after the
+voucher window, and a detail whose marks moved between them is refused as
+`voucher_window_changed_during_read` (a voucher entered or saved, a ledger renamed, or a report
+that raises a mark; an export raised the voucher mark by 3 once): the bills, the ledger catalogue
+and the vouchers are tied by the party's spelling, so a rename between those reads would have
+tied different ledgers. It costs two small reads, and any edit in Tally during the call refuses
+it, so run it again once. A change that moves neither mark is not seen, and allocations that net
+to zero can still read `tied`. The three reads are not otherwise compared. Measured on one synthetic book only
 (reference 12a.14); a second synthetic book (captures of 9 October 2026) also showed an `as_of`
 earlier than the last voucher, a post-dated voucher and an advance later adjusted by an invoice
 reading as Tally's own screen does, bill for bill. Not measured: a client book, an opening bill with

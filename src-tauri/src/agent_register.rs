@@ -547,7 +547,7 @@ fn mark_register_side_item(mut item: Value) -> Value {
 /// The window was planned against the marks the masters were read under; the marks read after
 /// it must be those marks, or the book moved while the window was read. (An undivided window
 /// read reports no marks of its own, so this closing read is the check.)
-fn window_drift(pinned: CompanyMarks, closing: CompanyMarks) -> Option<&'static str> {
+pub(super) fn window_drift(pinned: CompanyMarks, closing: CompanyMarks) -> Option<&'static str> {
     (closing != pinned).then_some("voucher_window_changed_during_read")
 }
 

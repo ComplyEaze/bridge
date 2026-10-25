@@ -40,6 +40,20 @@ impl Server {
             result_evidence = combine_evidence(result_evidence.clone(), evidence_from_runtime_read(currency.evidence()));
             let assertion = currency.admit_inr_classified().map_err(str::to_string)?;
             let as_of_date = to.clone();
+            // The party detail ties the statement's bills to the ledger catalogue and the
+            // vouchers read after it, by the party's spelling. A rename between those reads
+            // would tie different spellings and answer as a finding, so the company's marks are
+            // read before the first of them and again after the last.
+            let detail_marks = match (&detail_request, &party_argument) {
+                (Some(_), Some(_)) => {
+                    let (marks, evidence) = self
+                        .read_company_marks_once(&identity, &company.name)
+                        .await?;
+                    result_evidence = combine_evidence(result_evidence.clone(), evidence);
+                    Some(marks)
+                }
+                _ => None,
+            };
             let (load, outstandings_evidence) = self
                 .runtime
                 .fetch_agent_outstandings_with_evidence(
@@ -111,7 +125,9 @@ impl Server {
                     ..
                 } => {
                     let mut detail = None;
-                    if let (Some(kind), Some(party)) = (detail_request, &party_argument) {
+                    if let (Some(kind), Some(party), Some(opening)) =
+                        (detail_request, &party_argument, detail_marks)
+                    {
                         let (value, detail_evidence) = self
                             .outstandings_detail(
                                 &identity,
@@ -122,6 +138,7 @@ impl Server {
                                 reference_argument.as_deref(),
                                 &statement_open_bills,
                                 &statement_unallocated_by_party,
+                                opening,
                             )
                             .await?;
                         result_evidence = combine_evidence(result_evidence.clone(), detail_evidence);

@@ -66,7 +66,7 @@ import { relative, resolve } from "node:path";
 
 const scriptRoot = fileURLToPath(new URL("../", import.meta.url));
 
-export const SOURCE_ROOTS = ["src-tauri/src", "src-tauri/crates", "tools"];
+export const SOURCE_ROOTS = ["src-tauri/src", "src-tauri/crates"];
 // The method form; its argument must start `&mut` (see 1. above).
 const METHOD_READ = /\.\s*read_to_(?:end|string)\s*\(/g;
 // The qualified form; quick_xml's `Reader::read_to_end` is not `Read::`.

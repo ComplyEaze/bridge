@@ -59,7 +59,9 @@ $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
 if (-not (Test-Path -LiteralPath $OutDir)) { New-Item -ItemType Directory -Path $OutDir | Out-Null }
 $outFile = Join-Path $OutDir "$Case.stdout.txt"
 if (Test-Path -LiteralPath $outFile) { throw "STOP: $outFile exists already; use a new -OutDir" }
-$cmd = '"{0}" --confirm-journal < "{1}" > "{2}"' -f $Exe, $file, $outFile
+$errFile = Join-Path $OutDir "$Case.stderr.txt"
+if (Test-Path -LiteralPath $errFile) { throw "STOP: $errFile exists already; use a new -OutDir" }
+$cmd = '"{0}" --confirm-journal < "{1}" > "{2}" 2> "{3}"' -f $Exe, $file, $outFile, $errFile
 Write-Host "case=$Case exe_sha256=$exeHash"
 Write-Host "screen=$($bounds.Width)x$($bounds.Height) workarea=$($wa.Width)x$($wa.Height) at ($($wa.X),$($wa.Y)) (physical pixels)"
 Write-Host "command: cmd.exe /s /c `"$cmd`""
@@ -88,3 +90,6 @@ Write-Host "cmd exit=$($p.ExitCode) after $($clock.ElapsedMilliseconds) ms from 
 $bytes = [System.IO.File]::ReadAllBytes($outFile)
 Write-Host "stdout file=$outFile bytes=$($bytes.Length) sha256=$((Get-FileHash -Algorithm SHA256 -LiteralPath $outFile).Hash.ToLower())"
 Write-Host ("stdout text: [" + [System.Text.Encoding]::UTF8.GetString($bytes).TrimEnd() + "]")
+$errText = [System.IO.File]::ReadAllText($errFile).TrimEnd()
+Write-Host "stderr file=$errFile bytes=$((Get-Item -LiteralPath $errFile).Length) sha256=$((Get-FileHash -Algorithm SHA256 -LiteralPath $errFile).Hash.ToLower())"
+Write-Host ("stderr text: [" + $errText + "] (the box-fit line: the box and the work area the product compared, and fits=true or false)")

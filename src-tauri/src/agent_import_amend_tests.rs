@@ -1417,9 +1417,22 @@ fn an_amendment_reads_verified_only_once_the_pinned_voucher_was_altered() {
         )
         .unwrap()
     };
-    // Control: no pins (an ordinary batch) reads as before.
-    let control = verify(&amendment, book_before.clone());
+    // Control: a build that is not an amendment holds no pins and reads as before.
+    let control = verify(&original, book_row(&original));
     assert_eq!(control["counts"]["posted_verified"], 1, "{control}");
+    // An amendment built before the pins existed holds none: it fails closed,
+    // and the next step is to build it again.
+    let pre_pins = verify(&amendment, book_before.clone());
+    assert_eq!(
+        pre_pins["vouchers"][0]["status"], "matching_content_observed",
+        "{pre_pins}"
+    );
+    assert_eq!(pre_pins["vouchers"][0]["reason"], "amendment_not_pinned");
+    assert!(pre_pins["vouchers"][0]["next_step"]
+        .as_str()
+        .unwrap()
+        .contains("build the amendment again with this release"));
+    assert_eq!(pre_pins["counts"]["posted_verified"], 0);
     // The pin is what the build saw in the book: GUID, MasterID, ALTERID 40.
     let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
     let admitted = lineage
@@ -1466,8 +1479,8 @@ fn an_amendment_reads_verified_only_once_the_pinned_voucher_was_altered() {
     );
     assert_eq!(other["counts"]["posted_verified"], 0);
     // A restore removed the voucher and it was keyed again: it takes the removed
-    // one's GUID, MasterID and ALTERID (protocol reference 9.15), so it reads at
-    // or below the pin and is not verified...
+    // one's GUID and MasterID (protocol reference 9.15) and the book's next
+    // ALTERID. At or below the pin it is not verified...
     for (alter_id, reason) in [
         (40, "amendment_not_applied"),
         (39, "voucher_not_the_one_amended"),
@@ -1478,8 +1491,8 @@ fn an_amendment_reads_verified_only_once_the_pinned_voucher_was_altered() {
         assert_eq!(read["vouchers"][0]["reason"], reason, "{read}");
         assert_eq!(read["counts"]["posted_verified"], 0);
     }
-    // ...until something alters it past the pin: then the identity cannot tell
-    // it from the amended voucher, and it reads verified (a stated limit).
+    // ...but past the pin the identity cannot tell it from the amended voucher,
+    // and it reads verified (a stated limit).
     let mut keyed_and_saved = book_before.clone();
     keyed_and_saved.alter_id = Some(42);
     let read = verify(&amendment, keyed_and_saved);

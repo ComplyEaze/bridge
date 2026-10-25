@@ -62,7 +62,8 @@ pub(super) enum SincePin {
     /// the build, by this amendment's import or by anything else.
     Altered,
     /// The same GUID and MasterID with the ALTERID where the build saw it: not
-    /// altered since, so the amendment has not been applied.
+    /// altered since. Read as not applied; an upsert that changes nothing may
+    /// leave the ALTERID where it was (not measured), and that too fails closed.
     Unaltered,
     /// Another GUID or MasterID, an ALTERID before the pin, or one of them
     /// missing: not the voucher the build observed.

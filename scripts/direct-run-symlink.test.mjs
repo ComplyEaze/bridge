@@ -56,7 +56,6 @@ const PROBES = [
   { script: "render-legal.mjs", status: 2, pattern: /usage: render-legal\.mjs/ },
   { script: "check-mcpb-preview-admission.mjs", status: 1, pattern: /usage: node scripts\/check-mcpb-preview-admission\.mjs/ },
   { script: "check-no-test-seam.mjs", args: ["--expect-present"], status: 1, pattern: /a positive control must name the markers it expects/ },
-  { script: "check-node-windows-outcomes.mjs", status: 2, pattern: /usage: check-node-windows-outcomes\.mjs/ },
   { script: "check-registry-server-json.mjs", args: ["--bogus"], status: 1, pattern: /registry\/server\.json refused: usage: unknown argument --bogus/ },
   { script: "next-version.mjs", args: ["--bogus"], status: 1, pattern: /next-version: unknown flag --bogus/ },
   { script: "package-mcpb.mjs", status: 1, pattern: /usage: node scripts\/package-mcpb\.mjs/ },

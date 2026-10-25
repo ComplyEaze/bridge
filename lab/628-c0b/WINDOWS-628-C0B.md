@@ -33,7 +33,7 @@ Working folder `C:\bridge-lab\628\c0b\`, evidence `C:\bridge-lab\628\c0b\evidenc
 10. Direct call: `gst_status` with `company_guid`, `from` 2025-12-01, `to` 2025-12-31, `voucher_type_name` `Purchase`. RECORD every voucher's `gst_status` and `accepted_as_it_stands` (K1, K2 and K3 in particular) and the window's counts.
 11. MARKS -> `ans-c0b-marks-3.xml`. EXPECT both marks equal to step 8's (the calls wrote nothing; any change = FINDING of the first rank, and nothing more is sent). Then LAB-COMMON C10. The book keeps every voucher (no restore: GS1-L1's book is kept for the issue 628 sequence).
 
-## What is recorded (nothing here is judged at the lab; GS2 parses the recorded answers against issue 1904)
+## What is recorded (nothing here is judged at the lab; the requester parses the recorded answers against issue 1904)
 - From step 9's rows: which of C0's Purchase, K1, K2 and K3 are rows or side items, and with which reference, party and party GSTIN; the register's state.
 - From the relay's recording of step 9: the voucher-window answers whole (every voucher type of the window is in them, the Journal and the Payment included), with bytes and sha256 per message, as `manifest.tsv` lists them.
 - From step 10: the GST status of the copies.

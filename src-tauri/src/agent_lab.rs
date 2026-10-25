@@ -1001,9 +1001,12 @@ fn key_probe_result(
                 "cancelled": optional_field(row, "ISCANCELLED"),
                 "optional": optional_field(row, "ISOPTIONAL"),
                 "remote_id": optional_field(row, "BRIDGEREMOTEID"),
-                "remote_id_equals_key": remote_id == Some(key.as_str()),
-                "remote_id_equals_guid": remote_id.is_some()
-                    && remote_id == row.get("GUID").map(|guid| guid.trim()),
+                "remote_id_equals_key": remote_id
+                    .is_some_and(|remote_id| remote_id.eq_ignore_ascii_case(key.as_str())),
+                "remote_id_equals_guid": remote_id.is_some_and(|remote_id| {
+                    row.get("GUID")
+                        .is_some_and(|guid| guid.trim().eq_ignore_ascii_case(remote_id))
+                }),
             })
         })
         .collect::<Vec<_>>();
@@ -1018,6 +1021,17 @@ fn key_probe_result(
     })
 }
 
+/// The probe reads only `BRIDGE_LAB_TARGET_GUID`'s company: a request shape
+/// not yet observed is sent to the book the lab set aside for it, never to
+/// another company loaded on the lab's port.
+fn probe_target_admitted(config: &LabGuardConfig, company_guid: &str) -> Result<(), String> {
+    company_guid
+        .trim()
+        .eq_ignore_ascii_case(&config.target_guid)
+        .then_some(())
+        .ok_or_else(|| "lab_probe_company_not_target".to_string())
+}
+
 /// The vouchers a probe answer lists; the count covers them all.
 const KEY_PROBE_LISTED: usize = 20;
 
@@ -1029,9 +1043,10 @@ pub(super) async fn lab_voucher_key_probe(
     let day = normalized_date(required_string(args, "date")?)?;
     let term = ProbeTerm::parse(required_string(args, "term")?)?;
     let key = ProbeKey::new(required_string(args, "key")?)?;
-    // A read, like `lab_read_inventory`: the always-on lab preconditions, and
-    // the company verified like any other read.
-    require_lab_read_guards(server)?;
+    // A read, with the always-on lab preconditions; unlike `lab_read_inventory`
+    // it reads only the lab's target company, since its request is a new shape.
+    let config = require_lab_read_guards(server)?;
+    probe_target_admitted(&config, guid)?;
     let (company, identity, evidence) = server.verified_company(guid).await?;
     let request = lab_voucher_key_probe_read(identity.display_name(), &day, term, &key)
         .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
@@ -2064,5 +2079,19 @@ mod tests {
         assert_eq!(empty["term"], "remote_id");
         assert_eq!(empty["key"], PROBE_REMOTE_ID);
         assert_eq!(empty["date"], "20250410");
+    }
+
+    #[test]
+    fn the_key_probe_reads_only_the_lab_target_company() {
+        let config = LabGuardConfig::from_values(TARGET_GUID, "").unwrap();
+        assert_eq!(probe_target_admitted(&config, TARGET_GUID), Ok(()));
+        assert_eq!(
+            probe_target_admitted(&config, &TARGET_GUID.to_ascii_uppercase()),
+            Ok(())
+        );
+        assert_eq!(
+            probe_target_admitted(&config, DENY_GUID_1),
+            Err("lab_probe_company_not_target".to_string())
+        );
     }
 }

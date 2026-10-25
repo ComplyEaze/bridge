@@ -20,10 +20,7 @@ static ITEM: LazyLock<LedgerCreateItem> = LazyLock::new(|| item("Brand New Party
 static COMPANY: LazyLock<VerifiedCompanyIdentity> =
     LazyLock::new(|| VerifiedCompanyIdentity::test_fixture(NAME, GUID));
 static OTHER_COMPANY: LazyLock<VerifiedCompanyIdentity> = LazyLock::new(|| {
-    VerifiedCompanyIdentity::test_fixture(
-        "Some Other Company",
-        crate::synthetic_guid(0x1111),
-    )
+    VerifiedCompanyIdentity::test_fixture("Some Other Company", crate::synthetic_guid(0x1111))
 });
 
 fn marks(masters: u64) -> String {

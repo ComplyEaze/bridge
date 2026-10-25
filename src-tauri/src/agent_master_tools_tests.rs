@@ -2002,8 +2002,7 @@ fn record_intent_for_test(server: &Server, batch: &MasterBatch) {
 /// As [`record_intent_for_test`], for the journal in `dir`.
 fn record_intent_in(dir: &std::path::Path, batch: &MasterBatch) {
     let lock = ExclusiveAdmission::acquire(dir).unwrap();
-    let pre_image =
-        PreImage::new([(crate::synthetic_guid(0xbbbb).to_string(), 1)]).unwrap();
+    let pre_image = PreImage::new([(crate::synthetic_guid(0xbbbb).to_string(), 1)]).unwrap();
     let written = write_pre_image(dir, &lock, batch, &pre_image).unwrap();
     let intent = MasterDispatchIntent::new(
         batch,
@@ -2120,8 +2119,7 @@ async fn an_intent_recorded_while_the_dialog_is_open_stops_the_post() {
     let rival = batch.clone();
     let scripted = ScriptedApproval::approving_after(move || {
         let lock = ExclusiveAdmission::acquire(&data_dir).unwrap();
-        let pre_image =
-            PreImage::new([(crate::synthetic_guid(0xbbbb).to_string(), 1)]).unwrap();
+        let pre_image = PreImage::new([(crate::synthetic_guid(0xbbbb).to_string(), 1)]).unwrap();
         let written = write_pre_image(&data_dir, &lock, &rival, &pre_image).unwrap();
         let intent = MasterDispatchIntent::new(
             &rival,
@@ -2189,8 +2187,7 @@ fn dispatched_batch_in(dir: &std::path::Path, name: &str, company_guid: &str) ->
     };
     let lock = ExclusiveAdmission::acquire(dir).unwrap();
     append(dir, &lock, MasterRecord::Batch(batch.clone())).unwrap();
-    let pre_image =
-        PreImage::new([(crate::synthetic_guid(0xbbbb).to_string(), 1)]).unwrap();
+    let pre_image = PreImage::new([(crate::synthetic_guid(0xbbbb).to_string(), 1)]).unwrap();
     let written = write_pre_image(dir, &lock, &batch, &pre_image).unwrap();
     let intent = MasterDispatchIntent::new(
         &batch,

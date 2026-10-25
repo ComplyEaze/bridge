@@ -632,9 +632,7 @@ fn another_companys_mark_moving_is_located_elsewhere_whatever_else_holds() {
 #[test]
 fn a_company_loaded_or_unloaded_across_the_post_is_a_doubt() {
     let mut added = World::clean(suspense());
-    added
-        .marks()
-        .push(mark(crate::synthetic_guid(0x3333), 1));
+    added.marks().push(mark(crate::synthetic_guid(0x3333), 1));
     let judgement = added.judge();
     assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
     assert!(judgement.reasons.contains(&"company_scope_changed"));
@@ -882,9 +880,12 @@ fn a_name_present_under_either_fold_forbids_confirmed_absent() {
         .push(master(MasterKind::Group, new_ledger(), 11, &[NAME]));
     assert_ne!(group.judge().state, MasterVerdictState::ConfirmedAbsent);
     let mut alias = World::untouched(suspense());
-    alias
-        .masters()
-        .push(master(MasterKind::Ledger, new_ledger(), 11, &["Other", NAME]));
+    alias.masters().push(master(
+        MasterKind::Ledger,
+        new_ledger(),
+        11,
+        &["Other", NAME],
+    ));
     assert_ne!(alias.judge().state, MasterVerdictState::ConfirmedAbsent);
 }
 
@@ -1134,8 +1135,12 @@ fn the_name_absent_fact_follows_the_index_whatever_the_moment_or_the_marks() {
     }
     // A name present under another spelling is a collision, not an absence.
     let mut twin = World::untouched(suspense());
-    twin.masters()
-        .push(master(MasterKind::Ledger, new_ledger(), 11, &["zeta test ledger"]));
+    twin.masters().push(master(
+        MasterKind::Ledger,
+        new_ledger(),
+        11,
+        &["zeta test ledger"],
+    ));
     assert!(!twin.judge().name_absent_in_read_book);
 }
 

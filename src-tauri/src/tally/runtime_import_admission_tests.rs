@@ -1028,11 +1028,7 @@ async fn a_master_post_with_the_voucher_licence_sends_nothing() {
 #[tokio::test]
 async fn a_recorded_intent_of_another_batch_or_other_bytes_sends_nothing() {
     for (case, bound, sha_of_request) in [
-        (
-            "another batch",
-            Some(crate::synthetic_batch_id(0xb2)),
-            true,
-        ),
+        ("another batch", Some(crate::synthetic_batch_id(0xb2)), true),
         ("other bytes", Some(master_batch()), false),
         ("no batch", None, true),
     ] {
@@ -1194,10 +1190,8 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
 async fn a_master_post_for_another_company_is_refused_before_any_request() {
     use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem, MasterName};
     let companies = captured_companies();
-    let other = VerifiedCompanyIdentity::test_fixture(
-        "Some Other Company",
-        crate::synthetic_guid(0x1111),
-    );
+    let other =
+        VerifiedCompanyIdentity::test_fixture("Some Other Company", crate::synthetic_guid(0x1111));
     let approved = ApprovedImport::approved_masters_for_test(
         LedgerCreateItem::new(
             MasterName::new("Queue Test Suspense").unwrap(),

@@ -1,4 +1,3 @@
 8583f98d0d191e384402fbdb1c5d4f13e049f1271ec5321d30e0096bc74d4ed5  1746  v01-vouchers-wildcard.xml
-da23e071378703da5f67055c18c6e572b43bc13df13c03721c53d4d9c0662f79  1766  v02-vouchers-named-no-allocations.xml
-444f3dbcafe7105877f78a8077fae035d55d89c6268354a7ee0a575f943e8b35  1836  v03-vouchers-named-with-allocations.xml
+dadfa88e54771561f7e976451dfd78ca9d9a0ce92010a52d089468cafb079c5a  2954  a01-vouchers-audit-profile.xml
 14d28341b0aa8993e9105d892afe72646181e1d21d7f172e7a7bc925cbaf574e  1442  c01-census-unspanned.xml

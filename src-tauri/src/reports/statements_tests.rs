@@ -1119,6 +1119,30 @@ fn a_stock_book_whose_figure_does_not_close_every_gap_names_the_lines() {
     assert_eq!(lines, &vec!["Cost of Sales :".to_string()]);
 }
 
+/// The Profit and Loss of `BRIDGE TIEOUT D` (a book with opening stock and a matching capital entry),
+/// as Tally answered it, for the year and for 1 October to 31 March.
+const OPENING_STOCK_BOOK_YEAR: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml"
+);
+const OPENING_STOCK_BOOK_OCT_MAR: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml"
+);
+
+#[test]
+fn a_captured_book_with_opening_stock_is_declined_by_its_opening_stock_line() {
+    // Real bytes, not a mutation: the year (read before the October sale) carries Opening Stock
+    // -1000.00 and Closing Stock -2640.00; the second half-year carries -2640.00 and -2040.00. The slice is for a book whose
+    // Opening Stock Tally shows empty, so both decline, and the reason is the opening stock.
+    for bytes in [OPENING_STOCK_BOOK_YEAR, OPENING_STOCK_BOOK_OCT_MAR] {
+        let statement =
+            parse_native_statement(NativeStatementKind::ProfitAndLoss, &utf16(bytes)).unwrap();
+        assert_eq!(
+            TallyClosingStock::from_profit_and_loss(&statement),
+            Err(ClosingStockDeclined::OpeningStockNotShownEmpty)
+        );
+    }
+}
+
 #[test]
 fn a_closing_stock_not_as_captured_is_declined_by_its_shape() {
     // synthetic mutation: opening stock carrying an amount.

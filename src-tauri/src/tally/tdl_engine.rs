@@ -69,8 +69,7 @@ fn legacy_company_list_request() -> String {
     .to_string()
 }
 
-/// No production path sends this: the live-read tool renders `ledgers_v1`
-/// through `ReadOnlyProfile::LedgersV1`. It compiles only for the tests below
+/// No production path sends this. It compiles only for the tests below
 /// that check its formula hazard and escaping.
 #[cfg(test)]
 pub fn ledgers_request(company: &str) -> String {

@@ -409,7 +409,7 @@ def report(root: str, surface: str, base_ref: str) -> list[str]:
     return [
         f"surface coverage: since {base_ref}, this branch dropped pins or unsealed modules.",
         "  Nothing is refused. Pin each file that decides what Bridge posts or lets leave",
-        "  the machine; leave the rest. See bridge#416 and the comment on MAX_SURFACE_FILES.",
+        "  the machine; leave the rest. See bridge#416 and the rationale in the bridge-tally-core compatibility_surface_stays_whole test.",
         *lines,
     ]
 

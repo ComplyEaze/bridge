@@ -110,8 +110,8 @@ needs an acknowledgement file (`docs/tally/compatibility/acks/pr-<N>.txt`) in th
 request. Nothing in a docs diff suggests a compatibility gate is involved.
 
 What actually happens: the `Tally portable core` job does not fail on such an edit by itself (no
-per-file hash is stored any more; the surface digest is computed from the live bytes, and the test
-`real_tree_has_complete_migration_and_report_surface_coverage` checks pin coverage, not bytes). The
+per-file hash or surface digest is stored or computed, and the `compatibility_surface_stays_whole`
+test of `bridge-tally-core` checks pin coverage, not bytes). The
 missing acknowledgement fails the CI check `scripts/check-surface-ack.mjs`
 (`surface ack check FAILED: <reason>`), and `scripts/merge-gate.sh`, the local tool run by whoever
 merges, checks it too. Removing or renaming a declared part also edits the pin list.

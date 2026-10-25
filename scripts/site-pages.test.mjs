@@ -305,7 +305,7 @@ test("every page that carries a 'Checked against release' stamp carries the mani
 // The page lists what the stamped release installs. The catalog in the source is ahead of the release while a version is being
 // built: the tools it serves that no published build installs are named here, keyed by the release the page is stamped for. When the
 // stamp moves to the release that publishes them the entry is gone, so the page must list them, and until then the page must not.
-const inSourceNotPublished = { "0.5.1": ["company_features", "gst_status", "month_register", "statement_tie_out", "voucher_read_cost"] };
+const inSourceNotPublished = { "0.6.0": ["audit_test_run", "gst_uncertain_vouchers"] };
 test("the capabilities page names the tools the source's catalog serves, less those in no published build of the stamped release", () => {
   const source = readFileSync(new URL("../src-tauri/src/agent_catalog.rs", import.meta.url), "utf8");
   const names = region(source, "REGISTERED_TOOL_NAMES: &[&str] = &[", "];");

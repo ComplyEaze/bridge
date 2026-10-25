@@ -287,6 +287,7 @@ const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
+const TIEOUT_B_GUID: &str = "d64eda55-da7c-4106-a171-3e3cb6cdd331";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
 const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.utf16le.xml";
@@ -1003,6 +1004,35 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    // The inventory book of #692 (BRIDGE TIEOUT B): src/reports/statements_tests.rs.
+    Row {
+        fixture: "tests/fixtures/statement_balance_sheet_stock_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(BalanceSheet)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::BalanceSheet,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_stock_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_trial_balance_stock_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, TIEOUT_B_GUID)),
+    },
     // Native trial balances: src/native_trial_balance/tests.rs; src/reports/statements_tests.rs for
     // the statement captures; the FOREX plain request (FOREX_601D_CAPTURE_PROVENANCE.md) by the
     // FOREX company of the same unit tests.
@@ -1248,6 +1278,12 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_stock_summary_report",
         parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/company_inventory_flags_stock_book_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_inventory_flags",
+        parse: |_, text| typed(parse_company_inventory_flags(text, TIEOUT_B_GUID)),
     },
     Row {
         fixture: "tests/fixtures/company_inventory_flags_shape_lab_live.utf16le.xml",
@@ -1929,6 +1965,12 @@ const ROWS: &[Row] = &[
         parser: "parse_native_group_snapshot(CORPUS DENSE)",
         parse: |_, text| groups(text, "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3"),
     },
+    Row {
+        fixture: "tests/fixtures/statement_groups_stock_book_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(TIEOUT B)",
+        parse: |_, text| groups(text, TIEOUT_B_GUID),
+    },
     // Native voucher and voucher-type collections: tests/native_vouchers.rs,
     // tests/native_core_regressions.rs; src/tally/canonical_window_tests.rs for the dropped bound.
     Row {
@@ -2324,6 +2366,12 @@ const PILOT_LAB_PARENT_FILTER: &str =
      src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_scope_tests.rs, \
      and the replay in src/agent_import_post_e2e_tests.rs) pin what each parse returns; \
      pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_SCOPED_HSN: &str = "an answer of the pilot lab read on 21 Oct 2026, with no row \
+     here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
+     src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_admission_tests.rs, \
+     src/agent_import_invoice_scope_tests.rs, and the replay in \
+     src/agent_import_post_e2e_tests.rs) pin what each parse returns; the file is the answer \
+     whole as received; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_NUMBERING: &str = "an answer of the pilot lab read on 16 Oct 2026, a week \
      after the invoice round, with no row here: the app crate's replay \
      (src/agent_import_post_e2e_tests.rs) serves it to the voucher-numbering read of the \
@@ -2341,10 +2389,16 @@ const REGISTER_NOT_RECORDED: &str =
     "another synthetic book's Sales Register (6 Oct 2026), kept as \
      evidence for §12a.16 (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md); native_month_register reads its \
      grammar, and its tests run on BRIDGE PILOT LAB's registers instead";
-const GST_STATUS_READ: &str = "an answer of the GST status read (10 and 12 Oct 2026), which no parser of \
-     this crate reads: the app crate's gst_status tool parses it (src/agent_gst_status.rs), and its \
-     tests (src/agent_gst_status_tests.rs) pin what each parse returns; \
+const GST_STATUS_READ: &str = "an answer of the GST status read (10, 12 and 13 Oct 2026), which no parser of \
+     this crate reads: the app crate's gst_status and gst_uncertain_vouchers tools parse it \
+     (src/agent_gst_status.rs, src/agent_gst_uncertain.rs), and their tests \
+     (src/agent_gst_status_tests.rs, src/agent_gst_uncertain_tests.rs) pin what each parse returns; \
      agent/gst-status/PROVENANCE.md says what each file is";
+const GST_STATUS_MARKS: &str = "an answer of the company-marks read that opens the GST status \
+     reads of a call (13 Oct 2026, before and after the one Accept As Is), with no row here: the app crate's gate \
+     (src/agent_gst_status.rs) parses it, and the tests of gst_uncertain_vouchers \
+     (src/agent_gst_uncertain_tests.rs) serve it and pin what the parse returns; \
+     agent/gst-status/PROVENANCE.md says what it is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
@@ -2419,6 +2473,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-case-changed.utf16le.xml",
         PILOT_LAB_PARENT_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml",
+        PILOT_LAB_SCOPED_HSN,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml",
@@ -2553,6 +2611,26 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/gst-status/pilot-lab-gst-status-window.utf16le.xml",
         GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-after.utf16le.xml",
+        GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-before.utf16le.xml",
+        GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-count.utf16le.xml",
+        GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-marks-after.utf16le.xml",
+        GST_STATUS_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-marks.utf16le.xml",
+        GST_STATUS_MARKS,
     ),
     // Import request bodies named without `request`.
     ("tests/fixtures/agent/d3-batch-import.xml", IMPORT_REQUEST),

@@ -143,7 +143,7 @@ where
             }
             "ping" => Ok(json!({})),
             _ if !initialized => Err("initialize_required".to_string()),
-            "tools/list" => Ok(json!({"tools": catalog::tool_definitions(server.settings.import_enabled, server.settings.posting.enabled())})),
+            "tools/list" => Ok(json!({"tools": catalog::listed_tool_definitions(server.settings.import_enabled, server.settings.posting.enabled(), server.settings.audit_enabled)})),
             "tools/call" => match params.get("name").and_then(Value::as_str) {
                 Some(name) => {
                 let arguments = params
@@ -231,6 +231,14 @@ where
     Ok(())
 }
 
+/// The ceiling on one control message: the answer to initialize, ping or
+/// tools/list, or the refusal of an unknown method. Its content is fixed by the
+/// build and the request id (which `max_bytes` already bounds), never book
+/// data, so it is held to this rather than to `max_bytes`, which bounds what a
+/// tool returns from the books. A tool list larger than a user's `max_bytes`
+/// would otherwise leave the server answering without any tools.
+pub(super) const CONTROL_RESPONSE_MAX_BYTES: usize = 1_000_000;
+
 // The same final framing path handles success, cap replacements and durable
 // batch recovery after receipt failure. Tests exercise this with persisted builds.
 pub(super) async fn finish_response<W: AsyncWrite + Unpin>(
@@ -271,16 +279,22 @@ pub(super) async fn finish_response<W: AsyncWrite + Unpin>(
             response = recovery_error(id.clone(), recovery_batch_id.as_deref(), code);
         }
         // Tools may reduce an explicitly paged result. Control messages (including
-        // the tool catalogue) must either fit intact or return a bounded refusal.
+        // the tool catalogue) must either fit intact under their own ceiling or
+        // return a bounded refusal.
         let recovery_code = recovery_batch_id.as_ref().and_then(|_| {
             response["result"]["structuredContent"]["result"]["error"]["code"]
                 .as_str()
                 .map(str::to_string)
         });
-        let fits = if is_tool {
-            enforce_jsonrpc_response_byte_cap(&mut response, server.settings.max_bytes).is_ok()
+        let frame_cap = if is_tool {
+            server.settings.max_bytes
         } else {
-            response.to_string().len() < server.settings.max_bytes
+            server.settings.max_bytes.max(CONTROL_RESPONSE_MAX_BYTES)
+        };
+        let fits = if is_tool {
+            enforce_jsonrpc_response_byte_cap(&mut response, frame_cap).is_ok()
+        } else {
+            response.to_string().len() < frame_cap
         };
         if !fits {
             response = recovery_error(
@@ -291,7 +305,7 @@ pub(super) async fn finish_response<W: AsyncWrite + Unpin>(
                     .unwrap_or("agent_response_too_large"),
             );
         }
-        let mut serialized_response = serialize_response(&response, server.settings.max_bytes)?;
+        let mut serialized_response = serialize_response(&response, frame_cap)?;
         let mut terminal_egress_error = None;
         let mut prepared_receipt = None;
         if let Some(egress) = egress {

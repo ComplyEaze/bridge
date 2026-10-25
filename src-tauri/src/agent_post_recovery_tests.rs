@@ -87,6 +87,7 @@ fn local_batch_at(root: &std::path::Path, port: u16) -> Server {
         redaction: Redaction::None,
         import_enabled: true,
         posting: Posting::On,
+        audit_enabled: false,
     })
 }
 

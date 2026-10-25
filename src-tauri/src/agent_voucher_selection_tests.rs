@@ -432,7 +432,10 @@ async fn only_the_vouchers_tool_reports_window_timings_on_a_refusal() {
                 "company_guid": CAPTURED_GUID,
                 "from": "20260801",
                 "to": "20260802",
-                "numbering": [{"voucher_type": "Journal", "numbering_method": "manual"}],
+                // Declared automatic: this test is about the window read's timings on a
+                // refusal, and a type declared manual would first be checked against the
+                // book's own numbering (bridge#1691), which this plan does not answer.
+                "numbering": [{"voucher_type": "Journal", "numbering_method": "automatic"}],
                 "vouchers": [{
                     "date": "20260801", "voucher_type": "Journal", "voucher_number": "JV-1",
                     "party": "Cash",

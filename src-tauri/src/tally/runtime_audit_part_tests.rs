@@ -573,6 +573,114 @@ async fn an_error_envelope_is_rejected_whole_and_owes_nothing() {
     assert_eq!(simulator.finish().unwrap().len(), 5);
 }
 
+/// The header of a company Object export carries the product release fields
+/// (measured on a live TallyPrime 7.1 Silver, item 697-S0A): the collection
+/// status check refuses it, so the Object request is checked with exactly those
+/// five fields allowed and every other check of the envelope kept. A collection
+/// answer with the same header stays refused.
+fn object_answer(status: &str, release: &str, extra: &str) -> String {
+    format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>{status}</STATUS>{release}{extra}</HEADER>\
+         <BODY><DATA/></BODY></ENVELOPE>"
+    )
+}
+
+const RELEASE_HEADER: &str = "<PRODMAJORVER>1</PRODMAJORVER><PRODMINORVER>1</PRODMINORVER>\
+    <PRODMAJORREL>7</PRODMAJORREL><PRODMINORREL>1</PRODMINORREL><PRODTYPE>5</PRODTYPE>";
+
+async fn object_part(answer: &str) -> Result<AuditPart, AuditPartFailure> {
+    let lab = lab();
+    let simulator = SequenceSimulator::spawn(vec![
+        utf16(&lab.companies_xml),
+        utf16(answer),
+        utf16(&lab.companies_xml),
+    ])
+    .unwrap();
+    let object =
+        super::super::agent_read_request::AgentReadRequest::company_object(&lab.identity).unwrap();
+    assert!(object.is_company_object());
+    let result = TallyRuntime::default()
+        .fetch_audit_part(
+            config(&simulator),
+            &lab.identity,
+            object,
+            AuditPartShape::Single,
+        )
+        .await;
+    drop(simulator);
+    result
+}
+
+#[tokio::test]
+async fn the_company_object_answer_is_admitted_with_its_release_header() {
+    object_part(&object_answer("1", RELEASE_HEADER, ""))
+        .await
+        .expect("the object export is admitted");
+    // The same answer without the release fields is a plain envelope and passes too.
+    object_part(&object_answer("1", "", ""))
+        .await
+        .expect("a plain envelope is admitted");
+}
+
+#[tokio::test]
+async fn the_company_object_answer_keeps_every_other_envelope_check() {
+    let refused = |answer: String, why: &'static str| async move {
+        let failure = object_part(&answer).await.expect_err(why);
+        assert_eq!(
+            failure.kind,
+            AuditPartFailureKind::ResponseRejected,
+            "{why}"
+        );
+    };
+    refused(object_answer("0", RELEASE_HEADER, ""), "a failed status").await;
+    refused(
+        object_answer("1", RELEASE_HEADER, "<EXTRA>1</EXTRA>"),
+        "another header field",
+    )
+    .await;
+    refused(
+        object_answer("1", RELEASE_HEADER, "<PRODTYPE>5</PRODTYPE>"),
+        "a repeated release field",
+    )
+    .await;
+    refused(
+        object_answer("1", "<PRODTYPE>x</PRODTYPE>", ""),
+        "a release field that is not a number",
+    )
+    .await;
+    refused(
+        object_answer("1", RELEASE_HEADER, "").replace("<DATA/>", "<DATA/></ENVELOPE><ENVELOPE>"),
+        "a second root",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn a_collection_answer_with_the_release_header_is_refused() {
+    let lab = lab();
+    let answer = object_answer("1", RELEASE_HEADER, "");
+    let simulator = SequenceSimulator::spawn(vec![
+        utf16(&lab.companies_xml),
+        utf16(&answer),
+        utf16(&lab.companies_xml),
+    ])
+    .unwrap();
+    let collection =
+        super::super::agent_read_request::AgentReadRequest::parse(lab.request.clone()).unwrap();
+    assert!(!collection.is_company_object());
+    let failure = TallyRuntime::default()
+        .fetch_audit_part(
+            config(&simulator),
+            &lab.identity,
+            collection,
+            AuditPartShape::Single,
+        )
+        .await
+        .expect_err("a collection answer with that header is refused");
+    assert_eq!(failure.kind, AuditPartFailureKind::ResponseRejected);
+    drop(simulator);
+}
+
 #[tokio::test]
 async fn a_refused_response_head_owes_a_drain() {
     let lab = lab();

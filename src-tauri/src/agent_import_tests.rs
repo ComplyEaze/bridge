@@ -78,6 +78,7 @@ async fn batch_total_overflow_is_refused_before_dispatch_or_persistence() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let mut input = payload();
     for entry in input
@@ -114,6 +115,7 @@ async fn a_narration_that_would_read_back_rewritten_is_refused_at_build() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let mut input = payload();
     input.vouchers[0].narration = Some("Paid \u{fffd}#5; settled".into());
@@ -145,6 +147,7 @@ async fn a_batch_with_several_defects_reports_the_validation_defect_before_the_n
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let build = |input: &ImportPayload<String>| {
         let args = serde_json::to_value(input).unwrap();
@@ -430,6 +433,7 @@ fn external_import_ledger_read_refuses_busy_admission_without_waiting() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     };
     let server = Server::new(settings.clone());
     let append_admission = server
@@ -468,6 +472,7 @@ fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     };
     let server = Server::new(settings.clone());
     let initial = ImportLedgerLine {
@@ -593,6 +598,7 @@ fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -729,6 +735,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -1102,6 +1109,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let input = admitted_payload();
     let line = ImportLedgerLine {
@@ -2286,6 +2294,7 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -2416,24 +2425,9 @@ fn utf16le(bytes: &[u8]) -> String {
     .unwrap()
 }
 
-/// DERIVED, not Tally's bytes: the answer to the rates read the code sends now
-/// (restricted to the parents of the invoice's ledgers, #1331, with the three
-/// HSN/SAC fields added to its field list, #691), which the lab was not sent.
-/// It is the lab's answer to the unrestricted read with those three fields
-/// (`pilot-lab-ledger-rates-hsn`, 12 Oct 2026) with every ledger row removed
-/// that the lab's answer to the restricted read (`pilot-lab-ledger-rates-scoped`,
-/// 10 Oct 2026) does not hold: that read held exactly the unrestricted read's
-/// rows under the four parents (PROVENANCE; PARTIAL: one book, one spelling),
-/// and the book gained two ledgers (`BRIDGE Svc 4D 5%`, `BRIDGE Svc INH 5%`)
-/// between the two days, which the 10 Oct catalogue the replay pairs with does
-/// not hold. The removal is counted, and the rows left must be the scoped read's
-/// rows, name for name, each under one of the four parents.
-pub(super) fn pilot_scoped_rates_hsn() -> String {
-    let scoped = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml"));
-    derived_scoped_rates_hsn(&ledger_row_names(&scoped))
-}
-
-/// DERIVED, not Tally's bytes: as [`pilot_scoped_rates_hsn`], for the book of
+/// DERIVED, not Tally's bytes: the answer to the rates read the code sends
+/// (`pilot-lab-ledger-rates-scoped-hsn`, which the lab answered on 21 Oct 2026
+/// for the book as it then stood), for the book of
 /// the lab's W18 sittings (`pilot-lab-w18`), which the lab was not asked the
 /// scoped rates request on either. The rows are the lab's W16 answer's rows of
 /// the ledgers that the W18 catalogue holds under the four parents (the two
@@ -2973,6 +2967,7 @@ async fn import_bounds_distinct_ledger_names_before_tally_without_reducing_vouch
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let response = server
         .call_tool_response("build_import_xml", serde_json::to_value(unique).unwrap())
@@ -3260,6 +3255,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::from_enabled(writes_enabled),
+            audit_enabled: false,
         });
         let mut input = captured_catalogue_payload();
         input.vouchers.truncate(voucher_count);
@@ -3380,6 +3376,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::On,
+            audit_enabled: false,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(input).unwrap())
@@ -3735,6 +3732,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -3867,6 +3865,7 @@ fn line_error_text_does_not_count_against_a_pages_never_cut_part() {
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         })
     };
     let page = json!({"items": [], "dispatch": {"response": {"outcome": {
@@ -3912,6 +3911,7 @@ async fn a_hand_imported_batchs_alter_id_delta_is_measured_from_its_build_mark()
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -3955,6 +3955,7 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         })
     };
     let server = server_with(200_000);
@@ -4107,6 +4108,7 @@ async fn a_later_page_of_a_dispatched_batch_states_the_headline_of_the_first() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -4259,6 +4261,7 @@ async fn verify_saved_batch_after_dispatch(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -4337,6 +4340,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -4497,6 +4501,7 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -4611,6 +4616,7 @@ async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -5138,6 +5144,7 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
             redaction,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         })
     };
     let masked = server_with(super::super::Redaction::MaskParties);
@@ -5493,6 +5500,7 @@ fn numbering_server(directory: &std::path::Path, port: u16) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        audit_enabled: false,
     })
 }
 

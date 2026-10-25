@@ -9,7 +9,7 @@ ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Its so
 
 What we checked ourselves, and what we did not. The Claude Desktop install screens and buttons in these steps are as
 seen in our tests on 1 and 2 October 2026. The Mac had Claude Desktop version 2.19675.0 (read from the app's files),
-and the owner reports that the Windows PC had the same version. The TallyPrime screens of Step 1 (F1, Settings,
+and the maintainer reports that the Windows PC had the same version. The TallyPrime screens of Step 1 (F1, Settings,
 Connectivity, the Client/Server configuration box and its list), the browser check, and the Alt+K and Alt+Y menus were
 checked by looking, on TallyPrime 7.1 on Windows on 10 October 2026; saving with Ctrl+A, restarting TallyPrime and
 the Backup & Restore submenu were not part of that check. The Mac keys are written from general knowledge of those programs; we did not walk them
@@ -151,10 +151,10 @@ computer cannot confirm who made it. Keep the file only if you got it from the p
 
 ## Step 4. Fill in the settings
 
-A settings window opens with five lines. If none opens, open Settings, then Extensions, click ComplyEaze Bridge, then
+A settings window opens with six lines. If none opens, open Settings, then Extensions, click ComplyEaze Bridge, then
 **Configure**. Go from top to bottom.
 
-![The five settings, drawn as a diagram: the Terms line ticked, Tally host localhost, Tally port 9000, Response redaction none, Allow voucher posting switched off.](./img/install-settings.svg)
+![The first five settings, drawn as a diagram: the Terms line ticked, Tally host localhost, Tally port 9000, Response redaction none, Allow voucher posting switched off. The sixth, Allow tax-audit test runs, is not drawn; leave it off.](./img/install-settings.svg)
 
 | Line | What to do | What it is |
 | --- | --- | --- |
@@ -163,6 +163,7 @@ A settings window opens with five lines. If none opens, open Settings, then Exte
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
 | **Response redaction** | Do not change it. It says `none`. | A way to limit what ComplyEaze Bridge sends to the AI provider. Choose one value. The other two are `mask_parties` (shortens party and ledger names, and the bank account details read from a ledger, to their first two and last two characters; some names are not shortened, and narrations are not changed) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Neither hides, among other things: amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details and references, or the last four digits of a bank statement's account number. [Security and privacy](../security-and-privacy.md) lists the rest. |
 | **Allow voucher posting, one voucher or a batch of up to 50** | Leave it **off**. | Lets Claude make entries in Tally: one voucher, or a saved batch of up to 50, each post only after you approve it in a separate window. |
+| **Allow tax-audit test runs (audit_test_run)** | Leave it **off** unless you want to try a tax-audit test. | Lets Claude run one tax-audit test (today the cash share of receipts and payments against the s.44AB(a) limit) on a company's books for a period inside FY 2025-26. It reads every voucher of the period and writes nothing to Tally; its figures go to your AI provider like any read. |
 
 Click **Save**.
 
@@ -291,7 +292,9 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 - **Checking the download.** Releases are on [GitHub Releases](https://github.com/ComplyEaze/bridge/releases), the
   newest first. Each archive has a same-named `.sha256` file and a small provenance record on its release, so an
   organization can identify the downloaded bytes and the source commit. Run `certutil -hashfile <file> SHA256` on
-  Windows or `shasum -a 256 <file>` on a Mac and compare the result with the `.sha256` file.
+  Windows or `shasum -a 256 <file>` on a Mac, in the folder that holds the file (a command window opens in your home
+  folder, so `cd Downloads` first), and compare the 64-character code it prints with the code at the start of the
+  `.sha256` file.
 - **Build attestation.** From 0.4.0 each archive also has a build attestation, which `gh attestation verify` can
   check. It says which workflow run and commit produced those bytes. It is not a code signature, no client checks it
   yet, and it does not show that the code is safe.

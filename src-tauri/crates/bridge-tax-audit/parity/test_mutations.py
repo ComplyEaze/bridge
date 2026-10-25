@@ -18,6 +18,7 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -472,6 +473,39 @@ class BaselineOutput(unittest.TestCase):
         details: list[str] = []
         self.assertEqual(mu.baseline([FakeWorker(self.crate, [BUILT, PASSED])], 5, 5, details), [])
         self.assertEqual(details, [])
+
+
+class KillGroup(unittest.TestCase):
+    """`_kill_group` on the process groups a worker starts (its own session, as `Worker.run` does)."""
+
+    def start(self, *argv: str) -> subprocess.Popen:
+        proc = subprocess.Popen(list(argv), start_new_session=True)
+        self.addCleanup(lambda: proc.poll() is None and (proc.kill(), proc.wait()))
+        return proc
+
+    def test_a_group_whose_leader_exited_unreaped_is_already_gone(self):
+        # macOS answers killpg with EPERM here (the crash that stopped a night run); Linux delivers it.
+        proc = self.start("/bin/sh", "-c", "exit 0")
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            with contextlib.suppress(ProcessLookupError):
+                if os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT):
+                    break
+            time.sleep(0.01)
+        mu._kill_group(proc)
+        self.assertEqual(proc.returncode, 0)
+
+    def test_a_running_group_is_ended(self):
+        proc = self.start("/bin/sleep", "30")
+        mu._kill_group(proc)
+        self.assertEqual(proc.returncode, -15)
+
+    def test_eperm_from_a_running_leader_is_raised(self):
+        proc = self.start("/bin/sleep", "30")
+        with unittest.mock.patch.object(mu.os, "killpg", side_effect=PermissionError(1, "denied")):
+            with self.assertRaises(PermissionError):
+                mu._kill_group(proc)
+        self.assertIsNone(proc.poll())
 
 
 class Shard(unittest.TestCase):

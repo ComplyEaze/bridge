@@ -468,6 +468,10 @@ async fn a_rule_code_or_an_argument_code_is_kept_and_no_other_text_is() {
         "argument_invalid:sha2560",
         "statement_x:row_3",
         "argument_invalid:test_",
+        // A name, or a number in groups of three, has a property name's shape.
+        "argument_invalid:acme_traders",
+        "argument_invalid:900_000_000",
+        "argument_invalid:test_x",
         "Ä1-x",
         "C1-é",
         long_rule.as_str(),
@@ -540,6 +544,43 @@ fn every_rule_code_the_tax_audit_crate_emits_is_listed() {
     listed.sort();
     assert_eq!(listed, codes);
     for code in codes {
+        assert_eq!(receipt_code(&json!(code)), Some(json!(code)), "{code}");
+    }
+}
+
+/// Every `argument_invalid:<name>` the bridge's sources write, and every name
+/// a refusal could carry after its colon, is kept in a receipt: the closed set
+/// drops only names no refusal writes.
+#[test]
+fn every_argument_code_the_sources_write_is_kept_in_the_receipt() {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut written = std::collections::BTreeSet::new();
+    for entry in std::fs::read_dir(&directory).unwrap() {
+        let path = entry.unwrap().path();
+        let file = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default();
+        if !file.ends_with(".rs") || file.ends_with("_tests.rs") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path).unwrap();
+        for tail in text.split("\"argument_invalid:").skip(1) {
+            let name = tail.split('"').next().unwrap();
+            if !name.is_empty() && !name.contains('{') {
+                written.insert(name.to_string());
+            }
+        }
+    }
+    assert!(
+        written.len() > 10,
+        "only {} argument codes found",
+        written.len()
+    );
+    assert!(argument_names().contains("test"));
+    let names = written.iter().chain(argument_names());
+    for name in names {
+        let code = format!("argument_invalid:{name}");
         assert_eq!(receipt_code(&json!(code)), Some(json!(code)), "{code}");
     }
 }

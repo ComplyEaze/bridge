@@ -60,7 +60,7 @@ fn receipt_error(structured: &Value) -> Option<Value> {
 
 /// A code is one of the three kinds Bridge's own codes are, at most 64 bytes:
 /// a tool code (`vouchers_window_part_failed`), a tool code naming the
-/// argument it refused (`argument_invalid:test`; see [`is_argument_key`]), or
+/// argument it refused (`argument_invalid:test`; see [`argument_names`]), or
 /// one of the tax-audit engine's rule codes ([`RULE_CODES`]). Anything else, a
 /// word in capitals or a space included, is not a code.
 fn receipt_code(value: &Value) -> Option<Value> {
@@ -78,22 +78,46 @@ fn is_code(text: &str) -> bool {
                 .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
     };
     match text.split_once(':') {
-        Some((code, key)) => tool_code(code) && is_argument_key(key),
+        Some((code, name)) => tool_code(code) && argument_names().contains(name),
         None => tool_code(text) || RULE_CODES.contains(&text),
     }
 }
 
-/// The name after a code's colon, as a schema property is named (`test`,
-/// `proposals_sha256`): each `_`-separated part lower-case letters, then at
-/// most three digits. A run of digits, such as an account or a phone number,
-/// is not a name. Nor is a second colon, which keeps out the ledger name
-/// `agent_voucher_summary` writes after its gap code.
-fn is_argument_key(key: &str) -> bool {
-    key.split('_').all(|part| {
-        let letters = part.bytes().take_while(u8::is_ascii_lowercase).count();
-        let digits = &part.as_bytes()[letters..];
-        letters > 0 && digits.len() <= 3 && digits.iter().all(u8::is_ascii_digit)
+/// The names a code may carry after its colon: every property, at any depth,
+/// of a registered tool's published schema (the schema `validate_tool_arguments`
+/// refuses an unknown argument by, before any code can name it) and the
+/// summary's `no_placements`. A set, not a shape, because a lower-case party
+/// name or a number written in groups of three has a property name's shape. A
+/// second colon, as in the ledger name `agent_voucher_summary` writes after
+/// its gap code, is in no name.
+fn argument_names() -> &'static std::collections::BTreeSet<String> {
+    static NAMES: std::sync::OnceLock<std::collections::BTreeSet<String>> =
+        std::sync::OnceLock::new();
+    NAMES.get_or_init(|| {
+        let mut names = std::collections::BTreeSet::from(["no_placements".to_string()]);
+        let tools = super::catalog::registered_tool_definitions(true, true);
+        for tool in tools.as_array().into_iter().flatten() {
+            property_names(&tool["inputSchema"], &mut names);
+        }
+        names
     })
+}
+
+/// The property names at every depth of a schema: a refusal of a nested value
+/// names its own property (`argument_invalid:bridge_txn_id`).
+fn property_names(schema: &Value, names: &mut std::collections::BTreeSet<String>) {
+    match schema {
+        Value::Object(object) => {
+            if let Some(properties) = object.get("properties").and_then(Value::as_object) {
+                names.extend(properties.keys().cloned());
+            }
+            object
+                .values()
+                .for_each(|value| property_names(value, names));
+        }
+        Value::Array(items) => items.iter().for_each(|value| property_names(value, names)),
+        _ => {}
+    }
 }
 
 /// The rule codes the tax-audit engine refuses with: the only codes in

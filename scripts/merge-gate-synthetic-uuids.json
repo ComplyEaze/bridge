@@ -24,10 +24,6 @@
     {
       "uuid": "aae372c5-a894-491c-8843-5532e43d2d2f",
       "note": "company identifier of the synthetic lab company BRIDGE GST LEDGER LAB, created on Tally's screen for a lab item on 25 Oct 2026: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml added by pull request 1867, whose provenance table names the book; every ledger and voucher identifier in those captures carries it as a prefix"
-    },
-    {
-      "uuid": "ae1490be-52c5-4544-9ffc-4b7da85f9797",
-      "note": "company identifier of the synthetic lab company BRIDGE GST RECON LAB: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-extent.utf16le.xml on master, whose PROVENANCE.md says the book's data is synthetic; already carried by many tracked fixtures and tests"
     }
   ]
 }

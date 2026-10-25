@@ -119,8 +119,8 @@ export function checkAck({ basePins, headPins, changed, acks, prNumber, withdraw
   const expectedPaths = touched.filter((p) => !removed.includes(p));
   const result = (r) => ({ ok: r.length === 0, reasons: r, touched, removed });
   const renamedOut = acks.renamedOut ?? [];
-  // The digest hashes working-tree bytes, and a `.gitattributes` below the root (eol, ident,
-  // working-tree-encoding) changes those bytes without any pinned path appearing in a diff. The
+  // A `.gitattributes` below the root (eol, ident, working-tree-encoding) changes the bytes of
+  // a pinned file without any pinned path appearing in a diff. The
   // root one is pinned, so it is covered like any other pin; a nested one is refused outright.
   for (const c of changed) {
     for (const p of [c.path, c.oldPath]) {

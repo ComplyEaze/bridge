@@ -204,6 +204,11 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       chose (`kind`) and the report's name, the window's dates, and for each
       month, Tally's debit, credit and closing amounts. It holds no
       party, ledger or narration, and `mask_parties` has nothing to shorten in it.
+    - The Negative Stock read (`negative_stock`) sends the company name and
+      its identifier and the dates, and for each item on Tally's Negative
+      Stock list, the item's name (shortened under `mask_parties`), its closing
+      quantity with its unit, and its rate and value. The quantity, rate and
+      value are not masked under any setting. It holds no narrations.
     - The GSTR-1 status read (`gst_status`) sends the company name and its
       identifier, the voucher type name you gave and the dates, and for each
       voucher its number, date, voucher type name, Tally's identifier and

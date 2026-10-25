@@ -43,6 +43,8 @@
 | **No cloud path for Tally data** | Bridge has no upload feature (the document-sync code was removed); Tally data would need a versioned destination contract (fine for now — local-first is the positioning). |
 | **Velocity sink** | ~30 PRs of pre-dispatch safety ritual produced zero rows of evidence. Safety engineering has been optimizing ceremony before dispatch instead of verifiability after dispatch. |
 
+> **DEVIATION 2026-10-21 (#1789):** the IndiaTax, Bills/Outstandings and Inventory pack batches, their canonical models and their reconciliation were removed without being wired: no read ever produced one. Outstandings and stock are read by the `outstandings` and `stock_summary` tools from Tally's own collections and reports instead. A pack for these is rebuilt only from a live capture (AGENTS.md P1).
+
 ---
 
 ## 2. Market research (July 2026: sourced claims, gaps, and hypotheses)
@@ -272,7 +274,7 @@ Four persona proposals (CA operator, product strategist, protocol engineer, UX d
 4. **Excel/CSV → review grid → post pipeline** with saved per-client column mappings — the expansion product.
 5. **Drift Sentinel** — checkpoint → "changed/new/deleted/back-dated since sign-off" with before/after diffs. Firm-maintained books only in v1; calm "backup restored, re-baselining" state distinct from tamper alarm.
 6. **Honest freshness UX** — Sync Beacon with dual timestamps; Gap Map reborn as a fix-it list; Truth States compressed to three visual tiers (Verified+time / Attention+reason+fix / Broken+remediation).
-7. **Incremental sync v2** — ALTMSTID/ALTVCHID cheap probe, segmented per-FY/month GUID+AlterID scans (a full-books unbounded export can hang Tally on a large book during working hours — segment + off-hours + visible progress/cancel), verified-scan-only tombstones, wired to the existing `bridge-tally-incremental` crate (well-shaped, just unwired).
+7. **Incremental sync v2** — ALTMSTID/ALTVCHID cheap probe, segmented per-FY/month GUID+AlterID scans (on a large book an unbounded whole-book export can occupy Tally for many minutes and leave the gateway refusing every company for tens of minutes; the agent's windowed voucher reads are bounded before they are sent (16 MiB byte budget from a census of the window at the book's measured per-voucher cost, protocol reference §11c); the sync snapshot path still splits only after a response trips the cap, so v2 must reuse that bound — segment + off-hours + visible progress/cancel), verified-scan-only tombstones, wired to the existing `bridge-tally-incremental` crate (well-shaped, just unwired).
 8. **Kill the ceremony, keep the evidence** — rule adopted verbatim: *no safety mechanism without a demonstrated failure mode it prevents; no capability claim without a receipt.*
 9. **Declared topology honesty** — v1 supports: local single-machine, loaded-company, licensed Tally, no TallyVault, no gateway auth. Tally-on-cloud/RDP (**internal hypothesis: market prevalence is unverified**), multi-user LAN, gateway-security setups = explicit `Unsupported` Passport states, not silent failures.
 

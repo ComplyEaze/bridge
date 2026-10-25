@@ -75,6 +75,10 @@ pub(crate) use stock_summary::StockSummaryReadError;
 #[path = "runtime_stock_summary_tests.rs"]
 mod stock_summary_tests;
 
+#[path = "runtime_negative_stock.rs"]
+mod negative_stock;
+pub(crate) use negative_stock::{NegativeStockAnswer, NegativeStockReadError};
+
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
 pub(crate) use trial_balance::SingleCurrencyTrialBalance;
@@ -2555,6 +2559,11 @@ pub struct TallyRuntime {
     /// The per-port wire lock every session's client gates its sends on
     /// (`endpoint_wire`).
     wire: WireGateConfig,
+    /// The desktop app's Terms-of-Use acceptance. `None` is a runtime that answers to no gate of
+    /// this kind: the MCP server (which has its own, `agent/terms`) and the tests. The desktop app
+    /// builds its runtime with [`TallyRuntime::desktop`], which refuses every send until the terms
+    /// are accepted (bridge#1106).
+    terms: Option<Arc<crate::desktop_terms::DesktopTerms>>,
     #[cfg(test)]
     transport_policy: Option<bridge_tally_transport::TransportPolicy>,
 }
@@ -2621,21 +2630,29 @@ impl Drop for CachedProbeReservation {
     }
 }
 
+/// Tests build their runtimes with `default()`; production code names which kind it wants, so a
+/// rebuilt desktop runtime cannot come back without its gate.
+#[cfg(test)]
 impl Default for TallyRuntime {
     fn default() -> Self {
-        Self {
-            sessions: Arc::new(Mutex::new(HashMap::new())),
-            audit_drain: Arc::new(Mutex::new(HashMap::new())),
-            audit_drain_probe_interval: AUDIT_DRAIN_PROBE_INTERVAL,
-            audit_drain_probe_stale: AUDIT_DRAIN_PROBE_STALE,
-            audit_drain_probe_slow: AUDIT_DRAIN_PROBE_SLOW,
-            control: PortableReadRuntime::default(),
-            wire: WireGateConfig::default(),
-            #[cfg(test)]
-            transport_policy: None,
-        }
+        Self::ungated()
     }
 }
+
+/// The refusal a [`TallyRuntime`] returns, before any request is queued, while the desktop app's
+/// terms are not accepted. `code` is `terms_not_accepted` or `terms_record_unavailable`.
+#[derive(Debug)]
+pub(crate) struct TermsRefusal {
+    pub(crate) code: &'static str,
+}
+
+impl std::fmt::Display for TermsRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the Terms of Use are not accepted ({})", self.code)
+    }
+}
+
+impl std::error::Error for TermsRefusal {}
 
 fn apply_scoped_standard_identity(result: &mut TallyProbeResult, company: TallyCompany) {
     result.companies = vec![company];
@@ -2663,6 +2680,32 @@ fn apply_scoped_standard_identity(result: &mut TallyProbeResult, company: TallyC
 }
 
 impl TallyRuntime {
+    /// A runtime with no desktop terms gate: the MCP server's (its own gate refuses first) and
+    /// the tests'.
+    pub(crate) fn ungated() -> Self {
+        Self {
+            sessions: Arc::new(Mutex::new(HashMap::new())),
+            audit_drain: Arc::new(Mutex::new(HashMap::new())),
+            audit_drain_probe_interval: AUDIT_DRAIN_PROBE_INTERVAL,
+            audit_drain_probe_stale: AUDIT_DRAIN_PROBE_STALE,
+            audit_drain_probe_slow: AUDIT_DRAIN_PROBE_SLOW,
+            control: PortableReadRuntime::default(),
+            wire: WireGateConfig::default(),
+            terms: None,
+            #[cfg(test)]
+            transport_policy: None,
+        }
+    }
+
+    /// The desktop app's runtime: every send refuses until `terms` says the Terms of Use are
+    /// accepted.
+    pub(crate) fn desktop(terms: Arc<crate::desktop_terms::DesktopTerms>) -> Self {
+        Self {
+            terms: Some(terms),
+            ..Self::ungated()
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn with_transport_policy(policy: bridge_tally_transport::TransportPolicy) -> Self {
         Self {
@@ -2685,6 +2728,11 @@ impl TallyRuntime {
     }
 
     fn session(&self, config: TallyConfig) -> anyhow::Result<Arc<TallySession>> {
+        // First, before the session cache: every send of the desktop app obtains its client here,
+        // so while the terms are not accepted nothing reaches Tally (bridge#1106).
+        if let Some(code) = self.terms.as_ref().and_then(|terms| terms.refusal()) {
+            return Err(TermsRefusal { code }.into());
+        }
         let endpoint = EndpointKey::from_config(&config)?;
         let mut sessions = self
             .sessions

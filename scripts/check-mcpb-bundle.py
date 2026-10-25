@@ -32,6 +32,7 @@ DEFAULT_TOOLS = {
     "masters",
     "month_register",
     "negative_ledgers",
+    "negative_stock",
     "outstandings",
     "profit_and_loss",
     "purchase_register",

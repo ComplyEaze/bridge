@@ -27,8 +27,6 @@ use sha2::{Digest, Sha256};
 
 /// Admission of the tally-read v1 `company` part (audit_read plan step 3).
 pub mod audit_company_part;
-#[cfg(feature = "bills-native-outstandings-probe")]
-pub mod bills_native_outstandings_probe;
 pub mod currency_composite;
 pub mod group_ancestry;
 pub mod gst_details;

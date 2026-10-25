@@ -8,10 +8,6 @@ publish = false
 edition = "2021"
 rust-version = "1.96"
 
-[features]
-default = []
-bills-native-outstandings-probe = []
-
 [lints]
 workspace = true
 

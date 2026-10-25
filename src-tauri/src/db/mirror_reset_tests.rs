@@ -342,7 +342,7 @@ async fn an_open_mirror_refuses_a_reset_and_a_reset_refuses_an_open_at_once() {
         .expect("an opener must not wait on a held proof");
     assert!(refused);
     drop(proof);
-    drop(lock_for_open(&database).expect("free again once the proof is dropped"));
+    drop(lock_for_open(&database).expect("available again once the proof is dropped"));
 }
 
 #[tokio::test]

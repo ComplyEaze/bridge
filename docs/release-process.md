@@ -538,8 +538,21 @@ one at that pair and one at the current merge base and head. The line is carried
 pair only when they are byte-identical apart from the `index` lines and the text after the hunk
 numbers (context lines and hunk numbers are part of the comparison, so a change moved in a file is
 not the same change), neither is empty or holds a binary change, the new one lists no file twice
-and names exactly the pull request's current file list. Only CLEAN is carried, never MERGE-ADVERSARY
-RECOMMEND, which must name the current pair, and every void still applies to a carried line. What
+and names exactly the pull request's current file list. A pull request whose binaries are all
+listed in the lab-capture manifest, none needing the owner's `--binary-review-sha` attestation
+and none removed, renamed or modified (only a binary addition is carried, because a modified
+binary's base blob is not bound), can still be carried: each binary section is then replaced by its
+path and its full 40-hex blob id from the compare API, so the blob ids are compared in full, the id
+for the current range must be the blob the manifest check verified, and a file list the API may
+have truncated (300 files or more) or a missing id is not carried. The gate prints the reason a
+verdict was not carried as a "verdict not carried" note. When the
+CLEAN line is carried, the MERGE-ADVERSARY RECOMMEND line is carried with it under the same proof,
+but only if it names exactly the same older head and merge base as the carried CLEAN line (never any
+other older pair, and never when CLEAN was not carried); a RECOMMEND line that names the current
+pair stands on its own. Every void applies to a carried line exactly as it does to the carried
+CLEAN line, and the gate's output says when the RECOMMEND line was carried. The review tier is
+decided at the current pair from master's classification, so a reclassification on master can
+newly require a RECOMMEND line that the older pair did not need. What
 master changed in other files, or in the same file outside the pull request's hunks, is not looked
 at: the required checks at the head cover it, not the reviewer. When the pull request's own lines
 cannot be shown unchanged the gate says so and the reviewer looks again.

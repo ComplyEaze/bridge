@@ -4,7 +4,7 @@ This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
 page was not read again at it, except as said below). Release 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) was
-published after the pull requests named here; this page was not read again at that tag. Six
+published after the pull requests named here; this page was not read again at that tag. Seven
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
@@ -12,7 +12,7 @@ masters read, in sections 1 and 2 (#1398), the note on how long a
 from this repository loads the PDF library from, in section 5 (#1422), the
 statement party written into a bank voucher's narration, in section 2 (#1430), the
 file of skipped bank-statement rows, in section 4 (#1625), and the
-location shown for an import file on a Microsoft Store install of Claude Desktop, in section 4 (#1569). It was written from a reading
+location shown for an import file on a Microsoft Store install of Claude Desktop, in section 4 (#1569), and the mailing details of a party ledger and the masking of its address, in sections 1 and 2 (#1490). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
@@ -112,8 +112,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     named in a build warning and the ledger in a refused cash-or-bank row), stock
     item names and their parents, godown, stock-group, cost-centre and cost-category
     names and their parents, the category a cost centre belongs to,
-    and five fields of a ledger's details: the name on the PAN, the bank account
-    holder's name, the bank details, the name a mailing address is printed under and the
+    and three fields of a ledger's details: the name on the PAN, the bank account
+    holder's name and the bank details; from the release that includes #1490 (not
+    0.6.0 or earlier) also the name a mailing address is printed under and the
     address itself (each line of the mailing address, and the flat address field).
     A party's PIN code, state and country, which `ledger_masters` returns with
     `fields=compliance`, are not masked under any mode. A name of four characters or fewer is

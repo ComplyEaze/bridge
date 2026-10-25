@@ -776,7 +776,13 @@ fn ledger_movement_schema_exposes_offset_and_limit() {
 
 #[test]
 fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
-    let known_parties = ["Customer One", "Supplier Two", "PAN Holder", "Entry Ledger"];
+    let known_parties = [
+        "Customer One",
+        "Supplier Two",
+        "PAN Holder",
+        "Entry Ledger",
+        "Mailing Firm",
+    ];
     let samples = [
         (
             "balance_sheet",
@@ -793,7 +799,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ),
         (
             "ledger_masters",
-            json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder"}))}]}),
+            json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder","address":"Mailing Firm","mailing_details":{"observation":"entries","entries":[{"applicable_from":"20260401","mailing_name":"Mailing Firm","address_lines":["C/o Mailing Firm","1 Test Street"],"pin_code":"560001","state":"Karnataka","country":"India","other_content_skipped":false}]}}))}]}),
         ),
         (
             "ledger_movement",

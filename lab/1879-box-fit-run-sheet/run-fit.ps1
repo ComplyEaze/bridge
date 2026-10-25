@@ -70,20 +70,26 @@ $clock = [System.Diagnostics.Stopwatch]::StartNew()
 $p = Start-Process -FilePath 'cmd.exe' -ArgumentList ('/s /c "' + $cmd + '"') -PassThru -WindowStyle Hidden
 Write-Host "started cmd pid=$($p.Id). If the box cannot be answered by mouse, from ANOTHER window: taskkill /PID $($p.Id) /T /F (that closes only this probe)."
 $child = $null
-for ($i = 0; $i -lt 150 -and $null -eq $child; $i++) {
+for ($i = 0; $i -lt 150 -and $null -eq $child -and -not $p.HasExited; $i++) {
   Start-Sleep -Milliseconds 100
   $child = Get-CimInstance Win32_Process -Filter "Name='bridge_mcp.exe'" | Where-Object { $_.CommandLine -like '*--confirm-journal*' } | Select-Object -First 1
 }
-if ($null -eq $child) { Write-Host 'child process not found in 15 s'; return }
-Write-Host "child pid=$($child.ProcessId)"
 $rects = @()
-for ($i = 0; $i -lt 100 -and $rects.Count -eq 0; $i++) { Start-Sleep -Milliseconds 100; $rects = [W]::Find([uint32]$child.ProcessId) }
-if ($rects.Count -eq 0) { Write-Host 'no visible window of the child in 10 s' }
+if ($null -ne $child) {
+  Write-Host "child pid=$($child.ProcessId)"
+  for ($i = 0; $i -lt 100 -and $rects.Count -eq 0 -and -not $p.HasExited; $i++) { Start-Sleep -Milliseconds 100; $rects = [W]::Find([uint32]$child.ProcessId) }
+  if ($rects.Count -eq 0) { Write-Host 'no visible window of the child (it ended, or none appeared in 10 s)' }
+} elseif ($p.HasExited) {
+  # A box that does not fit is cancelled within a fraction of a second, before this loop can see the child.
+  Write-Host 'the child ended before it could be found (a box cancelled at once ends this fast): no window to measure; the exit status and the box-fit line below say what happened'
+} else {
+  Write-Host 'child process not found in 15 s while the command is still running: closing nothing; answer or end the box as the sheet says, then read the status below'
+}
 foreach ($r in $rects) {
   $parts = $r.Split('|', 2); $v = $parts[0].Split(',') | ForEach-Object { [int]$_ }
   Write-Host ("window title='{0}' rect(L,T,R,B)={1} size={2}x{3} top_off_screen={4} bottom_below_workarea={5} left_off={6} right_off={7}" -f $parts[1], $parts[0], ($v[2]-$v[0]), ($v[3]-$v[1]), ($v[1] -lt $wa.Y), ($v[3] -gt ($wa.Y + $wa.Height)), ($v[0] -lt $wa.X), ($v[2] -gt ($wa.X + $wa.Width)))
 }
-Write-Host 'NOW take a WHOLE-SCREEN screenshot with the lab tool (not the keyboard), then answer by MOUSE as the sheet says for this case.'
+if (-not $p.HasExited) { Write-Host 'NOW take a WHOLE-SCREEN screenshot with the lab tool (not the keyboard), then answer by MOUSE as the sheet says for this case.' }
 $p.WaitForExit()
 $clock.Stop()
 Write-Host "cmd exit=$($p.ExitCode) after $($clock.ElapsedMilliseconds) ms from start (77 box did not fit; 1 No/Cancel/X; 0 with the token Yes; 0 with no token = box not measured or not shown)"

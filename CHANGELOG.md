@@ -115,6 +115,12 @@ These changes are in source and not yet in a published build.
   accepted observations enter the local mirror. The summary line drops the "rejected rows" clause and the table
   column reads "Accepted returned rows"; a run that rejected source records is still shown by its gap. The count
   stays in the proof's data and in the export.
+- The summary of a post whose binding was refused now says that ComplyEaze Bridge cannot close the batch or amend it
+  (part of #1039). Before, it said only that the batch "stays open". The notice for a multi-voucher batch whose
+  voucher mark step was not confirmed no longer suggests that recording a review with `acknowledge_post_review`
+  clears it: the record is kept on this computer and the notice stays. No behaviour changes. A way to close a batch
+  with a refused binding from ComplyEaze Bridge is not built: a person's confirmation cannot stand for a voucher's
+  identity before it is measured whether Tally names the post's own vouchers when another user is writing.
 - When a withdrawn skipped transfer row's other statement may sit in a batch that is not verified
   (`other_side_unverified`), the next step now offers to build that statement again only if every batch named for
   the row was never sent to Tally, `verify_import` listed every one of their vouchers as `not_found`, and the person

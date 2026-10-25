@@ -63,3 +63,44 @@ Tally's built-in Balance Sheet and Profit and Loss, requested by report name (pr
   - The one-month heavy-book Profit and Loss, each group tree and each Trial Balance were run once.
 - No book here holds inventory, so no closing-stock line was observed.
 - The explode flag, Education, Gold and foreign-currency books were not measured.
+
+## `*_stock_book_*`: the inventory book (BRIDGE TIEOUT B), 21 Oct 2026
+
+Tally's Profit and Loss and Balance Sheet by name, and the Trial Balance and group tree the statements are derived from, for one synthetic company with inventory integrated with accounts (#692). Every file is a live capture, never hand-written, taken read-only by the Windows lab and committed to the lab branch `lab/692-tieout-b-answers` (the first eight files at `20ef79c46c87d4b10571b2fd21f6a76375ccfc4e`, the inventory-flags pair at `8af487be217086536a863a60d5912a73089b08b3`) (its `MANIFEST.txt` holds the lab's hashes), then copied here byte for byte.
+
+- **Host / gateway:** TallyPrime **Silver (licensed)**, 7.1, a lab instance, the company loaded alone, one request at a time, all answers HTTP 200.
+- **Company:** the synthetic `BRIDGE TIEOUT B`: three stock items directly under Primary, one purchase (5 May 2025: 10 at 100, 20 at 50, 5 at 200), one sale (20 May: A 4 at 150, B 10 at 80), freight 500 on 1 June, no opening stock; its last voucher is dated 1 June 2025, so a half-year window returned the same bytes as the full year and is not committed.
+- **Encoding:** answers are BOM-less UTF-16LE as received; requests are the exact bytes sent, UTF-16LE with a BOM. The Trial Balance answer holds one `&#4;` character reference and the group tree 30 of them plus 82 raw U+0003 characters inside `PARENTSTRUCTURE`: kept as received.
+- **Request shape:** the statement requests are §12a.1's built-in report request with this company's name; the Trial Balance and group requests are the production texts of the neighbouring `statement_*` fixtures with only the company name changed.
+
+| file | bytes | sha256 | report | window |
+|---|---|---|---|---|
+| `statement_profit_and_loss_stock_book_fy_live.utf16le.xml` | 1920 | `d5dcdea6d99839492ddbdd17a0c809f8d25d2d415f523f5db7b8897e4c736835` | Profit and Loss | 2025-04-01 to 2026-03-31 |
+| `statement_balance_sheet_stock_book_fy_live.utf16le.xml` | 1840 | `fb590bb683df71b661ca1a203a55a1aa6952e97d591cd2cf7c94d108bcaf9ea6` | Balance Sheet | 2025-04-01 to 2026-03-31 |
+| `statement_trial_balance_stock_book_fy_live.utf16le.xml` | 13476 | `7ff82ce27ed95949fae25a08a4df4268542c2bfd3c4a77fb0719a05a0281a4ec` | native Trial Balance (9 ledgers) | 2025-04-01 to 2026-03-31 |
+| `statement_groups_stock_book_live.utf16le.xml` | 54280 | `48678d9701f6b169bc03dfb1521373eee79bce2ab949940d2252502085ea033c` | List of Groups (28 groups) | none (a master collection) |
+| `statement_profit_and_loss_stock_book_fy_request.utf16le.xml` | 760 | `2da98ea3fc23fea1fb121914296bb41676397306c1497b390295e1743eb9045b` | request for the Profit and Loss | as above |
+| `statement_balance_sheet_stock_book_fy_request.utf16le.xml` | 756 | `fcc94a8a4b6bea5019d7cfb28b1469e6894e803aff8af5748d8b0c7e6117a10c` | request for the Balance Sheet | as above |
+| `statement_trial_balance_stock_book_fy_request.utf16le.xml` | 1142 | `e25f2e4e5892ff497990726fb73451eda5c28fa5c8e186bcc6d92136cc0f8249` | request for the Trial Balance | as above |
+| `statement_groups_stock_book_request.utf16le.xml` | 1064 | `130d5ffa6295243da2751e1cc1845e31da3763e2790276b2cc0dd9dc46e51757` | request for the group tree | none |
+| `company_inventory_flags_stock_book_live.utf16le.xml` | 4886 | `c58d3ba017b17bc71120a6b0e61bdd58ad3f2181011120cd65eb06e2961b4b24` | company inventory flags (`ISINTEGRATED` `Yes`, `ISINVENTORYON` `Yes`, 3 stock items) | none (a company object) |
+| `company_inventory_flags_stock_book_request.utf16le.xml` | 1638 | `8f964258be6506b08782b87bb548871e3fa18b284213baf855428f71d44f210d` | request for the company inventory flags | none |
+
+What they establish (confidence: partial; one book, one release, no opening stock):
+
+- **Profit and Loss.** Flat pairs in this order: `Sales Accounts` main `1400.00`; `Cost of Sales :` main `-900.00`; `Opening Stock` empty; `Add: Purchase Accounts` sub `-3000.00`; `Less: Closing Stock` sub `-2100.00` (the 5th `PLAMT`, sub column, main column empty); `Indirect Expenses` main `-500.00`. There is no Gross Profit leaf. Closing stock carries the sign of the purchase line (a debit is negative): `-900.00` is `-3000.00` less `-2100.00`.
+- **Balance Sheet.** `Capital Account` `50000.00`, `Current Liabilities` `3000.00`, `Profit & Loss A/c` empty, `Current Assets` `-53000.00`. No closing-stock leaf: stock sits inside Current Assets.
+- **Trial Balance and groups.** Seven ledgers with the figures above plus `Cash` and `Profit & Loss A/c` at `0.00`. Current Assets derived from them is `-50900.00`, `2100.00` short of Tally's: the closing stock.
+- **Not established:** opening stock, a costing method, a non-integrated book, a window spanning two financial years, more than one purchase rate for an item.
+
+## `statement_profit_and_loss_opening_stock_book_*`: a book with opening stock (BRIDGE TIEOUT D), 21 Oct 2026
+
+- **Date and instance:** 2026-10-21, TallyPrime 7.1 Silver (licensed) on Windows, `education_mode=false`, one request at a time with curl, HTTP 200, the company loaded alone. The requests are the committed Profit and Loss request with only the company and, for the second, the dates changed (1 October 2025 to 31 March 2026); not committed again. The lab's send log records each answer's sha256, equal to the files'.
+- **Book:** `BRIDGE TIEOUT D`, a synthetic company built by hand: the book `BRIDGE TIEOUT C` (one item with opening stock 10 Nos at 100.00, purchases 5 May (10 at 120) and 5 June (10 at 140), a sale 20 June (8 at 200), default costing) plus one change, a capital ledger of 1,000.00 Cr, so that its opening stock has a matching capital entry. A further sale on 15 October (5 at 250) was keyed after the year had been read once; it is in the second file's read only. The first file's bytes are identical to the answer for `BRIDGE TIEOUT C` over the same year (`ans-e1-pl-fy.xml` on the lab branch `lab/692-tieout-c-answers`, same sha256), because the capital ledger changes no Profit and Loss line.
+
+| file | bytes | sha256 | content |
+| --- | ---: | --- | --- |
+| `statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml` | 1622 | `f6ccb220551af3ccc25e9d579f8521b932b9da9737bdbeeca8ca9afc3161be66` | Profit and Loss, 1 April 2025 to 31 March 2026, read before the October sale: Sales `1600.00` main; `Cost of Sales :` `-960.00` main; `Opening Stock` `-1000.00`; `Add: Purchase Accounts` `-2600.00`; `Less: Closing Stock` `-2640.00` |
+| `statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml` | 1606 | `a72afe57618cc6488d6920d706f3a4b52100073bcb015622e4f5f8f716bbebdf` | Profit and Loss, 1 October 2025 to 31 March 2026: Sales `1250.00` main; `Cost of Sales :` `-600.00` main; `Opening Stock` `-2640.00`; `Add: Purchase Accounts` empty; `Less: Closing Stock` `-2040.00` |
+
+What they establish (confidence: partial; one book, one release): a non-empty `Opening Stock` line is a debit in the sub column and can differ from the closing line, with movement in the window. The answers carry no `Profit & Loss A/c` leaf: the nett profit is the sum of the lines. Not established: a costing method other than the default, a stock group, negative stock, a non-integrated book.

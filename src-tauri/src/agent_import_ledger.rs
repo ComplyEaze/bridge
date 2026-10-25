@@ -1741,6 +1741,7 @@ fn admit_post_span_verdict(
     }
 }
 
+/// Shared with the master journal, which bounds its records the same way.
 pub(super) fn read_record(reader: &mut impl BufRead, line: &mut Vec<u8>) -> Result<bool, String> {
     line.clear();
     loop {

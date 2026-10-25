@@ -18,6 +18,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shlex
 import shutil
 import stat
@@ -126,16 +127,26 @@ class MergeGateControls(unittest.TestCase):
 
     @classmethod
     @contextlib.contextmanager
-    def master_state(cls, tracked=None, symlinks=None, ignored=None, hidden_edits=None):
+    def master_state(cls, tracked=None, symlinks=None, ignored=None, hidden_edits=None, deleted=None):
         """Put files on the throwaway origin/master (and in the gate's checkout), then put it back.
 
         tracked: path -> text, committed. symlinks: path -> target, committed as links. ignored: path -> text, written
         into the checkout only, with a committed .gitignore naming it (git status does not show it). hidden_edits: path -> text
         written over a tracked file in the checkout and hidden from git with skip-worktree (git diff and git status do not show it).
+        deleted: path -> text, committed and then removed in a later commit, so master once held it.
         """
         base = subprocess.run(["git", "-C", str(cls.repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
         try:
+            if deleted:
+                for path, text in deleted.items():
+                    (cls.repo / path).parent.mkdir(parents=True, exist_ok=True)
+                    (cls.repo / path).write_text(text)
+                cls.git_in_repo("add", "-A")
+                cls.git_in_repo("commit", "-q", "-m", "held")
+                cls.git_in_repo("rm", "-q", *deleted)
+                cls.git_in_repo("commit", "-q", "-m", "deleted")
             for path, text in (tracked or {}).items():
+                (cls.repo / path).parent.mkdir(parents=True, exist_ok=True)
                 (cls.repo / path).write_text(text)
             for path, target in (symlinks or {}).items():
                 os.symlink(target, cls.repo / path)
@@ -666,8 +677,8 @@ class MergeGateControls(unittest.TestCase):
 
     # -- The lab-capture manifest: scripts/merge-gate-lab-captures.json on master ---------------------------------------
     LAB_PATH = "scripts/merge-gate-lab-captures.json"
-    LAB_BLOB = "3b18e512dba79e4c8300dd08aeb37f8e728b8dad"
-    LAB_BLOB_OFF = "3b18e512dba79e4c8300dd08aeb37f8e728b8dae"
+    LAB_BLOB = "1e0627036228d2a3032c1d66e96b9e997bea34af"
+    LAB_BLOB_OFF = "1e0627036228d2a3032c1d66e96b9e997bea34ae"
     OTHER_BLOB = "9f2b1c4e7a6d03581e4c2b7a9d0f3e5c6b8a1d24"
     ATTEST = "1 binary addition/change(s) require the owner's own --binary-review-sha attestation"
     LAB_BYTES = b"lab capture bytes\n"
@@ -691,6 +702,118 @@ class MergeGateControls(unittest.TestCase):
             result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
         self.assertIn("lab-capture manifest: 1 listed capture(s) (blob ", result.stdout)
         self.assertNotIn("--binary-review-sha attestation", result.stdout)
+
+    # -- Stale manifest entries: a warning, never a block ---------------------------------------------------------------
+    STALE = "lab-capture manifest: stale entry"
+    PENDING = "entr(ies) not yet on master (pending)"
+
+    def test_an_entry_whose_path_master_never_held_is_only_counted_as_pending(self):
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn("lab-capture manifest: 1 " + self.PENDING, result.stdout)
+        self.assertNotIn(self.STALE, result.stdout)
+
+    def test_an_entry_whose_file_master_holds_at_the_listed_blob_is_neither_stale_nor_pending(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="docs/kept.bin"))
+        with self.master_state(tracked={self.LAB_PATH: manifest, "docs/kept.bin": self.LAB_BYTES.decode()}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertNotIn(self.STALE, result.stdout)
+        self.assertIn("lab-capture manifest: 1 " + self.PENDING, result.stdout)
+
+    def test_an_entry_whose_path_master_holds_with_another_blob_is_stale_but_still_passes(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="docs/changed.bin"))
+        with self.master_state(tracked={self.LAB_PATH: manifest, "docs/changed.bin": "other bytes\n"}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn(self.STALE + " 'docs/changed.bin': master holds another blob there", result.stdout)
+
+    def test_an_entry_whose_path_is_a_directory_on_master_is_stale(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="docs/dir"))
+        with self.master_state(tracked={self.LAB_PATH: manifest, "docs/dir/inner.txt": "x\n"}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn(self.STALE + " 'docs/dir': master holds another blob there", result.stdout)
+
+    def test_an_entry_whose_path_master_deleted_is_stale_and_names_the_commit(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="docs/gone.bin"))
+        with self.master_state(tracked={self.LAB_PATH: manifest}, deleted={"docs/gone.bin": "gone\n"}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertRegex(result.stdout, re.escape(self.STALE + " 'docs/gone.bin': master deleted it at ") + "[0-9a-f]{7,}")
+        self.assertIn("lab-capture manifest: 1 " + self.PENDING, result.stdout)
+
+    def test_a_path_with_pathspec_magic_is_read_literally(self):
+        # ":(glob)docs/*" would match every docs file as a pathspec; read literally it names no file master ever held
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path=":(glob)docs/*"))
+        with self.master_state(tracked={self.LAB_PATH: manifest, "docs/kept.bin": "x\n"}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertNotIn(self.STALE, result.stdout)
+        self.assertIn("lab-capture manifest: 2 " + self.PENDING, result.stdout)
+
+    def test_a_stale_entry_with_a_home_shaped_path_is_named_redacted(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="Users/someone/cap.bin"))
+        with self.master_state(tracked={self.LAB_PATH: manifest, "Users/someone/cap.bin": "other\n"}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn(self.STALE + " '<home>/cap.bin'", result.stdout)
+        self.assertNotIn("someone", result.stdout)
+
+    COULD_NOT_RUN = "lab-capture manifest: the stale-entry check could not run (git could not look up an entry's path on master)"
+
+    def test_a_git_failure_on_the_first_entry_says_the_check_could_not_run_and_changes_nothing_else(self):
+        # git refuses a path outside the repository (exit 128); the schema allows "docs/../../x" because it does not start with ".."
+        manifest = self.lab_manifest(self.lab_entry(path="docs/../../outside.bin"), self.lab_entry())
+        with self.master_state(tracked={self.LAB_PATH: manifest}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn(self.COULD_NOT_RUN, result.stdout)
+        self.assertNotIn(self.PENDING, result.stdout)
+        self.assertNotIn(self.STALE, result.stdout)
+
+    def test_a_git_failure_after_some_entries_says_the_check_stopped_partway(self):
+        manifest = self.lab_manifest(self.lab_entry(), self.lab_entry(path="docs/../../outside.bin"))
+        with self.master_state(tracked={self.LAB_PATH: manifest}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn("lab-capture manifest: the stale-entry check stopped partway, after 1 of 2 entries", result.stdout)
+        self.assertNotIn(self.COULD_NOT_RUN, result.stdout)
+
+    def test_a_current_entry_counts_as_checked_before_a_later_git_failure(self):
+        # the first entry is current (master holds it at the listed blob); the failure comes after it
+        manifest = self.lab_manifest(self.lab_entry(path="docs/kept.bin"), self.lab_entry(path="docs/../../outside.bin"), self.lab_entry())
+        with self.master_state(tracked={self.LAB_PATH: manifest, "docs/kept.bin": self.LAB_BYTES.decode()}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn("lab-capture manifest: the stale-entry check stopped partway, after 1 of 3 entries", result.stdout)
+        self.assertNotIn(self.COULD_NOT_RUN, result.stdout)
+
+    def run_with_failing_git(self, subcommand, manifest):
+        # a git stub that fails only the stale check's own lookups (git --literal-pathspecs ... <subcommand>); every other call is real
+        real_git = shutil.which("git")
+        with tempfile.TemporaryDirectory() as stub_dir:
+            stub = Path(stub_dir) / "git"
+            stub.write_text("#!/bin/sh\n"
+                            "case \" $* \" in *\" --literal-pathspecs \"*\" %s \"*) echo 'stub: refused' >&2; exit 128 ;; esac\n"
+                            "exec %s \"$@\"\n" % (subcommand, shlex.quote(real_git)))
+            stub.chmod(0o755)
+            old_path = os.environ["PATH"]
+            os.environ["PATH"] = stub_dir + os.pathsep + old_path
+            try:
+                with self.master_state(tracked={self.LAB_PATH: manifest}):
+                    return self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+            finally:
+                os.environ["PATH"] = old_path
+
+    def test_a_failing_history_lookup_is_not_counted_as_pending(self):
+        result = self.run_with_failing_git("log", self.lab_manifest(self.lab_entry()))
+        self.assertIn(self.COULD_NOT_RUN, result.stdout)
+        self.assertNotIn(self.PENDING, result.stdout)
+
+    def test_a_failing_tree_lookup_is_not_counted_as_pending(self):
+        result = self.run_with_failing_git("ls-tree", self.lab_manifest(self.lab_entry()))
+        self.assertIn(self.COULD_NOT_RUN, result.stdout)
+        self.assertNotIn(self.PENDING, result.stdout)
+
+    def test_more_than_eight_stale_entries_are_named_eight_times_and_counted(self):
+        paths = ["docs/s%d.bin" % i for i in range(10)]
+        manifest = self.lab_manifest(self.lab_entry(), *[self.lab_entry(path=p) for p in paths])
+        with self.master_state(tracked=dict({self.LAB_PATH: manifest}, **{p: "other\n" for p in paths})):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertEqual(result.stdout.count(self.STALE + " '"), 8)
+        self.assertIn("lab-capture manifest: 10 stale entries in all (eight named above)", result.stdout)
 
     def test_a_listed_binary_in_a_renamed_file_is_judged_by_its_new_path(self):
         with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
@@ -772,13 +895,23 @@ class MergeGateControls(unittest.TestCase):
     def test_a_listed_entry_whose_sha256_differs_from_the_blobs_bytes_is_not_exempt(self):
         with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(sha256="0" * 64))}):
             result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
-        self.assertIn("listed capture 'docs/new.png' not exempt: its bytes differ from the size or sha256 in the manifest", result.stdout)
+        self.assertIn("listed capture 'docs/new.png' not exempt: its bytes differ from the manifest (the sha256 differs)", result.stdout)
         self.assertNotIn("binary capture(s) are listed", result.stdout)
 
     def test_a_listed_entry_whose_size_differs_from_the_blobs_bytes_is_not_exempt(self):
         with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(size=len(self.LAB_BYTES) + 1))}):
             result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
-        self.assertIn("not exempt: its bytes differ from the size or sha256 in the manifest", result.stdout)
+        self.assertIn("not exempt: its bytes differ from the manifest (the size differs)", result.stdout)
+
+    def test_a_blob_answer_whose_bytes_are_not_that_blob_exempts_nothing_even_if_the_manifest_records_them(self):
+        # the answer's bytes match the entry's size and sha256, but do not hash to the blob id that was asked for
+        other = b"other capture bytes\n"
+        entry = self.lab_entry(size=len(other), sha256=hashlib.sha256(other).hexdigest())
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(entry)}):
+            result = self.assert_blocked("binary-blob-not-that-blob", self.ATTEST)
+        self.assertIn("listed capture 'docs/new.png' not exempt: could not check its bytes (the blob answer does not hash to its blob id)", result.stdout)
+        self.assertNotIn("bytes differ", result.stdout)
+        self.assertNotIn("binary capture(s) are listed", result.stdout)
 
     def test_a_failed_blob_request_is_told_apart_from_differing_bytes_and_exempts_nothing(self):
         with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):
@@ -940,8 +1073,156 @@ class MergeGateControls(unittest.TestCase):
                 result = self.assert_blocked(scenario, self.VERDICT_BLOCK)
                 self.assertNotIn("carried", result.stdout.replace("not carried", ""))
 
-    def test_a_carried_clean_line_does_not_replace_the_recommend_line_of_the_full_tier(self):
+    # A pull request whose binaries are all in the lab-capture manifest: the compare diffs hide the bytes, so the gate compares the
+    # full blob id of each binary, read from the compare JSON of each range.
+    def listed_binary_state(self):
+        return self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())})
+
+    def assert_not_carried(self, result):
+        self.assertIn("is not carried", result.stdout)
+        self.assertNotIn("is carried to head", result.stdout)
+
+    def test_a_clean_line_is_carried_when_every_binary_is_listed_and_its_blob_is_the_same_in_both_ranges(self):
+        for scenario in ("carry-listed-binary", "carry-listed-binary-patch-body", "carry-listed-binary-299-files"):
+            with self.subTest(scenario=scenario), self.listed_binary_state():
+                result = self.assert_pass(scenario, "is carried to head")
+                self.assertIn("with 1 manifest-listed binary blob(s) unchanged", result.stdout)
+                self.assertIn(self.LISTED_OK, result.stdout)
+                self.assertNotIn("--binary-review-sha attestation", result.stdout)
+
+    def test_a_clean_line_is_not_carried_when_a_listed_binary_has_another_blob_in_the_older_range(self):
+        with self.listed_binary_state():
+            result = self.assert_blocked("carry-listed-binary-blob-differs", self.VERDICT_BLOCK)
+        self.assert_not_carried(result)
+        self.assertIn(self.LISTED_OK, result.stdout)
+
+    def test_a_clean_line_is_not_carried_for_an_unlisted_binary_even_with_the_attestation(self):
+        # no manifest on master: the owner's attestation lets the gate itself pass, but never the carry
+        result = self.assert_blocked("carry-listed-binary", self.VERDICT_BLOCK, extra_args=("--binary-review-sha", HEAD))
+        self.assert_not_carried(result)
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(path="docs/other.png"))}):
+            result = self.assert_blocked("carry-listed-binary", self.VERDICT_BLOCK, extra_args=("--binary-review-sha", HEAD))
+        self.assert_not_carried(result)
+        # without the attestation the binary itself is what blocks
+        result = self.assert_blocked("carry-listed-binary", self.ATTEST)
+        self.assert_not_carried(result)
+
+    def test_a_clean_line_is_not_carried_when_a_listed_binary_was_renamed(self):
+        with self.listed_binary_state():
+            result = self.assert_blocked("carry-listed-binary-renamed", self.VERDICT_BLOCK)
+        self.assert_not_carried(result)
+        self.assertIn(self.LISTED_OK, result.stdout)
+
+    def test_a_clean_line_is_not_carried_when_the_compare_json_cannot_prove_the_blob(self):
+        reasons = {
+            "carry-listed-binary-json-fails": "the compare JSON request failed",
+            "carry-listed-binary-truncated": "lists 300 or more files",
+            "carry-listed-binary-path-missing": "is missing from the compare JSON or appears twice in it",
+            "carry-listed-binary-path-missing-new": "is missing from the compare JSON or appears twice in it",
+            "carry-listed-binary-path-twice": "is missing from the compare JSON or appears twice in it",
+            "carry-listed-binary-uppercase-sha": "is not 40 lowercase hex",
+            "carry-listed-binary-short-sha": "is not 40 lowercase hex",
+            "carry-listed-binary-no-files-list": "the binary evidence could not be read",
+        }
+        for scenario, reason in reasons.items():
+            with self.subTest(scenario=scenario), self.listed_binary_state():
+                result = self.assert_blocked(scenario, self.VERDICT_BLOCK)
+                self.assert_not_carried(result)
+                self.assertIn("verdict not carried: ", result.stdout)
+                self.assertIn(reason, result.stdout)
+
+    # Only an ADDED binary is carried: the kept `new file mode` line binds an empty base, whereas the base blob of a modified binary is
+    # only in the stripped `index` line, so B0 -> B1 and B2 -> B1 would hash alike.
+    def test_a_clean_line_is_not_carried_for_a_modified_listed_binary_whatever_its_base(self):
+        for scenario in ("carry-listed-binary-modified", "carry-listed-binary-modified-same-base"):
+            with self.subTest(scenario=scenario), self.listed_binary_state():
+                result = self.assert_blocked(scenario, self.VERDICT_BLOCK)
+                self.assertIn(self.LISTED_OK, result.stdout)
+                self.assert_not_carried(result)
+                self.assertIn("verdict not carried: a manifest-exempted binary is not a plain addition", result.stdout)
+
+    # One test per check of the carry, each set up so that only that check stands between the scenario and a carry.
+    def test_the_binary_paths_of_the_diff_must_be_exactly_the_exempted_ones(self):
+        with self.listed_binary_state():
+            result = self.assert_blocked("carry-listed-binary-extra-in-compare", self.VERDICT_BLOCK)
+        self.assert_not_carried(result)
+        self.assertIn("verdict not carried: the binary paths of the diff are not exactly the manifest-exempted paths", result.stdout)
+
+    def test_every_binary_of_the_pull_request_must_be_exempted_by_the_manifest(self):
+        with self.listed_binary_state():
+            result = self.assert_blocked("carry-listed-binary-and-unlisted", self.VERDICT_BLOCK, extra_args=("--binary-review-sha", HEAD))
+        self.assert_not_carried(result)
+        self.assertIn("verdict not carried: a binary change of the pull request is not exempted by the lab-capture manifest", result.stdout)
+
+    def test_an_exempted_binary_that_is_not_a_plain_addition_in_the_files_list_is_not_carried(self):
+        # the files API calls it renamed, the compare JSON (wrongly) added: only the gate's own record of the exemption is left to refuse
+        with self.listed_binary_state():
+            result = self.assert_blocked("carry-listed-binary-renamed-json-added", self.VERDICT_BLOCK)
+        self.assert_not_carried(result)
+        self.assertIn("verdict not carried: a manifest-exempted binary is not a plain addition (modified, renamed or copied)", result.stdout)
+
+    def test_a_binary_that_is_not_an_addition_in_the_compare_json_is_not_carried(self):
+        # the files API says added, the compare JSON modified: only the status check of the carry is left to refuse
+        with self.listed_binary_state():
+            result = self.assert_blocked("carry-listed-binary-json-modified", self.VERDICT_BLOCK)
+        self.assert_not_carried(result)
+        self.assertIn("verdict not carried: a binary file is not a plain addition in the compare JSON", result.stdout)
+
+    def test_the_compare_json_blob_must_be_the_blob_the_manifest_check_verified(self):
+        # the same other blob in both ranges, so the digests agree: only the binding to the verified blob is left to refuse
+        with self.listed_binary_state():
+            result = self.assert_blocked("carry-listed-binary-json-differs-from-files", self.VERDICT_BLOCK)
+        self.assert_not_carried(result)
+        self.assertIn("verdict not carried: a binary blob id in the compare JSON is not the blob the manifest check verified", result.stdout)
+
+    def test_a_text_only_clean_line_is_carried_as_before(self):
+        result = self.assert_pass("carry-same-patch", "is carried to head")
+        self.assertNotIn("manifest-listed binary", result.stdout)
+        self.assertIn("hunk places and context included (digest ", result.stdout)
+
+    # The owner's RECOMMEND line for the older pair is carried with the CLEAN line, under the same proof.
+    CARRIED_RECOMMEND = "the MERGE-ADVERSARY RECOMMEND line was carried to head"
+
+    def test_a_carried_clean_line_still_needs_a_recommend_line_of_some_kind_in_the_full_tier(self):
         self.assert_blocked("carry-same-patch-write-path", self.VERDICT_BLOCK)
+
+    def test_a_recommend_line_for_the_carried_pair_is_carried_in_the_full_tier(self):
+        result = self.assert_pass("carry-rec-fullpath", "is carried to head")
+        self.assertIn(self.CARRIED_RECOMMEND, result.stdout)
+        self.assertIn("review tier: full", result.stdout)
+        with self.listed_binary_state():
+            result = self.assert_pass("carry-rec-listed-binary", "is carried to head")
+        self.assertIn(self.CARRIED_RECOMMEND, result.stdout)
+        self.assertIn("with 1 manifest-listed binary blob(s) unchanged", result.stdout)
+
+    def test_a_recommend_line_for_another_older_pair_is_not_carried(self):
+        result = self.assert_blocked("carry-rec-fullpath-other-pair", self.VERDICT_BLOCK)
+        self.assertNotIn(self.CARRIED_RECOMMEND, result.stdout)
+        self.assertIn("is carried to head", result.stdout)  # the CLEAN line was carried; the other pair's RECOMMEND was not
+
+    def test_a_voided_recommend_line_is_not_carried(self):
+        result = self.assert_blocked("carry-rec-fullpath-retracted", self.VERDICT_BLOCK)
+        self.assertNotIn(self.CARRIED_RECOMMEND, result.stdout)
+
+    def test_a_newer_recommend_line_at_the_current_pair_stands_on_its_own(self):
+        result = self.assert_pass("carry-rec-fullpath-newer-current", "is carried to head")
+        self.assertNotIn(self.CARRIED_RECOMMEND, result.stdout)
+
+    def test_a_recommend_line_is_not_carried_when_nothing_is_carried(self):
+        # the patch differs between the pairs: neither line is carried
+        result = self.assert_blocked("carry-rec-fullpath-patch-differs", self.VERDICT_BLOCK)
+        self.assert_not_carried(result)
+        self.assertNotIn(self.CARRIED_RECOMMEND, result.stdout)
+        # a listed binary whose blob differs between the pairs
+        with self.listed_binary_state():
+            result = self.assert_blocked("carry-rec-listed-binary-blob-differs", self.VERDICT_BLOCK)
+        self.assert_not_carried(result)
+        self.assertNotIn(self.CARRIED_RECOMMEND, result.stdout)
+        # an unlisted binary, with and without the attestation
+        for extra in ((), ("--binary-review-sha", HEAD)):
+            result = self.assert_blocked("carry-rec-listed-binary", self.VERDICT_BLOCK if extra else self.ATTEST, extra_args=extra)
+            self.assert_not_carried(result)
+            self.assertNotIn(self.CARRIED_RECOMMEND, result.stdout)
 
     def test_both_lines_still_pass_at_either_tier(self):
         self.assert_pass("pass", self.VERDICT_PASS)
@@ -1840,12 +2121,102 @@ class MergeVerdictEvaluator(unittest.TestCase):
             with self.subTest(bad=bad):
                 self.assertEqual(self.status(dict(doc, tier="one", carried=bad)), "block")
 
-    def test_a_carried_clean_line_does_not_carry_the_recommend_line(self):
-        both = self.doc(comments=[self.comment(self.old_clean(), self.T[1]),
-                                  self.comment("MERGE-ADVERSARY RECOMMEND head=" + self.OLD_HEAD + " base=" + self.OLD_BASE, self.T[2])])
-        carried = {"head": self.OLD_HEAD, "base": self.OLD_BASE}
-        self.assertEqual(self.status(dict(both, tier="full", carried=carried)), "block")
-        self.assertEqual(self.status(dict(both, tier="one", carried=carried)), "pass")
+    def old_recommend(self, head=None, base=None):
+        return "MERGE-ADVERSARY RECOMMEND head=" + (head or self.OLD_HEAD) + " base=" + (base or self.OLD_BASE)
+
+    def carried_pair(self):
+        return {"head": self.OLD_HEAD, "base": self.OLD_BASE}
+
+    def test_a_recommend_line_for_the_carried_pair_is_carried_with_the_clean_line(self):
+        both = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment(self.old_recommend(), self.T[2])])
+        for tier in ("full", "one", None):
+            with self.subTest(tier=tier):
+                result = self.mod.evaluate(dict(both, tier=tier, carried=self.carried_pair()))
+                self.assertEqual(result["status"], "pass")
+                self.assertEqual(result["recommend_carried"], tier != "one")
+        # as reviews, too, and in either order of the two lines
+        reviews = self.doc(reviews=[self.review(self.old_recommend(), self.T[1]), self.review(self.old_clean(), self.T[2])])
+        self.assertEqual(self.status(dict(reviews, tier="full", carried=self.carried_pair())), "pass")
+
+    def test_a_recommend_line_for_an_older_pair_is_not_carried_when_no_pair_was_carried(self):
+        both = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment(self.old_recommend(), self.T[2])])
+        self.assertEqual(self.status(dict(both, tier="full")), "block")
+        for bad in (None, {"head": self.OLD_HEAD}, {"head": "5" * 40, "base": self.OLD_BASE}, "carried", []):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.status(dict(both, tier="full", carried=bad)), "block")
+
+    def test_a_recommend_line_is_not_carried_when_the_clean_line_was_not(self):
+        # CLEAN names the current pair (nothing carried for it) and RECOMMEND an older pair: the older RECOMMEND does not stand
+        doc = self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.old_recommend(), self.T[2])])
+        self.assertEqual(self.status(dict(doc, tier="full", carried=self.carried_pair())), "block")
+        # CLEAN names another older pair than the one carried
+        other = self.old_clean().replace(self.OLD_HEAD, "6" * 40)
+        doc = self.doc(comments=[self.comment(other, self.T[1]), self.comment(self.old_recommend(), self.T[2])])
+        self.assertEqual(self.status(dict(doc, tier="full", carried=self.carried_pair())), "block")
+
+    def test_a_recommend_line_for_a_different_older_pair_than_the_carried_clean_line_is_not_carried(self):
+        for line in (self.old_recommend(head="6" * 40), self.old_recommend(base="6" * 40), self.old_recommend(head="6" * 40, base="7" * 40)):
+            with self.subTest(line=line[-90:]):
+                doc = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment(line, self.T[2])])
+                result = self.mod.evaluate(dict(doc, tier="full", carried=self.carried_pair()))
+                self.assertEqual(result["status"], "block")
+                self.assertFalse(result["recommend_carried"])
+        # an older RECOMMEND for the carried pair does not stand when the newest one names another pair
+        doc = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment(self.old_recommend(), self.T[2]),
+                                 self.comment(self.old_recommend(head="6" * 40), self.T[3])])
+        self.assertEqual(self.status(dict(doc, tier="full", carried=self.carried_pair())), "block")
+
+    def test_two_recommend_lines_in_the_same_newest_second_do_not_carry(self):
+        # one names the carried pair and one another pair, at the same second: ambiguous, so nothing carries
+        other = self.old_recommend(head="6" * 40)
+        for order in ((self.old_recommend(), other), (other, self.old_recommend())):
+            with self.subTest(first=order[0][-60:]):
+                doc = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment(order[0], self.T[2]), self.comment(order[1], self.T[2])])
+                result = self.mod.evaluate(dict(doc, tier="full", carried=self.carried_pair()))
+                self.assertEqual(result["status"], "block")
+                self.assertFalse(result["recommend_carried"])
+
+    def test_a_carried_recommend_line_is_voided_like_the_carried_clean_line(self):
+        carried = self.carried_pair()
+        lines = [self.comment(self.old_clean(), self.T[1]), self.comment(self.old_recommend(), self.T[2])]
+        retract = "MERGE-ADVERSARY RETRACT head=" + "1" * 40 + " base=" + "2" * 40
+        stand = self.mod.evaluate(dict(self.doc(comments=lines), tier="full", carried=carried))
+        self.assertEqual(stand["status"], "pass")
+        voids = {
+            "a later retraction": dict(comments=lines + [self.comment(retract, self.T[3])]),
+            "a later NOT-CLEAN": dict(comments=lines + [self.comment("MERGE-VERDICT NOT-CLEAN head=" + "1" * 40 + " base=" + "2" * 40, self.T[3])]),
+            "a void at the same second": dict(comments=lines + [self.comment(retract, self.T[2])]),
+            "a later owner edit": dict(comments=lines, comments_graph=[{"authorId": self.OWNER, "lastEditedAt": self.T[3], "editCount": 1}]),
+            "an owner edit of unknown time": dict(comments=lines, comments_graph=[{"authorId": self.OWNER, "lastEditedAt": None, "editCount": 1}]),
+            "a later deletion": dict(comments=lines, events=[{"type": "CommentDeletedEvent", "createdAt": self.T[3], "authorId": self.OWNER}]),
+            "a later dismissal": dict(comments=lines, events=[{"type": "ReviewDismissedEvent", "createdAt": self.T[3], "authorId": self.OWNER}]),
+            "a later review asking for changes": dict(comments=lines, reviews=[self.review(self.CLEAN, self.T[3], state="CHANGES_REQUESTED")]),
+            "an owner inline comment with a token": dict(comments=lines, inline=[self.comment("MERGE-VERDICT x", self.T[3])]),
+            "an owner commit comment with a token": dict(comments=lines),
+        }
+        for name, kwargs in voids.items():
+            with self.subTest(void=name):
+                doc = self.doc(**kwargs)
+                if name == "an owner commit comment with a token":
+                    doc["commit_comments"] = [dict(self.comment("MERGE-ADVERSARY x", self.T[3]))]
+                result = self.mod.evaluate(dict(doc, tier="full", carried=carried))
+                self.assertEqual(result["status"], "block")
+                self.assertFalse(result["recommend_carried"])
+        # a void between the two lines voids the older one only: the RECOMMEND line is older here, so it does not stand
+        between = self.doc(comments=[self.comment(self.old_recommend(), self.T[1]), self.comment(retract, self.T[2]), self.comment(self.old_clean(), self.T[3])])
+        self.assertEqual(self.status(dict(between, tier="full", carried=carried)), "block")
+        # a token by anyone else is refused
+        other = self.doc(comments=lines + [self.comment(self.old_recommend(), self.T[3], uid=7)])
+        self.assertEqual(self.status(dict(other, tier="full", carried=carried)), "block")
+
+    def test_a_newer_recommend_line_at_the_current_pair_stands_on_its_own(self):
+        doc = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment(self.old_recommend(), self.T[2]),
+                                 self.comment(self.RECOMMEND, self.T[3])])
+        result = self.mod.evaluate(dict(doc, tier="full", carried=self.carried_pair()))
+        self.assertEqual(result["status"], "pass")
+        self.assertFalse(result["recommend_carried"])
+        # and without any carried pair a RECOMMEND at the current pair never needed one, though the old CLEAN still does
+        self.assertEqual(self.status(dict(doc, tier="full")), "block")
 
     def test_a_carried_clean_line_is_voided_like_any_other(self):
         carried = {"head": self.OLD_HEAD, "base": self.OLD_BASE}

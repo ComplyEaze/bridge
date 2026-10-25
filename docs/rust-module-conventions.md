@@ -90,7 +90,7 @@ non-idiomatic Rust. Treat them as questions only.
    can jointly confirm purity, and keep moves free of edits so `git blame -C` and
    `git log --follow` still work.
 8. **Prove purity with test names, not counts, then run the suite.** Diff `cargo test -- --list`
-   output before and after, on both workspaces (`src-tauri/`, `tools/`): a count can match while a
+   output before and after, on the workspace (`src-tauri/`): a count can match while a
    test was dropped and another added. But listing is not running.
    - **Tests that read source as text still compile after a move and then fail.** Before moving, grep
      for `include_str!` and script `readFile` calls naming the file. The first `commands.rs` split
@@ -142,7 +142,7 @@ Answer these in the PR body before splitting a file:
 8. Does git change coupling agree with the static seam?
 9. Can the parent stay a pure façade?
 10. Is this one named group, small enough to review as a move?
-11. Do test *names* match before and after on both workspaces, with fmt and clippy clean?
+11. Do test *names* match before and after in the workspace, with fmt and clippy clean?
 12. Did you add the acknowledgement (`acks/pr-<N>.txt`) listing every changed pinned path and every new pin, and leave `git status` clean?
 
 ## The current map

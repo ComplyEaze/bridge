@@ -1042,6 +1042,28 @@ const ROWS: &[Row] = &[
         },
     },
     Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
         fixture: "tests/fixtures/statement_profit_and_loss_stock_book_fy_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_statement(ProfitAndLoss)",
@@ -1170,6 +1192,24 @@ const ROWS: &[Row] = &[
     // Built-in Negative Stock report: src/native_negative_stock_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_negative_stock_shape_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_negstock_lab_2_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_negstock_lab_2_to_20250531_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_negative_stock",
         parse: |_, text| typed(parse_native_negative_stock(text)),

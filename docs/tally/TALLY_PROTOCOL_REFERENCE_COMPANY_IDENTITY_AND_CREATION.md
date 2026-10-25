@@ -395,7 +395,7 @@ with the gateway healthy):
 | --- | --- |
 | Flat, batch 1 | `BASICCURRENCYFORMALNAME`, `CURRENCYEXPANDEDSYMBOL`, `CURRENCYORIGINALNAME`, `BASECURRENCYFORMALNAME`, `FORMALNAMEFORCURRENCY` |
 | Flat, batch 2 | `BASECURRENCYNAME`, `BASICCURRENCYNAME`, `CURRENCYFULLNAME`, `FORMALCURRENCYNAME`, `CURRENCYMAILNAME`, `CMPCURRENCYFORMALNAME`, `EXPANDEDCURRENCYSYMBOL`, `CURRENCYDESC` |
-| Nested sub-object | `<BASECURRENCY>`, `<CURRENCY.LIST>`, `<BASECURRENCY.LIST>` each carrying `ORIGINALNAME`/`MAILINGNAME`/`EXPANDEDSYMBOL` |
+| Nested sub-object | three nested currency sub-objects, each carrying the currency's name and symbol elements |
 
 **Batching is valid here because unknown elements are silently ignored** — a batch that still
 reports the same "required" error disproves every name in it at once.
@@ -512,39 +512,34 @@ the base.
 - any release other than 7.1, including whether one that does not know the field answers in-band
   or blocks on a modal.
 
-These are exports. §9.10b's trap is `ORIGINALNAME` sent as a `COMPANY` child in an **import**.
+These are exports. §9.10b's trap is a company-level **import**.
 
-### 9.10b `ORIGINALNAME` at `COMPANY` level hangs the gateway — **TRAP**
+### 9.10b Some company-level import shapes block the gateway — **TRAP**
 
-**VERIFIED 2026-07-30.** A flat combination of
-`MAILINGNAME` + `EXPANDEDSYMBOL` + `DECIMALSYMBOL` + **`ORIGINALNAME`** inside `<COMPANY>`
-produced **no response at all** — the request timed out at 120 s and `/status` stayed empty
-thereafter. The three *nested* shapes immediately before it all returned clean in-band errors
-with the gateway alive, so the difference is the flat shape, and `ORIGINALNAME` is the element
-the earlier pass had also singled out as rejected-for-symbol.
+**VERIFIED 2026-07-30.** One company-creation shape produced no response: the request timed out
+and `/status` stayed empty afterwards. Other shapes returned clean in-band errors with the gateway
+alive.
 
-**Do not send `ORIGINALNAME` as a direct `COMPANY` child.**
+**Rule:** Bridge sends no company-level import. Some company-level
+import shapes raise an unhandled internal error in Tally's UI that blocks the gateway until a
+person dismisses it. No request builder in Bridge emits a company-level import; no automated
+check enforces that yet. A future attempt in this area health-checks
+after every request and stops at the first dead gateway; it never loops over candidate shapes,
+because a loop of company-creation attempts has previously taken the operator's machine down.
 
 #### It raised the §1.2 modal dialog and blocked for 44 minutes until a human clicked OK
 
-**VERIFIED by operator screenshot.** The Tally window showed, for the whole outage:
-
-```
-Internal Error.  Contact Tally Solutions.
-Unable to create company in path ''!
-```
-
-**Timeline:** gateway dead from **22:31**; dialog still open on screen at **23:13**; gateway
-responsive at **23:14:45**, coinciding with the operator dismissing it. **~44 minutes blocked,
-ended by a human, not by recovery.** No partial company was created — a company list
-afterwards returned only `Aarav Trading Company Demo`.
+**VERIFIED by operator screenshot.** The Tally window showed the §1.2 internal-error dialog for
+the whole outage. **Timeline:** gateway dead from **22:31**; dialog still open on screen at
+**23:13**; gateway responsive at **23:14:45**, coinciding with the operator dismissing it. Ended
+by a human, not by recovery. No partial company was created.
 
 > **Correction.** This entry first recorded the outage as unattended self-recovery and used it
-> to revise §11b.2's busy-regime maximum upward to 44 minutes. **That was wrong** — the
-> gateway was polled from the network side only, where a dialog-blocked Tally and a busy Tally
-> are indistinguishable (§1.2 point 3), and recovery was attributed to time when it was
-> actually caused by the operator. §11b.2's measured maximum stands at **523 s**. A watchdog
-> must not be built on the retracted number.
+> to revise §11b.2's busy-regime maximum upward to 44 minutes. **That was wrong** — the gateway was polled
+> from the network side only, where a dialog-blocked Tally and a busy Tally are
+> indistinguishable (§1.2 point 3), and recovery was attributed to time when it was actually
+> caused by the operator. §11b.2's measured maximum stands at **523 s**. A watchdog must not be
+> built on the retracted number.
 
 **The method error worth keeping:** network-side polling cannot establish *why* a gateway came
 back. Attributing recovery to elapsed time requires knowing nobody touched the machine. Where
@@ -554,18 +549,11 @@ what was on screen.
 #### Why this shape reached the path code at all
 
 Every other probe in this pass carried the same `SVCURRENTPATH` and failed in-band on the
-currency formal name. Only the shape containing **`ORIGINALNAME`** produced the empty-path
-internal error. So `ORIGINALNAME` as a `COMPANY` child diverts Tally into a code path that
-**never consults `SVCURRENTPATH`**, hits an unset path, and raises an unhandled internal error
-in the UI instead of returning a `LINEERROR`.
-
-This retroactively explains the original §1.2 dialog from the earlier session — those attempts
-predate the `SVCURRENTPATH` finding, so any of them could reach the same unset-path state.
-
-**Method note.** The probe script health-checked after every shape and stopped itself on the
-first dead gateway rather than sending the remaining candidates. That is the required pattern
-for this whole area — a loop of company-creation attempts has previously taken the operator's
-machine down.
+currency formal name. The blocking shape diverted Tally into a code path that **never consults
+`SVCURRENTPATH`**, hit an unset path, and raised an unhandled internal error in the UI instead of
+returning a `LINEERROR`. That also explains the original §1.2 dialog from the earlier session:
+those attempts predate the `SVCURRENTPATH` finding, so any of them could reach the same
+unset-path state.
 
 ### 9.10c Routes ruled out by documentation review
 
@@ -581,57 +569,40 @@ machine down.
   permissions or corruption. **That diagnosis does not apply here** — our path was literally
   empty, i.e. never supplied.
 
-### 9.10d The legacy `IMPORTDATA` envelope is accepted — and renames the loaded company — **P0 TRAP**
+### 9.10d A company-level import with no pinned company alters the loaded company — **P0 TRAP**
 
-**VERIFIED 2026-07-31.** Code search (not web search) found a working third-party
-implementation using an envelope **structurally different from ours**: `TALLYREQUEST` is the
-single token **`Import Data`**, there is no `<TYPE>`/`<ID>`, and the body is the legacy
-`IMPORTDATA / REQUESTDESC / REPORTNAME / REQUESTDATA` form rather than `DESC / DATA`.
-
-```xml
-<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER>
-<BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>All Masters</REPORTNAME>
-<STATICVARIABLES><SVCURRENTPATH>…</SVCURRENTPATH></STATICVARIABLES></REQUESTDESC>
-<REQUESTDATA><TALLYMESSAGE xmlns:UDF="TallyUDF">
-<COMPANY Action="Create">
-  <NAME>Bridge Billwise Lab</NAME><MAILINGNAME>…</MAILINGNAME>
-  <STARTINGFROM>20240401</STARTINGFROM><BOOKSFROM>20240401</BOOKSFROM>
-  <BASECURRENCYSYMBOL>Rs.</BASECURRENCYSYMBOL><FORMALNAME>Indian Rupees</FORMALNAME>
-  <ISBILLWISEON>Yes</ISBILLWISEON>
-</COMPANY></TALLYMESSAGE></REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>
-```
+**VERIFIED 2026-07-31.** A company-creation import in a legacy envelope that a third-party
+implementation uses, sent with a company loaded and no `SVCURRENTCOMPANY`, was accepted.
 
 **Result: `CREATED=0`, `ALTERED=1`, `ERRORS=0`, `EXCEPTIONS=0`, no `LINEERROR`.**
 
-**No company was created. The currently loaded company was RENAMED.** `Aarav Trading Company
-Demo` became `Bridge Billwise Lab` — same `GUID bb8ad19e-…-87fec0c6215e`, same
-`COMPANYNUMBER 100000`, same 87 ledgers and 28 groups. A field-level diff against a
-pre-incident capture showed **`NAME` was the only substantive change**; the other six diffs
-were request-scoped `CMPINFO` counters. Reversing the same request with the original name
-restored it.
+**No company was created. The currently loaded company was renamed:** same GUID, same
+`COMPANYNUMBER`, same ledgers and groups. A field-level diff against a pre-incident capture
+showed `NAME` as the only substantive change; the other diffs were request-scoped `CMPINFO`
+counters. Re-sending with the original name restored it.
 
 **Three lessons, in order of importance:**
 
 1. **`Action="Create"` on a `COMPANY` object does not mean create.** With a company loaded and
    no `SVCURRENTCOMPANY`, Tally binds the `COMPANY` object to the **loaded** company and
    alters it. This is §9.11's omission hazard in its most destructive form yet: a *creation*
-   request silently mutating an unrelated production company's identity.
+   request silently mutating an unrelated company's identity.
 2. **§9.2/I6 is what caught it.** `ERRORS=0` and `EXCEPTIONS=0` and no `LINEERROR` — a check of
    errors alone would have reported success. Only "the **intended** counter incremented"
    caught it, because `CREATED` stayed 0 while `ALTERED` moved. This is the **fourth**
    distinct silent-failure mode that rule has caught.
 3. **I2 applies to company creation too**, which is counter-intuitive: the one request type
-   that has no existing company to pin is exactly the one that will hijack whichever company
+   that has no existing company to pin is exactly the one that will alter whichever company
    happens to be open.
 
-**Leading hypothesis for why creation never succeeds:** Tally's import binds a `COMPANY`
-object to the loaded company. Creation may require **no company loaded at all**. That is
-testable — the operator closes all companies, then one request is sent — but it cannot be done
-remotely and disrupts whoever is using the instance. **Untested.**
+**Rule:** every import pins the company (I2), and success requires the intended counter to move
+(I6). Bridge sends no company-level import; no request builder emits one.
 
-**Where a future attempt should start:** the hypothesis above, not more element-name guessing.
-`BASECURRENCYSYMBOL` + `FORMALNAME` as a *pair* in the legacy envelope raised no currency error
-at all, so the currency schema may already be solved and simply masked by the alter behaviour.
+**Leading hypothesis for why creation never succeeds:** Tally's import binds a `COMPANY` object
+to the loaded company, so creation may require no company loaded at all. Testing it needs an
+operator at the instance and disrupts whoever is using it. **Untested.** A currency symbol and
+formal name sent as a pair in this envelope raised no currency error, so the currency schema may
+already be solved and masked by the alter behaviour.
 
 **Value judgement — unchanged, and now better founded.** Company creation is a one-time human
 setup step; Bridge's users already have companies. This is worth completing only if

@@ -327,6 +327,26 @@ fn the_catalog_lists_exactly_the_admitted_tests() {
     }
 }
 
+/// A test the crate has ported but this tool has not admitted, and a name the
+/// crate does not know, are refused by the schema's list as
+/// `argument_invalid:test`, with nothing sent: no Tally listens on the port,
+/// so a request would have failed as a refused connection instead.
+#[tokio::test]
+async fn a_test_not_admitted_is_refused_by_the_schema_before_any_request() {
+    assert!(registry::find("cash_payments_40a3").is_some());
+    for test in ["cash_payments_40a3", "no_such_test"] {
+        let one = serve(Vec::new(), Redaction::None);
+        let mut case = args();
+        case["test"] = json!(test);
+        let response = one.server.call_tool("audit_test_run", case).await;
+        assert_eq!(error_code(&response), "argument_invalid:test", "{test}");
+        assert_eq!(
+            response["structuredContent"]["evidence"]["bytes"], 0,
+            "{test}"
+        );
+    }
+}
+
 fn dump(figures: usize, findings: usize) -> Value {
     json!({
         "test_id": "t", "test_version": "1", "rules_version": "1",

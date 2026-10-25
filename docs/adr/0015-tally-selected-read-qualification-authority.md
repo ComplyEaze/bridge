@@ -7,6 +7,8 @@ flow when written, and still an accurate record of what was decided and why.
 The implementing path is gone: see **Amendment** below before relying on
 anything in this ADR as current behavior.
 
+**Amended 2026-10-15 (#1745):** `tools/bridge-tally-live-read`, which the text below still names as the sender of some requests, was removed. The text is kept as written.
+
 ## Context
 
 A successful company-list probe proves neither that a selected company's

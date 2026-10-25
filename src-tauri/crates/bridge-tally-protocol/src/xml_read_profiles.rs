@@ -151,12 +151,11 @@ impl ReadOnlyProfileId {
     }
 
     /// Whether this profile must not be sent to an Education-mode Tally. Only
-    /// `ledgers_v1` is: a custom report (`TYPE=Data`) that passes a spaced
-    /// collection identifier to a `$$` function (`$$NumItems:BRIDGE Ledger
-    /// Collection V1`). Education answered it with a blocking "Bad formula!"
-    /// dialog on the Tally screen, which holds the XML gateway until someone
-    /// dismisses it (bridge#45). A caller that knows the endpoint is in
-    /// Education must refuse such a read before sending it, with
+    /// `ledgers_v1` is: a custom report (`TYPE=Data`) whose `$$` function takes
+    /// a spaced identifier (IMPLEMENTATION_GUIDE I1). Education answered it
+    /// with a blocking dialog on the Tally screen, which holds the XML gateway
+    /// until someone dismisses it (bridge#45). A caller that knows the endpoint
+    /// is in Education must refuse such a read before sending it, with
     /// [`EDUCATION_REPORT_FAMILY_UNSUPPORTED`]. A test renders every profile
     /// and checks this against [`first_spaced_function_argument`].
     pub fn education_refuses_report_formula(self) -> bool {

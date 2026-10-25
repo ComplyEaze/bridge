@@ -1091,7 +1091,8 @@ async fn a_narration_marker_decides_a_present_from_a_nonempty_window() {
 /// This comment used to say that file was **not** in the compatibility
 /// surface, and that this test existed to cover it. It is pinned:
 /// `agent_catalog.rs` entered the surface with the voucher-presence engine,
-/// taking the slot `MAX_SURFACE_FILES`' own comment had reserved for it by
+/// taking the slot the pin-list rationale (now in the module documentation of
+/// bridge-tally-core's compatibility_surface_stays_whole test) had reserved for it by
 /// name. The claim and the pin landed in the same squash, so there is no point
 /// in master's history where it was true -- only, presumably, an earlier
 /// moment on the branch that the squash flattened away.

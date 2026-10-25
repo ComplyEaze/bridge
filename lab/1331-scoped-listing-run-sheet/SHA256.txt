@@ -1,0 +1,8 @@
+# sha256  bytes  file  (source of each request)
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md  byte for byte from lab/626-1038-1050-run-sheets at 8c602c15
+1852e6a833b5488d88ea3aa337bfa9e203ea81b63b1ba77138d88765fb87c376  4069  RUN-SHEET.md  
+040ac47754c40a4e2e736f8be2b3f37cac924213ea66c8c4f0074222f9a00280  982  requests/d01_marks.request.utf16le.xml  committed note-days/shape_lab_company_marks_request.utf16le.xml, company changed
+48f2dc3d88b2e0f994789f661fba660dc5e2c9ff0b00f5706b55ccc41e79ff9c  1742  requests/d02_listing_whole.request.utf16le.xml  committed note-days/shape_lab_ledgers_1_request.utf16le.xml, company changed
+ddcd347116f72c0b0d0b42dd5fa6b8eff592ce48bef9f3fb4a309466b0871d92  2172  requests/d03_listing_four_parents.request.utf16le.xml  p02 with company and period changed; equals d02 plus the parent formula and FILTERS
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  976  requests/p01_marks.request.utf16le.xml  committed note-days/shape_lab_company_marks_request.utf16le.xml, company changed
+f1feb2ac0748a0dbb02244219da9a13aa41278fe847e59287df3bb6ff50f14c0  2166  requests/p02_listing_four_parents.request.utf16le.xml  committed agent/pilot-lab/pilot-lab-ledger-rates-scoped.request.utf16le.xml with its GST-details FETCH suffix removed

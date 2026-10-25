@@ -1,5 +1,9 @@
 //! The local-data report reads and never writes (#local-data slice 1).
 use super::*;
+use crate::agent::agent_import::tests::{sentinel_batch_id, sentinel_uuid};
+
+/// The company of the master journal tests: the merge gate's one registered synthetic GUID.
+const COMPANY_GUID: &str = "00000000-0000-4000-8000-000000000002";
 
 fn write(path: &Path, bytes: &[u8]) {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -43,7 +47,7 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     write(&root.join("agent-import-statement-skips.jsonl"), b"123");
     write(&root.join("agent-master-ledger.jsonl"), b"abc");
     write(
-        &root.join("master-pre-image-bridge-00000000-0000-4000-8000-000000000001.json"),
+        &root.join(format!("master-pre-image-{}.json", sentinel_batch_id(0x1545))),
         b"{}",
     );
     // A look-alike with no batch id in its name is not one of ours.
@@ -717,12 +721,12 @@ fn the_lock_folder_is_counted_when_the_data_folder_is_missing() {
 }
 
 fn master_journal_text(verdict: bool, truncated: bool) -> String {
-    let id = "bridge-00000000-0000-4000-8000-0000000000aa";
+    let id = sentinel_batch_id(0x15aa);
     let sha = "a".repeat(64);
     let batch = serde_json::json!({
         "record_type": "master_batch", "batch_id": id, "batch_sha256": sha,
         "class": "ledger_create",
-        "company": {"guid": "00000000-0000-0000-0000-000000000001", "name": "Synthetic",
+        "company": {"guid": COMPANY_GUID, "name": "Synthetic",
             "number": "1", "books_from": "20260401"},
         "items": [{"name": "Synthetic One", "kind": "suspense", "bill_wise": false,
             "party_gstin": null, "gst_duty_head": null}]
@@ -732,13 +736,13 @@ fn master_journal_text(verdict: bool, truncated: bool) -> String {
         "native_request_sha256": "b".repeat(64),
         "items": [{"name": "Synthetic One", "canonical_key": "k", "absence_key": "a"}],
         "pre_image_sha256": "c".repeat(64), "pre_image_count": 2,
-        "pre_post_master_marks": [{"company_guid": "00000000-0000-0000-0000-000000000001",
+        "pre_post_master_marks": [{"company_guid": COMPANY_GUID,
             "altmstid": 7}]
     });
     let verdict_line = serde_json::json!({
         "record_type": "master_verdict", "batch_id": id, "batch_sha256": sha,
         "state": "posted_verified",
-        "items": [{"name": "Synthetic One", "guid": "00000000-aaaa-bbbb-cccc-000000000000",
+        "items": [{"name": "Synthetic One", "guid": sentinel_uuid(0x15ab).to_string(),
             "reason": null}]
     });
     // A verified create rests on Tally's answer, recorded before the verdict.
@@ -800,10 +804,11 @@ fn an_unreadable_master_journal_makes_the_report_incomplete() {
 fn a_stage_left_beside_a_sidecar_is_counted_with_the_journal() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
-    let id = "bridge-00000000-0000-4000-8000-0000000000aa";
+    let id = sentinel_batch_id(0x15aa);
     write(
         &root.join(format!(
-            "master-pre-image-{id}.00000000-0000-4000-8000-0000000000bb.next"
+            "master-pre-image-{id}.{}.next",
+            sentinel_uuid(0x15bb)
         )),
         b"123",
     );

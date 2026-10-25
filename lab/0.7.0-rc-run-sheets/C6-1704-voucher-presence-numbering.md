@@ -1,0 +1,14 @@
+# C6 (#1704): is a voucher type declared manual checked against the book's own numbering before the window is read?
+WHY: `voucher_presence` treats a voucher number as an identity only where the book's series for the type is Manual and prevents duplicate numbers. The check reads the numbering first (20 more requests), and refuses the call otherwise. It has only run against committed captures of two books (9 and 13 October) in the simulator, never live.
+COMPANY: BRIDGE NUMBERING LAB (new). Voucher type Journal: numbering Manual, series set to prevent duplicate numbers, exactly one series. Voucher type Receipt: Automatic numbering with "retain existing numbers" on. Two Journals on day D with numbers JV-1 and JV-2 (hand-keyed, 1.00 between two ledgers). The company is NEW: if a company or data folder of this name exists on the PC, STOP and report it. Create it with books beginning 1 April 2025; take backup BK1 into a NEW empty folder (name, size, sha256) before keying. No write by Bridge; reads only. Record the licence mode: Education mode is expected to refuse the numbering read with `masters_education_unqualified`, which is a finding to record, not a failure.
+MODE: B. Posting may stay OFF.
+STEPS (one request at a time; each answer saved whole with its egress request count):
+1. `list_companies`; GUID. `tally_status`: M0, V0.
+2. `voucher_presence` for day D, `numbering` = [{voucher_type: "Journal", numbering_method: "manual"}], `vouchers` = [one proposed Journal JV-1 with the same date and the same two entries as the keyed voucher]. Record the answer and the request count.
+3. Same call with `numbering` = [{voucher_type: "Receipt", numbering_method: "manual"}] and one proposed Receipt. Record the answer and the request count.
+4. Same as step 2 with the voucher type spelled "Journall" (a type the book does not hold) in `numbering` and in the proposal. Record the answer.
+5. Same as step 2 with `numbering` = [{voucher_type: "Journal", numbering_method: "automatic"}]. Record the answer, its `numbering_read` and its request count.
+6. `tally_status`: M1, V1 (both must equal M0, V0).
+EXPECT (record, not predicted): step 2 answered, with the numbering read shown for Journal (method Manual, duplicates prevented) and a request count about 20 above step 5's (the PR says 34 becomes 54 on a small book). Step 3 refused as `presence_numbering_method_differs_from_book` with Receipt in `candidates` and no voucher-window request in the egress log. Step 4 refused the same way (no type of that exact name). Step 5 answered with `numbering_read` equal to `not_read`.
+PASS = steps 2 to 5 as stated and M1, V1 unchanged. FAIL = step 3 or 4 answered with presence results; a window request sent after a refused numbering check; a mark that moves. Any other code is a finding: record it whole.
+STOP RULES: any dialog before a call; a mark that moves; a failed request reported as failed, never as "0 rows".

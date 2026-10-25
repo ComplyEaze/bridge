@@ -787,7 +787,7 @@ fn decisions_that_could_not_be_read_are_never_reported_as_absent() {
 fn an_excluded_ledger_with_no_decision_is_printed_not_final_in_the_decisions_row() {
     // The default synthetic source has no group read, so its ledger is excluded.
     let workbook = build_party_ledger_master_workbook(source_with_precision(2)).unwrap();
-    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let bytes = render_with(&workbook, &[]).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut strings = String::new();
     std::io::Read::read_to_string(

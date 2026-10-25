@@ -1530,14 +1530,14 @@ impl Server {
             // successful build.
             // Keep the refusal code: `post_import` returns this same code, and
             // the guidance names it rather than guessing a reason (#866).
-            // Asked at the batch cap even while posting is off, so a default
-            // install learns whether the setting would give this batch a route;
-            // `post_voucher_limit` is 1 then and would refuse every batch of two.
+            // Asked at the limit posting would have, even while posting is off, so
+            // a default install learns whether the setting would give this batch a
+            // route; `post_voucher_limit` is 1 then and would refuse every batch of two.
             let native_post_refusal = post::admit_saved_voucher(
                 &line,
                 &self.settings.endpoint,
                 post::PostScope::Vouchers,
-                ledger::MAX_BATCH_POST_VOUCHERS,
+                Self::post_voucher_limit_when_enabled(post::PostScope::Vouchers),
             )
             .err();
             let (mut warnings, next_step) = build_import_guidance(
@@ -3355,7 +3355,7 @@ fn invoice_guidance(warnings: &mut Value) -> &'static str {
     INVOICE_POST_NEXT_STEP
 }
 
-const AMENDMENT_NOT_POSTABLE: &str = "No import XML was sent to Tally. ComplyEaze Bridge does not post amendments (post_import refuses them), so this file goes into the book only by an import in Tally: import it promptly, then use verify_import; do not call post_import for this batch.";
+const AMENDMENT_NOT_POSTABLE: &str = "No import XML was sent to Tally. ComplyEaze Bridge does not post amendments (a native post cannot alter a voucher in place), so this file goes into the book only by an import in Tally: import it promptly, then use verify_import; do not call post_import for this batch.";
 
 const AMENDMENT_NEXT_STEP: &str = "Import promptly: an edit made in Tally before the import is overwritten, so build the amendment again first if anyone may have changed these vouchers, and re-enter any allocation afterwards. Verify right after importing: that first verification is what a later amendment compares against. Confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers) and check that it reports altered vouchers and none created, then call verify_import with this batch_id. If any voucher was created, do not import again: call verify_import and reconcile the duplicate by hand. Import and verify each amendment before building the next one for the same voucher: two amendments built from the same state overwrite each other, and the later import wins.";
 
@@ -3657,6 +3657,8 @@ fn build_import_guidance(
             .collect::<Vec<_>>())
     };
     let manual_import_next_step = "Confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment";
+    // A batch that two routes could put in the book: either direction books it twice.
+    let one_route = "Use one route only: once this file is imported, do not post this batch, and once this batch is posted, do not import this file; nothing checks an import against a post.";
     // A file import after a native post is not checked against it (the post
     // binds a fresh REMOTEID); a post after a file import is refused by the
     // post's own book read (import_preexisting_identity).
@@ -3680,9 +3682,9 @@ fn build_import_guidance(
         // still refuse.
         (false, None) => (
             warnings(
-                "No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post. With Allow voucher posting on (off by default; it means accepting the limits in Terms of Use section 9.2), the post_import tool, which that setting adds, would check this saved batch again and ask the local user to approve it in a separate window, and may still refuse it. Until then, import the written file in Tally, then use verify_import; once it is imported, do not also post it.",
+                &format!("No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post. With Allow voucher posting on (off by default; it means accepting the limits in Terms of Use section 9.2), the post_import tool, which that setting adds, would check this saved batch again and ask the local user to approve it in a separate window, and may still refuse it. Until then, import the written file in Tally, then use verify_import. {one_route}"),
             ),
-            "Tell the user that this connection cannot post. With Allow voucher posting on in the extension settings (off by default; it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge would offer this saved batch for their approval in a separate window, after checking the book again, and may still refuse it. Do not say that it will be posted from this chat. Until then: confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment",
+            "Tell the user that this connection cannot post. With Allow voucher posting on in the extension settings (off by default; it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge would offer this saved batch for their approval in a separate window, after checking the book again, and may still refuse it. Do not say that it will be posted from this chat. Until then: confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment. Use one route only: once this file is imported, do not post this batch, and once this batch is posted, do not import this file; nothing checks an import against a post.",
         ),
         (false, Some(code)) => (
             warnings(&format!(
@@ -3706,9 +3708,11 @@ fn native_post_route(code: &str, writes_enabled: bool) -> String {
     } else {
         "To post it with ComplyEaze Bridge once Allow voucher posting is on"
     };
+    // The rebuilt batches and this file hold the same vouchers: importing this file after any of
+    // them is posted or imported books those vouchers twice, and nothing checks it.
     match code {
         "import_post_batch_too_large" => format!(
-            " {to_post}, build it again in batches of at most {voucher_limit} vouchers, a bank statement by a narrower range of whole days; a single statement day of more than {voucher_limit} rows cannot be split yet, so tell the user so. Otherwise import"
+            " {to_post}, build it again in batches of at most {voucher_limit} vouchers (each is checked again and may still be refused), a bank statement by a narrower range of whole days; a single statement day of more than {voucher_limit} rows cannot be split yet, so tell the user so. Once any of those batches is posted or imported, never import this file: nothing checks an import against an earlier post or import. Otherwise import"
         ),
         _ => " Import".to_string(),
     }

@@ -48,10 +48,12 @@ These changes are in source and not yet in a published build.
   it a route: the build checks the batch as `post_import` would at the batch limit of 50, and the assistant is told
   to say that, with the setting on (it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge
   would check the batch again and ask for approval, and may still refuse it; the file import stays the route until
-  then. With posting on, a batch `post_import` can take no longer suggests importing its file as well, and says not
-  to (an import after a post is not checked against it); a batch over 50 is told to be built again in batches of at
-  most 50. The desktop review names the assistant's batch posting for a saved batch it cannot post, and no longer
-  suggests choosing a Journal without its number. Wording only otherwise; the file routes for a voucher that carries
+  then. Every text that offers both routes says to use one only: once the file is imported, do not post the batch,
+  and once the batch is posted, do not import the file (an import after a post is not checked against it). With
+  posting on, a batch `post_import` can take no longer suggests importing its file as well; a batch over 50 is told to
+  be built again in batches of at most 50, and never to import the original file once one of them is posted or
+  imported. The desktop review names the assistant's batch posting for a saved batch it cannot post, says a saved
+  invoice is posted only that way, and no longer suggests choosing a Journal without its number. Wording only otherwise; the file routes for a voucher that carries
   its own number and for text the approval window cannot show are unchanged (part of #1709).
 - The approval window, and the review window, now open with a line that says what each answer does, before any
   detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this

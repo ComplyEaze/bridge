@@ -83,7 +83,7 @@ impl DesktopJournalError {
             ),
             "import_post_requires_one_journal" => (
                 "ComplyEaze Bridge's desktop review posts one unnumbered Journal, and this saved batch is a different shape.",
-                "With Allow voucher posting on in the extension settings (off by default; Terms of Use section 9.2), ask the assistant to post this saved batch, giving it this batch's id (the file's name without .xml): it posts one voucher, or a batch of 2 to 50 Journals or of 2 to 50 Payments, Receipts and Contras, after you approve it in a separate window, and it checks the batch again first and may refuse it. Otherwise import this file in Tally (Gateway of Tally → Import → Vouchers), then verify it, and do not also ask the assistant to post it. The file itself is unchanged and correct.",
+                "With Allow voucher posting on in the extension settings (off by default; Terms of Use section 9.2), ask the assistant to post this saved batch, giving it this batch's id (the file's name without .xml): it posts one voucher, or a batch of 2 to 50 Journals or of 2 to 50 Payments, Receipts and Contras, after you approve it in a separate window, and it checks the batch again first and may refuse it. A saved invoice is posted only that way: never import its file. Any other batch may instead be imported from this file in Tally (Gateway of Tally → Import → Vouchers) and then verified. Use one route only: once you import this file, do not ask the assistant to post the batch, and once the assistant has posted it, or any batch built again from its vouchers, do not import this file; nothing checks an import against a post. The file itself is unchanged and correct.",
             ),
             "import_post_amendment_requires_file_import" => (
                 "This saved Journal amends an earlier batch, and ComplyEaze Bridge does not post amendments.",
@@ -281,5 +281,22 @@ mod tests {
             .contains("2 to 50 Journals or of 2 to 50 Payments, Receipts and Contras"));
         assert!(refused.remediation.contains("may refuse it"));
         assert!(!refused.remediation.contains("more than one voucher"));
+        // An invoice is never sent to a file import, and the two routes are warned both ways.
+        assert!(refused
+            .remediation
+            .contains("A saved invoice is posted only that way: never import its file."));
+        assert!(refused.remediation.contains(
+            "once the assistant has posted it, or any batch built again from its vouchers, do not import this file"
+        ));
+        assert!(refused
+            .remediation
+            .contains("once you import this file, do not ask the assistant to post the batch"));
+        // A numbered Journal keeps its number: the remediation never suggests dropping it.
+        let numbered = DesktopJournalError::refused("import_post_numbered_journal_unsupported");
+        assert!(numbered
+            .remediation
+            .contains("the voucher number is your decision"));
+        assert!(!numbered.remediation.contains("unnumbered Journal"));
+        assert!(!numbered.remediation.to_lowercase().contains("manually"));
     }
 }

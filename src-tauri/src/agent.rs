@@ -2591,7 +2591,10 @@ impl Server {
         #[cfg(feature = "lab-writes")]
         if matches!(
             name,
-            "lab_read_inventory" | "lab_import_masters" | "lab_import_vouchers"
+            "lab_read_inventory"
+                | "lab_read_purchase_identity"
+                | "lab_import_masters"
+                | "lab_import_vouchers"
         ) {
             lab::require_lab_writes_env()?;
         }
@@ -2658,6 +2661,8 @@ impl Server {
             "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
+            #[cfg(feature = "lab-writes")]
+            "lab_read_purchase_identity" => lab::lab_read_purchase_identity(self, args).await,
             #[cfg(feature = "lab-writes")]
             "lab_import_masters" => lab::lab_import_masters(self, args).await,
             #[cfg(feature = "lab-writes")]

@@ -210,6 +210,38 @@ pub(super) fn render_agent_lab_inventory_vouchers(
     render_windowed_vouchers(company, from, to, "", AGENT_LAB_INVENTORY_VOUCHER_FETCH, "")
 }
 
+/// The candidate FETCH for a check that a supplier invoice is not already in the books (#1904):
+/// [`AGENT_VOUCHER_FETCH`] with its entry wildcard narrowed to the entry fields such a check reads
+/// and the bill allocations, nothing else changed. LAB-ONLY (feature `lab-writes`) until a lab
+/// sitting has compared it with the agent read on the same window: protocol reference §8.2a
+/// measured `ALLLEDGERENTRIES.BILLALLOCATIONS.*` on one 7.1 book only, and this exact list has never
+/// been sent to Tally.
+#[cfg(feature = "lab-writes")]
+const AGENT_LAB_PURCHASE_IDENTITY_FETCH: &str =
+    "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,\
+NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.LEDGERNAME,\
+ALLLEDGERENTRIES.AMOUNT,ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,ALLLEDGERENTRIES.BILLALLOCATIONS.*,\
+REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE";
+
+/// The candidate narrow read of [`AGENT_LAB_PURCHASE_IDENTITY_FETCH`], in the window shape and with
+/// the voucher-type class computes of [`render_agent_class_vouchers_in_span`], so the FETCH list is
+/// the only difference from the agent read it is compared with.
+#[cfg(feature = "lab-writes")]
+pub(super) fn render_agent_lab_purchase_identity_vouchers(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Result<String, String> {
+    render_windowed_vouchers(
+        company,
+        from,
+        to,
+        "",
+        AGENT_LAB_PURCHASE_IDENTITY_FETCH,
+        &voucher_type_class_computes(),
+    )
+}
+
 /// A voucher type's name is quoted into a TDL string literal in the status
 /// read, where XML escaping cannot protect it (Tally decodes `&quot;` before
 /// evaluating, #861), so a name is admitted only when it holds nothing a
@@ -483,6 +515,26 @@ pub(super) fn lab_inventory_vouchers_read(
     to: &TallyDate,
 ) -> Result<ReadRequest, String> {
     render_agent_lab_inventory_vouchers(company, from, to).map(ReadRequest)
+}
+
+#[cfg(feature = "lab-writes")]
+pub(super) fn lab_purchase_identity_vouchers_read(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Result<ReadRequest, String> {
+    render_agent_lab_purchase_identity_vouchers(company, from, to).map(ReadRequest)
+}
+
+/// The agent's class-resolved window read, unnarrowed: what `vouchers` sends when it filters by
+/// type, here the read the candidate narrow read is compared with.
+#[cfg(feature = "lab-writes")]
+pub(super) fn lab_agent_class_vouchers_read(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Result<ReadRequest, String> {
+    render_agent_class_vouchers_in_span(company, from, to, None).map(ReadRequest)
 }
 
 #[cfg(feature = "lab-writes")]

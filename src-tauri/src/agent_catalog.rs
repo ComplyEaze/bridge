@@ -547,6 +547,8 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
     #[cfg(feature = "lab-writes")]
     names.push("lab_read_inventory");
     #[cfg(feature = "lab-writes")]
+    names.push("lab_read_purchase_identity");
+    #[cfg(feature = "lab-writes")]
     names.push("lab_import_masters");
     #[cfg(feature = "lab-writes")]
     names.push("lab_import_vouchers");
@@ -571,7 +573,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
             .filter(|name| {
                 !matches!(
                     name,
-                    &"lab_read_inventory" | &"lab_import_masters" | &"lab_import_vouchers"
+                    &"lab_read_inventory"
+                        | &"lab_read_purchase_identity"
+                        | &"lab_import_masters"
+                        | &"lab_import_vouchers"
                 ) || lab_tools_env_enabled()
             })
             .map(|name| {
@@ -736,6 +741,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         "LAB-ONLY. Compiled only behind the `lab-writes` feature and refuses unless BRIDGE_LAB_WRITES=1, BRIDGE_TALLY_PORT=9001, and BRIDGE_LAB_TARGET_GUID is set to a well-formed GUID (and BRIDGE_LAB_DENY_GUIDS, unless the target is the only company loaded). This is a read: company_guid selects the company like any other read tool and is verified the same way (`company_identity_not_found`/`company_identity_ambiguous`), independent of the configured lab target -- the stronger loaded-company/deny-list guard applies only to a lab write batch, not a read. Read-only: units, godowns, stock groups and stock items (parent, base unit, opening qty/rate/value, GST/HSN fields as returned, unclassified), plus inventory entries per voucher for a date window. Reuses the same windowing and window_honoured corroboration as `vouchers`. No signed compatibility evidence exists yet for any inventory field on this Tally release/mode -- treat every value as exploratory.",
                         json!({"type":"object","additionalProperties":false,"required":["company_guid","from","to"],"properties":{"company_guid":{"type":"string","minLength":1},"from":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"to":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"offset":{"type":"integer","minimum":0,"default":0},"limit":{"type":"integer","minimum":1}}}),
                     ),
+                    "lab_read_purchase_identity" => (
+                        "LAB-ONLY (#1904). Compiled only behind the `lab-writes` feature and refuses unless BRIDGE_LAB_WRITES=1, BRIDGE_TALLY_PORT=9001, and BRIDGE_LAB_TARGET_GUID is set to a well-formed GUID (and BRIDGE_LAB_DENY_GUIDS, unless the target is the only company loaded). A read: company_guid selects and verifies the company as any read does. For one date window it sends the voucher read `vouchers` sends when it filters by type, and the candidate narrow read a check for a supplier invoice already in the books would send (the same window and class fields; only the entry fields and the bill allocations are fetched), parses both with the same parser and returns each read's rows and characters per row, and every difference by voucher GUID and field name (at most 100 listed; the values stay in the exchange the lab keeps). No differences means the narrow read returned every field of every voucher as the agent read did on this book and window, nothing more. Writes nothing.",
+                        json!({"type":"object","additionalProperties":false,"required":["company_guid","from","to"],"properties":{"company_guid":{"type":"string","minLength":1},"from":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"to":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"}}}),
+                    ),
                     _ => (
                         "ComplyEaze Bridge read-only Tally tool",
                         json!({"type":"object", "additionalProperties": false}),
@@ -759,7 +768,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                 if let Some(effect) = effect {
                     tool["annotations"] = effect.annotations();
                 }
-                if name == "lab_read_inventory" {
+                if matches!(name, "lab_read_inventory" | "lab_read_purchase_identity") {
                     tool["annotations"] = json!({"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true});
                 }
                 if matches!(name, "lab_import_masters" | "lab_import_vouchers") {

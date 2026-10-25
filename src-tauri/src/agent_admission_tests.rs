@@ -1461,6 +1461,71 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
     }
 }
 
+/// `build_import_xml`'s description says some things only through its arguments: the proposals
+/// file, the voucher type rules, the ledger name rules and the amendment comparison are stated
+/// once, on the argument they govern, and the description no longer repeats them (#1863). Each argument therefore keeps the phrases below, so shortening one of
+/// them cannot silently drop one of these rules.
+#[test]
+fn the_build_rules_the_description_leaves_to_its_arguments_stay_on_them() {
+    let definitions = tool_definitions(true, true);
+    let schema = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "build_import_xml"))
+        .map(|tool| &tool["inputSchema"])
+        .expect("build_import_xml is registered");
+    for (pointer, phrases) in [
+        (
+            "/properties/proposals_id/description",
+            &["admitted exactly as inline ones", "Requires proposals_sha256"][..],
+        ),
+        (
+            "/properties/proposals_sha256/description",
+            &["refused if the file no longer has it"][..],
+        ),
+        (
+            "/properties/vouchers/items/properties/voucher_type/description",
+            &[
+                "Journal takes any balanced set of entries",
+                "two or more entries",
+                "at least one debit and one credit and no ledger on both sides",
+                "and neither of those fields",
+                "reaches Bank Accounts or Cash-in-Hand",
+                "every credit on a Payment, every debit on a Receipt, every leg on a Contra",
+                "must be established as holding no money",
+                "one three-entry Receipt built by ComplyEaze Bridge has been imported over the gateway and verified",
+            ][..],
+        ),
+        (
+            "/properties/vouchers/items/properties/entries/items/properties/ledger/description",
+            &[
+                "It may end in one CR LF only when the live ledger's stored name does",
+                "case, spacing, dashes, slashes or quotes, a trailing line break",
+                "ledger_has_folded_twin",
+            ][..],
+        ),
+        (
+            "/properties/amends_batch_id/description",
+            &[
+                "so a file import alters the vouchers instead of duplicating them",
+                "Refused if any build of that batch was posted natively",
+                "still in the book as a build of that batch wrote it in the fields compared",
+                "(date, a bank voucher's effective date when Tally returns one, type, number when set, entries' ledger, amount and side, narration)",
+                "checked during this build only, not at import",
+                "the party ledger are not compared",
+                "allocations made in Tally are expected to be lost",
+            ][..],
+        ),
+    ] {
+        let text = schema
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("build_import_xml has no {pointer}"));
+        for phrase in phrases {
+            assert!(text.contains(phrase), "{pointer} lost {phrase:?}");
+        }
+    }
+}
+
 /// A paged tool's `limit` defaults to the configured row limit (`BRIDGE_AGENT_MAX_ROWS`), which an
 /// operator can change, so its schema names no default of its own: a fixed 500 there was false
 /// whenever the row limit was not 500 (#1148). The two evidence reads default to 20 and keep it.

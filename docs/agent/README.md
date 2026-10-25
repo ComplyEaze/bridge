@@ -754,7 +754,8 @@ Use `audit_test_run` with `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD),
 two group lists `cash_groups` and `bank_groups` to run one test of ComplyEaze Bridge's tax-audit
 engine on the company's own books. Today `test` can only be `cash_44ab`, the share of cash in the
 books' receipts and payments against the s.44AB(a) limit. A test joins the list only with a real-book
-parity record at a pinned reference commit; a test not on it is refused as `audit_test_not_admitted`.
+parity record at a pinned reference commit; the tool's schema lists only those tests, so any other is refused
+as `argument_invalid:test` before any request.
 The rules the engine holds are those of assessment year 2026-27, so `from` and `to` must lie inside
 1 April 2025 to 31 March 2026; any other period is refused as `audit_period_outside_ay_2026_27` before a
 request, and a part-year inside it is read and judged against the whole year's thresholds.

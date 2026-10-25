@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use bridge_tally_protocol::PartyLedgerMasterFieldObservation;
 use rust_xlsxwriter::{Format, Workbook, XlsxError};
 
-use super::party_ledger_master::{PartyLedgerMasterSource, PartyLedgerMasterWorkbook};
+use super::party_ledger_master::PartyLedgerMasterWorkbook;
 use super::party_statement_xlsx::amount_to_f64;
 use super::schedule_iii::{
     build_schedule_iii_view, Decision, DecisionStatus, Finality, LineBasis, NotApplied,
@@ -331,7 +331,7 @@ fn write_schedule_iii(
             let DecisionStatus::Applied { row_index, .. } = status else {
                 return None;
             };
-            let notes = drift_notes(source, status);
+            let notes = drift_notes(status);
             (!notes.is_empty()).then(|| (*row_index, notes.join(" ")))
         })
         .collect();
@@ -408,7 +408,7 @@ fn write_schedule_iii(
             worksheet.write_string(row, 1, &decision.ledger_name_when_made)?;
             worksheet.write_string(row, 2, decision.ledger.as_str())?;
             worksheet.write_string(row, 3, decision.head.caption())?;
-            worksheet.write_string(row, 4, status_text(source, status))?;
+            worksheet.write_string(row, 4, status_text(status))?;
             row += 1;
         }
     }
@@ -475,7 +475,7 @@ fn decisions_summary(
 
 /// What changed in Tally since an applied decision was made, without stopping
 /// it from applying. Empty for a decision that is not applied.
-fn drift_notes(source: &PartyLedgerMasterSource, status: &DecisionStatus) -> Vec<String> {
+fn drift_notes(status: &DecisionStatus) -> Vec<String> {
     let DecisionStatus::Applied {
         ancestry_changed, ..
     } = status
@@ -503,11 +503,11 @@ fn group_path(nearest_first: &[String]) -> String {
     path.join(" > ")
 }
 
-fn status_text(source: &PartyLedgerMasterSource, status: &DecisionStatus) -> String {
+fn status_text(status: &DecisionStatus) -> String {
     match status {
         DecisionStatus::Applied { .. } => {
             let mut text = "Applied.".to_string();
-            for note in drift_notes(source, status) {
+            for note in drift_notes(status) {
                 text.push(' ');
                 text.push_str(&note);
             }

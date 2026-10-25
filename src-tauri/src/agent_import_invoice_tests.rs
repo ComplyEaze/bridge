@@ -3011,3 +3011,15 @@ fn a_resolved_code_is_warned_about_and_an_unresolved_one_refused() {
     );
     assert_eq!(warnings.len(), 1);
 }
+
+/// The divergent invoice's next step must not promise that saving the invoice again repairs it:
+/// a save changes the voucher's AlterID, and what a verification reads after one is not
+/// established (voucher writes reference, section 9.16).
+#[test]
+fn the_divergent_next_step_does_not_promise_a_resave_repairs_the_invoice() {
+    let text = crate::agent::agent_import::verification::INVOICE_DIVERGENT_NEXT_STEP;
+    assert!(!text.contains("then open the invoice and save it again"));
+    assert!(text.contains("changes the invoice's AlterID"));
+    assert!(text.contains("has not been established"));
+    assert!(text.ends_with("Do not post it again."));
+}

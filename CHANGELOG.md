@@ -39,6 +39,11 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- The next steps for five situations no longer send a person to enter a voucher in Tally themselves; each now says what
+  ComplyEaze Bridge does and that it cannot put the voucher in the book yet: a voucher Tally reported as not
+  created (and one later not found after that report), a row a rejected batch carried, a statement day that is
+  partly posted, the extra row of same-day twins, and the first voucher of a company that has never held one
+  (part of #1709).
 - The approval window, and the review window, now open with a line that says what each answer does, before any
   detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
   voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N
@@ -89,6 +94,43 @@ These changes are in source and not yet in a published build.
   no keyed No; neither was read against the screen. The value
   mapping is unchanged: do not read `true` as eligible.
 
+- A read refused because the company it names is not loaded in Tally, was renamed since `list_companies`, or is
+  listed more than once now says so and says to open the company in Tally and ask again (#1699). Before,
+  an assistant saw only an operation code such as `ledger_movement_read_failed`, and the all-companies
+  outstandings sweep and the All clients screen reported the same cases as a failed currency probe. The refusal
+  carries `company_identity_absent_or_ambiguous`, `company_identity_presentation_collision` or
+  `company_identity_not_matched` as its cause. Nothing about what is refused changes; only the reason and the
+  next step are named. Not yet run by us against a renamed company in a live Tally.
+- A read that stops because the company's books changed in Tally while it was being read
+  (`voucher_window_changed_during_read` and the `*_extent_changed` codes) now says that nothing is wrong with the
+  request and to run the same request again once the saving or exporting in Tally has finished; a later page of a
+  held listing that cannot be served (`listing_snapshot_changed`) says to start again from the first page without
+  `snapshot_id` (part of #1633). One GST return export in TallyPrime 7.1 Silver raised the voucher mark by 3
+  with no voucher change, which is why a routine export can trip these. Not changed: a correct post that reads as
+  unverified after such an export is still open on #1633.
+- A snapshot request that reaches its 20-second deadline is recorded as `request_deadline_exceeded` instead of
+  `tally_unreachable` (#1671), so a person is no longer told to check that Tally is running when it was
+  only slow. The deadline and the rule that such a request is not sent again are unchanged. Covered by tests only.
+- The Proof of Sync screen no longer shows a rejected-row count (#1634): it could only ever read zero, because only
+  accepted observations enter the local mirror. The summary line drops the "rejected rows" clause and the table
+  column reads "Accepted returned rows"; a run that rejected source records is still shown by its gap. The count
+  stays in the proof's data and in the export.
+- The summary of a post whose binding was refused now says that ComplyEaze Bridge cannot close the batch or amend it
+  (part of #1039). Before, it said only that the batch "stays open". The notice for a multi-voucher batch whose
+  voucher mark step was not confirmed no longer suggests that recording a review with `acknowledge_post_review`
+  clears it: the record is kept on this computer and the notice stays. No behaviour changes. A way to close a batch
+  with a refused binding from ComplyEaze Bridge is not built: a person's confirmation cannot stand for a voucher's
+  identity before it is measured whether Tally names the post's own vouchers when another user is writing.
+- When a withdrawn skipped transfer row's other statement may sit in a batch that is not verified
+  (`other_side_unverified`), the next step now offers to build that statement again only if every batch named for
+  the row was never sent to Tally, `verify_import` listed every one of their vouchers as `not_found`, and the person
+  confirms none of their files was ever imported; if any voucher was found or a file was imported, it says to check
+  in Tally which of their vouchers are there (#1820). Wording only.
+- The tool list is answered whole under its own fixed ceiling of 1,000,000 bytes, apart from the cap on what a
+  tool returns from the books (#1798). Before, a `BRIDGE_AGENT_MAX_BYTES` set below about 197 KB made the list
+  itself too large (`agent_response_too_large`) and left the assistant with no tools. Every tool answer still
+  keeps the configured cap, and a test holds the tool list under 225,000 bytes.
+
 - `profit_and_loss` and `balance_sheet` can now be established on a book with stock items (part of #692), using
   Tally's own `Less: Closing Stock` figure from its Profit and Loss, shown as `closing_stock` (`applied`, with its
   value and source, or `declined`, with the reason) and not derived or taken from `stock_summary`. It is used only when
@@ -116,6 +158,16 @@ These changes are in source and not yet in a published build.
   books measured; not tried on them). Measured on one synthetic book of TallyPrime 7.1 Silver (three captures, one item
   with two dated entries in each list); a state row other than `Any`, slab rates, another release, a larger book
   and a zero-row stock-item answer are not measured. `stock_summary` is unchanged.
+
+- `negative_stock` (new tool; part of #1358): Tally's own Negative Stock list for a window, as `item`, `quantity`,
+  `rate` and `value` per listed stock item, returned as Tally prints them and compared with no other report
+  (`checks` says so). Being listed is not a finding that the quantity is below zero, and an empty answer is
+  `not_established`, never "no negative stock": Tally's empty answer cannot be told from a report that was not
+  rendered. Measured on synthetic books: a short item listed for a whole financial year, the same item at
+  another quantity for a window ending mid-year (with its rate and value empty), and a book with none short answered
+  an empty envelope. Any other window is named as unmeasured, a book whose master mark is over 874 is
+  refused before the report is asked for (a stated guess, as for `stock_summary`), and the cost on a large book is not known. Not yet run
+  against Tally.
 
 ## [0.6.0] - 2026-10-16
 

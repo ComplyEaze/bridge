@@ -141,6 +141,9 @@ pub(super) struct MasterIndex {
     /// Ledgers the compliance read set aside by currency (foreign, or a base-currency
     /// ledger whose balance is a composite). A voucher that touches one cannot be classified.
     excluded: BTreeSet<String>,
+    /// Each ledger's GUID by name, so an answer names a ledger by what does not change with a
+    /// mask or a rename; empty where the listing carried none.
+    guids: BTreeMap<String, String>,
 }
 
 impl MasterIndex {
@@ -169,7 +172,16 @@ impl MasterIndex {
         Ok(Self {
             by_name,
             excluded: excluded.into_iter().collect(),
+            guids: BTreeMap::new(),
         })
+    }
+
+    pub(super) fn with_guids(self, guids: BTreeMap<String, String>) -> Self {
+        Self { guids, ..self }
+    }
+
+    pub(super) fn guid_of(&self, name: &str) -> Option<&str> {
+        self.guids.get(name).map(String::as_str)
     }
 
     pub(super) fn len(&self) -> usize {
@@ -824,7 +836,8 @@ impl Server {
             .into_iter()
             .map(|ledger| ledger.ledger)
             .chain(listing.mixed_currency_ledgers_excluded);
-        let index = MasterIndex::build(listing.records.iter(), &groups, excluded)?;
+        let index = MasterIndex::build(listing.records.iter(), &groups, excluded)?
+            .with_guids(listing.ledger_guids);
         Ok(RegisterMasters {
             index,
             marks,

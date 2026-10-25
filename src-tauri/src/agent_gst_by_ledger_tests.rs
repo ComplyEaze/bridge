@@ -327,7 +327,7 @@ fn two_counter_ledgers_or_another_group_set_the_voucher_aside() {
         }
     }
     // The book's Suspense ledger stands in for any ledger outside the counter and settlement
-    // groups (Direct Expenses, Fixed Assets, Current Assets, Stock-in-Hand and so on).
+    // groups (Current Assets, Stock-in-Hand and so on).
     entries.push(json!({"ledger": "Suspense", "amount": "-1000.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
     assert_eq!(reason(&index, &other), SetAside::OtherLedgersPresent);
     // A sales ledger on a purchase is its own reason, ahead of the others.

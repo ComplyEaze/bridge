@@ -1,0 +1,21 @@
+case=probe-40 exe_sha256=b87ac71ba980cb5937c204c1633aee564c5336c86b40539550411411e7ac1440
+screen=1920x1080 workarea=1920x1030 at (0,0) (physical pixels)
+command: cmd.exe /s /c ""<staged build>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" 
+--confirm-journal < "inputs\probe-40.txt" > 
+"<new run folder>\probe-40.stdout.txt" 2> "<new run folder>\probe-40.stderr.txt""
+started cmd pid=28948. If the box cannot be answered by mouse, from ANOTHER window: taskkill /PID 28948 /T /F (that 
+closes only this probe).
+child pid=18908
+window title='ComplyEaze Bridge — post this voucher?' rect(L,T,R,B)=598,86,1342,1021 size=744x935 top_off_screen=False 
+bottom_below_workarea=False left_off=False right_off=False
+NOW take a WHOLE-SCREEN screenshot with the lab tool (not the keyboard), then answer by MOUSE as the sheet says for 
+this case.
+cmd exit=0 after 20210 ms from start (77 box did not fit; 1 No/Cancel/X; 0 with the token Yes; 0 with no token = box 
+not measured or not shown)
+stdout file=<new run folder>\probe-40.stdout.txt bytes=58 
+sha256=3130925b45a12cc83725c9948defab25fb7c9a236e6cc7b17c825efe813c8402
+stdout text: [bridge-post-approved:0f9d3c1e-6b7a-4c58-9a21-5d3e8b1c7f40]
+stderr file=<new run folder>\probe-40.stderr.txt bytes=63 
+sha256=c2c1f689327824b7b4d0cfbb6565b615cac7c7769af9f021304b6ab77e65e9d0
+stderr text: [box-fit: box=(598,86,1342,1021) work=(0,0,1920,1030) fits=true] (the box-fit line: the box and the work 
+area the product compared, and fits=true or false)

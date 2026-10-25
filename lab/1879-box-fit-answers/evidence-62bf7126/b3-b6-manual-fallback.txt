@@ -1,0 +1,24 @@
+Manual fallback (sheet: 'open cmd, run "<exe>" --confirm-journal < <input> > <out>, then echo %ERRORLEVEL%'), run from PowerShell as: cmd.exe /s /c ""<staged build>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal < "inputs\<case>.txt" > "<new run folder>\<case>.stdout.txt" 2> "<new run folder>\<case>.stderr.txt"", exit status from $LASTEXITCODE, elapsed by a stopwatch around the call.
+
+b3 probe-48 cmd exit=77 elapsed_ms=154 stdout=0B stderr=63B
+b4 probe-60 cmd exit=77 elapsed_ms=264 stdout=0B stderr=63B c8e06543 [box-fit: box=(598,0,1342,1315) work=(0,0,1920,1030) fits=false]
+b5 probe-80 cmd exit=77 elapsed_ms=246 stdout=0B stderr=63B 847f5dcd [box-fit: box=(598,0,1342,1695) work=(0,0,1920,1030) fits=false]
+b6 probe-120 cmd exit=77 elapsed_ms=249 stdout=0B stderr=63B f768d2b0 [box-fit: box=(618,0,1320,2455) work=(0,0,1920,1030) fits=false]
+
+Files:
+b3 probe-48
+  probe-48.stdout.txt 0 B sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  probe-48.stderr.txt 63 B sha256 a03a4e4158800ecb2c8cac7b0e2d13f80ae11079e07d8999f30727b47fe99314
+  stderr text: box-fit: box=(598,0,1342,1087) work=(0,0,1920,1030) fits=false
+b4 probe-60
+  probe-60.stdout.txt 0 B sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  probe-60.stderr.txt 63 B sha256 c8e0654398e126cda84af78b9b1bf6405fae02188312035b2c07ae26d79c904d
+  stderr text: box-fit: box=(598,0,1342,1315) work=(0,0,1920,1030) fits=false
+b5 probe-80
+  probe-80.stdout.txt 0 B sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  probe-80.stderr.txt 63 B sha256 847f5dcd5f362d953e678d4cbac6be2e697e21a5dacb4fd4afd072f5277a0975
+  stderr text: box-fit: box=(598,0,1342,1695) work=(0,0,1920,1030) fits=false
+b6 probe-120
+  probe-120.stdout.txt 0 B sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  probe-120.stderr.txt 63 B sha256 f768d2b0e3a370e68760d745b9fa2c0e589d57d2d8a7d56d39424a515d1c46cf
+  stderr text: box-fit: box=(618,0,1320,2455) work=(0,0,1920,1030) fits=false

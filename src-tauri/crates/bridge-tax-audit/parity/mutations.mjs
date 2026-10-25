@@ -1015,7 +1015,8 @@ function pidAlive(pid) {
 /** Whether a takeover gate was left behind. A gate names its owner's pid in a file inside it, so it is stale
  * exactly when that run is gone, however long a live owner has been stalled (suspended, or asleep with its
  * machine). A gate with no owner yet is one a run has just made, or one that run died before naming: only the
- * second is older than GATE_STALE_MS. */
+ * second is older than GATE_STALE_MS. A crashed run's pid that a later process reuses keeps its gate until someone removes
+ * it, as a claim already stays with a reused pid (pidAlive cannot tell the two processes apart). */
 function gateIsStale(gate) {
   const owner = Number.parseInt(fs.readFileSync(path.join(gate, "owner"), "utf8"), 10);
   if (Number.isInteger(owner) && owner > 0) return !pidAlive(owner);
@@ -1085,12 +1086,21 @@ export function lockWorkdir(workdir) {
         pause(20);
         continue;
       }
+      let named = false;
       try {
-        fs.writeFileSync(path.join(gate, "owner"), `${process.pid}\n`);
+        try {
+          fs.writeFileSync(path.join(gate, "owner"), `${process.pid}\n`);
+          named = true;
+        } catch (e) {
+          // This run was suspended between making the gate and naming itself for longer than GATE_STALE_MS, and
+          // another run took the unnamed gate as abandoned: it is no longer ours to use or to remove.
+          if (e.code === "ENOENT") continue;
+          throw e;
+        }
         const again = claimedBy(lock);
         if (again !== null && !pidAlive(again)) fs.rmSync(lock, { force: true });
       } finally {
-        fs.rmSync(gate, { recursive: true, force: true });
+        if (named) fs.rmSync(gate, { recursive: true, force: true });
       }
     }
     return null;

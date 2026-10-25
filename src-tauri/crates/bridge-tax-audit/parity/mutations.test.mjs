@@ -1248,6 +1248,34 @@ mu.lockWorkdir(process.argv[2]);
     claim.release();
   });
 
+  test("a run whose still-unnamed gate was taken as abandoned starts over instead of failing", async () => {
+    // Suspended between making the gate and naming itself for longer than the age limit, a run finds its gate gone: it
+    // must not throw out of lockWorkdir, nor remove a gate that is no longer its own.
+    const work = path.join(g.t, "gate-taken-before-naming");
+    fs.mkdirSync(work, { recursive: true });
+    const dead = spawn("/bin/sh", ["-c", "exit 0"], { stdio: "ignore" });
+    await exited(dead);
+    fs.writeFileSync(path.join(work, ".lock"), `${dead.pid}\n`);
+    const write = fs.writeFileSync;
+    let taken = false;
+    fs.writeFileSync = (target, ...rest) => {
+      if (!taken && String(target).endsWith("/.lock.takeover/owner")) {
+        taken = true;
+        fs.rmSync(path.dirname(String(target)), { recursive: true, force: true }); // another run removed the unnamed gate
+      }
+      return write(target, ...rest);
+    };
+    try {
+      const claim = mu.lockWorkdir(work);
+      assert.ok(taken, "the gate was taken before its owner named itself");
+      assert.notEqual(claim, null, "the run started over and took the workdir");
+      claim.release();
+      assert.ok(!fs.existsSync(path.join(work, ".lock.takeover")), "no gate left behind");
+    } finally {
+      fs.writeFileSync = write;
+    }
+  });
+
   test("concurrent claimants never hold the workdir together, though they start from a dead holder's claim", async () => {
     // The claim must be exclusive as flock was: made whole (a reader never sees it without its pid), and a
     // takeover of a dead holder's claim never removes a claim another run has just made.

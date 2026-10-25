@@ -319,15 +319,25 @@ fn workbook(source: PartyLedgerMasterSource) -> PartyLedgerMasterWorkbook {
 
 /// A synthetic book with its balances as of 31 July 2026 (FY 2026-27).
 fn book(rows: Vec<PartyLedgerMasterRow>) -> PartyLedgerMasterWorkbook {
+    book_between("20260401", "20260731", rows)
+}
+
+/// The same book read over `from` to `to`; the decision binds by the year the
+/// balances are AS OF (`to`), not by the year the read begins in.
+fn book_between(
+    from: &str,
+    to: &str,
+    rows: Vec<PartyLedgerMasterRow>,
+) -> PartyLedgerMasterWorkbook {
     workbook(PartyLedgerMasterSource {
         company: "Synthetic Books".to_string(),
         company_guid: "company-guid".to_string(),
         currency_assertion: OutstandingsCurrencyAssertion::Inr,
         currency_decimal_places: 2,
-        from: TallyDate::parse("20260401").unwrap(),
-        to: TallyDate::parse("20260731").unwrap(),
-        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
-        last_voucher_date: TallyDate::parse("20260731").unwrap(),
+        from: TallyDate::parse(from).unwrap(),
+        to: TallyDate::parse(to).unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse(to).unwrap()),
+        last_voucher_date: TallyDate::parse(to).unwrap(),
         count_cross_check: None,
         rows,
         request_sha256: "0".repeat(64),
@@ -455,13 +465,14 @@ fn totals(view: &ScheduleIIIView) -> (String, String, String) {
 }
 
 #[test]
-fn without_decisions_the_view_is_final_and_every_line_is_group_evidence() {
+fn without_decisions_an_excluded_ledger_keeps_the_view_not_final_and_every_line_is_group_evidence() {
     let source = book(vec![
         row("Customer", "Sundry Debtors", "-100"),
         row("Term loan", "Loans (Liability)", "500"),
     ]);
     let view = build_schedule_iii_view(&source, &[]).unwrap();
-    assert_eq!(view.finality, Finality::Final);
+    // "Term loan" is excluded: a client mapping decision is still required.
+    assert_eq!(view.finality, Finality::NotFinal);
     assert!(view.decisions.is_empty());
     assert_eq!(view.lines.len(), 1);
     assert_eq!(
@@ -754,7 +765,6 @@ fn a_move_between_subgroups_of_one_group_applies_and_reports_the_ancestry_change
         vec![DecisionStatus::Applied {
             id: DecisionId(22),
             row_index: 0,
-            renamed_from: None,
             ancestry_changed: Some(AncestryChange {
                 was: vec!["Staff advances".to_string(), "Sundry Debtors".to_string()],
                 now: vec!["Customers".to_string(), "Sundry Debtors".to_string()],
@@ -946,7 +956,7 @@ fn a_ledger_with_no_parent_cannot_take_a_decision() {
 }
 
 #[test]
-fn a_renamed_ledger_is_bound_by_its_case_folded_guid_and_reports_its_old_name() {
+fn a_renamed_ledger_is_found_by_its_case_folded_guid_but_its_decision_needs_reconfirmation() {
     let mut renamed = row("Term loan from director", "Loans (Liability)", "500");
     renamed.guid = "GUID-TERM LOAN".to_string();
     let source = book(vec![renamed]);
@@ -960,19 +970,20 @@ fn a_renamed_ledger_is_bound_by_its_case_folded_guid_and_reports_its_old_name() 
     let view = build_schedule_iii_view(&source, &decisions).unwrap();
 
     assert_eq!(
-        view.decisions,
-        vec![DecisionStatus::Applied {
-            id: DecisionId(8),
-            row_index: 0,
-            renamed_from: Some("Term loan".to_string()),
-            ancestry_changed: None,
-        }]
+        not_applied(&view, 8),
+        Some(&NotApplied::Renamed {
+            was: "Term loan".to_string(),
+            now: "Term loan from director".to_string(),
+        })
     );
-    assert_eq!(view.finality, Finality::Final);
+    assert!(!applied(&view, 8));
+    // The ledger stays excluded, and the view is not final.
+    assert_eq!(view.exclusions.len(), 1);
+    assert_eq!(view.finality, Finality::NotFinal);
 }
 
 #[test]
-fn a_decision_for_another_year_is_offered_not_applied_and_leaves_the_view_final() {
+fn a_decision_for_another_year_is_offered_not_applied_and_needs_no_attention_itself() {
     let source = book(vec![row("Term loan", "Loans (Liability)", "500")]);
     let mut last_year = decision(
         9,
@@ -985,8 +996,40 @@ fn a_decision_for_another_year_is_offered_not_applied_and_leaves_the_view_final(
     let view = build_schedule_iii_view(&source, &[last_year]).unwrap();
 
     assert_eq!(not_applied(&view, 9), Some(&NotApplied::OtherYear));
-    assert_eq!(view.finality, Finality::Final);
+    // The year mismatch alone needs no attention; the ledger it would have
+    // placed is still excluded, and that is what keeps the view not final.
+    assert!(!NotApplied::OtherYear.needs_attention());
     assert_eq!(view.exclusions.len(), 1);
+    assert_eq!(view.finality, Finality::NotFinal);
+}
+
+#[test]
+fn a_decision_binds_by_the_year_of_the_balance_date_when_the_read_spans_two_financial_years() {
+    // Read 1 April 2025 to 31 July 2026: it begins in FY 2025-26 and its
+    // balances are as of FY 2026-27. A decision for FY 2026-27 applies; one for
+    // FY 2025-26 does not.
+    let rows = || vec![row("Term loan", "Loans (Liability)", "500")];
+    let source = book_between("20250401", "20260731", rows());
+    let current = decision(
+        31,
+        "Term loan",
+        unmapped("loans (liability)"),
+        ScheduleIIIHead::OtherCurrentLiabilities,
+    );
+    let view = build_schedule_iii_view(&source, &[current]).unwrap();
+    assert!(applied(&view, 31));
+    assert_eq!(view.finality, Finality::Final);
+
+    let mut began_in = decision(
+        32,
+        "Term loan",
+        unmapped("loans (liability)"),
+        ScheduleIIIHead::OtherCurrentLiabilities,
+    );
+    began_in.year = FinancialYear::beginning_in(FY_2026_27 - 1);
+    let view = build_schedule_iii_view(&source, &[began_in]).unwrap();
+    assert_eq!(not_applied(&view, 32), Some(&NotApplied::OtherYear));
+    assert_eq!(view.finality, Finality::NotFinal);
 }
 
 #[test]

@@ -271,7 +271,11 @@ fn write_schedule_iii(
     worksheet.write_string_with_format(7, 0, "Check interpretation", &bold)?;
     worksheet.write_string(7, 1, "Difference 0 is the Tally-sign self-check over every captured ledger closing balance; it is evidence, not an assertion of statement completeness.")?;
     worksheet.write_string_with_format(8, 0, "CA grouping decisions", &bold)?;
-    worksheet.write_string(8, 1, decisions_summary(view.decisions(), view.finality()))?;
+    worksheet.write_string(
+        8,
+        1,
+        decisions_summary(view.decisions(), view.exclusions().len(), view.finality()),
+    )?;
 
     let header_row = 9u32;
     for (column, label) in [
@@ -426,7 +430,11 @@ fn basis_text(basis: LineBasis) -> &'static str {
     }
 }
 
-fn decisions_summary(statuses: &[DecisionStatus], finality: Finality) -> String {
+fn decisions_summary(
+    statuses: &[DecisionStatus],
+    excluded_ledgers: usize,
+    finality: Finality,
+) -> String {
     if statuses.is_empty() {
         return "None were applied to this export.".to_string();
     }
@@ -448,8 +456,19 @@ fn decisions_summary(statuses: &[DecisionStatus], finality: Finality) -> String 
         .count();
     let attention = statuses.len() - applied - other_year;
     let verdict = match finality {
-        Finality::Final => "Nothing needs attention.",
-        Finality::NotFinal => "NOT FINAL: resolve each decision that needs attention.",
+        Finality::Final => "Nothing needs attention.".to_string(),
+        Finality::NotFinal => {
+            let mut text = String::from("NOT FINAL:");
+            if attention > 0 {
+                text.push_str(" resolve each decision that needs attention.");
+            }
+            if excluded_ledgers > 0 {
+                text.push_str(&format!(
+                    " {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
+                ));
+            }
+            text
+        }
     };
     format!("{applied} applied; {attention} not applied and need attention; {other_year} for another financial year. {verdict}")
 }
@@ -458,21 +477,12 @@ fn decisions_summary(statuses: &[DecisionStatus], finality: Finality) -> String 
 /// it from applying. Empty for a decision that is not applied.
 fn drift_notes(source: &PartyLedgerMasterSource, status: &DecisionStatus) -> Vec<String> {
     let DecisionStatus::Applied {
-        row_index,
-        renamed_from,
-        ancestry_changed,
-        ..
+        ancestry_changed, ..
     } = status
     else {
         return Vec::new();
     };
     let mut notes = Vec::new();
-    if renamed_from.is_some() {
-        notes.push(format!(
-            "Tally now names this ledger \"{}\"; the GUID is unchanged.",
-            source.rows[*row_index].name
-        ));
-    }
     if let Some(change) = ancestry_changed {
         notes.push(format!(
             "Ancestry changed since the decision: {} → {}.",
@@ -506,6 +516,9 @@ fn status_text(source: &PartyLedgerMasterSource, status: &DecisionStatus) -> Str
         DecisionStatus::NotApplied { reason, .. } => match reason {
             NotApplied::OtherYear => "Not applied: made for another financial year.".to_string(),
             NotApplied::LedgerMissing => "Not applied: the ledger is not in this read.".to_string(),
+            NotApplied::Renamed { was, now } => format!(
+                "Not applied: Tally now names this ledger \"{now}\", and the decision was made for \"{was}\". Confirm it for the ledger as it is named now."
+            ),
             NotApplied::BalanceNotEstablished => {
                 "Not applied: Tally returned no closing balance for the ledger.".to_string()
             }

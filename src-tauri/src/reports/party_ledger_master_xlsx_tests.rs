@@ -446,6 +446,53 @@ fn decided_heads_their_basis_and_a_stale_decision_reach_the_group_subtotal_sheet
 }
 
 #[test]
+fn a_renamed_ledger_and_an_excluded_one_each_say_so_and_the_sheet_is_not_final() {
+    use crate::reports::schedule_iii::{
+        DecisionId, Derivation, DerivedOutcome, FinancialYear, LedgerGuid, ScheduleIIIHead,
+        Undetermined,
+    };
+    let mut source = source_with_precision(2);
+    source.rows[0].name = "Term loan from director".to_string();
+    source.rows[0].guid = "loan-guid".to_string();
+    source.rows[0].parent =
+        PartyLedgerMasterFieldObservation::Returned("Loans (Liability)".to_string());
+    source.rows[0].closing_balance = Some(ExactDecimal::parse("500.00".to_string()).unwrap());
+    source.groups = vec![bridge_tally_protocol::TallyNamedMaster {
+        name: "Loans (Liability)".to_string(),
+        parent: PartyLedgerMasterFieldObservation::Returned("Primary".to_string()),
+        reserved_name: Some("Loans (Liability)".to_string()),
+    }];
+    let workbook = build_party_ledger_master_workbook(source).unwrap();
+    let decisions = [Decision {
+        id: DecisionId(3),
+        ledger: LedgerGuid::new("loan-guid").unwrap(),
+        ledger_name_when_made: "Term loan".to_string(),
+        made_against: Derivation {
+            outcome: DerivedOutcome::Undetermined(Undetermined::UnmappedReservedGroup(
+                "loans (liability)".to_string(),
+            )),
+            ancestry: vec!["Loans (Liability)".to_string()],
+        },
+        head: ScheduleIIIHead::OtherCurrentLiabilities,
+        year: FinancialYear::beginning_in(2026),
+    }];
+
+    let bytes = render_party_ledger_master_xlsx(&workbook, &decisions).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut text = String::new();
+    for name in ["xl/worksheets/sheet2.xml", "xl/sharedStrings.xml"] {
+        std::io::Read::read_to_string(&mut archive.by_name(name).unwrap(), &mut text).unwrap();
+    }
+
+    assert!(text.contains("Tally now names this ledger"));
+    assert!(text.contains("Term loan from director"));
+    assert!(text.contains("the decision was made for"));
+    assert!(text.contains(
+        "0 applied; 1 not applied and need attention; 0 for another financial year. NOT FINAL: resolve each decision that needs attention. 1 ledger(s) are excluded: a client mapping decision is required."
+    ));
+}
+
+#[test]
 fn a_decision_whose_ledger_moved_between_subgroups_reports_the_change_on_the_row_and_in_the_list() {
     use crate::reports::schedule_iii::{
         DecisionId, Derivation, DerivedOutcome, FinancialYear, GroupSubtotalKind, LedgerGuid,

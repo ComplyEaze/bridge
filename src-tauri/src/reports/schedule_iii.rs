@@ -126,7 +126,10 @@ pub(crate) enum LineBasis {
     Decided(ScheduleIIIHead),
 }
 
-/// A view is final only when every decision for its period applied.
+/// A view is final only when every decision it was given for its period applied
+/// and no ledger is left excluded (an exclusion is a ledger that still needs a
+/// client mapping decision). Whether it was given every decision recorded for
+/// this book and year is the caller's: the view takes a slice and cannot check it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Finality {
     Final,
@@ -500,9 +503,6 @@ pub(crate) enum DecisionStatus {
     Applied {
         id: DecisionId,
         row_index: usize,
-        /// The name the ledger had when the decision was made, when Tally now
-        /// shows another. The GUID still proves which ledger it is.
-        renamed_from: Option<String>,
         /// Set when the groups above the ledger changed without changing its
         /// standing, such as a move between two subgroups of one group.
         ancestry_changed: Option<AncestryChange>,
@@ -518,6 +518,14 @@ pub(crate) enum NotApplied {
     /// For another financial year: offered, not stale.
     OtherYear,
     LedgerMissing,
+    /// Tally now names the ledger something else than when the decision was made.
+    /// A GUID is not established as a ledger's identity for good (a restore can hand
+    /// an identifier to another record; ADR 0016), so the decision is not applied
+    /// until the CA confirms it for the ledger as it is named now.
+    Renamed {
+        was: String,
+        now: String,
+    },
     BalanceNotEstablished,
     ReadIncomplete,
     /// The ledger no longer has the standing the decision was made against,
@@ -564,7 +572,9 @@ fn derive(source: &PartyLedgerMasterSource) -> Vec<Derivation> {
 /// ledger is listed loudly as an exclusion.
 ///
 /// It takes the validated workbook, whose ledger GUIDs are non-blank and
-/// unique, so a decision binds to at most one row.
+/// unique, so a decision binds to at most one row. The caller passes the
+/// decisions recorded for this book and year; a decision for another year is
+/// offered, never applied.
 pub(crate) fn build_schedule_iii_view(
     workbook: &PartyLedgerMasterWorkbook,
     decisions: &[Decision],
@@ -634,12 +644,13 @@ pub(crate) fn build_schedule_iii_view(
     let difference = credit_total
         .checked_subtract(&debit_total)
         .map_err(|_| ScheduleIIIError::Arithmetic)?;
-    let finality = if decisions.iter().any(|status| {
-        matches!(status, DecisionStatus::NotApplied { reason, .. } if reason.needs_attention())
-    }) {
-        Finality::NotFinal
-    } else {
+    let finality = if exclusions.is_empty()
+        && !decisions.iter().any(|status| {
+            matches!(status, DecisionStatus::NotApplied { reason, .. } if reason.needs_attention())
+        }) {
         Finality::Final
+    } else {
+        Finality::NotFinal
     };
     Ok(ScheduleIIIView {
         lines,
@@ -686,6 +697,13 @@ fn bind(
             continue;
         };
         let row = &source.rows[row_index];
+        if row.name != decision.ledger_name_when_made {
+            statuses.push(not_applied(NotApplied::Renamed {
+                was: decision.ledger_name_when_made.clone(),
+                now: row.name.clone(),
+            }));
+            continue;
+        }
         let Derivation {
             outcome: now,
             ancestry,
@@ -706,8 +724,6 @@ fn bind(
                 DecisionStatus::Applied {
                     id: decision.id,
                     row_index,
-                    renamed_from: (row.name != decision.ledger_name_when_made)
-                        .then(|| decision.ledger_name_when_made.clone()),
                     ancestry_changed: (*ancestry != decision.made_against.ancestry).then(|| {
                         AncestryChange {
                             was: decision.made_against.ancestry.clone(),

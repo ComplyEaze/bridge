@@ -77,11 +77,14 @@ applies those that still fit, and reports the rest without applying them. No dec
    A balance changing side or settling to zero within the same group is not a move. Whether the head still fits
    that balance is checked on its own. Each decision is sorted into exactly one status (`NotApplied` names the
    reasons):
-   - **applied,** reporting any drift on the ledger's row and in the decision list: the old name when the
-     ledger was renamed in Tally (the GUID is unchanged), and the old and new group chain when its groups changed
-     without changing its standing;
+   - **applied,** reporting any drift on the ledger's row and in the decision list: the old and new group chain
+     when its groups changed without changing its standing;
    - **for another financial year:** offered, never applied;
    - **ledger missing;**
+   - **renamed:** the GUID is found, but Tally now names the ledger otherwise than when the decision was made.
+     A GUID is not established as a ledger's identity for good, and a restore can hand an identifier to another
+     record (ADR 0016: an identifier match is never auto-resolved), so the decision is offered, not applied,
+     until the CA confirms it for the ledger as it is named now;
    - **balance not established;**
    - **group read incomplete:** no parent, a gap in the group read, or a group whose parent Tally did not return.
      None of these gives the ledger a standing, so no decision may rest on it;
@@ -89,11 +92,13 @@ applies those that still fit, and reports the rest without applying them. No dec
    - **balance on the other side from the head.**
 
    A move between user-created subgroups under the same predefined group does not change the standing, so the
-   decision still applies. It is never silent: it is reported as drift, as a rename is, because the CA's reason
-   may have rested on the subgroup the ledger has left.
+   decision still applies. It is never silent: it is reported as drift, because the CA's reason may have rested
+   on the subgroup the ledger has left.
 
-   Any status other than applied or another year makes the view `NotFinal`. It is printed as NOT FINAL, not
-   withheld, so the CA can see what to resolve. Two decisions for one ledger in one year are an error: the export
+   Any status other than applied or another year makes the view `NotFinal`, and so does any ledger left
+   excluded (one that still needs a client mapping decision), whether or not a decision was offered for it. A
+   view is final only when nothing remains for the client to decide. It is printed as NOT FINAL, not withheld,
+   so the CA can see what to resolve. Two decisions for one ledger in one year are an error: the export
    fails rather than render.
 5. **Amounts are not an input.**
    - A decision moves a row index between lines, and every line total is summed from the read's own rows. Amounts

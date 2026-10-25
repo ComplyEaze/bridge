@@ -20,6 +20,10 @@
     {
       "uuid": "61c6de69-1748-461c-ad3f-162cb949df9f",
       "note": "company identifier of the synthetic lab company WR2 Unicode Lab: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml on master, already carried by many tracked fixtures and tests"
+    },
+    {
+      "uuid": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c",
+      "note": "company identifier of the invented company of the tax-audit crate's synthetic read: the hand-written GUID constant in src-tauri/crates/bridge-tax-audit/parity/generate_fixture.py on master (added in a845b66a1, #501); the synthetic read and its goldens carry it, the voucher and ledger identifiers in them with a counter suffix; already in 45 tracked files"
     }
   ]
 }

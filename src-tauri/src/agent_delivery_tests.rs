@@ -398,6 +398,65 @@ async fn a_late_response_keeps_only_its_whitelisted_error_in_the_receipt() {
     }
 }
 
+/// bridge#1916: a tax-audit rule code and an argument refusal are codes too,
+/// so their receipts keep them, as a code or a cause and from a JSON-RPC
+/// message; text of any other shape still never passes.
+#[tokio::test]
+async fn a_rule_code_or_an_argument_code_is_kept_and_no_other_text_is() {
+    let codes = [
+        "BIND-GROUP-UNKNOWN",
+        "C5-books-from",
+        "POP-1",
+        "argument_invalid:test",
+        "company_guid_required",
+    ];
+    for code in codes {
+        let receipt = late_receipt(json!({"result": {"error": {
+            "code": code, "cause": code, "message": "Private message"}}}))
+        .await;
+        assert_eq!(
+            receipt["error"],
+            json!({"code": code, "cause": code}),
+            "{code}"
+        );
+        let receipt = late_receipt_for(Err(code.to_string())).await;
+        assert_eq!(receipt["error"], json!({"code": code}), "{code}");
+    }
+    let long_rule = format!("C1-{}", "a".repeat(62));
+    let not_codes = [
+        "PRIVATE",
+        "Private",
+        "Private-7",
+        "Private Ledger",
+        "C5-books from",
+        "C5-books_from",
+        "BIND-",
+        "-BIND",
+        "BIND--UNKNOWN",
+        "argument_invalid:",
+        ":test",
+        "argument_invalid:Test",
+        "argument_invalid:a:b",
+        "Ä1-x",
+        "C1-é",
+        long_rule.as_str(),
+    ];
+    for text in not_codes {
+        let receipt = late_receipt(json!({"result": {"error": {"code": text}}})).await;
+        assert!(receipt.get("error").is_none(), "{text}: {receipt}");
+        let receipt = late_receipt(json!({"result": {"error": {
+            "code": "audit_test_refused", "cause": text}}}))
+        .await;
+        assert_eq!(
+            receipt["error"],
+            json!({"code": "audit_test_refused"}),
+            "{text}"
+        );
+        let receipt = late_receipt_for(Err(text.to_string())).await;
+        assert!(receipt.get("error").is_none(), "{text}: {receipt}");
+    }
+}
+
 mod request_trail_receipts {
     //! #918: the receipt of a call that sent requests names each of them.
     use super::*;

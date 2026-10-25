@@ -58,16 +58,43 @@ fn receipt_error(structured: &Value) -> Option<Value> {
     Some(kept)
 }
 
+/// A code is one of the three shapes Bridge's own codes take, at most 64
+/// bytes: a tool code (`vouchers_window_part_failed`), a tool code naming the
+/// argument it refused (`argument_invalid:test`), or a tax-audit rule code
+/// (`BIND-GROUP-UNKNOWN`, `C5-books-from`: upper-case letters or digits, then
+/// one or more hyphenated parts). Anything else, a word with no hyphen or a
+/// space included, is not a code.
 fn receipt_code(value: &Value) -> Option<Value> {
     value
         .as_str()
-        .filter(|text| {
-            (1..=64).contains(&text.len())
-                && text
-                    .bytes()
-                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
-        })
+        .filter(|text| (1..=64).contains(&text.len()) && is_code(text))
         .map(|text| json!(text))
+}
+
+fn is_code(text: &str) -> bool {
+    let tool_code = |part: &str| {
+        !part.is_empty()
+            && part
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+    };
+    let rule_code = |text: &str| {
+        let mut parts = text.split('-');
+        let head = parts.next().unwrap_or_default();
+        let mut rest = parts.peekable();
+        head.as_bytes().first().is_some_and(u8::is_ascii_uppercase)
+            && head
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
+            && rest.peek().is_some()
+            && rest.all(|part| {
+                !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_alphanumeric())
+            })
+    };
+    match text.split_once(':') {
+        Some((code, key)) => tool_code(code) && tool_code(key),
+        None => tool_code(text) || rule_code(text),
+    }
 }
 
 fn receipt_date(value: &Value) -> Option<Value> {

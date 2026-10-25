@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -52,13 +53,28 @@ function requiredChecksNeeds() {
   return needs.slice("    needs: [".length, -1).split(", ");
 }
 
-function runRequiredChecks(needs) {
-  const result = spawnSync("bash", ["-c", requiredChecksCommand()], {
-    cwd: repoRoot,
-    encoding: "utf8",
-    env: { ...process.env, NEEDS_JSON: JSON.stringify(needs) },
-  });
-  return { status: result.status, output: result.stdout + result.stderr };
+// `live` is what a stand-in `gh api repos/<repo>/pulls/<n> --jq .draft` prints (the pull request as it is when this job
+// runs); `ghExit` makes it fail instead.
+function runRequiredChecks(needs, { live = "true", ghExit = "0" } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "required-checks-"));
+  try {
+    mkdirSync(join(dir, "bin"));
+    writeFileSync(join(dir, "bin", "gh"), `#!/bin/bash\nprintf '%s' "$*" > "$STUB_GH_ARGS"\n[ "$STUB_GH_EXIT" = 0 ] || exit "$STUB_GH_EXIT"\nprintf '%s\\n' "$STUB_LIVE_DRAFT"\n`);
+    chmodSync(join(dir, "bin", "gh"), 0o755);
+    const result = spawnSync("bash", ["-c", requiredChecksCommand()], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env, PATH: `${join(dir, "bin")}:${process.env.PATH}`, NEEDS_JSON: JSON.stringify(needs), GITHUB_REPOSITORY: "o/r", PR_NUMBER: "7",
+        STUB_GH_ARGS: join(dir, "gh-args"), STUB_GH_EXIT: ghExit, STUB_LIVE_DRAFT: live,
+      },
+    });
+    let ghArgs = null;
+    try { ghArgs = readFileSync(join(dir, "gh-args"), "utf8"); } catch { /* gh was never called */ }
+    return { status: result.status, output: result.stdout + result.stderr, ghArgs };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 // The jobs gated on a scope output, and the output that gates each.
@@ -72,19 +88,19 @@ function run(scope, { results = {}, master = false } = {}) {
       : job === "compiler-cache-retention" ? (master ? "success" : "skipped") : "success";
     needs[job] = { result, outputs: {} };
   }
-  needs.changes.outputs = { ...scope };
+  needs.changes.outputs = { draft: "false", ...scope };
   for (const [job, result] of Object.entries(results)) needs[job] = { ...needs[job], result };
   return needs;
 }
 const NOTHING = { native: "false", bundle: "false", tax_audit: "false" };
 const FULL = { native: "true", bundle: "true", tax_audit: "true" };
-const passes = (needs, label) => {
-  const { status, output } = runRequiredChecks(needs);
+const passes = (needs, label, options) => {
+  const { status, output } = runRequiredChecks(needs, options);
   assert.equal(status, 0, `${label}\n${output}`);
   assert.match(output, /Every job that should have run passed, and every skipped job was not selected/);
 };
-const fails = (needs, message, label) => {
-  const { status, output } = runRequiredChecks(needs);
+const fails = (needs, message, label, options) => {
+  const { status, output } = runRequiredChecks(needs, options);
   assert.equal(status, 1, `${label}\n${output}`);
   assert.ok(output.includes(message), `${label}: expected "${message}" in\n${output}`);
 };
@@ -95,10 +111,26 @@ test("every job required-checks needs is classified here, so each case below cov
 });
 
 test("a run whose jobs all did what the scope said passes, selected or not", () => {
-  passes(run(NOTHING), "a draft or docs-only pull request: native, bundle, seam and tax-audit skipped");
+  passes(run(NOTHING), "a docs-only pull request: native, bundle, seam and tax-audit skipped");
   passes(run(FULL), "a full run");
   passes(run(FULL, { master: true }), "a master run with the cache pruner");
   passes(run({ native: "true", bundle: "false", tax_audit: "false" }), "native only");
+});
+
+test("a draft-scoped run passes only while its pull request is still a draft, read again when this job runs", () => {
+  const draftRun = () => run({ ...NOTHING, draft: "true" });
+  passes(draftRun(), "a draft pull request, native, bundle and seam skipped", { live: "true" });
+  assert.equal(runRequiredChecks(draftRun()).ghArgs, "api repos/o/r/pulls/7 --jq .draft", "it reads this pull request's draft flag");
+  assert.equal(runRequiredChecks(run(FULL)).ghArgs, null, "a run not scoped as a draft never asks");
+  for (const live of ["false", "", "TRUE", "null"]) {
+    fails(draftRun(), "draft-scoped run, but the pull request is not a draft now", `ready now: ${JSON.stringify(live)}`, { live });
+  }
+  fails(draftRun(), `draft-scoped run, but the pull request is not a draft now ("unreadable")`, "the lookup failed", { ghExit: "1" });
+  // A run that was not scoped as a draft never asks, and an odd value fails.
+  passes(run(FULL), "a full run", { ghExit: "1" });
+  const odd = run(FULL);
+  odd.changes.outputs.draft = "yes";
+  fails(odd, `scope output draft is "yes", neither 'true' nor 'false'`, "odd draft output");
 });
 
 test("a selected job that was skipped, failed or cancelled fails the aggregator", () => {

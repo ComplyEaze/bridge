@@ -46,6 +46,7 @@ jobs:
     outputs:
       bundle: ${{ steps.scope.outputs.bundle }}
       bundle_os: ${{ steps.scope.outputs.bundle_os }}
+      draft: ${{ steps.scope.outputs.draft }}
       native: ${{ steps.scope.outputs.native }}
       native_os: ${{ steps.scope.outputs.native_os }}
       tax_audit: ${{ steps.scope.outputs.tax_audit }}
@@ -81,6 +82,19 @@ jobs:
           # pins the bundler and the build: pnpm-lock.yaml, .node-version, rust-toolchain.toml, .cargo/ and
           # src-tauri/Cargo.lock, Cargo.toml and .cargo/.
           packaging_paths='^(\.github/workflows/ci\.yml$|packaging/|package\.json$|pnpm-lock\.yaml$|\.node-version$|rust-toolchain\.toml$|\.cargo/|src-tauri/(tauri\.conf\.json$|icons/|build\.rs$|Cargo\.(lock|toml)$|\.cargo/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$)'
+
+          # A draft pull request runs no native, bundle or seam job; every other job is scoped as below. Marking it ready
+          # (`ready_for_review`, a trigger above) starts a new run of the same head that is scoped in full (and cancels this
+          # one if it is still running), and Required checks there needs those jobs again. The merge queue's run is never a draft run. Only the
+          # exact payload value `true` is a draft, and then the pull request is read again: a re-run of an old draft run
+          # keeps its payload, and a push made just before the ready click can start its run after the ready run. A pull
+          # request that is no longer a draft, or whose state cannot be read, is scoped in full.
+          draft=false
+          if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then
+            live_draft="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .draft)" || live_draft=unreadable
+            if [[ "$live_draft" == "true" ]]; then draft=true; fi
+          fi
+          echo "draft=$draft" >> "$GITHUB_OUTPUT"
 
           # The unscoped run: every heavy job runs, whatever changed. Its caller writes the systems first.
           full_run() {
@@ -138,18 +152,6 @@ jobs:
             base="$PR_BASE_SHA"
           else
             base="$MERGE_GROUP_BASE_SHA"
-          fi
-
-          # A draft pull request runs no native, bundle or seam job; every other job is scoped as below. Marking it ready
-          # (`ready_for_review`, a trigger above) starts a new run of the same head that is scoped in full (and cancels this
-          # one if it is still running), and Required checks there needs those jobs again. The merge queue's run is never a draft run. Only the
-          # exact payload value `true` is a draft, and then the pull request is read again: a re-run of an old draft run
-          # keeps its payload, and a push made just before the ready click can start its run after the ready run. A pull
-          # request that is no longer a draft, or whose state cannot be read, is scoped in full.
-          draft=false
-          if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then
-            live_draft="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .draft)" || live_draft=unreadable
-            if [[ "$live_draft" == "true" ]]; then draft=true; fi
           fi
 
           echo "native_os=$windows" >> "$GITHUB_OUTPUT"
@@ -957,15 +959,20 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      # Only to read whether a draft-scoped run's pull request is still a draft.
+      pull-requests: read
     steps:
       - name: Verify every job that should have run passed
         shell: bash
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           printf '%s\n' "$NEEDS_JSON"
           node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
           // A rule is one of three kinds: { kind: 'always' }, { kind: 'scope', output } or { kind: 'optional' }.
           const rules = new Map([
             ['changes', { kind: 'always' }],
@@ -982,6 +989,20 @@ jobs:
           const RESULTS = new Set(['success', 'failure', 'cancelled', 'skipped']);
           const needs = JSON.parse(process.env.NEEDS_JSON);
           const scope = needs.changes?.outputs ?? {};
+          const problems = [];
+          // A draft-scoped run skipped the heavy jobs because its pull request was a draft when the scope job ran. It
+          // passes only while the pull request still is one, read again here: re-running the failed jobs of an old draft
+          // run after the ready click re-runs this job but not the scope job, and must not turn this job green.
+          if (scope.draft === 'true') {
+            let live = 'unreadable';
+            try {
+              live = execFileSync('gh', ['api', `repos/${process.env.GITHUB_REPOSITORY}/pulls/${process.env.PR_NUMBER}`, '--jq', '.draft'], { encoding: 'utf8' }).trim();
+            } catch { /* an unreadable pull request is not a draft */ }
+            console.log(`draft-scoped run; the pull request is a draft now: ${live}`);
+            if (live !== 'true') problems.push(`draft-scoped run, but the pull request is not a draft now (${JSON.stringify(live)}): its heavy jobs were skipped, so use the run of the ready state`);
+          } else if (scope.draft !== 'false') {
+            problems.push(`scope output draft is ${JSON.stringify(scope.draft)}, neither 'true' nor 'false'`);
+          }
           // What this job requires of each result: the set of results that pass, or a reason it cannot judge.
           function expected(rule) {
             if (rule.kind === 'always') return { pass: ['success'] };
@@ -992,7 +1013,6 @@ jobs:
             if (selected === 'false') return { pass: ['skipped'] };
             return { error: `scope output ${rule.output} is ${JSON.stringify(selected)}, neither 'true' nor 'false'` };
           }
-          const problems = [];
           for (const job of [...new Set([...Object.keys(needs), ...rules.keys()])].sort()) {
             const result = Object.hasOwn(needs, job) ? needs[job]?.result : undefined;
             const rule = rules.get(job);

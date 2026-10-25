@@ -211,6 +211,7 @@ test("a draft payload is checked against the live pull request, so a re-run of a
   const asked = runScope("pull_request", { changed, draft: "true" });
   assert.equal(asked.ghArgs, "api repos/o/r/pulls/7 --jq .draft");
   assert.deepEqual(heavy(asked.outputs), { native: "false", bundle: "false", tax_audit: "true" });
+  assert.equal(asked.outputs.draft, "true", "Required checks reads the draft scope from this output");
   for (const live of ["false", "", "TRUE", "null"]) {
     assert.deepEqual(heavy(runScope("pull_request", { changed, draft: "true", env: { STUB_LIVE_DRAFT: live } }).outputs), full, `live draft ${JSON.stringify(live)}`);
   }
@@ -218,7 +219,12 @@ test("a draft payload is checked against the live pull request, so a re-run of a
   assert.deepEqual(heavy(runScope("pull_request", { changed, draft: "true", env: { STUB_GH_EXIT: "1" } }).outputs), full, "gh failed");
   // No other payload value asks, and no other event does.
   for (const draft of ["false", ""]) assert.equal(runScope("pull_request", { changed, draft }).ghArgs, null, `draft ${JSON.stringify(draft)}`);
-  for (const event of ["merge_group", "push", "schedule", "workflow_dispatch"]) assert.equal(runScope(event, { changed, draft: "true" }).ghArgs, null, event);
+  for (const event of ["merge_group", "push", "schedule", "workflow_dispatch"]) {
+    const { ghArgs, outputs } = runScope(event, { changed, draft: "true" });
+    assert.equal(ghArgs, null, event);
+    assert.equal(outputs.draft, "false", event);
+  }
+  assert.equal(runScope("pull_request", { changed, draft: "true", env: { STUB_LIVE_DRAFT: "false" } }).outputs.draft, "false");
 });
 
 test("ready_for_review is a pull_request trigger, so marking a draft ready starts a run scoped in full", () => {

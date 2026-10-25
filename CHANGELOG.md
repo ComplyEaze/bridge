@@ -138,8 +138,10 @@ These changes are in source and not yet in a published build.
   highly scaled screen can now be refused at the box where it was shown before; a larger or less scaled screen, or a
   shorter narration, helps, and the `post_import` and `acknowledge_post_review` texts say so. Not covered: macOS,
   whose alert cannot be measured, a screen that changes while the box is open, and a second monitor with another
-  scale. The size at which a box stops fitting was measured in the lab on one screen (1920x1080 at 125 percent); the
-  check itself has not yet run on a real Windows machine.
+  scale. Run on one real Windows screen (1920x1080 at 125 percent, one monitor): boxes of 40 and 44 lines were
+  shown and answered normally, and boxes of 48, 60, 80 and 120 lines were cancelled before they were seen and refused;
+  that screen holds about 44 lines (the 48-line box is 1087 pixels high against a working area of 1030). Other
+  screens, other scales and a second monitor have not been measured.
 
 ## [0.6.0] - 2026-10-16
 

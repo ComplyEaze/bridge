@@ -1,0 +1,8 @@
+# sha256  bytes  file  (requests: the committed request each was derived from, changing only the company and dates)
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md  byte for byte from lab/626-1038-1050-run-sheets at 8c602c15
+b5359093938f40c1b285f8f44fb189f70bacc6361c53e8d84b02f7197ef78735  6014  RUN-SHEET.md  
+cbe03d018fc1c899ae5399718dde2be47a69d6c0a5a52fa4c8262268abc075c9  984  requests/r01_marks.request.utf16le.xml  note-days/shape_lab_company_marks_request.utf16le.xml
+b1345ea7bcd2d6cbfa0b34c721a1887410d8e3d74be6005e21822bffe7b550f1  1152  requests/r02_trial_balance_to_20260630.request.utf16le.xml  statement_trial_balance_fy_request.utf16le.xml
+04289908b1bf6e472ee867a758d127d6366fd40fa451f9e0e36e29449a63c79f  1152  requests/r03_trial_balance_to_20260731.request.utf16le.xml  statement_trial_balance_fy_request.utf16le.xml
+7e6d8f749b90b15709f7297a8ac2bc7e03fd8dfa5120a5981c48165e9c16ac46  1152  requests/r04_trial_balance_to_20260815.request.utf16le.xml  statement_trial_balance_fy_request.utf16le.xml
+0353952afb0baf6a04193aa097889897c780e86dd8765544b91f2ebcec8f8422  1152  requests/r05_trial_balance_to_20260831.request.utf16le.xml  statement_trial_balance_fy_request.utf16le.xml

@@ -19,7 +19,11 @@ A book of 1,000 or more vouchers is not covered here. No synthetic one exists ye
 
 **THE STATEMENT** is the synthetic three-month PDF of the 14 October run, kept on the lab PC: 3,927 bytes, sha256 beginning `506e05eb` and ending `4fc9`. Check the full hash against that run's notes on the lab PC before every call. A different file = STOP.
 
-**THE BUILD** is the ComplyEaze Bridge build the run coordinator names, from the lab's desktop entry with its own data folder and posting NOT set. Record its `bridge_mcp.exe` sha256 at the start and at the end.
+**THE BUILD** (named 26 Oct 2026) is the build already staged at the lab as `w1-2306d86d`: the Windows bundle of master `2306d86dfd4c86a3c5f6c19ea9ddff6818c460fb`, Bridge CI run `40077056130` (event `schedule`), artifact `12553782422` (zip digest `sha256:74ae2daa851397b71cb59e80373d9478a2da72c74398108e33e34ea83e56eb1e`); its `bridge_mcp.exe` as the lab recorded it on staging: sha256 `92a899a21f904f88cb2d13ce44b1417d5aecaf333caad5230de598bf54d89524`. Record the exe's sha256 at the start and at the end; any other hash = STOP. Run it over stdio with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, ONE new empty `BRIDGE_AGENT_DATA_DIR` for the whole item, `BRIDGE_TERMS_ACCEPTED=true` (the person responsible for the lab accepting the Terms of Use), `BRIDGE_AGENT_ENABLE_IMPORT=true` (`parse_bank_statement` refuses without it), `BRIDGE_AGENT_ENABLE_WRITES` unset (posting NOT set) and `BRIDGE_AGENT_REDACTION` unset.
+
+**NO RAW REQUESTS (26 Oct 2026).** Every read in this item is a call of the build's own tools, the one dispatch path to Tally. The files in `requests/` are edited copies of committed requests and are NOT sent (AGENTS.md P7): they stay here only as the record of what this sheet first asked. The marks are read with `ledger_masters` (first page, no `snapshot_id`): M = `snapshot.master_alter_id`, V = `snapshot.voucher_alter_id`, `snapshot.reused` must read false (`tally_status` carries no marks). Tally's own figures per ledger are read with `trial_balance` from `2026-04-01` (the books' first day) to the date named; record each named ledger's row whole (its closing balance as the tool names it, with its sign). In licensed mode `trial_balance` admits any day; its refusals here would be `trial_balance_before_books` or `trial_balance_education_unqualified`: either is recorded whole as a RESULT, and the EXPECT that needs it is reported "not established". Its amounts are in Tally's sign (a debit balance is negative, reference §5.6): compare `closing.value` numerically; a `present_empty` amount is "not established". The only raw sends left are LAB-COMMON's GET /status checks (C2 c and C10), which stay.
+
+**THE CALLS.** `parse_bank_statement` is called with the same required arguments the 14 October run used for THE STATEMENT (bank, account label, password file, opening and closing balance, bank ledger `Union Bank`, suspense ledger; from that run's own call records on the lab PC), changing only `from` and `to` as each step says. `statement_tie_out` is called with `company_guid`, the `proposals_id` and `proposals_sha256` that parse returned, and `stage` `after_post` (the book as it stands now) in every step. Its three figures are in the statement's sign (positive: the book shows more money in the bank than the statement).
 
 **OWNER steps** are marked [OWNER].
 
@@ -29,8 +33,9 @@ A book of 1,000 or more vouchers is not covered here. No synthetic one exists ye
 3. [OWNER] Go-ahead.
 
 ## Step 0 and the book as recorded
-C2 step 0 with THE COMPANY loaded alone. Then:
-- raw read `requests/r01_marks.request.utf16le.xml` (marks M0);
+C2 step 0 with THE COMPANY loaded alone, WITHOUT its MARKS request file (see NO RAW REQUESTS). Then:
+- `list_companies`: EXPECT exactly one company, BRIDGE TIE OUT LAB 3, GUID `9c97970c-e25d-4348-9740-6ddb1caaa56d`, `books_from` 20260401, as the 14 October run recorded it (`lab/1628-m-month-window-tie-out-answers`, `results/s0-list_companies.json`). Anything else = STOP. Every later call uses this `company_guid`;
+- `ledger_masters` (marks M0);
 - Bridge `ledger_movement` for Union Bank, 1 July to 30 September 2026.
 
 EXPECT, as on 14 October: opening -10000.00, closing -11800. Any other figure = STOP (the book is not as recorded).
@@ -44,10 +49,10 @@ Then backup **BK1** (C5) into a NEW empty folder `C:\bridge-lab\1211\backups\BK1
 4. **Control:** the same two calls for the whole of July (2026-07-01 to 2026-07-31).
 
 EXPECT:
-- steps 1 to 3: opening, closing and change each `not_established` with a reason code, `window` null, and no amount;
+- steps 1 to 3: opening, closing and change each `not_established` with reason `window_not_whole_calendar_months`, and no amount. The tool answers these from the file alone and reads no ledger: record the call's sends from its `egress_log` lines (the 14 October run sent no ledger read here). This row therefore shows the typed answer on a part-month window; it shows nothing that depends on the post;
 - step 4: tied 0.00 three times, as on 14 October.
 
-An error (no typed result), or any amount on a part-month window, is the finding.
+An error (no typed result), any amount on a part-month window, or a ledger read sent for one is the finding.
 
 ## R2: a second bank ledger, and Tally's own figures (writes by hand, then restored)
 1. **By hand:** create ledger `BRIDGE Bank B` under Bank Accounts, with no opening balance. Screenshot it before the accept.
@@ -55,25 +60,26 @@ An error (no typed result), or any amount on a part-month window, is the finding
 3. Bridge `statement_tie_out` for July and for August, each from a parse of that whole month.
 
    EXPECT tied 0.00 three times for each: the bank ledger still matches its statement.
-4. Raw reads, Tally's own figures (TBALCLOSING per ledger, C4):
-   - `requests/r02_trial_balance_to_20260630.request.utf16le.xml` (Union Bank on the eve of July);
-   - `r03_..._to_20260731` (the end of July);
-   - `r05_..._to_20260831` (the end of August).
+4. Tally's own figures per ledger, by `trial_balance` from `2026-04-01`:
+   - to `2026-06-30` (Union Bank on the eve of July);
+   - to `2026-07-31` (the end of July);
+   - to `2026-08-31` (the end of August).
 
-   EXPECT:
-   - Union Bank's closing to 30 June equals the opening `statement_tie_out` read for July;
-   - Union Bank's closing to 31 July equals July's book closing;
-   - Union Bank's closing to 31 August equals August's book closing, -11800 as in step 0;
-   - BRIDGE Bank B holds 700.00 Dr from 31 July.
+   EXPECT (Tally's sign, compared numerically):
+   - Union Bank's closing to 30 June = -10000.00;
+   - Union Bank's closing to 31 July = minus the statement's balance on 31 July as the proposals file records it on the lab PC (`window.tie_out`); record both figures;
+   - Union Bank's closing to 31 August = -11800.00, as in step 0;
+   - BRIDGE Bank B's closing to 31 July = -700.00 (700.00 Dr).
+   (`statement_tie_out` returns gaps, not the book's balances; so these are compared with Tally's own figures and with the statement's, not with a figure the tool reports.)
 5. **By hand:** key Contra W2, dated 20-08-2026: BRIDGE Bank B Dr 1,000.00, Union Bank Cr. It is not on the statement. Screenshot before the accept.
-6. Bridge `statement_tie_out` for August (whole month) again, then raw read `r05` again.
+6. Bridge `statement_tie_out` for August (whole month) again, then `trial_balance` from `2026-04-01` to `2026-08-31` again.
 
-   EXPECT: opening tied 0.00; closing and change each differing by 1,000.00, in the sign the tool states. The book closing the tool reports equals Union Bank's TBALCLOSING to 31 August in this second `r05`.
-7. Raw read `r04_trial_balance_to_20260815`: Union Bank to the middle of August, recorded for the slice's notes (no EXPECT).
-8. Marks M1.
+   EXPECT: `opening_gap` tied 0.00; `closing_gap` and `change_in_window` each `differs` with amount -1000.00 (the book shows 1,000.00 less in Union Bank than the statement); Union Bank's closing to 31 August in this second `trial_balance` = -10800.00.
+7. `trial_balance` from `2026-04-01` to `2026-08-15`: Union Bank to the middle of August, recorded for the slice's notes (no EXPECT; a refusal for the mid-month date is itself the note).
+8. `ledger_masters`: marks M1.
 
 ## After R2: restore
-Restore BK1 (C6). Then marks M2, and Bridge `ledger_movement` for Union Bank, 1 July to 30 September 2026.
+Restore BK1 (C6). Then `list_companies` (EXPECT as in step 0), `ledger_masters` (marks M2), and Bridge `ledger_movement` for Union Bank, 1 July to 30 September 2026.
 
 EXPECT: M2 equals M0, and the movement equals step 0's. If not: STOP, and report what the book holds.
 
@@ -87,7 +93,7 @@ EXPECT: M2 equals M0, and the movement equals step 0's. If not: STOP, and report
 ## Close and evidence
 - **C10:** Shut Company; no company loaded.
 - **C11:** evidence to a new branch `lab/1211-tie-out-rows-answers`, after the pre-push scan and [OWNER] yes. It holds:
-  - every Bridge answer and raw answer, whole, with size and sha256;
+  - every Bridge answer, whole, with size and sha256;
   - the egress log lines this build's data folder gained;
   - the notes;
   - the backup's name, size and hash.

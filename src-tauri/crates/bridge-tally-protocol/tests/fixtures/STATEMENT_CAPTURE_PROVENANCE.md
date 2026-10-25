@@ -92,3 +92,15 @@ What they establish (confidence: partial; one book, one release, no opening stoc
 - **Balance Sheet.** `Capital Account` `50000.00`, `Current Liabilities` `3000.00`, `Profit & Loss A/c` empty, `Current Assets` `-53000.00`. No closing-stock leaf: stock sits inside Current Assets.
 - **Trial Balance and groups.** Seven ledgers with the figures above plus `Cash` and `Profit & Loss A/c` at `0.00`. Current Assets derived from them is `-50900.00`, `2100.00` short of Tally's: the closing stock.
 - **Not established:** opening stock, a costing method, a non-integrated book, a window spanning two financial years, more than one purchase rate for an item.
+
+## `statement_profit_and_loss_opening_stock_book_*`: a book with opening stock (BRIDGE TIEOUT D), 21 Oct 2026
+
+- **Date and instance:** 2026-10-21, TallyPrime 7.1 Silver (licensed) on Windows, `education_mode=false`, one request at a time with curl, HTTP 200, the company loaded alone. The requests are the committed Profit and Loss request with only the company and, for the second, the dates changed (1 October 2025 to 31 March 2026); not committed again. The lab's send log records each answer's sha256, equal to the files'.
+- **Book:** a synthetic company built by hand for this, equal to the inventory book of the files above except for one change: a capital ledger of 1,000.00 Cr, so that its opening stock of 1,000.00 (10 Nos at 100.00) has a matching capital entry. Purchases 5 May (10 at 120) and 5 June (10 at 140), sales 20 June (8 at 200) and 15 October (5 at 250); default costing.
+
+| file | bytes | sha256 | content |
+| --- | ---: | --- | --- |
+| `statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml` | 1622 | `f6ccb220551af3ccc25e9d579f8521b932b9da9737bdbeeca8ca9afc3161be66` | Profit and Loss, 1 April 2025 to 31 March 2026 (after the October sale): Sales `2850.00` main; `Cost of Sales :` `-1560.00` main; `Opening Stock` `-1000.00`; `Add: Purchase Accounts` `-2600.00`; `Less: Closing Stock` `-2040.00` |
+| `statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml` | 1606 | `a72afe57618cc6488d6920d706f3a4b52100073bcb015622e4f5f8f716bbebdf` | Profit and Loss, 1 October 2025 to 31 March 2026: Sales `1250.00` main; `Cost of Sales :` `-600.00` main; `Opening Stock` `-2640.00`; `Add: Purchase Accounts` empty; `Less: Closing Stock` `-2040.00` |
+
+What they establish (confidence: partial; one book, one release): a non-empty `Opening Stock` line is a debit in the sub column and can differ from the closing line, with movement in the window. The answers carry no `Profit & Loss A/c` leaf: the nett profit is the sum of the lines. Not established: a costing method other than the default, a stock group, negative stock, a non-integrated book.

@@ -47,7 +47,10 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     write(&root.join("agent-import-statement-skips.jsonl"), b"123");
     write(&root.join("agent-master-ledger.jsonl"), b"abc");
     write(
-        &root.join(format!("master-pre-image-{}.json", sentinel_batch_id(0x1545))),
+        &root.join(format!(
+            "master-pre-image-{}.json",
+            sentinel_batch_id(0x1545)
+        )),
         b"{}",
     );
     // A look-alike with no batch id in its name is not one of ours.

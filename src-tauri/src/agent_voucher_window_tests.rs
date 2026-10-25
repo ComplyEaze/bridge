@@ -7458,3 +7458,28 @@ fn a_ledger_name_with_colons_survives_the_trip_through_the_refusal_string() {
         Some("Acme: North, Ltd: Unit 2")
     );
 }
+
+/// #1240: a counted voucher on either end day of the window is inside it, a voucher on the day
+/// before or after is not, and an empty census holds nothing.
+#[test]
+fn a_census_holds_a_voucher_between_two_days_including_both_ends() {
+    let (from, to) = (
+        TallyDate::parse("20260802").unwrap(),
+        TallyDate::parse("20260804").unwrap(),
+    );
+    for (days, expected) in [
+        (vec![("20260802", 1)], true),
+        (vec![("20260803", 2)], true),
+        (vec![("20260804", 1)], true),
+        (vec![("20260801", 3), ("20260805", 1)], false),
+        (vec![], false),
+    ] {
+        let census = census_of(&days);
+        assert_eq!(
+            census.holds_a_voucher_between(&from, &to).unwrap(),
+            expected,
+            "{days:?}"
+        );
+        assert_eq!(census.is_empty(), days.is_empty(), "{days:?}");
+    }
+}

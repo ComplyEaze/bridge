@@ -1017,6 +1017,28 @@ const ROWS: &[Row] = &[
         },
     },
     Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
         fixture: "tests/fixtures/statement_profit_and_loss_stock_book_fy_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_statement(ProfitAndLoss)",

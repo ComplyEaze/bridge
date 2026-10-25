@@ -1,1 +1,395 @@
-{"schema_version": 1, "entries": []}
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "blob": "bbcfc2859e3e0e24b224ca7eef28971accfc4bbd",
+      "capture_id": "pilot-lab-audit-census.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-census.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "685b646740a4f7751d44089bd99d248f4334da714d16e946d35d47f485a501ce",
+      "size": 1436
+    },
+    {
+      "blob": "2287a0f826cf523f53c310cc8ef4a6033e91da89",
+      "capture_id": "pilot-lab-audit-census.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-census.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "11c0077ba4a02cf6b076e56364b00928f20390db68257a65ffd25efc35e03f55",
+      "size": 102580
+    },
+    {
+      "blob": "9350f6da34044d6cb0510d0d21cceb1ff5eee620",
+      "capture_id": "pilot-lab-audit-company-object.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-company-object.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "2b02e1c703cc3a48789ee1eaf52231c1588c0e7d3d084aae9d19a55e83785905",
+      "size": 896
+    },
+    {
+      "blob": "69862e0c6b5395d3df270b4c92050854b93ee952",
+      "capture_id": "pilot-lab-audit-company-object.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-company-object.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "5f5b72b7b5bfc42467fbea30b389581c5106ff08ee7b415731fbf372ebfad93d",
+      "size": 4208
+    },
+    {
+      "blob": "f1d82c59fd680552c94763740abe13482d54aa56",
+      "capture_id": "pilot-lab-audit-groups.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-groups.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f",
+      "size": 1066
+    },
+    {
+      "blob": "14f7e1c33fa7f84eddfb9c4bd3624eca5b27de70",
+      "capture_id": "pilot-lab-audit-groups.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-groups.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "0657b125f00a7f0b4cc31f249d9492337a6408ec3628f124a7da3b824e354e75",
+      "size": 55954
+    },
+    {
+      "blob": "89d22b7e7fca8a21a6f98f3913850a0f8f460781",
+      "capture_id": "pilot-lab-audit-ledgers.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-ledgers.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "4531f5136c694cab3cc2f0acc777500038f6a926f699e8d545cf9c6e99d9b12a",
+      "size": 1278
+    },
+    {
+      "blob": "cd1fd5eae0ae72ac0d0e8d53fb807bfa80128521",
+      "capture_id": "pilot-lab-audit-ledgers.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "dce6eb363c6f2688d2783e1764992575bfb7e4c72e8dd3ec0ffc273c0dd07fed",
+      "size": 26106
+    },
+    {
+      "blob": "68db59d575ec2bf853192cc43b91af8b1c107a46",
+      "capture_id": "pilot-lab-audit-trial-balance.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-trial-balance.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "ce8f26e7715a287ec882bd34beaa28205dc411a7d41a90a568423bb63d75880c",
+      "size": 1144
+    },
+    {
+      "blob": "ce33307eae76446b24b4404535983deb70435b68",
+      "capture_id": "pilot-lab-audit-trial-balance.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-trial-balance.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "a96bcfd665124d075fab60f159f93e9ce4fa32af5e8b026c3788f01d2c57eb1f",
+      "size": 24498
+    },
+    {
+      "blob": "09e54586681324f38437f9a7362296a641a4d2e5",
+      "capture_id": "pilot-lab-audit-voucher-types.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-voucher-types.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "ee4c14f497960afb939de3139bae7bc575e86554045386c3e61e5d9ca76155f3",
+      "size": 972
+    },
+    {
+      "blob": "bf4b0ba2db559dd99e303a411e17d8e84df3f0da",
+      "capture_id": "pilot-lab-audit-voucher-types.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-voucher-types.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "4011411447154d88f27c265bd667f22e6186df9f6ca51e74aef2953cf6324b27",
+      "size": 37956
+    },
+    {
+      "blob": "d8b57eba054ec45415bc500de481eea918b2f400",
+      "capture_id": "pilot-lab-audit-vouchers.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-vouchers.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "1680d37c06f2975b79ac66b1df18f7886dadc6658269d423ef7e2827e83d8a70",
+      "size": 1740
+    },
+    {
+      "blob": "bf5269da904b097ce56d6fd4e0e1006f2680b0af",
+      "capture_id": "pilot-lab-audit-vouchers.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "pull request 1862 at 3b295f6a6d30",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-vouchers.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md at that head",
+      "sha256": "4085c787ad2737467891388fe674167af19f2ade786bbac539a425aae6ab6c7e",
+      "size": 2568786
+    },
+    {
+      "blob": "f4d3821b01103737293d15993cba4e032cb15028",
+      "capture_id": "builtin_negative_ledgers_bridge_lab_win_fy_live.utf16le.xml",
+      "company": "Bridge Lab Win 0.5.1",
+      "lab_ref": "pull request 1689 at 3c91a01fe2a1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_negative_ledgers_bridge_lab_win_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "b838c49fe1d4a80876ba63f74e6c975e781deb201e7b455b4098545e05d16d5d",
+      "size": 1018
+    },
+    {
+      "blob": "96b1b46b247245e804435b54c97d08df537f608f",
+      "capture_id": "builtin_negative_ledgers_bridge_lab_win_fy_request.utf16le.xml",
+      "company": "Bridge Lab Win 0.5.1",
+      "lab_ref": "pull request 1689 at 3c91a01fe2a1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_negative_ledgers_bridge_lab_win_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "301671dafe3802202b24515a62c90001658b86089c41cba48ce4098f9287ce68",
+      "size": 772
+    },
+    {
+      "blob": "4a174c46734f010be8837468f0320c904876f265",
+      "capture_id": "builtin_negative_ledgers_shape_lab_fy_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "pull request 1689 at 3c91a01fe2a1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_negative_ledgers_shape_lab_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "2945267f32e168ceb55a32bc569d5d6c862644870b7ccb3cb008858ed64b4f4c",
+      "size": 5236
+    },
+    {
+      "blob": "5aeaaa0e5d0c4d08a3f112aa3fd02514caaa1966",
+      "capture_id": "builtin_negative_ledgers_shape_lab_fy_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "pull request 1689 at 3c91a01fe2a1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_negative_ledgers_shape_lab_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "8b54a2bfa6e5c330bc86264124f4aaf316f01046e54bfaa98aff86ffaa1ede28",
+      "size": 764
+    },
+    {
+      "blob": "b9fdb49e6a46438311823990455aa3f55b612f05",
+      "capture_id": "builtin_negative_stock_negstock_lab_2_fy_live.utf16le.xml",
+      "company": "BRIDGE NEGSTOCK LAB 2",
+      "lab_ref": "pull request 1835 at e025ca7027d6",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_negative_stock_negstock_lab_2_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "0b6fdf155016e065f669dff7e221108789c52d1900528c443f66ad608b1fc20e",
+      "size": 514
+    },
+    {
+      "blob": "a0fdfd75cceffe8c93f80b1098b3445f9989c9a5",
+      "capture_id": "builtin_negative_stock_negstock_lab_2_fy_request.utf16le.xml",
+      "company": "BRIDGE NEGSTOCK LAB 2",
+      "lab_ref": "pull request 1835 at e025ca7027d6",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_negative_stock_negstock_lab_2_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "4e29535d9d740e7ed89fbecad799c47f3ce0d35a59ad62b5830ae6366a12623e",
+      "size": 770
+    },
+    {
+      "blob": "ab0ca5939583a9f2567735e0ea8cb39172e97e4c",
+      "capture_id": "builtin_negative_stock_negstock_lab_2_to_20250531_live.utf16le.xml",
+      "company": "BRIDGE NEGSTOCK LAB 2",
+      "lab_ref": "pull request 1835 at e025ca7027d6",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_negative_stock_negstock_lab_2_to_20250531_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "720cd2f5ecb09138b675d399df3dcca90fafb416a0709738d391ad44161a65c2",
+      "size": 490
+    },
+    {
+      "blob": "95ec3a786075e880b6b4593a057a4b2363d783ca",
+      "capture_id": "builtin_negative_stock_negstock_lab_2_to_20250531_request.utf16le.xml",
+      "company": "BRIDGE NEGSTOCK LAB 2",
+      "lab_ref": "pull request 1835 at e025ca7027d6",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_negative_stock_negstock_lab_2_to_20250531_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "5e6811cef1ce108f736c17b420e6ae6ac42362f230161a54705d71640371b0d4",
+      "size": 770
+    },
+    {
+      "blob": "bf13397f868cd6e001a1ba1c172ef3ae91d47cb8",
+      "capture_id": "builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT C",
+      "lab_ref": "pull request 1835 at e025ca7027d6",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3",
+      "size": 46
+    },
+    {
+      "blob": "94b903972270e077884137c45d58ad19c8ca4ce6",
+      "capture_id": "builtin_negative_stock_tieout_c_fy_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT C",
+      "lab_ref": "pull request 1835 at e025ca7027d6",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_negative_stock_tieout_c_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "6f9ed321654680017caaf3f49fbaa88f3491f9d283ba768579474c95d7017495",
+      "size": 758
+    },
+    {
+      "blob": "d3c0f08aaca865db09e74597148cf48adacc744e",
+      "capture_id": "masters_stock_items_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "pull request 1742 at 726f9976a10c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see MASTERS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "c90cfcc238cf308b58fc160e6ecd78affa691729a3dbc2ff963f4d777e82d075",
+      "size": 1192
+    },
+    {
+      "blob": "ff595f9fc7ce9794aaf79cbca4b35855e77046ad",
+      "capture_id": "masters_stock_items_shape_lab_baseline_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "pull request 1742 at 726f9976a10c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_baseline_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see MASTERS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "7038532ed86f7b924fe537d42b241eab93576d471787627e42f96837833c8a92",
+      "size": 19450
+    },
+    {
+      "blob": "09e600d8dc9c2e9da29f2f4045741da6679dbcdc",
+      "capture_id": "masters_stock_items_shape_lab_item_created_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "pull request 1742 at 726f9976a10c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_item_created_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see MASTERS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "bdfffd330d47fcc2acc97eb40ded1ff262f86bd385c831a5b7b1b107bbcedd74",
+      "size": 23938
+    },
+    {
+      "blob": "5032f81df379273cf1e52e5d1f8b6782e75f57dd",
+      "capture_id": "masters_stock_items_shape_lab_two_dates_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "pull request 1742 at 726f9976a10c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see MASTERS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "6a4fd0b871763bad43db92cc98cbf0e0c48fcda441b84fbe20664d753df5d653",
+      "size": 28208
+    },
+    {
+      "blob": "265c482193724af70b370680459749f269813661",
+      "capture_id": "masters_stock_items_tieout_b_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT B",
+      "lab_ref": "pull request 1742 at 726f9976a10c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_tieout_b_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see MASTERS_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "4566334dc76cf64df6edf1eb0a6e55b8ae8c5df7c3976a3ebd2c9b823ae10bf8",
+      "size": 16328
+    },
+    {
+      "blob": "2d5853f7e0617377e85bcc5bfad3195be18c5829",
+      "capture_id": "statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch closing-stock-captures-2 at b237e7c095ef",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md at that commit",
+      "sha256": "f6ccb220551af3ccc25e9d579f8521b932b9da9737bdbeeca8ca9afc3161be66",
+      "size": 1622
+    },
+    {
+      "blob": "0830ca44585859f0dce5da73f3e4c6d0aca5637c",
+      "capture_id": "statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch closing-stock-captures-2 at b237e7c095ef",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md at that commit",
+      "sha256": "a72afe57618cc6488d6920d706f3a4b52100073bcb015622e4f5f8f716bbebdf",
+      "size": 1606
+    },
+    {
+      "blob": "aba8c898582745f8e4a70eb4032efa80220a123f",
+      "capture_id": "voucher_cost_centre_allocations_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "pull request 1707 at b09e7d89ae6a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "2cd0c800f810c4a8fabdce06612784baff6e710a2787758be39ef60ae81d46fb",
+      "size": 35860
+    },
+    {
+      "blob": "b6600a4084ebb2aaaa9a7ce40b40f9eb367a905d",
+      "capture_id": "voucher_cost_centre_allocations_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "pull request 1707 at b09e7d89ae6a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_CAPTURE_PROVENANCE.md at that head",
+      "sha256": "783a89f96e6c28ee9b575a1d871fbdcadcada8f7a44122b153d001a167ee71a8",
+      "size": 1740
+    },
+    {
+      "blob": "3473a00f48dd6229502aa83f52c92af58e2e394d",
+      "capture_id": "masters-lab-ledger-index.request.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f",
+      "size": 2232
+    },
+    {
+      "blob": "9daa49232d3c3c73e3f7e3b346f7acf3c5b8d894",
+      "capture_id": "masters-lab-ledger-index-baseline.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index-baseline.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "268040ba3927e31222aefead1e49dbef744bf60417918362c18a9e08d1e5c6eb",
+      "size": 13610
+    },
+    {
+      "blob": "578e351d9ede0c6acfe7d2f6b408dd9ee881add2",
+      "capture_id": "masters-lab-ledger-index-after-name-cases.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index-after-name-cases.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "f875beee3ec7f3f1b94c0da7af075d682d560668c38454996b774ba6774dd853",
+      "size": 16256
+    },
+    {
+      "blob": "4453444e4c29eba0dd42f5c8216bdba5124b9afb",
+      "capture_id": "masters-lab-ledger-index-after-fold-cases.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index-after-fold-cases.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "6ee39a99c4855fb3944391b7fc50a3ff8fc37a5a25bb6c398a0decb3a72736a8",
+      "size": 28054
+    },
+    {
+      "blob": "54531728717b9c775446f69f44512d5ff986b481",
+      "capture_id": "masters-lab-groups.request.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-groups.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0",
+      "size": 1070
+    },
+    {
+      "blob": "79e6a5ec5f39ffd92843b8a9d440aa8157c293ac",
+      "capture_id": "masters-lab-groups-baseline.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "pull request 1650 at f2de0ae15a97",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-groups-baseline.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
+      "sha256": "7131aa4566ea5d630fa4506af5165319d261abe087e3a1b614b62080d2c4e3aa",
+      "size": 56068
+    }
+  ]
+}

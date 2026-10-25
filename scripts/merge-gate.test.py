@@ -666,8 +666,8 @@ class MergeGateControls(unittest.TestCase):
 
     # -- The lab-capture manifest: scripts/merge-gate-lab-captures.json on master ---------------------------------------
     LAB_PATH = "scripts/merge-gate-lab-captures.json"
-    LAB_BLOB = "3b18e512dba79e4c8300dd08aeb37f8e728b8dad"
-    LAB_BLOB_OFF = "3b18e512dba79e4c8300dd08aeb37f8e728b8dae"
+    LAB_BLOB = "1e0627036228d2a3032c1d66e96b9e997bea34af"
+    LAB_BLOB_OFF = "1e0627036228d2a3032c1d66e96b9e997bea34ae"
     OTHER_BLOB = "9f2b1c4e7a6d03581e4c2b7a9d0f3e5c6b8a1d24"
     ATTEST = "1 binary addition/change(s) require the owner's own --binary-review-sha attestation"
     LAB_BYTES = b"lab capture bytes\n"
@@ -772,13 +772,23 @@ class MergeGateControls(unittest.TestCase):
     def test_a_listed_entry_whose_sha256_differs_from_the_blobs_bytes_is_not_exempt(self):
         with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(sha256="0" * 64))}):
             result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
-        self.assertIn("listed capture 'docs/new.png' not exempt: its bytes differ from the size or sha256 in the manifest", result.stdout)
+        self.assertIn("listed capture 'docs/new.png' not exempt: its bytes differ from the manifest (the sha256 differs)", result.stdout)
         self.assertNotIn("binary capture(s) are listed", result.stdout)
 
     def test_a_listed_entry_whose_size_differs_from_the_blobs_bytes_is_not_exempt(self):
         with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry(size=len(self.LAB_BYTES) + 1))}):
             result = self.assert_blocked("binary-missing-attestation", self.ATTEST)
-        self.assertIn("not exempt: its bytes differ from the size or sha256 in the manifest", result.stdout)
+        self.assertIn("not exempt: its bytes differ from the manifest (the size differs)", result.stdout)
+
+    def test_a_blob_answer_whose_bytes_are_not_that_blob_exempts_nothing_even_if_the_manifest_records_them(self):
+        # the answer's bytes match the entry's size and sha256, but do not hash to the blob id that was asked for
+        other = b"other capture bytes\n"
+        entry = self.lab_entry(size=len(other), sha256=hashlib.sha256(other).hexdigest())
+        with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(entry)}):
+            result = self.assert_blocked("binary-blob-not-that-blob", self.ATTEST)
+        self.assertIn("listed capture 'docs/new.png' not exempt: could not check its bytes (the blob answer does not hash to its blob id)", result.stdout)
+        self.assertNotIn("bytes differ", result.stdout)
+        self.assertNotIn("binary capture(s) are listed", result.stdout)
 
     def test_a_failed_blob_request_is_told_apart_from_differing_bytes_and_exempts_nothing(self):
         with self.master_state(tracked={self.LAB_PATH: self.lab_manifest(self.lab_entry())}):

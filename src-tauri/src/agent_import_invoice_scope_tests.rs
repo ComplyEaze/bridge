@@ -438,10 +438,19 @@ fn a_parent_that_differs_only_in_case_from_a_scoped_one_is_refused() {
 /// before any request, under the plan's own cause.
 #[test]
 fn a_scope_too_large_for_one_read_is_refused() {
+    // The rates request asks for GST details, so the bound is the one for a read with them, which
+    // is smaller than the Standard one; a scope sized on the Standard bound would pass here.
     let limit = crate::tally::connection::parent_partition_limits(
-        crate::tally::connection::ComplianceRead::Standard,
+        crate::tally::connection::ComplianceRead::WithGstDetails,
     )
     .max_ledgers_per_part;
+    assert!(
+        limit
+            < crate::tally::connection::parent_partition_limits(
+                crate::tally::connection::ComplianceRead::Standard
+            )
+            .max_ledgers_per_part
+    );
     let names = (0..=limit)
         .map(|index| format!("Ledger {index}"))
         .collect::<Vec<_>>();

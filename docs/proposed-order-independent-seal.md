@@ -1,5 +1,7 @@
 # Proposed: an order-independent compatibility seal
 
+> **Status note 2026-10-15 (#1745):** the `tools/` Cargo workspace this text refers to (the compatibility crate, the live-read controller and the read transport) was removed after the owner's decision on #609. The text below is kept as written. The surface digest it proposes no longer exists.
+
 > **Status note, 30 Sep 2026: superseded by schema 3.** The surface file no longer
 > stores per-file hashes, `scripts/reseal.sh`, `rehash-surface` and the merge driver
 > are gone, and the surface digest is computed from the live bytes of the pinned

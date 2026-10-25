@@ -291,7 +291,7 @@ test("a byte-count-only mismatch (same filename, wrong declared size) still fail
   const root = await makeTree();
   try {
     const actualBytes = "0123456789\n";
-    const dir = join(root, "docs/tally/compatibility/fixtures");
+    const dir = join(root, "scripts/fixtures");
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, "size-mismatch.json"), actualBytes);
     const realSha256 = createHash("sha256").update(actualBytes).digest("hex");

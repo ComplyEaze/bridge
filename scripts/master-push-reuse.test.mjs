@@ -153,7 +153,7 @@ for (const [name, failWith] of [
 
 test("a lockfile, manifest, toolchain, CI workflow or CI action change runs everything without asking the API", async () => {
   for (const file of [
-    "src-tauri/Cargo.lock", "Cargo.toml", "src-tauri/crates/bridge-tally-core/Cargo.toml", "tools/Cargo.lock",
+    "src-tauri/Cargo.lock", "Cargo.toml", "src-tauri/crates/bridge-tally-core/Cargo.toml",
     "rust-toolchain.toml", "rust-toolchain", "scripts/master-push-reuse.mjs", ".cargo/config.toml", "src-tauri/.cargo/config.toml",
     "src-tauri/tauri.conf.json", ".github/workflows/ci.yml", ".github/actions/setup-windows-native/action.yml",
   ]) {

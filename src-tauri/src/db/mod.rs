@@ -1,4 +1,5 @@
 pub mod encrypted;
+pub mod mirror_reset;
 pub mod tally_incremental;
 pub mod tally_mirror;
 

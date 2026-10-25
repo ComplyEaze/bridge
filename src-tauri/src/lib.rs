@@ -42,6 +42,8 @@ use tokio::sync::OnceCell;
 pub(crate) struct LazyTallyMirror {
     app_data_directory: PathBuf,
     repository: OnceCell<db::tally_mirror::TallyMirrorRepository>,
+    /// Held for as long as the mirror is open, so a reset cannot delete it from under this handle.
+    use_lock: OnceCell<db::encrypted::MirrorUseLock>,
 }
 
 impl LazyTallyMirror {
@@ -49,6 +51,7 @@ impl LazyTallyMirror {
         Self {
             app_data_directory,
             repository: OnceCell::new(),
+            use_lock: OnceCell::new(),
         }
     }
 
@@ -72,11 +75,15 @@ impl LazyTallyMirror {
                 let database_path = self.app_data_directory.join("tally-mirror-v1.db");
                 let _initialization_lock =
                     db::encrypted::lock_mirror_initialization(&database_path)?;
+                // Taken before the key is resolved, so a reset that holds the mirror refuses this
+                // open instead of racing it.
+                let use_lock = db::encrypted::lock_mirror_in_use(&database_path)?;
                 let key_store = db::OsMirrorKeyStore::for_database(&database_path);
                 let resolved_key = db::resolve_mirror_key(&database_path, &key_store)?;
                 let pool = db::connect_encrypted(&database_path, resolved_key.key).await?;
                 let repository = db::tally_mirror::TallyMirrorRepository::new(pool);
                 repository.migrate().await?;
+                let _ = self.use_lock.set(use_lock);
                 Ok(repository)
             })
             .await

@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
 use zeroize::Zeroizing;
 
-const MIRROR_KEY_BYTES: usize = 32;
+pub(crate) const MIRROR_KEY_BYTES: usize = 32;
 const KEYRING_SERVICE: &str = "com.complyeaze.bridge.tally-mirror";
 const KEYRING_ACCOUNT_PREFIX: &str = "database-key-v1";
 
@@ -120,6 +120,64 @@ pub fn lock_mirror_initialization(
     file.lock()
         .map_err(|_| anyhow::anyhow!("The Tally mirror is being initialized by another process"))?;
     Ok(MirrorInitializationLock { _file: file })
+}
+
+/// Held by an open mirror for its whole life, and taken exclusively by a reset, so a reset cannot
+/// run while any handle in any process (this one included: each lock is on its own open file)
+/// has the mirror open. It is a different file from the initialization lock, which is held only
+/// while a mirror is being opened.
+#[derive(Debug)]
+pub struct MirrorUseLock {
+    _file: File,
+}
+
+/// Why the use lock could not be taken.
+#[derive(Debug, thiserror::Error)]
+pub enum MirrorUseLockError {
+    /// Another handle holds it in the way that excludes this one: the mirror is open elsewhere
+    /// (for an exclusive request), or a reset is running (for a shared one).
+    #[error("The Tally mirror is in use or being reset")]
+    Held,
+    #[error("The Tally mirror use lock could not be opened")]
+    Unavailable,
+}
+
+fn mirror_use_lock_file(database_path: &Path) -> Result<File, MirrorUseLockError> {
+    let file_name = database_path
+        .file_name()
+        .ok_or(MirrorUseLockError::Unavailable)?;
+    let mut lock_name = file_name.to_os_string();
+    lock_name.push(".use.lock");
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(database_path.with_file_name(lock_name))
+        .map_err(|_| MirrorUseLockError::Unavailable)
+}
+
+/// The shared lock an open mirror holds. Refuses at once, without waiting, while a reset has it.
+pub fn lock_mirror_in_use(database_path: &Path) -> Result<MirrorUseLock, MirrorUseLockError> {
+    let file = mirror_use_lock_file(database_path)?;
+    match file.try_lock_shared() {
+        Ok(()) => Ok(MirrorUseLock { _file: file }),
+        Err(std::fs::TryLockError::WouldBlock) => Err(MirrorUseLockError::Held),
+        Err(std::fs::TryLockError::Error(_)) => Err(MirrorUseLockError::Unavailable),
+    }
+}
+
+/// The exclusive lock a reset takes. Refuses at once, without waiting, while any handle has the
+/// mirror open.
+pub(crate) fn lock_mirror_exclusively(
+    database_path: &Path,
+) -> Result<MirrorUseLock, MirrorUseLockError> {
+    let file = mirror_use_lock_file(database_path)?;
+    match file.try_lock() {
+        Ok(()) => Ok(MirrorUseLock { _file: file }),
+        Err(std::fs::TryLockError::WouldBlock) => Err(MirrorUseLockError::Held),
+        Err(std::fs::TryLockError::Error(_)) => Err(MirrorUseLockError::Unavailable),
+    }
 }
 
 pub struct ResolvedMirrorKey {

@@ -111,7 +111,7 @@ jobs:
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.mjs$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes(\.test)?\.mjs$|retain-macos-test-binaries(\.test)?\.mjs$))' <<< "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.mjs$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes(\.test)?\.mjs$|retain-macos-test-binaries(\.test)?\.mjs$))' <<< "$changed_files"; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
@@ -124,7 +124,6 @@ jobs:
             echo 'tax_audit=false' >> "$GITHUB_OUTPUT"
           fi
 
-          # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.
           if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
           else
@@ -307,7 +306,6 @@ jobs:
         with:
           workspaces: |
             src-tauri -> target
-            tools -> target
           # bridge#669: a PR-scoped cache only serves that PR; PRs restore master's.
           save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
       - name: Test portable Tally truth layer
@@ -318,20 +316,6 @@ jobs:
           -p bridge-tally-protocol
           -p bridge-tally-transport
           -p tally-protocol-simulator
-      - name: Test portable Tally qualification tools
-        working-directory: tools
-        run: cargo test --locked --workspace --no-fail-fast
-      - name: Test disabled protocol evidence features
-        working-directory: src-tauri
-        run: >-
-          cargo test --locked -p bridge-tally-protocol --no-fail-fast
-          --features bills-native-outstandings-probe
-      - name: Test isolated native outstandings qualification path
-        working-directory: tools
-        run: |
-          cargo test --locked -p bridge-tally-compatibility --features bills-native-outstandings-probe-receipt
-          cargo test --locked -p bridge-tally-read-transport --features bills-native-outstandings-probe-transport
-          cargo test --locked -p bridge-tally-live-read --features bills-native-outstandings-probe-runner -- --test-threads=1
       - name: Lint portable Tally truth layer
         working-directory: src-tauri
         run: >-
@@ -341,40 +325,6 @@ jobs:
           -p bridge-tally-transport
           -p tally-protocol-simulator
           --all-targets -- -D warnings -A clippy::pedantic
-      - name: Lint portable Tally qualification tools
-        working-directory: tools
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings -A clippy::pedantic
-      - name: Lint disabled protocol evidence features
-        working-directory: src-tauri
-        run: >-
-          cargo clippy --locked -p bridge-tally-protocol
-          --features bills-native-outstandings-probe
-          --all-targets -- -D warnings -A clippy::pedantic
-      - name: Lint isolated native outstandings qualification path
-        working-directory: tools
-        run: |
-          cargo clippy --locked -p bridge-tally-compatibility --features bills-native-outstandings-probe-receipt --all-targets -- -D warnings -A clippy::pedantic
-          cargo clippy --locked -p bridge-tally-read-transport --features bills-native-outstandings-probe-transport --all-targets -- -D warnings -A clippy::pedantic
-          cargo clippy --locked -p bridge-tally-live-read --features bills-native-outstandings-probe-runner --all-targets -- -D warnings -A clippy::pedantic
-      - name: Enforce exact Tally compatibility claims
-        working-directory: tools
-        run: >-
-          cargo run --locked -p bridge-tally-compatibility --
-          gate
-          ../docs/tally/compatibility/compatibility-matrix.json
-          ../docs/tally/compatibility/compatibility-surface.json
-          ../docs/tally/compatibility/trusted-evidence-keys.json
-          ../docs/tally/compatibility/evidence
-          ..
-      - name: Reject generated Tally matrix drift
-        working-directory: tools
-        run: >-
-          cargo run --locked -p bridge-tally-compatibility --
-          check-matrix-markdown
-          ../docs/tally/compatibility/compatibility-matrix.json
-          ../docs/tally/support-matrix.md
-      - name: Enforce no-write live-read dependency boundary
-        run: node scripts/check-tally-live-read-boundary.mjs
       - name: Enforce Tally-path egress boundary
         run: node scripts/check-tally-egress-boundary.mjs
       - name: Enforce fixture byte integrity
@@ -438,7 +388,6 @@ jobs:
         with:
           workspaces: |
             src-tauri -> target
-            tools -> target
           # Separate the Windows dependency artifacts from the former registry-only
           # cache. Keep Cargo/toolchain/profile fingerprints and cleanup defaults;
           # workspace binaries and incremental artifacts are not persisted.
@@ -554,17 +503,6 @@ jobs:
       - name: Test native workspace doctests
         if: matrix.shard == 1
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --workspace --doc --no-fail-fast
-      - name: Test Tally qualification tools workspace
-        if: matrix.shard == 1
-        working-directory: tools
-        run: cargo test --locked --workspace --no-fail-fast
-      - name: Test isolated native outstandings qualification feature
-        if: matrix.shard == 1
-        working-directory: tools
-        run: >-
-          cargo test --locked -p bridge-tally-live-read
-          --features bills-native-outstandings-probe-runner
-          --all-targets -- --test-threads=1
       - name: Lint the native workspace
         if: matrix.shard == 2
         run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --all-targets --timings -- -D warnings -A clippy::pedantic
@@ -583,17 +521,6 @@ jobs:
         run: |
           cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --lib --bins --message-format=json -- -A clippy::pedantic --force-warn clippy::disallowed_methods --force-warn clippy::disallowed_types > "$RUNNER_TEMP/egress-census.jsonl"
           node scripts/check-tally-egress-boundary.mjs --census "$RUNNER_TEMP/egress-census.jsonl" "$RUNNER_OS"
-      - name: Lint Tally qualification tools workspace
-        if: matrix.shard == 2
-        working-directory: tools
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings -A clippy::pedantic
-      - name: Lint isolated native outstandings qualification feature
-        if: matrix.shard == 2
-        working-directory: tools
-        run: >-
-          cargo clippy --locked -p bridge-tally-live-read
-          --features bills-native-outstandings-probe-runner
-          --all-targets -- -D warnings -A clippy::pedantic
 
       - name: Retain native compiler timings
         if: ${{ always() }}

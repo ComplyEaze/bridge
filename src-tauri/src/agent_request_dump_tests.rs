@@ -1,19 +1,29 @@
 //! A test-only dump of the requests the product itself renders, as files a lab
 //! operator can send by hand (#681, #1231, #899). It only formats strings and
 //! writes files into a new folder; nothing here opens a connection, so nothing
-//! it does can reach Tally. The files are the product's own builder output
-//! (AGENTS.md: no request is written by hand), each checked before it is
-//! written, UTF-16LE with a byte-order mark and no final line break, as the lab
-//! sends them.
+//! it does can reach Tally. Every file is a request builder's own output,
+//! unedited (AGENTS.md: no request is written by hand, and a new shape is not
+//! made here: a candidate shape is measured through the dispatch path, with its
+//! deadline, size cap and window checks, not by hand). Each is checked before
+//! it is written, UTF-16LE with a byte-order mark and no final line break, as
+//! the lab sends them.
 //!
-//! To dump for a named lab company (set the folder to a path that does not
-//! exist yet or is empty):
+//! Send one at a time, on a small synthetic book and a window the book is
+//! known to fill lightly: an oversized read can occupy the gateway for many
+//! minutes (protocol reference 5.2). The windows are for licensed mode; in
+//! Education mode only the days 1, 2 and 31 are honoured (2.7).
+//!
+//! To dump for a named lab company (the folder must be absent or empty):
 //! `BRIDGE_DUMP_COMPANY="..." BRIDGE_DUMP_FROM=YYYYMMDD BRIDGE_DUMP_TO=YYYYMMDD
 //!  BRIDGE_DUMP_DIR=... cargo test -p bridge --lib request_dump -- --ignored --nocapture`
-//! Optional: `BRIDGE_DUMP_SPAN_AFTER` and `BRIDGE_DUMP_SPAN_THROUGH` also write
-//! a census narrowed to that AlterID span.
+//! Optional, both or neither: `BRIDGE_DUMP_SPAN_AFTER` and
+//! `BRIDGE_DUMP_SPAN_THROUGH` also write a census narrowed to that AlterID span.
 use super::*;
+use bridge_tally_protocol::xml_read_profiles::{
+    ReadOnlyProfile, ValidatedCompanyName, ValidatedDateRange,
+};
 use std::fmt::Write as _;
+use std::io::Write as _;
 
 /// One request to write: its file name and rendered text.
 struct Dumped {
@@ -21,12 +31,8 @@ struct Dumped {
     xml: String,
 }
 
-/// The voucher FETCH list `ledger_movement` sends, which names its fields and
-/// carries no bill allocations. The allocation variant adds exactly one field.
-const WITH_ALLOCATIONS: &str = ",ALLLEDGERENTRIES.BILLALLOCATIONS.*";
-
-fn day(text: &str) -> bridge_tally_core::TallyDate {
-    bridge_tally_core::TallyDate::parse(text).unwrap()
+fn day(text: &str) -> Result<bridge_tally_core::TallyDate, String> {
+    bridge_tally_core::TallyDate::parse(text).map_err(|_| format!("{text:?} is not a date"))
 }
 
 /// The header ID must be the NAME of a collection the request defines, else
@@ -47,43 +53,34 @@ fn id_names_its_collection(xml: &str) -> Result<(), String> {
     }
 }
 
-/// The product's renderings for one company and window, checked.
+/// The product's renderings for one company and window, checked: the shipped
+/// voucher read, the tax-audit voucher profile (the baseline of #681) and the
+/// census, with an optional AlterID span.
 fn rendered(
     company: &str,
     from: &str,
     to: &str,
     span: Option<(u64, u64)>,
 ) -> Result<Vec<Dumped>, String> {
-    let (from, to) = (day(from), day(to));
-    let wildcard = render_agent_vouchers(company, &from, &to, None)?;
-    let named = render_agent_movement_vouchers(company, &from, &to)?;
-    // The one change of the allocation variant: one more field at the end of
-    // the FETCH list. It must apply exactly once, else this refuses.
-    let end = "ALLLEDGERENTRIES.ISDEEMEDPOSITIVE</FETCH>";
-    if named.matches(end).count() != 1 {
-        return Err("the named-field request no longer ends its FETCH as expected".into());
-    }
-    let with_allocations = named.replacen(
-        end,
-        &format!("ALLLEDGERENTRIES.ISDEEMEDPOSITIVE{WITH_ALLOCATIONS}</FETCH>"),
-        1,
-    );
+    let (from_date, to_date) = (day(from)?, day(to)?);
+    let name = ValidatedCompanyName::new(company).map_err(|_| "company_name_invalid")?;
+    let window = ValidatedDateRange::new(from, to).map_err(|_| "window_invalid")?;
     let mut all = vec![
         Dumped {
             name: "v01-vouchers-wildcard.xml",
-            xml: wildcard,
+            xml: render_agent_vouchers(company, &from_date, &to_date, None)?,
         },
         Dumped {
-            name: "v02-vouchers-named-no-allocations.xml",
-            xml: named,
-        },
-        Dumped {
-            name: "v03-vouchers-named-with-allocations.xml",
-            xml: with_allocations,
+            name: "a01-vouchers-audit-profile.xml",
+            xml: ReadOnlyProfile::AuditVouchersV1 {
+                company: &name,
+                window: &window,
+            }
+            .render(),
         },
         Dumped {
             name: "c01-census-unspanned.xml",
-            xml: render_agent_voucher_census(company, &from, &to, None)?,
+            xml: render_agent_voucher_census(company, &from_date, &to_date, None)?,
         },
     ];
     if let Some((after, through)) = span {
@@ -91,8 +88,8 @@ fn rendered(
             name: "c02-census-span.xml",
             xml: render_agent_voucher_census(
                 company,
-                &from,
-                &to,
+                &from_date,
+                &to_date,
                 Some(AlterIdSpan { after, through }),
             )?,
         });
@@ -104,7 +101,7 @@ fn rendered(
 }
 
 /// Writes the checked requests and a manifest into `dir`, which must be absent
-/// or empty. Returns the manifest text.
+/// or empty. Existing files are never overwritten. Returns the manifest text.
 fn write_all(dir: &std::path::Path, requests: &[Dumped]) -> Result<String, String> {
     if dir.exists()
         && std::fs::read_dir(dir)
@@ -115,10 +112,18 @@ fn write_all(dir: &std::path::Path, requests: &[Dumped]) -> Result<String, Strin
         return Err("the folder is not empty".into());
     }
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let create = |name: &str, bytes: &[u8]| -> Result<(), String> {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(dir.join(name))
+            .map_err(|e| e.to_string())?;
+        file.write_all(bytes).map_err(|e| e.to_string())
+    };
     let mut manifest = String::new();
     for request in requests {
         let bytes = bridge_tally_protocol::encode_tally_xml_request_utf16le(&request.xml);
-        std::fs::write(dir.join(request.name), &bytes).map_err(|e| e.to_string())?;
+        create(request.name, &bytes)?;
         writeln!(
             manifest,
             "{}  {}  {}",
@@ -128,15 +133,30 @@ fn write_all(dir: &std::path::Path, requests: &[Dumped]) -> Result<String, Strin
         )
         .map_err(|e| e.to_string())?;
     }
-    std::fs::write(dir.join("MANIFEST.txt"), &manifest).map_err(|e| e.to_string())?;
+    create("MANIFEST.txt", manifest.as_bytes())?;
     Ok(manifest)
 }
 
+/// Both span bounds or neither: one alone is refused, never dropped.
+fn span_from(after: Option<String>, through: Option<String>) -> Result<Option<(u64, u64)>, String> {
+    match (after, through) {
+        (None, None) => Ok(None),
+        (Some(after), Some(through)) => Ok(Some((
+            after.parse().map_err(|_| "span after is not a number")?,
+            through
+                .parse()
+                .map_err(|_| "span through is not a number")?,
+        ))),
+        _ => Err("set both BRIDGE_DUMP_SPAN_AFTER and BRIDGE_DUMP_SPAN_THROUGH, or neither".into()),
+    }
+}
+
 /// The dump is the product's own output, checked: every header ID names the
-/// collection the request defines, the allocation variant differs from the
-/// named-field request by exactly the one field, and the census is a census.
+/// collection the request defines, the audit profile carries no allocation
+/// path (it is the baseline), the census is a census, and the files are
+/// BOM-prefixed UTF-16LE.
 #[test]
-fn the_dumped_requests_are_checked_and_differ_only_as_stated() {
+fn the_dumped_requests_are_checked_and_unedited() {
     let requests = rendered("Synthetic Book", "20260801", "20260802", Some((10, 20))).unwrap();
     let by_name = |name: &str| {
         requests
@@ -146,17 +166,24 @@ fn the_dumped_requests_are_checked_and_differ_only_as_stated() {
             .xml
             .clone()
     };
-    let named = by_name("v02-vouchers-named-no-allocations.xml");
-    let with = by_name("v03-vouchers-named-with-allocations.xml");
-    assert!(!named.contains("BILLALLOCATIONS"));
-    assert_eq!(with.replacen(WITH_ALLOCATIONS, "", 1), named);
+    assert_eq!(
+        by_name("v01-vouchers-wildcard.xml"),
+        render_agent_vouchers(
+            "Synthetic Book",
+            &day("20260801").unwrap(),
+            &day("20260802").unwrap(),
+            None
+        )
+        .unwrap()
+    );
     assert!(by_name("v01-vouchers-wildcard.xml").contains("ALLLEDGERENTRIES.*"));
+    assert!(!by_name("a01-vouchers-audit-profile.xml").contains("BILLALLOCATIONS"));
     assert!(by_name("c01-census-unspanned.xml").contains("Bridge Agent Voucher Census"));
     assert!(by_name("c02-census-span.xml").contains("$AlterID"));
     let directory = tempfile::tempdir().unwrap();
     let target = directory.path().join("dump");
     let manifest = write_all(&target, &requests).unwrap();
-    assert_eq!(manifest.lines().count(), 5);
+    assert_eq!(manifest.lines().count(), 4);
     let bytes = std::fs::read(target.join("v01-vouchers-wildcard.xml")).unwrap();
     assert_eq!(
         &bytes[..2],
@@ -179,26 +206,40 @@ fn a_request_whose_id_names_no_collection_is_refused() {
     assert!(id_names_its_collection(&broken.replace("One", "Two")).is_ok());
 }
 
+/// A span with one bound is refused; a bad date or name is an error, not a panic.
+#[test]
+fn bad_settings_are_refused_not_dropped() {
+    assert_eq!(span_from(None, None), Ok(None));
+    assert_eq!(
+        span_from(Some("5".into()), Some("9".into())),
+        Ok(Some((5, 9)))
+    );
+    assert!(span_from(Some("5".into()), None).is_err());
+    assert!(span_from(None, Some("9".into())).is_err());
+    assert!(span_from(Some("x".into()), Some("9".into())).is_err());
+    assert!(rendered("Synthetic Book", "2026-08-01", "20260802", None).is_err());
+    assert!(rendered("", "20260801", "20260802", None).is_err());
+}
+
 /// The operator's entry point: ignored unless asked for, and refused when its
 /// settings are missing.
 #[test]
 #[ignore = "writes files for the lab; see the module comment"]
 fn request_dump_for_a_named_lab_company() {
     let setting = |name: &str| std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set"));
-    let span = match (
-        std::env::var("BRIDGE_DUMP_SPAN_AFTER"),
-        std::env::var("BRIDGE_DUMP_SPAN_THROUGH"),
-    ) {
-        (Ok(after), Ok(through)) => Some((after.parse().unwrap(), through.parse().unwrap())),
-        _ => None,
-    };
+    let span = span_from(
+        std::env::var("BRIDGE_DUMP_SPAN_AFTER").ok(),
+        std::env::var("BRIDGE_DUMP_SPAN_THROUGH").ok(),
+    )
+    .unwrap_or_else(|why| panic!("{why}"));
     let requests = rendered(
         &setting("BRIDGE_DUMP_COMPANY"),
         &setting("BRIDGE_DUMP_FROM"),
         &setting("BRIDGE_DUMP_TO"),
         span,
     )
-    .unwrap();
-    let manifest = write_all(std::path::Path::new(&setting("BRIDGE_DUMP_DIR")), &requests).unwrap();
+    .unwrap_or_else(|why| panic!("{why}"));
+    let manifest = write_all(std::path::Path::new(&setting("BRIDGE_DUMP_DIR")), &requests)
+        .unwrap_or_else(|why| panic!("{why}"));
     println!("{manifest}");
 }

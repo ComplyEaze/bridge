@@ -390,6 +390,356 @@
       "seed_basis": "synthetic lab book; see agent/masters-lab.PROVENANCE.md at that head",
       "sha256": "7131aa4566ea5d630fa4506af5165319d261abe087e3a1b614b62080d2c4e3aa",
       "size": 56068
+    },
+    {
+      "blob": "56587e8749f01247ea27ba89a88eb96e6ffc3605",
+      "capture_id": "gst-ledger-l1/s6-03nov-L-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-L-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "4050fe96d18f996da1c109a3c76212e7d045f817cb41f609bc99e31f726b5172",
+      "size": 37742
+    },
+    {
+      "blob": "61a727fd2d26ef8137edc0e7a43d3942354f0783",
+      "capture_id": "gst-ledger-l1/s6-03nov-P-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-P-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "c4372ae1536d68d652d1efb5dc3de5b20827969bb89e912be20b67859d45ed96",
+      "size": 25434
+    },
+    {
+      "blob": "0ac6a603c68bacc5e73ec6252f1867c5ea1b1aa1",
+      "capture_id": "gst-ledger-l1/s6-03nov-b-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-b-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "4271d60f71fe0d878446296cf3135d58d5a6c00814ddff2fc10056c6258927da",
+      "size": 3866
+    },
+    {
+      "blob": "d14ffce4b8e1fd8a8a90be652edd3878e4d0e6ae",
+      "capture_id": "gst-ledger-l1/s6-03nov-c-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-c-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "2f7f19fe7eaa1f8b98d734dcb598fbf12e04c8c3edc4e394c0b0b1c9e6cdedca",
+      "size": 3410
+    },
+    {
+      "blob": "dbb303267d6f6e4ed44e9a4a6c58028270870ed5",
+      "capture_id": "gst-ledger-l1/s6-03nov-e-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "c29b8dccbc1a449db4273ed666e8e77a8a0753877b08126da254870c46cd9189",
+      "size": 4030
+    },
+    {
+      "blob": "d72dee1317845d7f5ebceb996d1a2aa92261d89f",
+      "capture_id": "gst-ledger-l1/s6-03nov-g-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-g-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "e65f72894a59defc8bb91a3fe64d3e37d72fe9365aac67eadacd16bbb47dbdfa",
+      "size": 54290
+    },
+    {
+      "blob": "e265073904b3ef197798616a42f81d45f39e9f36",
+      "capture_id": "gst-ledger-l1/s6-03nov-m-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-m-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "5518a0661c7812c67324e4abad94a4315c3487e5c89bf06e537039588a111619",
+      "size": 3414
+    },
+    {
+      "blob": "b7ddf052ccb64a4552f04774b3f720a87c7c1607",
+      "capture_id": "gst-ledger-l1/s6-03nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "f0d39e7fa67588da76d66a40363a6ec72e216d92948858e09570f19e53f58113",
+      "size": 5448
+    },
+    {
+      "blob": "a9764ec311ae22194ef46e47535663c77715566f",
+      "capture_id": "gst-ledger-l1/s6-03nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "1511d735ee77a3e7e68ba81e5e3a2fe3e9fd58eb1d83507b6b832e6747fbe0ff",
+      "size": 65516
+    },
+    {
+      "blob": "775e2ffcdbd0f3a8dabdca64426d98f52e352a7c",
+      "capture_id": "gst-ledger-l1/s6-04nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-04nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "d0f5d50a525a1735b342427ac4cfe98dd6f88509350bc24d0b800a0167d5e214",
+      "size": 5444
+    },
+    {
+      "blob": "e202c02b6ca148f0eeceeb9f4814f97ba631281f",
+      "capture_id": "gst-ledger-l1/s6-04nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-04nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "63619a18f92c43d65312968864ff1507991eeaaee5875bc53ed964e1b34e03d3",
+      "size": 52068
+    },
+    {
+      "blob": "3fe5c391dd5ce20db28877d876d3a9e05d10fd43",
+      "capture_id": "gst-ledger-l1/s6-05nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-05nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "ff6393088fdbd1c670251c2b1da6d15dce93bff0ecbfd3483270c8ae86f2013c",
+      "size": 5448
+    },
+    {
+      "blob": "b25d8fac2b962aac6ade9f1883519a4bcd04d412",
+      "capture_id": "gst-ledger-l1/s6-05nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-05nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "c7cfd470123ef68de8d44b36e777acbcc2fcea0fb22acb0ea6c055b5b8008fb9",
+      "size": 65528
+    },
+    {
+      "blob": "b91af6d55b6df3448eb10a9b16f131348e036b17",
+      "capture_id": "gst-ledger-l1/s6-06nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-06nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "4f669c66dda0031f567447088619496d6f5d9be02e234d450b08bf7cc54f018b",
+      "size": 5448
+    },
+    {
+      "blob": "88d9f22d4c4514497f82778405cc043c36e01b3c",
+      "capture_id": "gst-ledger-l1/s6-06nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-06nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "0533a439ccb3c6576f546fe611d3a9a62e975bd71d9315c17ec63ad2ce29a140",
+      "size": 65528
+    },
+    {
+      "blob": "e5c598969c0b50629a5635a85545049e3f509c28",
+      "capture_id": "gst-ledger-l1/s6-07nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-07nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "4587e4d498c77fa5a563fe899c6583b1d3037f8ddf77582eee50f68775eea7a0",
+      "size": 5450
+    },
+    {
+      "blob": "87920b4dafbb18c1106be7d771898e2c786dc977",
+      "capture_id": "gst-ledger-l1/s6-07nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-07nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "227f09bd2893282421e481d79c48504c96871a94d348e59ea5e71f983820e941",
+      "size": 81492
+    },
+    {
+      "blob": "09085a9fba4716ddb7257260eae54c9253f70d28",
+      "capture_id": "gst-ledger-l1/s6-08nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-08nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "4395c211e7ebe55f3e754846634be1ace1299a8fd499948df0a6734aa1e0c01a",
+      "size": 5444
+    },
+    {
+      "blob": "13a319720661689a0679aed0db95051f17343a2f",
+      "capture_id": "gst-ledger-l1/s6-08nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-08nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "fc2bf699f246a1b3a5fb6e1562963bf0c16debdec4e0ae763fa5296742f26ddb",
+      "size": 65552
+    },
+    {
+      "blob": "b29c668f99e3380041acd04e1c04b5f3ff0fe97c",
+      "capture_id": "gst-ledger-l1/s6-10nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-10nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "700d208be69301e70a8d5a71b68d82fd8edcb00592c7343b677e5716d02dd67b",
+      "size": 5456
+    },
+    {
+      "blob": "8c387919a279f2fc57282d51445cfb3a64cf75aa",
+      "capture_id": "gst-ledger-l1/s6-10nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-10nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "f0130239483a6fef8fcf0d04ea85c6b01477e7e4ca7d627933382db1a5d19883",
+      "size": 65500
+    },
+    {
+      "blob": "e8e42b128ab595ae7ee6f88b6f446d90273402c3",
+      "capture_id": "gst-ledger-l1/s6-11nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-11nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "946bee1424766c64aa5df4a7fe4259ac04f207c90d803139785b4c6972905d27",
+      "size": 5444
+    },
+    {
+      "blob": "62c041f8e2eacc4abf8d854d00ff7005cb3ec884",
+      "capture_id": "gst-ledger-l1/s6-11nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-11nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "f4aaecb8bb430634db21a0fce26a2f2d36f8a9a71b30449638cf4fe786cd6a20",
+      "size": 34710
+    },
+    {
+      "blob": "91ba0ad87fe52f09dd37ae307f595ed9bc278258",
+      "capture_id": "gst-ledger-l1/s6-12nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-12nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "f96c8f32d34379e19d6fb4ef587a8aa8ce703a09eb148207360598e5679a9497",
+      "size": 5446
+    },
+    {
+      "blob": "8756f0740993aaf1134961c2b2547ee703faf997",
+      "capture_id": "gst-ledger-l1/s6-12nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-12nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "5dd45fe460107e3303828fba3d4d14b9dd5cf3c380de9f9c36a6451deaa06913",
+      "size": 50640
+    },
+    {
+      "blob": "3a0f49134ce48c476677a60f8b798a1e3c5f5e54",
+      "capture_id": "gst-ledger-l1/s6-13nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-13nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "81db84c63f6a675b562e5407d9618c3012a0d6b3564a3752049b85da0e805f4a",
+      "size": 5448
+    },
+    {
+      "blob": "e759df46a585aca74f9a86b79e0227738962e40f",
+      "capture_id": "gst-ledger-l1/s6-13nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-13nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "fd4362fec21fbea1f747819964d0666091820bcf551583f23b8d7bb88819536e",
+      "size": 48190
+    },
+    {
+      "blob": "493a4177df2bdace69d42bb62076362c6fb2187f",
+      "capture_id": "gst-ledger-l1/s6-14nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-14nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "fb6df7804b4bbee2680309ce36e2bb691fe348baa0a5cd19e21617dddfbd4cac",
+      "size": 5444
+    },
+    {
+      "blob": "e5eddf080e62c9311d50642b1af26b8f5f0c1cbe",
+      "capture_id": "gst-ledger-l1/s6-14nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-14nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "bd1a3c39bf3b51c94b40feee969a9936d1ca971a19941e851845e9cce6e188e4",
+      "size": 78626
+    },
+    {
+      "blob": "bcdc1f67250d6cd3d806db2b6460b2a8572dd72b",
+      "capture_id": "gst-ledger-l1/s6-15nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-15nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "a75c6fffb5390c3788cf5bf4f07c5cfe79434141ae9c663588222258cfd44c81",
+      "size": 5448
+    },
+    {
+      "blob": "2b52bec62b14b9faca8964a888d31ad16ab1f3a8",
+      "capture_id": "gst-ledger-l1/s6-15nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-15nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "e8eed3b9558a34fb713cf0675fe44b7d32604416f404c56c1de69d0a10722af8",
+      "size": 64146
+    },
+    {
+      "blob": "758e720c9f7b6eb5701436547e528c7db7fba1fe",
+      "capture_id": "gst-ledger-l1/s6-16nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-16nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "8c1a770145779c10d5c103d22c366c661fbc99621abe5702e3669f248b5e6e1f",
+      "size": 5464
+    },
+    {
+      "blob": "b99019fa987f048404662041d445b7c122bdac2f",
+      "capture_id": "gst-ledger-l1/s6-16nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-16nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "f196f25421ea9ab593a58ad4d78050c5380d7ece3a207b7113344f115646b272",
+      "size": 65552
+    },
+    {
+      "blob": "01a0fb137ac47e4310d8b3c8a245e570166d1728",
+      "capture_id": "gst-ledger-l1/s6-17nov-n-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-17nov-n-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "599435920156c7bba90ef2c4fe075932c597278188b1811e8d1340bcddbcf074",
+      "size": 5444
+    },
+    {
+      "blob": "ef62a4412ec574892424e288ed3987eb34ee2c33",
+      "capture_id": "gst-ledger-l1/s6-17nov-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "pull request 1867 at 5175e4fd77e1",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-17nov-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l1/PROVENANCE.md at that head",
+      "sha256": "2e72097ac027adfac2dd804f270542085f547af082a8cf2af3c844c9b6cc3a97",
+      "size": 94594
     }
   ]
 }

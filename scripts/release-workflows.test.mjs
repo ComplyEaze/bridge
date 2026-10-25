@@ -326,11 +326,11 @@ function runSiteSummaryStep(run, { deployments, changeSite }) {
   // Each item is its own page, as `gh api --paginate` prints them with a per-page --jq, so a step
   // that does not collect every page, or does not pass --paginate, fails here.
   const script = `gh() { [ "$1" = api ] && [ "$2" = --paginate ] && [ "$4" = --jq ] || exit 97; case "$3" in
-    repos/example/bridge/deployments\\?environment=github-pages\\&per_page=100) jq -c '.[] | [.]' "${dir}/deployments.json" | while IFS= read -r page; do printf '%s' "$page" | jq -r "$5"; done ;;
-    repos/example/bridge/deployments/*/statuses\\?per_page=100) id="\${3#*/deployments/}"; id="\${id%%/*}"; jq -c '.[] | [.]' "${dir}/statuses-\${id}.json" | { while IFS= read -r page; do printf '%s' "$page" | jq -r "$5" || exit 141; sleep 0.01; done; [ ! -e "${dir}/statuses-\${id}.fail" ] || exit 1; } ;;
+    repos/example/bridge/deployments\\?environment=github-pages\\&per_page=100) jq -c '.[] | [.]' "${dir}/deployments.json" | while IFS= read -r page; do printf '%s' "$page" | jq -r "$5" | tr -d '\\r'; done ;;
+    repos/example/bridge/deployments/*/statuses\\?per_page=100) id="\${3#*/deployments/}"; id="\${id%%/*}"; jq -c '.[] | [.]' "${dir}/statuses-\${id}.json" | { while IFS= read -r page; do printf '%s' "$page" | jq -r "$5" | tr -d '\\r' || exit 141; sleep 0.01; done; [ ! -e "${dir}/statuses-\${id}.fail" ] || exit 1; } ;;
     *) exit 97 ;;
   esac; }\n${run}`;
-  const result = spawnSync("bash", ["-c", script], { cwd: work, encoding: "utf8", env: { ...env, REPOSITORY: "example/bridge", RUNNER_TEMP: dir, GITHUB_SHA: second, GIT_TRACE: "1", GITHUB_STEP_SUMMARY: join(dir, "summary.md") } });
+  const result = spawnSync("bash", ["-c", script], { cwd: work, encoding: "utf8", env: { ...env, REPOSITORY: "example/bridge", RUNNER_TEMP: dir, GITHUB_SHA: second, GITHUB_STEP_SUMMARY: join(dir, "summary.md") } });
   const summary = readFileSync(join(dir, "summary.md"), "utf8");
   rmSync(dir, { recursive: true, force: true });
   return { status: result.status, stderr: result.stderr, summary };
@@ -368,7 +368,7 @@ test("the site summary step is informational, permitted to read deployments, and
   // comparison goes on to the first different commit rather than reporting that nothing changed.
   const rerun = runSiteSummaryStep(summary.run, { deployments: [own, { sha: "self", states: ["success"] }, live], changeSite: "<p>two</p>\n" });
   assert.equal(rerun.status, 0, rerun.stderr);
-  assert.match(rerun.summary, /^\+<p>two<\/p>$/m, `a successful deployment of this commit is skipped; step stderr: ${rerun.stderr}`);
+  assert.match(rerun.summary, /^\+<p>two<\/p>$/m, "a successful deployment of this commit is skipped");
 
   // Only a deployment whose NEWEST status is success went live. An older success under a newer
   // failure or inactive status (superseded or torn down) is not the last deploy.

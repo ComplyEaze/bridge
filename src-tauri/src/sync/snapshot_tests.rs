@@ -1515,6 +1515,17 @@ async fn a_commit_the_mirror_refuses_on_an_invariant_is_refused_again_on_every_r
         assert!(!status.resume_available, "attempt {attempt}");
     }
 
+    // Only an invariant of the batch is refused for good; any other commit failure stays a mirror
+    // failure.
+    assert!(matches!(
+        commit_error(MirrorError::NotFound),
+        SnapshotError::Mirror(MirrorError::NotFound)
+    ));
+    assert!(matches!(
+        commit_error(MirrorError::VerificationInvariant),
+        SnapshotError::CommitRefused
+    ));
+
     // A mirror failure a later resume can get past keeps its own code and its resume.
     let transient = status_after_error(
         &plan,

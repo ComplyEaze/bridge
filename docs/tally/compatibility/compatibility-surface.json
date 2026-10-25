@@ -664,7 +664,7 @@
     },
     {
       "path": "src-tauri/src/db/migrations/0028_schedule_iii_grouping_events.sql",
-      "reason": "creates the append-only store of a CA's Schedule III grouping decisions, which decides the head an exported Schedule III view presents a ledger under; it is required by REQUIRED_SURFACE_DIRECTORIES, and a defect there could apply or silently drop a recorded decision"
+      "reason": "creates the append-only store of a CA's Schedule III grouping decisions, which decides the head an exported Schedule III view presents a ledger under; it is under a directory the compatibility gate requires to be pinned whole (REQUIRED_DIRECTORIES in bridge-tally-core's compatibility_surface_stays_whole test), and a defect there could apply or silently drop a recorded decision"
     },
     {
       "path": "src-tauri/src/db/tally_incremental.rs"

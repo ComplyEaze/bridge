@@ -452,11 +452,21 @@ fn decisions_summary(view: &ScheduleIIIView) -> String {
         " {elsewhere} grouping event(s) for this company and financial year are recorded under another company number or books-from date and were not applied: confirm which book they belong to."
     );
     if statuses.is_empty() {
-        return if elsewhere > 0 {
-            format!("None were applied to this export. NOT FINAL:{elsewhere_note}")
-        } else {
-            "None were applied to this export.".to_string()
-        };
+        // With no decision given, what can keep the view from being final is a ledger still
+        // excluded, or events kept under another book.
+        let mut text = String::from("None were applied to this export.");
+        if finality == Finality::NotFinal {
+            text.push_str(" NOT FINAL:");
+            if excluded_ledgers > 0 {
+                text.push_str(&format!(
+                    " {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
+                ));
+            }
+            if elsewhere > 0 {
+                text.push_str(&elsewhere_note);
+            }
+        }
+        return text;
     }
     let applied = statuses
         .iter()
@@ -475,8 +485,25 @@ fn decisions_summary(view: &ScheduleIIIView) -> String {
         })
         .count();
     let attention = statuses.len() - applied - other_year;
+    // An applied decision whose ledger moved between subgroups stays applied, but its reason may
+    // have rested on the subgroup the ledger has left, so the verdict says to look at it.
+    let moved = statuses
+        .iter()
+        .filter(|status| {
+            matches!(
+                status,
+                DecisionStatus::Applied {
+                    ancestry_changed: Some(_),
+                    ..
+                }
+            )
+        })
+        .count();
     let verdict = match finality {
-        Finality::Final => "Nothing needs attention.".to_string(),
+        Finality::Final if moved == 0 => "Nothing needs attention.".to_string(),
+        Finality::Final => format!(
+            "Applied, but {moved} decided ledger(s) now sit under other groups than when decided: review each decision's status."
+        ),
         Finality::NotFinal => {
             let mut text = String::from("NOT FINAL:");
             if attention > 0 {

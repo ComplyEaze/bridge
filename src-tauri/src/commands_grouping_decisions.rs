@@ -177,13 +177,13 @@ fn grouping_refusal_error(refusal: GroupingRequestRefusal) -> TallyCommandError 
             "grouping_year_changed_since_export",
             "Operation",
             format!(
-                "The books moved from the financial year beginning April {} to the one beginning April {} after the export, so nothing was saved.",
-                seen.first_year(),
-                now.first_year(),
+                "The save read the books as of a date in the financial year beginning April {now}, and the export it follows was made for the year beginning April {seen}, so nothing was saved.",
+                seen = seen.first_year(),
+                now = now.first_year(),
             ),
             "after_change",
             false,
-            "Export again and decide against the new year's export.",
+            "Export again for the year you decided in, then save.",
         ),
         GroupingRequestRefusal::Moved(mismatches) => tally_command_error(
             "grouping_read_changed_since_export",

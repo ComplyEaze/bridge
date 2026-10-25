@@ -553,7 +553,11 @@ fn a_decision_whose_ledger_moved_between_subgroups_reports_the_change_on_the_row
     assert!(strings.contains("Staff advances → Sundry Debtors"));
     assert!(strings.contains("CA grouping decision. Ancestry changed since the decision"));
     assert!(strings.contains("Applied. Ancestry changed since the decision"));
-    assert!(strings.contains("Nothing needs attention."));
+    // Final, but never "Nothing needs attention." beside a drift the CA should look at.
+    assert!(strings.contains(
+        "Applied, but 1 decided ledger(s) now sit under other groups than when decided: review each decision's status."
+    ));
+    assert!(!strings.contains("Nothing needs attention."));
 }
 
 fn workbook_text(source: PartyLedgerMasterSource) -> String {
@@ -641,13 +645,15 @@ fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
 /// The package of the host-date workbook: with no date typed, the bytes must not
 /// change. The first digest was taken from master before #903 changed anything
 /// (96744b54...); the Schedule III sheet then gained its decisions row, its basis
-/// column and its decisions section (#737), which moves the baseline once, so both
-/// digests are taken again from the tree that has them. The two stay what they were
+/// column and its decisions section (#737), which moves the baseline once; the decisions row
+/// then also began to print NOT FINAL for a book with an excluded ledger (this fixture's one
+/// ledger is excluded, its group read being empty), which moved it again. Both digests are taken
+/// from the tree that has them. The two stay what they were
 /// to each other: the later-dated variant differs from the plain one only by its note.
 const HOST_DATE_PACKAGE_WITHOUT_NOTE: &str =
-    "bd101415a54ac8ccad3725d365000837e8ff4814691663646e9fdd1aa44587e0";
+    "1308e28af056945e94d5c2f758daaaa7ef812f15559794eced988526b67f4933";
 const HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE: &str =
-    "6096cac89f18c50505a2ab3a0bee5a99f89b004d703ab1a058098dc73dbf59b7";
+    "f8dc3c3e7ccf585711adab04b6e0d2ca62f1e6dc301e29379ae7aa41b3487926";
 
 #[test]
 fn the_host_date_workbook_is_byte_for_byte_what_it_was_before_a_date_could_be_typed() {
@@ -707,7 +713,7 @@ fn decisions_recorded_under_another_book_are_said_and_the_sheet_is_not_final() {
     )
     .unwrap();
     assert!(strings.contains(
-        "None were applied to this export. NOT FINAL: 2 grouping event(s) for this company and financial year are recorded under another company number or books-from date and were not applied: confirm which book they belong to."
+        "None were applied to this export. NOT FINAL: 1 ledger(s) are excluded: a client mapping decision is required. 2 grouping event(s) for this company and financial year are recorded under another company number or books-from date and were not applied: confirm which book they belong to."
     ));
 }
 
@@ -775,4 +781,21 @@ fn decisions_that_could_not_be_read_are_never_reported_as_absent() {
         assert!(strings.contains(text), "{why:?}");
         assert!(!strings.contains("None were applied"));
     }
+}
+
+#[test]
+fn an_excluded_ledger_with_no_decision_is_printed_not_final_in_the_decisions_row() {
+    // The default synthetic source has no group read, so its ledger is excluded.
+    let workbook = build_party_ledger_master_workbook(source_with_precision(2)).unwrap();
+    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut strings,
+    )
+    .unwrap();
+    assert!(strings.contains(
+        "None were applied to this export. NOT FINAL: 1 ledger(s) are excluded: a client mapping decision is required."
+    ));
 }

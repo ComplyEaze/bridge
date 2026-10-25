@@ -505,9 +505,12 @@ pub(super) struct ImportLedgerLine {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     withdrawn_skips: Option<Vec<String>>,
     /// For an amendment: each voucher's GUID, MasterID and ALTERID as this
-    /// build observed them in the book (#685), so a verification can tell an
-    /// amendment that was applied (same GUID and MasterID, ALTERID moved past
-    /// the pin) from one that was not. Absent on every build that is not an
+    /// build observed them in the book (#685), so a verification counts a
+    /// voucher verified only when it is the one observed (same GUID and
+    /// MasterID) and was altered since (ALTERID past the pin), which is
+    /// necessary for the amendment to have been applied, not proof of it. The
+    /// pin structs deny unknown fields, so a later release that adds a pin
+    /// field writes lines this release refuses to read. Absent on every build that is not an
     /// amendment, and on all older records. A release older than this field
     /// does not read it (this struct does not deny unknown fields); every
     /// release since #660 refuses to post an amendment batch.

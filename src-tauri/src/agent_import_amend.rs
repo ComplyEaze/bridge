@@ -31,9 +31,14 @@ use super::*;
 /// (#685): its GUID, its MasterID and its ALTERID. An amendment is a same-REMOTEID
 /// upsert, which alters the voucher in place (same GUID and MasterID, ALTERID
 /// moved to the book's next mark: protocol reference 9.14), so a later read can
-/// tell an amendment that was applied from one that was not. Built only from a
-/// row of the book, by [`PinnedVoucherState::observed`], so a pin cannot be made
-/// up. Persisted with the build that observed it (`ImportLedgerLine`).
+/// tell whether it found the voucher the build observed and whether that voucher
+/// was altered since the build. An alteration is not proof that this amendment
+/// was applied: saving the voucher unchanged on Tally's own screen moves the
+/// ALTERID too, and so did a bill reference, a cost-centre allocation and a
+/// bank-reconciliation date (the screen-actions table of the measurements part).
+/// A build makes a pin only from a row of the book, by
+/// [`PinnedVoucherState::observed`]; a journal line is read back as written.
+/// Persisted with the build that observed it (`ImportLedgerLine`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct PinnedVoucherState {
@@ -50,15 +55,15 @@ pub(super) struct AmendmentPin {
     pub(super) state: PinnedVoucherState,
 }
 
-/// What a later read of an amended voucher says about the amendment.
+/// What a later read of an amended voucher says against its pin.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum AmendmentApplied {
-    /// The same GUID and MasterID, with an ALTERID past the pin.
-    Yes,
-    /// The same GUID and MasterID with the ALTERID where the build saw it: the
-    /// book was not altered since, so the file has not been imported (or changed
-    /// nothing).
-    NotYet,
+pub(super) enum SincePin {
+    /// The same GUID and MasterID, with an ALTERID past the pin: altered since
+    /// the build, by this amendment's import or by anything else.
+    Altered,
+    /// The same GUID and MasterID with the ALTERID where the build saw it: not
+    /// altered since, so the amendment has not been applied.
+    Unaltered,
     /// Another GUID or MasterID, an ALTERID before the pin, or one of them
     /// missing: not the voucher the build observed.
     NotTheSameVoucher,
@@ -74,20 +79,20 @@ impl PinnedVoucherState {
         })
     }
 
-    /// Whether the voucher a read found is this one with the amendment applied.
-    pub(super) fn applied_in(
+    /// Whether the voucher a read found is this one, and altered since the build.
+    pub(super) fn since_pin(
         &self,
         guid: Option<&str>,
         master_id: Option<&str>,
         alter_id: Option<u64>,
-    ) -> AmendmentApplied {
+    ) -> SincePin {
         if guid != Some(self.guid.as_str()) || master_id != Some(self.master_id.as_str()) {
-            return AmendmentApplied::NotTheSameVoucher;
+            return SincePin::NotTheSameVoucher;
         }
         match alter_id {
-            Some(now) if now > self.alter_id => AmendmentApplied::Yes,
-            Some(now) if now == self.alter_id => AmendmentApplied::NotYet,
-            _ => AmendmentApplied::NotTheSameVoucher,
+            Some(now) if now > self.alter_id => SincePin::Altered,
+            Some(now) if now == self.alter_id => SincePin::Unaltered,
+            _ => SincePin::NotTheSameVoucher,
         }
     }
 }

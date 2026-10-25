@@ -287,15 +287,25 @@ pub(super) fn observed_fingerprint(
 }
 
 /// An amendment batch reads `posted_verified` only for a voucher that is the
-/// one its build observed, with the amendment applied (#685): the same GUID and
-/// MasterID, and an ALTERID past the one the build pinned (a same-REMOTEID
-/// upsert alters in place and moves the ALTERID: protocol reference 9.14). The
-/// tag and the content alone cannot say so: a file that changes only an
-/// uncompared field (a reference) leaves content equal to the book before
-/// anyone imports it, and a voucher a restore removed can be keyed again with
-/// the same identity (9.15). A voucher that fails the test is demoted to
-/// `matching_content_observed`, which no verdict counts as verified. A build
-/// that is not an amendment holds no pins and is untouched.
+/// one its build observed and that was altered since the build (#685): the
+/// same GUID and MasterID, and an ALTERID past the one the build pinned (a
+/// same-REMOTEID upsert alters in place and moves the ALTERID: protocol
+/// reference 9.14). The tag and the content alone cannot say even that much: a
+/// file that changes only an uncompared field (a reference) leaves content
+/// equal to the book before anyone imports it. A voucher that fails the test is
+/// demoted to `matching_content_observed`, which no verdict counts as verified;
+/// so is one of an amendment build whose line holds no pin for it, since a
+/// build pins every voucher it admits. A build that is not an amendment holds
+/// no pins and is untouched.
+///
+/// What the test cannot tell (stated, not closed): an alteration other than
+/// this import (saving the voucher unchanged on Tally's screen, a
+/// bank-reconciliation date) moves the ALTERID as well, so a file that changes
+/// only uncompared fields reads verified once anything alters the voucher. And a
+/// voucher a restore removed that is keyed or imported again takes the removed
+/// one's GUID, MasterID and ALTERID (9.15): its ALTERID is at or below the pin,
+/// so it is not verified, until something alters it past the pin; after that it
+/// reads as altered, and the identity cannot tell it from the amended voucher.
 fn demote_unapplied_amendments(
     rows: &mut [Value],
     counts: &mut BTreeMap<&'static str, u64>,
@@ -308,20 +318,20 @@ fn demote_unapplied_amendments(
         if row["status"] != "posted_verified" {
             continue;
         }
-        let Some(pin) = pins
+        let pin = pins
             .iter()
-            .find(|pin| row["bridge_txn_id"].as_str() == Some(pin.bridge_txn_id.as_str()))
-        else {
-            continue;
-        };
-        let reason = match pin.state.applied_in(
-            row["guid"].as_str(),
-            row["master_id"].as_str(),
-            row["alter_id"].as_u64(),
-        ) {
-            amend::AmendmentApplied::Yes => continue,
-            amend::AmendmentApplied::NotYet => "amendment_not_applied",
-            amend::AmendmentApplied::NotTheSameVoucher => "voucher_not_the_one_amended",
+            .find(|pin| row["bridge_txn_id"].as_str() == Some(pin.bridge_txn_id.as_str()));
+        let reason = match pin.map(|pin| {
+            pin.state.since_pin(
+                row["guid"].as_str(),
+                row["master_id"].as_str(),
+                row["alter_id"].as_u64(),
+            )
+        }) {
+            Some(amend::SincePin::Altered) => continue,
+            Some(amend::SincePin::Unaltered) => "amendment_not_applied",
+            Some(amend::SincePin::NotTheSameVoucher) => "voucher_not_the_one_amended",
+            None => "amendment_not_pinned",
         };
         row["status"] = json!("matching_content_observed");
         row["attribution"] = json!("not_established");

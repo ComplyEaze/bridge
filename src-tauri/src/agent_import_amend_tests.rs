@@ -1311,6 +1311,21 @@ async fn an_amendment_of_a_posted_batch_is_not_a_second_post_of_its_row() {
     let result = &built.payload["result"];
     assert!(result.get("error").is_none(), "{result}");
     assert_eq!(result["amendment"]["identity_batch_id"], original.as_str());
+    // The saved build holds the pin of the voucher it admitted (#685): the
+    // GUID, MasterID and ALTERID the book read gave, which the verification of
+    // this amendment is later held to.
+    let journal = std::fs::read_to_string(directory_ledger(&server)).unwrap();
+    let saved: Vec<Value> = journal
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .filter(|line| line["batch_id"] == result["batch_id"] && line.get("txn_ids").is_some())
+        .collect();
+    assert_eq!(saved.len(), 1, "{journal}");
+    assert_eq!(
+        saved[0]["amendment_pins"],
+        json!([{"bridge_txn_id":"txn-001","state":{
+            "guid":format!("{CAPTURED_GUID}-00000001"),"master_id":"1","alter_id":12}}])
+    );
     simulator.finish().unwrap();
 }
 
@@ -1358,27 +1373,29 @@ fn a_row_without_a_guid_or_master_id_is_not_admitted() {
     }
 }
 
-/// An amendment is applied when the voucher is the same one and its ALTERID has
-/// moved past the pin; anything else is not.
+/// A read finds the pinned voucher altered when it is the same one and its
+/// ALTERID has moved past the pin; unaltered when the ALTERID is the pin's; and
+/// anything else is not the voucher the build observed.
 #[test]
-fn a_pin_tells_an_applied_amendment_from_one_that_is_not() {
-    use amend::AmendmentApplied::{NotTheSameVoucher, NotYet, Yes};
+fn a_pin_tells_an_altered_voucher_from_an_unaltered_or_another_one() {
+    use amend::SincePin::{Altered, NotTheSameVoucher, Unaltered};
     let pin: amend::AmendmentPin = serde_json::from_value(json!({
         "bridge_txn_id":"txn-001","state":{"guid":"g-5","master_id":"5","alter_id":40}}))
     .unwrap();
-    let applied = |guid, master_id, alter_id| pin.state.applied_in(guid, master_id, alter_id);
-    assert_eq!(applied(Some("g-5"), Some("5"), Some(41)), Yes);
-    assert_eq!(applied(Some("g-5"), Some("5"), Some(40)), NotYet);
+    let applied = |guid, master_id, alter_id| pin.state.since_pin(guid, master_id, alter_id);
+    assert_eq!(applied(Some("g-5"), Some("5"), Some(41)), Altered);
+    assert_eq!(applied(Some("g-5"), Some("5"), Some(40)), Unaltered);
     assert_eq!(applied(Some("g-5"), Some("5"), Some(39)), NotTheSameVoucher);
     assert_eq!(applied(Some("g-5"), Some("5"), None), NotTheSameVoucher);
     assert_eq!(applied(Some("g-6"), Some("5"), Some(41)), NotTheSameVoucher);
     assert_eq!(applied(Some("g-5"), Some("6"), Some(41)), NotTheSameVoucher);
     assert_eq!(applied(None, Some("5"), Some(41)), NotTheSameVoucher);
+    assert_eq!(applied(Some("g-5"), None, Some(41)), NotTheSameVoucher);
 }
 
 /// #685: the verification of an amendment batch reads `posted_verified` for a
-/// voucher only when the amendment has been applied to the voucher the build
-/// observed. A file that changes nothing the read compares leaves the book's
+/// voucher only when it is the voucher the build observed and was altered since
+/// the build. A file that changes nothing the read compares leaves the book's
 /// content equal to the amendment before anyone imports it.
 #[test]
 fn an_amendment_reads_verified_only_once_the_pinned_voucher_was_altered() {
@@ -1432,13 +1449,13 @@ fn an_amendment_reads_verified_only_once_the_pinned_voucher_was_altered() {
         "{applied}"
     );
     assert_eq!(applied["counts"]["posted_verified"], 1);
-    // Another voucher with the same content and tag (a restore removed the
-    // original and it was keyed again): not the one that was amended.
-    let mut keyed_again = book_before.clone();
-    keyed_again.alter_id = Some(41);
-    keyed_again.guid = Some(format!("{GUID}-00000009"));
-    keyed_again.master_id = Some("9".into());
-    let other = verify(&amendment, keyed_again);
+    // Another voucher with the same content and tag (the original deleted and
+    // a copy keyed): not the one that was amended.
+    let mut copy = book_before.clone();
+    copy.alter_id = Some(41);
+    copy.guid = Some(format!("{GUID}-00000009"));
+    copy.master_id = Some("9".into());
+    let other = verify(&amendment, copy);
     assert_eq!(
         other["vouchers"][0]["status"], "matching_content_observed",
         "{other}"
@@ -1448,4 +1465,36 @@ fn an_amendment_reads_verified_only_once_the_pinned_voucher_was_altered() {
         "voucher_not_the_one_amended"
     );
     assert_eq!(other["counts"]["posted_verified"], 0);
+    // A restore removed the voucher and it was keyed again: it takes the removed
+    // one's GUID, MasterID and ALTERID (protocol reference 9.15), so it reads at
+    // or below the pin and is not verified...
+    for (alter_id, reason) in [
+        (40, "amendment_not_applied"),
+        (39, "voucher_not_the_one_amended"),
+    ] {
+        let mut keyed_again = book_before.clone();
+        keyed_again.alter_id = Some(alter_id);
+        let read = verify(&amendment, keyed_again);
+        assert_eq!(read["vouchers"][0]["reason"], reason, "{read}");
+        assert_eq!(read["counts"]["posted_verified"], 0);
+    }
+    // ...until something alters it past the pin: then the identity cannot tell
+    // it from the amended voucher, and it reads verified (a stated limit).
+    let mut keyed_and_saved = book_before.clone();
+    keyed_and_saved.alter_id = Some(42);
+    let read = verify(&amendment, keyed_and_saved);
+    assert_eq!(read["counts"]["posted_verified"], 1, "{read}");
+    // A line that holds pins but none for this voucher fails closed: a build
+    // pins every voucher it admits.
+    let mut unpinned = amendment.clone();
+    unpinned.amendment_pins = Some(Vec::new());
+    let mut altered = book_before.clone();
+    altered.alter_id = Some(41);
+    let read = verify(&unpinned, altered);
+    assert_eq!(
+        read["vouchers"][0]["status"], "matching_content_observed",
+        "{read}"
+    );
+    assert_eq!(read["vouchers"][0]["reason"], "amendment_not_pinned");
+    assert_eq!(read["counts"]["posted_verified"], 0);
 }

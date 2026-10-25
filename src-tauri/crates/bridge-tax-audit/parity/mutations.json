@@ -14634,24 +14634,24 @@
  {
   "id": "G3B-45",
   "by": "author",
-  "what": "gst inputs: a named GSTR-3B accepted",
-  "file": "src/lib.rs",
-  "from": "    if gstr3b_loaded || named {\n",
-  "to": "    if gstr3b_loaded {\n"
+  "what": "gst refusal: a named GSTR-3B accepted",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "    if named || caller_holds_one {\n",
+  "to": "    if caller_holds_one {\n"
  },
  {
   "id": "G3B-46",
   "by": "author",
-  "what": "gst inputs: a loaded GSTR-3B accepted",
-  "file": "src/lib.rs",
-  "from": "    if gstr3b_loaded || named {\n",
+  "what": "gst refusal: a GSTR-3B the caller holds accepted",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "    if named || caller_holds_one {\n",
   "to": "    if named {\n"
  },
  {
   "id": "G3B-47",
   "by": "author",
-  "what": "gst inputs: an empty GSTR-3B name refused",
-  "file": "src/lib.rs",
+  "what": "gst refusal: an empty GSTR-3B name refused",
+  "file": "src/gst_ledgers_3b.rs",
   "from": ".is_some_and(|v| v.as_str() != Some(\"\"));",
   "to": ".is_some();"
  },
@@ -14674,9 +14674,57 @@
  {
   "id": "G3B-50",
   "by": "author",
-  "what": "binding: rcm_tax_ledgers bound after narration_payee_ledgers",
+  "what": "binding: rcm_tax_ledgers never bound",
   "file": "src/binding.rs",
   "from": "    let rcm_tax_ledgers = bind_role_list(&mut lbinder, roles, \"rcm_tax_ledgers\")?;\n",
   "to": "    let rcm_tax_ledgers = None;\n"
+ },
+ {
+  "id": "G3B-51",
+  "by": "author",
+  "what": "registry: a GSTR-3B named as loaded is not held",
+  "file": "src/registry.rs",
+  "from": "        self.named_documents.contains(&CallerNamedDocument::Gstr3b)\n            || self",
+  "to": "        false\n            || self"
+ },
+ {
+  "id": "G3B-52",
+  "by": "author",
+  "what": "registry: a GSTR-3B comparison turnover is not held",
+  "file": "src/registry.rs",
+  "from": "            || self.turnover_inputs.gstr3b.is_some()\n",
+  "to": "            || false\n"
+ },
+ {
+  "id": "G3B-53",
+  "by": "author",
+  "what": "months: the period's last month dropped",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "    while (y, m) <= end {\n",
+  "to": "    while (y, m) < end {\n"
+ },
+ {
+  "id": "G3B-54",
+  "by": "author",
+  "what": "heads: the Trial Balance row looked up by head, not ledger",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "if let Some(tb) = book.tb.get(name) {",
+  "to": "if let Some(tb) = book.tb.get(head) {"
+ },
+ {
+  "id": "G3B-55",
+  "by": "author",
+  "what": "rcm: the books figure cites no voucher",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "                voucher_refs(vs),\n",
+  "to": "                Vec::new(),\n"
+ },
+ {
+  "id": "G3B-56",
+  "by": "author",
+  "what": "tax ledgers: a ledger under two heads keeps the later",
+  "file": "src/lib.rs",
+  "from": "                if other != *head {\n",
+  "to": "                if false {\n"
  }
 ]

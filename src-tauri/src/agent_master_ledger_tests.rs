@@ -4,6 +4,10 @@ use serde_json::json;
 use std::io::Cursor;
 use std::path::Path;
 use uuid::Uuid;
+use crate::agent::agent_import::tests::{sentinel_batch_id, sentinel_uuid};
+
+/// The merge gate's one registered synthetic company GUID.
+const COMPANY_GUID: &str = "00000000-0000-4000-8000-000000000002";
 
 fn batch_id() -> String {
     format!("bridge-{}", Uuid::new_v4())
@@ -29,7 +33,7 @@ fn batch_with(id: &str, sha: &str, items: Vec<StoredLedgerCreate>) -> MasterBatc
         batch_sha256: sha.into(),
         class: MasterClass::LedgerCreate,
         company: MasterCompany {
-            guid: "00000000-0000-0000-0000-000000000001".into(),
+            guid: COMPANY_GUID.into(),
             name: "Synthetic Company".into(),
             number: "1".into(),
             books_from: "20260401".into(),
@@ -571,7 +575,7 @@ fn a_verified_verdict_must_name_every_guid_and_guids_must_be_canonical() {
     ))
     .is_ok());
     let mut upper = verdict_for(&batch, MasterVerdictState::PostedVerified);
-    upper.items[0].guid = Some("ABCDEF00-0000-0000-0000-000000000000".into());
+    upper.items[0].guid = Some(sentinel_uuid(0xabcd).to_string().to_uppercase());
     assert_eq!(
         read(&format!("{prefix}{}", line(&MasterRecord::Verdict(upper)))).unwrap_err(),
         invalid(Invalid::BadGuid)
@@ -770,8 +774,8 @@ fn a_corrupt_journal_file_blocks_appends() {
 
 fn pre_image() -> PreImage {
     PreImage::new([
-        ("BBBBBBBB-0000-0000-0000-000000000002".to_string(), 12),
-        ("aaaaaaaa-0000-0000-0000-000000000001".to_string(), 11),
+        (sentinel_uuid(0xbb02).to_string().to_uppercase(), 12),
+        (sentinel_uuid(0xaa01).to_string(), 11),
     ])
     .unwrap()
 }
@@ -788,7 +792,11 @@ fn the_pre_image_is_sorted_lower_case_and_round_trips_through_its_sidecar() {
     let bytes = std::fs::read(&path).unwrap();
     assert_eq!(
         String::from_utf8(bytes.clone()).unwrap(),
-        "{\"aaaaaaaa-0000-0000-0000-000000000001\":11,\"bbbbbbbb-0000-0000-0000-000000000002\":12}"
+        format!(
+            "{{\"{}\":11,\"{}\":12}}",
+            sentinel_uuid(0xaa01),
+            sentinel_uuid(0xbb02)
+        )
     );
     assert_eq!(sha, sha256_hex(&bytes));
     assert_eq!(
@@ -797,7 +805,7 @@ fn the_pre_image_is_sorted_lower_case_and_round_trips_through_its_sidecar() {
     );
     // The same write repeated is accepted; different bytes under the name are not.
     assert_eq!(write(directory.path(), &id, &image).unwrap(), written);
-    let other = PreImage::new([("cccccccc-0000-0000-0000-000000000003".to_string(), 1)]).unwrap();
+    let other = PreImage::new([(sentinel_uuid(0xcc03).to_string(), 1)]).unwrap();
     assert_eq!(
         write(directory.path(), &id, &other).unwrap_err(),
         PreImageError::ExistsDifferent
@@ -868,12 +876,10 @@ fn a_sidecar_that_is_not_the_sorted_lower_case_map_is_refused_even_with_its_dige
     let directory = tempfile::tempdir().unwrap();
     let id = batch_id();
     let path = directory.path().join(format!("master-pre-image-{id}.json"));
+    let upper_key = format!("{{\"{}\":1}}", sentinel_uuid(0xaa01).to_string().to_uppercase());
     for (bytes, expected) in [
         (&b"[1,2]"[..], PreImageError::Malformed),
-        (
-            &b"{\"AAAAAAAA-0000-0000-0000-000000000001\":1}"[..],
-            PreImageError::Malformed,
-        ),
+        (upper_key.as_bytes(), PreImageError::Malformed),
         (&b"{}"[..], PreImageError::Empty),
         (&b"{\"../x\":1}"[..], PreImageError::BadGuid),
     ] {
@@ -890,10 +896,11 @@ fn a_batch_id_that_could_leave_the_data_dir_is_refused_for_the_sidecar() {
     let directory = tempfile::tempdir().unwrap();
     let nested = directory.path().join("nested");
     std::fs::create_dir(&nested).unwrap();
+    let traversal = format!("{}/../../x", sentinel_batch_id(0));
     for id in [
         "../escape",
         "bridge-../../escape",
-        "bridge-00000000-0000-4000-8000-000000000000/../../x",
+        traversal.as_str(),
         "",
         "/etc/passwd",
         "bridge-not-a-uuid",
@@ -1081,7 +1088,7 @@ fn an_intent_needs_marks_that_include_the_batchs_own_company() {
     };
     assert_eq!(with(vec![]).unwrap_err(), invalid(Invalid::MarksMissing));
     assert_eq!(
-        with(vec![mark("00000000-0000-0000-0000-0000000000ff")]).unwrap_err(),
+        with(vec![mark(&sentinel_uuid(0x00ff).to_string())]).unwrap_err(),
         invalid(Invalid::MarksMissing)
     );
     assert_eq!(
@@ -1094,13 +1101,13 @@ fn an_intent_needs_marks_that_include_the_batchs_own_company() {
     assert_eq!(with(vec![mark("")]).unwrap_err(), invalid(Invalid::BadGuid));
     // Other loaded companies are recorded beside the batch's own.
     assert!(with(vec![
-        mark("00000000-0000-0000-0000-0000000000ff"),
+        mark(&sentinel_uuid(0x00ff).to_string()),
         mark(&batch.company.guid)
     ])
     .is_ok());
     // The company of the batch is a canonical GUID too.
     let mut upper = batch.clone();
-    upper.company.guid = "ABCDEF00-0000-0000-0000-000000000001".into();
+    upper.company.guid = sentinel_uuid(0xabce).to_string().to_uppercase();
     assert_eq!(
         read(&line(&MasterRecord::Batch(upper))).unwrap_err(),
         invalid(Invalid::BadGuid)

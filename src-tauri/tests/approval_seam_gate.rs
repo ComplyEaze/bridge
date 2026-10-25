@@ -1144,6 +1144,10 @@ const ANSWER_EFFECT: &str = r#"fn answer_effect(shown: Shown, count: VoucherCoun
                 .into(),
             "Nothing is released until you answer.",
         ),
+        Shown::Masters => (
+            "create this ledger in Tally".into(),
+            "Nothing is created until you answer.",
+        ),
     }
 }"#;
 
@@ -1153,6 +1157,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
     let button = match shown {
         Shown::Post => post_words(count).1,
         Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
+        Shown::Masters => MASTERS_BUTTON.to_string(),
     };
     format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}")
 }"#;
@@ -1337,7 +1342,8 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 27] = [
     (
         "async fn confirm_masters_dialog(preview: &str) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| \"master_approval_unavailable\")?;
-    confirm_masters_with(&executable, preview).await
+    let shown = displayed_text(Shown::Masters, ONE_ITEM, preview);
+    confirm_masters_with(&executable, &shown).await
 }",
         1,
     ),
@@ -1532,8 +1538,8 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen(
-            "confirm_masters_with(&executable, preview).await\n}",
-            "let _ = (executable, preview);\n    Ok(())\n}",
+            "confirm_masters_with(&executable, &shown).await\n}",
+            "let _ = (executable, shown);\n    Ok(())\n}",
             1,
         ),
         // The one-ledger decision approves a clean exit with no token, or on

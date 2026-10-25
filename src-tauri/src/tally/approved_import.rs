@@ -1778,6 +1778,11 @@ pub(crate) mod test_seam {
              ComplyEaze Bridge builds and posts invoices for it again. Click Cancel to cancel. \
              Nothing is released until you answer."
         );
+        assert_eq!(
+            super::answer_text(super::Shown::Masters, ONE),
+            "Click \"Create ledger\" to create this ledger in Tally. Click Cancel to cancel. \
+             Nothing is created until you answer."
+        );
     }
 
     /// The same for the Windows titles, which carry the question.
@@ -1823,6 +1828,11 @@ pub(crate) mod test_seam {
              ComplyEaze Bridge builds and posts invoices for it again. Press N (or click No) to \
              cancel. Nothing is released until you answer."
         );
+        assert_eq!(
+            super::answer_text(super::Shown::Masters, ONE),
+            "Press Y (or click Yes) to create this ledger in Tally. Press N (or click No) to \
+             cancel. Nothing is created until you answer."
+        );
     }
 
     /// The answer text is wrapped under the dialog's line width without losing
@@ -1835,6 +1845,7 @@ pub(crate) mod test_seam {
             super::Shown::Post,
             super::Shown::Review,
             super::Shown::StopRelease,
+            super::Shown::Masters,
         ] {
             for n in [1, 2, 9, 10, 50] {
                 let text = super::answer_text(shown, count(n));
@@ -1913,6 +1924,14 @@ pub(crate) mod test_seam {
         assert_ne!(post, review);
         assert!(!release.contains("record that you reviewed"));
         assert!(!post.contains("release the invoice stop"));
+        // The one-ledger dialog opens with its own answer text, never a
+        // voucher's.
+        let masters = super::displayed_text(super::Shown::Masters, super::ONE_ITEM, "Details");
+        assert_eq!(
+            masters,
+            format!("{}\n\nDetails", wrapped(super::Shown::Masters))
+        );
+        assert!(masters.contains("create this ledger in Tally") && !masters.contains("voucher"));
     }
 
     /// The dialog subprocesses show a dialog only for input of the shape the
@@ -1961,6 +1980,8 @@ enum Shown {
     Post,
     Review,
     StopRelease,
+    /// The one-ledger dialog, always about one ledger.
+    Masters,
 }
 
 /// The two uses of the review dialog. [`ReviewAcknowledged::confirm`] takes
@@ -2006,6 +2027,10 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
                 .into(),
             "Nothing is released until you answer.",
         ),
+        Shown::Masters => (
+            "create this ledger in Tally".into(),
+            "Nothing is created until you answer.",
+        ),
     }
 }
 
@@ -2023,6 +2048,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
     let button = match shown {
         Shown::Post => post_words(count).1,
         Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
+        Shown::Masters => MASTERS_BUTTON.to_string(),
     };
     format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}")
 }
@@ -2211,10 +2237,12 @@ async fn confirm_review_with(
 
 /// The one-ledger dialog: its own subprocess mode, title, button and token,
 /// answered exactly as the post dialog is, by the token for this call's nonce
-/// and a clean exit together. Always asked about one item.
+/// and a clean exit together. Always asked about one item. Like the other
+/// dialogs, its first lines say what each answer does (#1780).
 async fn confirm_masters_dialog(preview: &str) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| "master_approval_unavailable")?;
-    confirm_masters_with(&executable, preview).await
+    let shown = displayed_text(Shown::Masters, ONE_ITEM, preview);
+    confirm_masters_with(&executable, &shown).await
 }
 
 async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {

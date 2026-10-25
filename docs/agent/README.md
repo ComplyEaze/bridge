@@ -2366,7 +2366,8 @@ ledger, a group or an alias (`master_name_taken`), saves the request in the
 local masters journal and returns a `batch_id` with the preview the person will
 be shown (under `mask_parties` the ledger's name in it is masked; the dialog
 shows it whole); it writes nothing to Tally. `post_ledger_creates` takes that
-`batch_id`, asks the local user in a native dialog, and sends the create once;
+`batch_id`, asks the local user in a native dialog (whose first line says what each
+answer does, as the post dialog's does), and sends the create once;
 its approval, pending and approved answers behave as `post_import`'s do. A batch
 already sent is never sent again: a later call reads the book back, or reports
 what was recorded for a batch already settled.

@@ -36,7 +36,7 @@ Run each window with P first, then M, on the same book state.
 | book | company number | GUID |
 |---|---|---|
 | `BRIDGE BATCH LAB` | 100050 | `a30f23c3-4819-4334-96ab-ffa6fba70976` |
-| `BRIDGE CORPUS DENSE` | 100012 (books from 1 Apr 2025) | `d45bc1b0-e5e3-4261-b3b2-cce3915f42d3` |
+| `BRIDGE CORPUS DENSE` | the number in the company list fixture `company_identity_fields_after_split.utf8.xml` (books from 1 Apr 2025) | `d45bc1b0-e5e3-4261-b3b2-cce3915f42d3` |
 
 Each is loaded ALONE. Step 0 (C2) begins every part: the company list request `c0-company-list` (path `lab-evidence/72-reads/requests/c0-company-list.utf16le.xml` of branch `lab/72-reads-rd21`, sha256 `9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8`) must show exactly the one company, with the number and GUID above; any other company, or another GUID, is a STOP. The marks read is `c1-marks-TEMPLATE` (path `lab-evidence/72-reads/requests/c1-marks-TEMPLATE.utf16le.xml` of the same branch, sha256 `4bcdcfd4b06f60fb6ee705cb3cb05c73037345a0ac123077071392f011d64c37`, placeholders `@@COMPANY@@` and `@@GUID@@` only); keep every answer whole, with its CMPINFO block. The answer holds `LastVoucherDate`.
 

@@ -23,20 +23,30 @@ use bridge_tax_audit::registry::{self, CallerData};
 /// 53938eb8), on one book with no cash payments: that side was checked at zero.
 pub(super) const ADMITTED: &[&str] = &["cash_44ab"];
 
-/// A test in [`ADMITTED`]: the only kind of name `run_test` takes, so no other
-/// ported test can be run through this tool.
-#[derive(Clone, Copy)]
-struct AdmittedTest(&'static str);
+mod admitted {
+    use super::ADMITTED;
 
-impl AdmittedTest {
-    fn parse(name: &str) -> Option<Self> {
-        ADMITTED
-            .iter()
-            .copied()
-            .find(|admitted| *admitted == name)
-            .map(Self)
+    /// A test in [`ADMITTED`]: the only kind of name `run_test` takes. Its field
+    /// is private to this module, so outside it only [`AdmittedTest::parse`]
+    /// makes one, and no other ported test can be run through the tool.
+    #[derive(Clone, Copy)]
+    pub(super) struct AdmittedTest(&'static str);
+
+    impl AdmittedTest {
+        pub(super) fn parse(name: &str) -> Option<Self> {
+            ADMITTED
+                .iter()
+                .copied()
+                .find(|admitted| *admitted == name)
+                .map(Self)
+        }
+
+        pub(super) fn name(self) -> &'static str {
+            self.0
+        }
     }
 }
+use admitted::AdmittedTest;
 
 /// Refused rather than cut short: a result past these is not one a caller
 /// can read whole.
@@ -139,7 +149,7 @@ fn run_test(
         code: AUDIT_TEST_REFUSED.to_string(),
         retryable: false,
     };
-    let ported = registry::find(test.0).ok_or_else(refused)?;
+    let ported = registry::find(test.name()).ok_or_else(refused)?;
     let rules = bridge_tax_audit::rules_for(engagement).map_err(|_| refused())?;
     // A refusal by the test carries the crate's detail, which can name a
     // ledger: only its rule code, when it has one, is kept.

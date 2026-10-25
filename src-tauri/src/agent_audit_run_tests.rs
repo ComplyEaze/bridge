@@ -339,6 +339,32 @@ fn the_catalog_lists_exactly_the_admitted_tests() {
             ported.id
         );
     }
+    // The `test` parameter's own line names no test: it points at the enum.
+    let line = tool["inputSchema"]["properties"]["test"]["description"]
+        .as_str()
+        .unwrap();
+    for ported in registry::PORTED {
+        assert!(!line.contains(ported.id), "{}", ported.id);
+    }
+}
+
+/// Only a name in `ADMITTED`, exactly as written, makes an `AdmittedTest`.
+#[test]
+fn only_an_admitted_name_parses_as_an_admitted_test() {
+    assert_eq!(
+        AdmittedTest::parse("cash_44ab").map(AdmittedTest::name),
+        Some("cash_44ab")
+    );
+    assert!(registry::find("cash_payments_40a3").is_some());
+    for name in [
+        "cash_payments_40a3",
+        "CASH_44AB",
+        " cash_44ab",
+        "cash_44ab ",
+        "",
+    ] {
+        assert!(AdmittedTest::parse(name).is_none(), "{name:?}");
+    }
 }
 
 /// A test the crate has ported but this tool has not admitted, and a name the

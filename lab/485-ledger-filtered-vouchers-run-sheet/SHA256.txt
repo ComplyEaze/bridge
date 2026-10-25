@@ -1,0 +1,10 @@
+# sha256  bytes  file  (source of each request)
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md  byte for byte from lab/626-1038-1050-run-sheets at 8c602c15
+1cde2ea47ddfaf08fbc28ffe172efc26325c4616bd0522e3adc8c045344168a6  5354  RUN-SHEET.md  
+040ac47754c40a4e2e736f8be2b3f37cac924213ea66c8c4f0074222f9a00280  982  requests/d01_marks.request.utf16le.xml  committed note-days/shape_lab_company_marks_request.utf16le.xml, company changed
+5ad19b7ed7e3758c5719da3c29146d31048b273a429a5bff66716948dc6c63d7  3094  requests/d02_vouchers_20250515.request.utf16le.xml  committed note-days/credit_note_day_voucher_window_request.utf16le.xml, company and dates changed
+64033cb5bd8da26a8ec5c31d395b913ad7cb86c3b4877382cfe39e0a938a008d  1668  requests/d03_ledger_vouchers_dn_sales_20250515.request.utf16le.xml  that window request with only its collection changed: Vouchers : Ledger, CHILDOF the ledger, explicit identity fields
+d3f61a3b0acbc10866a188d96ca3a7462f5a0935b98dc6fa7e713bfb168713cf  1668  requests/d04_ledger_vouchers_dn_sales_20250512_18.request.utf16le.xml  that window request with only its collection changed: Vouchers : Ledger, CHILDOF the ledger, explicit identity fields
+501c3094407612a082bd1518518276bcdd97af77ddcc358d4b7da2387fc84910  984  requests/t01_marks.request.utf16le.xml  committed note-days/shape_lab_company_marks_request.utf16le.xml, company changed
+de90752d735e696032512d49bb3c3cedb1cf2500411d690bd7b34408606e038b  3096  requests/t02_vouchers_fy.request.utf16le.xml  committed note-days/credit_note_day_voucher_window_request.utf16le.xml, company and dates changed
+8225fbe136172213209aaf80e5b1f9f3183982259c37a2ce06e28a30f23977f5  1678  requests/t03_ledger_vouchers_p1_fy.request.utf16le.xml  that window request with only its collection changed: Vouchers : Ledger, CHILDOF the ledger, explicit identity fields

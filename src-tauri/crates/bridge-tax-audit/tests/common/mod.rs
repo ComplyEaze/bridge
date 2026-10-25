@@ -22,7 +22,7 @@ pub fn fixtures() -> PathBuf {
 /// The committed divergences from the frozen reference (`fixtures/divergences.json`).
 pub fn divergences() -> Vec<bridge_tax_audit::divergence::Divergence> {
     let text = std::fs::read_to_string(fixtures().join("divergences.json")).unwrap();
-    bridge_tax_audit::divergence::parse(&text).unwrap()
+    bridge_tax_audit::divergence::parse_committed(&text).unwrap()
 }
 
 /// The reference's own golden under `golden/`, unpatched: only for checks of the golden itself.

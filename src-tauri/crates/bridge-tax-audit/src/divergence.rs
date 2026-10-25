@@ -17,15 +17,20 @@
 //! person who signs the answer reads the words, and a wording patch cannot pass unseen. Two records
 //! may not claim the same key, nor one an entry and the other a field of it.
 //!
-//! `ca_answer` names who worked the answer by role and where the worksheet is kept, by a private
-//! reference, never a person's or a client's name. A real-book key that names a per-book id (a
-//! ledger or party tag) belongs in a local, uncommitted registry passed to `local_parity`.
+//! `ca_answer` says who worked the answer, by role, and the date it was signed (or the working
+//! itself), never a person's or a client's name and never a pointer into material this repository
+//! cannot show. A committed record's real-book keys are among the keys its patch sets
+//! ([`parse_committed`]): what a real book may show differ is what was worked by hand. A real-book
+//! key that names a per-book id (a ledger or party tag) belongs in a local, uncommitted registry
+//! passed to `local_parity`, which [`parse`] reads.
 //!
 //! Not built yet: a fix that makes a test refuse an input it used to run on (an outcome patch).
 //! Such a fix needs that first; until then it fails the comparison loudly.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 
+use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::Value as Json;
 
 use crate::canonical::{hash_ordered, nfc, sha16};
@@ -73,8 +78,10 @@ pub const TOP_KEYS: [&str; 7] = [
     "module_invariant_violations",
 ];
 
-/// One declared divergence.
+/// One declared divergence. Only [`parse`] builds one (it cannot be written outside this crate),
+/// so what `parse` checks holds for every divergence.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Divergence {
     pub id: String,
     pub issue: u64,
@@ -86,10 +93,60 @@ pub struct Divergence {
     pub real_book_keys: Vec<String>,
 }
 
+/// A JSON document in which no object repeats a key. `serde_json` keeps the last value of a
+/// repeated key, so a record could show one value and enforce another; this refuses it instead.
+struct NoRepeatedKeys;
+
+impl<'de> Deserialize<'de> for NoRepeatedKeys {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_any(NoRepeatedKeys)
+    }
+}
+
+impl<'de> Visitor<'de> for NoRepeatedKeys {
+    type Value = Self;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a JSON value")
+    }
+    fn visit_bool<E>(self, _: bool) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_i64<E>(self, _: i64) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_u64<E>(self, _: u64) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_f64<E>(self, _: f64) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_str<E>(self, _: &str) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_unit<E>(self) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self, A::Error> {
+        while seq.next_element::<Self>()?.is_some() {}
+        Ok(self)
+    }
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self, A::Error> {
+        let mut seen = BTreeSet::new();
+        while let Some(key) = map.next_key::<String>()? {
+            if !seen.insert(key.clone()) {
+                return Err(de::Error::custom(format!("the key {key:?} appears twice")));
+            }
+            map.next_value::<Self>()?;
+        }
+        Ok(self)
+    }
+}
+
 /// Parse the committed registry: a JSON list of records, each with exactly the fields of
 /// [`Divergence`]. Refuses an unknown field, an empty `id`/`test`/`why`/`ca_answer`, issue 0, a
 /// repeated id, a record that patches nothing and declares no real-book key, and a key that is not
-/// in the grammar above.
+/// in the grammar above, and a document in which an object repeats a key.
 pub fn parse(text: &str) -> Result<Vec<Divergence>, String> {
     const FIELDS: [&str; 7] = [
         "id",
@@ -100,6 +157,7 @@ pub fn parse(text: &str) -> Result<Vec<Divergence>, String> {
         "expect",
         "real_book_keys",
     ];
+    serde_json::from_str::<NoRepeatedKeys>(text).map_err(|e| format!("divergences: {e}"))?;
     let doc: Json = serde_json::from_str(text).map_err(|e| format!("divergences: {e}"))?;
     let records = doc
         .as_array()
@@ -189,6 +247,25 @@ pub fn parse(text: &str) -> Result<Vec<Divergence>, String> {
         });
     }
     Ok(out)
+}
+
+/// [`parse`] for the committed registry: also refuses a record whose real-book key is not one of
+/// the keys its patch sets, so a real book is never let differ at a key no one worked by hand.
+pub fn parse_committed(text: &str) -> Result<Vec<Divergence>, String> {
+    let divergences = parse(text)?;
+    for d in &divergences {
+        if let Some(key) = d
+            .real_book_keys
+            .iter()
+            .find(|key| !d.expect.values().any(|patch| patch.contains_key(*key)))
+        {
+            return Err(format!(
+                "divergences: {}: real-book key {key} is not a key its patch sets",
+                d.id
+            ));
+        }
+    }
+    Ok(divergences)
 }
 
 /// A parsed key.
@@ -419,20 +496,13 @@ pub fn masked(
         for key in &d.real_book_keys {
             let parsed = Key::parse(key).map_err(|e| format!("{}: {e}", d.id))?;
             let (want, got) = (parsed.get(oracle), parsed.get(rust));
-            match &parsed {
-                Key::Top(top) if top != "population_note_text" => {
-                    return Err(format!(
-                        "{}: {key} is a whole list: it cannot be masked",
-                        d.id
-                    ));
-                }
-                Key::Entry { field: None, .. } if want.is_some() && got.is_some() => {
-                    return Err(format!(
-                        "{}: {key} is on both sides: declare the fields that differ",
-                        d.id
-                    ));
-                }
-                _ => {}
+            // A whole top-level list cannot be masked: `parse` refuses it as a real-book key.
+            if matches!(&parsed, Key::Entry { field: None, .. }) && want.is_some() && got.is_some()
+            {
+                return Err(format!(
+                    "{}: {key} is on both sides: declare the fields that differ",
+                    d.id
+                ));
             }
             if want == got {
                 continue;
@@ -476,6 +546,78 @@ pub fn expected_missing(
         }
     }
     Ok(missing)
+}
+
+/// `--divergences FILE` and `--expect ID` go together on a real-book run: a run that names a
+/// registry says which of its divergences the read must show, and one that names divergences
+/// names the registry they are in.
+pub fn flags_pair(registry: Option<&str>, expected: &[String]) -> Result<(), String> {
+    if expected.is_empty() == registry.is_none() {
+        Ok(())
+    } else {
+        Err(
+            "--divergences and --expect go together: name the divergences this read must show"
+                .to_string(),
+        )
+    }
+}
+
+/// What a real-book parity run of one test found.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RealBookRun {
+    /// Each declared key that differed, with the oracle's value and Rust's.
+    pub declared: Vec<String>,
+    /// The divergences the run named that did not show on it.
+    pub missing: Vec<String>,
+    /// What [`crate::compare::compare`] found once the declared keys were masked.
+    pub differences: Vec<String>,
+}
+
+impl RealBookRun {
+    /// Nothing differed but the declared keys, and every divergence the run named showed.
+    pub fn passed(&self) -> bool {
+        self.differences.is_empty() && self.missing.is_empty()
+    }
+}
+
+/// A real-book parity run: Rust's dump masked at the keys of the divergences named in `expected`
+/// ([`masked`]), the named ones that did not show ([`expected_missing`]), and the comparison of
+/// what is left with the oracle's dump.
+pub fn real_book_run(
+    rust: &Json,
+    oracle: &Json,
+    test_id: &str,
+    divergences: &[Divergence],
+    expected: &[String],
+) -> Result<RealBookRun, String> {
+    let refused = |e: String| format!("DIVERGENCES REFUSED: {e}");
+    let (compared, declared) =
+        masked(rust, oracle, test_id, divergences, expected).map_err(refused)?;
+    let missing = expected_missing(expected, &declared, test_id, divergences).map_err(refused)?;
+    let differences = crate::compare::compare(oracle, &compared, None)
+        .map_err(|e| format!("PARITY REFUSED: {e}"))?;
+    let shown = |doc: &Json, key: &Key| key.get(doc).map_or("absent".to_string(), Json::to_string);
+    let declared = declared
+        .into_iter()
+        .map(|line| {
+            let key = line
+                .split_once(": ")
+                .and_then(|(_, key)| Key::parse(key).ok());
+            match key {
+                Some(key) => format!(
+                    "{line} (oracle {}, rust {})",
+                    shown(oracle, &key),
+                    shown(rust, &key)
+                ),
+                None => line,
+            }
+        })
+        .collect();
+    Ok(RealBookRun {
+        declared,
+        missing,
+        differences,
+    })
 }
 
 #[cfg(test)]
@@ -751,5 +893,94 @@ mod tests {
         assert!(expected_missing(&["DV-1".into()], &shown, "u", &d)
             .unwrap_err()
             .contains("of t"));
+    }
+    #[test]
+    fn a_key_repeated_in_any_object_is_refused() {
+        let record = r#"{"id": "DV-1", "issue": 1, "test": "t", "why": "w", "ca_answer": "c",
+                         "expect": {"g": {"figures[t.a].value": 5, "figures[t.a].value": 6}}}"#;
+        let err = parse(&format!("[{record}]")).unwrap_err();
+        assert!(
+            err.contains(r#"the key "figures[t.a].value" appears twice"#),
+            "{err}"
+        );
+        let top = r#"[{"id": "DV-1", "id": "DV-2", "issue": 1, "test": "t", "why": "w",
+                       "ca_answer": "c", "expect": {"g": {"figures[t.a].value": 5}}}]"#;
+        assert!(parse(top)
+            .unwrap_err()
+            .contains(r#"the key "id" appears twice"#));
+        let fine = r#"[{"id": "DV-1", "issue": 1, "test": "t", "why": "w", "ca_answer": "c",
+                        "expect": {"g": {"figures[t.a].value": 5}, "h": {"figures[t.a].value": 5}}}]"#;
+        assert_eq!(parse(fine).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_committed_real_book_key_must_be_one_its_patch_sets() {
+        let record = |real: Json| {
+            json!([{"id": "DV-1", "issue": 1, "test": "t", "why": "w", "ca_answer": "c",
+                    "expect": {"g": {"figures[t.a].value": 5}, "h": {"findings[t/x].confidence": "x"}},
+                    "real_book_keys": real}])
+            .to_string()
+        };
+        let other = record(json!(["figures[t.a].value", "figures[t.b].value"]));
+        let err = parse_committed(&other).unwrap_err();
+        assert!(
+            err.contains("DV-1: real-book key figures[t.b].value is not a key its patch sets"),
+            "{err}"
+        );
+        // A local registry may name per-book keys that no patch sets.
+        assert_eq!(parse(&other).unwrap().len(), 1);
+        let both = record(json!(["figures[t.a].value", "findings[t/x].confidence"]));
+        assert_eq!(parse_committed(&both).unwrap(), parse(&both).unwrap());
+    }
+
+    #[test]
+    fn the_registry_and_its_expectations_are_named_together() {
+        let ids = ["DV-1".to_string()];
+        assert_eq!(flags_pair(None, &[]), Ok(()));
+        assert_eq!(flags_pair(Some("d.json"), &ids), Ok(()));
+        for (registry, expected) in [(Some("d.json"), &[][..]), (None, &ids[..])] {
+            assert!(flags_pair(registry, expected)
+                .unwrap_err()
+                .contains("go together"));
+        }
+    }
+
+    #[test]
+    fn a_real_book_run_passes_only_on_its_declared_keys_and_every_named_divergence() {
+        let oracle: Json = serde_json::from_str(include_str!(
+            "../tests/fixtures/golden/edge.ap_both.applicability_44ab.json"
+        ))
+        .unwrap();
+        let key = "figures[applicability_44ab.gstr1_turnover].value";
+        let d = parse(
+            &json!([{"id": "DV-1", "issue": 1, "test": "applicability_44ab", "why": "w",
+                     "ca_answer": "c", "expect": {"g": {key: 5}}, "real_book_keys": [key]}])
+            .to_string(),
+        )
+        .unwrap();
+        let named = ["DV-1".to_string()];
+        let same = real_book_run(&oracle, &oracle, "applicability_44ab", &d, &[]).unwrap();
+        assert!(same.passed() && same.declared.is_empty() && same.differences.is_empty());
+
+        let mut rust = oracle.clone();
+        Key::parse(key).unwrap().set(&mut rust, json!(7)).unwrap();
+        let shown = real_book_run(&rust, &oracle, "applicability_44ab", &d, &named).unwrap();
+        assert!(shown.passed(), "{shown:?}");
+        assert_eq!(
+            shown.declared,
+            [format!("DV-1: {key} (oracle 10000000000, rust 7)")]
+        );
+        // Not named: the same change is a difference.
+        let strict = real_book_run(&rust, &oracle, "applicability_44ab", &d, &[]).unwrap();
+        assert!(!strict.passed() && !strict.differences.is_empty() && strict.missing.is_empty());
+        // Named but not shown: missing.
+        let absent = real_book_run(&oracle, &oracle, "applicability_44ab", &d, &named).unwrap();
+        assert!(!absent.passed() && absent.differences.is_empty());
+        assert_eq!(absent.missing, named);
+        // A comparison that cannot run is refused, never passed.
+        let mut empty = oracle.clone();
+        empty["figures"] = json!([]);
+        let err = real_book_run(&empty, &empty, "applicability_44ab", &d, &[]).unwrap_err();
+        assert!(err.starts_with("PARITY REFUSED"), "{err}");
     }
 }

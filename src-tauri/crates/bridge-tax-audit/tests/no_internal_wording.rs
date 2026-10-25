@@ -290,7 +290,7 @@ fn the_walk_finds_a_planted_hit_under_each_prose_key() {
 fn no_golden_prose_uses_the_working_vocabulary() {
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let dir = fixtures.join("golden");
-    let divergences = bridge_tax_audit::divergence::parse(
+    let divergences = bridge_tax_audit::divergence::parse_committed(
         &std::fs::read_to_string(fixtures.join("divergences.json")).expect("the registry reads"),
     )
     .expect("the registry parses");

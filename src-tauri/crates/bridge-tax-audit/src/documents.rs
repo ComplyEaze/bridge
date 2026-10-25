@@ -647,7 +647,8 @@ mod tests {
         }
     }
 
-    /// The reference reader's own selftest cases (at reference `da9e2d3d`), on the emitter's shape: each refusal by its variant, with the reader's words.
+    /// The reference reader's own selftest cases (at reference `da9e2d3d`), on the emitter's
+    /// shape: each refusal by its variant, with the reader's words.
     #[test]
     fn a_statement_the_reference_reader_refuses_is_refused_with_its_reason() {
         let one = [("2025-06-05", 100_000, Some(400_000))];

@@ -75,7 +75,6 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use bridge_tax_audit::canonical::hex;
-use bridge_tax_audit::compare::compare;
 use bridge_tax_audit::divergence;
 use bridge_tax_audit::registry::{self, CallerData};
 use bridge_tax_audit::rules::{vendored_blocks_in_source, Rules, SOURCE_SHA256, VENDORED};
@@ -291,10 +290,8 @@ fn main() -> ExitCode {
         }
         args.drain(..2);
     }
-    if expected_ids.is_empty() != divergence_file.is_none() {
-        return fail(
-            "--divergences and --expect go together: name the divergences this read must show",
-        );
+    if let Err(e) = divergence::flags_pair(divergence_file.as_deref(), &expected_ids) {
+        return fail(e);
     }
     if let Some(flag) = args.iter().find(|arg| arg.starts_with("--")) {
         return fail(format!("{flag}: flags come before TEST_ID"));
@@ -510,44 +507,34 @@ read (parity/python_golden.py --emit-bank-statement)",
         Some(Ok(d)) => d,
         Some(Err(e)) => return fail(e),
     };
-    let (compared, declared) =
-        match divergence::masked(&rust, &python, test_id, &divergences, &expected_ids) {
-            Ok(masked) => masked,
-            Err(e) => return fail(format!("DIVERGENCES REFUSED: {e}")),
-        };
-    let missing =
-        match divergence::expected_missing(&expected_ids, &declared, test_id, &divergences) {
-            Ok(missing) => missing,
-            Err(e) => return fail(format!("DIVERGENCES REFUSED: {e}")),
-        };
-    for d in &declared {
+    let run = match divergence::real_book_run(&rust, &python, test_id, &divergences, &expected_ids)
+    {
+        Ok(run) => run,
+        Err(e) => return fail(e),
+    };
+    for d in &run.declared {
         println!("  declared: {d}");
     }
-    for id in &missing {
+    for id in &run.missing {
         println!("  expected divergence {id} did not show on this read");
     }
     let count = |key: &str| rust[key].as_array().map_or(0, Vec::len);
-    match compare(&python, &compared, None) {
-        Err(e) => fail(format!("PARITY REFUSED: {e}")),
-        Ok(differences) => {
-            println!("test_id={test_id} identical_json={}", python == rust);
-            println!(
-                "figures={} findings={} book_violations={} result_violations={} differences={} rust_ms={} rules: {rules_note}",
-                count("figures"),
-                count("findings"),
-                count("book_invariant_violations"),
-                count("result_invariant_violations"),
-                differences.len(),
-                elapsed.as_millis()
-            );
-            for d in &differences {
-                println!("  - {d}");
-            }
-            if differences.is_empty() && missing.is_empty() {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::FAILURE
-            }
-        }
+    println!("test_id={test_id} identical_json={}", python == rust);
+    println!(
+        "figures={} findings={} book_violations={} result_violations={} differences={} rust_ms={} rules: {rules_note}",
+        count("figures"),
+        count("findings"),
+        count("book_invariant_violations"),
+        count("result_invariant_violations"),
+        run.differences.len(),
+        elapsed.as_millis()
+    );
+    for d in &run.differences {
+        println!("  - {d}");
+    }
+    if run.passed() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
     }
 }

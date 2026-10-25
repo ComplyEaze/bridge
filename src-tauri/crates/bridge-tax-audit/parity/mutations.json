@@ -14400,20 +14400,12 @@
   "to": "            if let Some(hash) = None::<Key> {\n                let derived =\n"
  },
  {
-  "id": "DV-16",
-  "by": "author",
-  "what": "a whole list may be masked on a real book",
-  "file": "src/divergence.rs",
-  "from": "                Key::Top(top) if top != \"population_note_text\" => {\n",
-  "to": "                Key::Top(_) if false => {\n"
- },
- {
   "id": "DV-17",
   "by": "author",
   "what": "a whole entry on both sides may be masked",
   "file": "src/divergence.rs",
-  "from": "                Key::Entry { field: None, .. } if want.is_some() && got.is_some() => {\n",
-  "to": "                Key::Entry { field: None, .. } if false => {\n"
+  "from": "            if matches!(&parsed, Key::Entry { field: None, .. }) && want.is_some() && got.is_some()\n",
+  "to": "            if false\n"
  },
  {
   "id": "DV-18",
@@ -14470,5 +14462,61 @@
   "file": "src/divergence.rs",
   "from": "                    if matches!(&parsed, Key::Top(top) if top != \"population_note_text\") {\n",
   "to": "                    if false {\n"
+ },
+ {
+  "id": "DV-25",
+  "by": "author",
+  "what": "a key repeated in an object is accepted",
+  "file": "src/divergence.rs",
+  "from": "            if !seen.insert(key.clone()) {\n",
+  "to": "            if false && !seen.insert(key.clone()) {\n"
+ },
+ {
+  "id": "DV-26",
+  "by": "author",
+  "what": "the registry is not checked for repeated keys",
+  "file": "src/divergence.rs",
+  "from": "    serde_json::from_str::<NoRepeatedKeys>(text).map_err(|e| format!(\"divergences: {e}\"))?;\n",
+  "to": "    let _ = serde_json::from_str::<NoRepeatedKeys>(text);\n"
+ },
+ {
+  "id": "DV-27",
+  "by": "author",
+  "what": "a nested object's repeated key is not seen",
+  "file": "src/divergence.rs",
+  "from": "            map.next_value::<Self>()?;\n",
+  "to": "            map.next_value::<de::IgnoredAny>()?;\n"
+ },
+ {
+  "id": "DV-28",
+  "by": "author",
+  "what": "a committed real-book key need not be one its patch sets",
+  "file": "src/divergence.rs",
+  "from": "            .find(|key| !d.expect.values().any(|patch| patch.contains_key(*key)))\n",
+  "to": "            .find(|key| false && !d.expect.values().any(|patch| patch.contains_key(*key)))\n"
+ },
+ {
+  "id": "DV-29",
+  "by": "author",
+  "what": "a registry without its expectations, or the reverse, is accepted",
+  "file": "src/divergence.rs",
+  "from": "    if expected.is_empty() == registry.is_none() {\n",
+  "to": "    if true {\n"
+ },
+ {
+  "id": "DV-30",
+  "by": "author",
+  "what": "a real-book run passes with a named divergence missing",
+  "file": "src/divergence.rs",
+  "from": "        self.differences.is_empty() && self.missing.is_empty()\n",
+  "to": "        self.differences.is_empty()\n"
+ },
+ {
+  "id": "DV-31",
+  "by": "author",
+  "what": "a real-book run passes with a difference left",
+  "file": "src/divergence.rs",
+  "from": "        self.differences.is_empty() && self.missing.is_empty()\n",
+  "to": "        self.missing.is_empty()\n"
  }
 ]

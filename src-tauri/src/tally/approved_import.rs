@@ -1299,24 +1299,25 @@ pub(crate) mod test_seam {
             "ComplyEaze Bridge — record that you reviewed these 50 vouchers?"
         );
         // What each window's answer text says: Y and N answer a message box
-        // that has the keyboard (#1780).
+        // that has the keyboard (#1780). The text is wrapped at 100 characters,
+        // so its words are compared with the breaks read as spaces.
         assert_eq!(
-            super::answer_text(super::Shown::Post, ONE),
+            super::answer_text(super::Shown::Post, ONE).replace('\n', " "),
             "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to \
              cancel. Nothing is posted until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::Post, count(200)),
+            super::answer_text(super::Shown::Post, count(200)).replace('\n', " "),
             "Press Y (or click Yes) to post these 200 vouchers into Tally. Press N (or click No) \
              to cancel. Nothing is posted until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::Review, count(50)),
+            super::answer_text(super::Shown::Review, count(50)).replace('\n', " "),
             "Press Y (or click Yes) to record that you reviewed these 50 vouchers. Press N (or \
              click No) to cancel. Nothing is recorded until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::StopRelease, ONE),
+            super::answer_text(super::Shown::StopRelease, ONE).replace('\n', " "),
             "Press Y (or click Yes) to release the invoice stop for this company, so that \
              ComplyEaze Bridge builds and posts invoices for it again. Press N (or click No) to \
              cancel. Nothing is released until you answer."

@@ -1,10 +1,11 @@
 //! The files pinned by the raises to 232 and 238 (bridge#416) must stay pinned.
 //!
-//! The compatibility gate cannot notice a pin disappearing: it digests the pins
-//! that are listed and never adds paths. `docs/release-process.md` requires the
+//! Nothing checks that a listed pin is still wanted: the surface test in
+//! `bridge-tally-core` (`compatibility_surface_stays_whole`) checks that what is listed
+//! is whole, and never adds paths. `docs/release-process.md` requires the
 //! pin list to be merged rather than resolved by taking one side; a resolution
-//! that takes the base side anyway drops every entry a branch added, and the
-//! gate passes. So does the parse bound `MAX_SURFACE_FILES`, which only refuses a
+//! that takes the base side anyway drops every entry a branch added, and that
+//! test passes. So does its pin-count bound `MAX_PINS`, which only refuses a
 //! runaway list and would pass with all of them dropped.
 //! `book_presence_tests.rs` guards its own contract's pins the same way.
 //!
@@ -15,8 +16,8 @@ use std::collections::BTreeSet;
 const SURFACE: &str = include_str!("../../docs/tally/compatibility/compatibility-surface.json");
 
 /// Each path was unpinned while a module that declares it was pinned
-/// (bridge#416). The reason for each is recorded beside `MAX_SURFACE_FILES` in
-/// `tools/bridge-tally-compatibility/src/lib.rs`; it is not repeated here, so
+/// (bridge#416). The reason for each is recorded in the module documentation of
+/// `bridge-tally-core/tests/compatibility_surface_stays_whole.rs`; it is not repeated here, so
 /// the two cannot drift apart.
 const ADMISSION_AND_EGRESS: [&str; 12] = [
     "src-tauri/crates/bridge-tally-protocol/src/group_ancestry.rs",
@@ -34,7 +35,7 @@ const ADMISSION_AND_EGRESS: [&str; 12] = [
 ];
 
 /// The five files still pinned from the raise to 238: four on the read path, and
-/// the egress receipt's field walker. Reasons live beside `MAX_SURFACE_FILES`.
+/// the egress receipt's field walker. Reasons live in the same module documentation.
 const READ_PATH_AND_RECEIPT: [&str; 5] = [
     "src-tauri/src/agent_change_parse.rs",
     "src-tauri/src/agent_movement.rs",

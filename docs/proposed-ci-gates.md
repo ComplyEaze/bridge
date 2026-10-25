@@ -1,5 +1,7 @@
 # Proposed CI gates — deterministic review coverage
 
+> **Status note 2026-10-15 (#1745):** the `tools/` Cargo workspace this text refers to (the compatibility crate, the live-read controller and the read transport) was removed after the owner's decision on #609. The text below is kept as written. Where it names `tools/Cargo.toml`, read it as history.
+
 This repository's only automated code reviewer went away. Analysis of 880 real
 review findings found five classes that are mechanically catchable. This
 document is the reviewable patch a human applies to `.github/workflows/ci.yml`

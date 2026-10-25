@@ -486,6 +486,16 @@ pub(super) fn lab_inventory_vouchers_read(
 }
 
 #[cfg(feature = "lab-writes")]
+pub(super) fn lab_voucher_key_probe_read(
+    company: &str,
+    day: &TallyDate,
+    term: super::lab::ProbeTerm,
+    key: &super::lab::ProbeKey,
+) -> Result<ReadRequest, String> {
+    super::lab::render_lab_voucher_key_probe(company, day, term, key).map(ReadRequest)
+}
+
+#[cfg(feature = "lab-writes")]
 pub(super) fn lab_master_collection_read(
     company: &str,
     kind: super::lab::LabMasterKind,

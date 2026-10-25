@@ -821,17 +821,22 @@ has not yet run against a live Tally: the lab comparison comes first.
 `purchase_register` makes, in the same order and with the same drift checks and refusals, and for every voucher with an
 entry on a ledger under Duties & Taxes whose master carries a recognised GST duty head it decides one thing:
 
-- **attributed** to the voucher's one ledger under Purchase Accounts or Indirect Expenses, when the voucher has exactly
-  one such ledger, its class is Purchase, Debit Note, Journal, Payment, Sales or Credit Note, its ledger entries sum to
-  zero, all its GST entries are on one side, and every other entry is on the party, cash, bank or a non-GST duty ledger
-  such as TDS; or
-- **set aside** under the first reason that applies: `class_not_admitted`, `head_conflict`, `unrecognised_head`,
-  `head_absent`, `unresolved_group`, `sign_and_flag_disagree`, `entries_do_not_balance` (an item invoice reads this
+- **attributed** to the voucher's one ledger under Purchase Accounts or Indirect Expenses, when the voucher is a
+  Purchase, Debit Note, Journal or Payment with a ledger under Sundry Creditors on it, has exactly one such counter
+  ledger (a round-off ledger under Indirect Expenses counts as one), its ledger entries sum to zero, all its GST entries
+  are on one side, and every other entry is on the party, cash, bank or a ledger typed TDS or TCS. A duty head does not
+  say input or output, so a sale, a credit note or a tax payment with no supplier on it is never attributed; or
+- **set aside** under the first reason that applies: `class_not_admitted` (sales, credit notes, memoranda and any
+  other class), `head_conflict`, `unrecognised_head`, `head_absent`, `duty_ledger_without_gst_type` (a Duties & Taxes
+  ledger typed neither GST nor TDS or TCS, such as the `Others` an imported ledger reads by default),
+  `unresolved_group` (a ledger whose group does not resolve, which may be a GST ledger), `sign_and_flag_disagree`, `entries_do_not_balance` (an item invoice reads this
   way: its purchase or sales ledger sits in an inventory allocation the read does not fetch), `sales_ledger_present`,
   `gst_on_both_sides` (reverse-charge and set-off journals), `other_ledgers_present` (any other group, including Direct
-  Expenses and Fixed Assets until a live capture admits them), `no_counter_ledger` or `several_counter_ledgers`.
+  Expenses and Fixed Assets until a live capture admits them), `no_creditor_party` (such as a GST challan payment),
+  `no_counter_ledger` or `several_counter_ledgers`.
 
-`counter_ledgers` gives, per ledger, its predefined `group`, its `parent`, `vouchers`, `debit_side_tax` (negative, as
+`counter_ledgers` gives, per ledger, its predefined `group`, its `parent` (masked like a ledger name when it is a group
+the book named), `vouchers`, `debit_side_tax` (negative, as
 the books state it) and `credit_side_tax` (positive) per head, never netted. `set_aside` gives, per reason, the same
 totals and at most 100 vouchers listed. Cancelled, optional and post-dated vouchers are counted and not totalled; a
 window that is not complete is refused as `gst_by_ledger_window_partial`. Every total is folded from one decision per
@@ -840,7 +845,8 @@ is not seen. It is the books side a CA starts from for expense-head-wise input t
 decides no eligibility, availment, input or output side, and no return row.
 
 Measured on one synthetic book of TallyPrime 7.1 Silver, one month of eight vouchers created by import (purchases on
-two Purchase Accounts ledgers, a debit note, a sale, a journal on an Indirect Expenses ledger and a tax payment).
+two Purchase Accounts ledgers, a debit note, a sale, a journal on an Indirect Expenses ledger with a supplier on it and a
+tax payment).
 Not measured: vouchers typed on Tally's screen, item invoices, Direct Expenses and Fixed Assets ledgers, a window
 read in parts, Gold and other releases.
 

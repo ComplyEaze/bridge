@@ -24,6 +24,8 @@ const INDIRECT_EXPENSES: &str = "Indirect Expenses";
 /// capture; until then a voucher on one of them is set aside, not attributed.
 const COUNTER_GROUPS: [&str; 2] = [PURCHASE_ACCOUNTS, INDIRECT_EXPENSES];
 
+const SUNDRY_CREDITORS: &str = "Sundry Creditors";
+
 /// The groups whose ledgers settle a voucher (the party, cash, a bank) and so never stand in the
 /// way of attributing its tax.
 const SETTLEMENT_GROUPS: [&str; 5] = [
@@ -34,16 +36,19 @@ const SETTLEMENT_GROUPS: [&str; 5] = [
     "Bank OD A/c",
 ];
 
-/// The voucher classes the captures show; any other class (a memorandum or reversing journal,
-/// or one no capture covers) is set aside, so its tax never reaches a ledger's total.
-const ADMITTED_CLASSES: [&str; 6] = [
-    "Purchase",
-    "Debit Note",
-    "Journal",
-    "Payment",
-    "Sales",
-    "Credit Note",
-];
+/// The voucher classes whose GST is attributed, and only when a ledger under Sundry Creditors is
+/// on the voucher: a duty head does not say input or output, so a sale, a credit note (a discount
+/// allowed with output tax) or a tax payment with no supplier on it (a GST challan that also pays
+/// interest) would otherwise put output tax on an expense ledger. Any other class, a memorandum
+/// or reversing journal among them, is set aside. Purchase and Debit Note are the classes a
+/// capture shows attributed; Journal rests on a capture with a supplier on it.
+const ADMITTED_CLASSES: [&str; 4] = ["Purchase", "Debit Note", "Journal", "Payment"];
+
+/// Non-GST duty types a voucher may carry beside its GST without stopping the attribution: a
+/// ledger typed TDS or TCS cannot hold GST. A Duties & Taxes ledger of any other type (`Others`
+/// is what an imported ledger reads by default) may be a GST ledger left untyped, so it sets the
+/// voucher aside.
+const NON_GST_DUTY_TYPES: [&str; 2] = ["TDS", "TCS"];
 
 /// Why a voucher's tax was not attributed to a ledger. The first that applies, in this order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -52,12 +57,14 @@ enum SetAside {
     HeadConflict,
     UnrecognisedHead,
     HeadAbsent,
+    DutyLedgerWithoutGstType,
     UnresolvedGroup,
     SignAndFlagDisagree,
     EntriesDoNotBalance,
     SalesLedgerPresent,
     GstOnBothSides,
     OtherLedgersPresent,
+    NoCreditorParty,
     NoCounterLedger,
     SeveralCounterLedgers,
 }
@@ -69,12 +76,14 @@ impl SetAside {
             Self::HeadConflict => "head_conflict",
             Self::UnrecognisedHead => "unrecognised_head",
             Self::HeadAbsent => "head_absent",
+            Self::DutyLedgerWithoutGstType => "duty_ledger_without_gst_type",
             Self::UnresolvedGroup => "unresolved_group",
             Self::SignAndFlagDisagree => "sign_and_flag_disagree",
             Self::EntriesDoNotBalance => "entries_do_not_balance",
             Self::SalesLedgerPresent => "sales_ledger_present",
             Self::GstOnBothSides => "gst_on_both_sides",
             Self::OtherLedgersPresent => "other_ledgers_present",
+            Self::NoCreditorParty => "no_creditor_party",
             Self::NoCounterLedger => "no_counter_ledger",
             Self::SeveralCounterLedgers => "several_counter_ledgers",
         }
@@ -156,7 +165,7 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
     let (mut debit, mut credit) = (HeadTotals::default(), HeadTotals::default());
     let mut found = BTreeSet::new();
     let mut counters = BTreeSet::new();
-    let (mut sales, mut others, mut any_gst) = (false, false, false);
+    let (mut sales, mut others, mut any_gst, mut creditor) = (false, false, false, false);
     let mut balance = ExactDecimal::zero();
     for entry in entries {
         let name = entry
@@ -199,8 +208,13 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
                 let side = if is_debit { &mut debit } else { &mut credit };
                 side.add(&head, &amount)?;
             }
-            // A TDS or other non-GST duty ledger settles part of the voucher; it is not GST.
-            (LedgerGroup::DutiesAndTaxes, GstDutyHeadObservation::NotTaxLedger { .. }) => {}
+            // A TDS or TCS ledger settles part of the voucher; it is not GST.
+            (LedgerGroup::DutiesAndTaxes, GstDutyHeadObservation::NotTaxLedger { tax_type })
+                if NON_GST_DUTY_TYPES.contains(&tax_type.trim()) => {}
+            (LedgerGroup::DutiesAndTaxes, GstDutyHeadObservation::NotTaxLedger { .. }) => {
+                any_gst = true;
+                found.insert(SetAside::DutyLedgerWithoutGstType);
+            }
             (LedgerGroup::DutiesAndTaxes, GstDutyHeadObservation::Absent) => {
                 any_gst = true;
                 found.insert(SetAside::HeadAbsent);
@@ -213,7 +227,10 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
                 any_gst = true;
                 found.insert(SetAside::HeadConflict);
             }
+            // A ledger whose group does not resolve may be a GST ledger: the voucher is set aside
+            // and listed, never counted as having no GST.
             (LedgerGroup::Unresolved(_), _) => {
+                any_gst = true;
                 found.insert(SetAside::UnresolvedGroup);
             }
             _ => match ledger.reserved.as_deref() {
@@ -221,6 +238,7 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
                     counters.insert(name.to_string());
                 }
                 Some(SALES_ACCOUNTS) => sales = true,
+                Some(SUNDRY_CREDITORS) => creditor = true,
                 Some(group) if SETTLEMENT_GROUPS.contains(&group) => {}
                 _ => others = true,
             },
@@ -247,6 +265,9 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
     }
     if others {
         found.insert(SetAside::OtherLedgersPresent);
+    }
+    if !creditor {
+        found.insert(SetAside::NoCreditorParty);
     }
     match counters.len() {
         0 => found.insert(SetAside::NoCounterLedger),
@@ -366,6 +387,11 @@ fn gst_by_ledger_result(index: &MasterIndex, totals: &GstByLedger, redaction: Re
                 "credit_side_tax": bucket.credit.to_json(),
             });
             mark_party_field(&mut item, "ledger");
+            // A parent the book named itself (a sub-group) is masked like a ledger name; a
+            // parent that is the predefined group itself is not a name of the book's.
+            if item["parent"] != item["group"] {
+                mark_party_field(&mut item, "parent");
+            }
             item
         })
         .collect::<Vec<_>>();
@@ -399,10 +425,10 @@ fn gst_by_ledger_result(index: &MasterIndex, totals: &GstByLedger, redaction: Re
     )
 }
 
-const COVERAGE: &str = "GST booked in the books, not a return figure: per voucher, the entries on Duties & Taxes ledgers whose master carries a recognised GST duty head, totalled against the one ledger on that voucher under Purchase Accounts or Indirect Expenses (the groups a live capture has shown); debit_side_tax is negative as the books state it and credit_side_tax positive, never netted; a voucher with no such single ledger, or one these rules cannot read with certainty, is set aside under its reason with its own totals; nothing is apportioned; GST booked to a ledger outside Duties & Taxes, or to a ledger with no recognised head, is not attributed; eligibility, availment, input versus output and any return table are not decided";
+const COVERAGE: &str = "GST booked in the books, not a return figure: per voucher, the entries on Duties & Taxes ledgers whose master carries a recognised GST duty head, totalled against the one ledger on that voucher under Purchase Accounts or Indirect Expenses (the groups a live capture has shown), only on a Purchase, Debit Note, Journal or Payment that has a Sundry Creditors ledger on it; debit_side_tax is negative as the books state it and credit_side_tax positive, never netted; a voucher with no such single ledger, or one these rules cannot read with certainty, is set aside under its reason with its own totals; nothing is apportioned; GST booked to a ledger outside Duties & Taxes, or to a ledger with no recognised head, is not attributed; eligibility, availment, input versus output and any return table are not decided";
 
 /// The tool's description, without the receipt sentence the catalogue appends to every read.
-pub(in crate::agent) const DESCRIPTION: &str = "Read-only: the GST the books record, totalled per counter ledger, for a date window; not a return figure. It does not decide input tax credit eligibility, blocked credit, what was availed, input versus output, or which row of any return a ledger belongs in, and matches nothing against any portal. It reads what purchase_register and sales_register read (the ledger masters twice, the full voucher window, the same drift checks and refusals) and, for every voucher with an entry on a ledger under Duties & Taxes whose master carries a recognised GST duty head, takes that tax per head and attributes it to the voucher's one ledger under Purchase Accounts or Indirect Expenses, when the voucher has exactly one such ledger and nothing but the party, cash, bank and non-GST duty ledgers besides. `counter_ledgers` lists each such ledger with its predefined `group`, its `parent`, `vouchers`, `debit_side_tax` (negative, as the books state it) and `credit_side_tax` (positive), per head (cgst, igst, state_tax, sgst_utgst, ut_tax, cess; state_tax and sgst_utgst are both state-side and kept apart), never netted. Every other voucher with GST is set aside in `set_aside` under the first reason that applies, with its count, its own tax totals and at most 100 vouchers listed: class_not_admitted (a class other than Purchase, Debit Note, Journal, Payment, Sales and Credit Note, such as a memorandum), head_conflict, unrecognised_head, head_absent (a Duties & Taxes ledger that may be GST has no head), unresolved_group, sign_and_flag_disagree, entries_do_not_balance (for example an item invoice, whose purchase or sales ledger sits in an inventory allocation this read does not fetch), sales_ledger_present (sales and credit notes), gst_on_both_sides (reverse-charge and set-off journals), other_ledgers_present (a ledger under any other group, such as Direct Expenses, Fixed Assets, Current Assets or Stock-in-Hand), no_counter_ledger (tax payments) and several_counter_ledgers. Nothing is apportioned. Cancelled, optional and post-dated vouchers are counted, not totalled. A window that is not complete is refused (gst_by_ledger_window_partial). Ledger names are masked like vouchers masks them. Measured on one synthetic book of TallyPrime 7.1 Silver, one month of eight vouchers created by import: purchases on Purchase Accounts ledgers, a debit note, a sale, a journal on an Indirect Expenses ledger and a tax payment; not measured: vouchers typed on Tally's screen, item invoices, Direct Expenses and Fixed Assets ledgers, windows of more than eight vouchers or read in parts, Gold and other releases. A year on a large book may be refused as too large by the window read: use shorter windows.";
+pub(in crate::agent) const DESCRIPTION: &str = "Read-only: the GST the books record, totalled per counter ledger, for a date window; not a return figure. It does not decide input tax credit eligibility, blocked credit, what was availed, input versus output, or which row of any return a ledger belongs in, and matches nothing against any portal. It reads what purchase_register and sales_register read (the ledger masters twice, the full voucher window, the same drift checks and refusals) and, for every voucher with an entry on a ledger under Duties & Taxes whose master carries a recognised GST duty head, takes that tax per head and attributes it to the voucher's one ledger under Purchase Accounts or Indirect Expenses, only when the voucher is a Purchase, Debit Note, Journal or Payment with a ledger under Sundry Creditors on it, has exactly one such counter ledger (a round-off ledger under Indirect Expenses counts as one), and nothing besides but the party, cash, bank and TDS or TCS ledgers: a duty head does not say input or output, so a sale, a credit note or a tax payment with no supplier on it is never attributed. `counter_ledgers` lists each such ledger with its predefined `group`, its `parent` (masked like a ledger name when it is a group the book named), `vouchers`, `debit_side_tax` (negative, as the books state it) and `credit_side_tax` (positive), per head (cgst, igst, state_tax, sgst_utgst, ut_tax, cess; state_tax and sgst_utgst are both state-side and kept apart), never netted. Every other voucher with GST is set aside in `set_aside` under the first reason that applies, with its count, its own tax totals and at most 100 vouchers listed: class_not_admitted (any class but Purchase, Debit Note, Journal and Payment: sales, credit notes, memoranda), head_conflict, unrecognised_head, head_absent (a Duties & Taxes ledger that may be GST has no head), duty_ledger_without_gst_type (a Duties & Taxes ledger typed neither GST nor TDS or TCS, such as Others, which may be a GST ledger left untyped), unresolved_group (a ledger whose group does not resolve, which may be a GST ledger), sign_and_flag_disagree, entries_do_not_balance (for example an item invoice, whose purchase or sales ledger sits in an inventory allocation this read does not fetch), sales_ledger_present (sales and credit notes), gst_on_both_sides (reverse-charge and set-off journals), other_ledgers_present (a ledger under any other group, such as Direct Expenses, Fixed Assets, Current Assets or Stock-in-Hand), no_creditor_party (no ledger under Sundry Creditors, such as a GST challan payment), no_counter_ledger and several_counter_ledgers. Nothing is apportioned. Cancelled, optional and post-dated vouchers are counted, not totalled (`vouchers_cancelled_optional_or_post_dated`); `vouchers_without_gst_entry` counts the vouchers with no Duties & Taxes entry of any kind but TDS or TCS, and `vouchers_observed` every voucher of the window. A window that is not complete is refused (gst_by_ledger_window_partial). Ledger names are masked like vouchers masks them. Measured on one synthetic book of TallyPrime 7.1 Silver, one month of eight vouchers created by import: purchases on Purchase Accounts ledgers, a debit note, a sale, a journal on an Indirect Expenses ledger with a supplier on it and a tax payment; not measured: vouchers typed on Tally's screen, item invoices, Direct Expenses and Fixed Assets ledgers, windows of more than eight vouchers or read in parts, Gold and other releases. A year on a large book may be refused as too large by the window read: use shorter windows.";
 
 impl Server {
     pub(in crate::agent) async fn gst_by_counter_ledger(

@@ -138,5 +138,7 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphic
 # not proof of the historical crash's sole cause.
 libsqlite3-sys = { version = "0.37.0", features = ["bundled-sqlcipher"] }
 objc2 = "0.6.4"
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSApplication", "NSResponder"] }
-objc2-foundation = { version = "0.3.2", default-features = false }
+# NSAlert, NSButton, NSControl, NSScreen, NSView and NSWindow: the macOS approval alert is laid out and
+# measured before `rfd` shows it (tally/mac_fit.rs). Already in the lock through `rfd`.
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSAlert", "NSApplication", "NSButton", "NSControl", "NSResponder", "NSScreen", "NSView", "NSWindow"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSString"] }

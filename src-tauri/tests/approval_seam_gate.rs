@@ -859,8 +859,14 @@ fn each_dialog_answers_with_its_own_token() {
 /// must change this gate. This pins text, not the platform's behaviour.
 const REVIEW_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
+    // On macOS the alert is built, measured and shown by `mac_fit`, and never
+    // shown if it is taller than the screen (#1832); `rfd` shows it elsewhere.
+    let title = review_title(count);
+    if let Some(answered) = super::mac_fit::ask(&title, preview, REVIEW_BUTTON) {
+        return answered;
+    }
     rfd::MessageDialog::new()
-        .set_title(review_title(count))
+        .set_title(title)
         .set_description(preview)
         .set_level(rfd::MessageLevel::Warning)
         .set_buttons(rfd::MessageButtons::OkCancelCustom(
@@ -909,6 +915,10 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
 const POST_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
     let (title, button) = post_words(count);
+    // As for the review (#1832).
+    if let Some(answered) = super::mac_fit::ask(&title, preview, &button) {
+        return answered;
+    }
     rfd::MessageDialog::new()
         .set_title(title)
         .set_description(preview)
@@ -1743,6 +1753,17 @@ fn each_dialog_answers_only_on_its_positive_button() {
             "",
             1,
         ),
+        // The Mac alert is no longer measured before it is shown (#1832).
+        source.replacen(
+            "    if let Some(answered) = super::mac_fit::ask(&title, preview, REVIEW_BUTTON) {\n        return answered;\n    }\n",
+            "",
+            1,
+        ),
+        source.replacen(
+            "    if let Some(answered) = super::mac_fit::ask(&title, preview, &button) {\n        return answered;\n    }\n",
+            "",
+            1,
+        ),
         source.replacen("super::box_fit::guarded(|| {", "(|| {", 1),
         replace_last(&source, "super::box_fit::guarded(|| {", "(|| {"),
         source.replacen(
@@ -2213,5 +2234,120 @@ fn only_the_approvals_holder_makes_the_totals_form() {
         ),
     ] {
         assert!(!totals_form_problems(&broken_post, &broken_approval, &broken_others).is_empty());
+    }
+}
+
+/// `mac_fit::approves`, the one rule that turns a response into an approval,
+/// verbatim (#1832): only the second button.
+const MAC_FIT_APPROVES: &str = r#"pub(crate) fn approves(response: isize) -> bool {
+    response == SECOND_BUTTON
+}"#;
+
+/// The constant it compares with, verbatim: AppKit's second-button response.
+const MAC_FIT_SECOND_BUTTON: &str = r#"const SECOND_BUTTON: isize = 1001;"#;
+
+/// `mac_fit::ask`, the macOS dialog, verbatim (#1832). An edit that shows an
+/// alert that did not fit or could not be measured, reads the buttons the
+/// other way round, or measures before layout would show or approve what the
+/// person could not see.
+const MAC_FIT_ASK: &str = r#"#[cfg(target_os = "macos")]
+pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{
+        NSAlert, NSAlertStyle, NSApplication, NSApplicationActivationPolicy, NSScreen,
+    };
+    use objc2_foundation::NSString;
+    use std::io::Write;
+
+    // The dialog child runs this on its main thread, before Tokio starts.
+    let Some(mtm) = MainThreadMarker::new() else {
+        std::process::exit(0);
+    };
+    let app = NSApplication::sharedApplication(mtm);
+    // A process with no Dock presence cannot show an alert in front: as `rfd`
+    // does, make it an accessory app for the alert and put the policy back.
+    let policy = app.activationPolicy();
+    if policy == NSApplicationActivationPolicy::Prohibited {
+        app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
+    }
+    let visible = NSScreen::mainScreen(mtm).map(|screen| {
+        let frame = screen.visibleFrame();
+        (frame.size.width, frame.size.height)
+    });
+    // The alert this function shows if it fits: measured, then run.
+    let alert = NSAlert::new(mtm);
+    alert.setAlertStyle(NSAlertStyle::Warning);
+    alert.addButtonWithTitle(&NSString::from_str("Cancel"));
+    alert.addButtonWithTitle(&NSString::from_str(positive));
+    alert.setMessageText(&NSString::from_str(title));
+    alert.setInformativeText(&NSString::from_str(text));
+    alert.layout();
+    let frame = alert.window().frame();
+    let size = Some((frame.size.width, frame.size.height));
+    let _ = writeln!(
+        std::io::stderr(),
+        "box-fit: alert={size:?} visible={visible:?}"
+    );
+    match measured(size, visible) {
+        Measured::Fits => {}
+        Measured::DoesNotFit => std::process::exit(DOES_NOT_FIT_EXIT),
+        Measured::Unavailable => std::process::exit(0),
+    }
+    let response = alert.runModal();
+    if policy == NSApplicationActivationPolicy::Prohibited {
+        app.setActivationPolicy(policy);
+    }
+    Some(approves(response))
+}"#;
+
+/// The other platforms' `ask`, verbatim: it shows nothing, so `rfd` does.
+const MAC_FIT_ASK_ELSEWHERE: &str = r#"#[cfg(not(target_os = "macos"))]
+pub(crate) fn ask(_title: &str, _text: &str, _positive: &str) -> Option<bool> {
+    None
+}"#;
+
+/// Problems with how `mac_fit.rs` decides the macOS alert (#1832).
+fn mac_fit_problems(source: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (name, pin) in [
+        ("approves", MAC_FIT_APPROVES),
+        ("second button", MAC_FIT_SECOND_BUTTON),
+        ("ask", MAC_FIT_ASK),
+        ("ask elsewhere", MAC_FIT_ASK_ELSEWHERE),
+    ] {
+        if source.matches(pin).count() != 1 {
+            problems.push(format!("mac_fit.rs: {name} must occur once, as pinned"));
+        }
+    }
+    // Nothing may widen the two gates around them.
+    if source.matches("cfg").count() != 5 {
+        problems.push("mac_fit.rs: expected five `cfg` in all".into());
+    }
+    problems
+}
+
+#[test]
+fn the_mac_alert_is_shown_only_if_it_fits_and_approved_only_on_its_second_button() {
+    let source = read("src-tauri/src/tally/mac_fit.rs");
+    assert_eq!(mac_fit_problems(&source), Vec::<String>::new());
+    // The check itself: each way of showing or approving what it must not.
+    for broken in [
+        source.replacen("Measured::DoesNotFit => std::process::exit(DOES_NOT_FIT_EXIT),", "Measured::DoesNotFit => {}", 1),
+        source.replacen("Measured::Unavailable => std::process::exit(0),", "Measured::Unavailable => {}", 1),
+        source.replacen("    alert.layout();\n", "", 1),
+        source.replacen("response == SECOND_BUTTON", "response == 1000", 1),
+        source.replacen("const SECOND_BUTTON: isize = 1001;", "const SECOND_BUTTON: isize = 1000;", 1),
+        source.replacen("Some(approves(response))", "Some(response == 1000)", 1),
+        source.replacen(
+            "alert.addButtonWithTitle(&NSString::from_str(\"Cancel\"));\n    alert.addButtonWithTitle(&NSString::from_str(positive));",
+            "alert.addButtonWithTitle(&NSString::from_str(positive));\n    alert.addButtonWithTitle(&NSString::from_str(\"Cancel\"));",
+            1,
+        ),
+        source.replacen("let visible = NSScreen::mainScreen(mtm)", "let visible = Some((f64::MAX, f64::MAX)).filter(|_| false).or(None::<Size>); let _unused = NSScreen::mainScreen(mtm)", 1),
+        source.replacen("#[cfg(target_os = \"macos\")]\npub(crate) fn ask(", "#[cfg(any())]\npub(crate) fn ask(", 1),
+        source.replacen("#[cfg(not(target_os = \"macos\"))]\npub(crate) fn ask(", "#[cfg(all())]\npub(crate) fn ask(", 1),
+    ] {
+        assert_ne!(broken, source);
+        assert!(!mac_fit_problems(&broken).is_empty());
     }
 }

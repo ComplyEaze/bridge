@@ -37,10 +37,8 @@ corepack pnpm run build
 corepack pnpm run cargo:check
 ```
 
-For changes under `tools/`, also run
-`cargo test --locked --manifest-path tools/Cargo.toml --workspace`. CI includes
-additional feature-specific, formatting, lint and compatibility gates; use the
-workflow as the complete command reference.
+CI includes additional formatting, lint and boundary gates; use the workflow as
+the complete command reference.
 
 Run `corepack pnpm run tauri:build` on each native target host when validating
 packaging. Do not treat a Windows build as macOS evidence or the reverse.

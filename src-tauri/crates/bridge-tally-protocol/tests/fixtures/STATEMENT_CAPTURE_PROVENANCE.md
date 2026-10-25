@@ -79,6 +79,7 @@ Tally's Profit and Loss and Balance Sheet by name, and the Trial Balance and gro
 | `statement_balance_sheet_stock_book_fy_live.utf16le.xml` | 1840 | `fb590bb683df71b661ca1a203a55a1aa6952e97d591cd2cf7c94d108bcaf9ea6` | Balance Sheet | 2025-04-01 to 2026-03-31 |
 | `statement_trial_balance_stock_book_fy_live.utf16le.xml` | 13476 | `7ff82ce27ed95949fae25a08a4df4268542c2bfd3c4a77fb0719a05a0281a4ec` | native Trial Balance (9 ledgers) | 2025-04-01 to 2026-03-31 |
 | `statement_groups_stock_book_live.utf16le.xml` | 54280 | `48678d9701f6b169bc03dfb1521373eee79bce2ab949940d2252502085ea033c` | List of Groups (28 groups) | none (a master collection) |
+| `statement_groups_stock_book_72_live.utf16le.xml` | 54280 | `493256b22e131097da479f67d4280a272bec855d20c6314c6b37dfad530180c0` | List of Groups (28 groups), TallyPrime 7.2 Silver, the request `statement_groups_stock_book_request.utf16le.xml` | none (a master collection) |
 | `statement_profit_and_loss_stock_book_fy_request.utf16le.xml` | 760 | `2da98ea3fc23fea1fb121914296bb41676397306c1497b390295e1743eb9045b` | request for the Profit and Loss | as above |
 | `statement_balance_sheet_stock_book_fy_request.utf16le.xml` | 756 | `fcc94a8a4b6bea5019d7cfb28b1469e6894e803aff8af5748d8b0c7e6117a10c` | request for the Balance Sheet | as above |
 | `statement_trial_balance_stock_book_fy_request.utf16le.xml` | 1142 | `e25f2e4e5892ff497990726fb73451eda5c28fa5c8e186bcc6d92136cc0f8249` | request for the Trial Balance | as above |
@@ -92,3 +93,4 @@ What they establish (confidence: partial; one book, one release, no opening stoc
 - **Balance Sheet.** `Capital Account` `50000.00`, `Current Liabilities` `3000.00`, `Profit & Loss A/c` empty, `Current Assets` `-53000.00`. No closing-stock leaf: stock sits inside Current Assets.
 - **Trial Balance and groups.** Seven ledgers with the figures above plus `Cash` and `Profit & Loss A/c` at `0.00`. Current Assets derived from them is `-50900.00`, `2100.00` short of Tally's: the closing stock.
 - **Not established:** opening stock, a costing method, a non-integrated book, a window spanning two financial years, more than one purchase rate for an item.
+- **List of Groups on 7.2.** `statement_groups_stock_book_72_live.utf16le.xml` is the answer of TallyPrime 7.2 Silver (25 Oct 2026) to the same request for the same book: the same size, rows and values as the 7.1 capture, and in every row the computed `BRIDGECOMPANYGUID` before `PRIMARYGRPPARENT` (after it on 7.1). Confidence: partial; one book, one release.

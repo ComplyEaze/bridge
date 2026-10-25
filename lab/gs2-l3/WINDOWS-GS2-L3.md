@@ -26,4 +26,4 @@ Why: issue 1709 asks ComplyEaze Bridge to post the first voucher into a company 
 - The relay's recording folder whole with `manifest.tsv` and its SHA256 list: in particular every company-marks answer (`Bridge Agent Company High Water`), every book-extent answer and every voucher-window answer of steps 4 to 6.
 - The three tool answers and the list_companies answer, whole.
 - The company number, the release, the screenshots by name, size and sha256 (never pushed), the notes file.
-GS2 reads the recorded answers (parsed, never grepped) for: whether `ALTVCHID` is absent, present as 0 or present empty in THE COMPANY's row of every marks answer; `ALTMSTID` in each; and what the book-extent and window answers hold. The lab commits the evidence and, on GS2's fixture specification, the bodies to become fixtures.
+The requester reads the recorded answers (parsed, never grepped) for: whether `ALTVCHID` is absent, present as 0 or present empty in THE COMPANY's row of every marks answer; `ALTMSTID` in each; and what the book-extent and window answers hold. The lab commits the evidence and, on the requester's fixture specification, the bodies to become fixtures.

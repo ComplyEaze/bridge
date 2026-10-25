@@ -33,7 +33,7 @@ const stand = {
   silent: ["", 0],
 };
 
-function runScope(event, { script = "silent", changed = [], draft = "", env = {} } = {}) {
+function runScope(event, { script = "silent", changed = [], draft = "", env = {}, versions = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "scope-step-"));
   try {
     const sh = (command) => {
@@ -43,11 +43,18 @@ function runScope(event, { script = "silent", changed = [], draft = "", env = {}
     };
     const commit = (message) => sh(`git -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false commit -q --allow-empty -m ${message} && git rev-parse HEAD`);
     sh("git init -q -b main");
+    // `versions` is [the base's version, the head's]: a src-tauri/tauri.conf.json that carries it at each commit.
+    const tauriConf = (version) => {
+      mkdirSync(join(dir, "src-tauri"), { recursive: true });
+      writeFileSync(join(dir, "src-tauri/tauri.conf.json"), `{\n  "productName": "x",\n  "version": "${version}",\n  "identifier": "x"\n}\n`);
+    };
+    if (versions) { tauriConf(versions[0]); sh("git add -A"); }
     const base = commit("base");
     for (const file of changed) {
       mkdirSync(join(dir, file, ".."), { recursive: true });
       writeFileSync(join(dir, file), "x");
     }
+    if (versions) { if (versions[1] === null) rmSync(join(dir, "src-tauri/tauri.conf.json")); else tauriConf(versions[1]); }
     sh("git add -A");
     const head = commit("change");
     mkdirSync(join(dir, "bin"));
@@ -119,6 +126,23 @@ test("a push runs the macOS bundle and seam jobs when it changes a packaging pat
   for (const BEFORE_SHA of ["", "0".repeat(40), "f".repeat(40)]) {
     assert.deepEqual(systems(runScope("push", { script: "both", env: { BEFORE_SHA } }).outputs), { native: MAC, bundle: MAC }, `before ${BEFORE_SHA}`);
   }
+});
+
+test("a release pull request, whose version differs from its base's, runs the native, bundle and seam jobs on both systems, in the queue as well; an unchanged version does not", () => {
+  const code = ["src-tauri/src/x.rs"];
+  for (const event of ["pull_request", "merge_group"]) {
+    assert.deepEqual(systems(runScope(event, { changed: code, versions: ["0.6.0", "0.6.1"] }).outputs), { native: BOTH, bundle: BOTH }, `${event} with a new version`);
+    assert.deepEqual(systems(runScope(event, { changed: code, versions: ["0.6.0", "0.6.0"] }).outputs).native, WIN, `${event} with the same version`);
+    // One side unreadable counts as a change; both unreadable (no such file) does not.
+    assert.deepEqual(systems(runScope(event, { changed: code, versions: ["0.6.0", null] }).outputs).native, BOTH, `${event} that removes the file`);
+    assert.deepEqual(systems(runScope(event, { changed: code }).outputs).native, WIN, `${event} without the file`);
+  }
+  // A release pull request that is still a draft runs none of them, and the ready run does.
+  const draft = runScope("pull_request", { changed: code, draft: "true", versions: ["0.6.0", "0.6.1"] });
+  assert.deepEqual(heavy(draft.outputs), { native: "false", bundle: "false", tax_audit: "false" });
+  assert.deepEqual(systems(runScope("pull_request", { changed: code, draft: "false", versions: ["0.6.0", "0.6.1"] }).outputs), { native: BOTH, bundle: BOTH });
+  // A push is judged by its own rules (macOS native always), and a version change does not widen what the queue ran.
+  assert.deepEqual(systems(runScope("push", { script: "both", changed: code, versions: ["0.6.0", "0.6.1"] }).outputs).native, MAC);
 });
 
 test("a pull request and the merge queue run the native tests on Windows only; the queue adds the macOS bundle and seam jobs for a packaging change", () => {

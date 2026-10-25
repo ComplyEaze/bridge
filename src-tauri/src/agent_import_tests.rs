@@ -4810,17 +4810,27 @@ fn a_name_folding_equal_to_two_live_ledgers_is_reported_whichever_it_names() {
         ),
     ] {
         assert_eq!(
-            folded_twins(&[requested.to_string()], catalogue.iter().copied()),
+            folded_twins(
+                &[requested.to_string()],
+                catalogue.iter().copied(),
+                std::iter::empty()
+            ),
             [FoldedTwins {
                 requested: requested.to_string(),
                 live,
+                through_alias: Default::default(),
             }],
             "{requested:?}"
         );
     }
     for alone in ["Other", "ACME Traders"] {
         assert!(
-            folded_twins(&[alone.to_string()], catalogue.iter().copied()).is_empty(),
+            folded_twins(
+                &[alone.to_string()],
+                catalogue.iter().copied(),
+                std::iter::empty()
+            )
+            .is_empty(),
             "{alone}"
         );
     }
@@ -4842,6 +4852,7 @@ fn a_folded_twin_marks_the_report_unimportable_with_its_own_remedy() {
             ("Other", None),
         ]
         .into_iter(),
+        std::iter::empty(),
     );
     assert_eq!(report[0]["importable"], false);
     assert_eq!(report[0]["folded_twins"][0]["parent"], "Sundry Creditors");
@@ -4865,10 +4876,257 @@ fn a_twin_needing_both_folds_is_still_found() {
     // the line break or a non-ASCII case. The composite key does.
     for (requested, other) in [("Rent/Office\r\n", "RENT OFFICE"), ("Café/Bar", "CAFÉ BAR")] {
         let catalogue = [(requested, None), (other, None)];
-        let twins = folded_twins(&[requested.to_string()], catalogue.iter().copied());
+        let twins = folded_twins(
+            &[requested.to_string()],
+            catalogue.iter().copied(),
+            std::iter::empty(),
+        );
         assert_eq!(twins.len(), 1, "{requested:?}");
         assert_eq!(twins[0].live.len(), 2, "{requested:?}");
     }
+}
+
+// ---- Aliases (#1688) ------------------------------------------------------------------------------
+//
+// No alias twin can be made on Tally's screen (it refuses an alias equal to another ledger's name), so these
+// states are constructed: tuples for the twin check, and the committed shape-lab ledger capture with a row's
+// language list edited for the report. None of it is a capture.
+
+fn twins_with_aliases(
+    requested: &str,
+    catalogue: &[(&str, Option<&str>)],
+    aliases: &[(&str, &str)],
+) -> Vec<FoldedTwins> {
+    folded_twins(
+        &[requested.to_string()],
+        catalogue.iter().copied(),
+        aliases.iter().copied(),
+    )
+}
+
+#[test]
+fn an_alias_that_folds_equal_to_another_ledger_makes_the_two_a_twin() {
+    let catalogue = [("ACME", Some("Sundry Debtors")), ("Other", None)];
+    for requested in ["ACME", "acme", "Acme Co"] {
+        let aliases: &[(&str, &str)] = if requested == "Acme Co" {
+            &[("ACME", "Acme-Co"), ("Other", "ACME CO")]
+        } else {
+            &[("Other", "Acme")]
+        };
+        let found = twins_with_aliases(requested, &catalogue, aliases);
+        if requested == "Acme Co" {
+            // Two aliases, no ledger named like the request: still two ledgers.
+            assert_eq!(found.len(), 1, "{requested}");
+            assert_eq!(found[0].live.len(), 2, "{requested}");
+            assert_eq!(found[0].through_alias.len(), 2, "{requested}");
+        } else {
+            assert_eq!(found.len(), 1, "{requested}");
+            assert_eq!(
+                found[0].live,
+                [
+                    ("ACME".to_string(), Some("Sundry Debtors".to_string())),
+                    ("Other".to_string(), None)
+                ],
+                "{requested}"
+            );
+            assert_eq!(
+                found[0].through_alias,
+                BTreeMap::from([("Other".to_string(), "Acme".to_string())]),
+                "only the ledger reached through its alias says so: {requested}"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_alias_that_folds_equal_to_its_own_ledger_is_one_ledger_not_a_twin() {
+    let catalogue = [("ACME", None), ("Other", None)];
+    assert!(twins_with_aliases("ACME", &catalogue, &[("ACME", "acme")]).is_empty());
+    assert!(twins_with_aliases("acme", &catalogue, &[("ACME", "Acme")]).is_empty());
+}
+
+#[test]
+fn a_name_that_is_only_one_ledgers_alias_is_no_twin() {
+    let catalogue = [("ACME", None), ("Other", None)];
+    assert!(twins_with_aliases("Acme Trading", &catalogue, &[("ACME", "Acme Trading")]).is_empty());
+}
+
+#[test]
+fn an_alias_shared_by_two_ledgers_makes_them_a_twin() {
+    let catalogue = [("ACME", None), ("Other", None)];
+    let found = twins_with_aliases(
+        "Shared",
+        &catalogue,
+        &[("ACME", "Shared"), ("Other", "SHARED")],
+    );
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].live.len(), 2);
+    assert_eq!(found[0].through_alias.len(), 2);
+}
+
+#[test]
+fn a_twin_found_through_an_alias_is_reported_with_that_alias_and_still_unimportable() {
+    let names = ["ACME".to_string()];
+    let catalogue = ["ACME", "Other"].map(str::to_string);
+    let mut report =
+        requested_master_report(&requested_masters(&names).unwrap(), &catalogue).unwrap();
+    annotate_folded_twins(
+        &mut report,
+        &names,
+        [("ACME", None), ("Other", None)].into_iter(),
+        [("Other", "acme")].into_iter(),
+    );
+    assert_eq!(report[0]["importable"], false);
+    let twins = report[0]["folded_twins"].as_array().unwrap();
+    assert!(twins[0].get("through_alias").is_none());
+    assert_eq!(
+        twins[1]["through_alias"][super::super::PARTY_NAME_MARKER].as_str(),
+        Some("acme")
+    );
+    let guidance = master_recovery_guidance(&report);
+    assert!(guidance.contains("through_alias"), "{guidance}");
+}
+
+const SHAPE_LAB_COMPANY: &str = "BRIDGE SHAPE LAB";
+const SHAPE_LAB_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+
+/// The shape-lab ledger capture with the language list of the named rows
+/// replaced by `NAME`s: the first the row's own name, then the aliases.
+fn shape_lab_catalogue_with_aliases(
+    aliased: &[(&str, &[&str])],
+) -> bridge_tally_protocol::StandardLedgerCatalog {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-ledger-catalogue.utf16le.xml"
+    );
+    let mut xml = bridge_tally_protocol::decode_tally_xml_response_bytes_limited(
+        bytes,
+        "text/xml; charset=utf-16",
+        bridge_tally_protocol::ExpectedTallyTextEncoding::Utf16Le,
+        bytes.len(),
+    )
+    .expect("captured response decodes")
+    .text;
+    for (row, aliases) in aliased {
+        let start = xml
+            .find(&format!("<LEDGER NAME=\"{row}\""))
+            .expect("the capture holds the row");
+        let from = start + xml[start..].find("<LANGUAGENAME.LIST>").expect("a list");
+        let to = start + xml[start..].find("</LEDGER>").expect("a row end");
+        let names = std::iter::once(row)
+            .chain(aliases.iter())
+            .map(|name| format!("<NAME>{name}</NAME>"))
+            .collect::<String>();
+        let list = format!(
+            "<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\">{names}</NAME.LIST><LANGUAGEID>0</LANGUAGEID></LANGUAGENAME.LIST>"
+        );
+        xml = format!("{}{list}{}", &xml[..from], &xml[to..]);
+    }
+    bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+        &xml,
+        SHAPE_LAB_COMPANY,
+        SHAPE_LAB_GUID,
+    )
+    .expect("the edited capture parses")
+}
+
+fn alias_report(
+    requested: &[&str],
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) -> Vec<Value> {
+    let names = requested
+        .iter()
+        .map(|name| name.to_string())
+        .collect::<Vec<_>>();
+    let live = catalogue.names().map(str::to_string).collect::<Vec<_>>();
+    let mut report = masters_for_names(&names, &live).unwrap();
+    annotate_folded_twins(
+        &mut report,
+        &names,
+        catalogue.parents(),
+        catalogue.aliases(),
+    );
+    annotate_alias_of(&mut report, &names, catalogue);
+    report
+}
+
+fn alias_of(entry: &Value) -> Option<&str> {
+    entry["alias_of"][super::super::PARTY_NAME_MARKER].as_str()
+}
+
+#[test]
+fn a_name_that_is_one_ledgers_alias_says_which_ledger_and_is_still_not_exact() {
+    let catalogue = shape_lab_catalogue_with_aliases(&[("Cash", &["Till Cash"])]);
+    let report = alias_report(&["Till Cash", "Cash", "No Such Ledger"], &catalogue);
+    assert_eq!(alias_of(&report[0]), Some("Cash"));
+    assert_ne!(report[0]["match_state"], "exact", "an alias is never sent");
+    assert!(report[0].get("importable").is_none());
+    assert!(
+        alias_of(&report[1]).is_none(),
+        "the ledger's own spelling is exact"
+    );
+    assert_eq!(report[1]["match_state"], "exact");
+    assert!(alias_of(&report[2]).is_none());
+    let guidance = master_recovery_guidance(&report);
+    assert!(guidance.contains("alias_of"), "{guidance}");
+}
+
+#[test]
+fn alias_of_is_by_exact_bytes_never_by_a_fold() {
+    let catalogue = shape_lab_catalogue_with_aliases(&[("Cash", &["Till Cash"])]);
+    for near in ["till cash", "Till  Cash", "Till Cash\r\n"] {
+        let report = alias_report(&[near], &catalogue);
+        assert!(alias_of(&report[0]).is_none(), "{near:?}");
+    }
+}
+
+#[test]
+fn a_name_that_is_an_alias_of_two_ledgers_names_neither() {
+    let names = shape_lab_catalogue_with_aliases(&[])
+        .names()
+        .filter(|name| *name != "ROUND OFF")
+        .take(2)
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let catalogue = shape_lab_catalogue_with_aliases(&[
+        (names[0].as_str(), &["Shared Alias"]),
+        (names[1].as_str(), &["Shared Alias"]),
+    ]);
+    let report = alias_report(&["Shared Alias"], &catalogue);
+    assert!(alias_of(&report[0]).is_none());
+    assert!(
+        report[0].get("folded_twins").is_some(),
+        "two ledgers answer to it: a twin"
+    );
+}
+
+#[test]
+fn a_twin_report_is_not_given_an_alias_of() {
+    // The requested name is byte-equal to the alias and folds equal to another
+    // ledger's own name ("ROUND OFF"): it is a twin, and a twin is never
+    // given an `alias_of` (which ledger it reaches is not established).
+    let catalogue = shape_lab_catalogue_with_aliases(&[("Cash", &["Round Off"])]);
+    let report = alias_report(&["Round Off"], &catalogue);
+    assert!(report[0].get("folded_twins").is_some());
+    assert!(alias_of(&report[0]).is_none());
+}
+
+#[test]
+fn an_alias_entry_gets_its_own_remedy_and_not_the_create_or_select_lines() {
+    let catalogue = shape_lab_catalogue_with_aliases(&[("Cash", &["Till Cash"])]);
+    let report = alias_report(&["Till Cash"], &catalogue);
+    let guidance = master_recovery_guidance(&report);
+    assert!(
+        guidance.contains("is an alias of a live ledger"),
+        "{guidance}"
+    );
+    assert!(
+        !guidance.contains("create the legitimate ledger"),
+        "{guidance}"
+    );
+    assert!(!guidance.contains("explicitly select"), "{guidance}");
+    // Another missing name still gets the lines an alias entry must not.
+    let report = alias_report(&["Till Cash", "No Such Ledger"], &catalogue);
+    assert!(master_recovery_guidance(&report).contains("create the legitimate ledger"));
 }
 
 /// The decoded, unescaped text of the first element named `tag` in `xml`.

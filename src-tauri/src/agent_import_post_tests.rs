@@ -2579,7 +2579,6 @@ fn a_saved_batch_holds_exactly_these_records() {
             on_account_approved,
             statement,
             withdrawn_skips: _,
-            amendment_pins: _,
         } = line;
         if let Some(ImportCompanyTuple {
             name: _,
@@ -2727,10 +2726,6 @@ fn a_saved_batch_holds_exactly_these_records() {
         }],
     }));
     line.withdrawn_skips = Some(vec![format!("st-20260901-{}", padn(2, 16))]);
-    line.amendment_pins = Some(vec![serde_json::from_value(
-        json!({"bridge_txn_id": "txn-001", "state": {"guid": "g", "master_id": "5", "alter_id": 40}}),
-    )
-    .unwrap()]);
     every_field_is_named(&line);
     let written = serde_json::to_value(&line).unwrap();
     let mut paths = std::collections::BTreeSet::new();
@@ -2738,12 +2733,6 @@ fn a_saved_batch_holds_exactly_these_records() {
     assert_eq!(
         paths.iter().map(String::as_str).collect::<Vec<_>>(),
         [
-            "amendment_pins",
-            "amendment_pins[].bridge_txn_id",
-            "amendment_pins[].state",
-            "amendment_pins[].state.alter_id",
-            "amendment_pins[].state.guid",
-            "amendment_pins[].state.master_id",
             "amends_batch_id",
             "batch_id",
             "built_at",

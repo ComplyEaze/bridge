@@ -302,7 +302,7 @@ fn a_voucher_still_as_any_build_wrote_it_is_admitted() {
             .compare_and_swap(&proposal, &book(vec![row]), &verified_as_booked(&lineage))
             .unwrap()
             .expect("book holds a version Bridge built");
-        assert_eq!(admitted[0].evidence["book_matches_batch_id"], expected);
+        assert_eq!(admitted[0]["book_matches_batch_id"], expected);
     }
 }
 
@@ -333,7 +333,7 @@ fn a_padded_saved_narration_is_compared_as_the_text_the_import_wrote() {
         .unwrap()
         .expect("book holds the version this build wrote");
     assert_eq!(
-        json!(admitted.iter().map(|a| &a.evidence).collect::<Vec<_>>()),
+        json!(admitted),
         json!([{"bridge_txn_id":"txn-001","book_matches_batch_id":ORIGINAL,
             "guid":format!("{GUID}-00000005"),"master_id":"5","alter_id":40,
             "not_observed":["effective_date"]}])
@@ -398,7 +398,7 @@ fn an_edited_missing_or_cancelled_voucher_refuses_the_amendment() {
         )
         .unwrap()
         .unwrap();
-    assert!(admitted[0].evidence.get("not_observed").is_none());
+    assert!(admitted[0].get("not_observed").is_none());
     let admitted = lineage
         .compare_and_swap(
             &proposal,
@@ -407,10 +407,7 @@ fn an_edited_missing_or_cancelled_voucher_refuses_the_amendment() {
         )
         .unwrap()
         .unwrap();
-    assert_eq!(
-        admitted[0].evidence["not_observed"],
-        json!(["effective_date"])
-    );
+    assert_eq!(admitted[0]["not_observed"], json!(["effective_date"]));
 
     assert_eq!(reason(vec![]), "not_in_book");
     // A voucher carrying another batch's marker is not this one.
@@ -1072,7 +1069,7 @@ fn an_unimported_amendment_does_not_hide_the_verified_build() {
         )
         .unwrap()
         .expect("the verified original still vouches for the book");
-    assert_eq!(admitted[0].evidence["book_matches_batch_id"], ORIGINAL);
+    assert_eq!(admitted[0]["book_matches_batch_id"], ORIGINAL);
 }
 
 /// The usual flow: the original verified, an amendment imported and verified,
@@ -1127,7 +1124,7 @@ fn the_build_whose_record_equals_the_book_admits_even_when_not_first() {
         )
         .unwrap()
         .expect("the amendment's own record equals the book");
-    assert_eq!(admitted[0].evidence["book_matches_batch_id"], AMENDMENT);
+    assert_eq!(admitted[0]["book_matches_batch_id"], AMENDMENT);
     // Altered since both readings: refused, naming the latest matching build
     // with a record.
     let mut altered = book_row(&original);
@@ -1311,203 +1308,50 @@ async fn an_amendment_of_a_posted_batch_is_not_a_second_post_of_its_row() {
     let result = &built.payload["result"];
     assert!(result.get("error").is_none(), "{result}");
     assert_eq!(result["amendment"]["identity_batch_id"], original.as_str());
-    // The saved build holds the pin of the voucher it admitted (#685): the
-    // GUID, MasterID and ALTERID the book read gave, which the verification of
-    // this amendment is later held to.
-    let journal = std::fs::read_to_string(directory_ledger(&server)).unwrap();
-    let saved: Vec<Value> = journal
-        .lines()
-        .map(|line| serde_json::from_str::<Value>(line).unwrap())
-        .filter(|line| line["batch_id"] == result["batch_id"] && line.get("txn_ids").is_some())
-        .collect();
-    assert_eq!(saved.len(), 1, "{journal}");
-    assert_eq!(
-        saved[0]["amendment_pins"],
-        json!([{"bridge_txn_id":"txn-001","state":{
-            "guid":format!("{CAPTURED_GUID}-00000001"),"master_id":"1","alter_id":12}}])
-    );
     simulator.finish().unwrap();
 }
 
-/// #685: a voucher the compare-and-swap admits is pinned to the identity and
-/// ALTERID of the row of the book it admitted, and the pin is what a later read
-/// is held to.
+/// #685: the build's own voucher mark keeps an amendment that was not imported
+/// from reading verified, even when its file changes nothing the read compares
+/// (here the content is equal to the book's), and its verification then records
+/// no baseline. Once imported, the upsert has moved the voucher's ALTERID past
+/// the mark, so it reads verified and that ALTERID becomes the baseline. The
+/// mark is the company's as the build read it, at or above every voucher's
+/// ALTERID: 50 here, with the voucher at 40 before the import and 51 after.
 #[test]
-fn an_admitted_voucher_is_pinned_to_the_row_the_baseline_matched() {
-    let original = build(ORIGINAL, None, "12.50", "20260901");
-    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
-    let proposal = build(AMENDMENT, Some(ORIGINAL), "18.00", "20260901").vouchers;
-    let admitted = lineage
-        .compare_and_swap(
-            &proposal,
-            &book(vec![book_row(&original)]),
-            &verified_as_booked(&lineage),
-        )
-        .unwrap()
-        .expect("the book is as built");
-    assert_eq!(
-        json!(admitted[0].pin),
-        json!({"bridge_txn_id":"txn-001","state":{
-            "guid":format!("{GUID}-00000005"),"master_id":"5","alter_id":40}})
-    );
-}
-
-/// A row that does not carry its GUID or MasterID cannot be told from another
-/// voucher later, so it is not admitted.
-#[test]
-fn a_row_without_a_guid_or_master_id_is_not_admitted() {
-    let original = build(ORIGINAL, None, "12.50", "20260901");
-    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
-    let proposal = build(AMENDMENT, Some(ORIGINAL), "18.00", "20260901").vouchers;
-    for strip in [
-        (|row: &mut ReadVoucher| row.master_id = None) as fn(&mut ReadVoucher),
-        |row| row.guid = None,
-    ] {
-        let mut row = book_row(&original);
-        strip(&mut row);
-        let refused = lineage
-            .compare_and_swap(&proposal, &book(vec![row]), &verified_as_booked(&lineage))
-            .unwrap()
-            .expect_err("an unidentified row is refused");
-        assert_eq!(refused[0]["reason"], "voucher_identity_not_read");
-    }
-}
-
-/// A read finds the pinned voucher altered when it is the same one and its
-/// ALTERID has moved past the pin; unaltered when the ALTERID is the pin's; and
-/// anything else is not the voucher the build observed.
-#[test]
-fn a_pin_tells_an_altered_voucher_from_an_unaltered_or_another_one() {
-    use amend::SincePin::{Altered, NotTheSameVoucher, Unaltered};
-    let pin: amend::AmendmentPin = serde_json::from_value(json!({
-        "bridge_txn_id":"txn-001","state":{"guid":"g-5","master_id":"5","alter_id":40}}))
-    .unwrap();
-    let applied = |guid, master_id, alter_id| pin.state.since_pin(guid, master_id, alter_id);
-    assert_eq!(applied(Some("g-5"), Some("5"), Some(41)), Altered);
-    assert_eq!(applied(Some("g-5"), Some("5"), Some(40)), Unaltered);
-    assert_eq!(applied(Some("g-5"), Some("5"), Some(39)), NotTheSameVoucher);
-    assert_eq!(applied(Some("g-5"), Some("5"), None), NotTheSameVoucher);
-    assert_eq!(applied(Some("g-6"), Some("5"), Some(41)), NotTheSameVoucher);
-    assert_eq!(applied(Some("g-5"), Some("6"), Some(41)), NotTheSameVoucher);
-    assert_eq!(applied(None, Some("5"), Some(41)), NotTheSameVoucher);
-    assert_eq!(applied(Some("g-5"), None, Some(41)), NotTheSameVoucher);
-}
-
-/// #685: the verification of an amendment batch reads `posted_verified` for a
-/// voucher only when it is the voucher the build observed and was altered since
-/// the build. A file that changes nothing the read compares leaves the book's
-/// content equal to the amendment before anyone imports it.
-#[test]
-fn an_amendment_reads_verified_only_once_the_pinned_voucher_was_altered() {
-    let original = build(ORIGINAL, None, "12.50", "20260901");
-    let mut amendment = build(AMENDMENT, Some(ORIGINAL), "12.50", "20260901");
-    let book_before = {
-        let mut row = book_row(&amendment);
-        row.narration = Some(format!(
-            "[BRIDGE:{}]",
-            amendment.attribution_tag(&amendment.vouchers[0])
-        ));
-        row
+fn an_amendment_reads_verified_only_above_the_build_mark() {
+    let amendment: ImportLedgerLine = {
+        let mut line =
+            serde_json::to_value(build(AMENDMENT, Some(ORIGINAL), "12.50", "20260901")).unwrap();
+        line["pre_import_mark"]["value"] = json!(50);
+        serde_json::from_value(line).unwrap()
     };
-    let verify = |line: &ImportLedgerLine, row: ReadVoucher| {
+    let verify = |row: ReadVoucher| {
         verification::verify_batch(
-            line,
+            &amendment,
             &ImportReadSource::admit(vec![row]).unwrap(),
             verification::Attribution::Tag,
         )
         .unwrap()
     };
-    // Control: a build that is not an amendment holds no pins and reads as before.
-    let control = verify(&original, book_row(&original));
-    assert_eq!(control["counts"]["posted_verified"], 1, "{control}");
-    // An amendment built before the pins existed holds none: it fails closed,
-    // and the next step is to build it again.
-    let pre_pins = verify(&amendment, book_before.clone());
+    let mut baseline = amend::VerifiedBaseline::default();
+    // not imported: the book holds the voucher at ALTERID 40, below the mark
+    let not_imported = verify(book_row(&amendment));
     assert_eq!(
-        pre_pins["vouchers"][0]["status"], "matching_content_observed",
-        "{pre_pins}"
+        not_imported["counts"]["posted_verified"], 0,
+        "{not_imported}"
     );
-    assert_eq!(pre_pins["vouchers"][0]["reason"], "amendment_not_pinned");
-    assert!(pre_pins["vouchers"][0]["next_step"]
-        .as_str()
-        .unwrap()
-        .contains("build the amendment again with this release"));
-    assert_eq!(pre_pins["counts"]["posted_verified"], 0);
-    // The pin is what the build saw in the book: GUID, MasterID, ALTERID 40.
-    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
-    let admitted = lineage
-        .compare_and_swap(
-            &amendment.vouchers,
-            &book(vec![book_row(&original)]),
-            &verified_as_booked(&lineage),
-        )
-        .unwrap()
-        .expect("the book is as built");
-    amendment.amendment_pins = Some(admitted.into_iter().map(|a| a.pin).collect());
-    // Not imported yet: the ALTERID has not moved.
-    let not_yet = verify(&amendment, book_before.clone());
+    assert_eq!(not_imported["vouchers"][0]["status"], "not_attributable");
     assert_eq!(
-        not_yet["vouchers"][0]["status"], "matching_content_observed",
-        "{not_yet}"
+        not_imported["vouchers"][0]["reason"],
+        "tag_precedes_pre_import_voucher_mark"
     );
-    assert_eq!(not_yet["vouchers"][0]["reason"], "amendment_not_applied");
-    assert_eq!(not_yet["counts"]["posted_verified"], 0);
-    assert_eq!(not_yet["counts"]["matching_content_observed"], 1);
-    // Imported: same GUID and MasterID, ALTERID moved on.
-    let mut altered = book_before.clone();
-    altered.alter_id = Some(41);
-    let applied = verify(&amendment, altered);
-    assert_eq!(
-        applied["vouchers"][0]["status"], "posted_verified",
-        "{applied}"
-    );
-    assert_eq!(applied["counts"]["posted_verified"], 1);
-    // Another voucher with the same content and tag (the original deleted and
-    // a copy keyed): not the one that was amended.
-    let mut copy = book_before.clone();
-    copy.alter_id = Some(41);
-    copy.guid = Some(format!("{GUID}-00000009"));
-    copy.master_id = Some("9".into());
-    let other = verify(&amendment, copy);
-    assert_eq!(
-        other["vouchers"][0]["status"], "matching_content_observed",
-        "{other}"
-    );
-    assert_eq!(
-        other["vouchers"][0]["reason"],
-        "voucher_not_the_one_amended"
-    );
-    assert_eq!(other["counts"]["posted_verified"], 0);
-    // A restore removed the voucher and it was keyed again: it takes the removed
-    // one's GUID and MasterID (protocol reference 9.15) and the book's next
-    // ALTERID. At or below the pin it is not verified...
-    for (alter_id, reason) in [
-        (40, "amendment_not_applied"),
-        (39, "voucher_not_the_one_amended"),
-    ] {
-        let mut keyed_again = book_before.clone();
-        keyed_again.alter_id = Some(alter_id);
-        let read = verify(&amendment, keyed_again);
-        assert_eq!(read["vouchers"][0]["reason"], reason, "{read}");
-        assert_eq!(read["counts"]["posted_verified"], 0);
-    }
-    // ...but past the pin the identity cannot tell it from the amended voucher,
-    // and it reads verified (a stated limit).
-    let mut keyed_and_saved = book_before.clone();
-    keyed_and_saved.alter_id = Some(42);
-    let read = verify(&amendment, keyed_and_saved);
-    assert_eq!(read["counts"]["posted_verified"], 1, "{read}");
-    // A line that holds pins but none for this voucher fails closed: a build
-    // pins every voucher it admits.
-    let mut unpinned = amendment.clone();
-    unpinned.amendment_pins = Some(Vec::new());
-    let mut altered = book_before.clone();
-    altered.alter_id = Some(41);
-    let read = verify(&unpinned, altered);
-    assert_eq!(
-        read["vouchers"][0]["status"], "matching_content_observed",
-        "{read}"
-    );
-    assert_eq!(read["vouchers"][0]["reason"], "amendment_not_pinned");
-    assert_eq!(read["counts"]["posted_verified"], 0);
+    assert!(!amend::record_first_verified(&mut baseline, &not_imported));
+    // imported: the same voucher, its ALTERID moved past the mark
+    let mut altered = book_row(&amendment);
+    altered.alter_id = Some(51);
+    let imported = verify(altered);
+    assert_eq!(imported["counts"]["posted_verified"], 1, "{imported}");
+    assert!(amend::record_first_verified(&mut baseline, &imported));
+    assert_eq!(baseline.vouchers["txn-001"], 51);
 }

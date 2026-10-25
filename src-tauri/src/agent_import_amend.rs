@@ -27,85 +27,6 @@
 //! see `compare_and_swap`); one made before that verification is not.
 use super::*;
 
-/// A voucher's identity and alteration mark as a build observed it in the book
-/// (#685): its GUID, its MasterID and its ALTERID. An amendment is a same-REMOTEID
-/// upsert, which alters the voucher in place (same GUID and MasterID, ALTERID
-/// moved to the book's next mark: protocol reference 9.14), so a later read can
-/// tell whether it found the voucher the build observed and whether that voucher
-/// was altered since the build. An alteration is not proof that this amendment
-/// was applied: saving the voucher unchanged on Tally's own screen moves the
-/// ALTERID too, and so did a bill reference, a cost-centre allocation and a
-/// bank-reconciliation date (the screen-actions table of the measurements part).
-/// A build makes a pin only from a row of the book, by
-/// [`PinnedVoucherState::observed`]; a journal line is read back as written.
-/// Persisted with the build that observed it (`ImportLedgerLine`).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct PinnedVoucherState {
-    guid: String,
-    master_id: String,
-    alter_id: u64,
-}
-
-/// One voucher of an amendment, with the state of the book it was admitted against.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct AmendmentPin {
-    pub(super) bridge_txn_id: String,
-    pub(super) state: PinnedVoucherState,
-}
-
-/// What a later read of an amended voucher says against its pin.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum SincePin {
-    /// The same GUID and MasterID, with an ALTERID past the pin: altered since
-    /// the build, by this amendment's import or by anything else.
-    Altered,
-    /// The same GUID and MasterID with the ALTERID where the build saw it: not
-    /// altered since. Read as not applied; an upsert that changes nothing may
-    /// leave the ALTERID where it was (not measured), and that too fails closed.
-    Unaltered,
-    /// Another GUID or MasterID, an ALTERID before the pin, or one of them
-    /// missing: not the voucher the build observed.
-    NotTheSameVoucher,
-}
-
-impl PinnedVoucherState {
-    /// Only from a row of the book, and only when it carries all three values.
-    fn observed(row: &ReadVoucher) -> Option<Self> {
-        Some(Self {
-            guid: row.guid.clone().filter(|guid| !guid.is_empty())?,
-            master_id: row.master_id.clone().filter(|id| !id.is_empty())?,
-            alter_id: row.alter_id?,
-        })
-    }
-
-    /// Whether the voucher a read found is this one, and altered since the build.
-    pub(super) fn since_pin(
-        &self,
-        guid: Option<&str>,
-        master_id: Option<&str>,
-        alter_id: Option<u64>,
-    ) -> SincePin {
-        if guid != Some(self.guid.as_str()) || master_id != Some(self.master_id.as_str()) {
-            return SincePin::NotTheSameVoucher;
-        }
-        match alter_id {
-            Some(now) if now > self.alter_id => SincePin::Altered,
-            Some(now) if now == self.alter_id => SincePin::Unaltered,
-            _ => SincePin::NotTheSameVoucher,
-        }
-    }
-}
-
-/// An amended voucher admitted by the compare-and-swap: the evidence the build
-/// reports, and the pin it persists.
-#[derive(Debug)]
-pub(super) struct Admission {
-    pub(super) evidence: Value,
-    pub(super) pin: AmendmentPin,
-}
-
 /// Every build that shares one wire identity, in journal order.
 pub(super) struct Lineage {
     pub(super) identity_batch_id: String,
@@ -229,7 +150,7 @@ impl Lineage {
         vouchers: &[ImportVoucher],
         observed: &ImportReadSource,
         baselines: &VerifiedBaselines,
-    ) -> Result<Result<Vec<Admission>, Vec<Value>>, String> {
+    ) -> Result<Result<Vec<Value>, Vec<Value>>, String> {
         let mut admitted = Vec::new();
         let mut refused = Vec::new();
         for voucher in vouchers {
@@ -316,16 +237,6 @@ impl Lineage {
             };
             match matched {
                 Some(batch_id) => {
-                    // The identity and ALTERID the baseline test above compared are
-                    // what the amendment is later checked against (#685); a row
-                    // without a GUID or MasterID cannot be told from another.
-                    let Some(state) = PinnedVoucherState::observed(&row) else {
-                        refused.push(
-                            json!({"bridge_txn_id":txn_id,"reason":"voucher_identity_not_read",
-                            "guid":row.guid,"master_id":row.master_id,"alter_id":row.alter_id}),
-                        );
-                        continue;
-                    };
                     let mut entry = json!({"bridge_txn_id":txn_id,
                     "book_matches_batch_id":batch_id,"guid":row.guid,"master_id":row.master_id,
                     "alter_id":row.alter_id});
@@ -335,13 +246,7 @@ impl Lineage {
                     {
                         entry["not_observed"] = json!(["effective_date"]);
                     }
-                    admitted.push(Admission {
-                        evidence: entry,
-                        pin: AmendmentPin {
-                            bridge_txn_id: txn_id.to_string(),
-                            state,
-                        },
-                    });
+                    admitted.push(entry);
                 }
                 None => refused.push(
                     json!({"bridge_txn_id":txn_id,"reason":"book_voucher_diverged",

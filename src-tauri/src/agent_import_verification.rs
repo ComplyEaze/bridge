@@ -286,87 +286,6 @@ pub(super) fn observed_fingerprint(
     }
 }
 
-/// An amendment batch reads `posted_verified` only for a voucher that is the
-/// one its build observed and that was altered since the build (#685): the
-/// same GUID and MasterID, and an ALTERID past the one the build pinned (a
-/// same-REMOTEID upsert alters in place and moves the ALTERID: protocol
-/// reference 9.14). The tag and the content alone cannot say even that much: a
-/// file that changes only an uncompared field (a reference) leaves content
-/// equal to the book before anyone imports it. A voucher that fails the test is
-/// demoted to `matching_content_observed`, which no verdict counts as verified,
-/// with a plain next step; so is a voucher of an amendment build that holds no
-/// pin for it: a build pins every voucher it admits, and an amendment built by a
-/// release before the pins holds none at all, so it is never verified as an
-/// amendment and is built again instead. A build that is not an amendment holds
-/// no pins and is untouched.
-///
-/// What the test cannot tell (stated, not closed): an alteration other than
-/// this import (saving the voucher unchanged on Tally's screen, a
-/// bank-reconciliation date) moves the ALTERID as well, so a file that changes
-/// only uncompared fields reads verified once anything alters the voucher. And a
-/// voucher a restore removed that is keyed or imported again takes the removed
-/// one's GUID and MasterID (9.15, one run): its ALTERID is the book's next mark,
-/// which may already be past the pin, so after a restore the identity cannot
-/// tell it from the amended voucher. The rule also rests on a voucher keeping its
-/// GUID and MasterID through a content-changing upsert (9.14, partial); if it
-/// does not, a real amendment reads `voucher_not_the_one_amended` (fails closed).
-fn demote_unapplied_amendments(
-    rows: &mut [Value],
-    counts: &mut BTreeMap<&'static str, u64>,
-    line: &ImportLedgerLine,
-) {
-    let pins: &[amend::AmendmentPin] = match (&line.amendment_pins, &line.amends_batch_id) {
-        (Some(pins), _) => pins,
-        (None, Some(_)) => &[],
-        (None, None) => return,
-    };
-    for row in rows.iter_mut() {
-        if row["status"] != "posted_verified" {
-            continue;
-        }
-        let pin = pins
-            .iter()
-            .find(|pin| row["bridge_txn_id"].as_str() == Some(pin.bridge_txn_id.as_str()));
-        let (reason, next_step) = match pin.map(|pin| {
-            pin.state.since_pin(
-                row["guid"].as_str(),
-                row["master_id"].as_str(),
-                row["alter_id"].as_u64(),
-            )
-        }) {
-            Some(amend::SincePin::Altered) => continue,
-            Some(amend::SincePin::Unaltered) => {
-                ("amendment_not_applied", AMENDMENT_NOT_APPLIED_NEXT_STEP)
-            }
-            Some(amend::SincePin::NotTheSameVoucher) => (
-                "voucher_not_the_one_amended",
-                VOUCHER_NOT_THE_ONE_AMENDED_NEXT_STEP,
-            ),
-            None => ("amendment_not_pinned", AMENDMENT_NOT_PINNED_NEXT_STEP),
-        };
-        row["status"] = json!("matching_content_observed");
-        row["attribution"] = json!("not_established");
-        row["reason"] = json!(reason);
-        row["next_step"] = json!(next_step);
-        for (key, delta) in [
-            ("posted_verified", false),
-            ("matching_content_observed", true),
-        ] {
-            if let Some(count) = counts.get_mut(key) {
-                *count = if delta {
-                    *count + 1
-                } else {
-                    count.saturating_sub(1)
-                };
-            }
-        }
-    }
-}
-
-const AMENDMENT_NOT_APPLIED_NEXT_STEP: &str = "This voucher has not been altered since ComplyEaze Bridge built the amendment, so the amendment has not been applied: import the amendment file, then verify again. If it was imported, check the voucher in Tally before anything else.";
-const VOUCHER_NOT_THE_ONE_AMENDED_NEXT_STEP: &str = "The voucher that carries this batch's marker is not the one ComplyEaze Bridge observed when it built the amendment: another GUID or MasterID, or an older ALTERID. Check in Tally which voucher holds this transaction before importing or building anything for it.";
-const AMENDMENT_NOT_PINNED_NEXT_STEP: &str = "This amendment build holds no record of the voucher as ComplyEaze Bridge observed it, most often because an earlier release built it, so it cannot be verified as an amendment. Do not import its file: build the amendment again with this release and import that file. If the old file was already imported, check the voucher in Tally.";
-
 /// How a batch's vouchers can be attributed to rows of the book.
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Attribution<'a> {
@@ -758,7 +677,6 @@ pub(super) fn verify_batch_as(
                 json!({"count":others.len(),"entries":entries,"attribution":"not_established"});
         }
     }
-    demote_unapplied_amendments(&mut rows, &mut counts, line);
     let (batch_duplicates, unrelated_duplicates_in_window) = batch_duplicate_sets(
         observed,
         &observed_identities,

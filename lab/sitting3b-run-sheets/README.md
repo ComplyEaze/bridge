@@ -2,6 +2,12 @@
 
 Not for merge. Written to LAB-COMMON v3 (C1 to C11 apply in full). The row names its company exactly, creates it NEW (STOP if the name or data folder exists), takes a backup into a new empty folder before the first change, marks every screen action as an OWNER STEP, and ends with a restore on the run coordinator's explicit word. Every read is sent by the built tool, one at a time, so no hand-written request is sent and the request-ID preflight does not apply to it. Record the TallyPrime version, the licence mode and the date at the top of the row. The build is not named: the run coordinator fills the marks at the cut. RC COMMIT: ______  EXE SHA256: ______
 
+## Build (named 26 Oct 2026, for a run before the release-candidate cut)
+
+The build already staged at the lab as `w1-2306d86d`: the Windows bundle of master `2306d86dfd4c86a3c5f6c19ea9ddff6818c460fb`, Bridge CI run `40077056130` (event `schedule`, conclusion `success`), artifact `12553782422` `unsigned-bundle-smoke-windows-latest` (60,880,528 bytes, zip digest `sha256:74ae2daa851397b71cb59e80373d9478a2da72c74398108e33e34ea83e56eb1e`). Its `bridge_mcp.exe` as the lab recorded it on staging: sha256 `92a899a21f904f88cb2d13ce44b1417d5aecaf333caad5230de598bf54d89524`. Before the first call hash the exe that will run and compare it with that line; any other hash is a STOP. These rows capture what Tally does; they test no change of the candidate, so a run on this build stands as their capture, and the cut decides whether any row is repeated on the candidate.
+
+Run it as the lab runs a staged exe over stdio, with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, a NEW empty `BRIDGE_AGENT_DATA_DIR` for each row (kept for the whole row), `BRIDGE_TERMS_ACCEPTED=true` (the person responsible for the lab accepting the Terms of Use), `BRIDGE_AGENT_REDACTION` unset and `BRIDGE_AGENT_ENABLE_WRITES` unset (posting OFF). A row that calls `build_import_xml` also sets `BRIDGE_AGENT_ENABLE_IMPORT=true` (the tool refuses without it); nothing is posted by the tool.
+
 ## Written
 | Sheet | Company (new) | Issue | What is keyed |
 |---|---|---|---|

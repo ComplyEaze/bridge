@@ -20,7 +20,8 @@ The owner is at the PC for the whole sitting and approves every native window.
 
 ## Phase B goes through the build's own tools
 Phase B sends no request file. Every read in it is a call to a ComplyEaze Bridge tool, from the named build the lab's standing
-config points at (record its path and sha256 at B0), with `audit_test_run` enabled and no redaction setting on. A tool call is the
+config points at (record its path and sha256 at B0), run as the stdio exe with `BRIDGE_AGENT_ENABLE_TAX_AUDIT=true` (as LR5 ran) and
+no redaction setting on. A tool call is the
 one dispatch path to Tally; nothing in this item is sent by curl. A tool reads one request at a time on its own.
 
 ## WHY
@@ -122,7 +123,10 @@ STOP:
 - if Tally shows a negative cash warning: report it, and continue only on the run coordinator's word.
 
 ## Phase B: the read (READ-ONLY, tool calls only)
-B0. Run C2 step 0. Record the build: its path, its sha256, and that `audit_test_run` is listed by the tools list.
+B0. Run C2 step 0 WITHOUT its MARKS request: this item has no MARKS request file for THE COMPANY and makes none (a request file
+    for another book, edited, is not admitted). The marks come from a tool instead: `trial_balance` for `2025-04-01` to
+    `2026-03-31` (offset 0, a fresh read); record its `snapshot.master_alter_id` and `snapshot.voucher_alter_id`. Record the build:
+    its path, its sha256, and that `audit_test_run` is listed by the tools list.
 
 B1. `list_companies`. EXPECT one open company, `BRIDGE SFT LAB`, with the GUID A2 recorded. Anything else: STOP.
 
@@ -139,7 +143,8 @@ B3. `read_evidence` with `limit` 40. Keep the result as a file. It lists each re
 B4. `vouchers` for `2025-04-01` to `2026-03-31` (every page). Keep each page as a file. EXPECT 34 vouchers: 11 for S1-S6 and 23
     for S7-S18, and the types and dates A5 recorded.
 
-B5. Run C2 step 0 again. The MARKS answer equals B0's (nothing was written in Phase B). Then C10.
+B5. Run C2 step 0 again, WITHOUT its MARKS request, and the same `trial_balance` call (offset 0). Its two snapshot marks equal
+    B0's, and B4's snapshot marks equal them too (nothing was written in Phase B). Then C10.
 
 What Phase B does not give: Tally's raw answers. The tools keep none (B3 holds fingerprints and sizes only), so no committed
 fixture comes from this item. What it gives: the live read of this book admitted end to end, the cash_44ab figures of a book of

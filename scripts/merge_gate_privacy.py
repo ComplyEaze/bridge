@@ -37,18 +37,20 @@ CREDENTIAL_CONTEXT_RE = re.compile(
     r"(?:credential|session|token|bearer)(?:[_-]|(?=[A-Z])))",
     re.I,
 )
-EMAIL_RE = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+)(?![A-Za-z0-9._%+-])")
+# The domain may end before a full stop that no domain character follows, as at the end of a sentence (`… .test.`,
+# `… .test.)`, `… .test..`); a full stop followed by a domain character continues the domain.
+EMAIL_RE = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+)(?!\.?[A-Za-z0-9_%+-])")
 EXAMPLE_EMAIL_DOMAINS = {"example.com", "example.org", "example.net", "example.invalid"}
 # A package specifier, such as a pnpm lockfile's name, an at sign and `1.2.3` (or `5.0.0-beta.1`), has the address
 # shape. It is not counted when its domain is a full semantic version whose last label is neither all letters nor an
 # internationalised `xn--` form: a top-level domain is always one of those two, so such a domain is never deliverable.
 # A prerelease ending in letters (`1.2.3-rc.mail.com`) is a real hostname and still counts, as do four numeric labels
-# and a leading zero. A specifier followed by an at sign, at once or after local-part characters a domain cannot hold,
+# and a leading zero. A specifier followed by an at sign, at once or after any local-part characters (full stops too),
 # still counts: its greedy domain may have taken the local part of an address written against it, which the scan
 # would otherwise never see.
-# What may follow a specifier's domain and still finish an address whose local part the domain took: local-part
-# characters a domain cannot hold, then the at sign.
-ADDRESS_TAIL_RE = re.compile(r"[!#$&'*/=?^`{|}~]*@")
+# What may follow a specifier's domain and still finish an address whose local part the domain took, or that is
+# written against it after full stops: any local-part characters, then the at sign.
+ADDRESS_TAIL_RE = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]*@")
 SEMVER_DOMAIN_RE = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?")
 # This is a single known public automated-contributor identity, not an
 # email-domain allowlist. It is eligible only in the exact Git attribution

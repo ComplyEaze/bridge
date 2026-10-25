@@ -1425,6 +1425,30 @@ class PrivacyScannerFindingsPR335(unittest.TestCase):
     def test_finding7_negative_example_domain_not_blocked(self):
         self.assert_not_blocked("Reviewer contact: dev@example.com")
 
+    # The address shape ends before a full stop that closes a sentence or a list. Each value is built from AT.
+    def test_an_address_followed_by_closing_punctuation_counts(self):
+        AT = "@"
+        for line in ("Write to jane.doe" + AT + "customerdomain.test.",
+                     "Write to jane.doe" + AT + "customerdomain.test.)",
+                     "Write to jane.doe" + AT + "customerdomain.test..",
+                     "Write to jane.doe" + AT + "customerdomain.test...",
+                     "Write to jane.doe" + AT + "customerdomain.test.\nNext line",
+                     # an address written against a package specifier after full stops
+                     "Bumped vite" + AT + "8.3.3...jane.doe" + AT + "customerdomain.test",
+                     "  pkg" + AT + "1.2.3..jane" + AT + "customerdomain.test",
+                     "  pkg" + AT + "1.2.3-jane..doe" + AT + "customerdomain.test",
+                     "  pkg" + AT + "1.2.3." + AT + "customerdomain.test",
+                     "  pkg" + AT + "1.2.3.!" + AT + "customerdomain.test"):
+            with self.subTest(line=line):
+                self.assertEqual(self.privacy.customer_email_count(line), 1)
+                self.assert_blocked(line, "customer email shape")
+
+    def test_a_package_specifier_or_an_example_address_before_a_full_stop_still_does_not_count(self):
+        AT = "@"
+        for line in ("Bumped vite" + AT + "8.3.3.", "Reviewer contact: dev" + AT + "example.com."):
+            with self.subTest(line=line):
+                self.assertEqual(self.privacy.customer_email_count(line), 0)
+
     # A package specifier (pnpm lockfile) has the address shape; a domain that is a full semantic version is not an
     # address. Each value is built from AT so that this file's own lines do not carry the shape.
     def test_package_specifiers_with_a_semver_domain_are_not_emails(self):

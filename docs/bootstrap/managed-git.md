@@ -36,11 +36,13 @@ personal information.
   `GitGuardian Security Checks`. The `Required checks` aggregate gate
   transitively covers `Native checks (*)`
   and `Bundle smoke (*)` (on a master
-  push, for a commit the merge queue already ran those jobs on, through that
-  queue run: `scripts/master-push-reuse.mjs`; a pull request runs the bundle and
-  seam jobs on Windows only, and the queue and a push run both systems; a draft
-  pull request runs no native, bundle or seam job, and marking it ready starts
-  a run that does); require the
+  push, for a commit the merge queue already ran the Windows jobs on, through
+  that queue run: `scripts/master-push-reuse.mjs`; a pull request and the queue
+  run the native tests on Windows only, and a master push, the nightly run and
+  a manual run add macOS; a pull request runs the bundle and seam jobs on Windows only, and
+  the queue and a push add macOS only when a packaging path changes, named in
+  the scope job; a draft pull request runs no native, bundle or seam job, and
+  marking it ready starts a run that does); require the
   gate rather than those individual matrix contexts, because they are
   path-filtered and report `skipped` on docs-only changes — requiring them
   directly makes documentation pull requests permanently unmergeable. The gate

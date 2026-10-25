@@ -43,7 +43,9 @@ jobs:
       actions: read
     outputs:
       bundle: ${{ steps.scope.outputs.bundle }}
+      bundle_os: ${{ steps.scope.outputs.bundle_os }}
       native: ${{ steps.scope.outputs.native }}
+      native_os: ${{ steps.scope.outputs.native_os }}
       tax_audit: ${{ steps.scope.outputs.tax_audit }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -62,7 +64,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          # The unscoped run: every heavy job runs, whatever changed.
+          # native_os and bundle_os are the systems the native, bundle-smoke and seam-control matrices run on. The macOS
+          # native tests run on a push to master and on a scheduled or manual run, never on a pull request or in the merge
+          # queue. The macOS bundle and seam jobs run on a scheduled or manual run, and in the queue or on a push only when
+          # a packaging path below changed. A pull request runs the bundle and seam jobs on Windows only.
+          windows='["windows-latest"]'
+          both='["windows-latest", "macos-latest"]'
+          # Packaging paths: src-tauri/tauri.conf.json, src-tauri/icons/, src-tauri/build.rs (it copies the bundled legal
+          # files), LICENSE, NOTICE, THIRD_PARTY_LICENSES.txt, THIRD_PARTY_LICENSES_RUST.txt, packaging/ (the MCPB manifest
+          # and the PDFium lock), package.json (the Tauri CLI and its build script), this workflow, and the scripts the
+          # bundle job runs: fetch-pdfium, capture-package-log, check-mcpb-bundle, package-mcpb, check-license-metadata,
+          # check-dependency-inventory, check-macos-bundle-resources and check-no-test-seam, with their tests.
+          packaging_paths='^(\.github/workflows/ci\.yml$|packaging/|package\.json$|src-tauri/(tauri\.conf\.json$|icons/|build\.rs$)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$)'
+
+          # The unscoped run: every heavy job runs, whatever changed. Its caller writes the systems first.
           full_run() {
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
             echo 'native=true' >> "$GITHUB_OUTPUT"
@@ -71,29 +86,45 @@ jobs:
           }
 
           if [[ "$EVENT_NAME" == "workflow_dispatch" || "$EVENT_NAME" == "schedule" ]]; then
+            { echo "native_os=$both"; echo "bundle_os=$both"; } >> "$GITHUB_OUTPUT"
             full_run
           fi
 
-          # A push to master runs a family of heavy jobs unless the merge queue already RAN that family
-          # on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped
+          # A push to master runs a family of heavy jobs on Windows unless the merge queue already RAN that
+          # family on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped
           # the family by scope is no evidence, so it is run here as it always was. Any error or doubt
           # in the lookup runs both: a non-zero exit discards whatever was printed (its status goes to the job
           # summary), and only an exact
           # `reuse_<family>=true` line among the first two skips anything. tax_audit is cheap and always runs on a push.
-          # To turn the reuse off, delete this block: every push is then a full run again.
+          # The queue never runs the macOS native tests, so a push always does. It runs the macOS bundle and seam jobs
+          # when it changes a packaging path, or when its before commit cannot be compared.
+          # To turn the reuse off, delete the reuse lookup: every push then runs the Windows jobs again.
           if [[ "$EVENT_NAME" == "push" ]]; then
             lookup_status=0
             decision="$(node scripts/master-push-reuse.mjs)" || lookup_status=$?
             if [[ "$lookup_status" -ne 0 ]]; then decision=''; fi
             printf '%s\n' "$decision"
             { echo '### Master push reuse'; echo '```'; printf '%s\n' "$decision"; echo '```'; echo "Lookup exit status: $lookup_status"; } >> "$GITHUB_STEP_SUMMARY"
-            for family in native bundle; do
-              if printf '%s\n' "$decision" | head -n 2 | grep -qx "reuse_${family}=true"; then
-                echo "${family}=false" >> "$GITHUB_OUTPUT"
-              else
-                echo "${family}=true" >> "$GITHUB_OUTPUT"
-              fi
-            done
+            reused() { printf '%s\n' "$decision" | head -n 2 | grep -qx "reuse_$1=true"; }
+            packaging=true
+            if [[ -n "$BEFORE_SHA" && ! "$BEFORE_SHA" =~ ^0+$ ]] && pushed_files="$(git diff --name-only --no-renames -z "$BEFORE_SHA" "$GITHUB_SHA" | tr '\0' '\n')" && ! grep -Eq "$packaging_paths" <<< "$pushed_files"; then
+              packaging=false
+            fi
+            echo 'native=true' >> "$GITHUB_OUTPUT"
+            if reused native; then
+              echo 'native_os=["macos-latest"]' >> "$GITHUB_OUTPUT"
+            else
+              echo "native_os=$both" >> "$GITHUB_OUTPUT"
+            fi
+            if reused bundle && [[ "$packaging" == true ]]; then
+              { echo 'bundle=true'; echo 'bundle_os=["macos-latest"]'; } >> "$GITHUB_OUTPUT"
+            elif reused bundle; then
+              { echo 'bundle=false'; echo "bundle_os=$windows"; } >> "$GITHUB_OUTPUT"
+            elif [[ "$packaging" == true ]]; then
+              { echo 'bundle=true'; echo "bundle_os=$both"; } >> "$GITHUB_OUTPUT"
+            else
+              { echo 'bundle=true'; echo "bundle_os=$windows"; } >> "$GITHUB_OUTPUT"
+            fi
             echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -111,8 +142,10 @@ jobs:
           draft=false
           if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then draft=true; fi
 
+          echo "native_os=$windows" >> "$GITHUB_OUTPUT"
           # A missing base has no useful predecessor. Keep the conservative path.
           if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            if [[ "$EVENT_NAME" == "merge_group" ]]; then echo "bundle_os=$both" >> "$GITHUB_OUTPUT"; else echo "bundle_os=$windows" >> "$GITHUB_OUTPUT"; fi
             full_run
           fi
 
@@ -136,6 +169,12 @@ jobs:
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
           else
             echo 'bundle=false' >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ "$EVENT_NAME" == "merge_group" ]] && grep -Eq "$packaging_paths" <<< "$changed_files"; then
+            echo "bundle_os=$both" >> "$GITHUB_OUTPUT"
+          else
+            echo "bundle_os=$windows" >> "$GITHUB_OUTPUT"
           fi
 
   frontend:
@@ -345,9 +384,11 @@ jobs:
   native:
     name: Native checks (${{ matrix.os }}, shard ${{ matrix.shard }} of 2)
     needs: changes
-    # Rust/Tauri changes always receive Windows and macOS coverage on PRs. The
-    # check is deliberately skipped only for frontend- and documentation-only PRs, and on a master
-    # push whose commit the merge queue already ran this job on (scripts/master-push-reuse.mjs).
+    # Rust/Tauri changes always receive Windows coverage on PRs and in the merge queue; macOS runs these
+    # tests on a push to master and on a scheduled or manual run (the scope job's native_os). The check is
+    # deliberately skipped for frontend- and documentation-only PRs and for a draft PR, and a master push
+    # runs it on macOS alone when the merge queue already ran it on Windows for that commit
+    # (scripts/master-push-reuse.mjs).
     if: needs.changes.outputs.native == 'true'
     runs-on: ${{ matrix.os }}
     # CI does not debug native test executables. Keep local line tables and
@@ -364,7 +405,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: ${{ fromJSON(needs.changes.outputs.native_os) }}
         # The workspace tests are split in two halves by nextest's own partitioning (the test step below), each half on
         # its own runner. Each shard compiles the whole workspace for itself and the two share one Rust cache key, which
         # shard 1 alone saves (so a freshly saved cache holds no clippy-only dependency builds, and shard 2 may check those
@@ -545,10 +586,10 @@ jobs:
     needs: changes
     # Bundle output is validated for packaging-relevant pull requests and for every
     # manual or scheduled run, and on a master push unless the merge queue already ran it
-    # on that commit. Rust/Tauri PRs retain the native platform matrix above. A pull request
-    # runs Windows only: the macOS bundle and seam jobs run in the merge queue and on a master
-    # push, so a macOS-only packaging failure is found at the queue (it ejects that entry)
-    # rather than costing every pull request about 12 macOS runner minutes.
+    # on that commit. A pull request runs Windows only. The macOS bundle and seam jobs run
+    # in the merge queue and on a master push only when a packaging path changed (the
+    # scope job's packaging_paths and bundle_os), so a macOS-only packaging failure is
+    # found at the queue (it ejects that entry) and the nightly run covers everything else.
     if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
@@ -557,7 +598,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["windows-latest", "macos-latest"]') }}
+        os: ${{ fromJSON(needs.changes.outputs.bundle_os) }}
     env:
       SCCACHE_DIR: ${{ github.workspace }}/.cache/bridge-package-sccache
       SCCACHE_CACHE_SIZE: 64M
@@ -766,7 +807,7 @@ jobs:
     # rather than after it: it builds the bridge lib unit-test executable in
     # release and requires the marker there, so a clean scan of the shipped
     # executables means the scan could have seen the seam. Same scope and
-    # platforms as bundle-smoke, whose runs it guards (on a pull request, Windows only).
+    # platforms as bundle-smoke, whose runs it guards (the scope job's bundle_os).
     if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -775,7 +816,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["windows-latest", "macos-latest"]') }}
+        os: ${{ fromJSON(needs.changes.outputs.bundle_os) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

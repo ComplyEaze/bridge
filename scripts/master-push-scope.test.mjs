@@ -10,6 +10,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { FAMILIES } from "./master-push-reuse.mjs";
 
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8").split("\n");
 function scopeScript() {
@@ -32,7 +33,7 @@ const stand = {
   silent: ["", 0],
 };
 
-function runScope(event, { script = "silent", changed = [], draft = "" } = {}) {
+function runScope(event, { script = "silent", changed = [], draft = "", env = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "scope-step-"));
   try {
     const sh = (command) => {
@@ -63,11 +64,13 @@ function runScope(event, { script = "silent", changed = [], draft = "" } = {}) {
       env: {
         PATH: `${join(dir, "bin")}:${process.env.PATH}`, HOME: dir,
         GITHUB_OUTPUT: outputFile, GITHUB_STEP_SUMMARY: summaryFile, STUB_ARGS: join(dir, "args"), GITHUB_SHA: head, GH_TOKEN: "synthetic",
-        EVENT_NAME: event, BEFORE_SHA: base, PR_BASE_SHA: base, PR_DRAFT: draft, MERGE_GROUP_BASE_SHA: base,
+        EVENT_NAME: event, BEFORE_SHA: base, PR_BASE_SHA: base, PR_DRAFT: draft, MERGE_GROUP_BASE_SHA: base, ...env,
       },
     });
     assert.equal(result.status, 0, result.stderr);
-    const outputs = Object.fromEntries(readFileSync(outputFile, "utf8").trim().split("\n").map((line) => line.split("=")));
+    const lines = readFileSync(outputFile, "utf8").trim().split("\n").map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]);
+    assert.equal(new Set(lines.map(([key]) => key)).size, lines.length, "every output is written once");
+    const outputs = Object.fromEntries(lines);
     const args = existsSync(join(dir, "args")) ? readFileSync(join(dir, "args"), "utf8") : null;
     return { outputs, summary: readFileSync(summaryFile, "utf8"), args };
   } finally {
@@ -76,17 +79,63 @@ function runScope(event, { script = "silent", changed = [], draft = "" } = {}) {
 }
 const heavy = (outputs) => ({ native: outputs.native, bundle: outputs.bundle, tax_audit: outputs.tax_audit });
 const ALL = { native: "true", bundle: "true", tax_audit: "true" };
+// The systems each matrix runs on, for the jobs the scope selected (an unselected job's list is never read).
+const systems = (outputs) => ({
+  native: outputs.native === "true" ? JSON.parse(outputs.native_os) : null,
+  bundle: outputs.bundle === "true" ? JSON.parse(outputs.bundle_os) : null,
+});
+const WIN = ["windows-latest"];
+const MAC = ["macos-latest"];
+const BOTH = ["windows-latest", "macos-latest"];
 
-test("a push skips a family only on an exact reuse line from a script that exited zero", () => {
-  assert.deepEqual(heavy(runScope("push", { script: "both" }).outputs), { native: "false", bundle: "false", tax_audit: "true" });
-  assert.deepEqual(heavy(runScope("push", { script: "nativeOnly" }).outputs), { native: "false", bundle: "true", tax_audit: "true" });
-  assert.deepEqual(heavy(runScope("push", { script: "bundleOnly" }).outputs), { native: "true", bundle: "false", tax_audit: "true" });
+test("a push skips a family's Windows jobs only on an exact reuse line from a script that exited zero, and always runs the macOS native tests", () => {
+  assert.deepEqual(systems(runScope("push", { script: "both" }).outputs), { native: MAC, bundle: null });
+  assert.deepEqual(systems(runScope("push", { script: "nativeOnly" }).outputs), { native: MAC, bundle: WIN });
+  assert.deepEqual(systems(runScope("push", { script: "bundleOnly" }).outputs), { native: BOTH, bundle: null });
+  for (const script of ["both", "nativeOnly", "bundleOnly"]) assert.equal(runScope("push", { script }).outputs.tax_audit, "true", script);
 });
 
-test("a push runs everything when the script says no, says nothing, crashes, or prints look-alikes", () => {
+test("a push runs everything on Windows when the script says no, says nothing, crashes, or prints look-alikes", () => {
   for (const script of ["neither", "silent", "crashedAfterTrue", "lookalikes", "injectedAfterTheDecision"]) {
-    assert.deepEqual(heavy(runScope("push", { script }).outputs), ALL, script);
+    const { outputs } = runScope("push", { script });
+    assert.deepEqual(heavy(outputs), ALL, script);
+    assert.deepEqual(systems(outputs), { native: BOTH, bundle: WIN }, script);
   }
+});
+
+test("a push runs the macOS bundle and seam jobs when it changes a packaging path, or when its before commit cannot be compared", () => {
+  for (const changed of [["src-tauri/tauri.conf.json"], ["packaging/mcpb/manifest.json"], ["LICENSE"], ["src-tauri/icons/icon.png"], [".github/workflows/ci.yml"]]) {
+    assert.deepEqual(systems(runScope("push", { script: "both", changed }).outputs), { native: MAC, bundle: MAC }, changed[0]);
+    assert.deepEqual(systems(runScope("push", { script: "neither", changed }).outputs), { native: BOTH, bundle: BOTH }, changed[0]);
+  }
+  for (const changed of [["src-tauri/src/x.rs"], ["src/App.tsx"], ["docs/a.md"], ["src-tauri/Cargo.lock"], ["scripts/check-windows-bundle-resources.ps1"]]) {
+    assert.deepEqual(systems(runScope("push", { script: "neither", changed }).outputs), { native: BOTH, bundle: WIN }, changed[0]);
+  }
+  for (const BEFORE_SHA of ["", "0".repeat(40), "f".repeat(40)]) {
+    assert.deepEqual(systems(runScope("push", { script: "both", env: { BEFORE_SHA } }).outputs), { native: MAC, bundle: MAC }, `before ${BEFORE_SHA}`);
+  }
+});
+
+test("a pull request and the merge queue run the native tests on Windows only; the queue adds the macOS bundle and seam jobs for a packaging change", () => {
+  const nativeAndBundle = ["src-tauri/src/x.rs"];
+  const packaging = ["src-tauri/src/x.rs", "src-tauri/tauri.conf.json"];
+  assert.deepEqual(systems(runScope("pull_request", { changed: nativeAndBundle }).outputs), { native: WIN, bundle: WIN });
+  assert.deepEqual(systems(runScope("pull_request", { changed: packaging }).outputs), { native: WIN, bundle: WIN });
+  assert.deepEqual(systems(runScope("merge_group", { changed: nativeAndBundle }).outputs), { native: WIN, bundle: WIN });
+  assert.deepEqual(systems(runScope("merge_group", { changed: packaging }).outputs), { native: WIN, bundle: BOTH });
+  // A missing base runs every job, still without macOS native tests; the queue then assumes a packaging change.
+  assert.deepEqual(systems(runScope("pull_request", { env: { PR_BASE_SHA: "" } }).outputs), { native: WIN, bundle: WIN });
+  assert.deepEqual(systems(runScope("merge_group", { env: { MERGE_GROUP_BASE_SHA: "0".repeat(40) } }).outputs), { native: WIN, bundle: BOTH });
+  for (const event of ["schedule", "workflow_dispatch"]) {
+    assert.deepEqual(systems(runScope(event).outputs), { native: BOTH, bundle: BOTH }, event);
+  }
+});
+
+test("a queue run that selects a family runs exactly the systems the reuse lookup judges", () => {
+  const judged = (names) => [...new Set(names.map((name) => /\((windows-latest|macos-latest)[,)]/.exec(name)[1]))];
+  const queue = systems(runScope("merge_group", { changed: ["src-tauri/src/x.rs"] }).outputs);
+  assert.deepEqual(queue.native, judged(FAMILIES.native));
+  assert.deepEqual(queue.bundle, judged(FAMILIES.bundle));
 });
 
 test("a push records the decision in the step summary, in a fenced block, and runs the lookup script", () => {

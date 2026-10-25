@@ -15,7 +15,8 @@ Captured, not authored. The two request files are the exact bytes sent (with a b
 mark); `tests/ledger_name_index.rs` checks that they equal what ComplyEaze Bridge renders for
 this company (the V3 ledger catalogue and the group snapshot). The four answers are the exact
 bodies Tally returned (UTF-16LE without a byte-order mark), with no edit: they carry Tally's own
-`&#4;` references and no GSTIN.
+`&#4;` references (one in each ledger-index answer, 30 in the group answer), the group answer also
+88 raw U+0003 characters that Tally writes unescaped, and no GSTIN.
 
 ## What was read
 

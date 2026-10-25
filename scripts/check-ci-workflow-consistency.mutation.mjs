@@ -321,3 +321,15 @@ test("native shards: the Windows prerequisites cache saved by both shards (the s
 test("native shards: both shards uploading one artifact name (a name without the shard) is refused", () => {
   refused(withChange(CI_FILE, (text) => text.replace("          name: native-crash-binaries-macos-shard-${{ matrix.shard }}", "          name: native-crash-binaries-macos")), "native: the pinned shard line must appear exactly once: name: native-crash-binaries-macos-shard-${{ matrix.shard }}");
 });
+
+// The scope job names the operating systems of the native tests (Windows on a pull request and in the queue, macOS added on a
+// push, the nightly and a manual run). A matrix with a fixed list would drop macOS from those runs and every check would pass.
+for (const [name, replacement] of [
+  ["a fixed Windows-only list", "os: [windows-latest]"],
+  ["the bundle job's system list", "os: ${{ fromJSON(needs.changes.outputs.bundle_os) }}"],
+]) {
+  test(`native systems: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/ci.yml", (text) => text.replace("        os: ${{ fromJSON(needs.changes.outputs.native_os) }}", `        ${replacement}`)),
+      "native must run on the systems the scope job's native_os names");
+  });
+}

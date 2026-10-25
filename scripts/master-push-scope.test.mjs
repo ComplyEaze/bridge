@@ -54,6 +54,9 @@ function runScope(event, { script = "silent", changed = [], draft = "", env = {}
     const [printed, exitCode] = stand[script];
     writeFileSync(join(dir, "bin", "node"), `#!/bin/bash\nprintf '%s' "$1" > "$STUB_ARGS"\ncat <<'EOF'\n${printed}EOF\nexit ${exitCode}\n`);
     chmodSync(join(dir, "bin", "node"), 0o755);
+    // A stand-in `gh api repos/<repo>/pulls/<n> --jq .draft`: prints the live draft state, or fails.
+    writeFileSync(join(dir, "bin", "gh"), `#!/bin/bash\nprintf '%s' "$*" > "$STUB_GH_ARGS"\n[ "$STUB_GH_EXIT" = 0 ] || exit "$STUB_GH_EXIT"\nprintf '%s\\n' "$STUB_LIVE_DRAFT"\n`);
+    chmodSync(join(dir, "bin", "gh"), 0o755);
     writeFileSync(join(dir, "scope.sh"), scopeScript());
     const outputFile = join(dir, "out");
     const summaryFile = join(dir, "summary");
@@ -64,6 +67,7 @@ function runScope(event, { script = "silent", changed = [], draft = "", env = {}
       env: {
         PATH: `${join(dir, "bin")}:${process.env.PATH}`, HOME: dir,
         GITHUB_OUTPUT: outputFile, GITHUB_STEP_SUMMARY: summaryFile, STUB_ARGS: join(dir, "args"), GITHUB_SHA: head, GH_TOKEN: "synthetic",
+        GITHUB_REPOSITORY: "o/r", PR_NUMBER: "7", STUB_GH_ARGS: join(dir, "gh-args"), STUB_GH_EXIT: "0", STUB_LIVE_DRAFT: "true",
         EVENT_NAME: event, BEFORE_SHA: base, PR_BASE_SHA: base, PR_DRAFT: draft, MERGE_GROUP_BASE_SHA: base, ...env,
       },
     });
@@ -72,7 +76,8 @@ function runScope(event, { script = "silent", changed = [], draft = "", env = {}
     assert.equal(new Set(lines.map(([key]) => key)).size, lines.length, "every output is written once");
     const outputs = Object.fromEntries(lines);
     const args = existsSync(join(dir, "args")) ? readFileSync(join(dir, "args"), "utf8") : null;
-    return { outputs, summary: readFileSync(summaryFile, "utf8"), args };
+    const ghArgs = existsSync(join(dir, "gh-args")) ? readFileSync(join(dir, "gh-args"), "utf8") : null;
+    return { outputs, summary: readFileSync(summaryFile, "utf8"), args, ghArgs };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -104,11 +109,11 @@ test("a push runs everything on Windows when the script says no, says nothing, c
 });
 
 test("a push runs the macOS bundle and seam jobs when it changes a packaging path, or when its before commit cannot be compared", () => {
-  for (const changed of [["src-tauri/tauri.conf.json"], ["packaging/mcpb/manifest.json"], ["LICENSE"], ["src-tauri/icons/icon.png"], [".github/workflows/ci.yml"]]) {
+  for (const changed of [["src-tauri/tauri.conf.json"], ["packaging/mcpb/manifest.json"], ["LICENSE"], ["src-tauri/icons/icon.png"], [".github/workflows/ci.yml"], ["pnpm-lock.yaml"], [".node-version"], ["rust-toolchain.toml"], ["src-tauri/Cargo.lock"], ["src-tauri/Cargo.toml"], ["src-tauri/.cargo/config.toml"], [".cargo/config.toml"]]) {
     assert.deepEqual(systems(runScope("push", { script: "both", changed }).outputs), { native: MAC, bundle: MAC }, changed[0]);
     assert.deepEqual(systems(runScope("push", { script: "neither", changed }).outputs), { native: BOTH, bundle: BOTH }, changed[0]);
   }
-  for (const changed of [["src-tauri/src/x.rs"], ["src/App.tsx"], ["docs/a.md"], ["src-tauri/Cargo.lock"], ["scripts/check-windows-bundle-resources.ps1"]]) {
+  for (const changed of [["src-tauri/src/x.rs"], ["src/App.tsx"], ["docs/a.md"], ["src-tauri/crates/bridge-core/Cargo.toml"], ["scripts/check-windows-bundle-resources.ps1"]]) {
     assert.deepEqual(systems(runScope("push", { script: "neither", changed }).outputs), { native: BOTH, bundle: WIN }, changed[0]);
   }
   for (const BEFORE_SHA of ["", "0".repeat(40), "f".repeat(40)]) {
@@ -150,9 +155,9 @@ test("a crashed lookup is recorded in the summary with its exit status, and prin
   assert.deepEqual(heavy(outputs), ALL);
 });
 
-test("the token reaches the scope step only on a push", () => {
+test("the token reaches the scope step only on a push and a pull request", () => {
   const step = workflow.join("\n");
-  assert.match(step, /^ {10}GH_TOKEN: \$\{\{ github\.event_name == 'push' && github\.token \|\| '' \}\}$/m);
+  assert.match(step, /^ {10}GH_TOKEN: \$\{\{ \(github\.event_name == 'push' \|\| github\.event_name == 'pull_request'\) && github\.token \|\| '' \}\}$/m);
 });
 
 test("a scheduled or manual run is a full run and never asks the script", () => {
@@ -198,6 +203,22 @@ test("a draft pull request runs no native or bundle job, and keeps the tax-audit
   for (const event of ["merge_group", "push", "schedule", "workflow_dispatch"]) {
     assert.deepEqual(heavy(runScope(event, { changed, draft: "true" }).outputs), ALL, event);
   }
+});
+
+test("a draft payload is checked against the live pull request, so a re-run of an old draft run is scoped in full once the pull request is ready", () => {
+  const changed = ["src-tauri/crates/bridge-tax-audit/src/lib.rs"];
+  const full = { native: "true", bundle: "true", tax_audit: "true" };
+  const asked = runScope("pull_request", { changed, draft: "true" });
+  assert.equal(asked.ghArgs, "api repos/o/r/pulls/7 --jq .draft");
+  assert.deepEqual(heavy(asked.outputs), { native: "false", bundle: "false", tax_audit: "true" });
+  for (const live of ["false", "", "TRUE", "null"]) {
+    assert.deepEqual(heavy(runScope("pull_request", { changed, draft: "true", env: { STUB_LIVE_DRAFT: live } }).outputs), full, `live draft ${JSON.stringify(live)}`);
+  }
+  // A lookup that fails leaves the pull request unjudged as a draft: it runs in full.
+  assert.deepEqual(heavy(runScope("pull_request", { changed, draft: "true", env: { STUB_GH_EXIT: "1" } }).outputs), full, "gh failed");
+  // No other payload value asks, and no other event does.
+  for (const draft of ["false", ""]) assert.equal(runScope("pull_request", { changed, draft }).ghArgs, null, `draft ${JSON.stringify(draft)}`);
+  for (const event of ["merge_group", "push", "schedule", "workflow_dispatch"]) assert.equal(runScope(event, { changed, draft: "true" }).ghArgs, null, event);
 });
 
 test("ready_for_review is a pull_request trigger, so marking a draft ready starts a run scoped in full", () => {

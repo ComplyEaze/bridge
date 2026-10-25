@@ -236,6 +236,9 @@ if (reuseScriptDigest !== "fed907ab68fe52ebd7eb227a377f546a51127303eef48d6cee560
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
+if (jobBlock(workflow, "native").match(/^ {8}os: .*$/gm)?.join("\n") !== "        os: ${{ fromJSON(needs.changes.outputs.native_os) }}") {
+  failures.push("native must run on the systems the scope job's native_os names");
+}
 // The native tests run as two halves, one per shard, by nextest's partitioning. What would silently lose
 // coverage is pinned: a shard list other than [1, 2], a partition count that does not match it, a step
 // that was meant to run once per operating system but never runs (or runs twice), and any other use of the
@@ -468,6 +471,8 @@ const expectedChanges = [
   "      contents: read",
   "      # Only to read this workflow's own merge-queue runs and their jobs (scripts/master-push-reuse.mjs).",
   "      actions: read",
+  "      # Only to read whether a pull request is still a draft when its draft run starts.",
+  "      pull-requests: read",
   "    outputs:",
   "      bundle: ${{ steps.scope.outputs.bundle }}",
   "      bundle_os: ${{ steps.scope.outputs.bundle_os }}",
@@ -486,8 +491,9 @@ const expectedChanges = [
   "          BEFORE_SHA: ${{ github.event.before }}",
   "          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
   "          PR_DRAFT: ${{ github.event.pull_request.draft }}",
+  "          PR_NUMBER: ${{ github.event.pull_request.number }}",
   "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
-  "          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}",
+  "          GH_TOKEN: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && github.token || '' }}",
   "        run: |",
   "          set -euo pipefail",
   "",
@@ -501,8 +507,10 @@ const expectedChanges = [
   "          # files), LICENSE, NOTICE, THIRD_PARTY_LICENSES.txt, THIRD_PARTY_LICENSES_RUST.txt, packaging/ (the MCPB manifest",
   "          # and the PDFium lock), package.json (the Tauri CLI and its build script), this workflow, and the scripts the",
   "          # bundle job runs: fetch-pdfium, capture-package-log, check-mcpb-bundle, package-mcpb, check-license-metadata,",
-  "          # check-dependency-inventory, check-macos-bundle-resources and check-no-test-seam, with their tests.",
-  "          packaging_paths='^(\\.github/workflows/ci\\.yml$|packaging/|package\\.json$|src-tauri/(tauri\\.conf\\.json$|icons/|build\\.rs$)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$)'",
+  "          # check-dependency-inventory, check-macos-bundle-resources and check-no-test-seam, with their tests. Also what",
+  "          # pins the bundler and the build: pnpm-lock.yaml, .node-version, rust-toolchain.toml, .cargo/ and",
+  "          # src-tauri/Cargo.lock, Cargo.toml and .cargo/.",
+  "          packaging_paths='^(\\.github/workflows/ci\\.yml$|packaging/|package\\.json$|pnpm-lock\\.yaml$|\\.node-version$|rust-toolchain\\.toml$|\\.cargo/|src-tauri/(tauri\\.conf\\.json$|icons/|build\\.rs$|Cargo\\.(lock|toml)$|\\.cargo/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$)'",
   "",
   "          # The unscoped run: every heavy job runs, whatever changed. Its caller writes the systems first.",
   "          full_run() {",
@@ -563,11 +571,16 @@ const expectedChanges = [
   "          fi",
   "",
   "          # A draft pull request runs no native, bundle or seam job; every other job is scoped as below. Marking it ready",
-  "          # (`ready_for_review`, a trigger above) starts a new run of the same head that is scoped in full and cancels this",
-  "          # one, and Required checks there needs those jobs again. The merge queue's run is never a draft run. Only the",
-  "          # exact payload value `true` is a draft.",
+  "          # (`ready_for_review`, a trigger above) starts a new run of the same head that is scoped in full (and cancels this",
+  "          # one if it is still running), and Required checks there needs those jobs again. The merge queue's run is never a draft run. Only the",
+  "          # exact payload value `true` is a draft, and then the pull request is read again: a re-run of an old draft run",
+  "          # keeps its payload, and a push made just before the ready click can start its run after the ready run. A pull",
+  "          # request that is no longer a draft, or whose state cannot be read, is scoped in full.",
   "          draft=false",
-  "          if [[ \"$EVENT_NAME\" == \"pull_request\" && \"$PR_DRAFT\" == \"true\" ]]; then draft=true; fi",
+  "          if [[ \"$EVENT_NAME\" == \"pull_request\" && \"$PR_DRAFT\" == \"true\" ]]; then",
+  "            live_draft=\"$(gh api \"repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER\" --jq .draft)\" || live_draft=unreadable",
+  "            if [[ \"$live_draft\" == \"true\" ]]; then draft=true; fi",
+  "          fi",
   "",
   "          echo \"native_os=$windows\" >> \"$GITHUB_OUTPUT\"",
   "          # A missing base has no useful predecessor. Keep the conservative path.",

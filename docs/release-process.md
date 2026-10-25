@@ -744,7 +744,7 @@ every note for them first, and for maintainers second.
   these hold: at least one user-visible change has landed, and CI is green on
   both hosts. The macOS native tests run only on a master push, the daily
   scheduled run and a manual run, never on a pull request or in the merge queue. A master
-  push may show the Windows native, bundle and seam jobs skipped when the merge
+  push leaves the Windows native, bundle and seam jobs out of its matrix when the merge
   queue ran them on that same commit; its job summary names the queue run. The
   macOS bundle and seam jobs run in the queue and on a push only when a
   packaging path changes, and the daily scheduled run runs everything.

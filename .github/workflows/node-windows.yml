@@ -1,10 +1,13 @@
 name: Node suite on Windows
 
 # The Node test suite (scripts/*.test.mjs) on windows-latest, where bridge#1471 measured 107 of 608
-# tests failing. Every one now passes or is skipped for a missing tool (Python), so any failing test
-# turns this job red. It runs on pull requests and in the merge queue so that it can be added to the
-# repository ruleset's required status checks: that is a ruleset setting, not a file in this
-# repository (the check is named by the job name below).
+# tests failing. Every one now passes or is skipped, so any failing test turns this job red. A skip
+# is the test's own decision on this host: 43 of 800 in the run that measured it (a POSIX stand-in
+# `cargo` in the egress-boundary test, a POSIX `gh` stub in the version test, `cargo audit` absent
+# from the runner, and a few cases that skip win32, `chmod` and `mkfifo` by design). It runs on pull
+# requests and in the merge queue so that it can be added to the repository ruleset's required
+# status checks: that is a ruleset setting, not a file in this repository (the check is named by the
+# job name below).
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -35,7 +38,10 @@ jobs:
           cache: pnpm
       - run: corepack pnpm install --frozen-lockfile
       # The same command as the first part of `pnpm test`, under bash because the suite's own tests
-      # call bash, jq and python (a test whose tool is missing skips itself).
+      # call bash and jq (a test whose tool or platform feature is missing skips itself). failglob
+      # makes a glob that matches no test file an error instead of a run of zero tests.
       - name: Run the Node suite
         shell: bash
-        run: node --experimental-strip-types --test scripts/*.test.mjs
+        run: |
+          shopt -s failglob
+          node --experimental-strip-types --test scripts/*.test.mjs

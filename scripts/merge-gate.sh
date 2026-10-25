@@ -698,7 +698,7 @@ else
       listing=$(git --literal-pathspecs -C "$gate_tree" ls-tree "$tip" -- "$path" 2>/dev/null) || { failed=1; break; }
       if [ -n "$listing" ]; then
         master_blob=$(awk '{ print $3 }' <<<"$listing")
-        [ "$master_blob" = "$blob" ] && continue
+        [ "$master_blob" = "$blob" ] && { checked=$((checked + 1)); continue; }
         stale=$((stale + 1))
         if [ "$stale" -le 8 ]; then
           shown=$(sed -E 's#/(Users|home)/[^/[:space:]]+#<home>#g; s#^(Users|home)/[^/[:space:]]+#<home>#g; s#[A-Za-z]:[\\/]+Users[\\/]+[^\\/[:space:]]+#<home>#g' <<<"$path" | python3 -I "$script_dir/merge_gate_privacy.py" --redact-shapes 2>/dev/null) || shown="(path not shown)"

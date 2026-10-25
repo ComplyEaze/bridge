@@ -772,6 +772,14 @@ class MergeGateControls(unittest.TestCase):
         self.assertIn("lab-capture manifest: the stale-entry check stopped partway, after 1 of 2 entries", result.stdout)
         self.assertNotIn(self.COULD_NOT_RUN, result.stdout)
 
+    def test_a_current_entry_counts_as_checked_before_a_later_git_failure(self):
+        # the first entry is current (master holds it at the listed blob); the failure comes after it
+        manifest = self.lab_manifest(self.lab_entry(path="docs/kept.bin"), self.lab_entry(path="docs/../../outside.bin"), self.lab_entry())
+        with self.master_state(tracked={self.LAB_PATH: manifest, "docs/kept.bin": self.LAB_BYTES.decode()}):
+            result = self.assert_pass("binary-missing-attestation", self.LISTED_OK)
+        self.assertIn("lab-capture manifest: the stale-entry check stopped partway, after 1 of 3 entries", result.stdout)
+        self.assertNotIn(self.COULD_NOT_RUN, result.stdout)
+
     def run_with_failing_git(self, subcommand, manifest):
         # a git stub that fails only the stale check's own lookups (git --literal-pathspecs ... <subcommand>); every other call is real
         real_git = shutil.which("git")

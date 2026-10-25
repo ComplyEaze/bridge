@@ -745,6 +745,11 @@ PY
   load_lab_captures
   lab_exempt_count=0
   lab_exempt_examples=""
+  # The paths the manifest exempted in this run, and whether any of them is not a plain addition or change (a rename or a copy). The
+  # verdict carry below reads both: a binary change is carried only when it is wholly the manifest's (docs/release-process.md).
+  lab_exempt_paths="$tmpdir/lab-exempt-paths.txt"
+  : >"$lab_exempt_paths"
+  lab_exempt_nonplain=0
   coverage_count=0
   coverage_examples=""
   metadata_only_count=0
@@ -792,6 +797,8 @@ PY
       if [ "$binary" -eq 1 ] && lab_capture_listed "$filename" "$status"; then
         # Listed, path and blob, in the owner-approved manifest on master: the owner read these bytes when he merged the list.
         lab_exempt_count=$((lab_exempt_count + 1))
+        printf '%s\n' "$filename" >>"$lab_exempt_paths"
+        case "$status" in added) ;; *) lab_exempt_nonplain=1 ;; esac
         if [ "$lab_exempt_count" -le 8 ]; then
           lab_exempt_examples="${lab_exempt_examples}${lab_exempt_examples:+; }$(bounded_coverage_name "$filename")"
         fi
@@ -1069,33 +1076,155 @@ else
     # not carried: the reviewer looks again. Master's edits elsewhere are NOT looked at, in other files or in the same file (below
     # the last hunk, or of equal length above one): they ride on master's own review and the checks at the head.
     # (git patch-id is not used: it ignores whitespace and position.)
-    # Two GitHub compare diffs prove it. A diff that cannot be read, is empty, holds a binary change (its text hides the bytes),
-    # lists a file twice, or names other files than the pull request's current file list is never carried. What master changed
-    # in other files is not looked at: that is the checks' job at the head.
+    # The MERGE-ADVERSARY RECOMMEND line for that same older pair is carried with it, under this same proof (merge_gate_verdict.py).
+    # Two GitHub compare diffs prove it. A diff that cannot be read, is empty, lists a file twice, or names other files than the
+    # pull request's current file list is never carried. A binary change is never carried either, because its text hides the
+    # bytes (and the `index` ids, stripped here, are the only thing that tells two versions apart, abbreviated by GitHub): except
+    # when every binary change of the pull request was exempted by the lab-capture manifest in this run (none needs the owner's
+    # attestation, none was removed, renamed or modified: only an addition, whose kept `new file mode` line binds an empty base)
+    # and the binary paths of the diff are exactly those. Each binary section is then replaced by one
+    # `binary <path> <full blob id>` line, the id read from the compare API's JSON for the same range (for the current range it
+    # must be the blob the manifest check verified), so equal digests mean the same text change and the same full blob for every
+    # binary. A refusal writes one fixed reason to a file, printed as a "verdict not carried" note. What master changed in other files is not
+    # looked at: that is the checks' job at the head.
     candidate_head=$(jq -r '.candidate_clean.head // empty' <<<"$verdict_result" 2>/dev/null)
     candidate_base=$(jq -r '.candidate_clean.base // empty' <<<"$verdict_result" 2>/dev/null)
     if [ "$(jq -r '.clean' <<<"$verdict_result" 2>/dev/null)" != "true" ] && [[ "$candidate_head" =~ ^[0-9a-f]{40}$ ]] && [[ "$candidate_base" =~ ^[0-9a-f]{40}$ ]]; then
+      # Reads the diff, the compare JSON and the exempted paths (and, for the current range, the REST blob ids the manifest check
+      # verified) from files, writes the diff with each binary section replaced by one `binary <path> <blob>` line, and exits 1,
+      # after writing one fixed reason (never file bytes) to the reason file, on anything it cannot prove: a path that is not
+      # UTF-8, a diff header it cannot read, a binary path twice, binary paths that are not exactly the exempted ones, a file list
+      # of 300 or more (GitHub truncates there), a binary path missing from it or listed twice, a status that is not "added"
+      # (the kept `new file mode` line binds an empty base; a modified binary's base blob is not bound, so it is never carried),
+      # a sha that is not 40 lowercase hex, or, in the current range, a sha other than the one the manifest check verified.
+      # No file bytes pass through a shell variable.
+      read -r -d '' carry_binary_py <<'PY' || true
+import json, re, sys
+diff_path, json_path, exempt_path, out_path, reason_path = sys.argv[1:6]
+blobs_path = sys.argv[6] if len(sys.argv) > 6 else None
+
+
+class Refuse(Exception):
+    pass
+
+
+def refuse(reason):
+    raise Refuse(reason)
+
+
+try:
+    with open(json_path, "rb") as handle:
+        doc = json.load(handle)
+    files = doc["files"]
+    if not isinstance(files, list):
+        refuse("the compare JSON has no file list")
+    if len(files) >= 300:
+        refuse("the compare JSON lists 300 or more files, so GitHub may have truncated it")
+    by_name = {}
+    for entry in files:
+        if not isinstance(entry, dict) or not isinstance(entry.get("filename"), str):
+            refuse("the compare JSON has a file entry without a name")
+        by_name.setdefault(entry["filename"], []).append(entry)
+    with open(exempt_path, "rb") as handle:
+        exempt = [line.decode("utf-8") for line in handle.read().split(b"\n") if line]
+    verified = None
+    if blobs_path is not None:
+        verified = {}
+        with open(blobs_path, "rb") as handle:
+            for line in handle.read().split(b"\n"):
+                if line:
+                    name, _, blob = line.decode("utf-8").partition("\t")
+                    verified.setdefault(name, []).append(blob)
+    with open(diff_path, "rb") as handle:
+        lines = handle.read().split(b"\n")
+    header = re.compile(rb"^diff --git a/.* b/(.*)$")
+    out, seen, path, skipping = [], [], None, False
+    for index, line in enumerate(lines):
+        if line.startswith(b"diff --git "):
+            match = header.match(line)
+            if match is None:
+                refuse("a diff header could not be read")
+            path, skipping = match.group(1).decode("utf-8"), False
+        elif not skipping and (line.startswith(b"Binary files ") or line == b"GIT binary patch"):
+            if path is None or path in seen:
+                refuse("a binary section has no file header or names a file twice")
+            seen.append(path)
+            found = by_name.get(path, [])
+            if len(found) != 1:
+                refuse("a binary path is missing from the compare JSON or appears twice in it")
+            if found[0].get("status") != "added":
+                refuse("a binary file is not a plain addition in the compare JSON (a modified binary's base blob is not bound)")
+            sha = found[0].get("sha")
+            if not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{40}", sha) is None:
+                refuse("a binary blob id in the compare JSON is not 40 lowercase hex")
+            if verified is not None and verified.get(path) != [sha]:
+                refuse("a binary blob id in the compare JSON is not the blob the manifest check verified")
+            out.append(("binary " + path + " " + sha).encode("utf-8"))
+            skipping = True
+            continue
+        if skipping:
+            if index == len(lines) - 1 and line == b"":
+                out.append(line)
+            continue
+        out.append(line)
+    if not seen or sorted(seen) != sorted(set(exempt)) or len(exempt) != len(set(exempt)):
+        refuse("the binary paths of the diff are not exactly the manifest-exempted paths")
+    with open(out_path, "wb") as handle:
+        handle.write(b"\n".join(out))
+except Refuse as why:
+    with open(reason_path, "w") as handle:
+        handle.write(str(why) + "\n")
+    sys.exit(1)
+except (OSError, ValueError, KeyError, TypeError, UnicodeError):
+    with open(reason_path, "w") as handle:
+        handle.write("the binary evidence could not be read\n")
+    sys.exit(1)
+PY
+      carry_reason_file="$tmpdir/carry-reason.txt"
+      : >"$carry_reason_file"
+      carry_refuse() { printf '%s\n' "$1" >"$carry_reason_file"; return 1; }
       own_change_digest() {
-        local diff_file="$tmpdir/patch-$1-$2.diff" names
+        local diff_file="$tmpdir/patch-$1-$2.diff" json_file="$tmpdir/compare-$1-$2.json" carried_file="$tmpdir/patch-$1-$2.carry" names digest_source verified_blobs=""
         gh api -H "Accept: application/vnd.github.diff" "repos/$REPO/compare/$1...$2" >"$diff_file" 2>>"$errfile" </dev/null || return 1
         grep -q '[^[:space:]]' "$diff_file" || return 1
-        ! grep -Eq '^(Binary files |GIT binary patch)' "$diff_file" || return 1
+        digest_source="$diff_file"
+        if grep -aEq '^(Binary files |GIT binary patch)' "$diff_file"; then
+          # Only when the manifest exempted every binary change of this pull request in this run: none left for the attestation
+          # (a removed binary is never listed, so it counts there), none renamed, copied or modified (only an addition is carried:
+          # a modified binary's base blob is not bound by the digest), and at least one exempted.
+          [ "${binary_count:-1}" -eq 0 ] || carry_refuse "a binary change of the pull request is not exempted by the lab-capture manifest, or was removed" || return 1
+          [ "${lab_exempt_count:-0}" -gt 0 ] || carry_refuse "no binary of the pull request is exempted by the lab-capture manifest" || return 1
+          [ "${lab_exempt_nonplain:-1}" -eq 0 ] || carry_refuse "a manifest-exempted binary is not a plain addition (modified, renamed or copied)" || return 1
+          [ -s "${lab_exempt_paths:-}" ] || carry_refuse "the list of exempted binary paths is empty" || return 1
+          gh api "repos/$REPO/compare/$1...$2" >"$json_file" 2>>"$errfile" </dev/null || carry_refuse "the compare JSON request failed" || return 1
+          # The current range is bound to the blob ids the manifest check verified (the pull request's files list).
+          if [ "${3:-}" = "check-files" ]; then verified_blobs="$changed_blobs"; fi
+          python3 -I -c "$carry_binary_py" "$diff_file" "$json_file" "$lab_exempt_paths" "$carried_file" "$carry_reason_file" ${verified_blobs:+"$verified_blobs"} 2>/dev/null || return 1
+          digest_source="$carried_file"
+        fi
         if [ "${3:-}" = "check-files" ]; then
           names=$(grep -E '^diff --git ' "$diff_file" | sed -E 's#^diff --git a/.* b/(.*)$#\1#') || return 1
           [ -n "$names" ] || return 1
           [ "$(printf '%s\n' "$names" | sort | uniq -d | wc -l | tr -d ' ')" -eq 0 ] || return 1
           [ "$(printf '%s\n' "$names" | sort -u)" = "$(cut -f1 "$changed_records" | sort -u)" ] || return 1
         fi
-        LC_ALL=C grep -av '^index ' "$diff_file" | LC_ALL=C sed -E 's/^(@@ [^@]* @@).*/\1/' | shasum -a 256 | cut -c1-64
+        LC_ALL=C grep -av '^index ' "$digest_source" | LC_ALL=C sed -E 's/^(@@ [^@]* @@).*/\1/' | shasum -a 256 | cut -c1-64
       }
       old_digest=$(own_change_digest "$candidate_base" "$candidate_head") && new_digest=$(own_change_digest "$merge_base" "$head" check-files)
       if [ -n "${old_digest:-}" ] && [ "${old_digest:-}" = "${new_digest:-}" ]; then
-        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is carried to head $short: the pull request's own change is byte-identical, hunk places and context included (digest ${old_digest:0:12})"
+        carried_binaries=$(grep -ac '^binary ' "$tmpdir/patch-$merge_base-$head.carry" 2>/dev/null) || carried_binaries=0
+        carried_binary_note=""
+        if [ "$carried_binaries" -gt 0 ]; then
+          carried_binary_note=", with $carried_binaries manifest-listed binary blob(s) unchanged"
+        fi
+        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is carried to head $short: the pull request's own change is byte-identical, hunk places and context included$carried_binary_note (digest ${old_digest:0:12})"
         jq -c --arg h "$candidate_head" --arg b "$candidate_base" '. + {carried: {head: $h, base: $b}}' "$tmpdir/verdict-doc.json" >"$tmpdir/verdict-doc-carried.json" 2>/dev/null \
           && verdict_exit=0 \
           && verdict_result=$(python3 -I "$script_dir/merge_gate_verdict.py" <"$tmpdir/verdict-doc-carried.json" 2>/dev/null) || verdict_exit=$?
       else
         say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is not carried: the pull request's own lines could not be shown unchanged"
+        carry_reason=$(head -c 200 "$carry_reason_file" 2>/dev/null | tr -cd '[:print:]')
+        [ -z "$carry_reason" ] || say "note" "verdict not carried: $carry_reason"
       fi
     fi
     if ! jq -e 'type == "object" and (.status | type == "string")' <<<"$verdict_result" >/dev/null 2>&1; then
@@ -1109,6 +1238,9 @@ else
           say "ok" "the owner's MERGE-VERDICT CLEAN stands at head $short and merge base ${merge_base:0:7} (review tier one: no MERGE-ADVERSARY RECOMMEND needed)"
         else
           say "ok" "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head $short and merge base ${merge_base:0:7}"
+          if [ "$(jq -r '.recommend_carried' <<<"$verdict_result")" = "true" ]; then
+            say "ok" "the MERGE-ADVERSARY RECOMMEND line was carried to head $short with the CLEAN line, under the same proof that the pull request's own change is unchanged"
+          fi
         fi
       elif [ "$(jq -r '.status' <<<"$verdict_result")" = "block" ]; then
         bad "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND do not both stand at head $short and merge base ${merge_base:0:7}"

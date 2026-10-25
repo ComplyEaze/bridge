@@ -2,6 +2,8 @@
 
 Not for merge. The build is NOT named yet: the run coordinator fills the marks below at the cut, and a row whose change is "not in" the candidate is reported "not in RC", never run on another build. Synthetic BRIDGE companies only, each NEW where a sheet says so (named in its sheet); never a client book.
 
+**Marks (26 Oct 2026).** `tally_status` carries no marks on the builds these rows run (it returns the product, release, licence, Education mode, endpoint, loaded companies and the date). Wherever a row below says "`tally_status`: Mx, Vx" (or reads a mark from it), call `tally_status` as written and ALSO `ledger_masters` (first page, no `snapshot_id`), and take the marks from its `snapshot.master_alter_id` (M) and `snapshot.voucher_alter_id` (V); record both answers whole and `snapshot.reused`, which must read false. A book that holds no voucher may give no V: record it. The stop rules on marks apply to these values.
+
 Written for a lab running TallyPrime 7.2. Earlier measurements in the sheets were taken on 7.1: record the Tally version, the licence mode (licensed, or Education with day-1/2/31 boundaries) and the date at the top of every row, and report any difference from a 7.1 measurement as a finding, not a failure. A row that posts or keys a voucher on an ordinary day needs licensed mode.
 
 Screen actions: every action on Tally's screen or the desktop's settings (renames, restores, hand-keying, backups, the extension restart) is an OWNER STEP, done by the owner one at a time; no one else acts on the lab PC. Books: each row names its company exactly and it is small by construction; a row never runs on a book it does not name, and never on a second loaded company unless it says so.

@@ -520,11 +520,11 @@ This does not establish:
 
 ## 11d. Education refuses Bridge's report-family TDL with a blocking dialog — **VERIFIED live for `ledgers_v1`, 2026-09-22; the rest inferred**
 
-On a TallyPrime 7.1 instance in Education mode, `ledgers_v1`'s custom report raised a modal
-**Error** dialog, `Cannot understand. Bad formula! '$$NumItems:BRIDGE Ledger Collection V1'`, and sent
-no response. The dialog holds the XML gateway until someone dismisses it on the Tally screen. From
-the network, that looks like a busy or dead gateway (bridge#45). A formula-free ledger `Collection`
-export to the same instance returned `STATUS 1` promptly, with no dialog.
+On a TallyPrime 7.1 instance in Education mode, `ledgers_v1`'s custom report, whose `$$` function
+takes a spaced identifier (I1), raised a modal **Error** dialog about its formula and sent no
+response. The dialog holds the XML gateway until someone dismisses it on the Tally screen. From the
+network, that looks like a busy or dead gateway (bridge#45). A ledger `Collection` export with no
+formula, sent to the same instance, returned `STATUS 1` promptly, with no dialog.
 
 Only `ledgers_v1` was observed. Two things are **inferred**: that the other builders using the same
 construct raise it too, and that the space in the argument is the cause. Those builders are every

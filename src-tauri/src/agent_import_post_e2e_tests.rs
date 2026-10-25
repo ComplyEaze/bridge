@@ -2341,6 +2341,24 @@ async fn only_the_target_moving_is_reported_as_the_landing() {
     );
 }
 
+/// A snapshot after the post whose target row omits its voucher mark says nothing about where
+/// the post went: it is unavailable, with its cause, never a step to a mark of zero (#1945).
+#[tokio::test]
+async fn an_omitted_voucher_mark_after_the_post_is_an_unavailable_snapshot_not_zero() {
+    let omitted =
+        company_marks(11, 50, "WR2 Unicode Lab").replacen("<ALTVCHID>11</ALTVCHID>", "", 1);
+    assert_ne!(omitted, company_marks(11, 50, "WR2 Unicode Lab"));
+    let located = located_after(omitted).await;
+    assert_eq!(
+        located,
+        json!({
+            "state": "after_snapshot_unavailable",
+            "after_read_failure": "marks_readback_voucher_mark_omitted",
+        }),
+        "{located}"
+    );
+}
+
 /// A step larger than Tally's CREATED means the post altered or cancelled
 /// vouchers itself, or another voucher in the target changed around it
 /// (protocol reference §11c.5). It is reported in `post_location`.

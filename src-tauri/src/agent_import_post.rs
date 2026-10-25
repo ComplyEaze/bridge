@@ -1466,6 +1466,9 @@ impl Server {
             });
             let (marks_after, after_read_cause) = match marks_read {
                 Ok(marks) => match location::parse_all_company_marks(&marks) {
+                    Ok(_) if location::omits_voucher_mark(&marks, identity.company_guid()) => {
+                        (None, Some("marks_readback_voucher_mark_omitted"))
+                    }
                     Ok(rows) => (Some(rows), None),
                     Err(_) => (None, Some("marks_readback_unparsed")),
                 },

@@ -71,6 +71,13 @@ pub(super) fn aimed_voucher_mark(marks: &str, guid: &str, name: &str) -> Option<
     }
 }
 
+/// Whether the target's row in `marks` omits its voucher mark. A snapshot after the post that
+/// omits it cannot say where the post went, so it is reported as unavailable, never read as a
+/// mark of zero (#1945).
+pub(super) fn omits_voucher_mark(marks: &str, guid: &str) -> bool {
+    matches!(company_voucher_mark(marks, guid), Ok(None))
+}
+
 /// The aim check, on the snapshot sent last before the POST: exactly one loaded
 /// company is the target (GUID and name), and no other loaded company shares
 /// its name. Anything else refuses before any import request.

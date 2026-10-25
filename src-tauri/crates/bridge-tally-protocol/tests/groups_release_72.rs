@@ -60,7 +60,7 @@ fn row_children(text: &str) -> Vec<Vec<String>> {
 }
 
 #[test]
-fn the_order_of_two_children_differs_between_the_releases_and_nothing_else_does() {
+fn the_computed_field_moves_between_the_releases_and_no_other_child_does() {
     let (old, new) = (
         row_children(&decode(RELEASE_71)),
         row_children(&decode(RELEASE_72)),
@@ -76,13 +76,15 @@ fn the_order_of_two_children_differs_between_the_releases_and_nothing_else_does(
     for (old_row, new_row) in old.iter().zip(&new) {
         assert!(position(old_row, "PRIMARYGRPPARENT") < position(old_row, "BRIDGECOMPANYGUID"));
         assert!(position(new_row, "BRIDGECOMPANYGUID") < position(new_row, "PRIMARYGRPPARENT"));
-        let (mut old_sorted, mut new_sorted) = (old_row.clone(), new_row.clone());
-        old_sorted.sort();
-        new_sorted.sort();
-        assert_eq!(
-            old_sorted, new_sorted,
-            "the same children, in another order"
-        );
+        // Apart from that one element, the children are the same, in the same order.
+        let without = |names: &[String]| {
+            names
+                .iter()
+                .filter(|name| *name != "BRIDGECOMPANYGUID")
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(without(old_row), without(new_row));
     }
 }
 

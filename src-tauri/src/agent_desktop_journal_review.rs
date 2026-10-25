@@ -75,11 +75,13 @@ impl DesktopJournalError {
                 "This saved Journal was built for a different Tally endpoint.",
                 "Reconnect to the saved host and port, then choose the original Journal again.",
             ),
-            "import_selected_file_too_large"
-            | "import_persisted_file_too_large"
-            | "import_review_too_large" => (
+            "import_selected_file_too_large" | "import_persisted_file_too_large" => (
                 "This Journal is too large for ComplyEaze Bridge's one-Journal desktop review.",
                 "Use the manual workflow for this file; ComplyEaze Bridge will not truncate the review.",
+            ),
+            "import_review_too_large" => (
+                "This Journal's approval text does not fit in ComplyEaze Bridge's desktop review box: it is over the box's line limit, or on Windows the box would not fit this screen.",
+                "Use the manual workflow for this file, or try again on a larger or less scaled screen; ComplyEaze Bridge will not truncate the review.",
             ),
             "import_post_requires_one_journal" => (
                 "ComplyEaze Bridge's desktop review posts one unnumbered Journal, and this saved batch is a different shape.",

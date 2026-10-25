@@ -130,6 +130,15 @@ These changes are in source and not yet in a published build.
   sheet it was if that read fails), and a book that offers a closing stock also has its inventory flags read (a failed
   read declines the figure as `inventory_flags_not_read`). The derived lines must also sum to zero. Measured on one synthetic book; opening stock, a costing
   method, a book that is not integrated and a window spanning two years are not measured.
+- On Windows the approval and review boxes cannot scroll, and a box taller than the screen used to push its buttons
+  off it. The box is now measured when it opens, against the working area of the monitor it opened on, and one that is
+  not wholly on the screen is closed at once and refused as `import_review_too_large` (a post) or `ack_review_too_large`
+  (a review, or the release of an invoice stop), with nothing posted or recorded; before this, a person could answer
+  with `Y` a box whose lower lines and buttons they could not see (part of #1780, #1832). A long batch or a small or
+  highly scaled screen can now be refused at the box where it was shown before; for one voucher only a larger or less
+  scaled screen helps, and the tool texts and the desktop review's message now say so. Not covered: macOS, whose alert
+  cannot be measured, and a screen that changes while the box is open. Measured on one screen (1920x1080 at 125 percent)
+  in the lab for the size at which a box stops fitting; the check itself has not yet run on a real Windows machine.
 
 ## [0.6.0] - 2026-10-16
 

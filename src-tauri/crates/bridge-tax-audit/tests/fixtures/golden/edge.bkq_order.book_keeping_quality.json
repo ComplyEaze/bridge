@@ -118,11 +118,16 @@
     },
     {
       "id": "book_keeping_quality.entry_order_lag_over_30_count_payment",
-      "value": 1,
+      "value": 2,
       "unit": "count",
       "definition_sha256_16": "cd81558e5d4d15f5",
       "definition_text": "Population vouchers of base type 'Payment' created (in Tally's creation order) after a sales voucher, whose own date is more than 30 days before the latest sale date already created at that point (that sale date less the voucher's own date).",
       "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Payment dup on 2025-03-01"
+        },
         {
           "kind": "voucher",
           "id": "o-pay31",
@@ -178,7 +183,7 @@
     },
     {
       "id": "book_keeping_quality.entry_order_lag_population_count_payment",
-      "value": 3,
+      "value": 4,
       "unit": "count",
       "definition_sha256_16": "dbbf19e5804ccb7a",
       "definition_text": "Population vouchers of base type 'Payment' created (in Tally's creation order) after at least one sales voucher, with a lag against the latest sale date already created.",
@@ -359,12 +364,17 @@
       "evidence": [
         {
           "kind": "voucher",
+          "id": "dup",
+          "label": "Payment dup on 2025-03-01"
+        },
+        {
+          "kind": "voucher",
           "id": "o-pay31",
           "label": "Payment o-pay31 on 2025-04-09"
         }
       ],
-      "title_sha256_16": "0bb1517f7b4e1cc1",
-      "title_text": "1 Payment vouchers were entered after a later-dated sale and are dated more than 30 days before it",
+      "title_sha256_16": "e310e692abe46bd8",
+      "title_text": "2 Payment vouchers were entered after a later-dated sale and are dated more than 30 days before it",
       "limits_sha256_16": "7480316694f76973",
       "limits_text": [
         "Tally's creation sequence approximates the order vouchers were created in the company; ALTERID moves on a later content edit but the creation order does not, so this lag does not show whether the voucher was later edited.",

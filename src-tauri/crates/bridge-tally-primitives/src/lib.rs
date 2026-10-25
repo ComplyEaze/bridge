@@ -1,17 +1,18 @@
 //! Portable Tally value types shared by the read protocol and the domain core.
 //!
-//! These are pure primitives: an exact decimal, a validated Tally date, and the
-//! shared error. They live below `bridge-tally-core` deliberately.
-//! `bridge-tally-core` also carries delivery/destination capability
-//! (`AxalTallyGateway`, `DestinationAdapter`), and the sealed read-only
-//! `bridge-tally-live-read` controller is forbidden from reaching that surface
-//! by `scripts/check-tally-live-read-boundary.mjs`. Keeping the value types
-//! here lets `bridge-tally-protocol` use them without dragging write capability
-//! into the read path.
+//! These are pure primitives: an exact decimal, a validated Tally date, the
+//! shared error, and which characters a reader sees ([`text`]). They live below `bridge-tally-core` deliberately.
+//! `bridge-tally-core` once carried delivery/destination capability, and the
+//! sealed read-only `bridge-tally-live-read` controller is still forbidden from
+//! reaching that crate by `scripts/check-tally-live-read-boundary.mjs`. Keeping
+//! the value types here lets `bridge-tally-protocol` use them without dragging
+//! core's write-side surface into the read path.
 
 use serde::{Deserialize, Deserializer, Serialize};
 
+pub mod company_guid;
 pub mod exact_arithmetic;
+pub mod text;
 
 /// Maximum accepted `ExactDecimal` lexeme length.
 pub const MAX_EXACT_DECIMAL_BYTES: usize = 256;
@@ -20,6 +21,10 @@ pub const MAX_EXACT_DECIMAL_BYTES: usize = 256;
 pub enum TallyError {
     #[error("Tally is not reachable")]
     Unreachable,
+    /// A request reached its deadline (#1671). It may have been sent, and Tally may still be
+    /// answering it, so this is not "Tally is not reachable".
+    #[error("A request to Tally reached its deadline")]
+    RequestDeadlineExceeded,
     #[error("Tally returned an invalid protocol response ({code})")]
     Protocol { code: String },
     #[error("Tally data failed validation ({code})")]
@@ -99,12 +104,18 @@ impl ExactDecimal {
         exact_arithmetic::numeric_equal(self.as_str(), other.as_str())
     }
 
-    pub fn abs(&self) -> Result<Self, TallyError> {
-        if self.is_negative() {
-            Self::parse(self.as_str().trim_start_matches('-').to_string())
-        } else {
-            Ok(self.clone())
+    /// The value without its sign. It cannot fail: a validated lexeme without
+    /// its leading `-` is still a validated lexeme. As with [`Self::abs`],
+    /// only a negative non-zero value loses its sign, so `-0.00` is unchanged.
+    pub fn magnitude(&self) -> Self {
+        match self.0.strip_prefix('-') {
+            Some(digits) if self.is_negative() => Self(digits.to_string()),
+            _ => self.clone(),
         }
+    }
+
+    pub fn abs(&self) -> Result<Self, TallyError> {
+        Ok(self.magnitude())
     }
 
     pub fn cmp_magnitude(&self, other: &Self) -> std::cmp::Ordering {
@@ -211,25 +222,15 @@ impl TallyDate {
         Self::parse(format!("{year:04}{month:02}{day:02}"))
     }
 
-    /// Adds calendar months, clamping a month-end source date to the last
-    /// valid day of the target month. Thus 31-Jan + 1 month is 28-Feb (or
-    /// 29-Feb in a leap year), rather than an implicit fixed-day conversion.
-    pub fn add_months_clamped(&self, months: u32) -> Result<Self, TallyError> {
-        let (year, month, day) = self.parts()?;
-        let month_index = month
-            .checked_sub(1)
-            .and_then(|value| value.checked_add(months))
-            .ok_or_else(|| invalid_data("tally_date_overflow"))?;
-        let target_year = year
-            .checked_add(month_index / 12)
-            .filter(|value| *value <= 9999)
-            .ok_or_else(|| invalid_data("tally_date_overflow"))?;
-        let target_month = month_index % 12 + 1;
-        let target_day = day.min(
-            gregorian_month_days(target_year, target_month)
-                .ok_or_else(|| invalid_data("invalid_tally_date"))?,
-        );
-        Self::parse(format!("{target_year:04}{target_month:02}{target_day:02}"))
+    /// Days since the civil epoch. It cannot fail: the eight digits were
+    /// validated when the date was built, so they are read, not parsed.
+    fn civil(&self) -> i64 {
+        let number = |range: std::ops::Range<usize>| {
+            self.0.as_bytes()[range]
+                .iter()
+                .fold(0_u32, |value, digit| value * 10 + u32::from(digit - b'0'))
+        };
+        civil_day(number(0..4), number(4..6), number(6..8))
     }
 
     fn parts(&self) -> Result<(u32, u32, u32), TallyError> {
@@ -243,6 +244,29 @@ impl TallyDate {
             .parse::<u32>()
             .map_err(|_| invalid_data("invalid_tally_date"))?;
         Ok((year, month, day))
+    }
+}
+
+/// Two dates in order, the first on or before the second, with the whole days
+/// between them. It exists only for an ordered pair, so the ordering and the
+/// day count are one computation and cannot disagree, and the count cannot
+/// fail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DateSpan {
+    days: u32,
+}
+
+impl DateSpan {
+    /// The span from `from` to `to`, or `None` when `from` is after `to`.
+    pub fn new(from: &TallyDate, to: &TallyDate) -> Option<Self> {
+        u32::try_from(to.civil() - from.civil())
+            .ok()
+            .map(|days| Self { days })
+    }
+
+    /// Whole days from the first date to the second: 0 for the same day.
+    pub fn days(&self) -> u32 {
+        self.days
     }
 }
 

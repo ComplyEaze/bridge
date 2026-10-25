@@ -1,0 +1,10 @@
+# fixture: note-days/credit_note_day_voucher_census_response.utf16le.xml
+# parser: parse_voucher_census(20250429)
+# source: captured
+Ok([
+    CensusRow {
+        day: 2025-04-29,
+        alter_id: 11,
+        guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000000b",
+    },
+])

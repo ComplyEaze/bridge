@@ -22,7 +22,7 @@ fn build(batch_id: &str, amends: Option<&str>, amount: &str, date: &str) -> Impo
         "endpoint_origin":origin(),
         "company":{"name":"Synthetic Accounts","guid":GUID,"company_number":"100001","books_from":"20260401"},
         "txn_ids":["txn-001"],"date_from":date,"date_to":date,
-        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"txn-001","date":date,"voucher_type":"Payment",
             "entries":[{"ledger":"Expense","amount":amount,"side":"Dr"},
@@ -74,7 +74,7 @@ fn book_row(line: &ImportLedgerLine) -> ReadVoucher {
         guid: Some(format!("{GUID}-00000005")),
         master_id: Some("5".into()),
         alter_id: Some(40),
-        date: Some(voucher.date.clone()),
+        date: bridge_tally_core::TallyDate::parse(voucher.date.as_str()).unwrap(),
         voucher_type: Some(voucher.voucher_type.as_str().into()),
         narration: Some(format!("[BRIDGE:{}]", line.attribution_tag(voucher))),
         voucher_number: Some("7".into()),
@@ -277,12 +277,12 @@ fn the_window_holds_where_a_voucher_is_and_where_the_amendment_moves_it() {
     let earlier = build(AMENDMENT, None, "12.50", "20260902").vouchers;
     assert_eq!(
         lineage.window(&earlier),
-        ("20260902".into(), "20260910".into())
+        Some((stored_date("20260902"), stored_date("20260910")))
     );
     let later = build(AMENDMENT, None, "12.50", "20260920").vouchers;
     assert_eq!(
         lineage.window(&later),
-        ("20260910".into(), "20260920".into())
+        Some((stored_date("20260910"), stored_date("20260920")))
     );
 }
 
@@ -304,6 +304,40 @@ fn a_voucher_still_as_any_build_wrote_it_is_admitted() {
             .expect("book holds a version Bridge built");
         assert_eq!(admitted[0]["book_matches_batch_id"], expected);
     }
+}
+
+/// The amendment check expects the narration the import wrote, which has no
+/// outer whitespace (#1055): a book row carrying the trimmed text and the tag
+/// is still the version this build wrote, and is admitted.
+#[test]
+fn a_padded_saved_narration_is_compared_as_the_text_the_import_wrote() {
+    let mut original = build(ORIGINAL, None, "12.50", "20260901");
+    original.vouchers[0].narration = Some("  Paid rent\u{a0}".into());
+    original.sha256 = sha256_hex(
+        render_import_xml(
+            "Synthetic Accounts",
+            &original.vouchers,
+            original.identity_batch_id(),
+        )
+        .as_bytes(),
+    );
+    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
+    let proposal = build(AMENDMENT, None, "18.00", "20260901").vouchers;
+    let mut row = book_row(&original);
+    row.narration = Some(format!(
+        "Paid rent [BRIDGE:{}]",
+        original.attribution_tag(&original.vouchers[0])
+    ));
+    let admitted = lineage
+        .compare_and_swap(&proposal, &book(vec![row]), &verified_as_booked(&lineage))
+        .unwrap()
+        .expect("book holds the version this build wrote");
+    assert_eq!(
+        json!(admitted),
+        json!([{"bridge_txn_id":"txn-001","book_matches_batch_id":ORIGINAL,
+            "guid":format!("{GUID}-00000005"),"master_id":"5","alter_id":40,
+            "not_observed":["effective_date"]}])
+    );
 }
 
 #[test]
@@ -333,11 +367,12 @@ fn an_edited_missing_or_cancelled_voucher_refuses_the_amendment() {
     ));
     assert_eq!(reason(vec![renarrated]), "book_voucher_diverged");
     let mut redated = book_row(&original);
-    redated.date = Some("20260905".into());
+    redated.date = bridge_tally_core::TallyDate::parse("20260905").unwrap();
     assert_eq!(reason(vec![redated]), "book_voucher_diverged");
     // an edited effective date is a change the amendment would overwrite
     let mut effective_redated = book_row(&original);
-    effective_redated.effective_date = Some("20260905".into());
+    effective_redated.effective_date =
+        Some(bridge_tally_core::TallyDate::parse("20260905").unwrap());
     let refused = lineage
         .compare_and_swap(
             &proposal,
@@ -354,7 +389,7 @@ fn an_edited_missing_or_cancelled_voucher_refuses_the_amendment() {
     // one that came back unchanged is admitted without a caveat; one that did
     // not come back is admitted with it
     let mut effective_kept = book_row(&original);
-    effective_kept.effective_date = effective_kept.date.clone();
+    effective_kept.effective_date = Some(effective_kept.date.clone());
     let admitted = lineage
         .compare_and_swap(
             &proposal,
@@ -432,7 +467,7 @@ fn an_amendment_is_never_eligible_for_native_posting() {
         "company_guid":GUID, "endpoint_origin":origin(),
         "company":{"name":"Synthetic Accounts","guid":GUID,"company_number":"100001","books_from":"20260401"},
         "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal",
             "entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},
@@ -494,8 +529,8 @@ async fn an_unknown_amendment_target_is_refused_before_any_tally_read() {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let mut input = serde_json::to_value(payload()).unwrap();
     input["amends_batch_id"] = json!(ORIGINAL);
@@ -522,18 +557,18 @@ fn simulated_server(directory: &std::path::Path, port: u16) -> Server {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     })
 }
 
 /// The Journal build sequence, with the preflight read answered by `book`.
 fn build_plans_reading(book: Option<String>) -> Vec<ScenarioPlan> {
-    let mut plans = qualified_import_cycle_plans()[..32].to_vec();
+    let mut plans = qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec();
     if let Some(book) = book {
-        // probe (2) + first cycle (16) + repeated catalogue (6), then the
-        // preflight read whose responses sit at offsets 1 and 3.
-        for index in [25, 27] {
+        // probe (2) + first cycle (16) + numbering read + repeated catalogue
+        // (6), then the preflight read whose responses sit at offsets 1 and 3.
+        for index in [25 + BUILD_NUMBERING_PLANS, 27 + BUILD_NUMBERING_PLANS] {
             plans[index].fixture = Fixture::SyntheticXml(book.clone());
             plans[index].encoding = WireEncoding::Utf16Le;
         }
@@ -557,21 +592,28 @@ fn book_holding(tag: &str, amount: &str) -> String {
 /// Record the captured two-Journal batch as this server built it: same
 /// company tuple and endpoint, so only the book decides the amendment.
 fn seed_original(server: &Server) {
+    seed_original_as(server, "posted_verified", ["txn-001", "txn-002"]);
+}
+
+/// The same record with another status and other transaction ids.
+fn seed_original_as(server: &Server, status: &str, txn_ids: [&str; 2]) -> ImportLedgerLine {
     let mut vouchers = captured_catalogue_payload().vouchers;
-    for voucher in &mut vouchers {
-        voucher.date = normalized_date(&voucher.date).unwrap();
+    for (voucher, txn_id) in vouchers.iter_mut().zip(txn_ids) {
+        voucher.date = normalized_date(&voucher.date).unwrap().as_str().to_string();
+        voucher.bridge_txn_id = txn_id.into();
     }
     let line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":ORIGINAL, "identity_scheme":"batch_v1", "company_guid":CAPTURED_GUID,
         "endpoint_origin":super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap(),
         "company":{"name":"WR2 Unicode Lab","guid":CAPTURED_GUID,"company_number":"1","books_from":"20260401"},
-        "txn_ids":["txn-001","txn-002"],"date_from":"20260901","date_to":"20260902",
-        "sha256":"a".repeat(64), "built_at":"2026-09-16T00:00:00Z", "status":"posted_verified",
+        "txn_ids":txn_ids,"date_from":"20260901","date_to":"20260902",
+        "sha256":"a".repeat(64), "built_at":"2026-09-16T00:00:00Z", "status":status,
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":vouchers
     }))
     .unwrap();
     server.append_import_ledger(&line).unwrap();
+    line
 }
 
 /// Record the original batch's first verification, as verify_import does,
@@ -610,7 +652,7 @@ async fn an_amendment_built_against_an_unchanged_book_reuses_the_original_remote
         .build_import_xml(&amendment_payload(&original, "15.00"))
         .await
         .unwrap();
-    assert_eq!(simulator.finish().unwrap().len(), 32);
+    assert_eq!(simulator.finish().unwrap().len(), QUALIFIED_BUILD_REQUESTS);
     let result = &built.payload["result"];
     let batch_id = result["batch_id"].as_str().unwrap();
     assert_ne!(batch_id, original, "an amendment is its own build");
@@ -676,7 +718,8 @@ async fn an_amendment_of_a_voucher_edited_in_tally_writes_nothing() {
     // Someone changed 12.50 to 13.00 in Tally after Bridge built it. The
     // refusal follows the preflight read, before the closing mode probe.
     let simulator = SequenceSimulator::spawn(
-        build_plans_reading(Some(book_holding(&tag, "13.00")))[..30].to_vec(),
+        build_plans_reading(Some(book_holding(&tag, "13.00")))[..30 + BUILD_NUMBERING_PLANS]
+            .to_vec(),
     )
     .unwrap();
     let server = simulated_server(directory.path(), simulator.address().port());
@@ -697,12 +740,64 @@ async fn an_amendment_of_a_voucher_edited_in_tally_writes_nothing() {
     );
     assert_eq!(std::fs::read_dir(&imports).unwrap().count(), files_before);
     assert_eq!(server.import_ledger().unwrap().len(), batches_before);
-    assert_eq!(simulator.finish().unwrap().len(), 30);
+    assert_eq!(
+        simulator.finish().unwrap().len(),
+        30 + BUILD_NUMBERING_PLANS
+    );
+}
+
+/// An amendment refused for its voucher numbering, under either code. The
+/// refusal comes before the amendment's check of the book, so its next step
+/// is the amendment's own, which sends the caller to verify_import, and
+/// nothing is written.
+#[tokio::test]
+async fn an_amendment_refused_for_its_voucher_numbering_is_sent_to_verify_the_earlier_batch() {
+    use crate::agent::agent_import::numbering_fixtures::with_sub_method;
+    use crate::agent::agent_import::post::numbering::{BUILD_AMENDMENT_NEXT_STEP, BUILD_NEXT_STEP};
+    for (plans, code) in [
+        (
+            through_build_numbering(&["Journal"]),
+            "import_voucher_numbering_not_automatic",
+        ),
+        (
+            with_sub_method(
+                through_build_numbering(&[]),
+                "Journal",
+                "<NUMBERINGSUBMETHOD>Auto Renumber</NUMBERINGSUBMETHOD>",
+            ),
+            "import_voucher_numbering_not_retain",
+        ),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let expected = plans.len();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let server = simulated_server(directory.path(), simulator.address().port());
+        seed_original(&server);
+        let imports = server.imports_dir().unwrap();
+        let files_before = std::fs::read_dir(&imports).unwrap().count();
+        let batches_before = server.import_ledger().unwrap().len();
+        let refused = server
+            .build_import_xml(&amendment_payload(ORIGINAL, "15.00"))
+            .await
+            .unwrap();
+        let result = &refused.payload["result"];
+        assert_eq!(result["state"], "refused", "{code}: {result}");
+        assert_eq!(result["reason"], code);
+        assert_eq!(result["next_step"], BUILD_AMENDMENT_NEXT_STEP, "{code}");
+        assert_ne!(result["next_step"], BUILD_NEXT_STEP, "{code}");
+        assert!(BUILD_AMENDMENT_NEXT_STEP.contains("verify_import"));
+        assert_eq!(std::fs::read_dir(&imports).unwrap().count(), files_before);
+        assert_eq!(server.import_ledger().unwrap().len(), batches_before);
+        assert_eq!(simulator.finish().unwrap().len(), expected, "{code}");
+    }
 }
 
 #[test]
 fn the_amendment_admission_module_stays_pinned() {
-    // The compatibility gate cannot see a pin dropped by a merge resolution.
+    // A pin the branch itself added and then lost in a merge resolution is a withdrawn pin:
+    // check-surface-ack.mjs reads the branch history and requires a `removed-pin:` line for it
+    // (#1006); one that existed at the base is a removed pin, which merge-gate.sh blocks
+    // without a `removed-pin:` line.
     // This module decides what an import file may overwrite; its reason sits
     // beside MAX_SURFACE_FILES.
     let surface: Value = serde_json::from_str(include_str!(
@@ -795,7 +890,8 @@ async fn an_amendment_of_a_voucher_altered_or_never_verified_writes_nothing() {
         let original = ORIGINAL.to_string();
         let tag = import_identity(&original, "txn-001").to_string();
         let simulator = SequenceSimulator::spawn(
-            build_plans_reading(Some(book_holding(&tag, "12.50")))[..30].to_vec(),
+            build_plans_reading(Some(book_holding(&tag, "12.50")))[..30 + BUILD_NUMBERING_PLANS]
+                .to_vec(),
         )
         .unwrap();
         let server = simulated_server(directory.path(), simulator.address().port());
@@ -820,36 +916,122 @@ async fn an_amendment_of_a_voucher_altered_or_never_verified_writes_nothing() {
             .unwrap()
             .contains("Correct the voucher in Tally directly"));
         assert_eq!(std::fs::read_dir(&imports).unwrap().count(), files_before);
-        assert_eq!(simulator.finish().unwrap().len(), 30);
+        assert_eq!(
+            simulator.finish().unwrap().len(),
+            30 + BUILD_NUMBERING_PLANS
+        );
     }
 }
 
 #[test]
 fn a_verified_baseline_file_is_written_once_per_voucher() {
     let directory = tempfile::tempdir().unwrap();
-    let proof = |alter_id: u64| json!({"vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":alter_id}]});
-    record_verified_baseline(directory.path(), ORIGINAL, &proof(40)).unwrap();
-    let first = std::fs::read(directory.path().join(format!("{ORIGINAL}.baseline.json"))).unwrap();
+    let addition =
+        |index: usize| verified_baseline_addition_path(directory.path(), ORIGINAL, index);
+    let proof = |vouchers: &[(&str, u64)]| {
+        json!({"vouchers": vouchers
+            .iter()
+            .map(|(txn_id, alter_id)| json!({"bridge_txn_id":txn_id,"status":"posted_verified","alter_id":alter_id}))
+            .collect::<Vec<_>>()})
+    };
+    record_verified_baseline(directory.path(), ORIGINAL, &proof(&[("txn-001", 40)])).unwrap();
+    let first = std::fs::read(addition(1)).unwrap();
     // A later verification after an edit reports the voucher posted at a
-    // higher ALTERID; the file keeps the first.
-    record_verified_baseline(directory.path(), ORIGINAL, &proof(41)).unwrap();
-    assert_eq!(
-        std::fs::read(directory.path().join(format!("{ORIGINAL}.baseline.json"))).unwrap(),
-        first
-    );
-    assert_eq!(
-        read_verified_baseline(directory.path(), ORIGINAL)
-            .unwrap()
-            .vouchers["txn-001"],
-        40
-    );
-    // An unreadable file is never rewritten.
-    std::fs::write(
-        directory.path().join(format!("{ORIGINAL}.baseline.json")),
-        b"{",
+    // higher ALTERID; nothing is written and the first value stays.
+    record_verified_baseline(directory.path(), ORIGINAL, &proof(&[("txn-001", 41)])).unwrap();
+    assert!(!addition(2).exists());
+    // A voucher verified for the first time goes to a file of its own; the
+    // earlier file is not touched (#911).
+    record_verified_baseline(
+        directory.path(),
+        ORIGINAL,
+        &proof(&[("txn-001", 41), ("txn-002", 52)]),
     )
     .unwrap();
-    assert!(record_verified_baseline(directory.path(), ORIGINAL, &proof(42)).is_err());
+    assert_eq!(std::fs::read(addition(1)).unwrap(), first);
+    let second: amend::VerifiedBaseline =
+        serde_json::from_slice(&std::fs::read(addition(2)).unwrap()).unwrap();
+    assert_eq!(
+        second.vouchers,
+        BTreeMap::from([("txn-002".to_string(), 52)])
+    );
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([
+            ("txn-001".to_string(), 40),
+            ("txn-002".to_string(), 52)
+        ]))
+    );
+    // An unreadable file is never added to, and the baseline reads as none.
+    std::fs::write(addition(1), b"{").unwrap();
+    assert!(
+        record_verified_baseline(directory.path(), ORIGINAL, &proof(&[("txn-003", 60)])).is_err()
+    );
+    assert!(!addition(3).exists());
+    assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
+}
+
+#[test]
+fn an_older_builds_baseline_is_read_first_and_never_touched() {
+    let directory = tempfile::tempdir().unwrap();
+    let legacy = verified_baseline_path(directory.path(), ORIGINAL);
+    std::fs::write(&legacy, br#"{"vouchers":{"txn-001":40}}"#).unwrap();
+    // An older build's stage, left by a stop before its rename.
+    let stage = directory
+        .path()
+        .join(format!("{ORIGINAL}.baseline.json.next"));
+    std::fs::write(&stage, b"older stage").unwrap();
+    let proof = json!({"vouchers":[
+        {"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":41},
+        {"bridge_txn_id":"txn-002","status":"posted_verified","alter_id":52}
+    ]});
+    record_verified_baseline(directory.path(), ORIGINAL, &proof).unwrap();
+    assert_eq!(
+        std::fs::read(&legacy).unwrap(),
+        br#"{"vouchers":{"txn-001":40}}"#
+    );
+    assert_eq!(std::fs::read(&stage).unwrap(), b"older stage");
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([
+            ("txn-001".to_string(), 40),
+            ("txn-002".to_string(), 52)
+        ]))
+    );
+    // An addition that repeats a recorded voucher proves nothing about which
+    // value came first: no baseline.
+    std::fs::write(
+        verified_baseline_addition_path(directory.path(), ORIGINAL, 2),
+        br#"{"vouchers":{"txn-001":41}}"#,
+    )
+    .unwrap();
+    assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
+}
+
+/// A baseline larger than `MAX_RECORD_BYTES` is no baseline, as an unreadable
+/// one is; one at the bound reads whole (#837).
+#[test]
+fn a_verified_baseline_past_the_record_bound_is_no_baseline() {
+    let directory = tempfile::tempdir().unwrap();
+    let proof =
+        json!({"vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":40}]});
+    record_verified_baseline(directory.path(), ORIGINAL, &proof).unwrap();
+    let path = verified_baseline_addition_path(directory.path(), ORIGINAL, 1);
+    let record = std::fs::read(&path).unwrap();
+    std::fs::write(
+        &path,
+        super::padded_record(&record, ledger::MAX_RECORD_BYTES),
+    )
+    .unwrap();
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([("txn-001".to_string(), 40)]))
+    );
+    std::fs::write(
+        &path,
+        super::padded_record(&record, ledger::MAX_RECORD_BYTES + 1),
+    )
+    .unwrap();
     assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
 }
 
@@ -968,20 +1150,163 @@ fn the_build_whose_record_equals_the_book_admits_even_when_not_first() {
     assert_eq!(refused[0]["reason"], "voucher_never_verified");
 }
 
+// Unix only: the stage takes a fresh name on each write, so the only failure a
+// test can cause before the rename is a folder that refuses new files. On
+// Windows that needs an access-control change, and this crate builds
+// windows-sys without its security API. On every platform,
+// a_record_written_once_is_whole_alone_and_never_replaced shows that the write
+// never replaces a record already there.
+#[cfg(unix)]
 #[test]
 fn a_failed_baseline_write_leaves_the_previous_file_whole() {
+    use std::os::unix::fs::PermissionsExt;
     let directory = tempfile::tempdir().unwrap();
     let proof = |txn_id: &str, alter_id: u64| json!({"vouchers":[{"bridge_txn_id":txn_id,"status":"posted_verified","alter_id":alter_id}]});
     record_verified_baseline(directory.path(), ORIGINAL, &proof("txn-001", 40)).unwrap();
-    let path = directory.path().join(format!("{ORIGINAL}.baseline.json"));
+    let path = verified_baseline_addition_path(directory.path(), ORIGINAL, 1);
     let before = std::fs::read(&path).unwrap();
-    // The staged file cannot be written: the write fails before the rename.
-    std::fs::create_dir(
-        directory
-            .path()
-            .join(format!("{ORIGINAL}.baseline.json.next")),
-    )
-    .unwrap();
-    assert!(record_verified_baseline(directory.path(), ORIGINAL, &proof("txn-002", 52)).is_err());
+    // Nothing can be staged in the folder: the write fails before the link.
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o500)).unwrap();
+    let result = record_verified_baseline(directory.path(), ORIGINAL, &proof("txn-002", 52));
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(result.is_err());
     assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([("txn-001".to_string(), 40)]))
+    );
+}
+
+/// A rebuild of the captured batch with the first voucher's debtor leg moved to
+/// another ledger and its narration changed: the same rows by transaction id,
+/// amounts and sides.
+fn remapped_rebuild() -> Value {
+    let mut input = captured_catalogue_payload();
+    for entry in &mut input.vouchers[0].entries {
+        if entry.ledger == "Bridge Nested Debtor WR4" {
+            entry.ledger = "WR2 Sales".into();
+        }
+    }
+    serde_json::to_value(input).unwrap()
+}
+
+/// Refused at build (#876): with writes off the file is imported by hand, and a
+/// hand import of a rebuilt row would put it in the books a second time.
+async fn assert_build_refused_for_a_row_already_sent(server: &Server, input: &Value) {
+    let ledger_before = std::fs::read(directory_ledger(server)).unwrap();
+    let built = server.build_import_xml(input).await.unwrap();
+    let result = &built.payload["result"];
+    assert_eq!(result["error"]["code"], "import_txn_already_posted");
+    assert_eq!(result["error"]["blocking_batch_id"], ORIGINAL);
+    assert!(result.get("batch_id").is_none(), "{result}");
+    assert_eq!(built.evidence.state, "partial");
+    assert_eq!(
+        built.evidence.reason_code.as_deref(),
+        Some("import_txn_already_posted")
+    );
+    let step = result["error"]["next_step"].as_str().unwrap();
+    assert!(step.contains("amends_batch_id"), "{step}");
+    assert!(step.contains("whatever ledger it names"), "{step}");
+    assert!(step.contains("Do not decide which yourself"), "{step}");
+    assert!(step.contains("and say which"), "{step}");
+    assert!(step.contains("Never rename a statement row"), "{step}");
+    assert!(!step.contains("import the file"), "{step}");
+    assert!(!step.contains("import by hand"), "{step}");
+    assert_eq!(
+        std::fs::read(directory_ledger(server)).unwrap(),
+        ledger_before
+    );
+    let written = std::fs::read_dir(server.imports_dir().unwrap())
+        .map(|entries| entries.count())
+        .unwrap_or(0);
+    assert_eq!(written, 0, "no file is written for a refused row");
+}
+
+fn directory_ledger(server: &Server) -> std::path::PathBuf {
+    server.settings.data_dir.join("agent-import-ledger.jsonl")
+}
+
+#[tokio::test]
+async fn a_rebuild_of_a_row_a_posted_batch_holds_is_refused_at_build() {
+    let directory = tempfile::tempdir().unwrap();
+    let simulator = SequenceSimulator::spawn(build_plans_reading(None)).unwrap();
+    let server = simulated_server(directory.path(), simulator.address().port());
+    seed_original(&server);
+    assert_build_refused_for_a_row_already_sent(&server, &remapped_rebuild()).await;
+    // Refused under the admission lock: only the reads that precede it were
+    // answered, not the mark, the repeated catalogue or the preflight.
+    let received = simulator.received();
+    simulator.cancel();
+    assert_eq!(received, 12, "requests answered before the row check");
+}
+
+#[tokio::test]
+async fn a_batch_sent_but_not_yet_verified_also_blocks_a_rebuild_at_build() {
+    let directory = tempfile::tempdir().unwrap();
+    let simulator = SequenceSimulator::spawn(build_plans_reading(None)).unwrap();
+    let server = simulated_server(directory.path(), simulator.address().port());
+    let sent = seed_original_as(&server, "built", ["txn-001", "txn-002"]);
+    server
+        .append_import_record_while_admitted(&ledger::StatusRecord::dispatch(&sent))
+        .unwrap();
+    assert_build_refused_for_a_row_already_sent(&server, &remapped_rebuild()).await;
+    simulator.cancel();
+}
+
+#[tokio::test]
+async fn a_statement_row_id_blocks_a_rebuild_whose_legs_changed() {
+    // A bank-statement build's row id survives a change of ledger and of
+    // amounts, so the id alone identifies the row.
+    let ids = [
+        "st-20260901-0123456789abcdef",
+        "st-20260902-fedcba9876543210",
+    ];
+    let directory = tempfile::tempdir().unwrap();
+    let simulator = SequenceSimulator::spawn(build_plans_reading(None)).unwrap();
+    let server = simulated_server(directory.path(), simulator.address().port());
+    seed_original_as(&server, "posted_verified", ids);
+    let mut input = remapped_rebuild();
+    for (voucher, id) in input["vouchers"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .zip(ids)
+    {
+        voucher["bridge_txn_id"] = json!(id);
+    }
+    // Every voucher's amounts change, so only the statement id can match.
+    for (voucher, amount) in input["vouchers"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .zip(["13.00", "8.00"])
+    {
+        for entry in voucher["entries"].as_array_mut().unwrap() {
+            entry["amount"] = json!(amount);
+        }
+    }
+    assert_build_refused_for_a_row_already_sent(&server, &input).await;
+    simulator.cancel();
+}
+
+#[tokio::test]
+async fn an_amendment_of_a_posted_batch_is_not_a_second_post_of_its_row() {
+    // Same date, amounts and sides as the batch it amends: only the narration
+    // changes. The row check must not treat the amended batch as a blocker.
+    let directory = tempfile::tempdir().unwrap();
+    let original = ORIGINAL.to_string();
+    let tag = import_identity(&original, "txn-001").to_string();
+    let simulator =
+        SequenceSimulator::spawn(build_plans_reading(Some(book_holding(&tag, "12.50")))).unwrap();
+    let server = simulated_server(directory.path(), simulator.address().port());
+    seed_original(&server);
+    seed_baseline(&server, 12);
+    let mut input = amendment_payload(&original, "12.50");
+    input["vouchers"][0]["narration"] = json!("Paid and settled again");
+    let built = server.build_import_xml(&input).await.unwrap();
+    let result = &built.payload["result"];
+    assert!(result.get("error").is_none(), "{result}");
+    assert_eq!(result["amendment"]["identity_batch_id"], original.as_str());
+    simulator.finish().unwrap();
 }

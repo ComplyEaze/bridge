@@ -1,0 +1,10 @@
+# fixture: note-days/cancelled_purchase_day_voucher_census_response.utf16le.xml
+# parser: parse_voucher_census(20250703)
+# source: captured
+Ok([
+    CensusRow {
+        day: 2025-07-03,
+        alter_id: 41,
+        guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000029",
+    },
+])

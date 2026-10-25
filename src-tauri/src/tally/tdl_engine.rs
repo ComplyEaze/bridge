@@ -1,18 +1,9 @@
-use bridge_tally_core::TallyDate;
-use bridge_tally_protocol::xml_text::escape_text as xml_escape;
-
 pub fn company_list_request() -> String {
     bridge_tally_protocol::xml_read_profiles::compatibility::company_list_request()
 }
 
 pub fn standard_ledger_identity_request(company: &str) -> String {
     bridge_tally_protocol::xml_read_profiles::compatibility::standard_ledger_identity_request(
-        company,
-    )
-}
-
-pub fn standard_ledger_catalog_request(company: &str) -> String {
-    bridge_tally_protocol::xml_read_profiles::compatibility::standard_ledger_catalog_request(
         company,
     )
 }
@@ -86,189 +77,9 @@ pub fn ledgers_request(company: &str) -> String {
     bridge_tally_protocol::xml_read_profiles::compatibility::ledgers_request(company)
 }
 
-/// No production path sends this: core groups come from the native group
-/// collection. Its report TDL is one Education answers with a blocking dialog
-/// (bridge#45), so it compiles only for tests, and nothing can dispatch it.
-#[cfg(test)]
-pub fn groups_request(company: &str) -> String {
-    format!(
-        r#"
-<ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>EXPORT</TALLYREQUEST>
-        <TYPE>DATA</TYPE>
-        <ID>BRIDGE Group Export V1</ID>
-    </HEADER>
-    <BODY>
-        <DESC>
-            <STATICVARIABLES>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-                <SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY>
-            </STATICVARIABLES>
-            <TDL>
-                <TDLMESSAGE>
-                    <REPORT NAME="BRIDGE Group Export V1">
-                        <FORMS>BRIDGE Group Export Form V1</FORMS>
-                        <PLAINXML>Yes</PLAINXML>
-                    </REPORT>
-                    <FORM NAME="BRIDGE Group Export Form V1">
-                        <TOPPARTS>BRIDGE Group Context Part V1, BRIDGE Group Rows Part V1</TOPPARTS>
-                    </FORM>
-                    <PART NAME="BRIDGE Group Context Part V1">
-                        <TOPLINES>BRIDGE Group Context Line V1</TOPLINES>
-                    </PART>
-                    <PART NAME="BRIDGE Group Rows Part V1">
-                        <TOPLINES>BRIDGE Group Row Line V1</TOPLINES>
-                        <REPEAT>BRIDGE Group Row Line V1 : BRIDGE Group Collection V1</REPEAT>
-                    </PART>
-                    <LINE NAME="BRIDGE Group Context Line V1">
-                        <LEFTFIELDS>BRIDGE Group Schema V1, BRIDGE Group Object Type V1, BRIDGE Group Company Name V1, BRIDGE Group Company GUID V1, BRIDGE Group Record Count V1</LEFTFIELDS>
-                        <XMLTAG>"COMPANYCONTEXT"</XMLTAG>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Group Schema V1">
-                        <SET>"bridge.tally.groups/1"</SET>
-                        <XMLTAG>"SCHEMA"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Group Object Type V1">
-                        <SET>"GROUP"</SET>
-                        <XMLTAG>"OBJECTTYPE"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Group Company Name V1">
-                        <SET>##SVCurrentCompany</SET>
-                        <XMLTAG>"NAME"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Group Company GUID V1">
-                        <SET>$GUID:Company:##SVCurrentCompany</SET>
-                        <XMLTAG>"GUID"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Group Record Count V1">
-                        <SET>$$NumItems:BRIDGE Group Collection V1</SET>
-                        <XMLTAG>"RECORDCOUNT"</XMLTAG>
-                    </FIELD>
-                    <LINE NAME="BRIDGE Group Row Line V1">
-                        <LEFTFIELDS>BRIDGE Group Parent V1</LEFTFIELDS>
-                        <XMLTAG>"GROUP"</XMLTAG>
-                        <XMLATTR>"NAME" : $Name</XMLATTR>
-                        <XMLATTR>"GUID" : $GUID</XMLATTR>
-                        <XMLATTR>"REMOTEID" : $RemoteID</XMLATTR>
-                        <XMLATTR>"MASTERID" : $MasterID</XMLATTR>
-                        <XMLATTR>"ALTERID" : $AlterID</XMLATTR>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Group Parent V1">
-                        <SET>$Parent</SET>
-                        <XMLTAG>"PARENT"</XMLTAG>
-                    </FIELD>
-                    <COLLECTION NAME="BRIDGE Group Collection V1" ISMODIFY="No" ISFIXED="No" ISINITIALIZE="No" ISOPTION="No" ISINTERNAL="No">
-                        <TYPE>Group</TYPE>
-                        <FETCH>Name, GUID, RemoteID, MasterID, AlterID, Parent</FETCH>
-                    </COLLECTION>
-                </TDLMESSAGE>
-            </TDL>
-        </DESC>
-    </BODY>
-</ENVELOPE>
-"#,
-        xml_escape(company)
-    )
-    .trim()
-    .to_string()
-}
-
-/// Experimental Bridge-defined ledger-balance cross-view. The request emits no
-/// ledger names: rows are joined to the canonical mirror by candidate native
-/// identifiers. Exact semantics and applicability remain capability-gated.
-///
-/// `from`/`to` are interpolated into two places: ordinary `SVFROMDATE`/
-/// `SVTODATE` character content, and a **quoted TDL literal**
-/// (`<SET>"{from}"</SET>`/`<SET>"{to}"</SET>`, bridge#832). XML escaping
-/// cannot protect the quoted-literal occurrence -- Tally decodes `&quot;`
-/// back to a literal `"` before evaluating the `<SET>` formula, so an
-/// escaped quote could still close the literal early. `TallyDate` closes
-/// that off with a closed input alphabet (exactly 8 ASCII digits) instead of
-/// escaping, the same fix used by
-/// `native_outstandings::render_native_voucher_export_request`.
-pub fn ledger_period_balances_request(company: &str, from: &TallyDate, to: &TallyDate) -> String {
-    format!(
-        r#"
-<ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>EXPORT</TALLYREQUEST>
-        <TYPE>DATA</TYPE>
-        <ID>BRIDGE Ledger Period Balances V1</ID>
-    </HEADER>
-    <BODY>
-        <DESC>
-            <STATICVARIABLES>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-                <SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY>
-                <SVFROMDATE TYPE="Date">{}</SVFROMDATE>
-                <SVTODATE TYPE="Date">{}</SVTODATE>
-            </STATICVARIABLES>
-            <TDL>
-                <TDLMESSAGE>
-                    <REPORT NAME="BRIDGE Ledger Period Balances V1">
-                        <FORMS>BRIDGE Ledger Period Balances Form V1</FORMS>
-                        <PLAINXML>Yes</PLAINXML>
-                    </REPORT>
-                    <FORM NAME="BRIDGE Ledger Period Balances Form V1">
-                        <TOPPARTS>BRIDGE Ledger Period Context Part V1, BRIDGE Ledger Period Rows Part V1</TOPPARTS>
-                    </FORM>
-                    <PART NAME="BRIDGE Ledger Period Context Part V1">
-                        <TOPLINES>BRIDGE Ledger Period Context Line V1</TOPLINES>
-                    </PART>
-                    <PART NAME="BRIDGE Ledger Period Rows Part V1">
-                        <TOPLINES>BRIDGE Ledger Period Row Line V1</TOPLINES>
-                        <REPEAT>BRIDGE Ledger Period Row Line V1 : BRIDGE Ledger Period Collection V1</REPEAT>
-                    </PART>
-                    <LINE NAME="BRIDGE Ledger Period Context Line V1">
-                        <LEFTFIELDS>BRIDGE Ledger Period Schema V1, BRIDGE Ledger Period Object V1, BRIDGE Ledger Period Company GUID V1, BRIDGE Ledger Period From V1, BRIDGE Ledger Period To V1, BRIDGE Ledger Period Ordinary Books Requested V1, BRIDGE Ledger Period Count V1</LEFTFIELDS>
-                        <XMLTAG>"COMPANYCONTEXT"</XMLTAG>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Ledger Period Schema V1"><SET>"bridge.tally.ledger-period-balances/1"</SET><XMLTAG>"SCHEMA"</XMLTAG></FIELD>
-                    <FIELD NAME="BRIDGE Ledger Period Object V1"><SET>"LEDGERPERIODBALANCE"</SET><XMLTAG>"OBJECTTYPE"</XMLTAG></FIELD>
-                    <FIELD NAME="BRIDGE Ledger Period Company GUID V1"><SET>$GUID:Company:##SVCurrentCompany</SET><XMLTAG>"GUID"</XMLTAG></FIELD>
-                    <FIELD NAME="BRIDGE Ledger Period From V1"><SET>"{}"</SET><XMLTAG>"FROMDATE"</XMLTAG></FIELD>
-                    <FIELD NAME="BRIDGE Ledger Period To V1"><SET>"{}"</SET><XMLTAG>"TODATE"</XMLTAG></FIELD>
-                    <FIELD NAME="BRIDGE Ledger Period Ordinary Books Requested V1"><SET>Yes</SET><TYPE>Logical</TYPE><XMLTAG>"ORDINARYBOOKSREQUESTED"</XMLTAG></FIELD>
-                    <FIELD NAME="BRIDGE Ledger Period Count V1"><SET>$$NumItems:BRIDGE Ledger Period Collection V1</SET><XMLTAG>"RECORDCOUNT"</XMLTAG></FIELD>
-                    <LINE NAME="BRIDGE Ledger Period Row Line V1">
-                        <LEFTFIELDS>BRIDGE Ledger Period Opening V1, BRIDGE Ledger Period Closing V1</LEFTFIELDS>
-                        <XMLTAG>"LEDGERPERIODBALANCE"</XMLTAG>
-                        <XMLATTR>"GUID" : $GUID</XMLATTR>
-                        <XMLATTR>"REMOTEID" : $RemoteID</XMLATTR>
-                        <XMLATTR>"MASTERID" : $MasterID</XMLATTR>
-                        <XMLATTR>"ALTERID" : $AlterID</XMLATTR>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Ledger Period Opening V1"><SET>$TBalOpening</SET><TYPE>Amount</TYPE><FORMAT>"No Symbol, No Comma"</FORMAT><XMLTAG>"OPENINGBALANCE"</XMLTAG></FIELD>
-                    <FIELD NAME="BRIDGE Ledger Period Closing V1"><SET>$TBalClosing</SET><TYPE>Amount</TYPE><FORMAT>"No Symbol, No Comma"</FORMAT><XMLTAG>"CLOSINGBALANCE"</XMLTAG></FIELD>
-                    <COLLECTION NAME="BRIDGE Ledger Period Collection V1" ISMODIFY="No" ISFIXED="No" ISINITIALIZE="Yes" ISOPTION="No" ISINTERNAL="No">
-                        <TYPE>Ledger</TYPE>
-                        <FETCH>GUID, RemoteID, MasterID, AlterID, TBalOpening, TBalClosing</FETCH>
-                    </COLLECTION>
-                </TDLMESSAGE>
-            </TDL>
-        </DESC>
-    </BODY>
-</ENVELOPE>
-"#,
-        xml_escape(company),
-        from.as_str(),
-        to.as_str(),
-        from.as_str(),
-        to.as_str(),
-    )
-    .trim()
-    .to_string()
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        company_list_request, groups_request, ledger_period_balances_request, ledgers_request,
-        legacy_company_list_request, TallyDate,
-    };
+    use super::{company_list_request, ledgers_request, legacy_company_list_request};
 
     /// The builders the hazard gate records as passing a spaced identifier to
     /// a `$$` function (Education answered one with a blocking dialog,
@@ -298,37 +109,11 @@ mod tests {
             // `ReadOnlyProfileId::education_refuses_report_formula`: the tools'
             // Education transport.
             "render_ledgers",
-            // The same flag.
-            "render_vouchers",
-            // `RuntimeTallyConnector::read_core_period_balance_report`.
-            "ledger_period_balances_request",
-            // `#[cfg(test)]`: nothing outside tests can send it.
-            "groups_request",
         ];
         assert_eq!(listed, guarded.into_iter().collect());
-        for id in [
-            ReadOnlyProfileId::LedgersV1,
-            ReadOnlyProfileId::LedgerCanaryReadbackV1,
-            ReadOnlyProfileId::VouchersV2,
-            ReadOnlyProfileId::VouchersV3,
-        ] {
-            assert!(id.education_refuses_report_formula(), "{}", id.as_str());
-        }
-        let synthetic_from = TallyDate::parse("20260401").unwrap();
-        let synthetic_to = TallyDate::parse("20260430").unwrap();
-        for (builder, request) in [
-            ("ledgers_request", ledgers_request("Synthetic Company")),
-            (
-                "ledger_period_balances_request",
-                ledger_period_balances_request("Synthetic Company", &synthetic_from, &synthetic_to),
-            ),
-            ("groups_request", groups_request("Synthetic Company")),
-        ] {
-            assert!(
-                first_spaced_function_argument(&request).is_some(),
-                "{builder}"
-            );
-        }
+        let id = ReadOnlyProfileId::LedgersV1;
+        assert!(id.education_refuses_report_formula(), "{}", id.as_str());
+        assert!(first_spaced_function_argument(&ledgers_request("Synthetic Company")).is_some());
         assert_eq!(
             first_spaced_function_argument(&company_list_request()),
             None
@@ -343,9 +128,8 @@ mod tests {
     #[test]
     fn requests_only_fields_used_by_the_renderer() {
         let combined = format!(
-            "{}{}{}",
+            "{}{}",
             company_list_request(),
-            groups_request("Synthetic Company"),
             ledgers_request("Synthetic Company")
         );
         for prohibited in [
@@ -385,14 +169,6 @@ mod tests {
         assert!(ledgers.contains("<XMLATTR>\"MASTERID\" : $MasterID</XMLATTR>"));
         assert!(ledgers.contains("<XMLATTR>\"ALTERID\" : $AlterID</XMLATTR>"));
         assert!(ledgers.contains("Name, GUID, RemoteID, MasterID, AlterID"));
-
-        let groups = groups_request("BRIDGE SYNTHETIC BOOK");
-        assert!(groups.contains("<TYPE>DATA</TYPE>"));
-        assert!(groups.contains("<ID>BRIDGE Group Export V1</ID>"));
-        assert!(groups.contains("$$NumItems:BRIDGE Group Collection V1"));
-        assert!(groups
-            .contains("<REPEAT>BRIDGE Group Row Line V1 : BRIDGE Group Collection V1</REPEAT>"));
-        assert!(groups.contains("<TYPE>Group</TYPE>"));
     }
 
     #[test]
@@ -400,36 +176,5 @@ mod tests {
         let ledgers = ledgers_request("BRIDGE & <SYNTHETIC> \"BOOK\"");
         assert!(ledgers.contains("BRIDGE &amp; &lt;SYNTHETIC&gt; &quot;BOOK&quot;"));
         assert!(!ledgers.contains("BRIDGE & <SYNTHETIC>"));
-
-        let groups = groups_request("BRIDGE & <GROUPS>");
-        assert!(groups.contains("BRIDGE &amp; &lt;GROUPS&gt;"));
-
-        let from = TallyDate::parse("20260401").unwrap();
-        let to = TallyDate::parse("20260430").unwrap();
-        let period = ledger_period_balances_request("BRIDGE & PERIOD", &from, &to);
-        assert!(period.contains("BRIDGE &amp; PERIOD"));
-
-        // `from`/`to` also feed the quoted `<SET>"{from}"</SET>` TDL literal,
-        // where XML escaping cannot protect the argument (Tally decodes
-        // `&quot;` back to `"` before the formula runs). A closed-alphabet
-        // `TallyDate` makes the previously-escaped injection strings simply
-        // not constructible, rather than escaping them.
-        assert!(TallyDate::parse("2026<0401").is_err());
-        assert!(TallyDate::parse("2026&0430").is_err());
-    }
-
-    #[test]
-    fn period_balance_request_is_identity_scoped_and_name_free() {
-        let from = TallyDate::parse("20260401").unwrap();
-        let to = TallyDate::parse("20260430").unwrap();
-        let request = ledger_period_balances_request("Synthetic Company", &from, &to);
-        assert!(request.contains("bridge.tally.ledger-period-balances/1"));
-        assert!(request.contains("<SET>$TBalOpening</SET>"));
-        assert!(request.contains("<SET>$TBalClosing</SET>"));
-        assert!(request.contains("<XMLTAG>\"ORDINARYBOOKSREQUESTED\"</XMLTAG>"));
-        assert!(!request.contains("<XMLTAG>\"ORDINARYBOOKS\"</XMLTAG>"));
-        assert!(request.contains("<XMLATTR>\"GUID\" : $GUID</XMLATTR>"));
-        assert!(request.contains("<XMLTAG>\"FROMDATE\"</XMLTAG>"));
-        assert!(!request.contains("<XMLTAG>\"NAME\"</XMLTAG>"));
     }
 }

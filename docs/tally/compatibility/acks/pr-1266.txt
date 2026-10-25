@@ -1,0 +1,9 @@
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+src-tauri/src/agent.rs
+src-tauri/src/agent_import.rs
+src-tauri/src/agent_import_post.rs
+src-tauri/src/agent_read_profiles.rs
+src-tauri/src/agent_tests.rs
+src-tauri/src/agent_voucher_parse_tests.rs
+src-tauri/src/agent_voucher_window.rs
+reviewer: lamemustafa

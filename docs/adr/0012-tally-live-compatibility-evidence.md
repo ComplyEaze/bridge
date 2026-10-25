@@ -46,8 +46,10 @@ matrix cell additionally requires an exact-scope maintainer review attestation
 signed with Ed25519 by a configured non-revoked key. The release gate verifies
 the signature, key validity at review and release time, attestation expiry,
 receipt age, exact claim dimensions and operations, clean source state, commit,
-and current compatibility-surface digest. Evidence cannot be generalized to a
-different cell.
+and current compatibility-surface digest. Since surface schema 3 that digest is
+computed from the live bytes of every pinned file and never stored, so a changed
+pinned file makes evidence bound to the old digest stale. Evidence cannot be
+generalized to a different cell.
 
 The checked-in matrix is the claim authority. Missing evidence remains
 `unknown`; absence is never converted to success. `Unsupported` requires a
@@ -84,3 +86,12 @@ therefore contains only explicit `unknown` cells. A legitimate Education-host
 run remains necessary before any exact Windows cell can become `observed` or
 `supported`; no license restriction may be bypassed and no write probe is
 authorized by this ADR.
+
+## Note (2026-10-12, part of #1570)
+
+The live-read tool's two voucher steps (an expected-empty and an expected-populated range) and the
+fixture fields that served them (voucher sentinel, both date windows, voucher count bounds) were
+deleted, together with the `xml_voucher_empty_range_v1` and `xml_voucher_populated_range_v1`
+read-profile ids. The run now ends after the ledger step, and a `supported` claim now requires
+only the company enumeration, fixture marker and ledger read profiles; no claim of that level
+existed. The decision text above is unchanged.

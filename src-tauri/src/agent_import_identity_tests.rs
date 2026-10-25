@@ -2,7 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
-    let plans = qualified_import_cycle_plans()[..32].to_vec();
+    let plans = qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec();
     let simulator = SequenceSimulator::spawn([plans.clone(), plans].concat()).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = Server::new(crate::agent::Settings {
@@ -15,8 +15,8 @@ async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let legacy: ImportLedgerLine = serde_json::from_value(legacy_record()).unwrap();
     server.append_import_ledger(&legacy).unwrap();
@@ -33,6 +33,21 @@ async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
         let snapshot = server.latest_import_snapshot(batch_id).unwrap().unwrap();
         let xml = fs::read(result["path"].as_str().unwrap()).unwrap();
         assert_eq!(sha256_hex(&xml), result["sha256"]);
+        // The reported path went through `user_visible_path`: the state says
+        // how it was obtained, and it names the file stored under `imports`.
+        assert_eq!(
+            result["path_state"],
+            if cfg!(windows) { "resolved" } else { "as_is" }
+        );
+        let logical = directory
+            .path()
+            .join("imports")
+            .join(format!("{batch_id}.xml"));
+        assert_eq!(
+            fs::canonicalize(result["path"].as_str().unwrap()).unwrap(),
+            fs::canonicalize(&logical).unwrap()
+        );
+        assert!(!result["path"].as_str().unwrap().starts_with(r"\\?\"));
         assert_eq!(snapshot.batch.txn_ids, ["txn-001", "txn-002"]);
         assert_eq!(
             snapshot.batch.identity_scheme,
@@ -85,16 +100,19 @@ async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
         fs::read(directory.path().join("agent-import-ledger.jsonl")).unwrap(),
         journal
     );
-    assert_eq!(simulator.finish().unwrap().len(), 64);
+    assert_eq!(
+        simulator.finish().unwrap().len(),
+        2 * QUALIFIED_BUILD_REQUESTS
+    );
 }
 
 fn legacy_record() -> Value {
     json!({
         "batch_id":"batch-render", "company_guid":GUID, "company":null,
         "txn_ids":["txn-001"], "date_from":"20260901", "date_to":"20260901",
-        "sha256":"hash", "built_at":"2026-09-07T00:00:00Z", "status":"built",
+        "sha256":"hash", "built_at":"2026-09-07T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water", "value":10, "master_value":10},
-        "vouchers":[payload().vouchers.remove(0)]
+        "vouchers":[admitted_payload().vouchers.remove(0)]
     })
 }
 
@@ -148,7 +166,7 @@ fn namespaced_journal_roundtrips_derived_attribution_and_rejects_unknown_scheme(
 
 #[test]
 fn renderer_uses_one_derived_identity_for_remote_id_and_marker() {
-    let mut input = payload();
+    let mut input = admitted_payload();
     input.vouchers[0].voucher_number = Some("CLIENT-42".into());
     let mut renderings = Vec::new();
     for batch_id in ["batch-one", "batch-two"] {
@@ -158,31 +176,21 @@ fn renderer_uses_one_derived_identity_for_remote_id_and_marker() {
         let mut narrations = Vec::new();
         loop {
             match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"VOUCHER" => {
+                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "VOUCHER" => {
                     for attribute in tag.attributes() {
                         let attribute = attribute.unwrap();
-                        if attribute.key.as_ref() == b"REMOTEID" {
+                        if attribute.key.as_ref() == "REMOTEID" {
                             remote_ids.push(
                                 attribute
-                                    .decoded_and_normalized_value(
-                                        quick_xml::XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )
+                                    .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                                     .unwrap()
                                     .into_owned(),
                             );
                         }
                     }
                 }
-                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"NARRATION" => {
-                    narrations.push(
-                        reader
-                            .read_text(tag.name())
-                            .unwrap()
-                            .decode()
-                            .unwrap()
-                            .into_owned(),
-                    );
+                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "NARRATION" => {
+                    narrations.push(reader.read_text(tag.name()).unwrap().to_string());
                 }
                 quick_xml::events::Event::Eof => break,
                 _ => {}
@@ -234,7 +242,7 @@ fn captured_namespaced_journal_is_attributed_only_to_its_recorded_batch() {
         "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],
         "date_from":"20260907", "date_to":"20260907",
         "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
-        "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water", "value":8, "master_value":219},
         "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1", "date":"20260907",
             "voucher_type":"Journal", "narration":"Bridge MCP batch namespace qualification",
@@ -249,7 +257,7 @@ fn captured_namespaced_journal_is_attributed_only_to_its_recorded_batch() {
     );
     let source = parse_import_vouchers(&xml, CAPTURED_GUID).unwrap();
     assert_eq!(source.rows.len(), 1);
-    let result = verify_batch(&line, &source).unwrap();
+    let result = verify_batch(&line, &source, Attribution::Tag).unwrap();
     assert_eq!(result["counts"]["posted_verified"], 1);
     assert_eq!(result["counts"]["matching_content_observed"], 0);
     assert_eq!(result["duplicates"], json!([]));
@@ -265,9 +273,323 @@ fn captured_namespaced_journal_is_attributed_only_to_its_recorded_batch() {
     // Keep the actual observed source and all expected accounting fields intact.
     // A different batch must not inherit this posting's attribution.
     line.batch_id = "bridge-00000000-0000-4000-8000-000000000002".into();
-    let other = verify_batch(&line, &source).unwrap();
+    let other = verify_batch(&line, &source, Attribution::Tag).unwrap();
     assert_eq!(other["counts"]["posted_verified"], 0);
     assert_eq!(other["counts"]["matching_content_observed"], 1);
     assert_eq!(other["vouchers"][0]["marker"], "accounting_fingerprint");
     assert_eq!(other["vouchers"][0]["attribution"], "not_established");
+}
+
+/// The captured namespaced Journal and the build record it came from, for the
+/// post-span binding cases below.
+fn captured_journal_and_line() -> (ImportReadSource, ImportLedgerLine) {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-6c79872c-aab6-4be5-a181-18182c8148be",
+        "identity_scheme":"batch_v1",
+        "company_guid":CAPTURED_GUID,
+        "company":{"name":"WR2 Unicode Lab", "guid":CAPTURED_GUID,
+            "company_number":"100004", "books_from":"20260401"},
+        "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],
+        "date_from":"20260907", "date_to":"20260907",
+        "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
+        "pre_import_mark":{"kind":"company_high_water", "value":8, "master_value":219},
+        "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1", "date":"20260907",
+            "voucher_type":"Journal", "narration":"Bridge MCP batch namespace qualification",
+            "reference":null, "voucher_number":null,
+            "entries":[{"ledger":"Bridge Nested Debtor WR4", "amount":"12.61", "side":"Dr"},
+                {"ledger":"Cash", "amount":"12.61", "side":"Cr"}]}]
+    }))
+    .unwrap();
+    (parse_import_vouchers(&xml, CAPTURED_GUID).unwrap(), line)
+}
+
+fn binding(guid_suffix: &str, master_id: u64) -> Vec<span_identity::PostedVoucherIdentity> {
+    vec![span_identity::PostedVoucherIdentity {
+        bridge_txn_id: "BRIDGE_MCP_LIVE_20260906_A1".into(),
+        guid: format!("{CAPTURED_GUID}-{guid_suffix}"),
+        master_id,
+    }]
+}
+
+/// A bound voucher is found by its GUID first, ahead of the narration tag the
+/// capture also carries. The capture predates untagged native posts, so its
+/// row is given the narration an untagged post writes; kept as captured, with
+/// its tag, the bound row's narration differs from what this post wrote and
+/// reads divergent (#1608).
+#[test]
+fn a_bound_voucher_is_attributed_by_its_guid_first() {
+    let (captured, line) = captured_journal_and_line();
+    let untagged = ImportReadSource::admit(
+        captured
+            .rows
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                row.narration = line.vouchers[0].narration.clone();
+                row
+            })
+            .collect(),
+    )
+    .unwrap();
+    let result = verify_batch(
+        &line,
+        &untagged,
+        Attribution::Span(Some(&binding("00000005", 5))),
+    )
+    .unwrap();
+    assert_eq!(result["counts"]["posted_verified"], 1, "{result}");
+    assert_eq!(result["vouchers"][0]["marker"], "post_span_binding");
+    assert_eq!(result["duplicates"], json!([]));
+    let tagged = verify_batch(
+        &line,
+        &captured,
+        Attribution::Span(Some(&binding("00000005", 5))),
+    )
+    .unwrap();
+    assert_eq!(
+        tagged["vouchers"][0]["status"], "posted_divergent",
+        "{tagged}"
+    );
+    assert_eq!(tagged["vouchers"][0]["diffs"], json!(["narration"]));
+    let source = untagged;
+    // A binding whose GUID the window does not hold is `bound_not_in_window`,
+    // even beside a matching tag: the binding ranks first and a tag never
+    // overrides it, so the disagreement stays unverified (loud).
+    let elsewhere = verify_batch(
+        &line,
+        &source,
+        Attribution::Span(Some(&binding("00000099", 153))),
+    )
+    .unwrap();
+    assert_eq!(elsewhere["vouchers"][0]["status"], "bound_not_in_window");
+}
+
+/// One narration comparison for the read-back, the span binding and the
+/// amendment check (#1608): the text as written (trimmed, with its tag when it
+/// carried one) against the text read, byte for byte. A narration Tally holds
+/// none of equals only an empty one written; it never equals written text.
+#[test]
+fn a_narration_is_compared_as_written() {
+    use verification::narration_differs as differs;
+    let (_, line) = captured_journal_and_line();
+    let mut voucher = line.vouchers[0].clone();
+    voucher.narration = Some("  Rent for July  ".into());
+    let untagged = WrittenNarration::Untagged;
+    let tagged = WrittenNarration::Tagged("tag-1");
+    assert!(!differs(&voucher, untagged, Some("Rent for July")));
+    assert!(differs(&voucher, untagged, Some("Rent for July ")));
+    assert!(differs(&voucher, untagged, Some("Rent for june")));
+    assert!(differs(&voucher, untagged, None));
+    assert!(!differs(
+        &voucher,
+        tagged,
+        Some("Rent for July [BRIDGE:tag-1]")
+    ));
+    assert!(differs(&voucher, tagged, Some("Rent for July")));
+    assert!(differs(
+        &voucher,
+        tagged,
+        Some("Rent for July [BRIDGE:tag-2]")
+    ));
+    voucher.narration = None;
+    assert!(!differs(&voucher, untagged, None));
+    assert!(!differs(&voucher, untagged, Some("")));
+    assert!(differs(&voucher, untagged, Some("Edited")));
+    assert!(!differs(&voucher, tagged, Some("[BRIDGE:tag-1]")));
+}
+
+/// A voucher whose narration was edited in Tally reads `posted_divergent`,
+/// with the narration named in its diffs, on the tag basis as on a binding
+/// (#1608). Before, every other field matched and it read verified.
+#[test]
+fn a_narration_edited_in_tally_reads_divergent() {
+    let (captured, line) = captured_journal_and_line();
+    let edited = ImportReadSource::admit(
+        captured
+            .rows
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                row.narration = row
+                    .narration
+                    .map(|text| text.replacen("qualification", "qualifying", 1));
+                row
+            })
+            .collect(),
+    )
+    .unwrap();
+    let result = verify_batch(&line, &edited, Attribution::Tag).unwrap();
+    assert_eq!(
+        result["vouchers"][0]["status"], "posted_divergent",
+        "{result}"
+    );
+    assert_eq!(result["vouchers"][0]["diffs"], json!(["narration"]));
+    assert_eq!(result["counts"]["posted_verified"], 0);
+}
+
+/// A voucher matched by its content only is compared against the narration
+/// its batch wrote, and only reports it (#1608): an untagged row reads as a
+/// native post wrote it, so a native batch lists nothing, while a file's batch,
+/// which wrote the tag, lists the narration the row lacks.
+#[test]
+fn a_content_match_reports_the_narration_its_batch_wrote() {
+    let (captured, line) = captured_journal_and_line();
+    let untagged = ImportReadSource::admit(
+        captured
+            .rows
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                row.narration = line.vouchers[0].narration.clone();
+                row
+            })
+            .collect(),
+    )
+    .unwrap();
+    let native = verify_batch(&line, &untagged, Attribution::Span(None)).unwrap();
+    assert_eq!(
+        native["vouchers"][0]["status"], "matching_content_observed",
+        "{native}"
+    );
+    assert_eq!(native["vouchers"][0]["diffs"], json!([]));
+    let file = verify_batch(&line, &untagged, Attribution::Tag).unwrap();
+    assert_eq!(
+        file["vouchers"][0]["status"], "matching_content_observed",
+        "{file}"
+    );
+    assert_eq!(file["vouchers"][0]["diffs"], json!(["narration"]));
+}
+
+/// The GUID found the row, but its MasterID is not the one bound: refused,
+/// never attributed (the GUID is the company GUID plus the MasterID).
+#[test]
+fn a_bound_guid_on_another_master_id_is_not_attributed() {
+    let (source, line) = captured_journal_and_line();
+    let result = verify_batch(
+        &line,
+        &source,
+        Attribution::Span(Some(&binding("00000005", 6))),
+    )
+    .unwrap();
+    assert_eq!(result["counts"]["not_attributable"], 1);
+    assert_eq!(result["counts"]["posted_verified"], 0);
+    assert_eq!(result["vouchers"][0]["reason"], "bound_master_id_changed");
+}
+
+/// A bound voucher the window does not hold is never `not_found`; after a
+/// rollback it is `book_rolled_back`, and so is any voucher not found.
+#[test]
+fn a_bound_voucher_absent_from_the_window_is_never_not_found() {
+    let (_, line) = captured_journal_and_line();
+    let empty = ImportReadSource::admit(Vec::new()).unwrap();
+    let mut result = verify_batch(
+        &line,
+        &empty,
+        Attribution::Span(Some(&binding("00000005", 5))),
+    )
+    .unwrap();
+    assert_eq!(result["counts"]["bound_not_in_window"], 1);
+    assert_eq!(result["counts"]["not_found"], 0);
+    verification::mark_book_rolled_back(&mut result);
+    assert_eq!(result["counts"]["bound_not_in_window"], 0);
+    assert_eq!(result["counts"]["book_rolled_back"], 1);
+    assert_eq!(result["vouchers"][0]["status"], "book_rolled_back");
+    // An unbound voucher not found is rewritten the same way.
+    let mut unbound = verify_batch(&line, &empty, Attribution::Span(None)).unwrap();
+    assert_eq!(unbound["counts"]["not_found"], 1);
+    verification::mark_book_rolled_back(&mut unbound);
+    assert_eq!(unbound["counts"]["not_found"], 0);
+    assert_eq!(unbound["vouchers"][0]["status"], "book_rolled_back");
+}
+
+/// A bound voucher edited in Tally after its post (an amount changed) is found
+/// by its GUID and reads `posted_divergent`, never `posted_verified`: the
+/// binding names the object, and the content is still compared.
+#[test]
+fn a_bound_voucher_whose_amount_changed_reads_divergent() {
+    let (source, line) = captured_journal_and_line();
+    let mut rows = source.rows.clone();
+    for entry in &mut rows[0].entries {
+        entry.amount = if entry.amount.starts_with('-') {
+            "-13.61".into()
+        } else {
+            "13.61".into()
+        };
+    }
+    let edited = ImportReadSource::admit(rows).unwrap();
+    let result = verify_batch(
+        &line,
+        &edited,
+        Attribution::Span(Some(&binding("00000005", 5))),
+    )
+    .unwrap();
+    assert_eq!(
+        result["vouchers"][0]["marker"], "post_span_binding",
+        "{result}"
+    );
+    assert_eq!(
+        result["vouchers"][0]["status"], "posted_divergent",
+        "{result}"
+    );
+    assert_eq!(result["counts"]["posted_verified"], 0, "{result}");
+    assert_eq!(result["counts"]["posted_divergent"], 1, "{result}");
+}
+
+/// An untagged native post that was not bound: a row carrying the batch's tag
+/// is a hand import of the batch's file, not a voucher this POST created, so
+/// the tag attributes nothing and the row is matched by content only. The same
+/// row on the tag basis reads verified.
+#[test]
+fn a_tag_never_attributes_an_untagged_native_post() {
+    let (source, line) = captured_journal_and_line();
+    let tagged = verify_batch(&line, &source, Attribution::Tag).unwrap();
+    assert_eq!(tagged["counts"]["posted_verified"], 1, "{tagged}");
+    let native = verify_batch(&line, &source, Attribution::Span(None)).unwrap();
+    assert_eq!(native["counts"]["posted_verified"], 0, "{native}");
+    assert_eq!(native["counts"]["matching_content_observed"], 1, "{native}");
+    assert_eq!(native["vouchers"][0]["marker"], "accounting_fingerprint");
+}
+
+/// A hand-imported copy beside a bound voucher: the bound row (untagged, as
+/// the native post wrote it) verifies by its GUID, and the tagged copy is
+/// reported as a duplicate, never ignored and never counted.
+#[test]
+fn a_tagged_copy_beside_a_bound_voucher_is_a_duplicate() {
+    let (source, line) = captured_journal_and_line();
+    let mut native = source.rows[0].clone();
+    native.narration = line.vouchers[0].narration.clone();
+    let mut copy = source.rows[0].clone();
+    copy.guid = Some(format!("{CAPTURED_GUID}-00000099"));
+    copy.master_id = Some("153".into());
+    copy.alter_id = Some(11);
+    copy.remote_id = copy.guid.clone();
+    let both = ImportReadSource::admit(vec![native, copy]).unwrap();
+    let result = verify_batch(
+        &line,
+        &both,
+        Attribution::Span(Some(&binding("00000005", 5))),
+    )
+    .unwrap();
+    assert_eq!(
+        result["vouchers"][0]["marker"], "post_span_binding",
+        "{result}"
+    );
+    assert_eq!(result["counts"]["posted_verified"], 1, "{result}");
+    assert_eq!(result["counts"]["matching_content_observed"], 0, "{result}");
+    assert_eq!(
+        result["duplicates"].as_array().map(Vec::len),
+        Some(1),
+        "{result}"
+    );
 }

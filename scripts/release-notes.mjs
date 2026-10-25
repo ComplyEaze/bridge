@@ -1,11 +1,12 @@
 // One source for what changed: CHANGELOG.md. `notes` composes a GitHub release body from it and
 // `page` renders the same file for the install site, so the two cannot drift. Neither may block a
 // release or a deploy: every fallback prints a warning and still writes a usable file.
-import { readFileSync, writeFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
-const REPOSITORY_URL = "https://github.com/lamemustafa/bridge";
-const previewTag = /^mcp-preview-([0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z]+)*)$/;
+const REPOSITORY_URL = "https://github.com/ComplyEaze/bridge";
+// The current `mcp-vX.Y.Z` form and the older `mcp-preview-X.Y.Z` (see scripts/release-tag-forms.test.mjs).
+const previewTag = /^mcp-(?:preview-|v)([0-9]+\.[0-9]+\.[0-9]+)$/;
 const sectionHeading = /^## \[(?:v(?=\d))?([^\]]+)\](?:\s+[-\u2013\u2014]\s+(\S.*))?\s*$/;
 const linkDefinition = /^\[[^\]]+\]: \S+\s*$/;
 const fenceLine = /^\s*(`{3,}|~{3,})(.*)$/;
@@ -68,7 +69,7 @@ export function parseChangelog(source) {
 
 export function pickNotes(sections, tag) {
   const version = versionFromTag(tag);
-  if (version === undefined) throw new Error(`not an mcp-preview tag: ${tag}`);
+  if (version === undefined) throw new Error(`not a release tag (mcp-v or mcp-preview-): ${tag}`);
   const own = sections.find((section) => section.label === version && section.body !== "");
   if (own) return { mode: "version", body: own.body };
   const unreleased = sections.find((section) => section.label.toLowerCase() === "unreleased" && section.body !== "");
@@ -76,9 +77,8 @@ export function pickNotes(sections, tag) {
   return { mode: "none", body: "" };
 }
 
-export function composeBody(picked, footer) {
-  const tail = footer.trim();
-  return picked.body === "" ? `${tail}\n` : `${picked.body}\n\n---\n\n${tail}\n`;
+export function composeBody(picked, footer, header = "") {
+  return `${[header.trim(), picked.body, footer.trim()].filter((part) => part !== "").join("\n\n---\n\n")}\n`;
 }
 
 const escapeHtml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -170,7 +170,8 @@ const pageHead = `<!doctype html>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>What changed in ComplyEaze Bridge</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./chrome.css" />
+    <link rel="stylesheet" href="./pages.css" />
   </head>
   <body>
     <main class="page">
@@ -252,6 +253,14 @@ export function main(argv) {
   if (command === "notes") {
     const tag = argument(args, "--tag");
     const footer = readFileSync(argument(args, "--footer"), "utf8");
+    let header = "";
+    if (args.includes("--header")) {
+      try {
+        header = readFileSync(argument(args, "--header"), "utf8");
+      } catch (error) {
+        warn(`could not read the release header (${error.message}); the release carries the notes and the standard text without it`);
+      }
+    }
     let picked = { mode: "none", body: "" };
     try {
       const { sections, problems } = parseChangelogWithProblems(readFileSync(argument(args, "--changelog"), "utf8"));
@@ -262,7 +271,7 @@ export function main(argv) {
     }
     if (picked.mode === "none") warn(`CHANGELOG.md has no section for ${tag}; the release carries the standard text and GitHub's change list only`);
     if (picked.mode === "unreleased") warn(`CHANGELOG.md has no ${versionFromTag(tag)} section; the release carries its [Unreleased] text, which may describe changes this build does not have. Check the release body`);
-    writeFileSync(argument(args, "--out"), composeBody(picked, footer));
+    writeFileSync(argument(args, "--out"), composeBody(picked, footer, header));
     console.log(picked.mode);
     return 0;
   }
@@ -292,8 +301,8 @@ export function main(argv) {
     writeFileSync(argument(args, "--out"), html);
     return 0;
   }
-  console.error("usage: release-notes.mjs notes --tag T --changelog F --footer F --out F | page --changelog F [--template F] --out F");
+  console.error("usage: release-notes.mjs notes --tag T --changelog F --footer F [--header F] --out F | page --changelog F [--template F] --out F");
   return 2;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main(process.argv.slice(2));
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) process.exitCode = main(process.argv.slice(2));

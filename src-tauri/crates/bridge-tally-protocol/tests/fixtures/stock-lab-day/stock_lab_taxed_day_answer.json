@@ -1,0 +1,111 @@
+{
+ "company": {
+  "books_from": "20250401",
+  "company_number": "100027",
+  "guid": "1edb9b05-8d35-4c0c-9959-dce655730463",
+  "identity_state": "verified_tuple",
+  "missing_field": null,
+  "name": "BRIDGE STOCK LAB"
+ },
+ "evidence": {
+  "bytes": 554128,
+  "duration_ms": 5627,
+  "read_at": "2026-10-02T07:33:29.234Z",
+  "request_sha256": "1e0a54aaf702a6d90cc8414e84f183c4d22a39c7bb7d45436d9ac8bfa4444e4d",
+  "response_sha256": "f29d477657670f24e5bb0a4d69d773f232b450caa8c45ceccff46c65e0b1106f",
+  "state": "complete"
+ },
+ "read_at": "2026-10-02T07:33:23.606Z",
+ "result": {
+  "coverage": "items are the Sales and Credit Note vouchers that touch a ledger under Duties & Taxes; tax is taken only from the GST duty head recorded on a ledger master, never from a name or an amount; every other voucher type that touches those ledgers is listed apart (whether it belongs in a return is the CA's call); Sales and Credit Note vouchers with no entry on a Duties & Taxes ledger are counted in sales_vouchers_without_duties_taxes_entry, not returned as items; measured for sales so far: live runs on two synthetic companies for one taxed Sales item invoice (a row), one untaxed one (counted apart) and one Credit Note in voucher view booked on account (a row, with its signs reversed as Tally sends them: nothing is netted or flipped, so sum signed amounts), and one Sales accounting voucher classified against its book's ledger masters; the state-side head is state_tax on one measured book and sgst_utgst on another, both recognised for the same side, so look for neither alone; not shown by any run: an invoice-view Credit Note, an inter-state (IGST) line, a cancelled or optional sales voucher, an unrecognised or missing duty head on a sale, more than one voucher in a window, paging, a company with a registration, a tax Tally computes itself, a sale typed on Tally's screen, accounting-invoice mode, a post-dated sale, a REFERENCE or a populated PARTYGSTIN on a sale, REFERENCEDATE (not returned) and books with several currencies; a row carries `not_measured_live` naming the kind only where the row itself shows it, and kinds a row cannot show are not marked and not vouched for (a sale typed on Tally's screen in voucher view, a tax Tally computed itself, a duty head no sales capture has such as cess, an invoice of another shape than the one run, several currencies), so an unmarked row is not a measured one in those respects; a row is marked inter_state_line only when a tax entry's ledger master carries a recognised IGST head, and an IGST ledger with no head or an unrecognised head is listed under the without-head or unrecognised list with a status other than complete",
+  "items": [
+   {
+    "alter_id": 3,
+    "cancelled": false,
+    "date": "20250421",
+    "duties_taxes_entries_with_unrecognised_head": [],
+    "duties_taxes_entries_without_gst_head": [],
+    "entries_on_ledgers_with_unresolved_group": [],
+    "guid": "1edb9b05-8d35-4c0c-9959-dce655730463-00000003",
+    "has_taxable_entry": true,
+    "is_invoice": true,
+    "optional": false,
+    "other_entries": [],
+    "party": "Lab Customer One",
+    "party_entries": [
+     {
+      "amount": "-118.00",
+      "bill_allocations": [],
+      "is_deemed_positive": "Yes",
+      "ledger": "Lab Customer One"
+     }
+    ],
+    "party_group": "Sundry Debtors",
+    "post_dated": false,
+    "status": "complete",
+    "tax_in_books": [
+     {
+      "amount": "9.00",
+      "bill_allocations": [],
+      "head": "cgst",
+      "is_deemed_positive": "No",
+      "ledger": "Lab Output CGST",
+      "raw_head": "CGST"
+     },
+     {
+      "amount": "9.00",
+      "bill_allocations": [],
+      "head": "sgst_utgst",
+      "is_deemed_positive": "No",
+      "ledger": "Lab Output SGST",
+      "raw_head": "SGST/UTGST"
+     }
+    ],
+    "taxable_entries": [
+     {
+      "amount": "100.00",
+      "bill_allocations": [],
+      "is_deemed_positive": "No",
+      "ledger": "Lab Sales"
+     }
+    ],
+    "voucher_class": "Sales",
+    "voucher_number": "2",
+    "voucher_type": "Sales"
+   }
+  ],
+  "ledger_masters_observed": 8,
+  "next_offset": null,
+  "offset": 0,
+  "other_voucher_types_touching_duties_taxes": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "profile": "agent_sales_register_v1",
+  "reason": null,
+  "register_classes": [
+   "Sales",
+   "Credit Note"
+  ],
+  "sales_vouchers_without_duties_taxes_entry": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "state": "complete",
+  "total": 1,
+  "unclassified_voucher_type": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "vouchers_observed": 1,
+  "vouchers_with_unplaced_ledgers": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  }
+ },
+ "truncated": false
+}

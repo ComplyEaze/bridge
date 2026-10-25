@@ -1,0 +1,380 @@
+{
+ "comment": "bank_reconciliation on a statement that adds up, each check exactly Re 1 off (the first row's balance +100, one running-balance step -100, the declared closing 100 over the last row's balance and over its opening plus its rows), so every unmatched row is explained: bankrec_paths's books, its statement in date order with rows on the period's first and last days. An equal-gap tie decided by index (p01 takes row 1), a split each way (p02 over rows 3-4; row 5 over p03+p04), bank-only charges matched upper-cased (a lower-case term, and 'Straße' upper-casing to STRASSE), both timing reasons (p05, p06, p10), a voucher with two bank lines (p07), a zero-net voucher and an optional one left out (p08, p09), a numberless voucher labelled by its GUID's last 12 characters (p10), a narration over 60 characters and a missing balance; the window ends on the FY end.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_adds_up-000"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_adds_up-001"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-bankrec_adds_up-002"
+  },
+  {
+   "name": "Bank Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-bankrec_adds_up-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-bankrec_adds_up-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Edge Bank",
+   "opening": 1000000,
+   "debit": 462000,
+   "credit": 342777,
+   "closing": 1119223
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "p00",
+   "date": "2026-02-27",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     200000
+    ],
+    [
+     "Customer A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2026-03-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     100000
+    ],
+    [
+     "Customer A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2026-03-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Edge Bank",
+     -300000
+    ],
+    [
+     "Supplier B",
+     300000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2026-03-15",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     50000
+    ],
+    [
+     "Customer A",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2026-03-15",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     70000
+    ],
+    [
+     "Customer A",
+     -70000
+    ]
+   ]
+  },
+  {
+   "guid": "p05",
+   "date": "2026-03-20",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Edge Bank",
+     -40000
+    ],
+    [
+     "Supplier B",
+     40000
+    ]
+   ]
+  },
+  {
+   "guid": "p06",
+   "date": "2026-03-25",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     25000
+    ],
+    [
+     "Customer A",
+     -25000
+    ]
+   ]
+  },
+  {
+   "guid": "p07",
+   "date": "2026-03-18",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     10000
+    ],
+    [
+     "Edge Bank",
+     5000
+    ],
+    [
+     "Customer A",
+     -15000
+    ]
+   ]
+  },
+  {
+   "guid": "p08",
+   "date": "2026-03-12",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Edge Bank",
+     2000
+    ],
+    [
+     "Edge Bank",
+     -2000
+    ],
+    [
+     "Customer A",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "p09",
+   "date": "2026-03-14",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     999999
+    ],
+    [
+     "Customer A",
+     -999999
+    ]
+   ],
+   "status": "optional"
+  },
+  {
+   "guid": "gūid-ēdge-00000000000p10",
+   "date": "2026-03-26",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Edge Bank",
+     -777
+    ],
+    [
+     "Supplier B",
+     777
+    ]
+   ],
+   "number": ""
+  }
+ ],
+ "tests": [
+  "bank_reconciliation"
+ ],
+ "bank_reconciliation_ledger": "Edge Bank",
+ "bank_charge_terms": [
+  "sms alert",
+  "Straße"
+ ],
+ "bank_statement": {
+  "doc_id": "bank:edge:adds_up",
+  "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "account_ref": "XXXXXX0009",
+  "bank": "Invented Bank",
+  "period": {
+   "start": "2026-03-01",
+   "end": "2026-03-31"
+  },
+  "opening_balance_paise": 1200000,
+  "closing_balance_paise": 1227577,
+  "rows": [
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 0,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-01",
+    "narration": "SMS ALERT FEE MAR",
+    "debit_paise": 100,
+    "credit_paise": 0,
+    "balance_paise": 1200000
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 1,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-03",
+    "narration": "NEFT A AGAIN",
+    "debit_paise": 0,
+    "credit_paise": 100000,
+    "balance_paise": 1300000
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 2,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-07",
+    "narration": "NEFT A",
+    "debit_paise": 0,
+    "credit_paise": 100000,
+    "balance_paise": 1400000
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 3,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-11",
+    "narration": "CHQ 1 PART",
+    "debit_paise": 100000,
+    "credit_paise": 0,
+    "balance_paise": 1300000
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 4,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-12",
+    "narration": "CHQ 2 PART",
+    "debit_paise": 200000,
+    "credit_paise": 0,
+    "balance_paise": 1100000
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 5,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-16",
+    "narration": "NEFT TWO RECEIPTS",
+    "debit_paise": 0,
+    "credit_paise": 120000,
+    "balance_paise": 1219900
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 6,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-18",
+    "narration": "sms alert charges",
+    "debit_paise": 5000,
+    "credit_paise": 0,
+    "balance_paise": 1214900
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 7,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-18",
+    "narration": "NEFT C",
+    "debit_paise": 0,
+    "credit_paise": 15000,
+    "balance_paise": 1229900
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 8,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-22",
+    "narration": "Kontoführung straße gebühr",
+    "debit_paise": 3000,
+    "credit_paise": 0,
+    "balance_paise": null
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 9,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-28",
+    "narration": "UNKNOWN CREDIT",
+    "debit_paise": 0,
+    "credit_paise": 777,
+    "balance_paise": 1227677
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 10,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-30",
+    "narration": "UPI/ई-भुगतान/ककककककककककककककककककककककककककककककककककककककककककककख्य्अ END OF NARRATION TAIL",
+    "debit_paise": 150,
+    "credit_paise": 0,
+    "balance_paise": 1227527
+   },
+   {
+    "doc": "bank:edge:adds_up",
+    "row": 11,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2026-03-31",
+    "narration": "Straße charge",
+    "debit_paise": 50,
+    "credit_paise": 0,
+    "balance_paise": 1227477
+   }
+  ]
+ }
+}

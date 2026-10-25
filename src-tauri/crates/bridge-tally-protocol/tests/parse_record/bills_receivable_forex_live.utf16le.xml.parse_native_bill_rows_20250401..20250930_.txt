@@ -1,0 +1,293 @@
+# fixture: tests/fixtures/bills_receivable_forex_live.utf16le.xml
+# parser: parse_native_bill_rows(20250401..20250930)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "BRIDGE FX DEBTOR A",
+        reference: "FX-OPEN-1",
+        bill_date: TallyDate(
+            "20250331",
+        ),
+        due_date: TallyDate(
+            "20250331",
+        ),
+        closing_balance: ExactDecimal(
+            "-43000.00",
+        ),
+        tally_overdue_days: Some(
+            183,
+        ),
+    },
+    NativeBillRow {
+        party: "BRIDGE INR DEBTOR A",
+        reference: "INR-OPEN-1",
+        bill_date: TallyDate(
+            "20250331",
+        ),
+        due_date: TallyDate(
+            "20250331",
+        ),
+        closing_balance: ExactDecimal(
+            "-1000.00",
+        ),
+        tally_overdue_days: Some(
+            183,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 02",
+        reference: "FX-INV-01",
+        bill_date: TallyDate(
+            "20250411",
+        ),
+        due_date: TallyDate(
+            "20250511",
+        ),
+        closing_balance: ExactDecimal(
+            "-1250.00",
+        ),
+        tally_overdue_days: Some(
+            142,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 03",
+        reference: "FX-INV-02",
+        bill_date: TallyDate(
+            "20250421",
+        ),
+        due_date: TallyDate(
+            "20250521",
+        ),
+        closing_balance: ExactDecimal(
+            "-1500.00",
+        ),
+        tally_overdue_days: Some(
+            132,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 01",
+        reference: "FX-INV-03",
+        bill_date: TallyDate(
+            "20250501",
+        ),
+        due_date: TallyDate(
+            "20250531",
+        ),
+        closing_balance: ExactDecimal(
+            "-1750.00",
+        ),
+        tally_overdue_days: Some(
+            122,
+        ),
+    },
+    NativeBillRow {
+        party: "FX USD Debtor 01",
+        reference: "FXU-INV-001",
+        bill_date: TallyDate(
+            "20250501",
+        ),
+        due_date: TallyDate(
+            "20250531",
+        ),
+        closing_balance: ExactDecimal(
+            "-83500.00",
+        ),
+        tally_overdue_days: Some(
+            122,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 02",
+        reference: "FX-INV-04",
+        bill_date: TallyDate(
+            "20250511",
+        ),
+        due_date: TallyDate(
+            "20250610",
+        ),
+        closing_balance: ExactDecimal(
+            "-2000.00",
+        ),
+        tally_overdue_days: Some(
+            112,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 03",
+        reference: "FX-INV-05",
+        bill_date: TallyDate(
+            "20250521",
+        ),
+        due_date: TallyDate(
+            "20250620",
+        ),
+        closing_balance: ExactDecimal(
+            "-2250.00",
+        ),
+        tally_overdue_days: Some(
+            102,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 01",
+        reference: "FX-INV-06",
+        bill_date: TallyDate(
+            "20250531",
+        ),
+        due_date: TallyDate(
+            "20250630",
+        ),
+        closing_balance: ExactDecimal(
+            "-2500.00",
+        ),
+        tally_overdue_days: Some(
+            92,
+        ),
+    },
+    NativeBillRow {
+        party: "FX USD Debtor 02",
+        reference: "FXU-INV-002",
+        bill_date: TallyDate(
+            "20250601",
+        ),
+        due_date: TallyDate(
+            "20250601",
+        ),
+        closing_balance: ExactDecimal(
+            "-172000.00",
+        ),
+        tally_overdue_days: Some(
+            121,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 02",
+        reference: "FX-INV-07",
+        bill_date: TallyDate(
+            "20250610",
+        ),
+        due_date: TallyDate(
+            "20250710",
+        ),
+        closing_balance: ExactDecimal(
+            "-2750.00",
+        ),
+        tally_overdue_days: Some(
+            82,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 03",
+        reference: "FX-INV-08",
+        bill_date: TallyDate(
+            "20250620",
+        ),
+        due_date: TallyDate(
+            "20250720",
+        ),
+        closing_balance: ExactDecimal(
+            "-3000.00",
+        ),
+        tally_overdue_days: Some(
+            72,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 01",
+        reference: "FX-INV-09",
+        bill_date: TallyDate(
+            "20250630",
+        ),
+        due_date: TallyDate(
+            "20250730",
+        ),
+        closing_balance: ExactDecimal(
+            "-3250.00",
+        ),
+        tally_overdue_days: Some(
+            62,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 02",
+        reference: "FX-INV-10",
+        bill_date: TallyDate(
+            "20250710",
+        ),
+        due_date: TallyDate(
+            "20250809",
+        ),
+        closing_balance: ExactDecimal(
+            "-3500.00",
+        ),
+        tally_overdue_days: Some(
+            52,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 03",
+        reference: "FX-INV-11",
+        bill_date: TallyDate(
+            "20250720",
+        ),
+        due_date: TallyDate(
+            "20250819",
+        ),
+        closing_balance: ExactDecimal(
+            "-3750.00",
+        ),
+        tally_overdue_days: Some(
+            42,
+        ),
+    },
+    NativeBillRow {
+        party: "FX Party 01",
+        reference: "FX-INV-12",
+        bill_date: TallyDate(
+            "20250730",
+        ),
+        due_date: TallyDate(
+            "20250829",
+        ),
+        closing_balance: ExactDecimal(
+            "-4000.00",
+        ),
+        tally_overdue_days: Some(
+            32,
+        ),
+    },
+    NativeBillRow {
+        party: "BRIDGE FX DEBTOR A",
+        reference: "FX-INV-1",
+        bill_date: TallyDate(
+            "20250902",
+        ),
+        due_date: TallyDate(
+            "20250902",
+        ),
+        closing_balance: ExactDecimal(
+            "-51600.00",
+        ),
+        tally_overdue_days: Some(
+            28,
+        ),
+    },
+    NativeBillRow {
+        party: "BRIDGE INR DEBTOR A",
+        reference: "INR-INV-1",
+        bill_date: TallyDate(
+            "20250902",
+        ),
+        due_date: TallyDate(
+            "20250902",
+        ),
+        closing_balance: ExactDecimal(
+            "-2000.00",
+        ),
+        tally_overdue_days: Some(
+            28,
+        ),
+    },
+])

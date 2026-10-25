@@ -11,7 +11,7 @@ keeps its measurements and adds three things:
 ## Its sibling
 
 [`module-decomposition.md`](./module-decomposition.md) covers **how**: where to cut, what the
-parent keeps, the reseal order, and how to prove a move is pure. This document covers **whether
+parent keeps, the acknowledgement, and how to prove a move is pure. This document covers **whether
 and what**: which files to touch, what counts as a good seam, and the principles behind both.
 Read both before splitting a file.
 [`frontend-module-conventions.md`](./frontend-module-conventions.md) is the TypeScript and React
@@ -20,8 +20,8 @@ counterpart.
 ## The constraint general advice does not know about
 
 Most large files here are **pinned** in `docs/tally/compatibility/compatibility-surface.json`. A
-split changes the pin set, raises `MAX_SURFACE_FILES` by one named reason per new file, and needs
-`scripts/reseal.sh`. The evidence that attests the old file does not automatically
+split changes the pin set (each new pin with its own `reason`) and needs
+an acknowledgement file under `docs/tally/compatibility/acks/`. The evidence that attests the old file does not automatically
 attest the new ones. **The cost of splitting a pinned file is not the edit; it is the
 attestation.** Everything below assumes that cost is real.
 
@@ -96,9 +96,9 @@ non-idiomatic Rust. Treat them as questions only.
      for `include_str!` and script `readFile` calls naming the file. The first `commands.rs` split
      (#472) broke a `lib.rs` test that sliced `include_str!("commands.rs")`; test names were
      identical and CI caught it.
-   - **Also:** `cargo fmt --check`, clippy, and the reseal verification.
-9. **A pinned split carries its reasons.** Record one named reason per new pin beside
-   `MAX_SURFACE_FILES`, and pin every new file that decides what Bridge posts or lets leave the
+   - **Also:** `cargo fmt --check`, clippy, and the compatibility acknowledgement when a pinned path changed.
+9. **A pinned split carries its reasons.** Record one `reason` per new pin in the pin
+   list, and pin every new file that decides what Bridge posts or lets leave the
    machine ([`module-decomposition.md`](./module-decomposition.md)).
 10. **Don't reach for a new crate** unless you need something a module cannot give:
     - a compile or incremental-build boundary worth its dependency management;
@@ -118,6 +118,12 @@ non-idiomatic Rust. Treat them as questions only.
     Use a `syn`-based item graph, [`cargo-modules`](https://github.com/regexident/cargo-modules)
     (`structure`, `dependencies`), or rust-analyzer's SCIP index. Add change coupling from git
     history when a static seam looks clean.
+13. **Pair every `compile_fail` doctest with one that must compile.** Stable rustdoc does not check
+    the error code after `compile_fail` (measured on 1.96.0: a block marked `compile_fail,E0603`
+    passes on an E0451 error), so the block passes on any error, including a path that a move or
+    a narrower visibility made unreachable. Beside it, add a doctest that names the same item by
+    the same path and must compile. #1561 adds the first pair, on
+    `ApprovedPartyStatementDestination`.
 
 ## Decision checklist
 
@@ -137,7 +143,7 @@ Answer these in the PR body before splitting a file:
 9. Can the parent stay a pure façade?
 10. Is this one named group, small enough to review as a move?
 11. Do test *names* match before and after on both workspaces, with fmt and clippy clean?
-12. Did you reseal in order (regenerate, verify, stage) and leave `git status` clean?
+12. Did you add the acknowledgement (`acks/pr-<N>.txt`) listing every changed pinned path and every new pin, and leave `git status` clean?
 
 ## The current map
 
@@ -161,7 +167,7 @@ The earlier draft's open questions now have measured answers:
   layers and shared output types.
 - **The ten "ledger data" functions are at least four responsibilities,** each with its own
   closure: standard ledger source records (`parse_ledger_source_records_with_evidence` and its
-  wrappers), native ledger collection, period balance report, write read-back. The standard ledger
+  wrappers), native ledger collection, period balance report (removed by #1643; see #1642), write read-back. The standard ledger
   catalogue and identity (`parse_standard_ledger_catalog*`, 622 lines) is a separate family beside
   them.
 - **Text encoding is the first safe split.** It is 22 items and 586 lines, with no coupling to the
@@ -169,7 +175,7 @@ The earlier draft's open questions now have measured answers:
 
 Proposed order: text encoding, then import outcome (492 lines, depending only on XML reader
 primitives), then the base layers as `pub(crate)` modules, then the ledger families one per PR.
-This work is owned by a separate lane and waits for #456's test extraction.
+This work is being done separately and waits for #456's test extraction.
 
 ### `src/commands.rs` (~3,350 item lines, pinned)
 
@@ -190,7 +196,7 @@ shared items:
 - live reads: companies, ledgers, outstandings, selected ledger entries;
 - client group labels and preferences;
 - exports and party statements;
-- thin delegations to documents, Axal and the desktop journal.
+- thin delegations to the desktop journal.
 
 `commands_trial_balance.rs` already shows the per-feature pattern as `commands::trial_balance`.
 
@@ -221,10 +227,10 @@ per-iteration locals, so cutting between them would trade one long function for 
 ones. That is the "deep module over shallow modules" judgement applied to a function. Revisit it
 only if the locals can become one named per-iteration state type.
 
-### `src/db/tally_mirror.rs` (~5,900 lines, pinned)
+### `src/db/tally_mirror.rs` (~5,100 lines, pinned)
 
-**Shape.** About 3,660 lines are one `impl TallyMirrorRepository`, plus about 1,170 lines of free
-helpers and 800 lines of types.
+**Shape.** About 3,000 lines are one `impl TallyMirrorRepository`, plus about 1,150 lines of standalone
+helpers and 660 lines of types.
 
 **Families.** Grouping the repository's methods by name gives this rough split. It is keyword-based
 and indicative only, so read the methods before drawing a boundary:
@@ -232,7 +238,7 @@ and indicative only, so read the methods before drawing a boundary:
 | Family | Lines | Methods |
 |---|---:|---:|
 | Snapshot, commit and batch | ~1,480 | 21 |
-| Write canary and fixture enrolment (ADR 0004) | ~800 | 12 |
+| Write fixture enrolment (ADR 0004) | ~180 | 3 |
 | Proofs, explorer and reconciliation | ~490 | 7 |
 | Migrations and connection pool | ~380 | 3 |
 | Company, profile and setup | ~370 | 7 |
@@ -242,16 +248,12 @@ A method-aware root set is needed before measuring closures.
 
 ### `crates/bridge-tally-core` (pinned files)
 
-- **`bills_reconciliation.rs::assess_party_outstanding`** is 416 of the file's 688 item lines, 26
-  times the median: the crate's clearest one-huge-function case. Its body reads as six phases, from
-  scope admission to on-account handling. Extracting those steps in place is claimed tonight by a
-  separate lane.
 - **`master_binding.rs`** is one pipeline under `bind`, not a module of many things. Its one clean
   seam is identifier extraction: 18 items and 442 lines behind `extract_identifiers` and the
   `Identifier` types. That would be a deep module. It is also the most scrutinised code here
   (ADR 0016), so splitting it needs the master-binding owner's agreement.
 - **`book_presence.rs::decide`** is 393 lines, 12 times the file's median. Step extraction in place
-  is claimed by a separate lane.
+  is being done separately.
 
 ### Not yet measured
 

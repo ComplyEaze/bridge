@@ -31,15 +31,18 @@ const BILLS_PAYABLE_VALIDATION_LAB: &str =
 const LEDGER_SNAPSHOT_VALIDATION_LAB: &str =
     include_str!("fixtures/native/ledger_snapshot_validation_lab.xml");
 
-/// `BOOKSFROM` for "Bridge Billwise Lab", from `company_extent_9000.xml`
+/// `BOOKSFROM` for "Bridge Billwise Lab", from
+/// `agent/native-company-book-extents-with-number.utf8.xml`
 /// (`<BOOKSFROM TYPE="Date">20240401</BOOKSFROM>`).
 const BILLWISE_LAB_BOOKS_FROM: &str = "20240401";
-/// `BOOKSFROM` for "Bridge Ageing Lab", from `company_extent_9000.xml`
+/// `BOOKSFROM` for "Bridge Ageing Lab", from
+/// `agent/native-company-book-extents-with-number.utf8.xml`
 /// (`<BOOKSFROM TYPE="Date">20260401</BOOKSFROM>`).
 const AGEING_LAB_BOOKS_FROM: &str = "20260401";
 const NATIVE_CAPTURE_AS_OF: &str = "20260731";
 /// `BOOKSFROM` for the purpose-built `Bridge Validation Lab`, observed via
-/// the paired `CompanyBookExtentV1` read that bracketed the 2026-08-17 capture.
+/// the paired `CompanyBookExtentV1` read (a profile since removed) that
+/// bracketed the 2026-08-17 capture.
 const VALIDATION_LAB_BOOKS_FROM: &str = "20250401";
 const VALIDATION_CAPTURE_AS_OF: &str = "20260817";
 
@@ -833,9 +836,13 @@ fn absent_billoverdue_is_not_the_same_as_present_but_empty() {
             &as_of(VALIDATION_LAB_BOOKS_FROM),
             &as_of(VALIDATION_CAPTURE_AS_OF),
         ),
-        Err(NativeOutstandingsError::InvalidResponse(
-            "bills_fixed_row_missing_billoverdue"
-        ))
+        Err(NativeOutstandingsError::BillRow {
+            report: None,
+            row: 1,
+            cause: Box::new(NativeOutstandingsError::InvalidResponse(
+                "bills_fixed_row_missing_billoverdue"
+            )),
+        })
     );
 }
 
@@ -1372,9 +1379,13 @@ fn billfixed_missing_billcl_fails_closed() {
     );
     assert_eq!(
         result,
-        Err(NativeOutstandingsError::InvalidResponse(
-            "bills_fixed_row_missing_billcl"
-        ))
+        Err(NativeOutstandingsError::BillRow {
+            report: None,
+            row: 1,
+            cause: Box::new(NativeOutstandingsError::InvalidResponse(
+                "bills_fixed_row_missing_billcl"
+            )),
+        })
     );
 }
 
@@ -1414,7 +1425,13 @@ fn empty_bill_party_from_raw_bytes_fails_closed_before_double_counting() {
     match result {
         Err(error) => assert_eq!(
             error,
-            NativeOutstandingsError::InvalidResponse("bills_fixed_empty_billparty")
+            NativeOutstandingsError::BillRow {
+                report: None,
+                row: 1,
+                cause: Box::new(NativeOutstandingsError::InvalidResponse(
+                    "bills_fixed_empty_billparty"
+                )),
+            }
         ),
         Ok(result) => {
             assert_exact(&result.report.receivable_total, "100");
@@ -1448,9 +1465,13 @@ fn whitespace_and_self_closing_bill_party_use_the_distinct_empty_party_error() {
                 &as_of(AGEING_LAB_BOOKS_FROM),
                 &as_of(NATIVE_CAPTURE_AS_OF),
             ),
-            Err(NativeOutstandingsError::InvalidResponse(
-                "bills_fixed_empty_billparty"
-            ))
+            Err(NativeOutstandingsError::BillRow {
+                report: None,
+                row: 1,
+                cause: Box::new(NativeOutstandingsError::InvalidResponse(
+                    "bills_fixed_empty_billparty"
+                )),
+            })
         );
     }
 }
@@ -1479,9 +1500,13 @@ fn self_closing_empty_billoverdue_is_none_and_still_rejects_duplicates() {
             &as_of(VALIDATION_LAB_BOOKS_FROM),
             &as_of(VALIDATION_CAPTURE_AS_OF),
         ),
-        Err(NativeOutstandingsError::InvalidResponse(
-            "bills_duplicate_billoverdue"
-        ))
+        Err(NativeOutstandingsError::BillRow {
+            report: None,
+            row: 1,
+            cause: Box::new(NativeOutstandingsError::InvalidResponse(
+                "bills_duplicate_billoverdue"
+            )),
+        })
     );
 }
 
@@ -1539,7 +1564,11 @@ fn illegal_numeric_references_in_amounts_remain_fail_closed() {
             &as_of(BILLWISE_LAB_BOOKS_FROM),
             &as_of(NATIVE_CAPTURE_AS_OF),
         ),
-        Err(NativeOutstandingsError::InvalidAmount)
+        Err(NativeOutstandingsError::BillRow {
+            report: None,
+            row: 1,
+            cause: Box::new(NativeOutstandingsError::InvalidAmount),
+        })
     );
 
     let ledgers = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\

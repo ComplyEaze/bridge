@@ -20,8 +20,8 @@ use bridge_tally_compatibility::{
         BILLS_NATIVE_OUTSTANDINGS_PROBE_RECEIPT_SCHEMA_VERSION,
         BILLS_NATIVE_OUTSTANDINGS_PROFILE_ID, BILLS_NATIVE_OUTSTANDINGS_REPORT_ID,
     },
-    now_unix_ms, sha256_file, ApplicationStatus, CompatibilitySurfaceManifest, DatasetTier,
-    LocaleProfile, LoopbackFamily, ProductFamily, TallyMode, MAX_ARTIFACT_BYTES,
+    now_unix_ms, sha256_file, ApplicationStatus, DatasetTier, LocaleProfile, LoopbackFamily,
+    ProductFamily, TallyMode, MAX_ARTIFACT_BYTES,
 };
 use bridge_tally_protocol::{
     bills_native_outstandings_probe::{
@@ -46,8 +46,8 @@ use thiserror::Error;
 
 use super::{
     canonical_join, current_architecture, current_platform, encoding, git_output, read_bounded,
-    read_loopback, save_receipt_no_replace, sha256_hex, valid_commit, valid_release, valid_slug,
-    MAX_LOCAL_INPUT_BYTES,
+    read_loopback, resolve_surface_refusing_drift, save_receipt_no_replace, sha256_hex,
+    valid_commit, valid_release, valid_slug, MAX_LOCAL_INPUT_BYTES, SURFACE_RELATIVE_PATH,
 };
 
 const CONFIG_SCHEMA_VERSION: u16 = 1;
@@ -394,20 +394,19 @@ impl LoadedNativeOutstandingsProbe {
         }
         let ui_before = load_ui(&ui_before_path, "native_probe_ui_before_unavailable")?;
 
-        let surface_path =
-            repository_root.join("docs/tally/compatibility/compatibility-surface.json");
-        let surface = CompatibilitySurfaceManifest::from_json(
+        let surface_path = repository_root.join(SURFACE_RELATIVE_PATH);
+        let surface = resolve_surface_refusing_drift(
+            &repository_root,
             &read_bounded(
                 &surface_path,
                 MAX_ARTIFACT_BYTES,
                 "native_probe_surface_unavailable",
             )
             .map_err(|_| error("native_probe_surface_unavailable"))?,
+            "native_probe_surface_invalid",
+            "native_probe_surface_changed",
         )
-        .map_err(|_| error("native_probe_surface_invalid"))?;
-        surface
-            .validate_files(&repository_root)
-            .map_err(|_| error("native_probe_surface_changed"))?;
+        .map_err(|failure| error(failure.safe_code()))?;
 
         let loaded_at_unix_ms = now_unix_ms().map_err(|_| error("native_probe_clock_invalid"))?;
         validate_ui(&ui_before, "before", &fixture, &scenario, loaded_at_unix_ms)?;

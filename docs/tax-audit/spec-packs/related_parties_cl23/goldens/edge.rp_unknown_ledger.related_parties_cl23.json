@@ -1,0 +1,283 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "related_parties_cl23",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "ab3d3f4e061679c1",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). One entry = one voucher's net Dr+/Cr- line-sum on a person's nature ledger set.",
+  "figures": [
+    {
+      "id": "related_parties_cl23.amount_rent_06ce36b0",
+      "value": -300000,
+      "unit": "paise",
+      "definition_sha256_16": "8d921c94d8c582bc",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 06ce36b0)'s 'rent' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Missing Rent Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Upsilon Rent Payable",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "j01",
+          "label": "Journal j01 on 2025-09-30"
+        },
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Payment p01 on 2025-10-05"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_total_06ce36b0",
+      "value": -300000,
+      "unit": "paise",
+      "definition_sha256_16": "49f0a00a3bb28abe",
+      "definition_text": "Sum of amount_<nature>_06ce36b0 across every nature configured for person (tag 06ce36b0).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.applicable",
+      "value": "yes",
+      "unit": "text",
+      "definition_sha256_16": "9b27b7c2da441e41",
+      "definition_text": "Whether any related person has been confirmed by the client for this engagement. 'no' means none were confirmed -- never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.payable_accrued_rent_06ce36b0",
+      "value": 1500000,
+      "unit": "paise",
+      "definition_sha256_16": "8f540e7ecced171b",
+      "definition_text": "TB period CREDIT movement (accrual, P&L side) on person (tag 06ce36b0)'s 'rent' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Missing Rent Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Upsilon Rent Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_closing_rent_06ce36b0",
+      "value": 300000,
+      "unit": "paise",
+      "definition_sha256_16": "e2d3e639fd460d81",
+      "definition_text": "Closing payable (-TB closing_paise) on person (tag 06ce36b0)'s 'rent' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Missing Rent Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Upsilon Rent Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_opening_rent_06ce36b0",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "5c046ce491f5411f",
+      "definition_text": "Opening payable (-TB opening_paise) on person (tag 06ce36b0)'s 'rent' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Missing Rent Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Upsilon Rent Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_paid_rent_06ce36b0",
+      "value": 1200000,
+      "unit": "paise",
+      "definition_sha256_16": "b10ba8f5bf31357d",
+      "definition_text": "TB period DEBIT movement (amount actually paid) on person (tag 06ce36b0)'s 'rent' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Missing Rent Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Upsilon Rent Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.related_person_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "8feb927f1116a35a",
+      "definition_text": "Related persons confirmed by the client for this engagement.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_06ce36b0",
+      "value": "nephew of the proprietor",
+      "unit": "text",
+      "definition_sha256_16": "f641d1a2440a03b5",
+      "definition_text": "Relationship confirmed by the client for related person (tag 06ce36b0) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/06ce36b0",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "rent",
+          "figure_id": "related_parties_cl23.amount_rent_06ce36b0"
+        },
+        {
+          "name": "rent_accrued",
+          "figure_id": "related_parties_cl23.payable_accrued_rent_06ce36b0"
+        },
+        {
+          "name": "rent_paid",
+          "figure_id": "related_parties_cl23.payable_paid_rent_06ce36b0"
+        },
+        {
+          "name": "rent_payable_closing",
+          "figure_id": "related_parties_cl23.payable_closing_rent_06ce36b0"
+        },
+        {
+          "name": "rent_payable_opening",
+          "figure_id": "related_parties_cl23.payable_opening_rent_06ce36b0"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_06ce36b0"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "75a5e0d2b3fcd00a",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 06ce36b0) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/clause23/06ce36b0",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "rent",
+          "figure_id": "related_parties_cl23.amount_rent_06ce36b0"
+        },
+        {
+          "name": "rent_accrued",
+          "figure_id": "related_parties_cl23.payable_accrued_rent_06ce36b0"
+        },
+        {
+          "name": "rent_paid",
+          "figure_id": "related_parties_cl23.payable_paid_rent_06ce36b0"
+        },
+        {
+          "name": "rent_payable_closing",
+          "figure_id": "related_parties_cl23.payable_closing_rent_06ce36b0"
+        },
+        {
+          "name": "rent_payable_opening",
+          "figure_id": "related_parties_cl23.payable_opening_rent_06ce36b0"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_06ce36b0"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "2ac0b7ab32bf0991",
+      "title_text": "Transactions with a related person (tag 06ce36b0) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [
+    {
+      "invariant": "EVID-1",
+      "subject": "related_parties_cl23",
+      "detail": "unresolved ledger:Missing Rent Payable"
+    },
+    {
+      "invariant": "EVID-1",
+      "subject": "related_parties_cl23",
+      "detail": "unresolved ledger:Missing Rent Payable"
+    },
+    {
+      "invariant": "EVID-1",
+      "subject": "related_parties_cl23",
+      "detail": "unresolved ledger:Missing Rent Payable"
+    },
+    {
+      "invariant": "EVID-1",
+      "subject": "related_parties_cl23",
+      "detail": "unresolved ledger:Missing Rent Payable"
+    },
+    {
+      "invariant": "EVID-1",
+      "subject": "related_parties_cl23",
+      "detail": "unresolved ledger:Missing Rent Payable"
+    }
+  ],
+  "module_invariants_evaluated": [
+    "related_parties_cl23.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

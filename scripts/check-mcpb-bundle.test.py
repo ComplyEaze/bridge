@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
+import ast
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 
 spec = importlib.util.spec_from_file_location("mcpb_smoke", Path(__file__).with_name("check-mcpb-bundle.py"))
@@ -14,6 +17,22 @@ spec.loader.exec_module(smoke)
 
 
 class BundleSmokeTests(unittest.TestCase):
+    def test_tool_lists_are_one_name_per_line_sorted_without_duplicates(self):
+        # Two pull requests that add different tools then touch different lines.
+        # The sets stay hand-written; this reads the source, because a set
+        # literal drops a duplicate before the test could see it.
+        tree = ast.parse(Path(__file__).with_name("check-mcpb-bundle.py").read_text())
+        found = {}
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Set):
+                found[node.targets[0].id] = node.value
+        for name in ("DEFAULT_TOOLS", "IMPORT_TOOLS", "POSTING_TOOLS"):
+            elements = found[name].elts
+            names = [element.value for element in elements]
+            self.assertEqual(names, sorted(set(names)), name)
+            lines = [element.lineno for element in elements]
+            self.assertEqual(len(lines), len(set(lines)), f"{name}: one name per line")
+
     def test_schema_receipts_require_matching_write_completion(self):
         response = b'{"jsonrpc":"2.0","id":3,"result":{}}\n'
         digest = smoke.hashlib.sha256(response).hexdigest()
@@ -41,6 +60,7 @@ class BundleSmokeTests(unittest.TestCase):
                 bundle.writestr("manifest.json", json.dumps(manifest))
                 for resource in smoke.RESOURCES:
                     bundle.writestr(resource, "packaging fixture")
+                bundle.writestr(smoke.ICON, "packaging fixture")
                 bundle.writestr("bin/bridge_mcp", "packaging fixture")
                 bundle.writestr("bin/libpdfium.dylib", "packaging fixture")
                 bundle.writestr(smoke.PDFIUM_NOTICE, "packaging fixture")
@@ -49,7 +69,8 @@ class BundleSmokeTests(unittest.TestCase):
             self.assertFalse((root / "outside").exists())
             self.assertFalse((root / "unpacked").exists())
 
-    def pdfium_bundle(self, root, library_bytes=None, notice_bytes=None, include_library=True):
+    def pdfium_bundle(self, root, library_bytes=None, notice_bytes=None, include_library=True,
+                      archive_icon=True, manifest_icon=None):
         """A bundle that passes every check before the PDFium ones, against a
         repository holding the real lock file."""
         repository = root / "repository"
@@ -61,12 +82,18 @@ class BundleSmokeTests(unittest.TestCase):
             (repository / resource).write_text("packaging fixture")
         entry = "bin/host/bridge_mcp"
         library = "bin/host/" + smoke.PDFIUM_LIBRARIES[sys.platform]
-        manifest = {"server": {"type": "binary", "entry_point": entry,
+        manifest = {"icon": manifest_icon or smoke.ICON,
+                    "server": {"type": "binary", "entry_point": entry,
                                "mcp_config": {"command": "${__dirname}/" + entry}},
                     "compatibility": {"platforms": [sys.platform]}}
+        icon = smoke.PNG_SIGNATURE + b"icon fixture"
+        (repository / smoke.ICON_SOURCE).parent.mkdir(parents=True, exist_ok=True)
+        (repository / smoke.ICON_SOURCE).write_bytes(icon)
         archive = root / "bundle.mcpb"
         with zipfile.ZipFile(archive, "w") as bundle:
             bundle.writestr("manifest.json", json.dumps(manifest))
+            if archive_icon is not None:
+                bundle.writestr(smoke.ICON, icon if archive_icon is True else archive_icon)
             for resource in smoke.RESOURCES:
                 bundle.writestr(resource, "packaging fixture")
             info = zipfile.ZipInfo(entry)
@@ -95,6 +122,36 @@ class BundleSmokeTests(unittest.TestCase):
             archive, repository = self.pdfium_bundle(root, include_library=False)
             with self.assertRaisesRegex(smoke.SmokeError, "unexpected_archive_members"):
                 smoke.unpack_bundle(archive, root / "unpacked", repository)
+
+    @unittest.skipUnless(sys.platform in smoke.PDFIUM_LIBRARIES, "PDFium is bundled for macOS and Windows only")
+    def test_the_icon_must_be_present_named_by_the_manifest_and_the_committed_file(self):
+        cases = (
+            ({"archive_icon": None}, "unexpected_archive_members"),
+            ({"manifest_icon": "logo.png"}, "icon_declaration_mismatch"),
+            ({"archive_icon": b"not a png"}, "icon_is_not_png"),
+            ({"archive_icon": smoke.PNG_SIGNATURE + b"another image"}, "icon_bytes_differ"),
+        )
+        for options, code in cases:
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                archive, repository = self.pdfium_bundle(root, **options)
+                with self.assertRaisesRegex(smoke.SmokeError, code):
+                    smoke.unpack_bundle(archive, root / "unpacked", repository)
+
+    def test_the_shipped_notice_reserves_the_rights_in_the_icon(self):
+        # NOTICE is copied into every archive and the smoke compares the archive's bytes to it, so
+        # this is what a user of the package reads about the icon: not Apache-2.0, rights reserved.
+        repository = Path(__file__).resolve().parents[1]
+        text = " ".join((repository / "NOTICE").read_text(encoding="utf-8").split())
+        self.assertIn("packaging/mcpb/icon.png", text)
+        self.assertIn("are not licensed under Apache-2.0: all rights in them are reserved", text)
+        self.assertIn("A fork or modified build must replace them", text)
+
+    def test_the_committed_manifest_names_the_committed_icon(self):
+        repository = Path(__file__).resolve().parents[1]
+        manifest = json.loads((repository / "packaging/mcpb/manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["icon"], smoke.ICON)
+        self.assertTrue((repository / smoke.ICON_SOURCE).read_bytes().startswith(smoke.PNG_SIGNATURE))
 
     def test_an_unpinned_host_is_refused(self):
         repository = Path(__file__).resolve().parents[1]
@@ -134,8 +191,8 @@ class BundleSmokeTests(unittest.TestCase):
     def test_posting_defaults_off_and_a_default_on_manifest_is_refused(self):
         template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
         manifest = json.loads(template.read_text(encoding="utf-8"))
-        self.assertIs(manifest["user_config"]["enable_writes"]["default"], False)
-        manifest["user_config"]["enable_writes"]["default"] = True
+        self.assertIs(manifest["user_config"]["enable_posting_2026_10"]["default"], False)
+        manifest["user_config"]["enable_posting_2026_10"]["default"] = True
         with self.assertRaisesRegex(smoke.SmokeError, "posting_must_default_off"):
             smoke.resolve_environment(manifest)
 
@@ -149,9 +206,18 @@ class BundleSmokeTests(unittest.TestCase):
         enabled = smoke.expected_tools(dict(default, BRIDGE_AGENT_ENABLE_WRITES="true"))
         self.assertEqual(enabled - tools, {"post_import", "acknowledge_post_review"})
 
+    def test_the_tax_audit_tool_is_off_by_default_and_its_switch_adds_only_it(self):
+        template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
+        default = smoke.resolve_environment(json.loads(template.read_text(encoding="utf-8")))
+        self.assertEqual(default["BRIDGE_AGENT_ENABLE_TAX_AUDIT"], "false")
+        tools = smoke.expected_tools(default)
+        self.assertNotIn("audit_test_run", tools)
+        enabled = smoke.expected_tools(dict(default, BRIDGE_AGENT_ENABLE_TAX_AUDIT="true"))
+        self.assertEqual(enabled - tools, {"audit_test_run"})
+
     def test_import_mapping_must_be_the_constant_true(self):
         template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
-        for mapping in ("false", "${user_config.enable_writes}", "1"):
+        for mapping in ("false", "${user_config.enable_posting_2026_10}", "1"):
             manifest = json.loads(template.read_text(encoding="utf-8"))
             manifest["server"]["mcp_config"]["env"]["BRIDGE_AGENT_ENABLE_IMPORT"] = mapping
             with self.subTest(mapping=mapping), self.assertRaisesRegex(
@@ -166,19 +232,56 @@ class BundleSmokeTests(unittest.TestCase):
         template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
         for default in ("true", "false", 0, 1, None):
             manifest = json.loads(template.read_text(encoding="utf-8"))
-            manifest["user_config"]["enable_writes"]["default"] = default
+            manifest["user_config"]["enable_posting_2026_10"]["default"] = default
             with self.subTest(default=default), self.assertRaisesRegex(
                     smoke.SmokeError, "writes_default_must_be_boolean"):
                 smoke.resolve_environment(manifest)
 
     def test_write_mapping_cannot_bypass_user_setting(self):
         template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
-        for mapping in ("true", "false", "${user_config.redaction}"):
+        for mapping in ("true", "false", "${user_config.redaction}",
+                        "${user_config.enable_writes}"):
             manifest = json.loads(template.read_text(encoding="utf-8"))
             manifest["server"]["mcp_config"]["env"]["BRIDGE_AGENT_ENABLE_WRITES"] = mapping
             with self.subTest(mapping=mapping), self.assertRaisesRegex(
                     smoke.SmokeError, "writes_environment_mapping_mismatch"):
                 smoke.resolve_environment(manifest)
+
+    def test_terms_setting_defaults_to_not_accepted_and_is_mapped(self):
+        template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
+        manifest = json.loads(template.read_text(encoding="utf-8"))
+        self.assertEqual(smoke.resolve_environment(manifest)["BRIDGE_TERMS_ACCEPTED"], "false")
+        for field, value in (("default", True), ("default", None), ("type", "string")):
+            broken = json.loads(template.read_text(encoding="utf-8"))
+            broken["user_config"]["accept_terms_2026_10_1"][field] = value
+            with self.subTest(field=field, value=value), self.assertRaisesRegex(
+                    smoke.SmokeError, "^terms_setting_must_be_boolean_and_off$"):
+                smoke.resolve_environment(broken)
+        broken = json.loads(template.read_text(encoding="utf-8"))
+        del broken["user_config"]["accept_terms_2026_10_1"]
+        with self.assertRaisesRegex(smoke.SmokeError, "^terms_setting_must_be_boolean_and_off$"):
+            smoke.resolve_environment(broken)
+        # bridge#1413: a required setting with no stored value stops Claude Desktop from starting
+        # the server, so no setting may be required, the Terms setting included.
+        for name in ("accept_terms_2026_10_1", "port"):
+            broken = json.loads(template.read_text(encoding="utf-8"))
+            broken["user_config"][name]["required"] = True
+            with self.subTest(required=name), self.assertRaisesRegex(
+                    smoke.SmokeError, "^required_setting_blocks_launch$"):
+                smoke.resolve_environment(broken)
+        unrequired = json.loads(template.read_text(encoding="utf-8"))
+        unrequired["user_config"]["accept_terms_2026_10_1"]["required"] = False
+        self.assertEqual(smoke.resolve_environment(unrequired)["BRIDGE_TERMS_ACCEPTED"], "false")
+        for mapping in ("true", "${user_config.enable_posting_2026_10}"):
+            broken = json.loads(template.read_text(encoding="utf-8"))
+            broken["server"]["mcp_config"]["env"]["BRIDGE_TERMS_ACCEPTED"] = mapping
+            with self.subTest(mapping=mapping), self.assertRaisesRegex(
+                    smoke.SmokeError, "terms_environment_mapping_mismatch"):
+                smoke.resolve_environment(broken)
+        broken = json.loads(template.read_text(encoding="utf-8"))
+        del broken["server"]["mcp_config"]["env"]["BRIDGE_TERMS_ACCEPTED"]
+        with self.assertRaisesRegex(smoke.SmokeError, "unexpected_environment_mapping"):
+            smoke.resolve_environment(broken)
 
     def test_server_output_is_bounded(self):
         command = [sys.executable, "-c", "import sys; sys.stdout.write('x' * 1048576); sys.stdout.flush()"]
@@ -189,6 +292,119 @@ class BundleSmokeTests(unittest.TestCase):
         command = [sys.executable, "-c", "import time; time.sleep(10)"]
         with self.assertRaisesRegex(smoke.SmokeError, "server_timeout"):
             smoke.run_bounded(command, b"", os.environ.copy(), timeout=0.1)
+
+
+REAL_RMTREE = smoke.shutil.rmtree  # the patches below replace shutil.rmtree for the whole module
+
+
+class ScratchDirectoryTests(unittest.TestCase):
+    """The scratch folder holds the bundle's server binary, which Windows can keep locked for a moment
+    after the process has exited. Removing the folder must wait for that, and must not turn a finished
+    smoke run into a failure when it cannot."""
+
+    def scratch(self):
+        with mock.patch.object(smoke.time, "sleep") as sleep:
+            with smoke.scratch_directory("bridge-mcpb-test-") as path:
+                Path(path, "server.exe").write_bytes(b"x")
+                self.path = path
+                self.addCleanup(REAL_RMTREE, path, True)
+        self.sleep = sleep
+
+    def locked(self, failures, error=PermissionError):
+        real = REAL_RMTREE
+        calls = []
+
+        def remover(path, *args, **kwargs):
+            calls.append(path)
+            if failures is None or len(calls) <= failures:
+                raise error(13, "in use", path)
+            return real(path, *args, **kwargs)
+
+        return mock.patch.object(smoke.shutil, "rmtree", remover), calls
+
+    def test_a_folder_that_cannot_be_removed_at_first_is_removed_once_the_lock_clears(self):
+        patch, calls = self.locked(2)
+        with patch:
+            self.scratch()
+        self.assertEqual(len(calls), 3)
+        self.assertFalse(os.path.exists(self.path))
+
+    def test_a_folder_that_stays_locked_does_not_fail_the_run_and_says_what_was_left(self):
+        patch, calls = self.locked(None)
+        with patch, mock.patch.object(sys, "stderr", new=io.StringIO()) as stderr:
+            self.scratch()
+        message = stderr.getvalue()
+        self.assertIn("MCPB smoke could not remove its scratch folder " + self.path, message)
+        self.assertIn("PermissionError", message)
+        self.assertNotIn("Traceback", message)
+        self.assertTrue(os.path.exists(self.path))
+
+    def test_the_wait_is_bounded_and_pauses_between_attempts_only(self):
+        patch, calls = self.locked(None)
+        with patch, mock.patch.object(sys, "stderr", new=io.StringIO()):
+            self.scratch()
+        self.assertEqual(len(calls), smoke.REMOVE_ATTEMPTS)
+        self.assertTrue(3 <= len(calls) <= 12, "retries, but not without end")
+        self.assertLessEqual(smoke.REMOVE_ATTEMPTS * smoke.REMOVE_PAUSE_SECONDS, 10)
+        self.assertEqual(self.sleep.call_count, len(calls) - 1, "a pause between attempts, none after the last")
+
+    def test_an_error_cleanup_masks_as_not_a_directory_is_retried_like_any_oserror(self):
+        # TemporaryDirectory's own handler recurses into a locked file and surfaces this one.
+        patch, calls = self.locked(1, NotADirectoryError)
+        with patch:
+            self.scratch()
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(os.path.exists(self.path))
+
+    def test_a_folder_that_is_already_gone_is_neither_retried_nor_reported(self):
+        patch, calls = self.locked(None, FileNotFoundError)
+        with patch, mock.patch.object(sys, "stderr", new=io.StringIO()) as stderr:
+            self.scratch()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_an_interrupt_during_the_wait_is_not_swallowed(self):
+        patch, calls = self.locked(None, KeyboardInterrupt)
+        with patch, self.assertRaises(KeyboardInterrupt):
+            self.scratch()
+        self.assertEqual(len(calls), 1)
+
+    def test_an_error_inside_the_run_still_removes_the_folder_and_propagates(self):
+        with mock.patch.object(smoke.time, "sleep"):
+            with self.assertRaisesRegex(smoke.SmokeError, "boom"):
+                with smoke.scratch_directory("bridge-mcpb-test-") as path:
+                    Path(path, "server.exe").write_bytes(b"x")
+                    kept = path
+                    self.addCleanup(REAL_RMTREE, path, True)
+                    raise smoke.SmokeError("boom")
+        self.assertFalse(os.path.exists(kept))
+
+    def test_the_smoke_run_keeps_its_unpacked_bundle_in_the_scratch_folder(self):
+        tree = ast.parse(Path(__file__).with_name("check-mcpb-bundle.py").read_text())
+        names = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+        names |= {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+        self.assertNotIn("TemporaryDirectory", names)
+        function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "smoke")
+        used = [item.context_expr.func.id for node in ast.walk(function) if isinstance(node, ast.With)
+                for item in node.items if isinstance(item.context_expr, ast.Call)
+                and isinstance(item.context_expr.func, ast.Name)]
+        self.assertIn("scratch_directory", used)
+
+    @unittest.skipUnless(os.name == "nt", "a file held open without delete sharing locks removal on Windows")
+    def test_a_file_held_open_is_waited_for_against_the_real_operating_system(self):
+        held = []
+
+        def release(_seconds):
+            while held:
+                held.pop().close()
+
+        with mock.patch.object(smoke.time, "sleep", side_effect=release) as sleep:
+            with smoke.scratch_directory("bridge-mcpb-test-") as path:
+                self.path = path
+                self.addCleanup(REAL_RMTREE, path, True)
+                held.append(open(Path(path, "server.exe"), "wb"))
+        self.assertEqual(sleep.call_count, 1)
+        self.assertFalse(os.path.exists(self.path))
 
 
 if __name__ == "__main__":

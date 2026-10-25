@@ -13,8 +13,29 @@ test("a deadline explains the safe next step without exposing protocol jargon", 
     }),
     {
       category: "Tally is taking longer than expected",
-      action: "Bridge did not change data in Tally. Do not repeat the same request. Wait until Tally is responsive, then review the connection and company before making a changed request.",
+      action: "ComplyEaze Bridge did not change data in Tally. Do not repeat the same request. Wait until Tally is responsive, then review the connection and company before making a changed request.",
     },
+  );
+});
+
+test("a missing or invalid mirror key says a retry does not help and points at the credential store, not at Tally", () => {
+  const expected = {
+    category: "The local Tally mirror cannot be opened",
+    action: "Retrying does not help. Open ComplyEaze Bridge as the same computer user and restore that user's credential store (see the technical details), then open ComplyEaze Bridge again. Nothing was deleted and nothing changed in Tally.",
+  };
+  for (const code of ["tally_mirror_key_missing", "tally_mirror_key_invalid"]) {
+    assert.deepEqual(classifyTallyError({ code, message: "The encrypted Tally mirror cannot be opened." }), expected, code);
+    // A command that reports a plain string leads with the code, and gets the same guidance.
+    assert.deepEqual(
+      classifyUnstructuredTallyError(`${code}: The encrypted Tally mirror exists, but its key is not available. Retrying does not help.`),
+      expected,
+      `${code} as a string`,
+    );
+  }
+  assert.notDeepEqual(
+    classifyTallyError({ code: "tally_mirror_unavailable", message: "The encrypted Tally mirror could not be opened." }),
+    expected,
+    "a credential-store failure keeps its own, retryable guidance",
   );
 });
 
@@ -22,8 +43,8 @@ test("an unstructured request failure remains fail-closed without internal navig
   assert.deepEqual(
     classifyUnstructuredTallyError("Cannot read properties of undefined (reading 'invoke')"),
     {
-      category: "Bridge could not complete this request",
-      action: "Bridge cannot confirm the final state. Do not retry the same request yet; check Tally and the connection first.",
+      category: "ComplyEaze Bridge could not complete this request",
+      action: "ComplyEaze Bridge cannot confirm the final state. Do not retry the same request yet; check Tally and the connection first.",
     },
   );
 });
@@ -41,7 +62,8 @@ test("a plain endpoint failure gives the operator one clear next step", () => {
 test("a persisted-profile failure stays local instead of directing the operator to Tally", () => {
   const guidance = classifyUnstructuredTallyError("persisted_tally_company_profiles_unavailable");
 
-  assert.match(guidance.category, /saved company profiles are unavailable/i);
-  assert.match(guidance.action, /restart bridge/i);
-  assert.match(guidance.action, /keep tally unchanged/i);
+  assert.deepEqual(guidance, {
+    category: "ComplyEaze Bridge's saved company profiles are unavailable",
+    action: "ComplyEaze Bridge could not read its local saved company profiles. Restart ComplyEaze Bridge. If this happens again, keep Tally unchanged and ask for help with ComplyEaze Bridge's local data.",
+  });
 });

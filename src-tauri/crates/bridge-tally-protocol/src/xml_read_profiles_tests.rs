@@ -1,25 +1,14 @@
 use super::*;
 
-fn profiles<'a>(
-    company: &'a ValidatedCompanyName,
-    range: &'a ValidatedDateRange,
-    canary_ledger: &'a ValidatedCanaryLedgerName,
-    identity_query_sha256: &'a ValidatedIdentityQuerySha256,
-) -> [ReadOnlyProfile<'a>; 9] {
+fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 7] {
     [
         ReadOnlyProfile::CompanyListV1,
         ReadOnlyProfile::CompanyListV2,
         ReadOnlyProfile::CompanyBookExtentV2 { company },
         ReadOnlyProfile::StandardLedgerIdentityV1 { company },
         ReadOnlyProfile::StandardLedgerCatalogV1 { company },
+        ReadOnlyProfile::StandardLedgerCatalogV2 { company },
         ReadOnlyProfile::LedgersV1 { company },
-        ReadOnlyProfile::LedgerCanaryReadbackV1 {
-            company,
-            ledger_name: canary_ledger,
-            identity_query_sha256,
-        },
-        ReadOnlyProfile::VouchersV2 { company, range },
-        ReadOnlyProfile::VouchersV3 { company, range },
     ]
 }
 
@@ -55,42 +44,12 @@ fn validated_inputs_reject_arbitrary_or_invalid_values() {
         assert_eq!(ValidatedDateRange::new(from, to), Err(expected));
     }
     assert!(ValidatedDateRange::new("20240229", "20240229").is_ok());
-    for ledger_name in [
-        "",
-        "Cash",
-        "BRIDGE-CANARY-",
-        "canary\nledger",
-        "canary\"ledger",
-        "canary:$ledger",
-    ] {
-        assert_eq!(
-            ValidatedCanaryLedgerName::new(ledger_name),
-            Err(ReadProfileValidationError::CanaryLedgerInvalid)
-        );
-    }
-    assert_eq!(
-        ValidatedCanaryLedgerName::new("x".repeat(129)),
-        Err(ReadProfileValidationError::CanaryLedgerInvalid)
-    );
-    assert!(ValidatedCanaryLedgerName::new("BRIDGE-CANARY-LEDGER-001").is_ok());
-    assert_eq!(
-        ValidatedIdentityQuerySha256::new("a".repeat(63)),
-        Err(ReadProfileValidationError::IdentityQueryInvalid)
-    );
-    assert_eq!(
-        ValidatedIdentityQuerySha256::new("g".repeat(64)),
-        Err(ReadProfileValidationError::IdentityQueryInvalid)
-    );
 }
 
 #[test]
 fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     let company = ValidatedCompanyName::new("BRIDGE & <SYNTHETIC> \"BOOK\"").unwrap();
-    let range = ValidatedDateRange::new("20260401", "20260430").unwrap();
-    let canary_ledger = ValidatedCanaryLedgerName::new(TEMPLATE_CANARY_LEDGER).unwrap();
-    let identity_query_sha256 =
-        ValidatedIdentityQuerySha256::new(TEMPLATE_IDENTITY_QUERY_SHA256).unwrap();
-    for profile in profiles(&company, &range, &canary_ledger, &identity_query_sha256) {
+    for profile in profiles(&company) {
         let request = profile.render();
         let upper = request.to_ascii_uppercase();
         assert!(upper.contains("<TALLYREQUEST>EXPORT</TALLYREQUEST>"));
@@ -101,22 +60,6 @@ fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     let ledger = ReadOnlyProfile::LedgersV1 { company: &company }.render();
     assert!(ledger.contains("BRIDGE &amp; &lt;SYNTHETIC&gt; &quot;BOOK&quot;"));
     assert!(!ledger.contains("BRIDGE & <SYNTHETIC>"));
-
-    let canary = ReadOnlyProfile::LedgerCanaryReadbackV1 {
-        company: &company,
-        ledger_name: &canary_ledger,
-        identity_query_sha256: &identity_query_sha256,
-    }
-    .render();
-    assert!(canary.contains(BRIDGE_LEDGER_WRITE_READBACK_SCHEMA));
-    assert!(canary.contains("<FILTERS>BRIDGE Ledger Exact Canary Name V1</FILTERS>"));
-    assert!(canary.contains(
-        "<SYSTEM TYPE=\"Formulae\" NAME=\"BRIDGE Ledger Exact Canary Name V1\">$Name = \"BRIDGE-CANARY-LEDGER-001\"</SYSTEM>"
-    ));
-    assert!(canary.contains("$Name = \"BRIDGE-CANARY-LEDGER-001\""));
-    assert!(canary.contains(
-        "<XMLATTR>\"QUERYIDENTITYSETSHA256\" : \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"</XMLATTR>"
-    ));
 
     let injection =
         ValidatedCompanyName::new("X</SVCURRENTCOMPANY><TALLYREQUEST>IMPORT</TALLYREQUEST>")
@@ -137,14 +80,6 @@ fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     assert!(!bootstrap.contains("<TALLYREQUEST>IMPORT"));
     assert!(bootstrap.contains("&lt;/SVCURRENTCOMPANY&gt;"));
 
-    let extent_request = ReadOnlyProfile::CompanyBookExtentV1 {
-        company: &injection,
-    }
-    .render();
-    assert_eq!(extent_request.matches("<TALLYREQUEST>").count(), 1);
-    assert!(!extent_request.contains("<TALLYREQUEST>IMPORT"));
-    assert!(extent_request.contains("&lt;/SVCURRENTCOMPANY&gt;"));
-
     let extent_v2_request = ReadOnlyProfile::CompanyBookExtentV2 {
         company: &injection,
     }
@@ -152,47 +87,6 @@ fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     assert_eq!(extent_v2_request.matches("<TALLYREQUEST>").count(), 1);
     assert!(!extent_v2_request.contains("<TALLYREQUEST>IMPORT"));
     assert!(extent_v2_request.contains("&lt;/SVCURRENTCOMPANY&gt;"));
-
-    #[cfg(feature = "voucher-scan")]
-    {
-        let pinned = PinnedCompany::verified(injection.clone(), "synthetic-guid".to_string())
-            .expect("verified test identity");
-        let window = crate::outstandings::DateWindow::parse(
-            crate::outstandings::DateBoundaryProfile::EducationRestricted,
-            "20260401",
-            "20260402",
-        )
-        .unwrap()
-        .narrow_partitions()
-        .unwrap()
-        .remove(0);
-        for request in [
-            ReadOnlyProfile::VoucherOutstandingsV1 {
-                company: &pinned,
-                window: &window,
-                alter_id_range: AlterIdRange::new(0, 1).unwrap(),
-            }
-            .render(),
-            ReadOnlyProfile::VoucherEmptyPartitionWitnessV1 {
-                company: &pinned,
-                window: &window,
-            }
-            .render(),
-        ] {
-            assert_eq!(request.matches("<TALLYREQUEST>").count(), 1);
-            assert!(!request.contains("<TALLYREQUEST>IMPORT"));
-            assert!(request.contains("&lt;/SVCURRENTCOMPANY&gt;"));
-        }
-        let witness = ReadOnlyProfile::VoucherEmptyPartitionWitnessV1 {
-            company: &pinned,
-            window: &window,
-        };
-        assert_eq!(
-            witness.id(),
-            ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1
-        );
-        assert!(witness.template_sha256().len() == 64);
-    }
 }
 
 /// `CompanyListV2` is a native Tally `Company` collection, not the
@@ -224,8 +118,7 @@ fn company_list_v2_is_a_native_collection_scoped_to_no_single_company() {
 
 #[test]
 fn profile_ids_and_template_hashes_are_stable() {
-    #[cfg_attr(not(feature = "voucher-scan"), allow(unused_mut))]
-    let mut expected: Vec<(ReadOnlyProfileId, &str)> = vec![
+    let expected: Vec<(ReadOnlyProfileId, &str)> = vec![
         (
             ReadOnlyProfileId::CompanyListV1,
             "8905c041a75929f157be704ca9dd076a37995dc7936e0ad71c9361406a8fb694",
@@ -233,10 +126,6 @@ fn profile_ids_and_template_hashes_are_stable() {
         (
             ReadOnlyProfileId::CompanyListV2,
             "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
-        ),
-        (
-            ReadOnlyProfileId::CompanyBookExtentV1,
-            "f46420fd96ee567069d1bf70c7895e76c75482b5370fc52e97aea64b8950d3a5",
         ),
         (
             ReadOnlyProfileId::CompanyBookExtentV2,
@@ -251,24 +140,20 @@ fn profile_ids_and_template_hashes_are_stable() {
             "3f38d58a88c8bb99180290b2fb17a3057d6149f78d81e08ba3d9bfc2d595dd95",
         ),
         (
+            ReadOnlyProfileId::StandardLedgerCatalogV2,
+            "e93bbf843455db2a4c9f77991c52b16f10b16bbb792af5ecae4909a48216a62e",
+        ),
+        (
             ReadOnlyProfileId::LedgersV1,
             "259b8159eb7c5a503c96f2760996db992127298781d5a332699a090cea90301b",
         ),
         (
-            ReadOnlyProfileId::LedgerCanaryReadbackV1,
-            "e580b53ed7420ea15de08cb91b3aaf629028d32ddc79949eab6d8ca886628062",
-        ),
-        (
-            ReadOnlyProfileId::VouchersV2,
-            "81cc3da69ab58cd857603342898a2b3142ade321d5fea38de76c425612ccf6df",
-        ),
-        (
-            ReadOnlyProfileId::VouchersV3,
-            "8dbe02d0645ff6b055ea8f6fb63d27af90dc41e81ee42b39ee7d2b407ab4aa3b",
-        ),
-        (
             ReadOnlyProfileId::AuditCompanyObjectV1,
             "ff023f06940b80c8e922d8b238772cd77e18f220b2fd7a4be7af667029948acf",
+        ),
+        (
+            ReadOnlyProfileId::InvoiceCompanyHsnV1,
+            "bb3efcb756ab15771e58e1daaa543af6bb73b0e32a43a723f0d1ed7d11219703",
         ),
         (
             ReadOnlyProfileId::AuditLedgersV1,
@@ -283,21 +168,6 @@ fn profile_ids_and_template_hashes_are_stable() {
             "18f8280794a476fd3b44f55c63a9f3060b7a523da82331744fe4fc0b0a151337",
         ),
     ];
-    #[cfg(feature = "voucher-scan")]
-    expected.extend([
-        (
-            ReadOnlyProfileId::LedgerOpeningCoverageV1,
-            "ae607d1d0ae4347f30e03ae3f7ee6c9a48b936be1cf71bb63ea1966727871efb",
-        ),
-        (
-            ReadOnlyProfileId::VoucherOutstandingsV1,
-            "165b40352eda40491a189d58ac81777b307bb709c65afb1f3555f19f0df0edd9",
-        ),
-        (
-            ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1,
-            "7e9d3befbb8ef32503e0fe960c78aedcbf8a8075c056a8de1ad40846e6d109bc",
-        ),
-    ]);
     let observed = expected
         .iter()
         .map(|(profile, _)| (profile.as_str(), profile.template_sha256()))
@@ -313,7 +183,6 @@ fn profile_ids_and_template_hashes_are_stable() {
 #[test]
 fn compatibility_renderers_preserve_validated_profile_bytes() {
     let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
-    let range = ValidatedDateRange::new("20260401", "20260430").unwrap();
     assert_eq!(
         compatibility::company_list_request(),
         ReadOnlyProfile::CompanyListV1.render()
@@ -330,30 +199,6 @@ fn compatibility_renderers_preserve_validated_profile_bytes() {
         compatibility::ledgers_request(company.as_str()),
         ReadOnlyProfile::LedgersV1 { company: &company }.render()
     );
-    assert_eq!(
-        compatibility::vouchers_request(
-            company.as_str(),
-            range.from_yyyymmdd(),
-            range.to_yyyymmdd(),
-        ),
-        ReadOnlyProfile::VouchersV2 {
-            company: &company,
-            range: &range,
-        }
-        .render()
-    );
-    assert_eq!(
-        compatibility::selected_vouchers_request(
-            company.as_str(),
-            range.from_yyyymmdd(),
-            range.to_yyyymmdd(),
-        ),
-        ReadOnlyProfile::VouchersV3 {
-            company: &company,
-            range: &range,
-        }
-        .render()
-    );
 }
 
 /// Every element of `xml` as its slash-joined path and trimmed text, in
@@ -366,15 +211,11 @@ fn element_paths(xml: &str) -> Vec<(String, String)> {
     loop {
         match reader.read_event().unwrap() {
             Event::Start(event) => {
-                path.push(String::from_utf8(event.name().as_ref().to_vec()).unwrap());
+                path.push(event.name().as_ref().to_owned());
                 for attribute in event.attributes() {
                     let attribute = attribute.unwrap();
                     out.push((
-                        format!(
-                            "{}/@{}",
-                            path.join("/"),
-                            String::from_utf8(attribute.key.as_ref().to_vec()).unwrap()
-                        ),
+                        format!("{}/@{}", path.join("/"), attribute.key.as_ref()),
                         attribute
                             .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                             .unwrap()
@@ -384,14 +225,12 @@ fn element_paths(xml: &str) -> Vec<(String, String)> {
                 out.push((path.join("/"), String::new()));
             }
             Event::Text(text) => {
-                let text = text.decode().unwrap();
                 if let Some(last) = out.last_mut() {
                     last.1.push_str(&text);
                 }
             }
             Event::GeneralRef(reference) => {
-                let name = reference.decode().unwrap();
-                let decoded = quick_xml::escape::resolve_predefined_entity(&name).unwrap();
+                let decoded = quick_xml::escape::resolve_predefined_entity(&reference).unwrap();
                 out.last_mut().unwrap().1.push_str(decoded);
             }
             Event::End(_) => {
@@ -404,6 +243,30 @@ fn element_paths(xml: &str) -> Vec<(String, String)> {
     out.into_iter()
         .map(|(path, text)| (path, text.trim().to_string()))
         .collect()
+}
+
+/// The invoice build's company read is, character for character, the
+/// request the lab answered on 12 Oct 2026 (the file starts with a byte order
+/// mark), and differs from the audit part's only in its field list.
+#[test]
+fn invoice_company_hsn_is_the_company_object_request_the_lab_answered() {
+    let bytes = include_bytes!(
+        "../tests/fixtures/agent/pilot-lab/pilot-lab-company-object.request.utf16le.xml"
+    );
+    let units = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+    let sent = String::from_utf16(&units).unwrap();
+    let company = ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap();
+    let invoice = ReadOnlyProfile::InvoiceCompanyHsnV1 { company: &company }.render();
+    assert_eq!(sent.trim_start_matches('\u{feff}'), invoice);
+    let audit = ReadOnlyProfile::AuditCompanyObjectV1 { company: &company }.render();
+    let fields = AUDIT_COMPANY_FETCH
+        .iter()
+        .map(|field| format!("<FETCH>{field}</FETCH>"))
+        .collect::<String>();
+    assert_eq!(audit.replace(&fields, "<FETCH>*</FETCH>"), invoice);
 }
 
 #[test]
@@ -571,7 +434,7 @@ fn audit_fetch_lists_carry_what_a_silent_default_would_hide() {
         assert!(vouchers.iter().any(|field| field == required), "{required}");
     }
     // An absent quantity, rate or amount on a goods line is read as none,
-    // and the stock movement is silently dropped (Lane B, 2026-09-21).
+    // and the stock movement is silently dropped.
     for prefix in [
         "ALLLEDGERENTRIES.INVENTORYALLOCATIONS",
         "ALLINVENTORYENTRIES",
@@ -715,47 +578,32 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         match id {
             ReadOnlyProfileId::CompanyListV1
             | ReadOnlyProfileId::CompanyListV2
-            | ReadOnlyProfileId::CompanyBookExtentV1
             | ReadOnlyProfileId::CompanyBookExtentV2
             | ReadOnlyProfileId::StandardLedgerIdentityV1
             | ReadOnlyProfileId::StandardLedgerCatalogV1
+            | ReadOnlyProfileId::StandardLedgerCatalogV2
             | ReadOnlyProfileId::LedgersV1
-            | ReadOnlyProfileId::LedgerCanaryReadbackV1
-            | ReadOnlyProfileId::VouchersV2
-            | ReadOnlyProfileId::VouchersV3
             | ReadOnlyProfileId::AuditCompanyObjectV1
+            | ReadOnlyProfileId::InvoiceCompanyHsnV1
             | ReadOnlyProfileId::AuditLedgersV1
             | ReadOnlyProfileId::AuditVouchersV1
             | ReadOnlyProfileId::AuditStockItemsV1 => {}
-            #[cfg(feature = "voucher-scan")]
-            ReadOnlyProfileId::LedgerOpeningCoverageV1
-            | ReadOnlyProfileId::VoucherOutstandingsV1
-            | ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1 => {}
         }
     }
-    #[cfg_attr(not(feature = "voucher-scan"), allow(unused_mut))]
-    let mut ids = vec![
+    let ids = vec![
         ReadOnlyProfileId::CompanyListV1,
         ReadOnlyProfileId::CompanyListV2,
-        ReadOnlyProfileId::CompanyBookExtentV1,
         ReadOnlyProfileId::CompanyBookExtentV2,
         ReadOnlyProfileId::StandardLedgerIdentityV1,
         ReadOnlyProfileId::StandardLedgerCatalogV1,
+        ReadOnlyProfileId::StandardLedgerCatalogV2,
         ReadOnlyProfileId::LedgersV1,
-        ReadOnlyProfileId::LedgerCanaryReadbackV1,
-        ReadOnlyProfileId::VouchersV2,
-        ReadOnlyProfileId::VouchersV3,
         ReadOnlyProfileId::AuditCompanyObjectV1,
+        ReadOnlyProfileId::InvoiceCompanyHsnV1,
         ReadOnlyProfileId::AuditLedgersV1,
         ReadOnlyProfileId::AuditVouchersV1,
         ReadOnlyProfileId::AuditStockItemsV1,
     ];
-    #[cfg(feature = "voucher-scan")]
-    ids.extend([
-        ReadOnlyProfileId::LedgerOpeningCoverageV1,
-        ReadOnlyProfileId::VoucherOutstandingsV1,
-        ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1,
-    ]);
     ids.iter().copied().for_each(listed);
     ids
 }
@@ -774,16 +622,7 @@ fn education_refuses_exactly_the_profiles_that_render_a_spaced_function_argument
         refused.extend(hazard.map(|h| (id.as_str(), h)));
     }
     let ledgers = spaced("NumItems", "BRIDGE Ledger Collection V1");
-    let vouchers = spaced("NumItems", "BRIDGE Voucher Collection V1");
-    assert_eq!(
-        refused,
-        [
-            ("ledgers_v1", ledgers.clone()),
-            ("ledger_canary_readback_v1", ledgers),
-            ("vouchers_v2", vouchers.clone()),
-            ("vouchers_v3", vouchers),
-        ]
-    );
+    assert_eq!(refused, [("ledgers_v1", ledgers)]);
 }
 
 /// `$$name:argument`, assembled at run time: a literal would itself be a hit
@@ -820,4 +659,37 @@ fn a_spaced_function_argument_is_read_as_the_hazard_script_reads_it() {
     ] {
         assert_eq!(first_spaced_function_argument(&tdl), hit, "{tdl}");
     }
+}
+
+/// V2 is V1 and one more native method, so the same ledger rows come back with
+/// one more field, and V1's own bytes are not touched.
+#[test]
+fn the_v2_catalogue_request_is_v1_plus_the_bill_wise_method() {
+    let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
+    let v1 = ReadOnlyProfile::StandardLedgerCatalogV1 { company: &company }.render();
+    let v2 = ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render();
+    let method = "<NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>";
+    assert_eq!(v2.matches(method).count(), 1);
+    assert!(!v1.contains(method));
+    assert_eq!(
+        v2.lines()
+            .filter(|line| !line.contains(method))
+            .collect::<Vec<_>>(),
+        v1.lines().collect::<Vec<_>>()
+    );
+    // The method sits with the other native methods, not elsewhere in the request.
+    let lines = v2.lines().collect::<Vec<_>>();
+    let parent = lines
+        .iter()
+        .position(|line| line.trim() == "<NATIVEMETHOD>Parent</NATIVEMETHOD>")
+        .unwrap();
+    assert_eq!(lines[parent + 1].trim(), method);
+    assert_eq!(
+        ReadOnlyProfileId::StandardLedgerCatalogV2.as_str(),
+        "standard_ledger_catalog_v2"
+    );
+    assert_ne!(
+        ReadOnlyProfileId::StandardLedgerCatalogV1.template_sha256(),
+        ReadOnlyProfileId::StandardLedgerCatalogV2.template_sha256()
+    );
 }

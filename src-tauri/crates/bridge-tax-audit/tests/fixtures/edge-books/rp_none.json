@@ -1,0 +1,148 @@
+{
+ "comment": "related_parties_cl23: no related person confirmed (the related_parties key is absent, which the reader treats as an empty table). The gate is 'no' and its one finding is raised, although ledgers named like a relative's salary and rent move: nothing is inferred from a ledger name.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Indirect Incomes": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Sundry Creditors": "Current Liabilities"
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_none-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_none-001"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-rp_none-002"
+  },
+  {
+   "name": "Person A Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_none-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-rp_none-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Rent",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 0,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 5000000,
+   "debit": 20000000,
+   "credit": 4200000,
+   "closing": 20800000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -5000000
+  },
+  {
+   "ledger": "Person A Salary",
+   "opening": 0,
+   "debit": 3000000,
+   "credit": 0,
+   "closing": 3000000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 20000000,
+   "closing": -20000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-05-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     20000000
+    ],
+    [
+     "Sales",
+     -20000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person A Salary",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Alpha Rent",
+     1200000
+    ],
+    [
+     "Bank A",
+     -1200000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ]
+}

@@ -3,6 +3,7 @@ import { CircleHelp, Database, FileText, Play, RefreshCw } from "lucide-react";
 import { formatIdentifier, formatRuntimeTime } from "./display-format";
 import { type OperatorError, TallyErrorNotice } from "./tally-command-error";
 import { type CapabilityProfile, CapabilityRows, PACK_LABELS } from "./tally-capability-evidence";
+import { CORE_READ_REFUSAL_TITLES } from "./core-read-refusals";
 import {
   type ConnectionStatus,
   type MirrorExplorerPage,
@@ -136,7 +137,7 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
   },
   education_report_family_unsupported: {
     title: "Ledger-balance cross-view needs a licensed Tally",
-    action: "Tally is in Education mode, which cannot run this read-only report, so Bridge did not send it. Run a new evidence read against a licensed Tally.",
+    action: "Tally is in Education mode, which cannot run this read-only report, so ComplyEaze Bridge did not send it. Run a new evidence read against a licensed Tally.",
     retry: "after_change",
   },
   report_tie_out_unavailable: {
@@ -154,20 +155,40 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
     action: "Run again during a controlled quiet period. A stable reread still does not prove atomic isolation.",
     retry: "after_change",
   },
+  company_book_extent_drifted: {
+    title: CORE_READ_REFUSAL_TITLES.company_book_extent_drifted,
+    action: "Two back-to-back reads of the company's book did not match, so the run stopped. Run again when nobody is entering vouchers or masters in this company.",
+    retry: "after_change",
+  },
+  company_altmstid_missing: {
+    title: CORE_READ_REFUSAL_TITLES.company_altmstid_missing,
+    action: "Without that marker ComplyEaze Bridge cannot tell whether masters changed during the read, so the run stopped. Close and reopen the company in TallyPrime, then start a new run. If it stops the same way, update TallyPrime to its latest release before trying again.",
+    retry: "after_change",
+  },
+  company_identity_mismatch: {
+    title: CORE_READ_REFUSAL_TITLES.company_identity_mismatch,
+    action: "Tally did not report the selected company for this run. Check which company is open in Tally, select it again, and start a new run.",
+    retry: "after_change",
+  },
   minimum_window_response_too_large: {
     title: "One Tally day exceeds the bounded response limit",
-    action: "Bridge cannot split below one calendar day. Reduce that day's source density or use a future qualified collection filter before starting a new run; retrying unchanged will fail again.",
+    action: "ComplyEaze Bridge cannot split below one calendar day. Reduce that day's source density or use a future qualified collection filter before starting a new run; retrying unchanged will fail again.",
     retry: "after_change",
+  },
+  rejected_snapshot_records: {
+    title: "Source records were rejected",
+    action: "Some source records were rejected while this run was being read, so they are not in the local mirror. Do not rely on the mirror for this run's records until the cause of the rejection is understood; an unchanged retry is not expected to help.",
+    retry: "not_useful",
   },
   adaptive_window_limit_reached: {
     title: "Adaptive window safety limit reached",
-    action: "Start a new run for a shorter requested period. Bridge stopped before growing the durable split graph beyond its reviewed bound.",
+    action: "Start a new run for a shorter requested period. ComplyEaze Bridge stopped before growing the durable split graph beyond its reviewed bound.",
     retry: "after_change",
   },
 };
 
-function guidanceForGap(code: string): GapGuidance {
-  return GAP_GUIDANCE[code] ?? {
+export function guidanceForGap(code: string): GapGuidance {
+  return (Object.prototype.hasOwnProperty.call(GAP_GUIDANCE, code) ? GAP_GUIDANCE[code] : undefined) ?? {
     title: formatIdentifier(code),
     action: "Inspect the local Proof of Sync and support artifact. Do not retry unchanged until this gap's cause is understood.",
     retry: "not_useful",
@@ -361,7 +382,7 @@ export function MirrorProofScreen({
           <h2>{latestProof ? `${formatIdentifier(latestProof.outcome)} · ${formatIdentifier(latestProof.verification_state)} ${formatIdentifier(latestProof.pack_id)} attempt` : "No durable Core Accounting run receipt yet"}</h2>
           <p>
             {latestProof
-              ? `Within this run's declared Core Accounting scope, Bridge persisted ${latestProof.accepted_records} provenance-backed accepted canonical rows, ${latestProof.provenance_unavailable_records} canonical rows with an explicit provenance-unavailable gap, and ${latestProof.rejected_records} rejected rows. These are not Tally source-total counts. ${latestProof.gap_codes.length} declared gap(s) and ${latestProof.warning_codes.length} warning(s).`
+              ? `Within this run's declared Core Accounting scope, ComplyEaze Bridge persisted ${latestProof.accepted_records} provenance-backed accepted canonical rows and ${latestProof.provenance_unavailable_records} canonical rows with an explicit provenance-unavailable gap. These are not Tally source-total counts. ${latestProof.gap_codes.length} declared gap(s) and ${latestProof.warning_codes.length} warning(s).`
               : "Endpoint reachability and fetched preview rows do not establish a Verified accounting state."}
           </p>
         </div>
@@ -394,7 +415,7 @@ export function MirrorProofScreen({
           )}
         </div>
       </article>
-      <p className="section-note">Reads Bridge's declared Core Accounting v3 scope for this period. It is not a native Trial Balance, a complete-books guarantee, or an atomic Tally snapshot.</p>
+      <p className="section-note">Reads ComplyEaze Bridge's declared Core Accounting v3 scope for this period. It is not a native Trial Balance, a complete-books guarantee, or an atomic Tally snapshot.</p>
 
       {syncEvidenceError && <TallyErrorNotice message={syncEvidenceError} />}
       {snapshotError && <TallyErrorNotice message={snapshotError} />}
@@ -406,7 +427,7 @@ export function MirrorProofScreen({
       )}
       {snapshotStartOutcomeUnknown && (
         <section className="status-strip" role="alert">
-          <span>Bridge could not confirm whether the read started or resumed. Refresh saved runs before continuing.</span>
+          <span>ComplyEaze Bridge could not confirm whether the read started or resumed. Refresh saved runs before continuing.</span>
           <button className="secondary-action" type="button" disabled={acknowledgingSnapshotOutcome} onClick={() => void acknowledgeSnapshotOutcome()}>{acknowledgingSnapshotOutcome ? "Refreshing saved runs…" : "Refresh and confirm no active run"}</button>
         </section>
       )}
@@ -417,7 +438,7 @@ export function MirrorProofScreen({
           <span>Phase: {formatIdentifier(snapshotJob.phase)}</span>
           <span>Completed executable windows: {snapshotJob.completed_windows}/{snapshotJob.total_windows}</span>
           <span>{snapshotJob.verification ? `Result: ${formatIdentifier(snapshotJob.verification)}` : "No verification claim yet"}</span>
-          {snapshotJob.failure_code && <span>Failure: {formatIdentifier(snapshotJob.failure_code)}</span>}
+          {snapshotJob.failure_code && <span>Failure: {guidanceForGap(snapshotJob.failure_code).title}</span>}
           {snapshotJob.requires_resume && (
             <span>{snapshotJob.resume_available ? "Worker detached: explicit resume required" : "Detached legacy state: inspect only"}</span>
           )}
@@ -474,8 +495,8 @@ export function MirrorProofScreen({
         </article>
         <article className="truth-card">
           <span>Local verified checkpoint</span>
-          <strong>{syncEvidence?.core_accounting_freshness.checkpoint_present ? "Bridge receipt committed" : "None"}</strong>
-          <small>{syncEvidence?.core_accounting_freshness.proof_present ? "Bridge committed this local receipt atomically; it is not a Tally source watermark or source-isolation guarantee." : "Partial and failed runs never advance freshness."}</small>
+          <strong>{syncEvidence?.core_accounting_freshness.checkpoint_present ? "ComplyEaze Bridge receipt committed" : "None"}</strong>
+          <small>{syncEvidence?.core_accounting_freshness.proof_present ? "ComplyEaze Bridge committed this local receipt atomically; it is not a Tally source watermark or source-isolation guarantee." : "Partial and failed runs never advance freshness."}</small>
         </article>
         <article className="truth-card">
           <span>Incremental execution</span>
@@ -517,7 +538,7 @@ export function MirrorProofScreen({
           <div>
             <h2>Local mirror explorer</h2>
             <p className="panel-description">Paged, privacy-preserving metadata for the selected company and Core Accounting pack. Names, amounts, source IDs, and payloads are not returned to this view.</p>
-            <p className="section-note">Totals describe rows currently held in Bridge's local mirror for the selected pack/run state. They are not Tally source counts and may reflect a Partial attempt. Aliases are page-local and may shift after later runs.</p>
+            <p className="section-note">Totals describe rows currently held in ComplyEaze Bridge's local mirror for the selected pack/run state. They are not Tally source counts and may reflect a Partial attempt. Aliases are page-local and may shift after later runs.</p>
           </div>
           <button className="secondary-action" onClick={() => void loadMirrorExplorerPage(0)} disabled={!selectedCompanyRecord?.mirror_company_id || tallyAction !== null}>
             <Database size={16} /> {tallyAction === "explorer" ? "Loading..." : "Load mirror page"}
@@ -558,7 +579,7 @@ export function MirrorProofScreen({
         <div className="panel-heading">
           <div>
             <h2>Hash-linked local proof ledger</h2>
-            <p className="panel-description">Append-only under Bridge's local controls. Hash checks detect inconsistency; this is not a signature, a tamper-proof audit log, or proof that the responder was genuine Tally.</p>
+            <p className="panel-description">Append-only under ComplyEaze Bridge's local controls. Hash checks detect inconsistency; this is not a signature, a tamper-proof audit log, or proof that the responder was genuine Tally.</p>
           </div>
           <span>Latest {syncEvidence?.latest_proofs.length ?? 0} loaded · 20-row API limit</span>
         </div>
@@ -570,8 +591,8 @@ export function MirrorProofScreen({
         ) : (
           <div className="table-wrap" role="region" aria-label="Hash-linked local proof ledger" tabIndex={0}>
             <table>
-              <caption>Loaded Proof of Sync attempt summaries; accepted/rejected values are returned run-scope rows, not source-completeness counts; older history may not be loaded</caption>
-              <thead><tr><th>Completed</th><th>Run</th><th>Pack</th><th>Result</th><th>Accepted / rejected returned rows</th><th>Proof hash</th><th>Gaps</th><th>Warnings</th><th>Support export</th></tr></thead>
+              <caption>Loaded Proof of Sync attempt summaries; the accepted value is a returned run-scope row count, not source-completeness counts; older history may not be loaded</caption>
+              <thead><tr><th>Completed</th><th>Run</th><th>Pack</th><th>Result</th><th>Accepted returned rows</th><th>Proof hash</th><th>Gaps</th><th>Warnings</th><th>Support export</th></tr></thead>
               <tbody>
                 {syncEvidence?.latest_proofs.map((proof) => (
                   <tr key={proof.selection_token}>
@@ -579,9 +600,9 @@ export function MirrorProofScreen({
                     <td><code>{proof.run_id}</code> <CopyTokenButton value={proof.run_id} label="run ID" /></td>
                     <td>{formatIdentifier(proof.pack_id)}</td>
                     <td>{formatIdentifier(proof.outcome)} · {formatIdentifier(proof.verification_state)} · Local hash check: {proof.integrity_state === "entry_hash_valid" ? "passed" : formatIdentifier(proof.integrity_state)}</td>
-                    <td>{proof.accepted_records} / {proof.rejected_records}</td>
+                    <td>{proof.accepted_records}</td>
                     <td><code title="Local consistency commitment; not authenticity">{proof.proof_sha256.slice(0, 12)}...</code> <CopyTokenButton value={proof.proof_sha256} label="local proof hash" /></td>
-                    <td>{proof.gap_codes.length ? proof.gap_codes.map(formatIdentifier).join(", ") : "None declared"}</td>
+                    <td>{proof.gap_codes.length ? proof.gap_codes.map((code) => guidanceForGap(code).title).join(", ") : "None declared"}</td>
                     <td>{proof.warning_codes.length ? proof.warning_codes.map(formatIdentifier).join(", ") : "None declared"}</td>
                     <td><button className="secondary-action" disabled={proofPreviewSelection?.proofId === proof.selection_token} onClick={() => void previewRedactedProof(proof)}>{proofPreviewSelection?.proofId === proof.selection_token ? "Loading/selected" : "Preview"}</button></td>
                   </tr>

@@ -1,5 +1,9 @@
 //! Refusal replay of captured reports; UTF-8 fault captures are sent in the
 //! negotiated UTF-16LE encoding without changing their XML content.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use crate::tally::connection::PartyLedgerMasterSourceValidationError;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -32,7 +36,7 @@ fn captured_identity(extent: &str) -> VerifiedCompanyIdentity {
         .expect("captured extent includes the party-master company");
     VerifiedCompanyIdentity::from_observed_companies(
         company.name.clone(),
-        company.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&company.guid.clone().unwrap()),
         company.company_number.clone().unwrap(),
         company.books_from.clone().unwrap(),
         &companies,
@@ -148,6 +152,8 @@ async fn refusal(
             &identity,
             DateBoundaryProfile::ModeAgnostic,
             assertion,
+            &BalanceDateBasis::HostToday(TallyDate::parse("20990101").unwrap()),
+            crate::tally::connection::ComplianceRead::Standard,
         ),
     )
     .await

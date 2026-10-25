@@ -1,7 +1,14 @@
 //! One native report operation shared by desktop and MCP callers.
 use super::*;
+use bridge_tally_protocol::native_cash_flow::{
+    parse_native_cash_flow, render_native_cash_flow_request, NativeCashFlow, WholeMonthWindow,
+    WholeMonthWindowError,
+};
 use bridge_tally_protocol::native_statement_reports::{
     parse_native_statement, render_native_statement_request, NativeStatement, NativeStatementKind,
+};
+use bridge_tally_protocol::native_stock_summary::{
+    parse_company_inventory_flags, render_company_inventory_flags_request,
 };
 use bridge_tally_protocol::native_trial_balance::{
     parse_native_trial_balance, parse_native_trial_balance_with_currency,
@@ -31,7 +38,7 @@ pub struct TrialBalanceRead {
 
 /// Whether a caller can present a Trial Balance that covers only part of the
 /// book. A caller that cannot show the ledgers left out must never receive
-/// one, so the partial read is opt-in: [`TallyRuntime::fetch_trial_balance`]
+/// one, so the partial read is opt-in: [`TallyRuntime::fetch_trial_balance_with_extent`]
 /// keeps the single-INR refusal for every other reader (bridge#709).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TrialBalanceCurrencyScope {
@@ -169,7 +176,45 @@ struct StatementSources {
     trial_balance: SingleCurrencyTrialBalance,
     groups: Vec<TallyNamedMaster>,
     balance_sheet: NativeStatement,
+    /// Read for both tools: it is where Tally's own closing stock sits. `None`
+    /// only for a balance sheet whose read of it failed.
     profit_and_loss: Option<NativeStatement>,
+    /// Read only when that Profit and Loss offers a closing stock to use.
+    inventory: crate::reports::statements::InventoryFlags,
+}
+
+/// What a Cash Flow read adds to a Trial Balance read: the group tree that
+/// classifies its ledgers and Tally's own Cash Flow for the same window.
+struct CashFlowSources {
+    trial_balance: SingleCurrencyTrialBalance,
+    groups: Vec<TallyNamedMaster>,
+    cash_flow: NativeCashFlow,
+}
+
+enum ExtraSources {
+    Statement(StatementSources),
+    CashFlow(CashFlowSources),
+}
+
+/// What a Trial Balance read is asked to read inside its bracket besides the
+/// Trial Balance itself.
+#[derive(Clone, Copy)]
+enum TrialBalanceExtras {
+    Nothing,
+    Statement(NativeStatementKind),
+    /// Tally's Cash Flow over whole months. The window is built inside the
+    /// bracket, once the mode's date boundary profile is known.
+    CashFlow,
+}
+
+/// A Cash Flow read: the Trial Balance it is checked against, Tally's own
+/// Cash Flow, the window it covers, and the check of the one against the other,
+/// all read inside one identity and book-extent bracket (#1232).
+#[derive(Debug, Clone)]
+pub(crate) struct CashFlowRead {
+    pub(crate) trial_balance: TrialBalanceRead,
+    pub(crate) cash_flow: NativeCashFlow,
+    pub(crate) check: crate::reports::cash_flow::CashFlowCheck,
 }
 
 /// An ordered caller-selected range. Profile-specific boundary admission stays
@@ -199,6 +244,9 @@ pub(crate) enum TrialBalanceReadError {
     BeforeBooks,
     #[error("trial_balance_period_not_honoured")]
     Period(bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriodError),
+    /// The Cash Flow's window is not whole months inside the limit (#1232).
+    #[error("cash_flow_window_refused")]
+    CashFlowWindow(WholeMonthWindowError),
     #[error("{0}")]
     Currency(&'static str),
 }
@@ -209,6 +257,7 @@ impl TrialBalanceReadError {
             Self::EducationUnqualified => "trial_balance_education_unqualified",
             Self::BeforeBooks => "trial_balance_before_books",
             Self::Period(_) => "trial_balance_period_not_honoured",
+            Self::CashFlowWindow(error) => error.code(),
             Self::Currency(code) => code,
         }
     }
@@ -218,26 +267,9 @@ impl TallyRuntime {
     /// Native ledger-wise Trial Balance, with the same queue and read/write
     /// barrier as other monetary reads. Paired responses and stable book extent
     /// detect observed drift; they do not establish an atomic Tally snapshot.
-    pub async fn fetch_trial_balance(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-        period: TrialBalancePeriod,
-    ) -> anyhow::Result<TrialBalanceRead> {
-        self.fetch_trial_balance_with_extent(
-            config,
-            identity,
-            period,
-            TrialBalanceCurrencyScope::SingleCurrency,
-        )
-        .await
-        .map(|(read, _)| read)
-    }
-
-    /// As [`Self::fetch_trial_balance`], also returning the book extent the
-    /// read was pinned under: its opening and closing extents were equal, or
-    /// the read refused. A caller can tell later whether the book has moved
-    /// since (#630).
+    /// Also returns the book extent the read was pinned under: its opening and
+    /// closing extents were equal, or the read refused. A caller can tell later
+    /// whether the book has moved since (#630).
     pub(crate) async fn fetch_trial_balance_with_extent(
         &self,
         config: TallyConfig,
@@ -245,9 +277,15 @@ impl TallyRuntime {
         period: TrialBalancePeriod,
         scope: TrialBalanceCurrencyScope,
     ) -> anyhow::Result<(TrialBalanceRead, CompanyBookExtent)> {
-        self.fetch_trial_balance_sources(config, identity, period, scope, None)
-            .await
-            .map(|(read, _, extent)| (read, extent))
+        self.fetch_trial_balance_sources(
+            config,
+            identity,
+            period,
+            scope,
+            TrialBalanceExtras::Nothing,
+        )
+        .await
+        .map(|(read, _, extent)| (read, extent))
     }
 
     /// Tally's `kind` statement derived from the Trial Balance and group tree.
@@ -266,19 +304,57 @@ impl TallyRuntime {
                 identity,
                 period,
                 TrialBalanceCurrencyScope::SingleCurrency,
-                Some(kind),
+                TrialBalanceExtras::Statement(kind),
             )
             .await?;
-        let sources = sources.ok_or_else(|| anyhow::anyhow!("statement_sources_not_read"))?;
+        let Some(ExtraSources::Statement(sources)) = sources else {
+            return Err(anyhow::anyhow!("statement_sources_not_read"));
+        };
         let derived = crate::reports::statements::derive_statements(
             &sources.trial_balance,
             &sources.groups,
             &sources.balance_sheet,
             sources.profit_and_loss.as_ref(),
+            sources.inventory,
         )?;
         Ok(StatementsRead {
             trial_balance,
             derived,
+        })
+    }
+
+    /// Tally's own Cash Flow for whole months, with the Trial Balance of the
+    /// same window and the book's group tree read beside it, and the check of
+    /// the Cash Flow's net total against the cash and bank ledgers' movement.
+    /// All inside one identity and book-extent bracket; a several-currency book
+    /// is refused as for every statement.
+    pub(crate) async fn fetch_cash_flow(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        period: TrialBalancePeriod,
+    ) -> anyhow::Result<CashFlowRead> {
+        let (trial_balance, sources, _) = self
+            .fetch_trial_balance_sources(
+                config,
+                identity,
+                period,
+                TrialBalanceCurrencyScope::SingleCurrency,
+                TrialBalanceExtras::CashFlow,
+            )
+            .await?;
+        let Some(ExtraSources::CashFlow(sources)) = sources else {
+            return Err(anyhow::anyhow!("cash_flow_sources_not_read"));
+        };
+        let check = crate::reports::cash_flow::check_cash_flow(
+            &sources.trial_balance,
+            &sources.groups,
+            &sources.cash_flow,
+        )?;
+        Ok(CashFlowRead {
+            trial_balance,
+            cash_flow: sources.cash_flow,
+            check,
         })
     }
 
@@ -288,153 +364,209 @@ impl TallyRuntime {
         identity: &VerifiedCompanyIdentity,
         period: TrialBalancePeriod,
         scope: TrialBalanceCurrencyScope,
-        statement: Option<NativeStatementKind>,
-    ) -> anyhow::Result<(
-        TrialBalanceRead,
-        Option<StatementSources>,
-        CompanyBookExtent,
-    )> {
+        extras: TrialBalanceExtras,
+    ) -> anyhow::Result<(TrialBalanceRead, Option<ExtraSources>, CompanyBookExtent)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::MasterExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let identity = identity.clone();
-                let from = period.from.clone();
-                let to = period.to.clone();
-                async move {
-                    let mut evidence = RuntimeReadEvidence::empty();
-                    let result = async {
-                        let (profile, mode_evidence) = observe_read_boundary(&client).await?;
-                        evidence = mode_evidence;
-                        if profile == DateBoundaryProfile::EducationRestricted {
-                            return Err(TrialBalanceReadError::EducationUnqualified.into());
-                        }
-                        let period =
-                            NativeLedgerSnapshotPeriod::new(profile, from.clone(), to.clone())
-                                .map_err(TrialBalanceReadError::Period)?;
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let extent = client.fetch_company_book_extent(&identity).await?;
-                        if from < *extent.books_from() {
-                            return Err(TrialBalanceReadError::BeforeBooks.into());
-                        }
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let identity = identity.clone();
+            let from = period.from.clone();
+            let to = period.to.clone();
+            async move {
+                let mut evidence = RuntimeReadEvidence::empty();
+                let result = async {
+                    let (profile, mode_evidence) = observe_read_boundary(&client).await?;
+                    evidence = mode_evidence;
+                    if profile == DateBoundaryProfile::EducationRestricted {
+                        return Err(TrialBalanceReadError::EducationUnqualified.into());
+                    }
+                    let period = NativeLedgerSnapshotPeriod::new(profile, from.clone(), to.clone())
+                        .map_err(TrialBalanceReadError::Period)?;
+                    // Before anything is sent for the report: a window that
+                    // is not whole months costs no request.
+                    let cash_flow_window = match extras {
+                        TrialBalanceExtras::CashFlow => Some(
+                            WholeMonthWindow::new(profile, from.clone(), to.clone())
+                                .map_err(TrialBalanceReadError::CashFlowWindow)?,
+                        ),
+                        _ => None,
+                    };
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    let extent = client.fetch_company_book_extent(&identity).await?;
+                    if from < *extent.books_from() {
+                        return Err(TrialBalanceReadError::BeforeBooks.into());
+                    }
 
-                        let currency_request =
-                            render_company_currency_request(identity.display_name());
-                        let (currency_xml, bytes, hash) = client
-                            .fetch_native_report_paired(currency_request.clone())
-                            .await?
-                            .require_stable(PairedReadValidationError::CurrencyMaster)?;
-                        evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
-                            &currency_request,
-                            hash,
-                            bytes,
-                        ));
-                        let currency = parse_company_currency(&currency_xml)?;
-                        // A several-currency book is admitted only for a caller
-                        // that can show the ledgers left out, through the base
-                        // Tally identifies (bridge#551). Every other read keeps
-                        // the single-INR admission of existing monetary reports,
-                        // and only that admission can build the Trial Balance a
-                        // statement is derived from (#692).
-                        let admitted = if scope
-                            == TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly
-                            && currency.currency_count > 1
-                        {
-                            let masters = parse_currency_master_list(&currency_xml)?;
-                            let identified = identify_base_among_several(
-                                &client,
-                                &identity,
-                                &mut evidence,
-                                masters,
+                    let currency_request = render_company_currency_request(identity.display_name());
+                    let (currency_xml, bytes, hash) = client
+                        .fetch_native_report_paired(currency_request.clone())
+                        .await?
+                        .require_stable(PairedReadValidationError::CurrencyMaster)?;
+                    evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
+                        &currency_request,
+                        hash,
+                        bytes,
+                    ));
+                    let currency = parse_company_currency(&currency_xml)?;
+                    // A several-currency book is admitted only for a caller
+                    // that can show the ledgers left out, through the base
+                    // Tally identifies (bridge#551). Every other read keeps
+                    // the single-INR admission of existing monetary reports,
+                    // and only that admission can build the Trial Balance a
+                    // statement is derived from (#692).
+                    let admitted = if scope == TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly
+                        && currency.currency_count > 1
+                    {
+                        let masters = parse_currency_master_list(&currency_xml)?;
+                        let identified =
+                            identify_base_among_several(&client, &identity, &mut evidence, masters)
+                                .await?
+                                .ok_or(TrialBalanceReadError::Currency(
+                                    "company_base_currency_undetermined",
+                                ))?;
+                        if !identified.is_inr() {
+                            return Err(TrialBalanceReadError::Currency(
+                                "company_base_currency_not_inr",
                             )
-                            .await?
-                            .ok_or(TrialBalanceReadError::Currency(
-                                "company_base_currency_undetermined",
-                            ))?;
-                            if !identified.is_inr() {
+                            .into());
+                        }
+                        TrialBalanceAdmission::BaseAmongSeveral(identified)
+                    } else {
+                        TrialBalanceAdmission::SingleInr(
+                            CompanyCurrencyRead {
+                                currency: currency.clone(),
+                                extent: extent.clone(),
+                            }
+                            .admit_single_inr()
+                            .map_err(TrialBalanceReadError::Currency)?,
+                        )
+                    };
+                    let base = match &admitted {
+                        TrialBalanceAdmission::BaseAmongSeveral(identified) => Some(identified),
+                        TrialBalanceAdmission::SingleInr(_) => None,
+                    };
+
+                    let request = match &base {
+                        Some(_) => render_native_trial_balance_request_with_currency(
+                            identity.display_name(),
+                            &period,
+                        ),
+                        None => {
+                            render_native_trial_balance_request(identity.display_name(), &period)
+                        }
+                    };
+                    let (xml, bytes, hash) = client
+                        .fetch_native_report_paired(request.clone())
+                        .await?
+                        .require_stable(PairedReadValidationError::NativeLedgerCollection)?;
+                    evidence = evidence
+                        .clone()
+                        .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                    let (report, ledger_scope) = match &base {
+                        Some(identified) => {
+                            let scoped = parse_native_trial_balance_with_currency(
+                                &xml,
+                                identity.company_guid(),
+                                identified.base(),
+                            )?;
+                            (
+                                scoped.report,
+                                TrialBalanceLedgerScope::BaseCurrencyLedgersOnly {
+                                    base_name: identified.base().name().to_string(),
+                                    decimal_places: identified.decimal_places(),
+                                    foreign: scoped.foreign_currency_ledgers,
+                                    mixed: scoped.mixed_currency_ledgers,
+                                },
+                            )
+                        }
+                        None => (
+                            parse_native_trial_balance(&xml, identity.company_guid())?,
+                            TrialBalanceLedgerScope::AllLedgers,
+                        ),
+                    };
+                    let totals = crate::reports::trial_balance::observed_totals(&report)?;
+                    let sources = match extras {
+                        TrialBalanceExtras::Nothing => None,
+                        TrialBalanceExtras::CashFlow => {
+                            let Some(window) = &cash_flow_window else {
+                                return Err(anyhow::anyhow!("cash_flow_window_not_built"));
+                            };
+                            let request =
+                                render_native_group_snapshot_request(identity.display_name());
+                            let (xml, bytes, hash) = client
+                                .fetch_native_report_paired(request.clone())
+                                .await?
+                                .require_stable(PairedReadValidationError::NativeLedgerGroup)?;
+                            evidence = evidence
+                                .clone()
+                                .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                            let groups =
+                                parse_native_group_snapshot(&xml, identity.company_guid())?;
+                            let request =
+                                render_native_cash_flow_request(identity.display_name(), window);
+                            let (xml, bytes, hash) = client
+                                .fetch_native_report_paired(request.clone())
+                                .await?
+                                .require_stable(PairedReadValidationError::NativeCashFlow)?;
+                            evidence = evidence
+                                .clone()
+                                .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                            let cash_flow = parse_native_cash_flow(&xml, window)?;
+                            // A several-currency book was refused above
+                            // (`fetch_cash_flow` asks for the single-currency
+                            // scope); a partial read never reaches a check.
+                            let TrialBalanceAdmission::SingleInr(admission) = &admitted else {
                                 return Err(TrialBalanceReadError::Currency(
-                                    "company_base_currency_not_inr",
+                                    "company_base_currency_undetermined",
                                 )
                                 .into());
-                            }
-                            TrialBalanceAdmission::BaseAmongSeveral(identified)
-                        } else {
-                            TrialBalanceAdmission::SingleInr(
-                                CompanyCurrencyRead {
-                                    currency: currency.clone(),
-                                    extent: extent.clone(),
-                                    evidence: evidence.clone(),
-                                }
-                                .admit_single_inr()
-                                .map_err(TrialBalanceReadError::Currency)?,
-                            )
-                        };
-                        let base = match &admitted {
-                            TrialBalanceAdmission::BaseAmongSeveral(identified) => Some(identified),
-                            TrialBalanceAdmission::SingleInr(_) => None,
-                        };
-
-                        let request = match &base {
-                            Some(_) => render_native_trial_balance_request_with_currency(
+                            };
+                            Some(ExtraSources::CashFlow(CashFlowSources {
+                                trial_balance: SingleCurrencyTrialBalance::admitted(
+                                    report.clone(),
+                                    admission,
+                                ),
+                                groups,
+                                cash_flow,
+                            }))
+                        }
+                        TrialBalanceExtras::Statement(kind) => {
+                            let request =
+                                render_native_group_snapshot_request(identity.display_name());
+                            let (xml, bytes, hash) = client
+                                .fetch_native_report_paired(request.clone())
+                                .await?
+                                .require_stable(PairedReadValidationError::NativeLedgerGroup)?;
+                            evidence = evidence
+                                .clone()
+                                .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                            let groups =
+                                parse_native_group_snapshot(&xml, identity.company_guid())?;
+                            // Tally's own Balance Sheet gates both tools. Its own
+                            // Profit and Loss is read for both: it is where Tally's
+                            // closing stock sits, and it gates a P&L's gross and net.
+                            let request = render_native_statement_request(
+                                NativeStatementKind::BalanceSheet,
                                 identity.display_name(),
                                 &period,
-                            ),
-                            None => render_native_trial_balance_request(
-                                identity.display_name(),
-                                &period,
-                            ),
-                        };
-                        let (xml, bytes, hash) = client
-                            .fetch_native_report_paired(request.clone())
-                            .await?
-                            .require_stable(PairedReadValidationError::NativeLedgerCollection)?;
-                        evidence = evidence
-                            .clone()
-                            .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                        let (report, ledger_scope) = match &base {
-                            Some(identified) => {
-                                let scoped = parse_native_trial_balance_with_currency(
-                                    &xml,
-                                    identity.company_guid(),
-                                    identified.base(),
-                                )?;
-                                (
-                                    scoped.report,
-                                    TrialBalanceLedgerScope::BaseCurrencyLedgersOnly {
-                                        base_name: identified.base().name().to_string(),
-                                        decimal_places: identified.decimal_places(),
-                                        foreign: scoped.foreign_currency_ledgers,
-                                        mixed: scoped.mixed_currency_ledgers,
-                                    },
-                                )
-                            }
-                            None => (
-                                parse_native_trial_balance(&xml, identity.company_guid())?,
-                                TrialBalanceLedgerScope::AllLedgers,
-                            ),
-                        };
-                        let totals = crate::reports::trial_balance::observed_totals(&report)?;
-                        let sources = match statement {
-                            None => None,
-                            Some(kind) => {
-                                let request =
-                                    render_native_group_snapshot_request(identity.display_name());
-                                let (xml, bytes, hash) = client
-                                    .fetch_native_report_paired(request.clone())
-                                    .await?
-                                    .require_stable(PairedReadValidationError::NativeLedgerGroup)?;
-                                evidence = evidence
-                                    .clone()
-                                    .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                                let groups =
-                                    parse_native_group_snapshot(&xml, identity.company_guid())?;
-                                // Tally's own Balance Sheet gates both tools; its own
-                                // Profit and Loss is read only for a P&L's report.
+                            );
+                            let (xml, bytes, hash) = client
+                                .fetch_native_report_paired(request.clone())
+                                .await?
+                                .require_stable(PairedReadValidationError::NativeStatement)?;
+                            evidence = evidence
+                                .clone()
+                                .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                            let balance_sheet =
+                                parse_native_statement(NativeStatementKind::BalanceSheet, &xml)?;
+                            // Tally's own Profit and Loss gates a P&L's gross and net, and
+                            // is where Tally's closing stock sits. A P&L tool cannot
+                            // answer without it; a balance sheet only looks in it for the
+                            // closing stock, so there a Profit and Loss that cannot be
+                            // read means "no closing stock considered", the sheet it always was.
+                            let profit_and_loss_read: anyhow::Result<_> = async {
                                 let request = render_native_statement_request(
-                                    NativeStatementKind::BalanceSheet,
+                                    NativeStatementKind::ProfitAndLoss,
                                     identity.display_name(),
                                     &period,
                                 );
@@ -442,83 +574,124 @@ impl TallyRuntime {
                                     .fetch_native_report_paired(request.clone())
                                     .await?
                                     .require_stable(PairedReadValidationError::NativeStatement)?;
-                                evidence = evidence
-                                    .clone()
-                                    .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                                let balance_sheet = parse_native_statement(
-                                    NativeStatementKind::BalanceSheet,
+                                let statement = parse_native_statement(
+                                    NativeStatementKind::ProfitAndLoss,
                                     &xml,
                                 )?;
-                                let profit_and_loss = if kind == NativeStatementKind::ProfitAndLoss
-                                {
-                                    let request = render_native_statement_request(
-                                        kind,
-                                        identity.display_name(),
-                                        &period,
+                                Ok((request, hash, bytes, statement))
+                            }
+                            .await;
+                            let profit_and_loss = match (profit_and_loss_read, kind) {
+                                (Ok((request, hash, bytes, statement)), _) => {
+                                    evidence = evidence.clone().combine(
+                                        RuntimeReadEvidence::paired(&request, hash, bytes),
                                     );
+                                    Some(statement)
+                                }
+                                (Err(error), NativeStatementKind::ProfitAndLoss) => {
+                                    return Err(error);
+                                }
+                                (Err(_), NativeStatementKind::BalanceSheet) => None,
+                            };
+                            // The company's inventory flags are read only when that
+                            // Profit and Loss offers a closing stock to use, so a
+                            // book without one sends nothing more. A flags read that
+                            // fails or does not parse is not a failed statement: the
+                            // figure is declined as `inventory_flags_not_read`, and the
+                            // statement is the one it always was.
+                            let offers_closing_stock =
+                                profit_and_loss.as_ref().is_some_and(|statement| {
+                                    matches!(
+                                        crate::reports::statements::TallyClosingStock::from_profit_and_loss(
+                                            statement
+                                        ),
+                                        Ok(Some(_))
+                                    )
+                                });
+                            let inventory = if offers_closing_stock {
+                                let flags_read: anyhow::Result<_> = async {
+                                    let request = render_company_inventory_flags_request(
+                                        identity.display_name(),
+                                        identity.company_guid(),
+                                    )?;
                                     let (xml, bytes, hash) = client
                                         .fetch_native_report_paired(request.clone())
                                         .await?
                                         .require_stable(
-                                            PairedReadValidationError::NativeStatement,
+                                            PairedReadValidationError::StatementInventoryFlags,
                                         )?;
-                                    evidence = evidence.clone().combine(
-                                        RuntimeReadEvidence::paired(&request, hash, bytes),
-                                    );
-                                    Some(parse_native_statement(kind, &xml)?)
-                                } else {
-                                    None
-                                };
-                                // fetch_statements asks for the single-currency
-                                // scope, so a several-currency book was refused
-                                // above; a partial read never reaches a statement.
-                                let TrialBalanceAdmission::SingleInr(admission) = &admitted else {
-                                    return Err(TrialBalanceReadError::Currency(
-                                        "company_base_currency_undetermined",
-                                    )
-                                    .into());
-                                };
-                                Some(StatementSources {
-                                    trial_balance: SingleCurrencyTrialBalance::admitted(
-                                        report.clone(),
-                                        admission,
-                                    ),
-                                    groups,
-                                    balance_sheet,
-                                    profit_and_loss,
-                                })
-                            }
-                        };
-                        let closing_extent = client.fetch_company_book_extent(&identity).await?;
-                        if closing_extent != extent {
-                            return Err(PairedReadValidationError::NativeLedgerExtent.into());
+                                    let flags = parse_company_inventory_flags(
+                                        &xml,
+                                        identity.company_guid(),
+                                    )?
+                                    .flags;
+                                    Ok((request, hash, bytes, flags))
+                                }
+                                .await;
+                                match flags_read {
+                                    Ok((request, hash, bytes, flags)) => {
+                                        evidence = evidence.clone().combine(
+                                            RuntimeReadEvidence::paired(&request, hash, bytes),
+                                        );
+                                        crate::reports::statements::IntegratedInventory::from_flags(
+                                            &flags,
+                                        )
+                                    }
+                                    Err(_) => crate::reports::statements::InventoryFlags::NotRead,
+                                }
+                            } else {
+                                crate::reports::statements::InventoryFlags::NotRead
+                            };
+                            // fetch_statements asks for the single-currency
+                            // scope, so a several-currency book was refused
+                            // above; a partial read never reaches a statement.
+                            let TrialBalanceAdmission::SingleInr(admission) = &admitted else {
+                                return Err(TrialBalanceReadError::Currency(
+                                    "company_base_currency_undetermined",
+                                )
+                                .into());
+                            };
+                            Some(ExtraSources::Statement(StatementSources {
+                                trial_balance: SingleCurrencyTrialBalance::admitted(
+                                    report.clone(),
+                                    admission,
+                                ),
+                                groups,
+                                balance_sheet,
+                                profit_and_loss,
+                                inventory,
+                            }))
                         }
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        evidence = evidence
-                            .clone()
-                            .combine(confirm_read_boundary(&client, profile).await?);
-                        Ok((
-                            TrialBalanceRead {
-                                company_guid: identity.company_guid().to_string(),
-                                company_name: identity.display_name().to_string(),
-                                from,
-                                to,
-                                currency,
-                                report,
-                                totals,
-                                read_at: chrono::Utc::now().to_rfc3339(),
-                                evidence: evidence.clone(),
-                                ledger_scope,
-                            },
-                            sources,
-                            extent,
-                        ))
+                    };
+                    let closing_extent = client.fetch_company_book_extent(&identity).await?;
+                    if closing_extent != extent {
+                        return Err(PairedReadValidationError::NativeLedgerExtent.into());
                     }
-                    .await;
-                    result.map_err(|error| with_read_evidence(error, evidence))
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    evidence = evidence
+                        .clone()
+                        .combine(confirm_read_boundary(&client, profile).await?);
+                    Ok((
+                        TrialBalanceRead {
+                            company_guid: identity.company_guid().to_string(),
+                            company_name: identity.display_name().to_string(),
+                            from,
+                            to,
+                            currency,
+                            report,
+                            totals,
+                            read_at: chrono::Utc::now().to_rfc3339(),
+                            evidence: evidence.clone(),
+                            ledger_scope,
+                        },
+                        sources,
+                        extent,
+                    ))
                 }
-            },
-        )
+                .await;
+                result.map_err(|error| with_read_evidence(error, evidence))
+            }
+        })
         .await
     }
 }

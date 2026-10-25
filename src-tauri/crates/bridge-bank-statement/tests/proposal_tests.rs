@@ -1,8 +1,7 @@
-//! Proposal construction, ported from `scripts/bank_statement_import.test.py`.
+//! Proposal construction.
 //!
-//! The reference emitted XML and a REMOTEID; Bridge's writer owns both now, so
-//! these tests assert the `build_import_xml` payload shape instead, and that no
-//! identity is minted here.
+//! Bridge's writer owns the XML and the REMOTEID, so these tests assert the
+//! `build_import_xml` payload shape, and that no identity is minted here.
 
 mod common;
 
@@ -12,8 +11,8 @@ use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::parse::Row;
 use bridge_bank_statement::proposals::{
-    build, group_counterparties, selfcheck, Build, BuildOptions, Disposition, Side,
-    StatementRecord, VoucherType,
+    build, group_counterparties, is_statement_txn_id, selfcheck, Build, BuildOptions, Direction,
+    Disposition, Side, StatementRecord, VoucherType,
 };
 use common::*;
 
@@ -70,10 +69,11 @@ fn build_treatments() {
     ];
     let mapping = mapping(&[
         ("ALPHA", "Alpha Ledger", "contra"),
-        ("OWN ACCT", "", "skip"),
+        ("OWN ACCT", "Other Bank", "skip"),
     ]);
-    let Build { proposals, records } =
-        build(&rows, Bank::Hdfc, &mapping, &options("SUSPENSE ACC")).unwrap();
+    let Build {
+        proposals, records, ..
+    } = build(&rows, Bank::Hdfc, &mapping, &options("SUSPENSE ACC")).unwrap();
     assert_eq!(proposals.len(), 2);
     assert_eq!(records.len(), 3);
     assert_eq!(proposals[0].voucher_type, VoucherType::Contra);
@@ -146,6 +146,34 @@ fn build_treatments() {
     assert!(regex::Regex::new(r"^[A-Za-z0-9_-]{1,64}$")
         .unwrap()
         .is_match(&proposals[0].bridge_txn_id));
+    for proposal in &proposals {
+        assert!(
+            is_statement_txn_id(&proposal.bridge_txn_id),
+            "{}",
+            proposal.bridge_txn_id
+        );
+    }
+}
+
+/// A caller of `is_statement_txn_id` refuses on the id alone (#876), so it
+/// must not accept a label an agent types.
+#[test]
+fn only_an_id_of_the_statement_derived_form_is_recognised() {
+    assert!(is_statement_txn_id("st-20260901-0123456789abcdef"));
+    for no in [
+        "",
+        "t1",
+        "st-20260901-0123456789ABCDEF",
+        "st-20260901-0123456789abcde",
+        "st-20260901-0123456789abcdef0",
+        "st-2026090-0123456789abcdef",
+        "st-2026090a-0123456789abcdef",
+        "ST-20260901-0123456789abcdef",
+        "xst-20260901-0123456789abcdef",
+        "st-20260901-0123456789abcdef ",
+    ] {
+        assert!(!is_statement_txn_id(no), "{no}");
+    }
 }
 
 #[test]
@@ -271,6 +299,83 @@ fn impossible_dates_are_typed() {
         "unparseable_date",
     );
     assert_eq!(refusal.row, Some(1));
+}
+
+/// Printed out of date order, so the earliest and latest dates are neither the
+/// first nor the last row printed: a span read off the ends would be wrong.
+fn out_of_order_rows() -> [Row; 4] {
+    [
+        upi("05/08/26", "A", "111111111111", "10.00", "", "990.00"),
+        upi("09/08/26", "B", "222222222222", "10.00", "", "980.00"),
+        upi("01/08/26", "C", "333333333333", "10.00", "", "970.00"),
+        upi("07/08/26", "D", "444444444444", "10.00", "", "960.00"),
+    ]
+}
+
+#[test]
+fn span_is_the_earliest_and_latest_row_date_whatever_the_print_order() {
+    let built = build(
+        &out_of_order_rows(),
+        Bank::Hdfc,
+        &Mapping::default(),
+        &options("SUSP"),
+    )
+    .unwrap();
+    assert_eq!(
+        built.span,
+        Some((
+            Date::new(2026, 8, 1).unwrap(),
+            Date::new(2026, 8, 9).unwrap()
+        ))
+    );
+    assert_eq!(built.rows_outside_window, 0);
+}
+
+#[test]
+fn a_window_that_drops_rows_counts_them_and_the_span_still_covers_every_row() {
+    let mut window = options("SUSP");
+    window.date_from = Date::new(2026, 8, 2);
+    window.date_to = Date::new(2026, 8, 8);
+    let built = build(
+        &out_of_order_rows(),
+        Bank::Hdfc,
+        &Mapping::default(),
+        &window,
+    )
+    .unwrap();
+    assert_eq!(built.records.len(), 2);
+    assert_eq!(built.rows_outside_window, 2);
+    assert_eq!(
+        built.span,
+        Some((
+            Date::new(2026, 8, 1).unwrap(),
+            Date::new(2026, 8, 9).unwrap()
+        ))
+    );
+}
+
+#[test]
+fn a_window_that_drops_only_one_side_is_still_not_the_whole_statement() {
+    let mut window = options("SUSP");
+    window.date_from = Date::new(2026, 8, 2);
+    let built = build(
+        &out_of_order_rows(),
+        Bank::Hdfc,
+        &Mapping::default(),
+        &window,
+    )
+    .unwrap();
+    assert_eq!(built.rows_outside_window, 1);
+    let mut window = options("SUSP");
+    window.date_to = Date::new(2026, 8, 8);
+    let built = build(
+        &out_of_order_rows(),
+        Bank::Hdfc,
+        &Mapping::default(),
+        &window,
+    )
+    .unwrap();
+    assert_eq!(built.rows_outside_window, 1);
 }
 
 #[test]
@@ -415,26 +520,195 @@ fn record(party: &str, amount: &str) -> StatementRecord {
         amount: amount.to_string(),
         party: party.to_string(),
         ledger: "SUSP".to_string(),
+        reference: None,
+        instrument: None,
         suspense: true,
         bridge_txn_id: "st-x".to_string(),
         cash_movement: None,
         cash_answer: None,
+        direction: Direction::Inflow,
+        reversed_same_day: false,
     }
 }
 
 #[test]
 fn counterparties_group_by_mapping_key() {
     let groups = group_counterparties(&[
-        record("MERCURY MANUFACTURERS", "60000.00"),
-        record("MERCURY M ANUFACTURERS", "220000.00"),
-        record("AMBIKA INDUSTRIES", "1000.00"),
+        record("HALCYON MANUFACTURERS", "60000.00"),
+        record("HALCYON M ANUFACTURERS", "220000.00"),
+        record("ORCHID INDUSTRIES", "1000.00"),
     ])
     .unwrap();
     assert_eq!(groups.len(), 2);
     // one line for two spellings, labelled with the one the bank printed
-    assert_eq!(groups[0].party, "MERCURY MANUFACTURERS");
-    assert_eq!(groups[0].total, "280000.00");
+    assert_eq!(groups[0].party, "HALCYON MANUFACTURERS");
     assert_eq!(groups[0].rows, 2);
-    assert_eq!(groups[0].also_printed_as, ["MERCURY M ANUFACTURERS"]);
-    assert_eq!(groups[1].party, "AMBIKA INDUSTRIES");
+    assert_eq!(groups[0].also_printed_as, ["HALCYON M ANUFACTURERS"]);
+    assert_eq!(groups[1].party, "ORCHID INDUSTRIES");
+}
+
+/// Spellings of one payee with the same number of words are chosen and listed
+/// by name, never by the amounts they carry.
+#[test]
+fn a_shown_spelling_is_chosen_without_amounts() {
+    let groups = group_counterparties(&[
+        record("Alpha Traders", "900.00"),
+        record("ALPHA TRADERS", "10.00"),
+        record("alpha traders", "50.00"),
+    ])
+    .unwrap();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].party, "ALPHA TRADERS");
+    assert_eq!(
+        groups[0].also_printed_as,
+        ["Alpha Traders", "alpha traders"]
+    );
+}
+
+/// Pairing a skipped row with the other account's Contra needs the facts the
+/// statement printed, for every row and whatever became of it.
+#[test]
+fn every_record_carries_the_reference_and_instrument_the_statement_printed() {
+    let rows = [
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("02/08/26", "OWN ACCT", &rep('2', 12), "20.00", "", "970.00"),
+        row(&[
+            ("date", "03/08/26"),
+            ("narr", "CHQ PAID-MICR CLG-BETA"),
+            ("ref", &padn(417, 16)),
+            ("dr", "30.00"),
+            ("cr", ""),
+            ("bal", "940.00"),
+        ]),
+    ];
+    let mapping = mapping(&[
+        ("ALPHA", "Alpha Ledger", "auto"),
+        ("OWN ACCT", "Other Bank", "skip"),
+    ]);
+    let built = build(&rows, Bank::Hdfc, &mapping, &options("SUSPENSE ACC")).unwrap();
+    let seen: Vec<_> = built
+        .records
+        .iter()
+        .map(|record| {
+            (
+                record.reference.as_ref().map(ToString::to_string),
+                record.instrument.as_deref(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        seen,
+        [
+            (Some(rep('1', 12)), Some("1")),
+            (Some(rep('2', 12)), Some("1")),
+            (None, Some(padn(417, 16).as_str())),
+        ]
+    );
+    // the skipped row names the other account, so its Contra can be found
+    assert_eq!(built.records[1].disposition, Disposition::Skipped);
+    assert_eq!(built.records[1].ledger, "Other Bank");
+
+    // both facts reach the serialised record
+    let json = serde_json::to_value(&built.records[1]).unwrap();
+    assert_eq!(json["reference"], rep('2', 12));
+    assert_eq!(json["instrument"], "1");
+    assert_eq!(json["ledger"], "Other Bank");
+    let json = serde_json::to_value(&built.records[2]).unwrap();
+    assert!(json["reference"].is_null());
+}
+
+#[test]
+fn a_cash_line_waiting_for_an_answer_still_carries_the_printed_instrument() {
+    let rows = [row(&[
+        ("date", "03-08-2026"),
+        ("narr", "BY CASH"),
+        ("ref", "000417"),
+        ("dr", ""),
+        ("cr", "750.50"),
+        ("bal", "12000.00"),
+    ])];
+    let built = build(&rows, Bank::Ubi, &Mapping::default(), &options("SUSP")).unwrap();
+    assert_eq!(built.records[0].disposition, Disposition::NeedsAnswer);
+    assert_eq!(built.records[0].reference, None);
+    assert_eq!(built.records[0].instrument.as_deref(), Some("000417"));
+}
+
+#[test]
+fn a_skip_naming_the_statements_own_bank_ledger_is_refused() {
+    let rows = [
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("02/08/26", "OWN ACCT", &rep('2', 12), "20.00", "", "970.00"),
+    ];
+    // the same fold the crate uses for ledger names: case, hyphens and spacing
+    for (bank_ledger, skip_ledger) in [
+        ("Bank", "Bank"),
+        ("Bank", "bank "),
+        ("HDFC-BANK", "hdfc bank"),
+        ("HDFC BANK", "HDFC-BANK"),
+    ] {
+        let mut named = options("SUSPENSE ACC");
+        named.bank_ledger = bank_ledger;
+        let refusal = refuses(
+            build(
+                &rows,
+                Bank::Hdfc,
+                &mapping(&[("OWN ACCT", skip_ledger, "skip")]),
+                &named,
+            ),
+            "skip_ledger_is_statement_bank",
+        );
+        assert_eq!(refusal.row, Some(2), "{bank_ledger} / {skip_ledger}");
+    }
+    // another bank's ledger is the point of a skip
+    let mut named = options("SUSPENSE ACC");
+    named.bank_ledger = "HDFC BANK";
+    assert!(build(
+        &rows,
+        Bank::Hdfc,
+        &mapping(&[("OWN ACCT", "SBI BANK", "skip")]),
+        &named
+    )
+    .is_ok());
+}
+
+#[test]
+fn a_skip_ledger_meets_the_same_name_rules_as_any_other_ledger() {
+    let rows = [
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("02/08/26", "OWN ACCT", &rep('2', 12), "20.00", "", "970.00"),
+    ];
+    let mut named = options("SUSPENSE ACC");
+    named.bank_ledger = "HDFC BANK";
+    let refusal = refuses(
+        build(
+            &rows,
+            Bank::Hdfc,
+            &mapping(&[("OWN ACCT", "SBI\u{7}BANK", "skip")]),
+            &named,
+        ),
+        "ledger_not_admissible",
+    );
+    assert_eq!(refusal.row, Some(2));
+}
+
+#[test]
+fn a_skip_naming_the_suspense_ledger_is_refused() {
+    let rows = [
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("02/08/26", "OWN ACCT", &rep('2', 12), "20.00", "", "970.00"),
+    ];
+    let mut named = options("SUSPENSE ACC");
+    named.bank_ledger = "HDFC BANK";
+    for skip_ledger in ["SUSPENSE ACC", "suspense-acc"] {
+        let refusal = refuses(
+            build(
+                &rows,
+                Bank::Hdfc,
+                &mapping(&[("OWN ACCT", skip_ledger, "skip")]),
+                &named,
+            ),
+            "skip_ledger_is_suspense",
+        );
+        assert_eq!(refusal.row, Some(2), "{skip_ledger}");
+    }
 }

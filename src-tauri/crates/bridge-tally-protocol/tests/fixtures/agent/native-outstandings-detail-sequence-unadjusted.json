@@ -1,0 +1,701 @@
+{
+  "source": "The ordered record of every HTTP request one `outstandings` party-detail call sent to a live TallyPrime Silver 7.1 gateway for the synthetic company BRIDGE OUTSTANDINGS LAB, made through a debug `bridge_mcp` built from commit 3f097e8654bb389126b7e7a0002d0cc8cce2601f (binary sha256 6b3ecf49c54ed5a2ed93c04a94ad819fe86ae69a13145293c290862dba0d303a) and recorded by a serial read-only relay. Each entry names the fixture that holds the response body",
+  "observed_date": "2026-10-01",
+  "tool": "outstandings",
+  "arguments": {
+    "company_guid": "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
+    "as_of": "20260630",
+    "party": "OL P02 On Account Debtor",
+    "detail": "unadjusted"
+  },
+  "requests_sent": 66,
+  "posts": 38,
+  "status_reads": 28,
+  "request_encoding": "UTF-16LE with a byte-order mark, as Bridge sent it",
+  "response_sha256_is_of": "the response body as received; for the three company-wide requests (company list, book extent, marks) the named fixture is that body trimmed to one company row, so its own sha256 differs and is in the fixture's record",
+  "response_head": "Every answer was HTTP/1.1 200 OK with the headers Unicode, CONTENT-TYPE, RESPSTATUS: 1 and CONTENT-LENGTH. A POST was answered with `Unicode: Yes` and `CONTENT-TYPE: text/xml; charset=utf-16`; GET /status with `Unicode: No` and `CONTENT-TYPE: text/xml; charset=utf-8`. The head is not part of any fixture.",
+  "answer_detail": {
+    "as_of": "20260630",
+    "kind": "unadjusted",
+    "on_account_sum": "3000",
+    "party": "OL P02 On Account Debtor",
+    "residual": "3000",
+    "row_amounts": "as_allocated",
+    "rows": [
+      {
+        "allocation_type": "On Account",
+        "amount": "4000.00",
+        "bill_date": null,
+        "class": "on_account",
+        "date": "20250512",
+        "guid": "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-00000005",
+        "voucher_number": "2",
+        "voucher_type": "Receipt"
+      },
+      {
+        "allocation_type": "On Account",
+        "amount": "-1000.00",
+        "bill_date": null,
+        "class": "on_account",
+        "date": "20250520",
+        "guid": "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-00000006",
+        "voucher_number": "1",
+        "voucher_type": "Payment"
+      }
+    ],
+    "state": "tied",
+    "window": {
+      "company_vouchers_read": 20,
+      "from": "20250401",
+      "to": "20260630"
+    }
+  },
+  "answer_detail_is": "only the `detail` object of the live tool result, whose evidence state was `complete`. The result also carried the company, totals, ageing buckets, top parties, open bills and unallocated parties, which are not recorded here. A replay of these fixtures reads three trimmed responses, so its evidence bytes and response hash differ from the live call's.",
+  "transformation": [],
+  "provenance_limit": "One call on one synthetic book on one build. The order and count are what this commit sent on this book (voucher mark 20, one Currency master); a book with a higher mark or several currencies sends more requests.",
+  "sensitivity_review": "Synthetic company name, synthetic ledger names (prefix OL), synthetic GUIDs; no party, person, GSTIN, address or credential.",
+  "requests": [
+    {
+      "seq": 1,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 2,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 3,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 4,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 5,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 6,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyBookExtentV2",
+      "request_bytes": 1108,
+      "request_sha256": "a8e6bc8eee398cb658755899805b9846911f70b3aab72165f50b34c4be617ce3",
+      "response_bytes": 31240,
+      "response_sha256": "8de01bd03687cf141f240c19a6d84ad237433b49d1ae4972b642706090d3807a",
+      "response_fixture": "native-outstandings-detail-book-extent.utf16le.xml"
+    },
+    {
+      "seq": 7,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 8,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyBookExtentV2",
+      "request_bytes": 1108,
+      "request_sha256": "a8e6bc8eee398cb658755899805b9846911f70b3aab72165f50b34c4be617ce3",
+      "response_bytes": 31240,
+      "response_sha256": "8de01bd03687cf141f240c19a6d84ad237433b49d1ae4972b642706090d3807a",
+      "response_fixture": "native-outstandings-detail-book-extent.utf16le.xml"
+    },
+    {
+      "seq": 9,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 10,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyCurrencies",
+      "request_bytes": 980,
+      "request_sha256": "d086eee1c1df2142c3fd3b6ed8db873ac9f625ca209b16a322ff7720e864b5ca",
+      "response_bytes": 3414,
+      "response_sha256": "b8446ecfb936b46abd393efa01ff56e02644e2aaaed2f2c084a063c87a18bbd8",
+      "response_fixture": "native-outstandings-detail-currencies.utf16le.xml"
+    },
+    {
+      "seq": 11,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 12,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyCurrencies",
+      "request_bytes": 980,
+      "request_sha256": "d086eee1c1df2142c3fd3b6ed8db873ac9f625ca209b16a322ff7720e864b5ca",
+      "response_bytes": 3414,
+      "response_sha256": "b8446ecfb936b46abd393efa01ff56e02644e2aaaed2f2c084a063c87a18bbd8",
+      "response_fixture": "native-outstandings-detail-currencies.utf16le.xml"
+    },
+    {
+      "seq": 13,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 14,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyBookExtentV2",
+      "request_bytes": 1108,
+      "request_sha256": "a8e6bc8eee398cb658755899805b9846911f70b3aab72165f50b34c4be617ce3",
+      "response_bytes": 31240,
+      "response_sha256": "8de01bd03687cf141f240c19a6d84ad237433b49d1ae4972b642706090d3807a",
+      "response_fixture": "native-outstandings-detail-book-extent.utf16le.xml"
+    },
+    {
+      "seq": 15,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 16,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyBookExtentV2",
+      "request_bytes": 1108,
+      "request_sha256": "a8e6bc8eee398cb658755899805b9846911f70b3aab72165f50b34c4be617ce3",
+      "response_bytes": 31240,
+      "response_sha256": "8de01bd03687cf141f240c19a6d84ad237433b49d1ae4972b642706090d3807a",
+      "response_fixture": "native-outstandings-detail-book-extent.utf16le.xml"
+    },
+    {
+      "seq": 17,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 18,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 19,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 20,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 21,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 22,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyBookExtentV2",
+      "request_bytes": 1108,
+      "request_sha256": "a8e6bc8eee398cb658755899805b9846911f70b3aab72165f50b34c4be617ce3",
+      "response_bytes": 31240,
+      "response_sha256": "8de01bd03687cf141f240c19a6d84ad237433b49d1ae4972b642706090d3807a",
+      "response_fixture": "native-outstandings-detail-book-extent.utf16le.xml"
+    },
+    {
+      "seq": 23,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 24,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyBookExtentV2",
+      "request_bytes": 1108,
+      "request_sha256": "a8e6bc8eee398cb658755899805b9846911f70b3aab72165f50b34c4be617ce3",
+      "response_bytes": 31240,
+      "response_sha256": "8de01bd03687cf141f240c19a6d84ad237433b49d1ae4972b642706090d3807a",
+      "response_fixture": "native-outstandings-detail-book-extent.utf16le.xml"
+    },
+    {
+      "seq": 25,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 26,
+      "method": "POST",
+      "target": "/",
+      "request_id": "Bills Receivable",
+      "request_bytes": 778,
+      "request_sha256": "d2f2d5d542fb99f2078e58652996c0719fe8f9a767264edb1d28fe1fa7225543",
+      "response_bytes": 4806,
+      "response_sha256": "5caaa118457303471a9a80b4734e10e975f598595a71b05f6fe56c1f58888b2b",
+      "response_fixture": "native-outstandings-lab-bills-receivable-after-journal.utf16le.xml"
+    },
+    {
+      "seq": 27,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 28,
+      "method": "POST",
+      "target": "/",
+      "request_id": "Bills Receivable",
+      "request_bytes": 778,
+      "request_sha256": "d2f2d5d542fb99f2078e58652996c0719fe8f9a767264edb1d28fe1fa7225543",
+      "response_bytes": 4806,
+      "response_sha256": "5caaa118457303471a9a80b4734e10e975f598595a71b05f6fe56c1f58888b2b",
+      "response_fixture": "native-outstandings-lab-bills-receivable-after-journal.utf16le.xml"
+    },
+    {
+      "seq": 29,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 30,
+      "method": "POST",
+      "target": "/",
+      "request_id": "List of Groups",
+      "request_bytes": 1080,
+      "request_sha256": "35f8a0702fcec51f42f13794081951c3adef8f712bf6491d884174bb6068c648",
+      "response_bytes": 54290,
+      "response_sha256": "1b90f676a211116596437659d940db2a6095e675e13574b7ba591b73135c6b24",
+      "response_fixture": "native-outstandings-detail-groups.utf16le.xml"
+    },
+    {
+      "seq": 31,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 32,
+      "method": "POST",
+      "target": "/",
+      "request_id": "List of Groups",
+      "request_bytes": 1080,
+      "request_sha256": "35f8a0702fcec51f42f13794081951c3adef8f712bf6491d884174bb6068c648",
+      "response_bytes": 54290,
+      "response_sha256": "1b90f676a211116596437659d940db2a6095e675e13574b7ba591b73135c6b24",
+      "response_fixture": "native-outstandings-detail-groups.utf16le.xml"
+    },
+    {
+      "seq": 33,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 34,
+      "method": "POST",
+      "target": "/",
+      "request_id": "Bills Payable",
+      "request_bytes": 772,
+      "request_sha256": "3a50ab02d9f7a95357b3d741df847a89dd77a41799fdbe3159ad6525751ec136",
+      "response_bytes": 1472,
+      "response_sha256": "0ae8d41804081d00b94eaf6cc6f1b52d8fd026303a39800b91e20310f6725218",
+      "response_fixture": "native-outstandings-lab-bills-payable-after-journal.utf16le.xml"
+    },
+    {
+      "seq": 35,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 36,
+      "method": "POST",
+      "target": "/",
+      "request_id": "Bills Payable",
+      "request_bytes": 772,
+      "request_sha256": "3a50ab02d9f7a95357b3d741df847a89dd77a41799fdbe3159ad6525751ec136",
+      "response_bytes": 1472,
+      "response_sha256": "0ae8d41804081d00b94eaf6cc6f1b52d8fd026303a39800b91e20310f6725218",
+      "response_fixture": "native-outstandings-lab-bills-payable-after-journal.utf16le.xml"
+    },
+    {
+      "seq": 37,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 38,
+      "method": "POST",
+      "target": "/",
+      "request_id": "List of Ledgers",
+      "request_bytes": 1298,
+      "request_sha256": "aaa049d5a2e223d1bd583ef00078d4d8a0879d33a41f9c4526d6805c30053392",
+      "response_bytes": 24576,
+      "response_sha256": "ea7fab4ad0acd22a5a5fcad1ded887d6de26fd9232d5cb1cba35e9fbc89d1865",
+      "response_fixture": "native-outstandings-detail-ledgers.utf16le.xml"
+    },
+    {
+      "seq": 39,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 40,
+      "method": "POST",
+      "target": "/",
+      "request_id": "List of Ledgers",
+      "request_bytes": 1298,
+      "request_sha256": "aaa049d5a2e223d1bd583ef00078d4d8a0879d33a41f9c4526d6805c30053392",
+      "response_bytes": 24576,
+      "response_sha256": "ea7fab4ad0acd22a5a5fcad1ded887d6de26fd9232d5cb1cba35e9fbc89d1865",
+      "response_fixture": "native-outstandings-detail-ledgers.utf16le.xml"
+    },
+    {
+      "seq": 41,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 42,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyBookExtentV2",
+      "request_bytes": 1108,
+      "request_sha256": "a8e6bc8eee398cb658755899805b9846911f70b3aab72165f50b34c4be617ce3",
+      "response_bytes": 31240,
+      "response_sha256": "8de01bd03687cf141f240c19a6d84ad237433b49d1ae4972b642706090d3807a",
+      "response_fixture": "native-outstandings-detail-book-extent.utf16le.xml"
+    },
+    {
+      "seq": 43,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 44,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyBookExtentV2",
+      "request_bytes": 1108,
+      "request_sha256": "a8e6bc8eee398cb658755899805b9846911f70b3aab72165f50b34c4be617ce3",
+      "response_bytes": 31240,
+      "response_sha256": "8de01bd03687cf141f240c19a6d84ad237433b49d1ae4972b642706090d3807a",
+      "response_fixture": "native-outstandings-detail-book-extent.utf16le.xml"
+    },
+    {
+      "seq": 45,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 46,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 47,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 48,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 49,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 50,
+      "method": "POST",
+      "target": "/",
+      "request_id": "List of Ledgers",
+      "request_bytes": 1988,
+      "request_sha256": "b3a718a5f8d0a9963a5675fd721b7348c5f521bbddc4e85772386d11b49b538e",
+      "response_bytes": 22408,
+      "response_sha256": "cfdd450a8845b23aba4719238019cc5733ca77d8620b3d673a4edf45c4b654bc",
+      "response_fixture": "native-outstandings-detail-ledger-catalogue.utf16le.xml"
+    },
+    {
+      "seq": 51,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 52,
+      "method": "POST",
+      "target": "/",
+      "request_id": "List of Ledgers",
+      "request_bytes": 1988,
+      "request_sha256": "b3a718a5f8d0a9963a5675fd721b7348c5f521bbddc4e85772386d11b49b538e",
+      "response_bytes": 22408,
+      "response_sha256": "cfdd450a8845b23aba4719238019cc5733ca77d8620b3d673a4edf45c4b654bc",
+      "response_fixture": "native-outstandings-detail-ledger-catalogue.utf16le.xml"
+    },
+    {
+      "seq": 53,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 54,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 55,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 56,
+      "method": "POST",
+      "target": "/",
+      "request_id": "Bridge Agent Company High Water",
+      "request_bytes": 990,
+      "request_sha256": "b9cb9d6314623c1fe52e4be71694832c719ddebd5ad3600e035265262f894606",
+      "response_bytes": 17086,
+      "response_sha256": "bbe169b2fecac35754e732defee955989cf227b863ad195679d60749f28f6f24",
+      "response_fixture": "native-outstandings-detail-high-water.utf16le.xml"
+    },
+    {
+      "seq": 57,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 58,
+      "method": "POST",
+      "target": "/",
+      "request_id": "Bridge Agent Company High Water",
+      "request_bytes": 990,
+      "request_sha256": "b9cb9d6314623c1fe52e4be71694832c719ddebd5ad3600e035265262f894606",
+      "response_bytes": 17086,
+      "response_sha256": "bbe169b2fecac35754e732defee955989cf227b863ad195679d60749f28f6f24",
+      "response_fixture": "native-outstandings-detail-high-water.utf16le.xml"
+    },
+    {
+      "seq": 59,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 60,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 61,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    },
+    {
+      "seq": 62,
+      "method": "POST",
+      "target": "/",
+      "request_id": "Bridge Agent Vouchers",
+      "request_bytes": 1726,
+      "request_sha256": "9d22fc0632288429069535f9e4e9deacf71108f9d593c3325507efd1e76fafa3",
+      "response_bytes": 665150,
+      "response_sha256": "228f4d893b15fef8ed62b031699b5b5b805cbd632a14cb8bdd57e34c049c72e9",
+      "response_fixture": "native-outstandings-lab-vouchers-window.utf16le.xml"
+    },
+    {
+      "seq": 63,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 64,
+      "method": "POST",
+      "target": "/",
+      "request_id": "Bridge Agent Vouchers",
+      "request_bytes": 1726,
+      "request_sha256": "9d22fc0632288429069535f9e4e9deacf71108f9d593c3325507efd1e76fafa3",
+      "response_bytes": 665150,
+      "response_sha256": "228f4d893b15fef8ed62b031699b5b5b805cbd632a14cb8bdd57e34c049c72e9",
+      "response_fixture": "native-outstandings-lab-vouchers-window.utf16le.xml"
+    },
+    {
+      "seq": 65,
+      "method": "GET",
+      "target": "/status",
+      "response_bytes": 51,
+      "response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+      "response_fixture": "native-outstandings-detail-status.txt"
+    },
+    {
+      "seq": 66,
+      "method": "POST",
+      "target": "/",
+      "request_id": "BridgeCompanyExtent",
+      "request_bytes": 2524,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_bytes": 37004,
+      "response_sha256": "84e5f7da51a352c72eeb002fef6afd56449c545560292c295ad812d58a5670cf",
+      "response_fixture": "native-outstandings-detail-company-list.utf16le.xml"
+    }
+  ]
+}

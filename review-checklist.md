@@ -10,7 +10,8 @@ item relevant to the change and mark non-applicable sections explicitly.
 - [ ] Errors are actionable without exposing sensitive values.
 - [ ] Database changes include migration compatibility and rollback notes.
 - [ ] New or changed commands validate inputs and surface user-safe errors.
-- [ ] AXAL protocol changes include a contract-level regression command or test.
+- [ ] The change adds no network destination other than the local Tally, and the
+  egress gate (`scripts/check-tally-egress-boundary.mjs`) stays green.
 
 ## Privacy and security checks
 

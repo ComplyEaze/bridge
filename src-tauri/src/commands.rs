@@ -3,10 +3,8 @@ use crate::db::tally_mirror::{
     company_profile_correlation_key, CapabilityItemInput, CapabilityKind as MirrorCapabilityKind,
     CapabilitySnapshotInput, CapabilityState as MirrorCapabilityState, Confidence, FreshnessState,
     LocalReconciliationMismatch, ProofSummary, RedactedProofExport, ReviewedSetupInput,
-    SelectedReadObservationInput, SelectedReadScopeInput, SourceIdentityInput,
-    WriteFixtureEnrollmentInput, WriteFixtureEnrollmentStatus,
+    SourceIdentityInput, WriteFixtureEnrollmentInput, WriteFixtureEnrollmentStatus,
 };
-use crate::gst::{GstDraftRequest, GstReturnDraft};
 use crate::reports::bulk_party_statement::{
     bulk_party_statement_party_count, write_bulk_party_statements_with_ageing_anchor,
     BulkPartyStatementRequest, PartyStatementDestinationApprovals,
@@ -17,7 +15,9 @@ use crate::reports::outstandings_working_paper_store::{
     WorkingPaperExportStoreError,
 };
 use crate::reports::outstandings_working_paper_xlsx::render_outstandings_working_paper_xlsx;
-use crate::reports::party_ledger_master::build_party_ledger_master_workbook;
+use crate::reports::party_ledger_master::{
+    build_party_ledger_master_workbook, BalanceDateBasis, SourceNote,
+};
 use crate::reports::party_ledger_master_xlsx::render_party_ledger_master_xlsx;
 use crate::reports::party_statement::{
     build_party_statement_with_ageing_anchor, PartyStatementError,
@@ -38,9 +38,8 @@ use crate::tally::validators::{
 pub use crate::tally::VerifiedCompanyIdentity;
 use crate::tally::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, ConnectionStatus,
-    EndpointKey, OutstandingsLoadResult, RuntimeTallyConnector, SelectedReadScopeEvidence,
-    TallyCompany, TallyConfig, TallyRuntime, TallySessionSnapshot, TallyTelemetryPreviewExport,
-    VerifiedCompanyIdentityError,
+    EndpointKey, OutstandingsLoadResult, RuntimeTallyConnector, TallyCompany, TallyConfig,
+    TallyRuntime, TallySessionSnapshot, VerifiedCompanyIdentityError,
 };
 use bridge_tally_core::{
     CapabilityFeatureId, CapabilityPackId, CapabilityState, CompanyRef as CoreCompanyRef,
@@ -81,7 +80,7 @@ fn party_statement_destination_not_authorized_error() -> TallyCommandError {
     tally_command_error(
         "statement_destination_not_authorized",
         "Operation",
-        "The statement destination was not selected in this Bridge session.",
+        "The statement destination was not selected in this ComplyEaze Bridge session.",
         "after_change",
         false,
         "Choose the destination folder again, then restart the statement export.",
@@ -132,7 +131,7 @@ fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> T
         WireRefusal::Busy => tally_command_error(
             "tally_endpoint_busy",
             "Operation",
-            "Another Bridge window or AI client is talking to Tally right now. Try again in a few seconds.",
+            "Another ComplyEaze Bridge window or AI client is talking to Tally right now. Try again in a few seconds.",
             "safe",
             false,
             "Try again in a few seconds. Nothing was sent to Tally.",
@@ -140,10 +139,10 @@ fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> T
         WireRefusal::Unavailable => tally_command_error(
             "tally_endpoint_lock_unavailable",
             "Operation",
-            "Bridge could not open its local Tally coordination file, so it sent nothing to Tally.",
+            "ComplyEaze Bridge could not open its local Tally coordination file, so it sent nothing to Tally.",
             "after_change",
             false,
-            "Check that Bridge's Application Support folder is available and writable, then try again.",
+            "Check that ComplyEaze Bridge's Application Support folder is available and writable, then try again.",
         ),
     }
 }
@@ -167,7 +166,7 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
         return tally_command_error(
             "response_validation_failed",
             "Response validation",
-            "The Tally response did not meet the party/ledger export validation contract, so Bridge withheld the unverified result.",
+            "The Tally response did not meet the party/ledger export validation contract, so ComplyEaze Bridge withheld the unverified result.",
             "after_change",
             true,
             "Keep the result unverified and inspect redacted diagnostics before retrying.",
@@ -237,7 +236,7 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
         (
             "company_base_currency_changed",
             "Currency admission",
-            "The selected Tally company changed while Bridge was establishing the workbook currency.",
+            "The selected Tally company changed while ComplyEaze Bridge was establishing the workbook currency.",
             "after_change",
             true,
             "Refresh the selected Tally company and retry the export only after its books stop changing.",
@@ -264,7 +263,7 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
         (
             "response_validation_failed",
             "Response validation",
-            "The Tally response did not satisfy Bridge's bounded protocol contract.",
+            "The Tally response did not satisfy ComplyEaze Bridge's bounded protocol contract.",
             "after_change",
             true,
             "Keep the result unverified and inspect redacted diagnostics before retrying.",
@@ -273,7 +272,7 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
         (
             "untrusted_discovery_limit_exceeded",
             "Discovery listing",
-            "The unverified local company listing exceeded Bridge's display safety limit.",
+            "The unverified local company listing exceeded ComplyEaze Bridge's display safety limit.",
             "after_change",
             true,
             "Reduce the locally listed companies or use a strict probe for reviewed company evidence.",
@@ -286,15 +285,6 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
             "after_change",
             true,
             "Load the intended company in Tally, probe again, and reselect its observed identity.",
-        )
-    } else if lower.contains("queue deadline") {
-        (
-            "tally_runtime_temporarily_unavailable",
-            "Operation",
-            "The local Tally request queue deadline was exceeded.",
-            "safe",
-            true,
-            "Refresh runtime status before retrying; the failed queue operation was recorded in local runtime health.",
         )
     } else if lower.contains("capacity")
         || lower.contains("circuit")
@@ -333,26 +323,86 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
 /// Adds report context only after the shared runtime mapper has removed
 /// transport and internal details from the operator-facing text.
 fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
-    // Sized before the master request was sent (#637): not a validation
+    // The date the CA chose is before the books begin (#903): refused from the
+    // opening extent, before any ledger master, balance or group request.
+    if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<PartyLedgerMasterSourceValidationError>(),
+            Some(PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom)
+        )
+    }) {
+        return tally_command_error(
+            "as_of_precedes_books_from",
+            "Operation",
+            "ComplyEaze Bridge withheld the party/ledger master: the As of date is before this company's books begin. No ledger master was requested.",
+            "after_change",
+            false,
+            "Choose an As of date on or after the start of the books, then export again.",
+        );
+    }
+    // Sized before any ledger request was sent (#637, #679): not a validation
     // failure, and retrying the unchanged export cannot help.
     if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<PartyLedgerMasterSourceValidationError>(),
-            Some(PartyLedgerMasterSourceValidationError::TooLarge { .. })
+            Some(PartyLedgerMasterSourceValidationError::CatalogueTooLarge { .. })
         )
     }) {
         return tally_command_error(
-            "ledger_masters_too_large",
+            "ledger_catalogue_too_large",
             "Response size",
-            "Bridge withheld the party/ledger master: the compliance read is over the size Bridge will request, because a read of that size has left Tally unable to answer. Bridge sized it by the ledgers a catalogue read counted, or, when the company's master-alteration mark was too high to count within budget, by the mark itself, an upper bound on ledgers (stock items, units and every other master count too), so a company with fewer ledgers may be refused. No master was requested.",
+            "ComplyEaze Bridge withheld the party/ledger master: the company's master-alteration mark is too high for ComplyEaze Bridge to count its ledgers within the response limit, and a response past the limit is cut off mid-read, which can leave Tally unable to answer. The mark is an upper bound on ledgers (stock items, units and every other master count too), so a company with fewer ledgers may be refused. No master was requested.",
             "after_change",
             false,
             "Do not retry the unchanged export: it refuses again.",
         );
     }
+    // The ledger count could not be established or did not add up (#679): each
+    // has its own typed code, not the endpoint failure the text heuristics of
+    // `tally_runtime_command_error` would read into it.
+    use PartyLedgerMasterSourceValidationError as Validation;
+    if let Some((code, too_large)) =
+        error
+            .chain()
+            .find_map(|cause| match cause.downcast_ref::<Validation>()? {
+                error @ (Validation::LedgerSpan { .. }
+                | Validation::LedgerSpanSliceInvalid { .. }
+                | Validation::LedgerCountDiffers { .. }
+                | Validation::LedgerCountCompanyDiffers { .. }
+                | Validation::LedgerCountCompanyInvalid { .. }
+                | Validation::LedgerCountCompanyResponseTooLarge { .. }) => {
+                    Some((error.safe_code(), false))
+                }
+                error @ (Validation::LedgerSpanSliceResponseTooLarge { .. }
+                | Validation::CountedCatalogueTooLarge { .. }) => Some((error.safe_code(), true)),
+                _ => None,
+            })
+    {
+        // A count that did not add up may be a book edited during the read; a
+        // count or a slice past what Bridge reads in one export refuses again.
+        return if too_large {
+            tally_command_error(
+                code,
+                "Response size",
+                "ComplyEaze Bridge withheld the party/ledger master: counting this company's ledgers needs a response larger than ComplyEaze Bridge will read. Nothing was released.",
+                "after_change",
+                false,
+                "Do not retry the unchanged export: it refuses again.",
+            )
+        } else {
+            tally_command_error(
+                code,
+                "Response validation",
+                "ComplyEaze Bridge withheld the party/ledger master: counting this company's ledgers failed or did not add up. Nothing was released.",
+                "after_change",
+                false,
+                "Retry once while nobody is editing this company in Tally. If it refuses again, this company cannot be exported by ComplyEaze Bridge yet.",
+            )
+        };
+    }
     let mut mapped = tally_runtime_command_error(error);
     mapped.message = format!(
-        "Bridge withheld the party/ledger master: {}",
+        "ComplyEaze Bridge withheld the party/ledger master: {}",
         mapped.message
     );
     mapped
@@ -363,27 +413,27 @@ fn party_ledger_master_currency_admission_error(reason: &'static str) -> TallyCo
     // currency. See TALLY_PROTOCOL_REFERENCE.md §9.10a.1.
     let (message, remediation) = match reason {
         "company_base_currency_undetermined" => (
-            "Tally defines multiple Currency masters, so Bridge could not establish the selected company's base currency from this read.",
-            "Do not retry the unchanged export: no operator confirmation can make this read safe. Bridge needs a read that establishes one INR base currency before it can label the workbook.",
+            "Tally defines multiple Currency masters, so ComplyEaze Bridge could not establish the selected company's base currency from this read.",
+            "Do not retry the unchanged export: no operator confirmation can make this read safe. ComplyEaze Bridge needs a read that establishes one INR base currency before it can label the workbook.",
         ),
         "company_base_currency_not_inr" => (
             "The selected Tally company does not use INR as its base currency.",
             "Do not retry the unchanged export: select a company whose established base currency is INR. A confirmation cannot change an unsupported base currency.",
         ),
         "company_currency_probe_failed" => (
-            "Bridge could not establish one INR base currency for the selected Tally company.",
+            "ComplyEaze Bridge could not establish one INR base currency for the selected Tally company.",
             "Do not retry until Tally can return a valid base-currency read for this selected company.",
         ),
         _ => (
-            "Bridge could not establish the selected Tally company's currency.",
-            "Do not retry until Bridge can establish the selected company's base currency from Tally.",
+            "ComplyEaze Bridge could not establish the selected Tally company's currency.",
+            "Do not retry until ComplyEaze Bridge can establish the selected company's base currency from Tally.",
         ),
     };
     tally_command_error(
         reason,
         "Currency admission",
         format!(
-            "Bridge withheld the party/ledger master: {message} The workbook cannot label the monetary figures safely."
+            "ComplyEaze Bridge withheld the party/ledger master: {message} The workbook cannot label the monetary figures safely."
         ),
         "after_change",
         true,
@@ -406,36 +456,64 @@ fn party_ledger_master_local_export_error(
     )
 }
 
+/// The typed key error the key resolution returned, if the failure was one. Only the two key
+/// states (the mirror file is there and the credential store holds no key for it, or holds a
+/// key that is not the mirror's length) are told apart by the callers; read from the typed
+/// error, never from its message.
+fn mirror_key_state(error: &anyhow::Error) -> Option<&crate::db::MirrorKeyError> {
+    error.downcast_ref::<crate::db::MirrorKeyError>()
+}
+
+const MIRROR_KEY_MISSING_MESSAGE: &str = "The encrypted Tally mirror exists, but the key that opens it is not in this computer's credential store.";
+const MIRROR_KEY_INVALID_MESSAGE: &str = "The key stored for the encrypted Tally mirror is not a valid key: it is not the length the mirror uses, and may be damaged.";
+
 /// Produces the typed command error for the encrypted Tally mirror failing to initialise on
-/// first use (denied keychain authorisation, or a local disk/storage failure). The mirror was
-/// never opened, so no local or Tally state changed; retrying after the operator resolves the
-/// underlying keychain/disk issue is safe.
-fn mirror_unavailable_command_error(_error: anyhow::Error) -> TallyCommandError {
-    tally_command_error(
-        "tally_mirror_unavailable",
-        "Operation",
-        "The encrypted Tally mirror could not be opened. Its operating-system credential may have been denied, or local storage is unavailable.",
-        "safe",
-        false,
-        "Approve the operating-system credential prompt for Bridge, or verify local disk access, then retry.",
-    )
+/// first use. The mirror was never opened, so no local or Tally state changed. A missing or
+/// invalid key is permanent until the credential is put back: retrying does
+/// not help, and the app deletes nothing. Any other failure (a denied credential prompt, a
+/// local disk or storage failure) is safe to retry once the operator has resolved it.
+fn mirror_unavailable_command_error(error: anyhow::Error) -> TallyCommandError {
+    match mirror_key_state(&error) {
+        Some(crate::db::MirrorKeyError::MissingForExistingMirror) => tally_command_error(
+            "tally_mirror_key_missing",
+            "Operation",
+            MIRROR_KEY_MISSING_MESSAGE,
+            "not_recommended",
+            false,
+            "Open ComplyEaze Bridge as the same computer user, and restore the operating-system credential if it was reset or restored (the macOS login keychain, or that user's Windows Credential Manager). Retrying does not help until then. The app does not delete the local mirror, and no reset is offered yet.",
+        ),
+        Some(crate::db::MirrorKeyError::StoredKeyInvalid) => tally_command_error(
+            "tally_mirror_key_invalid",
+            "Operation",
+            MIRROR_KEY_INVALID_MESSAGE,
+            "not_recommended",
+            false,
+            "Restore the operating-system credential from a backup of the same user's credential store. Retrying does not help until then. The app does not delete the local mirror, and no reset is offered yet.",
+        ),
+        _ => tally_command_error(
+            "tally_mirror_unavailable",
+            "Operation",
+            "The encrypted Tally mirror could not be opened. Its operating-system credential may have been denied, or local storage is unavailable.",
+            "safe",
+            false,
+            "Approve the operating-system credential prompt for ComplyEaze Bridge, or verify local disk access, then retry.",
+        ),
+    }
 }
 
 /// Same failure as [`mirror_unavailable_command_error`], for the handful of mirror-backed
-/// commands that report errors as a plain `String` rather than a [`TallyCommandError`].
-fn mirror_unavailable_string_error(_error: anyhow::Error) -> String {
-    "The encrypted Tally mirror could not be opened. Its operating-system credential may have been denied, or local storage is unavailable.".to_string()
-}
-
-#[tauri::command]
-pub async fn check_tally_connection(
-    config: TallyConfig,
-    runtime: State<'_, TallyRuntime>,
-) -> Result<ConnectionStatus, TallyCommandError> {
-    runtime
-        .check_connection(config)
-        .await
-        .map_err(tally_runtime_command_error)
+/// commands that report errors as a plain `String` rather than a [`TallyCommandError`]: the
+/// text tells the three cases apart, since a string carries no code.
+fn mirror_unavailable_string_error(error: anyhow::Error) -> String {
+    match mirror_key_state(&error) {
+        Some(crate::db::MirrorKeyError::MissingForExistingMirror) => format!(
+            "tally_mirror_key_missing: {MIRROR_KEY_MISSING_MESSAGE} Retrying does not help until the credential is restored; the app does not delete the local mirror."
+        ),
+        Some(crate::db::MirrorKeyError::StoredKeyInvalid) => format!(
+            "tally_mirror_key_invalid: {MIRROR_KEY_INVALID_MESSAGE} Retrying does not help until the credential is restored; the app does not delete the local mirror."
+        ),
+        _ => "The encrypted Tally mirror could not be opened. Its operating-system credential may have been denied, or local storage is unavailable.".to_string(),
+    }
 }
 
 #[tauri::command]
@@ -544,7 +622,6 @@ fn persisted_tally_probe_result(
         connection: probe.connection,
         companies,
         profile: probe.profile,
-        selected_read_scope: probe.selected_read_scope,
         profile_sha256,
         review_commitment_sha256,
         passport_snapshot_id: None,
@@ -697,22 +774,6 @@ pub async fn save_tally_setup(
             .find(|company| selected_identity.matches_observed_company(company))
             .cloned()
             .ok_or_else(reviewed_probe_changed_error)?;
-        if probe.selected_read_scope.as_ref().is_some_and(|scope| {
-            !company.guid.as_deref().is_some_and(|guid| {
-                guid.to_ascii_lowercase() == scope.company_guid_ascii_casefolded
-            }) || company.company_number.as_deref() != Some(scope.company_number.as_str())
-                || company.books_from.as_deref() != Some(scope.books_from_yyyymmdd.as_str())
-        }) {
-            return Err(tally_command_error(
-                "qualified_company_scope_changed",
-                "Tally application",
-                "The selected company does not match the qualified read scope.",
-                "after_change",
-                false,
-                "Select the qualified company or probe and qualify the replacement company.",
-            ));
-        }
-
         let saved = mirror
             .save_reviewed_setup(ReviewedSetupInput {
                 review_commitment_sha256: request.expected_review_commitment_sha256.clone(),
@@ -740,44 +801,7 @@ pub async fn save_tally_setup(
                 },
                 company_number: request.selected_company.company_number.clone(),
                 books_from_yyyymmdd: request.selected_company.books_from_yyyymmdd.clone(),
-                selected_read_scope: probe.selected_read_scope.as_ref().map(|scope| {
-                    SelectedReadScopeInput {
-                        scope_commitment_sha256: scope.scope_commitment_sha256.clone(),
-                        parent_review_sha256: scope.parent_review_sha256.clone(),
-                        ledger_profile_id: scope.ledger_profile_id.clone(),
-                        voucher_profile_id: scope.voucher_profile_id.clone(),
-                        voucher_from_yyyymmdd: scope.voucher_from_yyyymmdd.clone(),
-                        voucher_to_yyyymmdd: scope.voucher_to_yyyymmdd.clone(),
-                        company_number: scope.company_number.clone(),
-                        books_from_yyyymmdd: scope.books_from_yyyymmdd.clone(),
-                        observed_at_unix_ms,
-                        observations: scope
-                            .observations
-                            .iter()
-                            .map(|observation| SelectedReadObservationInput {
-                                capability_key: observation.capability_key.to_string(),
-                                state: mirror_capability_state(observation.state),
-                                confidence: mirror_confidence(observation.confidence),
-                                safe_reason_code: observation.safe_reason_code.to_string(),
-                                result_bucket: observation.result_bucket.to_string(),
-                                request_sha256: observation.request_sha256.clone(),
-                                decoded_response_sha256: observation
-                                    .decoded_response_sha256
-                                    .clone(),
-                                response_encoding: observation
-                                    .response_encoding
-                                    .map(str::to_string),
-                                company_context_verified: observation.company_context_verified,
-                                schema_verified: observation.schema_verified,
-                                record_count_verified: observation.record_count_verified,
-                                identity_evidence_state: observation
-                                    .identity_evidence_state
-                                    .to_string(),
-                                date_window_verified: observation.date_window_verified,
-                            })
-                            .collect(),
-                    }
-                }),
+                selected_read_scope: None,
             })
             .await
             .map_err(|_| {
@@ -842,7 +866,7 @@ fn reconcile_review_cleanup(
             "The local setup was not stored, and the in-memory review reservation could not be released.",
             "after_change",
             true,
-            "Restart Bridge, probe again, review the exact scope, and save again.",
+            "Restart ComplyEaze Bridge, probe again, review the exact scope, and save again.",
         )),
         Err(error) => Err(error),
     }
@@ -950,7 +974,7 @@ pub async fn enroll_tally_write_fixture(
             "safe", false, "Verify the three confirmations and local encrypted storage, then retry the fresh review.",
         ))?;
         let status = mirror.write_fixture_enrollment_status(&request.mirror_company_id).await.map_err(|_| {
-            tally_command_error("fixture_enrollment_status_unavailable", "Operation", "The local fixture status could not be read after enrollment.", "after_change", true, "Restart Bridge and inspect the local fixture status before any future canary.")
+            tally_command_error("fixture_enrollment_status_unavailable", "Operation", "The local fixture status could not be read after enrollment.", "after_change", true, "Restart ComplyEaze Bridge and inspect the local fixture status before any future canary.")
         })?;
         debug_assert!(!enrollment.id.is_empty());
         Ok(TallyWriteFixtureEnrollmentResponse {
@@ -975,7 +999,7 @@ pub async fn enroll_tally_write_fixture(
         Err(_) if !cleanup_succeeded => Err(tally_command_error(
             "fixture_enrollment_retry_state_uncertain", "Operation",
             "The local fixture enrollment did not complete cleanly and the reviewed cache could not be released.",
-            "after_change", true, "Restart Bridge, probe again, and inspect local fixture status before retrying.",
+            "after_change", true, "Restart ComplyEaze Bridge, probe again, and inspect local fixture status before retrying.",
         )),
         Err(error) => Err(error),
     }
@@ -1051,7 +1075,6 @@ pub struct PersistedTallyProbeResult {
     pub connection: ConnectionStatus,
     pub companies: Vec<PersistedTallyCompany>,
     pub profile: bridge_tally_core::CapabilityProfile,
-    pub selected_read_scope: Option<SelectedReadScopeEvidence>,
     pub profile_sha256: String,
     pub review_commitment_sha256: String,
     pub passport_snapshot_id: Option<String>,
@@ -1720,10 +1743,23 @@ pub async fn bootstrap_direct_tally_company(
     persisted_tally_probe_result(review_id, canonical_origin, observed_at_unix_ms, probe)
 }
 
+/// The ledger-master export's request. `as_of_yyyymmdd` is the date the CA
+/// chose on the Outstandings screen (#903); without it the balances end by the
+/// Bridge host's date, as before. A malformed date fails to deserialise: the
+/// screen refuses one before the call, so this is only a backstop.
 #[derive(Debug, Deserialize)]
-pub struct CompanyRequest {
+pub struct PartyLedgerMasterRequest {
     pub config: TallyConfig,
     pub selected_company: SelectedCompanyIdentity,
+    #[serde(default)]
+    pub as_of_yyyymmdd: Option<TallyDate>,
+}
+
+/// The saved workbook and what it says about its date, for the app to show.
+#[derive(Debug, Serialize)]
+pub struct PartyLedgerMasterExport {
+    pub path: String,
+    pub notes: Vec<SourceNote>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1822,6 +1858,19 @@ fn verify_observed_company_tuple_from_companies(
             "Probe again and choose an observed company identity.",
         ));
     }
+    // Parsed once, here. Probing again returns the same company, so the
+    // remediation is not to probe again.
+    let selected_guid =
+        bridge_tally_core::company_guid::CompanyGuid::parse(&selected_guid).map_err(|_| {
+            tally_command_error(
+                "company_selection_invalid",
+                "Tally application",
+                "The identity Tally gave this company is not in the expected form, so ComplyEaze Bridge cannot select it.",
+                "not_recommended",
+                false,
+                "Do not use this company here. Write to contact@complyeaze.com with this company's name.",
+            )
+        })?;
     VerifiedCompanyIdentity::from_observed_companies(
         selected.display_name.clone(),
         selected_guid,
@@ -1879,18 +1928,18 @@ fn verify_observed_company_tuple_from_companies(
 #[tauri::command]
 pub async fn export_party_ledger_master(
     app: tauri::AppHandle,
-    request: CompanyRequest,
+    request: PartyLedgerMasterRequest,
     runtime: State<'_, TallyRuntime>,
-) -> Result<String, TallyCommandError> {
+) -> Result<PartyLedgerMasterExport, TallyCommandError> {
     // One wire-lock wait budget for the whole command (#697).
     with_operation_wire_budget(export_party_ledger_master_once(app, request, runtime)).await
 }
 
 async fn export_party_ledger_master_once(
     app: tauri::AppHandle,
-    request: CompanyRequest,
+    request: PartyLedgerMasterRequest,
     runtime: State<'_, TallyRuntime>,
-) -> Result<String, TallyCommandError> {
+) -> Result<PartyLedgerMasterExport, TallyCommandError> {
     let identity =
         verify_observed_company_tuple(&runtime, &request.config, &request.selected_company).await?;
     // The classified read admits a book with several Currency masters when
@@ -1902,8 +1951,15 @@ async fn export_party_ledger_master_once(
         .admit_inr_classified()
         .map_err(party_ledger_master_currency_admission_error)?
         .into_compliance_assertion();
+    let basis = party_ledger_master_balance_basis(request.as_of_yyyymmdd, host_today)?;
     let source = runtime
-        .fetch_party_ledger_master_source(request.config, &identity, currency_assertion)
+        .fetch_party_ledger_master_source(
+            request.config,
+            &identity,
+            currency_assertion,
+            basis,
+            crate::tally::connection::ComplianceRead::Standard,
+        )
         .await
         .map_err(party_ledger_master_runtime_command_error)?;
     party_ledger_master_withheld(
@@ -1914,7 +1970,7 @@ async fn export_party_ledger_master_once(
         .map_err(|_| {
             party_ledger_master_local_export_error(
                 "party_ledger_master_source_invalid",
-                "Bridge withheld the party/ledger master because its verified source could not be represented safely.",
+                "ComplyEaze Bridge withheld the party/ledger master because its verified source could not be represented safely.",
                 "Refresh the selected Tally company and retry the export after reviewing its runtime status.",
             )
         })?;
@@ -1922,13 +1978,13 @@ async fn export_party_ledger_master_once(
     let bytes = render_party_ledger_master_xlsx(&workbook, &[]).map_err(|_| {
         party_ledger_master_local_export_error(
             "party_ledger_master_render_failed",
-            "Bridge could not build the party/ledger master workbook safely.",
+            "ComplyEaze Bridge could not build the party/ledger master workbook safely.",
             "Retry the export after reviewing local application status.",
         )
     })?;
     let mut slug = statement_filename_slug(workbook.source().company.as_str());
     slug.truncate(150);
-    save_report_download_bytes(
+    let path = save_report_download_bytes(
         &app,
         &format!(
             "party-ledger-master-{slug}-{}.xlsx",
@@ -1939,9 +1995,13 @@ async fn export_party_ledger_master_once(
     .map_err(|_| {
         party_ledger_master_local_export_error(
             "party_ledger_master_save_failed",
-            "Bridge could not save the party/ledger master workbook.",
+            "ComplyEaze Bridge could not save the party/ledger master workbook.",
             "Verify local Downloads-folder access, then retry the export.",
         )
+    })?;
+    Ok(PartyLedgerMasterExport {
+        path,
+        notes: workbook.source().notes(),
     })
 }
 
@@ -2000,7 +2060,7 @@ async fn fetch_selected_ledger_entries_once(
         tally_command_error(
             "selected_ledger_entries_refused",
             "Tally application",
-            "Bridge withheld this ledger investigation because its source could not be verified.",
+            "ComplyEaze Bridge withheld this ledger investigation because its source could not be verified.",
             "after_change",
             false,
             match code.as_str() {
@@ -2013,22 +2073,38 @@ async fn fetch_selected_ledger_entries_once(
     })
 }
 
+/// What ends the ledger-master export's balances: the date the CA chose, else
+/// the Bridge host's (#903). The host's date is asked for only when none was
+/// chosen, so a chosen date never reads the clock.
+fn party_ledger_master_balance_basis(
+    chosen: Option<TallyDate>,
+    host_today: impl FnOnce() -> Result<TallyDate, TallyCommandError>,
+) -> Result<BalanceDateBasis, TallyCommandError> {
+    match chosen {
+        Some(requested) => Ok(BalanceDateBasis::Requested(requested)),
+        None => host_today().map(BalanceDateBasis::HostToday),
+    }
+}
+
 fn requested_outstandings_as_of(
     explicit_as_of: Option<TallyDate>,
 ) -> Result<TallyDate, TallyCommandError> {
-    explicit_as_of
-        .map(Ok)
-        .unwrap_or_else(|| TallyDate::parse(chrono::Local::now().format("%Y%m%d").to_string()))
-        .map_err(|_| {
-            tally_command_error(
-                "current_date_invalid",
-                "Bridge application",
-                "Bridge could not construct today's outstandings date.",
-                "after_change",
-                false,
-                "Check the workstation date and time, then repeat the read-only action.",
-            )
-        })
+    explicit_as_of.map(Ok).unwrap_or_else(host_today)
+}
+
+/// The Bridge host's calendar date: Tally is local to it, so accounting-day
+/// defaults use its calendar rather than UTC's.
+fn host_today() -> Result<TallyDate, TallyCommandError> {
+    TallyDate::parse(chrono::Local::now().format("%Y%m%d").to_string()).map_err(|_| {
+        tally_command_error(
+            "current_date_invalid",
+            "ComplyEaze Bridge application",
+            "ComplyEaze Bridge could not construct today's date.",
+            "after_change",
+            false,
+            "Check the workstation date and time, then repeat the read-only action.",
+        )
+    })
 }
 
 #[tauri::command]
@@ -2188,7 +2264,7 @@ fn party_ledger_master_foreign_currency_error(
         "party_ledger_master_foreign_currency_ledgers",
         "Currency admission",
         format!(
-            "Bridge withheld the party/ledger master: this company keeps ledgers in a currency other than its base currency ({named}{more}). A workbook without them would not describe the whole book, and their balances are not rupees."
+            "ComplyEaze Bridge withheld the party/ledger master: this company keeps ledgers in a currency other than its base currency ({named}{more}). A workbook without them would not describe the whole book, and their balances are not rupees."
         ),
         "after_change",
         false,
@@ -2229,7 +2305,7 @@ fn party_ledger_master_mixed_currency_error(mixed: &[String]) -> TallyCommandErr
         "party_ledger_master_mixed_currency_ledgers",
         "Currency admission",
         format!(
-            "Bridge withheld the party/ledger master: some base-currency ledgers hold balances Tally shows in another currency ({named}{more}). A workbook without them would not describe the whole book, and Bridge does not read those balances."
+            "ComplyEaze Bridge withheld the party/ledger master: some base-currency ledgers hold balances Tally shows in another currency ({named}{more}). A workbook without them would not describe the whole book, and ComplyEaze Bridge does not read those balances."
         ),
         "after_change",
         false,
@@ -2249,13 +2325,17 @@ pub(crate) async fn sweep_company_outstandings(
     as_of: &TallyDate,
     ageing_anchor: crate::tally::OutstandingsAgeingAnchor,
 ) -> Result<OutstandingsLoadResult, CompanySweepFailure> {
-    let Ok(currency) = runtime
+    let currency = match runtime
         .detect_classified_base_currency_with_extent(config.clone(), identity)
         .await
-    else {
-        return Err(CompanySweepFailure::ReasonCode(
-            "company_currency_probe_failed",
-        ));
+    {
+        Ok(currency) => currency,
+        Err(error) => {
+            return Err(sweep_failure_naming_identity(
+                &error,
+                CompanySweepFailure::ReasonCode("company_currency_probe_failed"),
+            ));
+        }
     };
     let witness = currency
         .admit_inr_classified()
@@ -2269,7 +2349,20 @@ pub(crate) async fn sweep_company_outstandings(
             ageing_anchor,
         )
         .await
-        .map_err(|_| CompanySweepFailure::OutstandingsRead)
+        .map_err(|error| {
+            sweep_failure_naming_identity(&error, CompanySweepFailure::OutstandingsRead)
+        })
+}
+
+/// A sweep company's failure, naming the identity check when that is what refused it (#1699):
+/// the company is not loaded in Tally, was renamed, or was listed more than once. Any other
+/// error keeps the failure the caller would have reported. The reason carries no company name.
+pub(crate) fn sweep_failure_naming_identity(
+    error: &anyhow::Error,
+    otherwise: CompanySweepFailure,
+) -> CompanySweepFailure {
+    crate::tally::runtime::company_identity_refusal_cause(error)
+        .map_or(otherwise, CompanySweepFailure::ReasonCode)
 }
 
 /// Reads outstandings for several companies in one action.
@@ -2358,72 +2451,6 @@ pub fn tally_runtime_snapshots(
 }
 
 #[tauri::command]
-pub fn tally_telemetry_preview(
-    runtime: State<'_, TallyRuntime>,
-) -> Result<TallyTelemetryPreviewExport, TallyCommandError> {
-    runtime
-        .telemetry_preview()
-        .map_err(tally_runtime_command_error)
-}
-
-#[tauri::command]
-pub async fn prepare_gst_return_draft(request: GstDraftRequest) -> Result<GstReturnDraft, String> {
-    let _ = request;
-    Err("GST return drafting is not implemented; Bridge did not produce a GST result".to_string())
-}
-
-#[tauri::command]
-pub async fn validate_axal_credentials(
-    credentials: crate::axal::AxalCredentials,
-) -> Result<crate::axal::AxalSessionResponse, String> {
-    crate::axal::establish_credential_session(credentials)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn check_axal_connection_status(
-    credential_session_id: String,
-) -> Result<crate::axal::ConnectionStatusResponse, String> {
-    crate::axal::check_connection_status(&credential_session_id)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn revoke_axal_credential_session(credential_session_id: String) -> Result<(), String> {
-    crate::axal::revoke_credential_session(&credential_session_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn scan_document_paths(
-    request: crate::documents::ScanDocumentsRequest,
-) -> Result<crate::documents::ScanDocumentsResponse, String> {
-    crate::documents::scan_documents(request)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn sync_documents_to_axal(
-    request: crate::documents::SyncDocumentsRequest,
-) -> Result<crate::documents::SyncDocumentsResponse, String> {
-    crate::documents::sync_documents(request)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn revoke_document_authorizations(
-    selection_ids: Vec<String>,
-    scan_session_id: Option<String>,
-) -> Result<(), String> {
-    crate::documents::revoke_document_authorizations(&selection_ids, scan_session_id.as_deref())
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 pub async fn desktop_pick_journal_for_review(
     config: TallyConfig,
     runtime: State<'_, TallyRuntime>,
@@ -2461,35 +2488,6 @@ pub async fn desktop_reconcile_reviewed_journal(
     .map_err(desktop_journal_command_error)
 }
 
-#[tauri::command]
-pub async fn select_document_files() -> Result<Vec<crate::documents::SelectedDocumentPath>, String>
-{
-    tokio::task::spawn_blocking(|| {
-        let paths = rfd::FileDialog::new()
-            .set_title("Select documents")
-            .pick_files()
-            .unwrap_or_default();
-        crate::documents::authorize_selected_paths(paths).map_err(|error| error.to_string())
-    })
-    .await
-    .map_err(|error| format!("File picker failed: {error}"))?
-}
-
-#[tauri::command]
-pub async fn select_document_folder() -> Result<Vec<crate::documents::SelectedDocumentPath>, String>
-{
-    tokio::task::spawn_blocking(|| {
-        let paths = rfd::FileDialog::new()
-            .set_title("Select document folder")
-            .pick_folder()
-            .into_iter()
-            .collect::<Vec<_>>();
-        crate::documents::authorize_selected_paths(paths).map_err(|error| error.to_string())
-    })
-    .await
-    .map_err(|error| format!("Folder picker failed: {error}"))?
-}
-
 #[cfg(test)]
 #[path = "commands_tests.rs"]
 mod tests;
@@ -2503,7 +2501,9 @@ fn portable_export_file_name(file_name: &str) -> Result<String, String> {
         || trimmed.contains("..")
         || trimmed.starts_with('.')
     {
-        return Err("Bridge could not build a safe file name for this export.".to_string());
+        return Err(
+            "ComplyEaze Bridge could not build a safe file name for this export.".to_string(),
+        );
     }
 
     let mut sanitized = trimmed
@@ -2522,7 +2522,9 @@ fn portable_export_file_name(file_name: &str) -> Result<String, String> {
         sanitized.pop();
     }
     if sanitized.is_empty() {
-        return Err("Bridge could not build a safe file name for this export.".to_string());
+        return Err(
+            "ComplyEaze Bridge could not build a safe file name for this export.".to_string(),
+        );
     }
 
     let stem = sanitized
@@ -2622,36 +2624,97 @@ fn save_report_download_bytes(
         .path()
         .download_dir()
         .or_else(|_| app.path().home_dir())
-        .map_err(|_| "Bridge could not locate a folder to save into.".to_string())?;
-    let path = write_unique_download(&downloads, &file_name, contents)
-        .map_err(|error| format!("Bridge could not write the export: {error}"))?;
-    Ok(path.to_string_lossy().into_owned())
+        .map_err(|_| "ComplyEaze Bridge could not locate a folder to save into.".to_string())?;
+    save_download_into(
+        &downloads,
+        &app.state::<crate::exported_files::ExportedFiles>(),
+        &file_name,
+        contents,
+    )
+}
+
+/// Writes an export into `downloads` and records it, so the path returned to
+/// the webview is one the reveal command accepts (#915).
+fn save_download_into(
+    downloads: &std::path::Path,
+    exported: &crate::exported_files::ExportedFiles,
+    file_name: &str,
+    contents: &[u8],
+) -> Result<String, String> {
+    let path = write_unique_download(downloads, file_name, contents)
+        .map_err(|error| format!("ComplyEaze Bridge could not write the export: {error}"))?;
+    Ok(exported.record(path))
 }
 
 fn checked_export_file_name(file_name: &str) -> Result<String, String> {
     portable_export_file_name(file_name)
 }
 
+/// Why the reveal command refused a path, before launching anything.
+#[derive(Debug, PartialEq, Eq)]
+enum RevealRefusal {
+    /// No export of this process returned that path text.
+    NotExported,
+    /// An export did, but the file is no longer there.
+    Missing,
+}
+
+/// The reveal command's decision, apart from launching the file manager: the
+/// webview's path text is parsed into an exported file, which must still exist.
+fn reveal_target(
+    exported: &crate::exported_files::ExportedFiles,
+    path: &str,
+) -> Result<crate::exported_files::ExportedFile, RevealRefusal> {
+    let file = exported
+        .admit(path)
+        .map_err(|crate::exported_files::NotExported| RevealRefusal::NotExported)?;
+    if !file.path().is_file() {
+        return Err(RevealRefusal::Missing);
+    }
+    Ok(file)
+}
+
 /// Reveals an exported file in the OS file manager.
 ///
-/// Only ever called with a path this process just wrote, and the path is
-/// re-checked as an existing file before being handed to the platform tool --
-/// so a caller cannot use this to launch an arbitrary target.
+/// The path text comes from the webview, so it is parsed here into an
+/// [`ExportedFile`](crate::exported_files::ExportedFile): only a path an export
+/// recorded in this process is accepted, and any other path is refused before
+/// anything is launched (#915). The file is then re-checked as existing.
 #[tauri::command]
-pub async fn reveal_exported_file(path: String) -> Result<(), String> {
-    let target = std::path::PathBuf::from(&path);
-    if !target.is_file() {
-        return Err("Bridge could not find that export any more.".to_string());
-    }
+pub async fn reveal_exported_file(
+    path: String,
+    exported: State<'_, crate::exported_files::ExportedFiles>,
+) -> Result<(), String> {
+    let file = reveal_target(&exported, &path).map_err(|refusal| match refusal {
+        RevealRefusal::NotExported => {
+            "ComplyEaze Bridge shows only files it exported since it started. Export it again to \
+             show it."
+                .to_string()
+        }
+        RevealRefusal::Missing => {
+            "ComplyEaze Bridge could not find that export any more. It may have been moved or \
+             deleted."
+                .to_string()
+        }
+    })?;
+    let target = file.path();
 
     #[cfg(target_os = "macos")]
     let mut command = {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
+        )]
         let mut command = std::process::Command::new("open");
-        command.arg("-R").arg(&target);
+        command.arg("-R").arg(target);
         command
     };
     #[cfg(target_os = "windows")]
     let mut command = {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
+        )]
         let mut command = std::process::Command::new("explorer");
         // `explorer` wants the selector and path as one argument.
         command.arg(format!("/select,{}", target.display()));
@@ -2659,7 +2722,11 @@ pub async fn reveal_exported_file(path: String) -> Result<(), String> {
     };
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     let mut command = {
-        let parent = target.parent().unwrap_or(&target);
+        let parent = target.parent().unwrap_or(target);
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
+        )]
         let mut command = std::process::Command::new("xdg-open");
         command.arg(parent);
         command
@@ -2668,7 +2735,7 @@ pub async fn reveal_exported_file(path: String) -> Result<(), String> {
     command
         .spawn()
         .map(|_| ())
-        .map_err(|error| format!("Bridge could not open the folder: {error}"))
+        .map_err(|error| format!("ComplyEaze Bridge could not open the folder: {error}"))
 }
 
 /// A party statement names its source by the handle
@@ -2748,7 +2815,9 @@ pub async fn select_party_statement_destination(
             .pick_folder()
     })
     .await
-    .map_err(|_| "Bridge could not open the statement destination picker.".to_string())?;
+    .map_err(|_| {
+        "ComplyEaze Bridge could not open the statement destination picker.".to_string()
+    })?;
 
     let Some(selected) = selected else {
         return Ok(None);
@@ -2757,7 +2826,7 @@ pub async fn select_party_statement_destination(
     let approval_id = approvals
         .issue(std::path::PathBuf::from(&destination))
         .map_err(|_| {
-            "Bridge could not record the statement destination. Choose the folder again."
+            "ComplyEaze Bridge could not record the statement destination. Choose the folder again."
                 .to_string()
         })?;
     Ok(Some(PartyStatementDestinationSelection {
@@ -2773,7 +2842,7 @@ pub async fn revoke_party_statement_destination(
     approvals: State<'_, PartyStatementDestinationApprovals>,
 ) -> Result<(), String> {
     approvals.revoke(&approval_id).map_err(|_| {
-        "Bridge could not release the statement destination. Choose the folder again.".to_string()
+        "ComplyEaze Bridge could not release the statement destination. Choose the folder again.".to_string()
     })
 }
 
@@ -2788,7 +2857,7 @@ pub async fn revoke_party_statement_destination(
 /// actually chose. Failing closed with a clear message beats guessing.
 fn require_utf8_destination(path: std::path::PathBuf) -> Result<String, String> {
     path.into_os_string().into_string().map_err(|_| {
-        "Bridge could not use that folder because its name is not valid Unicode text. \
+        "ComplyEaze Bridge could not use that folder because its name is not valid Unicode text. \
          Choose a different folder, or rename it using standard characters."
             .to_string()
     })
@@ -2822,7 +2891,7 @@ pub(crate) fn party_statement_source(
 > {
     sources.get(source_id).map_err(|error| match error {
         WorkingPaperExportStoreError::Unavailable => {
-            "Bridge could not reach the statement source. Refresh outstandings and try again."
+            "ComplyEaze Bridge could not reach the statement source. Refresh outstandings and try again."
                 .to_string()
         }
         _ => "This outstandings result is no longer available for statements. Refresh \
@@ -2840,6 +2909,7 @@ pub async fn export_bulk_party_statements(
     request: ExportBulkPartyStatementsRequest,
     approvals: State<'_, PartyStatementDestinationApprovals>,
     party_statement_sources: State<'_, PartyStatementSourceStore>,
+    exported: State<'_, crate::exported_files::ExportedFiles>,
 ) -> Result<
     crate::reports::bulk_party_statement::BulkPartyStatementResult,
     BulkPartyStatementExportError,
@@ -2848,6 +2918,7 @@ pub async fn export_bulk_party_statements(
         request,
         &approvals,
         &party_statement_sources,
+        &exported,
     )
 }
 
@@ -2855,6 +2926,7 @@ fn export_bulk_party_statements_at_selected_destination(
     request: ExportBulkPartyStatementsRequest,
     approvals: &PartyStatementDestinationApprovals,
     party_statement_sources: &PartyStatementSourceStore,
+    exported: &crate::exported_files::ExportedFiles,
 ) -> Result<
     crate::reports::bulk_party_statement::BulkPartyStatementResult,
     BulkPartyStatementExportError,
@@ -2902,7 +2974,10 @@ fn export_bulk_party_statements_at_selected_destination(
             })
         }
     };
-    result.map_err(BulkPartyStatementExportError::Existing)
+    let mut batch = result.map_err(BulkPartyStatementExportError::Existing)?;
+    // The batch's manifest is what the webview offers to reveal (#915).
+    batch.manifest_path = exported.record(std::path::PathBuf::from(&batch.manifest_path));
+    Ok(batch)
 }
 
 /// Builds the all-party, dual-ageing working paper from one completed native
@@ -2920,11 +2995,11 @@ pub async fn export_outstandings_working_paper(
 ) -> Result<String, String> {
     let source = working_paper_exports
         .take(&request.export_id)
-        .map_err(|error| format!("Bridge withheld the working paper: {error}"))?;
+        .map_err(|error| format!("ComplyEaze Bridge withheld the working paper: {error}"))?;
     let paper = build_outstandings_working_paper(source)
-        .map_err(|error| format!("Bridge withheld the working paper: {error}"))?;
+        .map_err(|error| format!("ComplyEaze Bridge withheld the working paper: {error}"))?;
     let bytes = render_outstandings_working_paper_xlsx(&paper)
-        .map_err(|error| format!("Bridge could not build the working paper: {error}"))?;
+        .map_err(|error| format!("ComplyEaze Bridge could not build the working paper: {error}"))?;
     let mut slug = statement_filename_slug(paper.company());
     slug.truncate(150);
     save_report_download_bytes(
@@ -2962,23 +3037,25 @@ pub async fn export_party_statement(
     )
     .map_err(|error| match error {
         PartyStatementError::PartyNotFound => {
-            "Bridge no longer has exposure on record for this party — refresh and try again."
+            "ComplyEaze Bridge no longer has exposure on record for this party — refresh and try again."
                 .to_string()
         }
         PartyStatementError::ArithmeticOverflow => {
-            "Bridge could not total this party's statement exactly.".to_string()
+            "ComplyEaze Bridge could not total this party's statement exactly.".to_string()
         }
     })?;
 
     let (bytes, extension) = match request.format {
         PartyStatementFormat::Xlsx => (
-            render_party_statement_xlsx(&statement)
-                .map_err(|error| format!("Bridge could not build the statement: {error}"))?,
+            render_party_statement_xlsx(&statement).map_err(|error| {
+                format!("ComplyEaze Bridge could not build the statement: {error}")
+            })?,
             "xlsx",
         ),
         PartyStatementFormat::Pdf => (
-            render_party_statement_pdf(&statement)
-                .map_err(|error| format!("Bridge could not build the statement: {error}"))?,
+            render_party_statement_pdf(&statement).map_err(|error| {
+                format!("ComplyEaze Bridge could not build the statement: {error}")
+            })?,
             "pdf",
         ),
     };
@@ -2991,9 +3068,27 @@ pub async fn export_party_statement(
         .path()
         .download_dir()
         .or_else(|_| app.path().home_dir())
-        .map_err(|_| "Bridge could not locate a folder to save into.".to_string())?;
-    let path = write_unique_statement_file(&downloads, &stem, extension, &bytes)?;
-    Ok(path.to_string_lossy().into_owned())
+        .map_err(|_| "ComplyEaze Bridge could not locate a folder to save into.".to_string())?;
+    save_statement_into(
+        &downloads,
+        &app.state::<crate::exported_files::ExportedFiles>(),
+        &stem,
+        extension,
+        &bytes,
+    )
+}
+
+/// Writes a party statement into `downloads` and records it, so the path
+/// returned to the webview is one the reveal command accepts (#915).
+fn save_statement_into(
+    downloads: &std::path::Path,
+    exported: &crate::exported_files::ExportedFiles,
+    stem: &str,
+    extension: &str,
+    bytes: &[u8],
+) -> Result<String, String> {
+    let path = write_unique_statement_file(downloads, stem, extension, bytes)?;
+    Ok(exported.record(path))
 }
 
 /// Writes a new statement filename without ever replacing an earlier export.
@@ -3011,7 +3106,9 @@ fn write_unique_statement_file(
         || extension.is_empty()
         || extension.contains('.')
     {
-        return Err("Bridge could not build a safe file name for this export.".to_string());
+        return Err(
+            "ComplyEaze Bridge could not build a safe file name for this export.".to_string(),
+        );
     }
     for sequence in 1..=10_000_u32 {
         let suffix = if sequence == 1 {
@@ -3029,7 +3126,7 @@ fn write_unique_statement_file(
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(error) => {
                 return Err(format!(
-                    "Bridge could not create the statement export: {error}"
+                    "ComplyEaze Bridge could not create the statement export: {error}"
                 ))
             }
         };
@@ -3037,12 +3134,15 @@ fn write_unique_statement_file(
             drop(file);
             let _ = std::fs::remove_file(&path);
             return Err(format!(
-                "Bridge could not finish writing the statement export: {error}"
+                "ComplyEaze Bridge could not finish writing the statement export: {error}"
             ));
         }
         return Ok(path);
     }
-    Err("Bridge could not find an unused statement filename after 10,000 attempts.".to_string())
+    Err(
+        "ComplyEaze Bridge could not find an unused statement filename after 10,000 attempts."
+            .to_string(),
+    )
 }
 
 /// Lower-cases and hyphenates a party name into a filesystem-safe slug,

@@ -1,7 +1,10 @@
 //! Ledgers for the local MCP adapter.
+use crate::tally::connection::ComplianceRead;
+use crate::tally::runtime::MastersKind;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::group_ancestry::{AncestryChain, AncestryGap, GroupIndex};
 use bridge_tally_protocol::gst_registration::GstRegistrationHistory;
+use bridge_tally_protocol::PartyLedgerMasterFields;
 
 use super::*;
 
@@ -43,6 +46,22 @@ fn ancestry_gap_code(gap: AncestryGap) -> &'static str {
     }
 }
 
+/// One ledger's `compliance` object: the master fields as serialised, with the
+/// party names marked. `gst_details` is in the object only when the caller asked
+/// for the dated GST details (`include_gst_details`): without the flag no request
+/// asks for the list, so every row would carry `{"observation":"not_observed"}`
+/// (bridge#1520). It is removed here and not on the type, because a read that
+/// asked for it must report "asked, none returned" as `not_observed`.
+fn compliance_json(fields: PartyLedgerMasterFields, gst_details: bool) -> Value {
+    let mut compliance = serde_json::to_value(fields).unwrap_or_default();
+    if let Value::Object(object) = &mut compliance {
+        if !gst_details {
+            object.remove("gst_details");
+        }
+    }
+    mark_compliance_party_names(compliance)
+}
+
 /// Renders one ledger's resolved ancestry for the wire. `hops` is always the
 /// true resolved prefix -- never padded past where resolution stopped -- and
 /// `complete`/`gap` say plainly whether the caller is looking at the whole
@@ -66,16 +85,16 @@ fn ancestry_json(chain: &AncestryChain) -> Value {
 /// when they differ is unmeasured, so both are reported and a difference is
 /// flagged rather than resolved.
 #[derive(Debug, PartialEq, Eq)]
-struct PartyGstin {
-    gstin: Option<String>,
-    status: &'static str,
+pub(super) struct PartyGstin {
+    pub(super) gstin: Option<String>,
+    pub(super) status: &'static str,
     /// The in-force entry's `GSTREGISTRATIONTYPE`, so "Regular with no GSTIN"
     /// is not read as unregistered.
-    registration_type: Option<String>,
+    pub(super) registration_type: Option<String>,
     flat: Option<String>,
     /// The flat field names a GSTIN and a readable history says something
     /// else on that date: another GSTIN, or none.
-    sources_disagree: bool,
+    pub(super) sources_disagree: bool,
 }
 
 /// The row keys a [`PartyGstin`] answer is reported under.
@@ -93,7 +112,11 @@ fn party_gstin_fields(gstin: PartyGstin, as_of: &str) -> serde_json::Map<String,
     fields
 }
 
-fn party_gstin_on(flat: Option<&str>, history: &GstRegistrationHistory, as_of: &str) -> PartyGstin {
+pub(super) fn party_gstin_on(
+    flat: Option<&str>,
+    history: &GstRegistrationHistory,
+    as_of: &str,
+) -> PartyGstin {
     // `flat` is the field as returned, so an explicit `<PARTYGSTIN/>` is
     // `Some("")`: reported as read, but it names no GSTIN.
     let named = flat.filter(|value| !value.is_empty()).map(str::to_string);
@@ -285,6 +308,29 @@ fn currency_scope_frame(
     })
 }
 
+/// Adds to a listing's frame, when a census counted the book (#679), whether its
+/// count was checked against the company's own ledger count (#938): `matched`,
+/// `company_count_lower` (Tally's count is below the census's: the read went on)
+/// or `unavailable` (Tally's answer carried no count, so the check did not run).
+/// Nothing is added when no census ran.
+fn count_cross_check_frame(
+    frame: Value,
+    check: Option<crate::tally::connection::CountCrossCheck>,
+) -> Value {
+    let Some(check) = check else {
+        return frame;
+    };
+    let mut frame = match frame {
+        Value::Object(frame) => frame,
+        _ => serde_json::Map::new(),
+    };
+    frame.insert(
+        "ledger_count_cross_check".to_owned(),
+        json!({"status": check.code()}),
+    );
+    Value::Object(frame)
+}
+
 /// The caller's `as_of`, the date `party_gstin` is read as of (bridge#653);
 /// `None` leaves it to the Bridge host's date, taken where the rows are built.
 /// `as_of` selects only the GSTIN, so it is refused unless fields=compliance
@@ -298,35 +344,96 @@ fn requested_gstin_as_of(args: &Value) -> Result<Option<String>, String> {
     if !ledger_master_fields(&fields)? {
         return Err("ledger_masters_as_of_requires_compliance".to_string());
     }
-    normalized_date(&as_of).map(Some)
+    normalized_date(&as_of).map(|date| Some(date.as_str().to_string()))
+}
+
+/// Whether the caller asked for each ledger's dated GST details
+/// (`include_gst_details`, default false). They are read only with
+/// fields=compliance, so the flag is refused with any other `fields` rather
+/// than quietly ignored: a caller who asked for rates must not read a result
+/// without them as if none existed.
+fn requested_gst_details(args: &Value) -> Result<bool, String> {
+    let Some(include) = optional_bool(args, "include_gst_details")? else {
+        return Ok(false);
+    };
+    let fields = optional_string(args, "fields")?.unwrap_or_else(|| "basic".to_string());
+    if include && !ledger_master_fields(&fields)? {
+        return Err("ledger_masters_gst_details_requires_compliance".to_string());
+    }
+    Ok(include)
+}
+
+/// What a result with `include_gst_details` says about the rows it adds, so
+/// that a caller does not read more into them than the one capture behind
+/// them shows.
+const GST_DETAILS_LIMITATIONS: [&str; 6] = [
+    "compliance.gst_details holds Tally's ledger-level GST details as sent, per dated entry and state row; a rate is absent (the element was missing), empty, zero or a value, four different observations that are never merged.",
+    "HSN/SAC and type of supply are not returned because no capture shows them; the place of supply is in the registration history (compliance.gst_registrations), not here; slab rates are only flagged (slab_rates_present), not read; other_content_skipped says an entry held content that was not read.",
+    "A state_name or valuation_type that starts with U+FFFD and #4; is a Tally reserved value (written &#4; on the wire), kept as the parser returned it.",
+    "ineligible_itc is Tally's GSTINELIGIBLEITC as sent under its own name: true for Yes, false for No, null when the element is absent. It is an ineligibility flag where measured: on one ledger under Purchase Accounts, with a keyed history row, the screen's Eligible for Input Tax Credit Yes read as the element absent and its No as Yes (PARTIAL: one synthetic book, one release, one ledger, one dated entry; this book is not the 14-ledger one below). Do not read true as eligible. A Yes on any other ledger says nothing either way: the Sales ledgers of one captured book carry a Yes on their keyed entries, and Tally's own default entry (source As per Company/Group) carries one with no keyed No; neither was read against the screen. With several dated entries, read the one in force on the date.",
+    "Measured on one 14-ledger lab book of TallyPrime 7.1 Silver; this was not yet run through this tool on a live Tally.",
+    "The read is admitted at 8,000 bytes a ledger instead of 3,750, a margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element), not a measured ratio; a large book may be read in more parts or refused as too large.",
+];
+
+/// The frame with the GST details' limitations added when the rows hold them,
+/// and unchanged otherwise.
+fn gst_details_limitations_frame(frame: Value, gst_details: bool) -> Value {
+    if !gst_details {
+        return frame;
+    }
+    let mut frame = match frame {
+        Value::Object(frame) => frame,
+        _ => serde_json::Map::new(),
+    };
+    frame.insert("limitations".to_owned(), json!(GST_DETAILS_LIMITATIONS));
+    Value::Object(frame)
 }
 
 /// How long a ledger listing snapshot may serve its continuation pages
 /// (#630). A continuation page is served from the snapshot only while the
-/// book's extent, including `ALTMSTID` and `ALTVCHID`, is unchanged. Whether a
-/// regroup, an alteration made in Tally's own screens, or a deletion moves
-/// those marks is unmeasured (ADR 0004), so a change of that kind can leave a
-/// continuation page up to this old. A first page is always read fresh.
-const LISTING_SNAPSHOT_TTL: std::time::Duration = std::time::Duration::from_secs(600);
+/// book's extent, including `ALTMSTID` and `ALTVCHID`, is unchanged. A
+/// regroup, an opening change, a ledger create or delete, a voucher delete (+2),
+/// a cancel and a save with no change each moved a mark in the screen-action
+/// table of the protocol reference (§11c.5, one run each); a change that moves
+/// neither mark is not seen, so it can leave a continuation page up to this old
+/// (the limits are listed in §11c.5 and in the tool text). A first page is
+/// always read fresh.
+pub(super) const LISTING_SNAPSHOT_TTL: std::time::Duration = std::time::Duration::from_secs(600);
 
 /// The most bytes all listing snapshots may hold together (#630), counted as
 /// their rows and frame serialized as JSON plus their groups' names, parents
 /// and reserved names. That is a proxy for the memory they take, not a bound
 /// on it: a parsed value takes more than its text. The oldest snapshot is
 /// dropped first; a listing larger than this is not held.
-const LISTING_SNAPSHOT_MAX_BYTES: usize = 64 * 1024 * 1024;
+pub(super) const LISTING_SNAPSHOT_MAX_BYTES: usize = 64 * 1024 * 1024;
 
 /// Which read a listing snapshot holds. A `basic` listing with a `group`
 /// filter also holds the group collection, so it is a different read; a
-/// trial balance is keyed by its period; a compliance listing by the date its
-/// rows' `party_gstin` was read as of (#653), since that date is rendered into
-/// the rows it holds.
+/// trial balance is keyed by its period; a masters listing by its kind; a
+/// stock summary by its date; a compliance listing by the date its rows'
+/// `party_gstin` was read as of (#653), since that date is rendered into the
+/// rows it holds, and by whether the rows hold each ledger's GST details
+/// (`include_gst_details`), which a read without them cannot serve.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ListingKind {
     Basic,
     BasicWithGroups,
-    Compliance { gstin_as_of: String },
-    TrialBalance { from: TallyDate, to: TallyDate },
+    Compliance {
+        gstin_as_of: String,
+        /// Whether the rows hold each ledger's dated GST details, which a read
+        /// without them cannot serve.
+        gst_details: bool,
+    },
+    TrialBalance {
+        from: TallyDate,
+        to: TallyDate,
+    },
+    Masters {
+        kind: MastersKind,
+    },
+    StockSummary {
+        as_of: TallyDate,
+    },
 }
 
 /// A group collection held with a snapshot, and the bytes it counts toward
@@ -369,6 +476,9 @@ pub(super) struct ListingSnapshot {
     /// What a page reports besides its rows (a trial balance's period,
     /// currency and totals); null for a ledger listing.
     pub(super) frame: Value,
+    /// What a trial balance read covers, for the headline of every page served
+    /// from this snapshot; `None` for a ledger listing.
+    pub(super) trial_balance_basis: Option<headline::TrialBalanceBasis>,
     pub(super) evidence: Evidence,
     read_at: String,
     taken: std::time::Instant,
@@ -397,11 +507,28 @@ impl ListingSnapshot {
             rows: Arc::new(rows),
             groups,
             frame,
+            trial_balance_basis: None,
             evidence,
             read_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
             taken: std::time::Instant::now(),
             bytes,
         }
+    }
+
+    /// A trial balance read's snapshot: it cannot be built without what the
+    /// read covers, so a page served from it always has a headline to state.
+    pub(super) fn trial_balance(
+        identity: &VerifiedCompanyIdentity,
+        kind: ListingKind,
+        extent: bridge_tally_protocol::outstandings_shared::CompanyBookExtent,
+        rows: Vec<Value>,
+        frame: Value,
+        evidence: Evidence,
+        basis: headline::TrialBalanceBasis,
+    ) -> Self {
+        let mut snapshot = Self::new(identity, kind, extent, rows, None, frame, evidence);
+        snapshot.trial_balance_basis = Some(basis);
+        snapshot
     }
 
     pub(super) fn describe(&self, reused: bool) -> Value {
@@ -447,13 +574,7 @@ impl ListingSnapshots {
     /// Holds a first page's read, replacing any earlier one for the same
     /// company and kind, and evicting the oldest until the cap holds.
     fn hold(&mut self, snapshot: Arc<ListingSnapshot>) {
-        self.purge_expired();
-        self.held.retain(|held| {
-            !(held
-                .company_guid
-                .eq_ignore_ascii_case(&snapshot.company_guid)
-                && held.kind == snapshot.kind)
-        });
+        self.drop_kind(&snapshot.company_guid, &snapshot.kind);
         if snapshot.bytes > self.max_bytes {
             return;
         }
@@ -470,6 +591,14 @@ impl ListingSnapshots {
             self.held.remove(oldest);
         }
         self.held.push(snapshot);
+    }
+
+    /// Drops the snapshot of one company and kind, if one is held.
+    fn drop_kind(&mut self, company_guid: &str, kind: &ListingKind) {
+        self.purge_expired();
+        self.held.retain(|held| {
+            !(held.company_guid.eq_ignore_ascii_case(company_guid) && held.kind == *kind)
+        });
     }
 
     /// The unexpired snapshot for this company and kind, if one is held.
@@ -500,7 +629,7 @@ impl ListingSnapshots {
 /// Why a continuation page that named its snapshot could not be served from
 /// it: the book moved, or the snapshot is no longer held (expired, replaced
 /// by a newer first page, evicted, or never held).
-fn snapshot_refusal(cause: &'static str) -> ToolFailure {
+pub(super) fn snapshot_refusal(cause: &'static str) -> ToolFailure {
     let mut failure = ToolFailure::from("listing_snapshot_changed".to_string());
     failure.cause = Some(cause);
     failure
@@ -511,6 +640,7 @@ impl Server {
         let guid = required_string(args, "company_guid")?;
         // Before any read: a refused `as_of` costs no Tally request.
         let requested_as_of = requested_gstin_as_of(args)?;
+        let gst_details = requested_gst_details(args)?;
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
             let fields = optional_string(args, "fields")?.unwrap_or_else(|| "basic".to_string());
@@ -524,6 +654,7 @@ impl Server {
             let kind = match (compliance, group.is_some()) {
                 (true, _) => ListingKind::Compliance {
                     gstin_as_of: requested_as_of.clone().unwrap_or_else(tally_host_today),
+                    gst_details,
                 },
                 (false, true) => ListingKind::BasicWithGroups,
                 (false, false) => ListingKind::Basic,
@@ -632,6 +763,21 @@ impl Server {
         Ok(snapshot)
     }
 
+    /// Drops the held snapshot of one listing. A read that may end without
+    /// holding anything calls it before reading afresh, so that an earlier
+    /// answer is never served after a newer read gave a different one.
+    pub(super) fn drop_listing(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        kind: &ListingKind,
+    ) -> Result<(), ToolFailure> {
+        self.listings
+            .lock()
+            .map_err(|_| "listing_snapshot_store_unavailable".to_string())?
+            .drop_kind(identity.company_guid(), kind);
+        Ok(())
+    }
+
     /// Drops every ledger listing snapshot of a company. Every write this
     /// server dispatches calls it before returning, whatever the outcome. A
     /// write from anywhere else (the desktop app's own server, another MCP
@@ -644,6 +790,7 @@ impl Server {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .drop_company(company_guid);
+        self.drop_voucher_pages(company_guid);
     }
 
     /// One fresh read of a ledger listing: the rows unfiltered and unredacted,
@@ -655,10 +802,25 @@ impl Server {
         kind: ListingKind,
     ) -> Result<ListingSnapshot, ToolFailure> {
         let (rows, groups, extent, read_evidence, frame) = match &kind {
-            ListingKind::Compliance { gstin_as_of } => {
+            ListingKind::Compliance {
+                gstin_as_of,
+                gst_details,
+            } => {
+                let gst_details = *gst_details;
+                let today = TallyDate::parse(tally_host_today())
+                    .map_err(|_| ToolFailure::from("current_date_invalid".to_string()))?;
                 let listing = self
                     .runtime
-                    .fetch_agent_party_ledger_masters_with_evidence(self.tally_config(), identity)
+                    .fetch_agent_party_ledger_masters_with_evidence(
+                        self.tally_config(),
+                        identity,
+                        today,
+                        if gst_details {
+                            ComplianceRead::WithGstDetails
+                        } else {
+                            ComplianceRead::Standard
+                        },
+                    )
                     .await
                     .map_err(|error| {
                         ToolFailure::from_runtime("party_ledger_master_read_failed", error)
@@ -686,9 +848,7 @@ impl Server {
                             "parent": parent,
                             "opening_balance": record.ledger.opening_balance,
                             "opening_balance_as_of": &opening_as_of,
-                            "compliance": mark_compliance_party_names(
-                                serde_json::to_value(record.fields).unwrap_or_default(),
-                            ),
+                            "compliance": compliance_json(record.fields, gst_details),
                             "ancestry": ancestry_json(&chain),
                         });
                         if let Value::Object(fields) = &mut row {
@@ -697,10 +857,14 @@ impl Server {
                         row
                     })
                     .collect::<Vec<_>>();
-                let frame = currency_scope_frame(
-                    &listing.foreign_currency_ledgers_excluded,
-                    &listing.mixed_currency_ledgers_excluded,
+                let frame = count_cross_check_frame(
+                    currency_scope_frame(
+                        &listing.foreign_currency_ledgers_excluded,
+                        &listing.mixed_currency_ledgers_excluded,
+                    ),
+                    listing.count_cross_check,
                 );
+                let frame = gst_details_limitations_frame(frame, gst_details);
                 (rows, Some(groups), listing.extent, listing.evidence, frame)
             }
             ListingKind::BasicWithGroups => {
@@ -738,7 +902,9 @@ impl Server {
                     .collect::<Vec<_>>();
                 (rows, None, listing.extent, listing.evidence, Value::Null)
             }
-            ListingKind::TrialBalance { .. } => {
+            ListingKind::TrialBalance { .. }
+            | ListingKind::Masters { .. }
+            | ListingKind::StockSummary { .. } => {
                 return Err("listing_kind_not_a_ledger_listing".to_string().into());
             }
         };

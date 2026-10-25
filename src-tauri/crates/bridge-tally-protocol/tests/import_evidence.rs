@@ -1,9 +1,8 @@
 use bridge_tally_protocol::{
     decode_tally_xml_response_bytes_limited, parse_import_evidence, parse_import_outcome,
-    parse_import_result, parse_ledger_write_readback_with_evidence, ExpectedTallyTextEncoding,
-    TallyImportApplicationStatus, TallyImportCounterPresence, TallyImportOutcome,
-    TallyImportResult, MAX_TALLY_LINE_ERRORS, MAX_TALLY_LINE_ERROR_BYTES,
-    MAX_TALLY_LINE_ERROR_CHARS,
+    parse_import_result, ExpectedTallyTextEncoding, TallyImportApplicationStatus,
+    TallyImportCounterPresence, TallyImportOutcome, TallyImportResult, MAX_TALLY_LINE_ERRORS,
+    MAX_TALLY_LINE_ERROR_BYTES, MAX_TALLY_LINE_ERROR_CHARS,
 };
 
 const LIVE_EDUCATION_W1_LEDGER: &str =
@@ -304,49 +303,6 @@ fn malformed_line_error_entities_return_only_a_safe_error() {
     assert_eq!(error, "Tally import response evidence was invalid");
     assert!(!error.contains("PRIVATE"));
     assert!(!error.contains("SENTINEL"));
-}
-
-#[test]
-fn write_readback_rejects_wrong_nesting_duplicate_fields_and_attributes() {
-    const HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    let wrap = |ledger: &str, count: usize| {
-        format!(
-            r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="bridge.tally.ledger-write-readback/1" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="{count}" QUERYIDENTITYSETSHA256="{HASH}"/>{ledger}</BODY></ENVELOPE>"#
-        )
-    };
-    let valid = r#"<LEDGER NAME="BRIDGE LEDGER" REMOTEID="remote-1"><PARENT>BRIDGE GROUP</PARENT><OPENINGBALANCE>0</OPENINGBALANCE></LEDGER>"#;
-    let valid_result = parse_ledger_write_readback_with_evidence(&wrap(valid, 1));
-    assert!(valid_result.is_ok(), "{valid_result:?}");
-
-    let nested = format!("<COLLECTION>{valid}</COLLECTION>");
-    assert!(parse_ledger_write_readback_with_evidence(&wrap(&nested, 1)).is_err());
-    let duplicate_field = valid.replace("</LEDGER>", "<OPENINGBALANCE>0</OPENINGBALANCE></LEDGER>");
-    assert!(parse_ledger_write_readback_with_evidence(&wrap(&duplicate_field, 1)).is_err());
-    let duplicate_attribute = valid.replace(
-        "REMOTEID=\"remote-1\"",
-        "REMOTEID=\"remote-1\" REMOTEID=\"remote-1\"",
-    );
-    assert!(parse_ledger_write_readback_with_evidence(&wrap(&duplicate_attribute, 1)).is_err());
-    let unexpected_attribute = valid.replace(
-        "REMOTEID=\"remote-1\"",
-        "REMOTEID=\"remote-1\" UNSAFE=\"1\"",
-    );
-    assert!(parse_ledger_write_readback_with_evidence(&wrap(&unexpected_attribute, 1)).is_err());
-
-    let case_variant_duplicate = valid.replace(
-        "REMOTEID=\"remote-1\"",
-        "REMOTEID=\"remote-1\" remoteid=\"other\"",
-    );
-    assert!(parse_ledger_write_readback_with_evidence(&wrap(&case_variant_duplicate, 1)).is_err());
-
-    let nested_context = wrap("", 0)
-        .replace("<COMPANYCONTEXT", "<WRAPPER><COMPANYCONTEXT")
-        .replace("/>", "/></WRAPPER>");
-    assert!(parse_ledger_write_readback_with_evidence(&nested_context).is_err());
-
-    let duplicate_status =
-        wrap("", 0).replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS><STATUS>1</STATUS>");
-    assert!(parse_ledger_write_readback_with_evidence(&duplicate_status).is_err());
 }
 
 const PARTIAL_COMMIT_LIVE: &[u8] =
@@ -663,4 +619,40 @@ fn an_element_inside_a_line_error_refuses_the_response() {
     );
     assert!(parse_import_outcome(&nested).is_err());
     assert!(parse_import_evidence(&nested).is_err());
+}
+
+const POST_SPAN_IMPORT_RESPONSE: &[u8] =
+    include_bytes!("fixtures/agent/post-span-import-response.utf16le.xml");
+
+/// The captured clean create of 10 vouchers keeps the `LASTVCHID` Tally
+/// reported (`fixtures/POST_SPAN_CAPTURE_PROVENANCE.md`), beside its counters.
+#[test]
+fn a_captured_clean_create_keeps_its_lastvchid() {
+    let outcome = parse_import_outcome(&captured(POST_SPAN_IMPORT_RESPONSE)).unwrap();
+    assert!(outcome.counters().is_clean_success_for(10, 0, 0));
+    assert!(outcome.counters().counter_presence.all_reported());
+    assert_eq!(outcome.last_vch_id(), Some(1733));
+}
+
+/// `LASTVCHID` survives a saved record, a response without it records no key,
+/// and a record saved before it was kept reads it as not observed.
+#[test]
+fn lastvchid_is_kept_in_records_and_absent_when_unreported() {
+    let captured_outcome = parse_import_outcome(&captured(POST_SPAN_IMPORT_RESPONSE)).unwrap();
+    let stored = serde_json::to_value(&captured_outcome).unwrap();
+    assert_eq!(stored["last_vch_id"], 1733);
+    let reread: TallyImportOutcome = serde_json::from_value(stored.clone()).unwrap();
+    assert_eq!(reread.last_vch_id(), Some(1733));
+
+    let mut old = stored;
+    old.as_object_mut().unwrap().remove("last_vch_id");
+    let reread: TallyImportOutcome = serde_json::from_value(old).unwrap();
+    assert_eq!(reread.last_vch_id(), None);
+
+    let unreported = parse_import_outcome("<RESPONSE><CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></RESPONSE>").unwrap();
+    assert_eq!(unreported.last_vch_id(), None);
+    assert!(serde_json::to_value(&unreported)
+        .unwrap()
+        .get("last_vch_id")
+        .is_none());
 }

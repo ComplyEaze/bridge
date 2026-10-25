@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 
 
@@ -137,6 +138,9 @@ def textual_destination(line: str) -> str | None:
 LFS_POINTER_VERSION_LINE = "version https://git-lfs.github.com/spec/v1"
 
 
+HUNK_NEW_START = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
 def parse(lines: list[str]) -> dict[str, object]:
     records: list[dict[str, object]] = []
     added_payload: list[str] = []
@@ -162,6 +166,8 @@ def parse(lines: list[str]) -> dict[str, object]:
                 "binary": False,
                 "gitlink": False,
                 "in_hunk": False,
+                "new_line": 0,
+                "locations": [],
             }
             continue
         if record is None:
@@ -189,24 +195,34 @@ def parse(lines: list[str]) -> dict[str, object]:
             continue
         if line.startswith("@@ "):
             record["in_hunk"] = True
+            header = HUNK_NEW_START.match(line)
+            record["new_line"] = int(header.group(1)) if header else 0
             continue
         if record["in_hunk"] and raw_line.startswith("+"):
             content = raw_line[1:]
             record["added"] = int(record["added"]) + 1
             added_payload.append(content)
+            record["locations"].append(record["new_line"])
+            record["new_line"] = int(record["new_line"]) + 1
             if content.rstrip("\r\n") == LFS_POINTER_VERSION_LINE:
                 record["binary"] = True
         elif record["in_hunk"] and raw_line.startswith("-"):
             record["deleted"] = int(record["deleted"]) + 1
+        elif record["in_hunk"] and not raw_line.startswith("\\"):
+            # A context line (a blank one may have lost its leading space).
+            record["new_line"] = int(record["new_line"]) + 1
     emit()
+    added_locations: list[list[object]] = []
     for record in records:
         record.pop("in_hunk")
+        record.pop("new_line")
         if record["destination"] is None:
             if record["textual_destination"] is None and record["rename_destination"] is None:
                 raise ValueError("ambiguous header without textual destination")
             record["destination"] = record["textual_destination"] or record["rename_destination"]
         record.pop("rename_destination")
-    return {"records": records, "added_payload": added_payload}
+        added_locations.extend([record["destination"], number] for number in record.pop("locations"))
+    return {"records": records, "added_payload": added_payload, "added_locations": added_locations}
 
 
 if __name__ == "__main__":

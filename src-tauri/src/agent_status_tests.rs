@@ -1,4 +1,8 @@
 //! Status-page faults against the captured gateway product observation.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use tally_protocol_simulator::{
     encode, Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
@@ -67,12 +71,20 @@ async fn tally_status_uses_observed_gateway_product_and_preserves_wire_evidence(
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         });
+        let before = tally_host_today();
         let response = server.call_tool("tally_status", json!({})).await;
+        let after = tally_host_today();
         assert_eq!(response["isError"], false, "{fault}");
         let result = &response["structuredContent"]["result"];
+        // The date an omitted `as_of` defaults to is stated, as the host's
+        // calendar day: bracketed so a midnight crossing cannot fail the test.
+        assert!(
+            result["today"] == before || result["today"] == after,
+            "{fault}: {result}"
+        );
         assert_eq!(
             result["product"],
             if fault == "unobserved" {
@@ -182,8 +194,8 @@ async fn tally_status_failure_retains_completed_sources_in_response_and_history(
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         });
         let response = server.call_tool("tally_status", json!({})).await;
         assert_eq!(response["isError"], true);
@@ -292,8 +304,8 @@ fn server_at(port: u16, max_bytes: usize) -> (Server, tempfile::TempDir) {
         max_bytes,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     (server, directory)
 }
@@ -324,6 +336,12 @@ async fn a_closed_port_is_refused_as_unreachable_and_names_the_endpoint() {
         assert_eq!(
             error["endpoint"],
             format!("http://127.0.0.1:{port}"),
+            "{tool}"
+        );
+        // The next step reaches the assistant with the refusal (#1458).
+        assert_eq!(
+            error["remediation"],
+            unanswered_remediation("endpoint_unreachable").unwrap(),
             "{tool}"
         );
         let evidence = &response["structuredContent"]["evidence"];
@@ -458,7 +476,14 @@ async fn a_request_held_back_after_repeated_failures_names_the_endpoint() {
         let error = refusal(&response);
         assert_eq!(error["code"], "company_collection_invalid");
         assert_eq!(error["endpoint"], format!("http://127.0.0.1:{port}"));
-        causes.push(error["cause"].as_str().unwrap().to_string());
+        let cause = error["cause"].as_str().unwrap().to_string();
+        // Each refusal names the step for its own cause (#1458).
+        assert_eq!(
+            error["remediation"],
+            unanswered_remediation(&cause).unwrap(),
+            "{cause}"
+        );
+        causes.push(cause);
     }
     // The first call's retries open the circuit; the next two are held back.
     assert_eq!(
@@ -494,6 +519,49 @@ fn an_unanswered_code_is_not_repeated_as_its_cause_and_keeps_the_endpoint() {
     let error = error_of(both);
     assert_eq!(error["cause"], "native_report_pair_changed");
     assert_eq!(error["endpoint"], "http://127.0.0.1:9");
+}
+
+/// The two next steps, word for word: the wiring tests compare a refusal with the function's own
+/// output, so a reword (to "retry", say) would pass them. These sentences say not to repeat the
+/// request by itself, and what the hold-back did and did not send (#1458).
+#[test]
+fn the_two_unanswered_next_steps_read_exactly() {
+    assert_eq!(
+        unanswered_remediation("endpoint_unreachable"),
+        Some(
+            "Tell the user to confirm Tally is running with the XML server enabled on the port named in this error. Do not repeat the request until they have."
+        )
+    );
+    assert_eq!(
+        unanswered_remediation("endpoint_circuit_cooldown"),
+        Some(
+            "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated."
+        )
+    );
+}
+
+/// The unanswered next step is consulted last: a code that has its own step keeps
+/// it, and an operation code with none takes the unanswered reason's (#1458).
+#[test]
+fn a_codes_own_next_step_wins_over_the_unanswered_reasons() {
+    let (server, _directory) = server_at(9, 200_000);
+    let error_of = |code: &str| {
+        let mut failure = ToolFailure::from(code.to_string());
+        failure.unanswered = Some(Unanswered("endpoint_unreachable"));
+        let response =
+            server.finish_tool_response("vouchers", &json!({}), Utc::now(), Err(failure));
+        response.value["structuredContent"]["result"]["error"].clone()
+    };
+    let own = error_of("tally_endpoint_busy");
+    assert_eq!(
+        own["remediation"],
+        refusal_remediation("tally_endpoint_busy").unwrap()
+    );
+    let none = error_of("agent_runtime_read_failed");
+    assert_eq!(
+        none["remediation"],
+        unanswered_remediation("endpoint_unreachable").unwrap()
+    );
 }
 
 /// #697: a send the endpoint's wire gate held back is refused by its own code,
@@ -534,4 +602,177 @@ async fn a_busy_wire_lock_names_itself_and_says_when_to_retry() {
         .unwrap()
         .contains("retry_after_s"));
     drop(held);
+}
+
+/// An assistant reads this description to learn that `today` is stated, and
+/// which defaults it is the date of.
+#[test]
+fn the_status_description_says_what_today_is_the_date_of() {
+    let definitions = tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "tally_status"))
+        .expect("tally_status tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    assert!(description.contains("`today` is this computer's calendar date (YYYYMMDD)"));
+    assert!(description.contains(
+        "`outstandings` uses when `as_of` is left out, and `ledger_masters` with `fields=compliance` for `party_gstin`"
+    ));
+}
+
+/// The company rule is in `list_companies`' own description as well as in the
+/// server instructions, so a client that drops the instructions keeps it.
+#[test]
+fn the_company_rule_is_in_the_list_companies_description() {
+    let definitions = tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "list_companies"))
+        .expect("list_companies tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    for needle in [
+        "Start here.",
+        "the company_guid every tool that reads a company's books needs",
+        "If exactly one company is open and the user named no client, use it and say which in your first line",
+        "if the user names a client and exactly one open company matches that name, use it and say which",
+        "otherwise ask which, offering the list, and never guess a company.",
+    ] {
+        assert!(description.contains(needle), "missing: {needle}");
+    }
+}
+
+/// The two log tools were once one identical sentence, and a model asked
+/// whether the user's data had been sent anywhere answered, from their names,
+/// that nothing had left the computer. Each now says what it holds and what
+/// it does not, so the descriptions must differ and must both carry the
+/// statement that what the assistant reads goes to the AI provider. That
+/// statement comes first: in a plan-only eval a model that read "no figures
+/// or book content" first echoed it as "no figures or client data sent".
+#[test]
+fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
+    let definitions = tool_definitions(true, false);
+    let description_of = |name: &str| {
+        definitions
+            .as_array()
+            .and_then(|tools| tools.iter().find(|tool| tool["name"] == name))
+            .unwrap_or_else(|| panic!("{name} tool definition"))["description"]
+            .as_str()
+            .expect("tool description")
+            .to_string()
+    };
+    let evidence = description_of("read_evidence");
+    let egress = description_of("egress_log");
+    let disclosure = "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider;";
+    for description in [&evidence, &egress] {
+        assert!(description.starts_with(disclosure), "{description}");
+        let holds = description.find("no figures or book content").unwrap();
+        assert!(
+            description
+                .find("Never tell the user that no data has left their computer.")
+                .unwrap()
+                < holds,
+            "{description}"
+        );
+    }
+    let holding_sentence = |text: &str| {
+        text.split(". ")
+            .find(|s| s.starts_with("Shows "))
+            .unwrap()
+            .to_string()
+    };
+    assert_ne!(holding_sentence(&evidence), holding_sentence(&egress));
+    // Each says what it holds, and not what the other holds.
+    assert!(evidence.contains("kept in memory"), "{evidence}");
+    assert!(!evidence.contains("local log file"), "{evidence}");
+    assert!(egress.contains("its local log file"), "{egress}");
+    assert!(!egress.contains("kept in memory"), "{egress}");
+    for description in [&evidence, &egress] {
+        for needle in [
+            "bounded",
+            "It does not show what the AI provider received.",
+            "amounts included, is sent to the AI provider",
+            "redaction can only shorten party and ledger names and bank account numbers or drop narrations",
+            "and does not hide amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or references, or the last four digits of a bank statement's account number (account_last4); under mask_parties a name written inside a narration or reference stays as it is",
+            "Never tell the user that no data has left their computer.",
+            "no figures or book content",
+            catalog::READ_RECEIPT_SENTENCE,
+        ] {
+            assert!(description.contains(needle), "missing: {needle}");
+        }
+    }
+    // A catalogue scorer read "shows the receipts, read from its local log" beside "each call
+    // appends receipt lines to the local log" as a write contradicting readOnlyHint: the log
+    // tool says the read changes nothing and that the one write is this call's own receipt lines.
+    assert!(egress.contains("Reading the log changes nothing in it; this call's own receipt lines are added after the read, like every call's."), "{egress}");
+    assert!(evidence.contains("It reads memory only; this call's own record is added to memory after the read, and its receipt lines go to the local log, like every call's."), "{evidence}");
+    let bound = format!("at most {MAX_EVIDENCE_RECORDS}");
+    for (name, description) in [("read_evidence", &evidence), ("egress_log", &egress)] {
+        assert!(
+            description.contains(". Use it "),
+            "{name} says when to use it: {description}"
+        );
+        let tool = definitions
+            .as_array()
+            .and_then(|tools| tools.iter().find(|tool| tool["name"] == name))
+            .unwrap_or_else(|| panic!("{name} tool definition"));
+        assert_eq!(tool["annotations"]["readOnlyHint"], json!(true), "{name}");
+        let limit = tool["inputSchema"]["properties"]["limit"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            limit.contains(&bound),
+            "{name}: limit names its bound ({bound}): {limit:?}"
+        );
+        // The configured row limit is applied after the default, so it can cap the default 20.
+        assert!(
+            limit.contains("or the configured row limit, BRIDGE_AGENT_MAX_ROWS, if lower, which can cap the default too"),
+            "{name}: limit names the configured cap: {limit:?}"
+        );
+        assert!(
+            limit.contains("default 20, at most 256"),
+            "{name}: limit text names its default and bound: {limit:?}"
+        );
+        assert_eq!(
+            tool["inputSchema"]["properties"]["limit"]["default"],
+            json!(20),
+            "{name}"
+        );
+        if name == "egress_log" {
+            // The tail counts log lines, and a stdio call writes two of them.
+            assert!(
+                limit.contains(
+                    "most recent receipt lines to return (each completed call writes two)"
+                ),
+                "{name}: limit counts lines, not calls: {limit:?}"
+            );
+            assert!(
+                limit.contains(
+                    "fewer when the newest receipt lines do not fit in the log read's size bound"
+                ),
+                "{name}: limit names the size bound: {limit:?}"
+            );
+        }
+    }
+}
+
+/// Only the two reasons a person meets first carry a next step; the rest of the
+/// unanswered reasons name none (#1458).
+#[test]
+fn only_the_unreachable_and_hold_back_reasons_name_a_next_step() {
+    assert!(unanswered_remediation("endpoint_unreachable").is_some());
+    assert!(unanswered_remediation("endpoint_circuit_cooldown").is_some());
+    for reason in [
+        "request_deadline_exceeded",
+        "request_failed",
+        "http_status_failure",
+        "endpoint_queue_deadline_exceeded",
+        "endpoint_half_open_probe_in_flight",
+        "endpoint_session_capacity_reached",
+        "endpoint_invalid",
+        "response_content_type_unsupported",
+    ] {
+        assert_eq!(unanswered_remediation(reason), None, "{reason}");
+    }
 }

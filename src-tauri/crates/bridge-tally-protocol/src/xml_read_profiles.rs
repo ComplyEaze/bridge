@@ -7,41 +7,29 @@
 
 use std::fmt;
 
+use bridge_tally_primitives::TallyDate;
 use sha2::{Digest, Sha256};
 
-#[cfg(feature = "voucher-scan")]
-use crate::outstandings::{
-    render_empty_partition_witness_template, render_ledger_opening_coverage,
-    render_outstandings_template, render_outstandings_vouchers, AlterIdRange, NarrowDateWindow,
-};
-#[cfg(feature = "voucher-scan")]
-use crate::outstandings_shared::PinnedCompany;
-use crate::outstandings_shared::{render_company_book_extent, render_company_book_extent_v2};
+use crate::encode_tally_xml_request_utf16le;
+use crate::outstandings_shared::render_company_book_extent_v2;
 use crate::xml_text::escape_text as xml_escape;
-use crate::{
-    encode_tally_xml_request_utf16le, BRIDGE_LEDGER_EXPORT_SCHEMA,
-    BRIDGE_LEDGER_WRITE_READBACK_SCHEMA,
-};
 
 const TEMPLATE_COMPANY: &str = "BRIDGE TEMPLATE COMPANY";
 const TEMPLATE_FROM: &str = "20000101";
 const TEMPLATE_TO: &str = "20000102";
-#[cfg(feature = "voucher-scan")]
-const TEMPLATE_ALTER_ID_START: u64 = 0;
-#[cfg(feature = "voucher-scan")]
-const TEMPLATE_ALTER_ID_END: u64 = 1;
-const TEMPLATE_CANARY_LEDGER: &str = "BRIDGE-CANARY-LEDGER-001";
-const BRIDGE_CANARY_LEDGER_PREFIX: &str = "BRIDGE-CANARY-";
-const TEMPLATE_IDENTITY_QUERY_SHA256: &str =
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+/// A template date as the typed date a date-only renderer takes. The
+/// constants above are fixed valid dates, so this cannot fail; it is used only
+/// to render a profile's fixed template, never on an input (#861).
+fn template_date(value: &'static str) -> TallyDate {
+    TallyDate::parse(value).expect("template dates are fixed valid YYYYMMDD constants")
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadProfileValidationError {
     CompanyInvalid,
     DateInvalid,
     DateRangeInvalid,
-    CanaryLedgerInvalid,
-    IdentityQueryInvalid,
 }
 
 impl fmt::Display for ReadProfileValidationError {
@@ -50,8 +38,6 @@ impl fmt::Display for ReadProfileValidationError {
             Self::CompanyInvalid => "read profile company input was invalid",
             Self::DateInvalid => "read profile date input was invalid",
             Self::DateRangeInvalid => "read profile date range was invalid",
-            Self::CanaryLedgerInvalid => "read profile canary ledger input was invalid",
-            Self::IdentityQueryInvalid => "read profile identity query input was invalid",
         })
     }
 }
@@ -81,67 +67,10 @@ impl fmt::Debug for ValidatedCompanyName {
     }
 }
 
-/// A deliberately narrow name for a Bridge-generated write-canary ledger.
-/// It is safe to place in the exact TDL filter formula used by the readback
-/// profile and cannot represent an arbitrary operator-supplied ledger name.
-#[derive(Clone, PartialEq, Eq)]
-pub struct ValidatedCanaryLedgerName(String);
-
-impl ValidatedCanaryLedgerName {
-    pub fn new(value: impl Into<String>) -> Result<Self, ReadProfileValidationError> {
-        let value = value.into();
-        if value.is_empty()
-            || value.len() > 128
-            || value
-                .strip_prefix(BRIDGE_CANARY_LEDGER_PREFIX)
-                .is_none_or(str::is_empty)
-            || !value.bytes().all(|byte| {
-                byte.is_ascii_alphanumeric() || matches!(byte, b' ' | b'-' | b'_' | b'.')
-            })
-        {
-            return Err(ReadProfileValidationError::CanaryLedgerInvalid);
-        }
-        Ok(Self(value))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Debug for ValidatedCanaryLedgerName {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("ValidatedCanaryLedgerName([redacted])")
-    }
-}
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct ValidatedIdentityQuerySha256(String);
-
-impl ValidatedIdentityQuerySha256 {
-    pub fn new(value: impl Into<String>) -> Result<Self, ReadProfileValidationError> {
-        let value = value.into();
-        if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Err(ReadProfileValidationError::IdentityQueryInvalid);
-        }
-        Ok(Self(value.to_ascii_lowercase()))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Debug for ValidatedIdentityQuerySha256 {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("ValidatedIdentityQuerySha256([redacted])")
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidatedDateRange {
-    from_yyyymmdd: String,
-    to_yyyymmdd: String,
+    from: TallyDate,
+    to: TallyDate,
 }
 
 impl ValidatedDateRange {
@@ -149,26 +78,32 @@ impl ValidatedDateRange {
         from_yyyymmdd: impl Into<String>,
         to_yyyymmdd: impl Into<String>,
     ) -> Result<Self, ReadProfileValidationError> {
-        let from_yyyymmdd = from_yyyymmdd.into();
-        let to_yyyymmdd = to_yyyymmdd.into();
-        if !valid_yyyymmdd(&from_yyyymmdd) || !valid_yyyymmdd(&to_yyyymmdd) {
+        let (Ok(from), Ok(to)) = (
+            TallyDate::parse(from_yyyymmdd),
+            TallyDate::parse(to_yyyymmdd),
+        ) else {
             return Err(ReadProfileValidationError::DateInvalid);
-        }
-        if from_yyyymmdd > to_yyyymmdd {
+        };
+        if from > to {
             return Err(ReadProfileValidationError::DateRangeInvalid);
         }
-        Ok(Self {
-            from_yyyymmdd,
-            to_yyyymmdd,
-        })
+        Ok(Self { from, to })
     }
 
     pub fn from_yyyymmdd(&self) -> &str {
-        &self.from_yyyymmdd
+        self.from.as_str()
     }
 
     pub fn to_yyyymmdd(&self) -> &str {
-        &self.to_yyyymmdd
+        self.to.as_str()
+    }
+
+    pub fn from_date(&self) -> &TallyDate {
+        &self.from
+    }
+
+    pub fn to_date(&self) -> &TallyDate {
+        &self.to
     }
 }
 
@@ -176,21 +111,13 @@ impl ValidatedDateRange {
 pub enum ReadOnlyProfileId {
     CompanyListV1,
     CompanyListV2,
-    CompanyBookExtentV1,
     CompanyBookExtentV2,
-    #[cfg(feature = "voucher-scan")]
-    LedgerOpeningCoverageV1,
     StandardLedgerIdentityV1,
     StandardLedgerCatalogV1,
+    StandardLedgerCatalogV2,
     LedgersV1,
-    LedgerCanaryReadbackV1,
-    VouchersV2,
-    VouchersV3,
-    #[cfg(feature = "voucher-scan")]
-    VoucherOutstandingsV1,
-    #[cfg(feature = "voucher-scan")]
-    VoucherEmptyPartitionWitnessV1,
     AuditCompanyObjectV1,
+    InvoiceCompanyHsnV1,
     AuditLedgersV1,
     AuditVouchersV1,
     AuditStockItemsV1,
@@ -201,21 +128,13 @@ impl ReadOnlyProfileId {
         match self {
             Self::CompanyListV1 => "company_list_v1",
             Self::CompanyListV2 => "company_list_v2",
-            Self::CompanyBookExtentV1 => "company_book_extent_v1",
             Self::CompanyBookExtentV2 => "company_book_extent_v2",
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 => "ledger_opening_coverage_v1",
             Self::StandardLedgerIdentityV1 => "standard_ledger_identity_v1",
             Self::StandardLedgerCatalogV1 => "standard_ledger_catalog_v1",
+            Self::StandardLedgerCatalogV2 => "standard_ledger_catalog_v2",
             Self::LedgersV1 => "ledgers_v1",
-            Self::LedgerCanaryReadbackV1 => "ledger_canary_readback_v1",
-            Self::VouchersV2 => "vouchers_v2",
-            Self::VouchersV3 => "vouchers_v3",
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 => "voucher_outstandings_v1",
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 => "voucher_empty_partition_witness_v1",
             Self::AuditCompanyObjectV1 => "audit_company_object_v1",
+            Self::InvoiceCompanyHsnV1 => "invoice_company_hsn_v1",
             Self::AuditLedgersV1 => "audit_ledgers_v1",
             Self::AuditVouchersV1 => "audit_vouchers_v1",
             Self::AuditStockItemsV1 => "audit_stock_items_v1",
@@ -229,21 +148,17 @@ impl ReadOnlyProfileId {
         sha256_hex(&encode_tally_xml_request_utf16le(&self.template()))
     }
 
-    /// Whether this profile must not be sent to an Education-mode Tally. Each
-    /// of these is a custom report (`TYPE=Data`) that passes a spaced
+    /// Whether this profile must not be sent to an Education-mode Tally. Only
+    /// `ledgers_v1` is: a custom report (`TYPE=Data`) that passes a spaced
     /// collection identifier to a `$$` function (`$$NumItems:BRIDGE Ledger
-    /// Collection V1`). Education answered `ledgers_v1` with a blocking "Bad
-    /// formula!" dialog on the Tally screen, which holds the XML gateway until
-    /// someone dismisses it (bridge#45). That the others, which carry the same
-    /// construct, do the same is inferred, not observed. A caller that knows the endpoint is in Education must
-    /// refuse such a read before sending it, with
+    /// Collection V1`). Education answered it with a blocking "Bad formula!"
+    /// dialog on the Tally screen, which holds the XML gateway until someone
+    /// dismisses it (bridge#45). A caller that knows the endpoint is in
+    /// Education must refuse such a read before sending it, with
     /// [`EDUCATION_REPORT_FAMILY_UNSUPPORTED`]. A test renders every profile
     /// and checks this against [`first_spaced_function_argument`].
     pub fn education_refuses_report_formula(self) -> bool {
-        matches!(
-            self,
-            Self::LedgersV1 | Self::LedgerCanaryReadbackV1 | Self::VouchersV2 | Self::VouchersV3
-        )
+        matches!(self, Self::LedgersV1)
     }
 
     /// The exact request rendered with fixed safe sentinels in every dynamic
@@ -252,43 +167,25 @@ impl ReadOnlyProfileId {
         match self {
             Self::CompanyListV1 => render_company_list(),
             Self::CompanyListV2 => render_company_list_v2(),
-            Self::CompanyBookExtentV1 => render_company_book_extent(TEMPLATE_COMPANY),
             Self::CompanyBookExtentV2 => render_company_book_extent_v2(TEMPLATE_COMPANY),
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 => render_ledger_opening_coverage(TEMPLATE_COMPANY),
             Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
+            Self::StandardLedgerCatalogV2 => render_standard_ledger_catalog_v2(TEMPLATE_COMPANY),
             Self::LedgersV1 => render_ledgers(TEMPLATE_COMPANY),
-            Self::LedgerCanaryReadbackV1 => render_ledger_canary_readback(
-                TEMPLATE_COMPANY,
-                TEMPLATE_CANARY_LEDGER,
-                TEMPLATE_IDENTITY_QUERY_SHA256,
-            ),
-            Self::VouchersV2 => render_vouchers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO),
-            Self::VouchersV3 => {
-                render_selected_vouchers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
+            Self::AuditCompanyObjectV1 => {
+                render_company_object(TEMPLATE_COMPANY, &AUDIT_COMPANY_FETCH)
             }
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 => render_outstandings_template(
-                TEMPLATE_COMPANY,
-                TEMPLATE_FROM,
-                TEMPLATE_TO,
-                TEMPLATE_ALTER_ID_START,
-                TEMPLATE_ALTER_ID_END,
-            ),
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 => render_empty_partition_witness_template(
-                TEMPLATE_COMPANY,
-                TEMPLATE_FROM,
-                TEMPLATE_TO,
-            ),
-            Self::AuditCompanyObjectV1 => render_audit_company_object(TEMPLATE_COMPANY),
+            Self::InvoiceCompanyHsnV1 => {
+                render_company_object(TEMPLATE_COMPANY, &INVOICE_COMPANY_FETCH)
+            }
             Self::AuditLedgersV1 => {
                 render_audit_ledgers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
             }
-            Self::AuditVouchersV1 => {
-                render_audit_vouchers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
-            }
+            Self::AuditVouchersV1 => render_audit_vouchers(
+                TEMPLATE_COMPANY,
+                &template_date(TEMPLATE_FROM),
+                &template_date(TEMPLATE_TO),
+            ),
             Self::AuditStockItemsV1 => {
                 render_audit_stock_items(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
             }
@@ -352,13 +249,6 @@ pub enum ReadOnlyProfile<'a> {
     /// so it can satisfy the trust check instead of being parsed as an
     /// unverified direct report.
     CompanyListV2,
-    #[cfg(feature = "voucher-scan")]
-    LedgerOpeningCoverageV1 {
-        company: &'a ValidatedCompanyName,
-    },
-    CompanyBookExtentV1 {
-        company: &'a ValidatedCompanyName,
-    },
     /// A versioned Company collection that includes the observed company
     /// number required to distinguish year-split sibling books.
     CompanyBookExtentV2 {
@@ -377,39 +267,24 @@ pub enum ReadOnlyProfile<'a> {
     StandardLedgerCatalogV1 {
         company: &'a ValidatedCompanyName,
     },
+    /// V1's request with each ledger's `ISBILLWISEON` fetched in the same row,
+    /// so the import family learns which ledgers are maintained bill by bill from the
+    /// catalogue read it already makes. Not for `source_draft`, presence or
+    /// the voucher and bill reads, which keep V1.
+    StandardLedgerCatalogV2 {
+        company: &'a ValidatedCompanyName,
+    },
     LedgersV1 {
         company: &'a ValidatedCompanyName,
-    },
-    /// A one-ledger export used only to verify a separately approved,
-    /// Bridge-generated synthetic write canary. It is not a general ledger
-    /// query and remains read-only.
-    LedgerCanaryReadbackV1 {
-        company: &'a ValidatedCompanyName,
-        ledger_name: &'a ValidatedCanaryLedgerName,
-        identity_query_sha256: &'a ValidatedIdentityQuerySha256,
-    },
-    VouchersV2 {
-        company: &'a ValidatedCompanyName,
-        range: &'a ValidatedDateRange,
-    },
-    VouchersV3 {
-        company: &'a ValidatedCompanyName,
-        range: &'a ValidatedDateRange,
-    },
-    #[cfg(feature = "voucher-scan")]
-    VoucherOutstandingsV1 {
-        company: &'a PinnedCompany,
-        window: &'a NarrowDateWindow,
-        alter_id_range: AlterIdRange,
-    },
-    #[cfg(feature = "voucher-scan")]
-    VoucherEmptyPartitionWitnessV1 {
-        company: &'a PinnedCompany,
-        window: &'a NarrowDateWindow,
     },
     /// The `company` part of a tally-read v1 read: a single-object export of
     /// the one named company. See [`AUDIT_COMPANY_FETCH`].
     AuditCompanyObjectV1 {
+        company: &'a ValidatedCompanyName,
+    },
+    /// The company object an invoice build reads for the company-level
+    /// HSN/SAC and its settings. See [`INVOICE_COMPANY_FETCH`].
+    InvoiceCompanyHsnV1 {
         company: &'a ValidatedCompanyName,
     },
     /// The `ledgers` part of a tally-read v1 read, for the audit period.
@@ -434,23 +309,13 @@ impl ReadOnlyProfile<'_> {
         match self {
             Self::CompanyListV1 => ReadOnlyProfileId::CompanyListV1,
             Self::CompanyListV2 => ReadOnlyProfileId::CompanyListV2,
-            Self::CompanyBookExtentV1 { .. } => ReadOnlyProfileId::CompanyBookExtentV1,
             Self::CompanyBookExtentV2 { .. } => ReadOnlyProfileId::CompanyBookExtentV2,
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 { .. } => ReadOnlyProfileId::LedgerOpeningCoverageV1,
             Self::StandardLedgerIdentityV1 { .. } => ReadOnlyProfileId::StandardLedgerIdentityV1,
             Self::StandardLedgerCatalogV1 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV1,
+            Self::StandardLedgerCatalogV2 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV2,
             Self::LedgersV1 { .. } => ReadOnlyProfileId::LedgersV1,
-            Self::LedgerCanaryReadbackV1 { .. } => ReadOnlyProfileId::LedgerCanaryReadbackV1,
-            Self::VouchersV2 { .. } => ReadOnlyProfileId::VouchersV2,
-            Self::VouchersV3 { .. } => ReadOnlyProfileId::VouchersV3,
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 { .. } => ReadOnlyProfileId::VoucherOutstandingsV1,
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 { .. } => {
-                ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1
-            }
             Self::AuditCompanyObjectV1 { .. } => ReadOnlyProfileId::AuditCompanyObjectV1,
+            Self::InvoiceCompanyHsnV1 { .. } => ReadOnlyProfileId::InvoiceCompanyHsnV1,
             Self::AuditLedgersV1 { .. } => ReadOnlyProfileId::AuditLedgersV1,
             Self::AuditVouchersV1 { .. } => ReadOnlyProfileId::AuditVouchersV1,
             Self::AuditStockItemsV1 { .. } => ReadOnlyProfileId::AuditStockItemsV1,
@@ -465,13 +330,8 @@ impl ReadOnlyProfile<'_> {
         match self {
             Self::CompanyListV1 => render_company_list(),
             Self::CompanyListV2 => render_company_list_v2(),
-            Self::CompanyBookExtentV1 { company } => render_company_book_extent(company.as_str()),
             Self::CompanyBookExtentV2 { company } => {
                 render_company_book_extent_v2(company.as_str())
-            }
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 { company } => {
-                render_ledger_opening_coverage(company.as_str())
             }
             Self::StandardLedgerIdentityV1 { company } => {
                 render_standard_ledger_identity(company.as_str())
@@ -479,46 +339,24 @@ impl ReadOnlyProfile<'_> {
             Self::StandardLedgerCatalogV1 { company } => {
                 render_standard_ledger_identity(company.as_str())
             }
+            Self::StandardLedgerCatalogV2 { company } => {
+                render_standard_ledger_catalog_v2(company.as_str())
+            }
             Self::LedgersV1 { company } => render_ledgers(company.as_str()),
-            Self::LedgerCanaryReadbackV1 {
-                company,
-                ledger_name,
-                identity_query_sha256,
-            } => render_ledger_canary_readback(
-                company.as_str(),
-                ledger_name.as_str(),
-                identity_query_sha256.as_str(),
-            ),
-            Self::VouchersV2 { company, range } => {
-                render_vouchers(company.as_str(), range.from_yyyymmdd(), range.to_yyyymmdd())
+            Self::AuditCompanyObjectV1 { company } => {
+                render_company_object(company.as_str(), &AUDIT_COMPANY_FETCH)
             }
-            Self::VouchersV3 { company, range } => render_selected_vouchers(
-                company.as_str(),
-                range.from_yyyymmdd(),
-                range.to_yyyymmdd(),
-            ),
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 {
-                company,
-                window,
-                alter_id_range,
-            } => render_outstandings_vouchers(company, window, alter_id_range),
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 { company, window } => {
-                crate::outstandings::voucher_empty_partition_witness_request(company, window)
-                    .into_xml()
+            Self::InvoiceCompanyHsnV1 { company } => {
+                render_company_object(company.as_str(), &INVOICE_COMPANY_FETCH)
             }
-            Self::AuditCompanyObjectV1 { company } => render_audit_company_object(company.as_str()),
             Self::AuditLedgersV1 { company, period } => render_audit_ledgers(
                 company.as_str(),
                 period.from_yyyymmdd(),
                 period.to_yyyymmdd(),
             ),
-            Self::AuditVouchersV1 { company, window } => render_audit_vouchers(
-                company.as_str(),
-                window.from_yyyymmdd(),
-                window.to_yyyymmdd(),
-            ),
+            Self::AuditVouchersV1 { company, window } => {
+                render_audit_vouchers(company.as_str(), window.from_date(), window.to_date())
+            }
             Self::AuditStockItemsV1 { company, period } => render_audit_stock_items(
                 company.as_str(),
                 period.from_yyyymmdd(),
@@ -547,14 +385,6 @@ pub mod compatibility {
 
     pub fn standard_ledger_catalog_request(company: &str) -> String {
         super::render_standard_ledger_identity(company)
-    }
-
-    pub fn vouchers_request(company: &str, from: &str, to: &str) -> String {
-        super::render_vouchers(company, from, to)
-    }
-
-    pub fn selected_vouchers_request(company: &str, from: &str, to: &str) -> String {
-        super::render_selected_vouchers(company, from, to)
     }
 }
 
@@ -668,6 +498,18 @@ fn render_company_list_v2() -> String {
 }
 
 fn render_standard_ledger_identity(company: &str) -> String {
+    render_standard_ledger_collection(company, "")
+}
+
+/// V1's request with `ISBILLWISEON` as one more native method.
+fn render_standard_ledger_catalog_v2(company: &str) -> String {
+    render_standard_ledger_collection(
+        company,
+        "\n                        <NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>",
+    )
+}
+
+fn render_standard_ledger_collection(company: &str, extra_methods: &str) -> String {
     format!(
         r#"
 <ENVELOPE>
@@ -688,7 +530,7 @@ fn render_standard_ledger_identity(company: &str) -> String {
                     <COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">
                         <NATIVEMETHOD>Name</NATIVEMETHOD>
                         <NATIVEMETHOD>GUID</NATIVEMETHOD>
-                        <NATIVEMETHOD>Parent</NATIVEMETHOD>
+                        <NATIVEMETHOD>Parent</NATIVEMETHOD>{}
                         <COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>
                         <COMPUTE>BRIDGECOMPANYNAME:##SVCurrentCompany</COMPUTE>
                     </COLLECTION>
@@ -698,7 +540,8 @@ fn render_standard_ledger_identity(company: &str) -> String {
     </BODY>
 </ENVELOPE>
 "#,
-        xml_escape(company)
+        xml_escape(company),
+        extra_methods
     )
     .trim()
     .to_string()
@@ -798,228 +641,39 @@ fn render_ledgers(company: &str) -> String {
     .to_string()
 }
 
-fn render_ledger_canary_readback(
-    company: &str,
-    ledger_name: &str,
-    identity_query_sha256: &str,
-) -> String {
-    let collection_filter = r#"                        <FILTERS>BRIDGE Ledger Exact Canary Name V1</FILTERS>
-"#;
-    let filter_formula = r#"                    <SYSTEM TYPE="Formulae" NAME="BRIDGE Ledger Exact Canary Name V1">$Name = "__BRIDGE_CANARY_LEDGER_NAME__"</SYSTEM>
-"#;
-    render_ledgers(company)
-        .replace("BRIDGE Ledger Export V1", "BRIDGE Ledger Canary Readback V1")
-        .replace(
-            BRIDGE_LEDGER_EXPORT_SCHEMA,
-            BRIDGE_LEDGER_WRITE_READBACK_SCHEMA,
-        )
-        .replacen(
-            "                        <XMLTAG>\"COMPANYCONTEXT\"</XMLTAG>",
-            &format!(
-                "                        <XMLTAG>\"COMPANYCONTEXT\"</XMLTAG>\n                        <XMLATTR>\"QUERYIDENTITYSETSHA256\" : \"{identity_query_sha256}\"</XMLATTR>",
-            ),
-            1,
-        )
-        .replacen(
-            "                        <TYPE>Ledger</TYPE>",
-            &format!("                        <TYPE>Ledger</TYPE>\n{collection_filter}"),
-            1,
-        )
-        .replacen(
-            "                </TDLMESSAGE>",
-            &format!(
-                "{}                </TDLMESSAGE>",
-                filter_formula.replace("__BRIDGE_CANARY_LEDGER_NAME__", ledger_name),
-            ),
-            1,
-        )
-}
-
-fn render_vouchers(company: &str, from: &str, to: &str) -> String {
-    format!(
-        r#"
-<ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>EXPORT</TALLYREQUEST>
-        <TYPE>DATA</TYPE>
-        <ID>BRIDGE Voucher Export V2</ID>
-    </HEADER>
-    <BODY>
-        <DESC>
-            <STATICVARIABLES>
-                <SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY>
-                <SVFROMDATE TYPE="Date">{}</SVFROMDATE>
-                <SVTODATE TYPE="Date">{}</SVTODATE>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-            </STATICVARIABLES>
-            <TDL>
-                <TDLMESSAGE>
-                    <REPORT NAME="BRIDGE Voucher Export V2">
-                        <FORMS>BRIDGE Voucher Export Form V2</FORMS>
-                        <PLAINXML>Yes</PLAINXML>
-                    </REPORT>
-                    <FORM NAME="BRIDGE Voucher Export Form V2">
-                        <TOPPARTS>BRIDGE Voucher Context Part V1, BRIDGE Voucher Rows Part V1</TOPPARTS>
-                    </FORM>
-                    <PART NAME="BRIDGE Voucher Context Part V1">
-                        <TOPLINES>BRIDGE Voucher Context Line V1</TOPLINES>
-                    </PART>
-                    <PART NAME="BRIDGE Voucher Rows Part V1">
-                        <TOPLINES>BRIDGE Voucher Row Line V1</TOPLINES>
-                        <REPEAT>BRIDGE Voucher Row Line V1 : BRIDGE Voucher Collection V1</REPEAT>
-                    </PART>
-                    <LINE NAME="BRIDGE Voucher Context Line V1">
-                        <LEFTFIELDS>BRIDGE Voucher Schema V1, BRIDGE Voucher Object Type V1, BRIDGE Voucher Company Name V1, BRIDGE Voucher Company GUID V1, BRIDGE Voucher Record Count V1</LEFTFIELDS>
-                        <XMLTAG>"COMPANYCONTEXT"</XMLTAG>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Voucher Schema V1">
-                        <SET>"bridge.tally.vouchers/2"</SET>
-                        <XMLTAG>"SCHEMA"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Object Type V1">
-                        <SET>"VOUCHER"</SET>
-                        <XMLTAG>"OBJECTTYPE"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Company Name V1">
-                        <SET>##SVCurrentCompany</SET>
-                        <XMLTAG>"NAME"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Company GUID V1">
-                        <SET>$GUID:Company:##SVCurrentCompany</SET>
-                        <XMLTAG>"GUID"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Record Count V1">
-                        <SET>$$NumItems:BRIDGE Voucher Collection V1</SET>
-                        <XMLTAG>"RECORDCOUNT"</XMLTAG>
-                    </FIELD>
-                    <LINE NAME="BRIDGE Voucher Row Line V1">
-                        <LEFTFIELDS>BRIDGE Voucher Date V1, BRIDGE Voucher Type V1, BRIDGE Voucher Number V1, BRIDGE Voucher Cancelled V1, BRIDGE Voucher Optional V2, BRIDGE Voucher Ledger Entry Count V1</LEFTFIELDS>
-                        <XMLTAG>"VOUCHER"</XMLTAG>
-                        <XMLATTR>"REMOTEID" : $RemoteID</XMLATTR>
-                        <XMLATTR>"GUID" : $GUID</XMLATTR>
-                        <XMLATTR>"MASTERID" : $MasterID</XMLATTR>
-                        <XMLATTR>"ALTERID" : $AlterID</XMLATTR>
-                        <EXPLODE>BRIDGE Voucher Ledger Entries Part V1 : Yes</EXPLODE>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Voucher Date V1">
-                        <SET>$Date</SET>
-                        <XMLTAG>"DATE"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Type V1">
-                        <SET>$VoucherTypeName</SET>
-                        <XMLTAG>"VOUCHERTYPENAME"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Number V1">
-                        <SET>$VoucherNumber</SET>
-                        <XMLTAG>"VOUCHERNUMBER"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Cancelled V1">
-                        <SET>$IsCancelled</SET>
-                        <XMLTAG>"ISCANCELLED"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Optional V2">
-                        <SET>$IsOptional</SET>
-                        <TYPE>Logical</TYPE>
-                        <XMLTAG>"ISOPTIONAL"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Ledger Entry Count V1">
-                        <SET>$$NumItems:AllLedgerEntries</SET>
-                        <XMLTAG>"LEDGERENTRYCOUNT"</XMLTAG>
-                    </FIELD>
-                    <PART NAME="BRIDGE Voucher Ledger Entries Part V1">
-                        <TOPLINES>BRIDGE Voucher Ledger Entry Row V1</TOPLINES>
-                        <REPEAT>BRIDGE Voucher Ledger Entry Row V1 : AllLedgerEntries</REPEAT>
-                        <XMLTAG>"LEDGERENTRIES"</XMLTAG>
-                    </PART>
-                    <LINE NAME="BRIDGE Voucher Ledger Entry Row V1">
-                        <LEFTFIELDS>BRIDGE Voucher Ledger Entry Index V1, BRIDGE Voucher Ledger Entry Name V1, BRIDGE Voucher Ledger Entry Amount V1, BRIDGE Voucher Ledger Entry Deemed Positive V1</LEFTFIELDS>
-                        <XMLTAG>"LEDGERENTRY"</XMLTAG>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Voucher Ledger Entry Index V1">
-                        <SET>$$Line</SET>
-                        <XMLTAG>"ENTRYINDEX"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Ledger Entry Name V1">
-                        <SET>$LedgerName</SET>
-                        <XMLTAG>"LEDGERNAME"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Ledger Entry Amount V1">
-                        <SET>$Amount</SET>
-                        <TYPE>Amount</TYPE>
-                        <FORMAT>"No Symbol, No Comma"</FORMAT>
-                        <XMLTAG>"AMOUNT"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Ledger Entry Deemed Positive V1">
-                        <SET>$IsDeemedPositive</SET>
-                        <TYPE>Logical</TYPE>
-                        <XMLTAG>"ISDEEMEDPOSITIVE"</XMLTAG>
-                    </FIELD>
-                    <COLLECTION NAME="BRIDGE Voucher Collection V1" ISMODIFY="No" ISFIXED="No" ISINITIALIZE="No" ISOPTION="No" ISINTERNAL="No">
-                        <TYPE>Voucher</TYPE>
-                        <FETCH>RemoteID, GUID, MasterID, AlterID, Date, VoucherTypeName, VoucherNumber, IsCancelled, AllLedgerEntries.*</FETCH>
-                    </COLLECTION>
-                </TDLMESSAGE>
-            </TDL>
-        </DESC>
-    </BODY>
-</ENVELOPE>
-"#,
-        xml_escape(company),
-        xml_escape(from),
-        xml_escape(to)
-    )
-    .trim()
-    .to_string()
-}
-
-fn render_selected_vouchers(company: &str, from: &str, to: &str) -> String {
-    let request = render_vouchers(company, from, to)
-        .replace("BRIDGE Voucher Export V2", "BRIDGE Voucher Export V3")
-        .replace("bridge.tally.vouchers/2", "bridge.tally.vouchers/3")
-        .replace(
-            "BRIDGE Voucher Company GUID V1, BRIDGE Voucher Record Count V1",
-            "BRIDGE Voucher Company GUID V1, BRIDGE Voucher From Date V3, BRIDGE Voucher To Date V3, BRIDGE Voucher Record Count V1",
-        );
-    let record_count_field = r#"                    <FIELD NAME="BRIDGE Voucher Record Count V1">"#;
-    let window_fields = r#"                    <FIELD NAME="BRIDGE Voucher From Date V3">
-                        <SET>$$String:##SVFromDate:"YYYYMMDD"</SET>
-                        <XMLTAG>"FROMDATE"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher To Date V3">
-                        <SET>$$String:##SVToDate:"YYYYMMDD"</SET>
-                        <XMLTAG>"TODATE"</XMLTAG>
-                    </FIELD>
-"#;
-    request.replacen(
-        record_count_field,
-        &format!("{window_fields}{record_count_field}"),
-        1,
-    )
-}
-
 /// FETCHLIST of the tally-read v1 `company` part (`AuditCompanyObjectV1`).
 ///
 /// A `Company` *collection* returns every loaded company whatever
 /// `SVCURRENTCOMPANY` says (protocol reference §12a.7), and both consumers
 /// take the first `COMPANY` carrying a GUID, so the part is a single-object
-/// export instead (protocol reference §9.11a). That shape was measured with
-/// `FETCH *` only (565 tags). This explicit list is narrower on purpose: the
+/// export instead (protocol reference §9.11a). That shape was first measured
+/// with `FETCH *` (565 tags). This explicit list is narrower on purpose: the
 /// part is stored, and nothing else in the company definition is read:
 /// `GUID` and `BOOKSFROM` (both engines), `ISINTEGRATED` (the Python stock
 /// test), and `NAME`, which no engine reads but which evidences which company
 /// Tally resolved the `ID` to. Each was present in the `FETCH *` captures of
-/// the audit books; whether an explicit `FETCHLIST` narrows an Object export
-/// is unmeasured, so admission checks the fields the consumers need, not the
-/// absence of the rest.
+/// the audit books. On the one Company object export measured with this list,
+/// the answer was far narrower than a `FETCH *` answer from another book, but
+/// Tally also sent three children the list does not name (protocol reference
+/// §9.11e, measured 2026-10-12), so admission checks the fields the consumers
+/// need, not the absence of the rest.
 ///
 /// Never add `ORIGINALNAME` or any field outside this list without a new
 /// profile id.
 pub const AUDIT_COMPANY_FETCH: [&str; 4] = ["GUID", "NAME", "BOOKSFROM", "ISINTEGRATED"];
 
+/// FETCHLIST of the invoice build's company read (`InvoiceCompanyHsnV1`):
+/// every field, the shape that was measured (§9.11a). The company-level
+/// HSN/SAC (`HSNDETAILS.LIST`) and its settings (`CMPGSTDETAILS.LIST`) came
+/// back in it and not in the company collection (protocol reference §9.16,
+/// the HSN/SAC check before a post, 12 Oct 2026); whether an explicit list
+/// carries them is not measured. The answer is parsed for those lists and
+/// the company's GUID, then dropped: it is never stored.
+pub const INVOICE_COMPANY_FETCH: [&str; 1] = ["*"];
+
 /// FETCH of the tally-read v1 `ledgers` part (`AuditLedgersV1`).
 ///
-/// The fields the audit consumers were recorded reading (Lane B's recorded
+/// The fields the audit consumers were recorded reading (the recorded
 /// Python reads and the crate's traced reads of the same parts, 2026-09-21).
 /// It is deliberately narrower
 /// than the party-master workbook's list: no bank details, IFSC, e-mail,
@@ -1073,9 +727,9 @@ INVENTORYENTRIESOUT.STOCKITEMNAME,INVENTORYENTRIESOUT.ACTUALQTY,INVENTORYENTRIES
 pub const AUDIT_STOCK_ITEM_FETCH: &str = "NAME, GUID, PARENT, BASEUNITS, \
 OPENINGBALANCE, OPENINGVALUE, CLOSINGBALANCE, CLOSINGVALUE";
 
-fn render_audit_company_object(company: &str) -> String {
+fn render_company_object(company: &str, fetch: &[&str]) -> String {
     let company = xml_escape(company);
-    let fetch = AUDIT_COMPANY_FETCH
+    let fetch = fetch
         .iter()
         .map(|field| format!("<FETCH>{field}</FETCH>"))
         .collect::<String>();
@@ -1099,12 +753,16 @@ fn render_audit_ledgers(company: &str, from: &str, to: &str) -> String {
 /// FETCH, so the request is the qualified window shape. The response-side
 /// checks keyed to that shape (`window_not_honoured`, part admission) are not
 /// inherited by this renderer; the caller that sends it must apply them.
-fn render_audit_vouchers(company: &str, from: &str, to: &str) -> String {
+///
+/// The dates go into a quoted `$$Date:"…"` literal, which XML escaping cannot
+/// protect (Tally decodes `&quot;` before evaluating), so only a date is
+/// accepted (#861).
+fn render_audit_vouchers(company: &str, from: &TallyDate, to: &TallyDate) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Vouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Vouchers\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{AUDIT_VOUCHER_FETCH}</FETCH><FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
-        from = xml_escape(from),
-        to = xml_escape(to),
+        from = from.as_str(),
+        to = to.as_str(),
     )
 }
 
@@ -1115,29 +773,6 @@ fn render_audit_stock_items(company: &str, from: &str, to: &str) -> String {
         from = xml_escape(from),
         to = xml_escape(to),
     )
-}
-
-fn valid_yyyymmdd(value: &str) -> bool {
-    if value.len() != 8 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
-        return false;
-    }
-    let year = value[0..4].parse::<u16>().ok();
-    let month = value[4..6].parse::<u8>().ok();
-    let day = value[6..8].parse::<u8>().ok();
-    let (Some(year), Some(month), Some(day)) = (year, month, day) else {
-        return false;
-    };
-    if year == 0 || !(1..=12).contains(&month) {
-        return false;
-    }
-    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-    let maximum_day = match month {
-        2 if leap => 29,
-        2 => 28,
-        4 | 6 | 9 | 11 => 30,
-        _ => 31,
-    };
-    (1..=maximum_day).contains(&day)
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

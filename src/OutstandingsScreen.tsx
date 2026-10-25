@@ -11,11 +11,14 @@ import {
   asOfYyyymmdd,
   bulkPartyStatementsInvokeArgument,
   bulkPartyStatementsPreviewInvokeArgument,
+  partyLedgerMasterInvokeArgument,
   partyStatementInvokeArgument,
   settleAsOfBoundValue,
   singleCompanyOutstandingsInvokeArgument,
   workingPaperInvokeArgument,
   type AsOfBoundValue,
+  type PartyLedgerMasterExport,
+  type PartyLedgerMasterNote,
 } from "./outstandings-as-of";
 import { companyIdentityKey, type CompanyIdentityKey } from "./company-identity";
 import { reportEvidenceDrawerEntry, type EvidenceDrawerEntry } from "./evidence-drawer-entry";
@@ -26,6 +29,8 @@ export type OutstandingsExportNotice = {
   path?: string;
   location?: string;
   failures?: Array<{ party: string; code: string; reason: string }>;
+  /** What a ledger-master workbook says about its date, by kind (bridge#903). */
+  notes?: PartyLedgerMasterNote[];
 };
 
 type Props = {
@@ -46,6 +51,8 @@ type Props = {
   liveReadSuppressed: boolean;
   openBookCount?: number;
   asOf: string;
+  /** Whether the operator chose `asOf`; an automatic date is the host's own. */
+  asOfOperatorSelected: boolean;
   onAsOfChange: (value: string) => void;
   onTallyReadActivityChange: (delta: 1 | -1) => void;
   onExportNoticeChange: (notice: OutstandingsExportNotice | null) => void;
@@ -104,7 +111,7 @@ const DISPLAY_OPEN_BILL_ROW_LIMIT = 2_000;
 const DISPLAY_UNALLOCATED_PARTY_LIMIT = 10;
 const UNSUPPORTED_CURRENCY_WITHHELD = {
   title: "Totals withheld",
-  message: "Bridge received an unsupported currency assertion. Unit A displays totals only for an explicit INR assertion.",
+  message: "ComplyEaze Bridge received an unsupported currency assertion. Unit A displays totals only for an explicit INR assertion.",
 } as const;
 
 type LoadResult =
@@ -155,7 +162,7 @@ export type OutstandingsEvidence =
       sourceBytes: number;
       receivableTotal: string;
       payableTotal: string;
-      // The native read can establish this residual; voucher scans cannot.
+      // The native read can establish this residual.
       // Undefined is intentionally distinct from an exact zero amount.
       unallocatedTotal?: string;
     }
@@ -208,6 +215,13 @@ export function OutstandingsExportNotice({
         )}
         <button type="button" onClick={onDismiss} aria-label="Dismiss">Dismiss</button>
       </span>
+      {notice.notes && notice.notes.length > 0 && (
+        <ul className="outstandings-export-notes">
+          {notice.notes.map((note) => (
+            <li key={note.kind} data-note-kind={note.kind}>{note.text}</li>
+          ))}
+        </ul>
+      )}
       {notice.failures && notice.failures.length > 0 && (
         <ul className="outstandings-export-failures">
           {notice.failures.map((failure) => (
@@ -229,6 +243,7 @@ export function OutstandingsScreen({
   liveReadSuppressed,
   openBookCount = 1,
   asOf,
+  asOfOperatorSelected,
   onAsOfChange,
   onTallyReadActivityChange,
   onExportNoticeChange,
@@ -326,7 +341,6 @@ export function OutstandingsScreen({
           currencyAssertion: inrCompleteResult.currency_assertion,
           readProvenance: {
             read_strategy: inrCompleteResult.read_strategy,
-            source_voucher_count: inrCompleteResult.report.source_voucher_count,
             open_receivable_bill_count: inrCompleteResult.report.open_receivable_bill_count,
           },
           sourceBytes: inrCompleteResult.report.source_bytes,
@@ -437,8 +451,8 @@ export function OutstandingsScreen({
   // applied per party inside groupOpenBillsByParty, never to the flattened
   // cross-party list, so one party's bill count can never push another
   // party's real bills out of the map entirely. null when statement rows are
-  // absent altogether (voucher-scan path) -- distinct from a present map that
-  // simply has no entry for a given party (that party has zero bill rows).
+  // absent altogether -- distinct from a present map that simply has no entry
+  // for a given party (that party has zero bill rows).
   const openBillsByParty = React.useMemo(
     () => groupOpenBillsByParty(inrCompleteResult?.statement_open_bills, DISPLAY_OPEN_BILL_ROW_LIMIT),
     [inrCompleteResult],
@@ -487,8 +501,8 @@ export function OutstandingsScreen({
     }
     return (
       <section className="panel wide outstandings-empty">
-        <h2>Bridge could not read this company&rsquo;s currency</h2>
-        <p>Without it Bridge cannot tell whether this company&rsquo;s amounts are in rupees, so it does not read outstandings. Reopen the company to try again.</p>
+        <h2>ComplyEaze Bridge could not read this company&rsquo;s currency</h2>
+        <p>Without it ComplyEaze Bridge cannot tell whether this company&rsquo;s amounts are in rupees, so it does not read outstandings. Reopen the company to try again.</p>
       </section>
     );
   }
@@ -610,7 +624,6 @@ export function OutstandingsScreen({
             {completeResult
               ? ` · ${readProvenance({
                   read_strategy: completeResult.read_strategy,
-                  source_voucher_count: completeResult.report.source_voucher_count,
                   open_receivable_bill_count: completeResult.report.open_receivable_bill_count,
                 })}`
               : ""}
@@ -678,11 +691,16 @@ export function OutstandingsScreen({
               type="button"
               disabled={exporting !== null || loading || liveReadNavigationLocked}
               onClick={async () => {
+                const argument = partyLedgerMasterInvokeArgument(config, company, asOf, asOfOperatorSelected);
+                if (!argument) {
+                  onExportNoticeChange({ message: "Choose a valid As of date before exporting the ledger master." });
+                  return;
+                }
                 if (!beginExport("ledger-master")) return;
                 onTallyReadActivityChange(1);
                 try {
-                  const path = await exportPartyLedgerMaster(config, company);
-                  onExportNoticeChange({ message: fileNameOf(path), path });
+                  const { path, notes } = await exportPartyLedgerMaster(argument);
+                  onExportNoticeChange({ message: fileNameOf(path), path, notes });
                 } catch (cause) {
                   onExportNoticeChange({ message: operatorMessage(cause) });
                 } finally {
@@ -994,7 +1012,7 @@ export function OutstandingsScreen({
       ) : !loading && !result && !error ? (
         <div className="outstandings-state">
           <strong>Ready for a read-only scan</strong>
-          <span>Bridge pins the company by GUID, reads each report twice, and shows numbers only when both copies agree.</span>
+          <span>ComplyEaze Bridge pins the company by GUID, reads each report twice, and shows numbers only when both copies agree.</span>
         </div>
       ) : null}
     </section>
@@ -1068,22 +1086,13 @@ async function exportWorkingPaper(result: InrCompleteResult) {
   return invoke<string>("export_outstandings_working_paper", argument);
 }
 
-/** Reads the qualified ledger/master source and writes its traceable workbook. */
+/** Reads the qualified ledger/master source and writes its traceable workbook.
+ * The argument is built by `partyLedgerMasterInvokeArgument`, which sends the
+ * screen's date only when the operator chose it. */
 async function exportPartyLedgerMaster(
-  config: Props["config"],
-  company: NonNullable<Props["company"]>,
+  argument: NonNullable<ReturnType<typeof partyLedgerMasterInvokeArgument>>,
 ) {
-  return invoke<string>("export_party_ledger_master", {
-    request: {
-      config,
-      selected_company: {
-        display_name: company.name,
-        company_guid: company.guid,
-        company_number: company.company_number,
-        books_from_yyyymmdd: company.books_from_yyyymmdd,
-      },
-    },
-  });
+  return invoke<PartyLedgerMasterExport>("export_party_ledger_master", argument);
 }
 
 /// Builds the report as CSV.
@@ -1120,7 +1129,7 @@ function reportToCsv(
   const row = (...values: Array<CsvCell>) => csvRow(...values);
 
   const lines = [
-    row(text("Bridge — aged outstandings")),
+    row(text("ComplyEaze Bridge — aged outstandings")),
     row(text("Company"), text(report.company_name)),
     row(text("As of"), text(formatDate(report.as_of_yyyymmdd))),
     row(text("Currency"), text("INR")),
@@ -1195,11 +1204,11 @@ function comparePartiesBy(sort: PartySort) {
 
 function amountOf(value: string) {
   if (!/^-?\d+(?:\.\d+)?$/.test(value)) {
-    throw new Error("Bridge could not read an outstandings amount.");
+    throw new Error("ComplyEaze Bridge could not read an outstandings amount.");
   }
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
-    throw new Error("Bridge could not read an outstandings amount.");
+    throw new Error("ComplyEaze Bridge could not read an outstandings amount.");
   }
   return parsed;
 }

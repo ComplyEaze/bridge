@@ -1,0 +1,25 @@
+{
+ "comment": "applicability_44ab, activity not recorded and turnover at or under the lowest threshold: s.44AB(a) is no, so the s.44AB(b) question is asked with the not-recorded wording; a books turnover with no comparison source.",
+ "entity_type": "individual",
+ "groups": {},
+ "ledgers": [],
+ "tb": [],
+ "vouchers": [],
+ "cash": [],
+ "bank": [],
+ "a44_turnover": {
+  "books_turnover_paise": 1000000000
+ },
+ "a44_cash_share": {
+  "receipts_bp": 900,
+  "payments_bp": 0,
+  "limits": []
+ },
+ "tests": [
+  "applicability_44ab"
+ ],
+ "presumptive_history": {
+  "ay": "2023-24",
+  "opted_44ad": false
+ }
+}

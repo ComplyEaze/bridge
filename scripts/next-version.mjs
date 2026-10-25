@@ -17,7 +17,7 @@
 // refuse, naming each one, unless --level is given: a guessed level would be
 // silent, and the level is the one judgement this script cannot make.
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -203,7 +203,7 @@ function requireCommit(ref, advice) {
 
 export function latestReleaseTag(tags) {
   const versioned = tags
-    .map((tag) => ({ tag, match: /^(?:mcp-preview-|v)(\d+\.\d+\.\d+)$/.exec(tag) }))
+    .map((tag) => ({ tag, match: /^(?:mcp-preview-|mcp-v|v)(\d+\.\d+\.\d+)$/.exec(tag) }))
     .filter(({ match }) => match)
     .map(({ tag, match }) => ({ tag, version: parse(match[1]) }));
   versioned.sort((a, b) => a.version[0] - b.version[0] || a.version[1] - b.version[1] || a.version[2] - b.version[2]);
@@ -328,11 +328,11 @@ async function main() {
   if (process.argv.includes("--apply")) {
     writeVersions(result.next);
     console.log(`wrote ${result.next} to ${Object.keys(VERSION_FILES).join(", ")} and README.md`);
-    console.log("package.json, src-tauri/Cargo.toml and src-tauri/Cargo.lock are pinned: run scripts/reseal.sh, then commit.");
+    console.log("package.json, src-tauri/Cargo.toml and src-tauri/Cargo.lock are pinned: the pull request that commits them needs an acknowledgement file (see docs/release-process.md).");
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     await main();
   } catch (error) {

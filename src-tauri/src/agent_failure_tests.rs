@@ -9,7 +9,7 @@ fn response_bytes(plan: &ScenarioPlan) -> Vec<u8> {
 #[tokio::test]
 async fn import_post_read_failures_retain_source_evidence_and_admission_errors_stay_empty() {
     for malformed_catalogue in [false, true] {
-        let mut plans = import_cycle_plans()[..10].to_vec();
+        let mut plans = import_family_cycle_plans()[..10].to_vec();
         if malformed_catalogue {
             // Remove one required attribute from the captured native catalogue.
             // This is fault injection, not a claimed additional Tally fixture.
@@ -61,8 +61,8 @@ async fn import_post_read_failures_retain_source_evidence_and_admission_errors_s
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         });
         let response = if malformed_catalogue {
             server
@@ -163,8 +163,8 @@ async fn a_name_the_core_refuses_costs_no_live_read() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
 
     let refused = server

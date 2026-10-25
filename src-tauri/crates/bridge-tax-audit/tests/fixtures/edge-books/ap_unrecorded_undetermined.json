@@ -1,0 +1,23 @@
+{
+ "comment": "applicability_44ab, activity not recorded and turnover between the two thresholds with the cash share within 5%: s.44AB(a) is undetermined, so the s.44AB(b) question is asked (not-recorded wording) where the business and profession cases are told apart only by the recorded activity; a books turnover with no comparison source.",
+ "entity_type": "individual",
+ "groups": {},
+ "ledgers": [],
+ "tb": [],
+ "vouchers": [],
+ "cash": [],
+ "bank": [],
+ "a44_turnover": {
+  "books_turnover_paise": 2000000000
+ },
+ "a44_cash_share": {
+  "receipts_bp": 100,
+  "payments_bp": 100,
+  "limits": [
+   "The cash share is read from the books only."
+  ]
+ },
+ "tests": [
+  "applicability_44ab"
+ ]
+}

@@ -7,8 +7,9 @@ use quick_xml::{events::Event, Reader};
 
 use crate::{
     attr_value, configured_reader, normalized_standard_company_guid, normalized_standard_value,
-    path_eq, pop_expected_path, read_identifier_text, read_required_text, validate_export_response,
-    validate_only_attributes, PartyLedgerMasterFieldObservation, TallyLedger,
+    path_eq, pop_expected_path, read_identifier_text, read_optional_text, read_required_text,
+    validate_export_response, validate_only_attributes, PartyLedgerMasterFieldObservation,
+    TallyLedger,
 };
 
 /// Rows either parser in this file will hold from one `List of Ledgers`
@@ -49,6 +50,13 @@ pub enum StandardLedgerCatalogError {
     CompanyIdentityMismatch,
     DuplicateIdentity,
     BoundsViolation,
+    /// A V2 catalogue row carried no `ISBILLWISEON`. A V1 body, which has none,
+    /// fails V2 here and nowhere else: the flag is never defaulted.
+    BillWiseFlagMissing,
+    /// A V2 catalogue row's `ISBILLWISEON` was empty or neither `Yes` nor `No`.
+    BillWiseFlagInvalid,
+    /// A V2 catalogue row carried `ISBILLWISEON` more than once.
+    BillWiseFlagRepeated,
 }
 
 impl std::fmt::Display for StandardLedgerCatalogError {
@@ -61,6 +69,11 @@ impl std::fmt::Display for StandardLedgerCatalogError {
             }
             Self::DuplicateIdentity => "standard ledger catalog contained a duplicate identity",
             Self::BoundsViolation => "standard ledger catalog exceeded a safety bound",
+            Self::BillWiseFlagMissing => "standard ledger catalog row had no bill-wise flag",
+            Self::BillWiseFlagInvalid => {
+                "standard ledger catalog row had an unusable bill-wise flag"
+            }
+            Self::BillWiseFlagRepeated => "standard ledger catalog row repeated its bill-wise flag",
         })
     }
 }
@@ -77,6 +90,9 @@ impl StandardLedgerCatalogError {
             Self::CompanyIdentityMismatch => "ledger_catalogue_identity_mismatch",
             Self::DuplicateIdentity => "ledger_catalogue_duplicate_identity",
             Self::BoundsViolation => "ledger_catalogue_bounds_exceeded",
+            Self::BillWiseFlagMissing => "ledger_catalogue_bill_wise_flag_missing",
+            Self::BillWiseFlagInvalid => "ledger_catalogue_bill_wise_flag_invalid",
+            Self::BillWiseFlagRepeated => "ledger_catalogue_bill_wise_flag_repeated",
         }
     }
 }
@@ -114,7 +130,8 @@ pub fn parse_standard_ledger_identity_observation(
                         "standard ledger identity collection exceeded the safe row limit"
                     );
                 }
-                let observed = parse_standard_ledger_identity_row(&mut reader, &element, false)?;
+                let observed =
+                    parse_standard_ledger_identity_row(&mut reader, &element, false, false)?;
                 if observed.company_name != expected_company_name {
                     anyhow::bail!(
                         "standard ledger identity collection did not confirm the requested company"
@@ -131,13 +148,17 @@ pub fn parse_standard_ledger_identity_observation(
                 }
                 ledger_count += 1;
             }
-            Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
+            Event::Start(element) => {
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+            }
             Event::Empty(_element)
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) =>
             {
                 anyhow::bail!("standard ledger identity collection contained an empty row");
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())?,
+            Event::End(element) => {
+                pop_expected_path(&mut path, element.name().as_ref().as_bytes())?
+            }
             Event::Eof => break,
             _ => {}
         }
@@ -165,18 +186,38 @@ pub struct StandardLedgerCatalog {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct StandardLedgerCatalogEntry {
+    /// The spelling of the row's `NAME` attribute: what every voucher row of
+    /// this ledger carries.
     name: String,
+    /// The ledger's own name when `LANGUAGENAME.LIST` gives a usable one that
+    /// differs from `name` (in case or symbols: 26 of 4,017 ledgers in a separate census of
+    /// 13 books, reference 9.4h, not reproducible from this repository); `None` otherwise. The identity is the GUID; neither
+    /// spelling is.
+    stored_name: Option<String>,
     guid: String,
     /// The immediate `PARENT` group Tally returned for this ledger, or `None`
     /// when it returned none. A ledger exposes no `PARENTSTRUCTURE`, so this
     /// single hop is all the ancestry one catalog response carries; a caller
     /// that needs the group's own identity must read the Group collection.
     parent: Option<String>,
+    /// The catalogue returned a `PARENT` this parse would not carry (see
+    /// `safe_standard_ledger_parent`), so `parent` is `None` although the
+    /// ledger has one.
+    parent_unsupported: bool,
 }
 
 impl StandardLedgerCatalog {
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.entries.iter().map(|entry| entry.name.as_str())
+    }
+
+    /// Each ledger's row spelling and, only when `LANGUAGENAME.LIST` gave a
+    /// different usable one, its stored name. A ledger without a stored name
+    /// is known by its row spelling alone, as before.
+    pub fn spellings(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
+        self.entries
+            .iter()
+            .map(|entry| (entry.name.as_str(), entry.stored_name.as_deref()))
     }
 
     /// Each ledger paired with the immediate parent group Tally returned for
@@ -185,6 +226,22 @@ impl StandardLedgerCatalog {
         self.entries
             .iter()
             .map(|entry| (entry.name.as_str(), entry.parent.as_deref()))
+    }
+
+    /// Each ledger's name, GUID and immediate parent, for planning parent
+    /// parts and checking the parts' rows against this catalogue (bridge#679).
+    pub fn identified_parents(
+        &self,
+    ) -> impl Iterator<Item = (&str, &str, crate::parent_partition::ParentObservation<'_>)> {
+        use crate::parent_partition::ParentObservation;
+        self.entries.iter().map(|entry| {
+            let parent = if entry.parent_unsupported {
+                ParentObservation::Unsupported
+            } else {
+                entry.parent.as_deref().into()
+            };
+            (entry.name.as_str(), entry.guid.as_str(), parent)
+        })
     }
 
     pub fn bind_selected(
@@ -209,6 +266,82 @@ impl StandardLedgerCatalog {
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(StandardLedgerCatalogBinding { entries })
     }
+}
+
+/// A ledger's `ISBILLWISEON`: maintained bill by bill, or not. Two states and no default: a row that does not say is refused, so
+/// "not maintained bill by bill" is never what an absent or unreadable flag turns into.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BillWiseFlag {
+    On,
+    Off,
+}
+
+impl BillWiseFlag {
+    fn parse(text: &str) -> Result<Self, StandardLedgerCatalogError> {
+        // After the reader's trimming, exactly the two spellings observed live
+        // (§12a.15); any other is refused until a capture shows Tally uses it (P1).
+        if text == "Yes" {
+            Ok(Self::On)
+        } else if text == "No" {
+            Ok(Self::Off)
+        } else {
+            Err(StandardLedgerCatalogError::BillWiseFlagInvalid)
+        }
+    }
+}
+
+/// One validated `StandardLedgerCatalogV2` answer: the V1 catalogue plus every
+/// ledger's [`BillWiseFlag`], from the one row. Only
+/// [`parse_standard_ledger_catalog_v2_with_identities`] makes one, so every
+/// ledger here has a flag.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StandardLedgerCatalogV2 {
+    catalog: StandardLedgerCatalog,
+    /// `flags[i]` is the flag of `catalog.entries[i]`.
+    flags: Vec<BillWiseFlag>,
+}
+
+impl StandardLedgerCatalogV2 {
+    /// The names, GUIDs and parents, exactly as a V1 answer would give them.
+    pub fn catalog(&self) -> &StandardLedgerCatalog {
+        &self.catalog
+    }
+
+    /// Each ledger's name, GUID and bill-wise flag, in response order.
+    pub fn bill_wise_flags(&self) -> impl Iterator<Item = (&str, &str, BillWiseFlag)> {
+        self.catalog
+            .entries
+            .iter()
+            .zip(&self.flags)
+            .map(|(entry, flag)| (entry.name.as_str(), entry.guid.as_str(), *flag))
+    }
+}
+
+/// [`parse_standard_ledger_catalog_with_identities`] for the V2 request: the
+/// same checks, and in addition exactly one `ISBILLWISEON` per row, `Yes` or
+/// `No`. A V1 body has none and is refused ([`StandardLedgerCatalogError::BillWiseFlagMissing`]).
+pub fn parse_standard_ledger_catalog_v2_with_identities(
+    xml: &str,
+    expected_company_name: &str,
+    expected_company_guid: &str,
+) -> Result<StandardLedgerCatalogV2, StandardLedgerCatalogError> {
+    let rows = parse_standard_ledger_catalog_rows(
+        xml,
+        expected_company_name,
+        expected_company_guid,
+        true,
+    )?;
+    let flags = rows
+        .iter()
+        .map(|row| {
+            row.bill_wise
+                .ok_or(StandardLedgerCatalogError::BillWiseFlagMissing)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(StandardLedgerCatalogV2 {
+        catalog: catalog_from_rows(rows),
+        flags,
+    })
 }
 
 /// Opaque selected-master identities from one validated standard catalog.
@@ -269,12 +402,21 @@ pub fn parse_standard_ledger_catalog_with_identities(
     expected_company_name: &str,
     expected_company_guid: &str,
 ) -> Result<StandardLedgerCatalog, StandardLedgerCatalogError> {
-    let rows =
-        parse_standard_ledger_catalog_rows(xml, expected_company_name, expected_company_guid)?;
-    Ok(StandardLedgerCatalog {
+    let rows = parse_standard_ledger_catalog_rows(
+        xml,
+        expected_company_name,
+        expected_company_guid,
+        false,
+    )?;
+    Ok(catalog_from_rows(rows))
+}
+
+fn catalog_from_rows(rows: Vec<StandardLedgerCatalogRow>) -> StandardLedgerCatalog {
+    StandardLedgerCatalog {
         entries: rows
             .into_iter()
             .map(|row| StandardLedgerCatalogEntry {
+                stored_name: row.stored_name.filter(|stored| *stored != row.ledger.name),
                 name: row.ledger.name,
                 guid: row.guid,
                 parent: row
@@ -282,9 +424,10 @@ pub fn parse_standard_ledger_catalog_with_identities(
                     .parent
                     .nonempty_returned_text()
                     .map(str::to_string),
+                parent_unsupported: row.parent_unsupported,
             })
             .collect(),
-    })
+    }
 }
 
 /// Parses the documented `List of Ledgers` collection as a deliberately
@@ -295,23 +438,186 @@ pub fn parse_standard_ledger_catalog(
     expected_company_name: &str,
     expected_company_guid: &str,
 ) -> Result<Vec<TallyLedger>, StandardLedgerCatalogError> {
-    Ok(
-        parse_standard_ledger_catalog_rows(xml, expected_company_name, expected_company_guid)?
-            .into_iter()
-            .map(|row| row.ledger)
-            .collect(),
-    )
+    Ok(parse_standard_ledger_catalog_rows(
+        xml,
+        expected_company_name,
+        expected_company_guid,
+        false,
+    )?
+    .into_iter()
+    .map(|row| row.ledger)
+    .collect())
+}
+
+/// The ledger GUIDs of one slice of the census (`crate::ledger_census`): the
+/// response to [`crate::ledger_census::render_ledger_census_slice_request`].
+/// A row carries the ledger's GUID and the company's GUID and nothing else that
+/// is read (its name arrives in the row's attribute and in `LANGUAGENAME.LIST`
+/// whatever is fetched, and is skipped here: only the count matters). A row
+/// holding any other field is refused, so a response that is not the slice
+/// that was asked for cannot be counted.
+///
+/// `max_rows` bounds what the parser will hold ([`StandardLedgerCatalogError::BoundsViolation`]
+/// past it); it is not the slice's span. AlterIDs are distinct, so a slice
+/// `(after, through]` holds at most `through - after` ledgers, and the census
+/// (`crate::ledger_census::LedgerCensus::accept`) refuses a slice holding more.
+/// No rows is a well-formed answer (a slice past every ledger); the census
+/// decides what an empty count means.
+pub fn parse_ledger_census_slice(
+    xml: &str,
+    expected_company_guid: &str,
+    max_rows: u64,
+) -> Result<Vec<String>, StandardLedgerCatalogError> {
+    let marked = crate::mark_forbidden_numeric_references(xml);
+    let xml = marked.as_ref();
+    validate_export_response(xml).map_err(|_| StandardLedgerCatalogError::MalformedResponse)?;
+    let expected_company_guid = normalized_standard_company_guid(expected_company_guid)
+        .map_err(|_| StandardLedgerCatalogError::BoundsViolation)?;
+    let mut reader = configured_reader(xml);
+    let mut path = Vec::<Vec<u8>>::new();
+    let mut guids = Vec::<String>::new();
+    let mut seen = HashSet::new();
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| StandardLedgerCatalogError::MalformedResponse)?
+        {
+            Event::Start(element)
+                if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) =>
+            {
+                if guids.len() as u64 >= max_rows {
+                    return Err(StandardLedgerCatalogError::BoundsViolation);
+                }
+                let row = parse_ledger_census_row(&mut reader, &element).map_err(|error| {
+                    error
+                        .downcast_ref::<StandardLedgerCatalogError>()
+                        .copied()
+                        .unwrap_or(StandardLedgerCatalogError::MalformedResponse)
+                })?;
+                if !row
+                    .company_guid
+                    .eq_ignore_ascii_case(&expected_company_guid)
+                {
+                    return Err(StandardLedgerCatalogError::CompanyIdentityMismatch);
+                }
+                let guid = row.ledger_guid.to_ascii_lowercase();
+                if !seen.insert(guid.clone()) {
+                    return Err(StandardLedgerCatalogError::DuplicateIdentity);
+                }
+                guids.push(guid);
+            }
+            Event::Start(element) => {
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+            }
+            Event::Empty(_) if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) => {
+                return Err(StandardLedgerCatalogError::MalformedResponse);
+            }
+            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref().as_bytes())
+                .map_err(|_| StandardLedgerCatalogError::MalformedResponse)?,
+            Event::Eof => break,
+            _ => {}
+        }
+    }
+    if path.is_empty() {
+        Ok(guids)
+    } else {
+        Err(StandardLedgerCatalogError::MalformedResponse)
+    }
+}
+
+struct LedgerCensusRow {
+    company_guid: String,
+    ledger_guid: String,
+}
+
+fn parse_ledger_census_row(
+    reader: &mut Reader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> anyhow::Result<LedgerCensusRow> {
+    validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
+    let row_name = element.name().as_ref().as_bytes().to_ascii_uppercase();
+    let mut company_guid = None;
+    let mut ledger_guid = None;
+    loop {
+        match reader.read_event()? {
+            Event::Start(child) => {
+                let child_name = child.name().as_ref().as_bytes().to_ascii_uppercase();
+                match child_name.as_slice() {
+                    b"NAME" => {
+                        validate_only_attributes(&child, &[b"TYPE"])?;
+                        skip_standard_ledger_identity_child(reader, child_name)?;
+                    }
+                    b"LANGUAGENAME.LIST" => {
+                        skip_standard_ledger_identity_child(reader, child_name)?
+                    }
+                    b"BRIDGECOMPANYGUID" => {
+                        validate_only_attributes(&child, &[b"TYPE"])?;
+                        set_bootstrap_context_once(
+                            &mut company_guid,
+                            normalized_standard_company_guid(&read_required_text(
+                                reader,
+                                child.name(),
+                            )?)?,
+                            "company GUID",
+                        )?;
+                    }
+                    b"GUID" => {
+                        validate_only_attributes(&child, &[b"TYPE"])?;
+                        if ledger_guid
+                            .replace(normalized_standard_value(
+                                &read_required_text(reader, child.name())?,
+                                "ledger GUID",
+                            )?)
+                            .is_some()
+                        {
+                            anyhow::bail!("ledger census row repeated ledger GUID");
+                        }
+                    }
+                    _ => anyhow::bail!("ledger census row contained an unexpected field"),
+                }
+            }
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(&row_name) =>
+            {
+                break
+            }
+            Event::Empty(_) => anyhow::bail!("ledger census row contained an empty field"),
+            Event::Text(text) if !text.trim().is_empty() => {
+                anyhow::bail!("ledger census row contained unexpected text")
+            }
+            Event::CData(_) | Event::DocType(_) | Event::PI(_) => {
+                anyhow::bail!("ledger census row contained a forbidden XML construct")
+            }
+            Event::Eof => anyhow::bail!("ledger census row ended before closing"),
+            _ => {}
+        }
+    }
+    Ok(LedgerCensusRow {
+        company_guid: company_guid
+            .ok_or_else(|| anyhow::anyhow!("ledger census row omitted computed company GUID"))?,
+        ledger_guid: ledger_guid
+            .ok_or_else(|| anyhow::anyhow!("ledger census row omitted ledger GUID"))?,
+    })
 }
 
 struct StandardLedgerCatalogRow {
     ledger: TallyLedger,
+    stored_name: Option<String>,
     guid: String,
+    parent_unsupported: bool,
+    /// `None` for V1; a V2 parse refuses a row without one in the row parser.
+    bill_wise: Option<BillWiseFlag>,
 }
 
 fn parse_standard_ledger_catalog_rows(
     xml: &str,
     expected_company_name: &str,
     expected_company_guid: &str,
+    read_bill_wise: bool,
 ) -> Result<Vec<StandardLedgerCatalogRow>, StandardLedgerCatalogError> {
     // The one rule every Tally read applies first (§1.1(d)): ledger names and
     // parents here must spell a forbidden reference exactly as the voucher
@@ -346,13 +652,14 @@ fn parse_standard_ledger_catalog_rows(
                 // every failure to "malformed": a refused ledger name is not a
                 // malformed response, and saying so sent a previous diagnosis
                 // at the transport for three rounds.
-                let observed = parse_standard_ledger_identity_row(&mut reader, &element, true)
-                    .map_err(|error| {
-                        error
-                            .downcast_ref::<StandardLedgerCatalogError>()
-                            .copied()
-                            .unwrap_or(StandardLedgerCatalogError::MalformedResponse)
-                    })?;
+                let observed =
+                    parse_standard_ledger_identity_row(&mut reader, &element, true, read_bill_wise)
+                        .map_err(|error| {
+                            error
+                                .downcast_ref::<StandardLedgerCatalogError>()
+                                .copied()
+                                .unwrap_or(StandardLedgerCatalogError::MalformedResponse)
+                        })?;
                 if observed.company_name != expected_company_name
                     || !observed
                         .company_guid
@@ -378,14 +685,19 @@ fn parse_standard_ledger_catalog_rows(
                         party_gstin: PartyLedgerMasterFieldObservation::NotObserved,
                         opening_balance: None,
                     },
+                    stored_name: observed.stored_name,
                     guid: ledger_guid,
+                    parent_unsupported: observed.parent_unsupported,
+                    bill_wise: observed.bill_wise,
                 });
             }
-            Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
+            Event::Start(element) => {
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+            }
             Event::Empty(_) if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) => {
                 return Err(StandardLedgerCatalogError::MalformedResponse);
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())
+            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref().as_bytes())
                 .map_err(|_| StandardLedgerCatalogError::MalformedResponse)?,
             Event::Eof => break,
             _ => {}
@@ -402,32 +714,58 @@ struct StandardLedgerIdentityRow {
     company_name: String,
     company_guid: String,
     ledger_name: Option<String>,
+    /// The first `NAME` of the first `LANGUAGENAME.LIST`, read only when the
+    /// row's own name is wanted; see [`walk_standard_ledger_identity_child`].
+    stored_name: Option<String>,
     ledger_guid: Option<String>,
     parent: PartyLedgerMasterFieldObservation,
+    parent_unsupported: bool,
+    bill_wise: Option<BillWiseFlag>,
 }
 
+/// `read_bill_wise` is the V2 shape: the row must carry one `ISBILLWISEON`.
+/// Without it, that element is as unexpected as any other field, so a V2 body
+/// fails the V1 parse as surely as a V1 body fails the V2 one.
 fn parse_standard_ledger_identity_row(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
     include_ledger_name: bool,
+    read_bill_wise: bool,
 ) -> anyhow::Result<StandardLedgerIdentityRow> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
     let mut ledger_name = include_ledger_name
-        .then(|| attr_value(reader, element, b"NAME"))
+        .then(|| attr_value(element, b"NAME"))
         .flatten()
         .map(|value| observed_standard_ledger_name(&value))
         .transpose()?;
-    let row_name = element.name().as_ref().to_ascii_uppercase();
+    let row_name = element.name().as_ref().as_bytes().to_ascii_uppercase();
     let mut company_name = None;
     let mut company_guid = None;
     let mut ledger_guid = None;
     let mut parent = PartyLedgerMasterFieldObservation::NotObserved;
     let mut parent_seen = false;
+    let mut parent_unsupported = false;
+    let mut stored_name = None;
+    let mut language_list_seen = false;
+    let mut bill_wise = None::<BillWiseFlag>;
     loop {
         match reader.read_event()? {
             Event::Start(child) => {
-                let child_name = child.name().as_ref().to_ascii_uppercase();
+                let child_name = child.name().as_ref().as_bytes().to_ascii_uppercase();
                 match child_name.as_slice() {
+                    b"ISBILLWISEON" if read_bill_wise => {
+                        validate_only_attributes(&child, &[b"TYPE"])?;
+                        // Every flag seen live is a Logical (§12a.15): a flag of
+                        // another type, or with no type, is not read as one.
+                        if attr_value(&child, b"TYPE").as_deref() != Some("Logical") {
+                            return Err(StandardLedgerCatalogError::BillWiseFlagInvalid.into());
+                        }
+                        let text = read_optional_text(reader, child.name())?
+                            .ok_or(StandardLedgerCatalogError::BillWiseFlagInvalid)?;
+                        if bill_wise.replace(BillWiseFlag::parse(&text)?).is_some() {
+                            return Err(StandardLedgerCatalogError::BillWiseFlagRepeated.into());
+                        }
+                    }
                     b"NAME" if include_ledger_name => {
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         if ledger_name
@@ -444,7 +782,7 @@ fn parse_standard_ledger_identity_row(
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         skip_standard_ledger_identity_child(
                             reader,
-                            child.name().as_ref().to_ascii_uppercase(),
+                            child.name().as_ref().as_bytes().to_ascii_uppercase(),
                         )?;
                     }
                     b"BRIDGECOMPANYNAME" => {
@@ -485,7 +823,7 @@ fn parse_standard_ledger_identity_row(
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         skip_standard_ledger_identity_child(
                             reader,
-                            child.name().as_ref().to_ascii_uppercase(),
+                            child.name().as_ref().as_bytes().to_ascii_uppercase(),
                         )?;
                     }
                     b"PARENT" if include_ledger_name => {
@@ -501,7 +839,10 @@ fn parse_standard_ledger_identity_row(
                         parent = match read_identifier_text(reader, child.name())? {
                             Some(value) => match safe_standard_ledger_parent(&value) {
                                 Some(value) => PartyLedgerMasterFieldObservation::Returned(value),
-                                None => PartyLedgerMasterFieldObservation::NotObserved,
+                                None => {
+                                    parent_unsupported = true;
+                                    PartyLedgerMasterFieldObservation::NotObserved
+                                }
                             },
                             None => PartyLedgerMasterFieldObservation::Returned(String::new()),
                         };
@@ -510,21 +851,39 @@ fn parse_standard_ledger_identity_row(
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         skip_standard_ledger_identity_child(
                             reader,
-                            child.name().as_ref().to_ascii_uppercase(),
+                            child.name().as_ref().as_bytes().to_ascii_uppercase(),
+                        )?;
+                    }
+                    // Only the first list can name the ledger: a later list, and
+                    // every `NAME` after the first in it, is an alias.
+                    b"LANGUAGENAME.LIST" if include_ledger_name && !language_list_seen => {
+                        language_list_seen = true;
+                        stored_name = walk_standard_ledger_identity_child(
+                            reader,
+                            child.name().as_ref().as_bytes().to_ascii_uppercase(),
+                            true,
                         )?;
                     }
                     b"LANGUAGENAME.LIST" => skip_standard_ledger_identity_child(
                         reader,
-                        child.name().as_ref().to_ascii_uppercase(),
+                        child.name().as_ref().as_bytes().to_ascii_uppercase(),
                     )?,
                     _ => anyhow::bail!(
                         "standard ledger identity collection contained an unexpected row field"
                     ),
                 }
             }
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(&row_name) => break,
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(&row_name) =>
+            {
+                break
+            }
             Event::Empty(child)
-                if include_ledger_name && child.name().as_ref().eq_ignore_ascii_case(b"PARENT") =>
+                if include_ledger_name && child.name().as_ref().eq_ignore_ascii_case("PARENT") =>
             {
                 validate_only_attributes(&child, &[b"TYPE"])?;
                 if parent_seen {
@@ -533,10 +892,15 @@ fn parse_standard_ledger_identity_row(
                 parent_seen = true;
                 parent = PartyLedgerMasterFieldObservation::Returned(String::new());
             }
+            Event::Empty(child)
+                if read_bill_wise && child.name().as_ref().eq_ignore_ascii_case("ISBILLWISEON") =>
+            {
+                return Err(StandardLedgerCatalogError::BillWiseFlagInvalid.into());
+            }
             Event::Empty(_) => {
                 anyhow::bail!("standard ledger identity collection contained an empty row field")
             }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("standard ledger identity collection contained unexpected row text")
             }
             Event::CData(_) | Event::DocType(_) | Event::PI(_) => {
@@ -558,8 +922,11 @@ fn parse_standard_ledger_identity_row(
             anyhow::anyhow!("standard ledger identity collection omitted computed company GUID")
         })?,
         ledger_name,
+        stored_name,
         ledger_guid,
         parent,
+        parent_unsupported,
+        bill_wise,
     })
 }
 
@@ -567,9 +934,64 @@ fn skip_standard_ledger_identity_child(
     reader: &mut Reader<&[u8]>,
     expected_name: Vec<u8>,
 ) -> anyhow::Result<()> {
+    walk_standard_ledger_identity_child(reader, expected_name, false).map(|_| ())
+}
+
+/// Walks one row child to its closing tag, as a skip does. With
+/// `capture_stored_name` it also returns the ledger's own name: the first
+/// `NAME` of the first `NAME.LIST` under `LANGUAGENAME.LIST`, read verbatim
+/// like the row's `NAME` attribute (reference 9.4h). Later names are aliases
+/// and are never identity. A first name that is empty, self-closing, not
+/// decodable or unusable as a ledger name leaves `None`, so the ledger keeps
+/// its row spelling, no alias is promoted, and the walk fails no read the skip
+/// used to pass: only the XML structure can fail it, as it could before.
+fn walk_standard_ledger_identity_child(
+    reader: &mut Reader<&[u8]>,
+    expected_name: Vec<u8>,
+    capture_stored_name: bool,
+) -> anyhow::Result<Option<String>> {
     let mut depth = 1_u32;
+    let mut stored_name = None;
+    let mut first_name_seen = false;
+    let mut in_name_list = false;
     loop {
         match reader.read_event()? {
+            Event::Start(child)
+                if capture_stored_name
+                    && depth == 2
+                    && in_name_list
+                    && !first_name_seen
+                    && child.name().as_ref().eq_ignore_ascii_case("NAME") =>
+            {
+                first_name_seen = true;
+                // Not `read_identifier_text`: its `?` on a bad entity would refuse the
+                // whole catalogue for a name this walk can simply leave unread.
+                let raw = reader.read_text(child.name())?;
+                stored_name = quick_xml::escape::unescape(&raw)
+                    .ok()
+                    .map(|v| v.into_owned())
+                    .filter(|value| !value.trim().is_empty())
+                    .and_then(|value| observed_standard_ledger_name(&value).ok());
+            }
+            Event::Empty(child)
+                if capture_stored_name
+                    && depth == 2
+                    && in_name_list
+                    && child.name().as_ref().eq_ignore_ascii_case("NAME") =>
+            {
+                // An empty first name is still the first name: an alias after it is not.
+                first_name_seen = true;
+            }
+            Event::Start(child)
+                if capture_stored_name
+                    && depth == 1
+                    && child.name().as_ref().eq_ignore_ascii_case("NAME.LIST") =>
+            {
+                in_name_list = true;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    anyhow::anyhow!("standard ledger identity nesting exceeded limits")
+                })?;
+            }
             Event::Start(_) => {
                 depth = depth.checked_add(1).ok_or_else(|| {
                     anyhow::anyhow!("standard ledger identity nesting exceeded limits")
@@ -581,13 +1003,21 @@ fn skip_standard_ledger_identity_child(
                         "standard ledger identity collection closed an unexpected field"
                     )
                 })?;
+                if depth == 1 {
+                    in_name_list = false;
+                }
                 if depth == 0 {
-                    if !end.name().as_ref().eq_ignore_ascii_case(&expected_name) {
+                    if !end
+                        .name()
+                        .as_ref()
+                        .as_bytes()
+                        .eq_ignore_ascii_case(&expected_name)
+                    {
                         anyhow::bail!(
                             "standard ledger identity collection closed an unexpected field"
                         );
                     }
-                    return Ok(());
+                    return Ok(stored_name);
                 }
             }
             Event::DocType(_) | Event::PI(_) => {
@@ -705,3 +1135,7 @@ fn set_bootstrap_context_once(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "standard_ledger_catalog_v2_tests.rs"]
+mod v2_tests;

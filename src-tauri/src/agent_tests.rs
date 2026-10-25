@@ -1,11 +1,17 @@
 use super::egress::EGRESS_TAIL_CHUNK_BYTES;
 use super::*;
+use std::collections::BTreeSet;
 use std::fs::OpenOptions;
 use std::io::Write;
 use tally_protocol_simulator::{
     Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
 use tokio::io::AsyncReadExt;
+
+/// A date as `normalized_date` returns it.
+fn day(text: &str) -> bridge_tally_core::TallyDate {
+    bridge_tally_core::TallyDate::parse(text).unwrap()
+}
 
 pub(super) fn company_collection_xml() -> String {
     "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME=\"BRIDGE SYNTHETIC BOOK\"><GUID>00000000-0000-4000-8000-000000000001</GUID><COMPANYNUMBER>1</COMPANYNUMBER><BOOKSFROM>20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>".to_string()
@@ -57,61 +63,69 @@ fn ordinary_vouchers_reject_missing_or_empty_core_fields_before_selection() {
 
 #[test]
 fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
-    for request in [
-        render_agent_vouchers("Book", "20260901", "20260902", None).unwrap(),
-        render_agent_changed_vouchers("Book", 1, 2),
-    ] {
-        let mut reader = quick_xml::Reader::from_str(&request);
-        let mut fields = Vec::new();
-        loop {
-            match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(event) if event.name().as_ref() == b"FETCH" => {
-                    fields = String::from_utf8_lossy(&reader.read_text(event.name()).unwrap())
-                        .split(',')
-                        .map(str::to_string)
-                        .collect();
-                }
-                quick_xml::events::Event::Eof => break,
-                _ => {}
+    let request = render_agent_vouchers(
+        "Book",
+        &tally_date("20260901"),
+        &tally_date("20260902"),
+        None,
+    )
+    .unwrap();
+    let mut reader = quick_xml::Reader::from_str(&request);
+    let mut fields = Vec::new();
+    loop {
+        match reader.read_event().unwrap() {
+            quick_xml::events::Event::Start(event) if event.name().as_ref() == "FETCH" => {
+                fields = reader
+                    .read_text(event.name())
+                    .unwrap()
+                    .split(',')
+                    .map(str::to_string)
+                    .collect();
             }
-        }
-        for field in [
-            "ISCANCELLED",
-            "ISOPTIONAL",
-            // Allow-listing ISPOSTDATED in agent_voucher_scalars.rs is inert unless
-            // it is also named here: Tally omits a field from COLLECTION XML that
-            // the FETCH list does not name, no matter what the parser accepts.
-            "ISPOSTDATED",
-            // The ENTRY wildcard, which 2.4a proves correct on the instance where
-            // curated allocation paths misreport New Ref/Agst Ref as On Account.
-            // The narrower BILLALLOCATIONS.* is cheaper and measured equivalent
-            // HERE, but untested THERE -- and an unverified narrowing is not worth
-            // a payload saving when the failure is silently-wrong evidence.
-            "ALLLEDGERENTRIES.*",
-            // Same inertness trap as ISPOSTDATED above: allow-listing REFERENCE/
-            // ISINVOICE/PARTYGSTIN in agent_voucher_scalars.rs without also naming
-            // them here would leave reference/is_invoice/party_gstin permanently
-            // absent. Protocol reference §8.2c captured all three cleanly on
-            // TallyPrime 7.1 Silver alongside the existing fields.
-            "REFERENCE",
-            "ISINVOICE",
-            "PARTYGSTIN",
-        ] {
-            assert!(fields.iter().any(|value| value == field), "missing {field}");
-        }
-        for narrower in [
-            "ALLLEDGERENTRIES.BILLALLOCATIONS.NAME",
-            "ALLLEDGERENTRIES.BILLALLOCATIONS.BILLTYPE",
-            "ALLLEDGERENTRIES.BILLALLOCATIONS.*",
-        ] {
-            assert!(
-                !fields.iter().any(|value| value == narrower),
-                "{narrower} must not be narrowed back in while 2.4a's instance is unverified"
-            );
+            quick_xml::events::Event::Eof => break,
+            _ => {}
         }
     }
+    for field in [
+        "ISCANCELLED",
+        "ISOPTIONAL",
+        // Allow-listing ISPOSTDATED in agent_voucher_scalars.rs is inert unless
+        // it is also named here: Tally omits a field from COLLECTION XML that
+        // the FETCH list does not name, no matter what the parser accepts.
+        "ISPOSTDATED",
+        // The ENTRY wildcard, which 2.4a proves correct on the instance where
+        // curated allocation paths misreport New Ref/Agst Ref as On Account.
+        // The narrower BILLALLOCATIONS.* is cheaper and measured equivalent
+        // HERE, but untested THERE -- and an unverified narrowing is not worth
+        // a payload saving when the failure is silently-wrong evidence.
+        "ALLLEDGERENTRIES.*",
+        // Same inertness trap as ISPOSTDATED above: allow-listing REFERENCE/
+        // ISINVOICE/PARTYGSTIN in agent_voucher_scalars.rs without also naming
+        // them here would leave reference/is_invoice/party_gstin permanently
+        // absent. Protocol reference §8.2c captured all three cleanly on
+        // TallyPrime 7.1 Silver alongside the existing fields.
+        "REFERENCE",
+        "ISINVOICE",
+        "PARTYGSTIN",
+        // Same inertness trap: `reference_date` is parsed only if the request names it (#1257).
+        "REFERENCEDATE",
+    ] {
+        assert!(fields.iter().any(|value| value == field), "missing {field}");
+    }
+    for narrower in [
+        "ALLLEDGERENTRIES.BILLALLOCATIONS.NAME",
+        "ALLLEDGERENTRIES.BILLALLOCATIONS.BILLTYPE",
+        "ALLLEDGERENTRIES.BILLALLOCATIONS.*",
+    ] {
+        assert!(
+            !fields.iter().any(|value| value == narrower),
+            "{narrower} must not be narrowed back in while 2.4a's instance is unverified"
+        );
+    }
     // A read should fetch what it returns: ledger_movement discards allocations.
-    let movement = render_agent_movement_vouchers("Book", "20260901", "20260902").unwrap();
+    let movement =
+        render_agent_movement_vouchers("Book", &tally_date("20260901"), &tally_date("20260902"))
+            .unwrap();
     assert!(
         !movement.contains("BILLALLOCATIONS"),
         "movement must not pay the allocation payload for data MovementEntry drops"
@@ -144,15 +158,20 @@ fn settings(address: std::net::SocketAddr, data_dir: PathBuf) -> Settings {
         max_bytes: 200_000,
         redaction: Redaction::MaskParties,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     }
 }
 
 #[test]
 fn agent_voucher_profile_uses_literal_filters_and_redaction_never_reveals_party() {
-    let request = render_agent_vouchers("BRIDGE SYNTHETIC BOOK", "20260401", "20260430", Some(99))
-        .expect("safe profile");
+    let request = render_agent_vouchers(
+        "BRIDGE SYNTHETIC BOOK",
+        &tally_date("20260401"),
+        &tally_date("20260430"),
+        Some(99),
+    )
+    .expect("safe profile");
     assert!(request.contains("<FILTERS>BridgeAgentWindow</FILTERS>"));
     assert!(request.contains("$AlterID > 99"));
     assert_eq!(
@@ -213,11 +232,21 @@ fn any_redaction_drops_tally_line_error_text_but_keeps_the_count() {
 
 #[test]
 fn voucher_company_name_is_validated_and_xml_escaped_without_a_tdl_literal() {
-    let request = render_agent_vouchers("Bridge, + खर्चा", "20260901", "20260902", None)
-        .expect("company name is an XML value");
+    let request = render_agent_vouchers(
+        "Bridge, + खर्चा",
+        &tally_date("20260901"),
+        &tally_date("20260902"),
+        None,
+    )
+    .expect("company name is an XML value");
     assert!(request.contains("<SVCURRENTCOMPANY>Bridge, + खर्चा</SVCURRENTCOMPANY>"));
     assert_eq!(
-        render_agent_vouchers("invalid\ncompany", "20260901", "20260902", None),
+        render_agent_vouchers(
+            "invalid\ncompany",
+            &tally_date("20260901"),
+            &tally_date("20260902"),
+            None
+        ),
         Err("company_name_invalid".to_string())
     );
 }
@@ -234,13 +263,12 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
             .expect("request must be well-formed XML")
         {
             quick_xml::events::Event::Start(event)
-                if event.name().as_ref() == b"SVCURRENTCOMPANY" =>
+                if event.name().as_ref() == "SVCURRENTCOMPANY" =>
             {
                 let raw = reader
                     .read_text(event.name())
                     .expect("SVCURRENTCOMPANY must have a matching close tag");
-                let decoded = raw.decode().expect("text must decode as UTF-8");
-                return quick_xml::escape::unescape(&decoded)
+                return quick_xml::escape::unescape(&raw)
                     .expect("text must unescape")
                     .into_owned();
             }
@@ -261,20 +289,14 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
 #[test]
 fn company_name_round_trips_through_xml_parsing_across_app_crate_renderer_families() {
     const NAME: &str = "BRIDGE ESCAPE & <LAB> \"Q\" 'A'";
-    let from = bridge_tally_core::TallyDate::parse("20260401").unwrap();
-    let to = bridge_tally_core::TallyDate::parse("20260430").unwrap();
     let requests: Vec<(&str, String)> = vec![
         (
             "tally::tdl_engine::ledgers_request",
             crate::tally::tdl_engine::ledgers_request(NAME),
         ),
         (
-            "tally::tdl_engine::ledger_period_balances_request",
-            crate::tally::tdl_engine::ledger_period_balances_request(NAME, &from, &to),
-        ),
-        (
             "agent_read_profiles::render_agent_vouchers",
-            render_agent_vouchers(NAME, "20260901", "20260902", None)
+            render_agent_vouchers(NAME, &tally_date("20260901"), &tally_date("20260902"), None)
                 .expect("company name is a valid XML value"),
         ),
     ];
@@ -303,7 +325,9 @@ fn the_audit_voucher_part_is_the_agent_window_shape_with_its_own_fetch() {
             "20260331",
         ),
     ] {
-        let agent = render_agent_vouchers_in_span(company, from, to, None).unwrap();
+        let agent =
+            render_agent_vouchers_in_span(company, &tally_date(from), &tally_date(to), None)
+                .unwrap();
         let (head, rest) = agent.split_once("<FETCH>").unwrap();
         let (_, tail) = rest.split_once("</FETCH>").unwrap();
         let expected = format!("{head}<FETCH>{AUDIT_VOUCHER_FETCH}</FETCH>{tail}");
@@ -386,11 +410,6 @@ async fn invalid_scope_arguments_are_rejected_before_any_tally_probe() {
             json!({"company_guid":"00000000-0000-4000-8000-000000000001", "from":"2026-09-01", "to":"2026-09-02", "ledger":42}),
             "argument_invalid:ledger",
         ),
-        (
-            "changed_since",
-            json!({"company_guid":"00000000-0000-4000-8000-000000000001", "master_snapshot_alter_id":-1}),
-            "changed_since_unqualified",
-        ),
     ] {
         let response = server.call_tool(tool, args).await;
         let error = &response["structuredContent"]["result"]["error"];
@@ -402,7 +421,10 @@ async fn invalid_scope_arguments_are_rejected_before_any_tally_probe() {
             error.get("remediation").is_none(),
             "{tool} refusal gained unearned remediation: {error}"
         );
-        assert_eq!(error["message"], "Bridge refused this operation.", "{tool}");
+        assert_eq!(
+            error["message"], "ComplyEaze Bridge refused this operation.",
+            "{tool}"
+        );
     }
 }
 
@@ -426,7 +448,10 @@ fn an_empty_book_refusal_carries_its_remediation_through_the_real_payload() {
     );
     let error = &response.value["structuredContent"]["result"]["error"];
     assert_eq!(error["code"], "empty_book_first_import");
-    assert_eq!(error["message"], "Bridge refused this operation.");
+    assert_eq!(
+        error["message"],
+        "ComplyEaze Bridge refused this operation."
+    );
     assert!(
         error["remediation"]
             .as_str()
@@ -459,11 +484,47 @@ fn a_small_response_budget_keeps_the_refusal_code_and_drops_only_the_guidance() 
     // The code is what the caller cannot do without, so it must survive a budget
     // too small to carry the guidance as well.
     assert_eq!(error["code"], "empty_book_first_import");
-    assert_eq!(error["message"], "Bridge refused this operation.");
+    assert_eq!(
+        error["message"],
+        "ComplyEaze Bridge refused this operation."
+    );
     assert!(
         error.get("remediation").is_none(),
         "guidance displaced the refusal budget: {error}"
     );
+}
+
+/// Every date refusal gives the one date next step (#1268), and a real one,
+/// `from` after `to`, carries it to the caller.
+#[tokio::test]
+async fn every_date_refusal_names_the_dates_it_accepts() {
+    let sentence = "Give each date as YYYYMMDD (YYYY-MM-DD also works), a real calendar day \
+                    from 0001-01-01 to 9999-12-31, with from no later than to. A window that \
+                    starts on 0001-01-01 or ends on 9999-12-31 cannot be widened to look for \
+                    vouchers next to it, so read one inside those days.";
+    for code in [
+        "invalid_date",
+        "invalid_date_range",
+        "tally_date_overflow",
+        "tally_date_underflow",
+    ] {
+        assert_eq!(refusal_remediation(code), Some(sentence), "{code}");
+    }
+    let directory = tempfile::tempdir().expect("agent directory");
+    let server = Server::new(settings(
+        "127.0.0.1:9".parse().unwrap(),
+        directory.path().to_path_buf(),
+    ));
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({"company_guid":"00000000-0000-4000-8000-000000000001",
+                "from":"2026-09-02", "to":"2026-09-01"}),
+        )
+        .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "invalid_date_range", "{response}");
+    assert_eq!(error["remediation"], sentence, "{response}");
 }
 
 #[test]
@@ -484,6 +545,21 @@ fn remediation_is_present_only_where_a_concrete_next_step_exists() {
         "masters_not_exact",
     ] {
         assert_eq!(refusal_remediation(code), None, "{code}");
+    }
+}
+
+/// A password file someone else can read is refused with a step that fixes it
+/// on each platform: on Windows a new copy, because a move keeps who can read it.
+#[test]
+fn a_shared_password_file_says_how_to_make_it_private() {
+    let step = refusal_remediation("statement_password_file_permissions").expect("a next step");
+    for phrase in [
+        "did not read the password and parsed nothing",
+        "(chmod 600)",
+        "make a new copy of it in a folder of your own",
+        "moving it keeps who can read it",
+    ] {
+        assert!(step.contains(phrase), "{phrase}: {step}");
     }
 }
 
@@ -553,6 +629,131 @@ fn a_read_deadline_is_named_rather_than_collapsed_into_the_generic_failure() {
 }
 
 #[test]
+fn a_refusal_for_a_book_that_changed_during_the_read_says_to_run_it_again() {
+    // Every code the change-during-read refusals use, as a code and as a cause (#1633). An arm
+    // dropped from the match fails here by name; a new code has to be added to this list.
+    for code in [
+        "voucher_window_changed_during_read",
+        "native_ledger_extent_changed",
+        "party_ledger_extent_changed",
+        "company_book_extent_changed",
+        "company_features_extent_changed",
+        "currency_extent_changed",
+        "currency_to_master_extent_changed",
+        "masters_extent_changed",
+        "month_register_extent_changed",
+        "stock_summary_extent_changed",
+    ] {
+        let step = refusal_remediation(code).unwrap_or_else(|| panic!("{code} has no next step"));
+        assert!(
+            step.contains("run the same request again once"),
+            "{code}: {step}"
+        );
+        assert!(step.contains("books changed in Tally"), "{code}: {step}");
+        // Through a shared operation code, the cause carries it.
+        assert_eq!(
+            remediation_for("native_outstandings_read_failed", Some(code)),
+            Some(step),
+            "{code}"
+        );
+    }
+    // The connection's own code for each extent refusal it has today has the advice. The list is
+    // written by hand: an extent refusal added later has to be added here.
+    use crate::tally::connection::PairedReadValidationError as Paired;
+    for refusal in [
+        Paired::NativeLedgerExtent,
+        Paired::PartyLedgerExtent,
+        Paired::CompanyBookExtent,
+        Paired::CompanyFeaturesExtent,
+        Paired::CurrencyExtent,
+        Paired::CurrencyToMasterExtent,
+        Paired::MastersExtent,
+        Paired::MonthRegisterExtent,
+        Paired::StockSummaryExtent,
+    ] {
+        let code = refusal.safe_code();
+        assert!(code.ends_with("_extent_changed"), "{code}");
+        assert!(
+            refusal_remediation(code).is_some(),
+            "{code} has no next step"
+        );
+    }
+    let snapshot = refusal_remediation("listing_snapshot_changed").expect("a next step");
+    assert!(
+        snapshot.contains("from the first page, without snapshot_id"),
+        "{snapshot}"
+    );
+}
+
+#[test]
+fn a_read_refused_for_the_company_identity_names_that_cause_and_the_next_step() {
+    use crate::tally::runtime::CompanyIdentityBracketError;
+    use bridge_tally_protocol::outstandings_shared::OutstandingsError;
+
+    let cases: [(anyhow::Error, &str, bool); 3] = [
+        (
+            CompanyIdentityBracketError::AbsentOrAmbiguous.into(),
+            "company_identity_absent_or_ambiguous",
+            true,
+        ),
+        (
+            OutstandingsError::CompanyIdentityMismatch.into(),
+            "company_identity_not_matched",
+            true,
+        ),
+        // Named, but no next step: nothing measured says what a person should do about it.
+        (
+            CompanyIdentityBracketError::PresentationCollision.into(),
+            "company_identity_presentation_collision",
+            false,
+        ),
+    ];
+    for (error, cause, has_next_step) in cases {
+        // Wrapped as production wraps a read failure, so the chain walk is what is tested.
+        let failure = ToolFailure::from_runtime(
+            "ledger_movement_read_failed",
+            crate::tally::runtime::with_read_evidence(
+                error.context("reading the ledger movement"),
+                crate::tally::runtime::RuntimeReadEvidence::empty(),
+            ),
+        );
+        assert_eq!(failure.code, "ledger_movement_read_failed", "{cause}");
+        assert_eq!(failure.cause, Some(cause));
+        let step = remediation_for(&failure.code, failure.cause);
+        assert_eq!(step.is_some(), has_next_step, "{cause}");
+        if let Some(step) = step {
+            assert!(
+                step.contains("open the company in Tally"),
+                "{cause}: {step}"
+            );
+            assert!(step.contains("list_companies"), "{cause}: {step}");
+        }
+    }
+
+    // `company_identity_mismatch` is already the CODE verify_import and post_import answer with
+    // when a saved batch's company no longer matches after Tally confirmed the company. Advice to
+    // "repeat the request" would loop there, so it is not keyed on that code.
+    assert_eq!(refusal_remediation("company_identity_mismatch"), None);
+
+    // The invalid-identity outstandings error is a different fault and keeps no identity cause,
+    // and so does a parse fault: only the two identity checks are named.
+    for other in [
+        OutstandingsError::InvalidCompanyIdentity,
+        OutstandingsError::InvalidResponse("synthetic_parse_fault"),
+        OutstandingsError::MasterWitnessAbsent,
+    ] {
+        let failure = ToolFailure::from_runtime("ledger_movement_read_failed", other.into());
+        assert!(
+            failure
+                .cause
+                .is_none_or(|cause| !cause.starts_with("company_identity")),
+            "{:?}",
+            failure.cause
+        );
+    }
+}
+
+#[test]
 fn ledger_master_fields_reject_unknown_schema_values() {
     assert_eq!(
         ledger_master_fields("complaince"),
@@ -577,56 +778,83 @@ fn ledger_movement_schema_exposes_offset_and_limit() {
 #[test]
 fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     let known_parties = ["Customer One", "Supplier Two", "PAN Holder", "Entry Ledger"];
-    let samples = BTreeMap::from([
-        ("tally_status", json!({"product":"TallyPrime"})),
+    let samples = [
         (
-            "list_companies",
-            json!({"companies":[{"name":"Bridge Books"}]}),
-        ),
-        ("voucher_schema", json!({"schema":{"type":"object"}})),
-        (
-            "validate_masters",
-            json!({"masters":[{"requested":party_name("Customer One"),"exact_live_spelling":party_name("Customer One"),"candidates":[party_name("Customer One")]}]}),
+            "balance_sheet",
+            json!({"result":{"profit_and_loss":{"ledger":{"name":party_name("Customer One")}}},"unclassified":[{"ledger":party_name("Supplier Two")}]}),
         ),
         (
             "build_import_xml",
             json!({"masters":[{"requested":party_name("Supplier Two"),"candidates":[party_name("Supplier Two")]}]}),
         ),
-        ("verify_import", json!({"vouchers":[]})),
+        ("egress_log", json!({"records":[]})),
+        (
+            "gst_uncertain_vouchers",
+            json!({"items":[{"list":"uncertain","voucher_number":"BP/1","party":party_name("Customer One"),"amount":"1050.00","party_side":"debit"}]}),
+        ),
         (
             "ledger_masters",
             json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder"}))}]}),
-        ),
-        (
-            "vouchers",
-            mark_voucher_party_names(
-                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger"}]}),
-            ),
-        ),
-        (
-            "changed_since",
-            json!({"masters":[mark_changed_master_party_name(json!({"name":"Supplier Two"}))]}),
-        ),
-        (
-            "outstandings",
-            json!({"top_parties":[{"party":party_name("Customer One")}],"open_bills":[{"party":party_name("Supplier Two")}],"unallocated":{"parties":[{"party":party_name("Supplier Two")}]}}),
         ),
         (
             "ledger_movement",
             json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
         ),
         (
-            "trial_balance",
-            json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
+            "list_companies",
+            json!({"companies":[{"name":"Bridge Books"}]}),
+        ),
+        (
+            "masters",
+            json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
+        ),
+        (
+            "outstandings",
+            json!({"top_parties":[{"party":party_name("Customer One")}],"open_bills":[{"party":party_name("Supplier Two")}],"unallocated":{"parties":[{"party":party_name("Supplier Two")}]}}),
+        ),
+        (
+            "parse_bank_statement",
+            json!({
+                "cash_questions":[{"printed_as":party_name("Customer One")}],
+                "counterparties":[{"party":party_name("Customer One"),"also_printed_as":[party_name("Supplier Two")],"ledger":party_name("Entry Ledger")}],
+                "ledgers_to_validate":[party_name("Entry Ledger")],
+            }),
+        ),
+        (
+            "post_import",
+            json!({"error":{"ledgers_changed":[party_name("Customer One"),party_name("Supplier Two")]}}),
         ),
         (
             "profit_and_loss",
             json!({"unclassified":[{"ledger":party_name("Entry Ledger")}]}),
         ),
         (
-            "balance_sheet",
-            json!({"result":{"profit_and_loss":{"ledger":{"name":party_name("Customer One")}}},"unclassified":[{"ledger":party_name("Supplier Two")}]}),
+            "purchase_register",
+            super::register::mark_register_row(
+                json!({"party":"Customer One","tax_in_books":[{"ledger":"Customer One"}],"taxable_entries":[{"ledger":"Supplier Two"}],"party_entries":[{"ledger":"Customer One"}],"other_entries":[{"ledger":"Supplier Two"}]}),
+            ),
         ),
+        ("read_evidence", json!({"records":[]})),
+        (
+            "sales_register",
+            super::register::mark_register_row(
+                json!({"party":"Customer One","tax_in_books":[{"ledger":"Customer One"}],"taxable_entries":[{"ledger":"Supplier Two"}],"party_entries":[{"ledger":"Customer One"}],"other_entries":[{"ledger":"Supplier Two"}]}),
+            ),
+        ),
+        (
+            "stock_summary",
+            json!({"items":[{"name":party_name("Customer One"),"guid":"g-1","parent":party_name("Supplier Two"),"base_unit":"Box","closing":{"value":"2500.00"}}],"offset":0}),
+        ),
+        ("tally_status", json!({"product":"TallyPrime"})),
+        (
+            "trial_balance",
+            json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
+        ),
+        (
+            "validate_masters",
+            json!({"masters":[{"requested":party_name("Customer One"),"exact_live_spelling":party_name("Customer One"),"candidates":[party_name("Customer One")]}]}),
+        ),
+        ("verify_import", json!({"vouchers":[]})),
         (
             "voucher_presence",
             json!({"vouchers":[super::presence::mark_presence_party_names(json!({
@@ -635,11 +863,137 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
                 "differences":[{"field":"party","proposed":"Customer One","observed":"Supplier Two"}],
             }))]}),
         ),
-        ("read_evidence", json!({"records":[]})),
-        ("egress_log", json!({"records":[]})),
-    ]);
-    assert_eq!(samples.len(), 17);
-    for (tool, sample) in samples {
+        ("voucher_schema", json!({"schema":{"type":"object"}})),
+        (
+            "vouchers",
+            mark_voucher_party_names(
+                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger"}]}),
+            ),
+        ),
+    ];
+    // Tools whose results carry no value marked as a party name, written out by
+    // hand: a tool in neither this list nor the samples fails the check below by
+    // name, so a new tool must either be given a sample or be listed here
+    // deliberately. `acknowledge_post_review` writes one local record and its
+    // module marks no party name; `local_data_report` returns only static
+    // strings, counts, sizes and whole days; `cash_flow` returns only months,
+    // amounts and counts of ledgers, and no ledger name; `company_features`
+    // returns only three settings, a currency symbol and the company's own name;
+    // `gst_status` returns only voucher numbers, dates, the voucher type's name
+    // and ids, and no party or ledger name; `month_register` returns only
+    // months, amounts and the report's name; `statement_tie_out` returns two
+    // dates, three signed gaps and fixed sentences, and never a ledger name;
+    // `voucher_read_cost` returns only a voucher mark, counts, seconds and
+    // constant text, and the company's own name; `audit_test_run` returns only
+    // figure and finding ids, numbers, the admitted test's fixed wording and the
+    // codes and counts of failed book checks (its own test replays a book and
+    // looks for every group, ledger and company name in the result).
+    #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
+    let mut without_a_sample = vec![
+        "acknowledge_post_review",
+        "audit_test_run",
+        "cash_flow",
+        "company_features",
+        "gst_status",
+        "local_data_report",
+        "month_register",
+        "statement_tie_out",
+        "voucher_read_cost",
+    ];
+    // Read once: the catalogue keeps the lab tools only while BRIDGE_LAB_WRITES=1
+    // is set as it is built, and another test changes that variable, so the
+    // exemptions below must come from this same read (#1435).
+    let registered = super::catalog::registered_tool_definitions(true, true)
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|tool| tool["name"].as_str().expect("tool name").to_string())
+        .collect::<BTreeSet<_>>();
+    // The lab-only tools are compiled in with the `lab-writes` feature (#999), and registered
+    // only while this read of the catalogue has them. `lab_read_inventory` is sampled: it marks a
+    // unit's, godown's, stock group's and stock item's own name and a voucher's party with
+    // `party_name`, which the tests in `agent_lab.rs` pin on the real parsers (the unit and stock
+    // item names and the voucher's party). The sample is built in this test like the others, so it
+    // tests the walk, not the tool.
+    //
+    // Known gap, lab-only (#999): the same names come back UNMARKED where they appear as another
+    // field: a stock item's `parent` and `base_unit`, and a voucher entry's `stock_item` and
+    // `godown` and a batch's `godown`. Under `MaskParties` a unit masked in `units` stays in the
+    // clear as a `base_unit`. The sample's values for those fields are not party-like, so the walk
+    // cannot see it. Marking them is a separate change.
+    #[allow(unused_mut)] // only pushed to when the `lab-writes` feature is compiled in
+    let mut lab_samples: Vec<(&str, Value)> = Vec::new();
+    #[cfg(feature = "lab-writes")]
+    if registered.contains("lab_read_inventory") {
+        lab_samples.push((
+            "lab_read_inventory",
+            json!({
+                "units": [{"name": party_name("Customer One"), "decimal_places": "3"}],
+                "stock_items": [{
+                    "name": party_name("Supplier Two"),
+                    "parent": "Primary",
+                    "hsn_code": "2836",
+                }],
+                "vouchers": {
+                    "items": [{
+                        "party": party_name("Customer One"),
+                        "inventory_entries": [{"stock_item": "Widget", "amount": "-8000.00"}],
+                    }],
+                    "offset": 0,
+                },
+            }),
+        ));
+    }
+    // The two lab import tools stay without a sample, on purpose. Their results carry names as
+    // plain strings that no marking reaches: the masters and vouchers the caller itself sent (as
+    // `Kind:Name` strings and `ledger_line[<name>]`, a ledger's name among them) and names read
+    // back from the target book. A sample would show a name that the walk cannot mask. The tools write only to a target admitted by `admit_lab_target`,
+    // whose guard today is a deny list of other companies (#972); a client's ledger names could
+    // appear unmasked only if that guard failed. Marking those names is a separate change.
+    #[cfg(feature = "lab-writes")]
+    without_a_sample.extend(
+        ["lab_import_masters", "lab_import_vouchers"]
+            .into_iter()
+            .filter(|name| registered.contains(*name)),
+    );
+    let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
+    assert_eq!(
+        sampled.len(),
+        sampled.iter().collect::<BTreeSet<_>>().len(),
+        "a tool has two samples: {sampled:?}"
+    );
+    // In name order, so two pull requests that add different tools add their
+    // samples on different lines (#995).
+    assert!(
+        sampled.windows(2).all(|pair| pair[0] < pair[1]),
+        "samples must be in tool-name order: {sampled:?}"
+    );
+    let covered = sampled
+        .iter()
+        .chain(&without_a_sample)
+        .copied()
+        .chain(lab_samples.iter().map(|(tool, _)| *tool))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        covered.len(),
+        covered.iter().collect::<BTreeSet<_>>().len(),
+        "a tool is both sampled and listed without a sample: {covered:?}"
+    );
+    let covered = covered
+        .iter()
+        .map(|tool| tool.to_string())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        registered.difference(&covered).collect::<Vec<_>>(),
+        Vec::<&String>::new(),
+        "a registered tool has no sample and is not listed as needing none"
+    );
+    assert_eq!(
+        covered.difference(&registered).collect::<Vec<_>>(),
+        Vec::<&String>::new(),
+        "a sample or exemption names a tool that is not registered"
+    );
+    for (tool, sample) in samples.into_iter().chain(lab_samples) {
         let redacted = redact_value(sample, Redaction::MaskParties);
         assert_no_known_party_name(&redacted, &known_parties, tool);
     }
@@ -697,8 +1051,8 @@ async fn malformed_tool_name_is_in_band_and_the_same_session_serves_the_next_req
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -751,14 +1105,36 @@ async fn egress_receipt_uses_the_final_jsonrpc_replacement_when_only_the_envelop
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     };
     let unframed = Server::new(base_settings.clone())
         .call_tool("voucher_schema", json!({}))
         .await;
+    // The reply carries the call's own duration twice (once structured, once
+    // as the content text), so a second call that takes up to four more
+    // digits (9 ms against 10 s) is that many bytes longer than the first. The
+    // cap must absorb that swing and still sit below what the JSON-RPC
+    // envelope adds, or the tool's own cap fires before any framing and the
+    // reply is an `isError` result with no `error` member.
+    let unframed_text = unframed.to_string();
+    assert_eq!(
+        unframed_text.matches("duration_ms").count(),
+        2,
+        "the duration must appear exactly twice, or the margin below is wrong"
+    );
+    let duration_digit_margin = 2 * 4;
+    let envelope_overhead = json!({"jsonrpc": "2.0", "id": 1, "result": unframed})
+        .to_string()
+        .len()
+        + 1
+        - unframed_text.len();
+    assert!(
+        duration_digit_margin < envelope_overhead,
+        "the margin ({duration_digit_margin}) must stay below the envelope overhead ({envelope_overhead})"
+    );
     let server = Server::new(Settings {
-        max_bytes: unframed.to_string().len(),
+        max_bytes: unframed_text.len() + duration_digit_margin,
         ..base_settings
     });
     let (mut client, server_io) = tokio::io::duplex(16_384);
@@ -815,8 +1191,8 @@ async fn tools_call_notifications_are_refused_and_receipted_without_dispatch() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -876,8 +1252,8 @@ async fn pagination_rejects_present_invalid_values_in_helpers_and_row_tools() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server.call_tool("egress_log", json!({"limit": "10"})).await;
     assert_eq!(
@@ -952,7 +1328,7 @@ fn egress_tail_waits_for_an_exclusive_append_lock() {
         .expect("complete row");
     let reader_path = path.clone();
     let reader = std::thread::spawn(move || read_egress_tail(&reader_path, 1));
-    std::thread::sleep(std::time::Duration::from_millis(20));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     assert!(
         !reader.is_finished(),
         "tail read must wait for the writer lock"
@@ -1033,7 +1409,7 @@ fn resolved_ledger_filter_keeps_only_the_exact_live_spelling() {
             json!({"voucher_number":"exact","amounts":[{"ledger":"AB"}]}),
             json!({"voucher_number":"near","amounts":[{"ledger":"A-B"}]}),
         ],
-        &resolved,
+        resolved.name(),
     );
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["voucher_number"], "exact");
@@ -1056,12 +1432,17 @@ fn client_side_ledger_filter_accepts_unquoted_tdl_ledger_names() {
     for ledger in ["Input CGST 9%", "=BVL Zeta Formula", "खर्चा"] {
         let resolved = resolve_ledger_name([ledger].into_iter(), ledger)
             .expect("live ledger spelling resolves");
-        let request = render_agent_vouchers("BRIDGE SYNTHETIC BOOK", "20260901", "20260902", None)
-            .expect("date-only voucher request");
+        let request = render_agent_vouchers(
+            "BRIDGE SYNTHETIC BOOK",
+            &tally_date("20260901"),
+            &tally_date("20260902"),
+            None,
+        )
+        .expect("date-only voucher request");
         assert!(!request.contains(ledger), "ledger must not enter TDL");
         let rows = filter_voucher_rows_for_ledger(
             vec![json!({"amounts":[{"ledger": ledger}]})],
-            &resolved,
+            resolved.name(),
         );
         assert_eq!(rows.len(), 1, "ledger remains selected after parsing");
     }
@@ -1125,8 +1506,8 @@ async fn stored_evidence_records_have_individual_timestamps_and_durations() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     server.call_tool("voucher_schema", json!({})).await;
     tokio::time::sleep(std::time::Duration::from_millis(1)).await;
@@ -1173,26 +1554,199 @@ fn egress_log_tail_reads_only_the_last_bounded_chunks() {
     assert!(tail.truncated);
 }
 
+/// #1076, decision A: an exact spelling resolves, and so does the one ledger
+/// that differs from the request only in ASCII case and ASCII spaces. Nothing
+/// looser resolves: an underscore, a hyphen or a dropped symbol asks the user.
 #[test]
-fn ledger_lookup_prefers_exact_live_spelling_and_rejects_ambiguous_matches() {
+fn a_ledger_resolves_only_on_its_spelling_or_ascii_case_and_spaces() {
     let names = ["Bank Charges", "Sales-Ledger"];
     assert_eq!(
-        resolve_ledger_name(names.into_iter(), "bank_charges"),
-        Ok("Bank Charges".to_string())
+        resolve_ledger_name(names.into_iter(), "  bank   CHARGES "),
+        Ok(LedgerMatch::CaseOrSpacing {
+            name: "Bank Charges".to_string()
+        })
+    );
+    for looser in [
+        "bank_charges",
+        "BankCharges",
+        "Sales Ledger",
+        "missing ledger",
+    ] {
+        assert_eq!(
+            resolve_ledger_name(names.into_iter(), looser),
+            Err(LedgerRefusal::NotFound),
+            "{looser}"
+        );
+    }
+    // `a_b` reached both `A-B` and `AB` under the old key; neither is its
+    // spelling, so nothing resolves, and an exact `AB` reaches only `AB`.
+    let near = ["A-B", "AB"];
+    assert_eq!(
+        resolve_ledger_name(near.into_iter(), "a_b"),
+        Err(LedgerRefusal::NotFound)
     );
     assert_eq!(
-        resolve_ledger_name(names.into_iter(), "missing ledger"),
-        Err("ledger_not_found".to_string())
+        resolve_ledger_name(near.into_iter(), "AB"),
+        Ok(LedgerMatch::Exact {
+            name: "AB".to_string(),
+            similar: Vec::new()
+        })
     );
-    let ambiguous = ["A-B", "AB"];
+}
+
+/// An upgrade stores no value for the new posting key, so a host may pass the
+/// manifest's placeholder unresolved, or an empty string: both read as off, and
+/// the server keeps every read. A typo still fails loud.
+#[test]
+fn the_posting_setting_reads_an_absent_empty_or_unresolved_value_as_off() {
+    assert_eq!(posting_setting(None), Ok(false));
+    assert_eq!(posting_setting(Some("")), Ok(false));
+    assert_eq!(posting_setting(Some(POSTING_PLACEHOLDER)), Ok(false));
+    for on in ["1", "true"] {
+        assert_eq!(posting_setting(Some(on)), Ok(true), "{on}");
+    }
+    for off in ["0", "false"] {
+        assert_eq!(posting_setting(Some(off)), Ok(false), "{off}");
+    }
+    for bad in [
+        "probe",
+        "TRUE",
+        "yes",
+        " true",
+        " ",
+        // Another key's placeholder, the released posting key's included, is not this key's.
+        "${user_config.accept_terms_2026_10_1}",
+        "${user_config.enable_writes}",
+        "${user_config.enable_posting_2026_10} ",
+        "${user_config.enable_posting_2026_10",
+    ] {
+        assert_eq!(
+            posting_setting(Some(bad)),
+            Err("boolean_setting_invalid".to_string()),
+            "{bad:?} must still fail at settings admission"
+        );
+    }
+}
+
+/// The tax-audit setting: absent, empty or the unresolved placeholder is off, a plain boolean is
+/// read, anything else fails loud; and the manifest maps exactly this key, off by default.
+#[test]
+fn the_tax_audit_setting_is_off_unless_turned_on_and_is_the_manifests_own() {
+    let read = |value: Option<&str>| {
+        audit_from_env(|name| {
+            assert_eq!(name, AUDIT_SETTING_VARIABLE);
+            value.map(std::ffi::OsString::from)
+        })
+    };
+    assert_eq!(read(None), Ok(false));
+    assert_eq!(read(Some("")), Ok(false));
+    assert_eq!(read(Some(AUDIT_PLACEHOLDER)), Ok(false));
+    assert_eq!(read(Some("false")), Ok(false));
+    assert_eq!(read(Some("true")), Ok(true));
+    assert_eq!(read(Some("1")), Ok(true));
     assert_eq!(
-        resolve_ledger_name(ambiguous.into_iter(), "a_b"),
-        Err("ledger_ambiguous".to_string())
+        read(Some("yes")),
+        Err("boolean_setting_invalid".to_string())
+    );
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    assert_eq!(
+        manifest["server"]["mcp_config"]["env"][AUDIT_SETTING_VARIABLE].as_str(),
+        Some(AUDIT_PLACEHOLDER)
     );
     assert_eq!(
-        resolve_ledger_name(ambiguous.into_iter(), "AB"),
-        Ok("AB".to_string())
+        AUDIT_PLACEHOLDER,
+        format!("${{user_config.{AUDIT_SETTING_KEY}}}")
     );
+    let setting = &manifest["user_config"][AUDIT_SETTING_KEY];
+    assert_eq!(setting["type"], "boolean");
+    assert_eq!(setting["default"], false);
+}
+
+/// The placeholder the server tolerates is the one the manifest passes for the
+/// posting setting, so the two cannot drift, and the released key is gone.
+#[test]
+fn the_tolerated_posting_placeholder_is_the_manifests_own_mapping() {
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    let mapped = &manifest["server"]["mcp_config"]["env"]["BRIDGE_AGENT_ENABLE_WRITES"];
+    assert_eq!(
+        mapped.as_str(),
+        Some(format!("${{user_config.{POSTING_SETTING_KEY}}}").as_str())
+    );
+    assert_eq!(mapped.as_str(), Some(POSTING_PLACEHOLDER));
+    assert!(manifest["user_config"][POSTING_SETTING_KEY].is_object());
+    assert!(manifest["user_config"].get("enable_writes").is_none());
+}
+
+/// One setting governs every post (#1090). The retired batch setting counts only
+/// while posting is on, and then it refuses `post_import` rather than posting.
+#[test]
+fn posting_follows_its_setting_and_the_retired_batch_setting_only_refuses() {
+    assert_eq!(Posting::from_settings(false, false), Posting::Off);
+    assert_eq!(Posting::from_settings(false, true), Posting::Off);
+    assert_eq!(Posting::from_settings(true, false), Posting::On);
+    assert_eq!(
+        Posting::from_settings(true, true),
+        Posting::RetiredSettingPresent
+    );
+    assert!(Posting::RetiredSettingPresent.enabled());
+    assert!(!Posting::Off.enabled());
+}
+
+/// `Settings::from_env` reads posting through `posting_from_env`: the posting
+/// key by its tolerant reader, and the retired batch setting by presence alone.
+#[test]
+fn posting_is_read_from_its_variable_and_the_retired_one_by_presence() {
+    let read = |pairs: &[(&str, &str)]| {
+        let pairs: std::collections::HashMap<String, std::ffi::OsString> = pairs
+            .iter()
+            .map(|(name, value)| (name.to_string(), (*value).into()))
+            .collect();
+        posting_from_env(|name| pairs.get(name).cloned())
+    };
+    const WRITES: &str = "BRIDGE_AGENT_ENABLE_WRITES";
+    const RETIRED: &str = "BRIDGE_AGENT_ENABLE_BATCH_POST";
+    assert_eq!(read(&[]), Ok(Posting::Off));
+    assert_eq!(read(&[(WRITES, "true")]), Ok(Posting::On));
+    assert_eq!(read(&[(WRITES, POSTING_PLACEHOLDER)]), Ok(Posting::Off));
+    for retired in ["", "false", "true", "probe"] {
+        assert_eq!(
+            read(&[(WRITES, "true"), (RETIRED, retired)]),
+            Ok(Posting::RetiredSettingPresent),
+            "{retired:?}"
+        );
+        assert_eq!(
+            read(&[(WRITES, "false"), (RETIRED, retired)]),
+            Ok(Posting::Off),
+            "{retired:?}"
+        );
+    }
+    assert_eq!(
+        read(&[(WRITES, "yes")]),
+        Err("boolean_setting_invalid".to_string())
+    );
+    // The released extension key's placeholder is not the posting key's.
+    assert_eq!(
+        read(&[(WRITES, "${user_config.enable_writes}")]),
+        Err("boolean_setting_invalid".to_string())
+    );
+}
+
+/// Only the posting key tolerates a placeholder or an empty value: every other
+/// boolean setting still refuses both.
+#[test]
+fn other_boolean_settings_still_refuse_an_unresolved_placeholder() {
+    for refused in [POSTING_PLACEHOLDER, "", "yes"] {
+        assert_eq!(
+            boolean_setting(Some(refused)),
+            Err("boolean_setting_invalid".to_string()),
+            "{refused:?}"
+        );
+    }
+    assert_eq!(boolean_setting(None), Ok(false));
+    assert_eq!(boolean_setting(Some("true")), Ok(true));
+    assert_eq!(boolean_setting(Some("0")), Ok(false));
 }
 
 #[test]
@@ -1270,11 +1824,11 @@ fn ledger_masters_evidence_changes_when_a_ledger_response_changes() {
 #[test]
 fn ledger_movement_rejects_a_window_before_the_observed_books_from() {
     assert_eq!(
-        ensure_movement_window_within_books("20260331", "20260401"),
+        ensure_movement_window_within_books(&day("20260331"), &day("20260401")),
         Err("window_precedes_books_from".to_string())
     );
     assert_eq!(
-        ensure_movement_window_within_books("20260401", "20260401"),
+        ensure_movement_window_within_books(&day("20260401"), &day("20260401")),
         Ok(())
     );
 }
@@ -1367,6 +1921,8 @@ fn outstandings_top_ranking_includes_wholly_unallocated_parties() {
         amount: bridge_tally_core::ExactDecimal::parse("100".to_string())
             .expect("synthetic amount"),
         direction: ExposureDirection::Receivable,
+        opening_balance: None,
+        composition: None,
     }];
 
     let ranked = redact_value(
@@ -1420,12 +1976,16 @@ fn payable_outstandings_views_exclude_mixed_receivable_rows() {
             amount: bridge_tally_core::ExactDecimal::parse("30".to_string())
                 .expect("synthetic amount"),
             direction: ExposureDirection::Receivable,
+            opening_balance: None,
+            composition: None,
         },
         UnallocatedParty {
             party: "Supplier B".to_string(),
             amount: bridge_tally_core::ExactDecimal::parse("40".to_string())
                 .expect("synthetic amount"),
             direction: ExposureDirection::Payable,
+            opening_balance: None,
+            composition: None,
         },
     ];
     let payable_unallocated = mixed_unallocated
@@ -1436,7 +1996,7 @@ fn payable_outstandings_views_exclude_mixed_receivable_rows() {
     assert_eq!(payable_unallocated[0].party, "Supplier B");
     assert_eq!(
         unallocated_totals_from_parties(&payable_unallocated).expect("payable unallocated"),
-        json!({"receivable":"0", "payable":"40", "gross_unallocated":"40"})
+        json!({"receivable":"0", "payable":"40", "gross_unallocated":"40", "by_composition": {"not_bill_wise_ledger":{"receivable":"0","payable":"0"}, "bill_wise_ledger_components_not_separated":{"receivable":"0","payable":"0"}, "composition_not_observed":{"receivable":"0","payable":"40"}}})
     );
 }
 
@@ -1517,25 +2077,6 @@ fn byte_trimming_keeps_each_cursor_relative_to_its_requested_offset() {
     assert_eq!(response["result"]["unallocated"]["next_offset"], 600);
 }
 
-#[test]
-fn byte_trimming_change_feed_rows_stops_checkpoint_advancement() {
-    let mut response = json!({"result": {
-        "voucher_alter_id": 10, "master_alter_id": 20,
-        "next_voucher_alter_id": 12, "next_master_alter_id": 22,
-        "checkpoint_advanceable": true,
-        "vouchers": [{"alter_id": 11}, {"alter_id": 12}],
-        "masters": [{"alter_id": 21}]
-    }});
-    assert!(truncate_response_items(&mut response).expect("trims vouchers"));
-    assert_eq!(
-        response["result"]["vouchers"].as_array().map(Vec::len),
-        Some(1)
-    );
-    assert_eq!(response["result"]["next_voucher_alter_id"], 11);
-    assert_eq!(response["result"]["checkpoint_advanceable"], false);
-    assert!(response["truncated"].as_bool().expect("truncated"));
-}
-
 #[tokio::test]
 async fn imports_are_hidden_and_refused_without_explicit_live_evidence_opt_in() {
     let disabled_tools = tool_definitions(false, false);
@@ -1562,13 +2103,77 @@ async fn imports_are_hidden_and_refused_without_explicit_live_evidence_opt_in() 
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server.call_tool("build_import_xml", json!({})).await;
     assert_eq!(
         response["structuredContent"]["result"]["error"]["code"],
         "import_unverified_on_live_tally"
+    );
+}
+
+/// A batch that mixes a Journal with a bank voucher is refused before any live
+/// read, and the refusal says how to split it (#1082). The endpoint is a closed
+/// port, so a refusal that came from a read would carry a transport code
+/// instead of this one.
+#[tokio::test]
+async fn a_batch_mixing_a_journal_with_a_bank_voucher_says_how_to_split_it() {
+    let directory = tempfile::tempdir().expect("temporary agent directory");
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".to_string(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: true,
+        posting: Posting::Off,
+        audit_enabled: false,
+    });
+    let mixed = json!({"company_guid":"00000000-0000-4000-8000-000000000001","vouchers":[
+        {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Journal","entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Income","amount":"12.50","side":"Cr"}]},
+        {"bridge_txn_id":"txn-002","date":"2026-09-02","voucher_type":"Payment","entries":[{"ledger":"Expense","amount":"7.50","side":"Dr"},{"ledger":"Bank","amount":"7.50","side":"Cr"}]}
+    ]});
+    // The typed refusal itself: its code, and no evidence, so no read was made.
+    let failure = server
+        .build_import_xml(&mixed)
+        .await
+        .err()
+        .expect("a mixed batch is refused");
+    assert_eq!(failure.code, "voucher_type_shapes_mixed");
+    assert!(failure.cause.is_none());
+    assert!(failure.evidence.is_none());
+    // The same refusal as a caller receives it, with its remediation.
+    let response = server.call_tool("build_import_xml", mixed).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "voucher_type_shapes_mixed", "{response}");
+    assert_eq!(
+        error["remediation"],
+        "A batch holds either Journals only, or Payment, Receipt and Contra vouchers only \
+         (those three may share a batch). Split the vouchers into one batch of each kind \
+         and build them separately; nothing was written or sent.",
+        "{response}"
+    );
+    assert_eq!(response["isError"], true);
+    assert!(!directory.path().join("imports").exists());
+    // The tool text states the rule before a caller meets the refusal.
+    let definitions = super::catalog::registered_tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "build_import_xml"))
+        .expect("build_import_xml is registered")["description"]
+        .as_str()
+        .expect("tool description");
+    // The rule is one whole sentence of the description, not a fragment of one.
+    assert!(
+        description.split(". ").any(|sentence| sentence
+            == "A batch holds Journals only, or Payment, Receipt and Contra vouchers only \
+                (those three may share one): a batch mixing the two is refused as \
+                voucher_type_shapes_mixed, so build one batch of each"),
+        "build_import_xml does not state the mixed-batch rule as its own sentence"
     );
 }
 
@@ -1596,122 +2201,6 @@ fn open_bill_paging_marks_remaining_rows_and_returns_a_cursor() {
     assert_eq!(last_page, vec!["c"]);
     assert!(!last_truncated);
     assert_eq!(last_next_offset, None);
-}
-
-#[test]
-fn changed_since_checkpoints_round_trip_as_numbers_with_numeric_string_compatibility() {
-    let observed =
-        observed_checkpoint(Some(&"42".to_string()), "voucher").expect("numeric high water");
-    let response = json!({"next_voucher_alter_id": observed});
-    assert_eq!(
-        checkpoint_arg(&response, "next_voucher_alter_id"),
-        Ok(Some(42))
-    );
-    assert_eq!(
-        checkpoint_arg(&json!({"voucher_alter_id":"42"}), "voucher_alter_id"),
-        Ok(Some(42))
-    );
-    assert_eq!(
-        checkpoint_arg(&json!({"voucher_alter_id":"bad"}), "voucher_alter_id"),
-        Err("checkpoint_invalid".to_string())
-    );
-}
-
-#[test]
-fn change_feed_snapshot_cursor_excludes_rows_inserted_after_first_page() {
-    let row = |alter_id| json!({"alter_id": alter_id});
-    let (first_page, first_truncated, first_cursor) =
-        stable_change_page(vec![row(3), row(1), row(2)], 0, 3, 2).expect("first page");
-    assert!(first_truncated);
-    assert_eq!(
-        first_page
-            .iter()
-            .map(|row| row["alter_id"].as_u64())
-            .collect::<Vec<_>>(),
-        vec![Some(1), Some(2)]
-    );
-    assert_eq!(first_cursor, 2);
-
-    // ALTERID 4 is inserted after page one. The original high-water 3 pins
-    // page two, so ID 3 is still returned and the new row cannot shift it.
-    let (second_page, second_truncated, second_cursor) =
-        stable_change_page(vec![row(4), row(3)], first_cursor, 3, 2)
-            .expect("snapshot-pinned second page");
-    assert!(!second_truncated);
-    assert_eq!(second_page, vec![row(3)]);
-    assert_eq!(second_cursor, 3);
-
-    let voucher_request = render_agent_changed_vouchers("BRIDGE SYNTHETIC BOOK", 2, 3);
-    let master_request =
-        render_agent_changed_masters("BRIDGE SYNTHETIC BOOK", 2, 3, MasterKind::Ledger);
-    for request in [voucher_request, master_request] {
-        assert!(request.contains("$AlterID &gt; 2 AND $AlterID &lt;= 3"));
-        assert!(request.contains("<SORT>Default: $AlterID</SORT>"));
-    }
-    let definitions = catalog::registered_tool_definitions(false, false);
-    let changed_since = definitions
-        .as_array()
-        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "changed_since"))
-        .expect("changed-since schema");
-    assert!(changed_since["inputSchema"]["properties"]["offset"].is_null());
-}
-
-#[test]
-fn truncated_change_feed_never_advances_the_checkpoint() {
-    assert!(!checkpoint_advanceable(Some(12), 0, 12, true));
-    assert!(!checkpoint_advanceable(Some(11), 0, 12, false));
-    assert!(checkpoint_advanceable(Some(12), 0, 12, false));
-}
-
-#[test]
-fn change_scan_rejects_any_missing_or_malformed_row_alter_id() {
-    assert_eq!(
-        validate_change_row_alter_ids(&[json!({"alter_id":null})]),
-        Err("change_row_alterid_invalid".to_string())
-    );
-    assert_eq!(
-        parse_agent_changed_masters("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER><NAME>Bad</NAME><ALTERID>nope</ALTERID></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>"),
-        Err("change_row_alterid_invalid".to_string())
-    );
-    assert_eq!(
-        parse_agent_changed_masters("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><GROUP><ALTERID>3</ALTERID></GROUP></COLLECTION></DATA></BODY></ENVELOPE>"),
-        Err("change_row_name_invalid".to_string())
-    );
-    assert_eq!(
-        parse_agent_changed_masters("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER><NAME>   </NAME><ALTERID>3</ALTERID></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>"),
-        Err("change_row_name_invalid".to_string())
-    );
-}
-
-#[test]
-fn changed_master_parser_decodes_entity_fragments() {
-    let rows = parse_agent_changed_masters("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER><NAME>R&amp;D</NAME><PARENT>Income &amp; Expense</PARENT><ALTERID>3</ALTERID><GUID>ledger-guid</GUID></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>").expect("changed master");
-    assert_eq!(rows[0]["name"], "R&D");
-    assert_eq!(rows[0]["parent"], "Income & Expense");
-}
-
-#[test]
-fn changed_master_rows_require_guid_or_master_id() {
-    let missing_identity = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER><NAME>Cash</NAME><ALTERID>3</ALTERID></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>";
-    assert_eq!(
-        parse_agent_changed_masters(missing_identity),
-        Err("change_row_identity_invalid".to_string())
-    );
-    assert!(
-        render_agent_changed_masters("BRIDGE SYNTHETIC BOOK", 2, 3, MasterKind::Ledger)
-            .contains("<FETCH>NAME,PARENT,ALTERID,GUID,MASTERID</FETCH>")
-    );
-}
-
-#[test]
-fn master_domain_high_water_ignores_unsupported_master_types() {
-    let xml = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER><ALTERID>4</ALTERID></LEDGER><GROUP><ALTERID>7</ALTERID></GROUP><STOCKITEM><ALTERID>99</ALTERID></STOCKITEM></COLLECTION></DATA></BODY></ENVELOPE>";
-    assert_eq!(parse_master_domain_high_water(xml), Ok(7));
-    for kind in MasterKind::ALL {
-        let request = render_agent_master_domain_high_water("Book", kind);
-        assert!(request.contains("<TYPE>Ledger</TYPE>") || request.contains("<TYPE>Group</TYPE>"));
-        assert!(!request.contains("ALTMSTID"));
-    }
 }
 
 #[test]
@@ -1786,9 +2275,52 @@ fn voucher_window_rejects_out_of_range_rows_and_requires_a_wider_empty_check() {
     ));
     assert!(window_honoured(&[], "20260901", "20260902"));
     assert_eq!(
-        widened_window("20260901", "20260902"),
-        Ok(("20260831".to_string(), "20260903".to_string()))
+        widened_window(&day("20260901"), &day("20260902")),
+        Ok((day("20260831"), day("20260903")))
     );
+}
+
+/// #861: the empty-window check reads a day either side of the window. At
+/// either end of the calendar there is none, so it is refused by `TallyDate`'s
+/// own code rather than sent on as a date that is not eight digits.
+#[test]
+fn widening_a_window_at_the_calendar_edge_is_refused_by_its_typed_code() {
+    assert_eq!(
+        widened_window(&day("20260901"), &day("99991231")),
+        Err("tally_date_overflow".to_string())
+    );
+    assert_eq!(
+        widened_window(&day("00010101"), &day("20260902")),
+        Err("tally_date_underflow".to_string())
+    );
+    assert_eq!(
+        widened_window(&day("99991230"), &day("99991230")),
+        Ok((day("99991229"), day("99991231")))
+    );
+}
+
+/// A tool's date is parsed once, at the boundary, by `normalized_date`: a date
+/// no `YYYYMMDD` can name is refused there by its typed code, so no window
+/// below it can hold one (#1245; formerly asserted where the window was read).
+#[test]
+fn a_tool_date_that_is_not_a_tally_date_is_refused_at_the_boundary() {
+    for text in [
+        "20261301",
+        "20260229",
+        "2026-13-01",
+        "2026090",
+        "",
+        "2026-09-0x",
+    ] {
+        assert_eq!(
+            normalized_date(text),
+            Err("invalid_date".to_string()),
+            "{text:?}"
+        );
+    }
+    // Every `-` is dropped before parsing, as before #1245.
+    assert_eq!(normalized_date("2026-09-01"), Ok(day("20260901")));
+    assert_eq!(normalized_date("20240229"), Ok(day("20240229")));
 }
 
 #[test]
@@ -1800,7 +2332,7 @@ fn empty_voucher_window_corroboration_handles_all_three_control_branches() {
             "20260902",
             None,
         ),
-        Ok((true, Some("nonempty_uncorroborated")))
+        Ok((true, Some("empty_window_wider_read_nonempty")))
     );
     assert_eq!(
         corroborate_empty_voucher_window(
@@ -1866,8 +2398,8 @@ async fn simulator_company_read_records_evidence_while_down_endpoint_is_typed() 
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let down_response = down.call_tool("tally_status", json!({})).await;
     assert!(down_response["structuredContent"]["result"]["error"]["code"].is_string());
@@ -1921,6 +2453,14 @@ async fn voucher_read_evidence_uses_utf16_transport_bytes() {
         status_plan(),
         high_water_plan(),
         status_plan(),
+        // The census of the window (#1029), then the window, both of the
+        // captured vouchers.
+        company_plan(),
+        company_plan(),
+        voucher_plan(),
+        status_plan(),
+        voucher_plan(),
+        status_plan(),
         company_plan(),
         company_plan(),
         voucher_plan(),
@@ -1957,16 +2497,18 @@ async fn voucher_read_evidence_uses_utf16_transport_bytes() {
     let expected_bytes = bridge_tally_protocol::encode_tally_xml_request_utf16le(&company_xml)
         .len()
         + bridge_tally_protocol::encode_tally_xml_request_utf16le(high_water_xml).len()
-        + bridge_tally_protocol::encode_tally_xml_request_utf16le(captured_vouchers).len();
+        // The census and the window both serve the captured vouchers.
+        + 2 * bridge_tally_protocol::encode_tally_xml_request_utf16le(captured_vouchers).len();
     assert_eq!(
         response["structuredContent"]["evidence"]["bytes"],
         expected_bytes * 2
     );
     assert_ne!(
         response["structuredContent"]["evidence"]["bytes"],
-        company_xml.len() + high_water_xml.len() + captured_vouchers.len()
+        company_xml.len() + high_water_xml.len() + 2 * captured_vouchers.len()
     );
-    assert_eq!(simulator.finish().expect("simulator result").len(), 16);
+    // 16 before the census (#1029) and its six legs.
+    assert_eq!(simulator.finish().expect("simulator result").len(), 22);
 }
 
 /// `vouchers` over an empty window on a company whose high-water row carries
@@ -2134,10 +2676,6 @@ fn native_cmpinfo_counters_are_not_voucher_or_master_rows() {
     assert!(parse_agent_changed_rows(&xml, "voucher")
         .expect("native empty changed vouchers")
         .is_empty());
-    assert!(parse_agent_changed_masters(&xml)
-        .expect("native empty masters")
-        .is_empty());
-    assert_eq!(parse_master_domain_high_water(&xml), Ok(0));
     assert_eq!(
         parse_company_high_water(&xml, "missing-guid"),
         Err("company_high_water_identity_absent".to_string())
@@ -2191,8 +2729,8 @@ fn evidence_reads_disclose_requested_limits_and_permanent_retention_eviction() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     assert!(!server.read_evidence(&json!({"limit":1})).unwrap().truncated);
     let record = |index: usize| Evidence {
@@ -2254,8 +2792,8 @@ async fn diagnostic_history_reads_honor_the_configured_global_row_cap() {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         });
         for index in 0..3 {
             server.record_evidence(Evidence {

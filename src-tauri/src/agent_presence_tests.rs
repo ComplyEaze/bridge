@@ -22,8 +22,8 @@ fn offline_server(directory: &std::path::Path) -> Server {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     })
 }
 
@@ -242,8 +242,10 @@ fn the_published_schema_names_the_three_numbering_methods_and_its_bounds() {
         schema["required"],
         json!(["company_guid", "from", "to", "numbering", "vouchers"])
     );
-    // The tool reads; it must not be annotated as a write.
-    assert!(tool.get("annotations").is_none());
+    // The tool reads; it is annotated read-only and never as a write. An absent
+    // annotation would read to a host as "destructive".
+    assert_eq!(tool["annotations"]["readOnlyHint"], json!(true));
+    assert_eq!(tool["annotations"]["destructiveHint"], json!(false));
     let description = tool["description"].as_str().expect("tool description");
     assert!(description.contains("manual"));
     // The spelling matters: `safe_reason_code` returns the `presence_`-prefixed
@@ -706,14 +708,92 @@ fn plans(steps: Vec<Step>) -> Vec<ScenarioPlan> {
         .collect()
 }
 
+/// The company list of a licensed TallyPrime 7.1 Silver install, whose licence
+/// fields the numbering read's mode probe observes (a committed capture).
+fn licensed_companies_xml() -> String {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    );
+    let words = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+    String::from_utf16(&words).expect("captured licensed company list")
+}
+
+/// The requests a call makes to check the book's numbering when it declares a
+/// type Manual (#1691): the company's master mark (one read of six requests),
+/// then the voucher-type numbering read (fourteen: the mode probe and identity,
+/// the masters pair, the numbering pair, identity and mode again).
+const SERIES_READ_REQUESTS: usize = 6 + 14;
+
+/// `base` with the numbering check spliced in after the ledger catalogue read
+/// (the first four identity requests and the six of the catalogue) and before
+/// the window. `manual` names the voucher types the BOOK numbers Manual; every
+/// other type reads Automatic, as in the captured series (protocol reference,
+/// voucher-type numbering).
+fn with_book_numbering(base: Vec<ScenarioPlan>, manual: &[&str]) -> Vec<ScenarioPlan> {
+    // A type the book numbers Manual also prevents duplicate numbers here, as the
+    // reference's rule requires; the captured defaults are used as captured below.
+    with_book_numbering_answers(
+        base,
+        agent_import::numbering_fixtures::manual_answers_preventing_duplicates(
+            CAPTURED_GUID,
+            manual,
+        ),
+    )
+}
+
+/// `with_book_numbering` with the masters and numbering answers given.
+fn with_book_numbering_answers(
+    base: Vec<ScenarioPlan>,
+    answers: (String, String),
+) -> Vec<ScenarioPlan> {
+    splice_numbering(base, answers, licensed_companies_xml(), high_water_xml())
+}
+
+/// The numbering check spliced in, with the licence answer of its mode probe
+/// and the answer of the master-mark read given.
+fn splice_numbering(
+    base: Vec<ScenarioPlan>,
+    (masters, numbering): (String, String),
+    licensed: String,
+    mark: String,
+) -> Vec<ScenarioPlan> {
+    // The master mark (a read of its own), then the numbering read: its mode
+    // probe (the status, then the company list with its licence fields), the
+    // identity check, the masters pair, the numbering pair, the identity check
+    // and the mode probe again.
+    let mut steps = paired_read(&mark);
+    steps.extend([Step::Status, Step::Payload(licensed.clone()), Step::Company]);
+    steps.extend([
+        Step::Payload(masters.clone()),
+        Step::Status,
+        Step::Payload(masters),
+        Step::Status,
+    ]);
+    steps.extend([
+        Step::Payload(numbering.clone()),
+        Step::Status,
+        Step::Payload(numbering),
+        Step::Status,
+    ]);
+    steps.extend([Step::Company, Step::Status, Step::Payload(licensed)]);
+    let inserted = plans(steps);
+    assert_eq!(inserted.len(), SERIES_READ_REQUESTS);
+    let mut out = base;
+    out.splice(10..10, inserted);
+    out
+}
+
 fn presence_plans() -> Vec<ScenarioPlan> {
     let catalogue = catalogue_xml();
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
-    // Catalogue, then the voucher window, then the paired-snapshot catalogue
-    // reread the nonempty (necessarily `Partial`) window path takes before it
-    // can still produce `present`/`possibly_present` verdicts.
+    // Catalogue, then the marks, the census of the window (#1029) and the
+    // voucher window, then the paired-snapshot catalogue reread.
     steps.extend(paired_read(&catalogue));
     steps.extend(paired_read(&high_water_xml()));
+    steps.extend(paired_read(&window_xml()));
     steps.extend(paired_read(&window_xml()));
     steps.extend(paired_read(&catalogue));
     plans(steps)
@@ -721,9 +801,26 @@ fn presence_plans() -> Vec<ScenarioPlan> {
 
 /// The voucher high-water mark the pre-flight volume bound reads before the
 /// window (protocol reference §11c). Small enough that the window is read
-/// whole, in the synthetic shape the import tests already replay.
+/// whole after its census, in the synthetic shape the import tests already
+/// replay.
 fn high_water_xml() -> String {
     format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{CAPTURED_GUID}</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>")
+}
+
+/// `presence_plans` on a book whose voucher mark needs a census (#985): the
+/// census counts the window's two vouchers, the window fits one read, and that
+/// read is admitted against the count.
+fn counted_presence_plans() -> Vec<ScenarioPlan> {
+    let catalogue = catalogue_xml();
+    let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
+    steps.extend(paired_read(&catalogue));
+    steps.extend(paired_read(
+        &high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>100</ALTVCHID>"),
+    ));
+    steps.extend(paired_read(&window_xml()));
+    steps.extend(paired_read(&window_xml()));
+    steps.extend(paired_read(&catalogue));
+    plans(steps)
 }
 
 /// `presence_plans` with one marker written into JV-1's narration, the way an
@@ -740,14 +837,17 @@ fn marker_presence_plans(marker: &str) -> Vec<ScenarioPlan> {
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue));
     steps.extend(paired_read(&high_water_xml()));
+    // The census of the window (#1029), then the window.
+    steps.extend(paired_read(&window));
     steps.extend(paired_read(&window));
     steps.extend(paired_read(&catalogue));
     plans(steps)
 }
 
 #[tokio::test]
-async fn a_nonempty_window_without_a_control_total_still_answers_but_never_issues_absent() {
-    let simulator = SequenceSimulator::spawn(presence_plans()).expect("simulator");
+async fn a_small_book_window_is_counted_so_a_proposal_nothing_resembles_is_absent() {
+    let simulator = SequenceSimulator::spawn(with_book_numbering(presence_plans(), &["Journal"]))
+        .expect("simulator");
     let directory = tempfile::tempdir().expect("directory");
     let server = Server::new(Settings {
         endpoint: TallyEndpointConfig {
@@ -759,8 +859,8 @@ async fn a_nonempty_window_without_a_control_total_still_answers_but_never_issue
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(
@@ -781,33 +881,144 @@ async fn a_nonempty_window_without_a_control_total_still_answers_but_never_issue
             }),
         )
         .await;
-    // A nonempty response has no source-side cardinality control, so the
-    // window is `Partial` and can never license `Absent` -- but `Present` and
-    // `PossiblyPresent` need no completeness proof, so the tool still answers
-    // rather than refusing the whole request the way it used to.
+    // The book's mark is small, but `voucher_presence` counts every book that
+    // has held a voucher (#1029): the census is the window's control total, so
+    // the window is `complete` and a proposal nothing resembles is `absent`.
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["window"]["read"], "complete");
+    assert_eq!(
+        result["totals"],
+        json!({"requested": 3, "present": 2, "possibly_present": 0, "absent": 1})
+    );
+    let items = result["items"].as_array().expect("items");
+    assert_eq!(items[0]["presence"], "present", "{items:?}");
+    assert_eq!(items[1]["presence"], "present", "{items:?}");
+    assert_eq!(items[2]["presence"], "absent", "{items:?}");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"],
+        "complete"
+    );
+    let observed = simulator.finish().expect("requests");
+    // 22 before the pre-flight volume bound, plus its high-water read and the
+    // census of the window (#1029), six legs each.
+    assert_eq!(observed.len(), 34 + SERIES_READ_REQUESTS);
+}
+
+/// #1029: the one window nothing counts is a nonempty one read from a company
+/// whose mark says it never held a voucher. The window stays `partial`, so no
+/// proposal is `absent`: the tool's own wiring from an uncounted window to
+/// `possibly_present` (`window_not_proven_complete`) is pinned here, since a
+/// small book is now counted.
+#[tokio::test]
+async fn an_uncounted_nonempty_window_issues_no_absent() {
+    let catalogue = catalogue_xml();
+    let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
+    steps.extend(paired_read(&catalogue));
+    steps.extend(paired_read(
+        &high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>0</ALTVCHID>"),
+    ));
+    steps.extend(paired_read(&window_xml()));
+    steps.extend(paired_read(&catalogue));
+    let simulator = SequenceSimulator::spawn(with_book_numbering(plans(steps), &["Journal"]))
+        .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
+    });
+    let response = server
+        .call_tool(
+            "voucher_presence",
+            json!({
+                "company_guid": CAPTURED_GUID,
+                "from": "20260901",
+                "to": "20260930",
+                "numbering": [{"voucher_type":"Journal","numbering_method":"manual"}],
+                "vouchers": [proposal("JV-9", "नमस्ते ट्रेडर्स", "99.00")],
+            }),
+        )
+        .await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["window"]["read"], "partial");
     assert_eq!(
         result["totals"],
-        json!({"requested": 3, "present": 2, "possibly_present": 1, "absent": 0})
+        json!({"requested": 1, "present": 0, "possibly_present": 1, "absent": 0})
     );
-    let items = result["items"].as_array().expect("items");
-    assert_eq!(items[0]["presence"], "present", "{items:?}");
-    assert_eq!(items[1]["presence"], "present", "{items:?}");
-    assert_eq!(items[2]["presence"], "possibly_present", "{items:?}");
     assert_eq!(
-        items[2]["reason"], "window_not_proven_complete",
-        "nothing resembled JV-9, but the window that found nothing was never \
-         proven complete, so it must not be reported absent"
+        result["items"][0]["reason"], "window_not_proven_complete",
+        "{result}"
     );
     assert_eq!(
         response["structuredContent"]["evidence"]["state"],
         "partial"
     );
+    // The marks read, and no census: a mark of zero has nothing to count.
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        28 + SERIES_READ_REQUESTS
+    );
+}
+
+/// #985, the same window on a book large enough to need a census: the census
+/// is the window's source-side control total (ADR 0017), so the window is
+/// `complete` and a proposal nothing resembles is `absent`.
+#[tokio::test]
+async fn a_nonempty_window_counted_by_its_census_can_issue_absent() {
+    let simulator =
+        SequenceSimulator::spawn(with_book_numbering(counted_presence_plans(), &["Journal"]))
+            .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
+    });
+    let response = server
+        .call_tool(
+            "voucher_presence",
+            json!({
+                "company_guid": CAPTURED_GUID,
+                "from": "20260901",
+                "to": "20260930",
+                "numbering": [{"voucher_type":"Journal","numbering_method":"manual"}],
+                "vouchers": [
+                    proposal("JV-1", "Bridge Nested Debtor WR4", "12.50"),
+                    proposal("JV-2", "Café Naïve Traders", "7.50"),
+                    proposal("JV-9", "नमस्ते ट्रेडर्स", "99.00"),
+                ],
+            }),
+        )
+        .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["window"]["read"], "complete", "{result}");
+    let items = result["items"].as_array().expect("items");
+    assert_eq!(items[0]["presence"], "present", "{items:?}");
+    assert_eq!(items[1]["presence"], "present", "{items:?}");
+    assert_eq!(items[2]["presence"], "absent", "{items:?}");
     let observed = simulator.finish().expect("requests");
-    // 22 before the pre-flight volume bound, plus its one high-water read.
-    assert_eq!(observed.len(), 28);
+    // The same 34 as a small book: the catalogue, marks, census, window and
+    // repeated catalogue reads, six legs each, after the four identity legs.
+    assert_eq!(observed.len(), 34 + SERIES_READ_REQUESTS);
 }
 
 /// The same window carrying a marker Bridge wrote, under `automatic` numbering.
@@ -822,7 +1033,7 @@ async fn a_nonempty_window_without_a_control_total_still_answers_but_never_issue
 /// therefore proves the marker path carries it, rather than restating the
 /// voucher-number path the sibling test above already covers.
 #[tokio::test]
-async fn a_narration_marker_decides_a_present_from_a_nonempty_partial_window() {
+async fn a_narration_marker_decides_a_present_from_a_nonempty_window() {
     let marker = agent_import::import_identity(BATCH, "txn-001").to_string();
     let simulator = SequenceSimulator::spawn(marker_presence_plans(&marker)).expect("simulator");
     let directory = tempfile::tempdir().expect("directory");
@@ -836,8 +1047,8 @@ async fn a_narration_marker_decides_a_present_from_a_nonempty_partial_window() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(
@@ -863,7 +1074,8 @@ async fn a_narration_marker_decides_a_present_from_a_nonempty_partial_window() {
         .await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
-    assert_eq!(result["window"]["read"], "partial");
+    // The small book is counted (#1029), so the window is complete.
+    assert_eq!(result["window"]["read"], "complete");
     let items = result["items"].as_array().expect("items");
     assert_eq!(items[0]["presence"], "present", "{items:?}");
     assert_eq!(items[0]["basis"], "narration_marker", "{items:?}");
@@ -881,16 +1093,20 @@ async fn a_narration_marker_decides_a_present_from_a_nonempty_partial_window() {
 ///
 /// The test is not redundant now, and the reason is worth being exact about,
 /// because "the file is pinned" sounds like it subsumes this. A pin detects
-/// that bytes changed; it does not judge how. Resealing is a normal part of
-/// editing any pinned file, so an edit that loosened admission and then
-/// resealed passes the gate — correctly, because the gate's question is
-/// whether the manifest describes the tree, not whether the tree is sound.
+/// that bytes changed; it does not judge how. Acknowledging the change is a
+/// normal part of editing any pinned file, so an edit that loosened admission
+/// and then added its acknowledgement passes the gate — correctly, because the
+/// gate's question is whether the manifest describes the tree, not whether the
+/// tree is sound.
 ///
 /// So the two guard different things. The pin makes a change to this file
-/// *visible*, and impossible to land without the manifest moving with it.
+/// *visible*: a change needs an acknowledgement moving with it, which
+/// `scripts/merge-gate.sh` enforces and CI reports (report-only until the check
+/// is made enforcing).
 /// This test makes a change *fail*, by digesting the parsed schema structure:
-/// `reseal.sh` knows how to update a file hash and has no idea how to update
-/// this digest, which is exactly why the two diverge. Its sibling
+/// the acknowledgement records which pinned files a pull request changed and has
+/// no idea how to update this digest, which is exactly why the two diverge. Its
+/// sibling
 /// `the_admission_contract_cannot_be_loosened_without_failing_something`
 /// names the specific losses -- dropping `additionalProperties`, widening the
 /// numbering enum, removing a required field -- where this one is blunter and
@@ -910,9 +1126,10 @@ fn every_admission_leaf_is_pinned_by_this_digest() {
     // This file is pinned into the compatibility surface, so changing the
     // schema now forces this constant to change, which moves the surface
     // digest, which is exactly the visibility the seal is for. If this fails
-    // and the schema change was deliberate, update the constant *and* reseal
-    // — that pairing is the point, not an inconvenience.
-    const PINNED: &str = "785b14835f3235ec009a248ac2b443316e764c584b31f2532aa1335365c5fb40";
+    // and the schema change was deliberate, update the constant *and* add the
+    // acknowledgement (docs/release-process.md) — that pairing is the point, not
+    // an inconvenience.
+    const PINNED: &str = "72dd221ae400026089355e7f71c9da09e1ca255019a477d37937b67be60dee8b";
     let definitions = tool_definitions(true, false);
     let schema = definitions
         .as_array()
@@ -925,7 +1142,7 @@ fn every_admission_leaf_is_pinned_by_this_digest() {
     assert_eq!(
         digest, PINNED,
         "the published admission contract changed; update this digest in the same commit that \
-         reseals the compatibility surface"
+         carries the compatibility-surface acknowledgement (docs/release-process.md)"
     );
 }
 
@@ -1014,8 +1231,11 @@ async fn a_ledger_missing_from_the_catalogue_fails_closed() {
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue));
     steps.extend(paired_read(&high_water_xml()));
+    // The census of the window (#1029), then the window.
     steps.extend(paired_read(&unlisted));
-    let simulator = SequenceSimulator::spawn(plans(steps)).expect("simulator");
+    steps.extend(paired_read(&unlisted));
+    let simulator = SequenceSimulator::spawn(with_book_numbering(plans(steps), &["Journal"]))
+        .expect("simulator");
     let directory = tempfile::tempdir().expect("directory");
     let server = Server::new(Settings {
         endpoint: TallyEndpointConfig {
@@ -1027,8 +1247,8 @@ async fn a_ledger_missing_from_the_catalogue_fails_closed() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server
         .call_tool_response(
@@ -1066,7 +1286,8 @@ async fn a_party_with_too_many_identifiers_costs_no_read() {
         .map(|index| format!("{:08}", 10_000_000 + index))
         .collect::<Vec<_>>()
         .join(" ");
-    let simulator = SequenceSimulator::spawn(presence_plans()).expect("simulator");
+    let simulator = SequenceSimulator::spawn(with_book_numbering(presence_plans(), &["Journal"]))
+        .expect("simulator");
     let directory = tempfile::tempdir().expect("directory");
     let server = Server::new(Settings {
         endpoint: TallyEndpointConfig {
@@ -1078,8 +1299,8 @@ async fn a_party_with_too_many_identifiers_costs_no_read() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server
         .call_tool_response(
@@ -1262,8 +1483,8 @@ async fn replay_the_twenty_invoice_engagement() {
         redaction: Redaction::None,
         import_enabled: false,
         // Read-only, and stated in the settings rather than only in a comment.
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
 
     // Scope the read to a manually numbered type. Presence by voucher number is
@@ -1692,8 +1913,8 @@ async fn a_batch_id_the_writer_could_not_have_made_is_refused() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     for (batch, refused) in [
         (BATCH, false),
@@ -1757,8 +1978,8 @@ async fn a_transaction_label_outside_the_published_nested_schema_is_refused_befo
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     // A space is the case the writer rejects and the declared pattern names.
     for (label, refused) in [("txn 001", true), ("txn-001", false)] {
@@ -1799,6 +2020,8 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue_xml()));
     steps.extend(paired_read(&high_water_xml()));
+    // The census of the window (#1029), then the window.
+    steps.extend(paired_read(&window_with_composite_vouchers(1)));
     steps.extend(paired_read(&window_with_composite_vouchers(1)));
     let simulator = SequenceSimulator::spawn(plans(steps)).expect("simulator");
     let directory = tempfile::tempdir().expect("directory");
@@ -1812,8 +2035,8 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(
@@ -1822,7 +2045,9 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
                 "company_guid": CAPTURED_GUID,
                 "from": "20260801",
                 "to": "20260802",
-                "numbering": [{"voucher_type":"Sales","numbering_method":"manual"}],
+                // Declared automatic: the refusal under test is the window's amount code, which no numbering
+                // changes, and the committed series answers hold no Sales row to check a manual declaration against.
+                "numbering": [{"voucher_type":"Sales","numbering_method":"automatic"}],
                 // Inside the captured window (1 Aug, Sales), which the check needs.
                 "vouchers": [{
                     "date": "20260801",
@@ -1843,4 +2068,676 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
         response["structuredContent"]["result"]["error"]["code"], "bill_allocation_amount_invalid",
         "{response}"
     );
+}
+
+// The book's own numbering is read before the window when a type is declared
+// Manual, and a declaration the book does not bear out refuses the call (#1691).
+
+const BOOK_SERIES_AUTO_RETAIN: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_m8r_x0_series.utf16le.xml"
+);
+const BOOK_SERIES_AUTO_RENUMBER: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_m8r_x4_series.utf16le.xml"
+);
+
+/// Requests before the series read: the four of the identity, the six of the
+/// ledger catalogue.
+const BEFORE_SERIES_READ: usize = 4 + 6;
+
+/// The requests a cancelled run really received. Cancelling wakes the
+/// simulator with a connection of its own, which it may record as an empty
+/// entry with no method; counting that would make a "no window was read"
+/// check depend on timing.
+fn answered(observed: &[tally_protocol_simulator::ObservedRequest]) -> usize {
+    observed
+        .iter()
+        .filter(|request| !request.method.is_empty())
+        .count()
+}
+
+fn presence_server(simulator: &SequenceSimulator, directory: &std::path::Path) -> Server {
+    Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.to_path_buf(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
+    })
+}
+
+/// The September window of the captured book with one proposal Journal-typed,
+/// under `numbering`.
+async fn presence_under(server: &Server, numbering: Value) -> Value {
+    server
+        .call_tool(
+            "voucher_presence",
+            json!({
+                "company_guid": CAPTURED_GUID,
+                "from": "20260901",
+                "to": "20260930",
+                "numbering": numbering,
+                "vouchers": [proposal("JV-1", "Bridge Nested Debtor WR4", "12.50")],
+            }),
+        )
+        .await
+}
+
+/// A refusal over the numbering: the code, the refused types, and the proof
+/// that no window request was sent (only the identity, the catalogue and the
+/// numbering check were).
+fn assert_numbering_refusal(response: &Value, code: &str, refused: &[(&str, &str)], sent: usize) {
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], code, "{response}");
+    let items = error["candidates"]
+        .as_array()
+        .unwrap_or_else(|| panic!("a refusal names the types it refuses: {response}"));
+    let got = items
+        .iter()
+        .map(|row| {
+            (
+                row["voucher_type"].as_str().unwrap_or("").to_string(),
+                row["book"]["state"].as_str().unwrap_or("").to_string(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let want = refused
+        .iter()
+        .map(|(name, state)| (name.to_string(), state.to_string()))
+        .collect::<Vec<_>>();
+    assert_eq!(got, want, "{response}");
+    assert!(
+        sent <= BEFORE_SERIES_READ + SERIES_READ_REQUESTS,
+        "the window was read before the numbering was checked: {sent} requests"
+    );
+}
+
+#[tokio::test]
+async fn a_type_declared_manual_that_the_book_numbers_automatic_retain_is_refused_before_the_window(
+) {
+    let answers = agent_import::numbering_fixtures::captured_numbering_answers(
+        CAPTURED_GUID,
+        BOOK_SERIES_AUTO_RETAIN,
+    );
+    let simulator =
+        SequenceSimulator::spawn(with_book_numbering_answers(presence_plans(), answers))
+            .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([
+            {"voucher_type":"Journal","numbering_method":"automatic"},
+            {"voucher_type":"Receipt","numbering_method":"manual"},
+        ]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("Receipt", "observed")],
+        sent,
+    );
+    let row = &response["structuredContent"]["result"]["error"]["candidates"][0];
+    assert_eq!(row["book"]["method"], "automatic", "{response}");
+    assert_eq!(row["book"]["sub_method"], "auto_retain", "{response}");
+    assert_eq!(row["declared"], "manual", "{response}");
+    assert_eq!(sent, BEFORE_SERIES_READ + SERIES_READ_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_type_declared_manual_that_the_book_numbers_auto_renumber_is_refused_before_the_window() {
+    let answers = agent_import::numbering_fixtures::captured_numbering_answers(
+        CAPTURED_GUID,
+        BOOK_SERIES_AUTO_RENUMBER,
+    );
+    let simulator =
+        SequenceSimulator::spawn(with_book_numbering_answers(presence_plans(), answers))
+            .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([
+            {"voucher_type":"Journal","numbering_method":"automatic"},
+            {"voucher_type":"Receipt","numbering_method":"manual"},
+        ]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("Receipt", "observed")],
+        sent,
+    );
+    let row = &response["structuredContent"]["result"]["error"]["candidates"][0];
+    assert_eq!(row["book"]["sub_method"], "auto_renumber", "{response}");
+}
+
+#[tokio::test]
+async fn a_type_declared_manual_that_the_book_does_not_hold_is_refused() {
+    let simulator = SequenceSimulator::spawn(with_book_numbering(presence_plans(), &["Journal"]))
+        .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([
+            {"voucher_type":"Journal","numbering_method":"manual"},
+            {"voucher_type":"Sales","numbering_method":"manual"},
+        ]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    // Journal is Manual in this book and is not named; Sales is not a type of it.
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("Sales", "not_in_book")],
+        sent,
+    );
+}
+
+#[tokio::test]
+async fn a_type_the_book_holds_as_manual_proceeds_and_the_book_s_reading_is_returned() {
+    // The captured Manual series prints `Auto Retain` too: that is not a reason to refuse it.
+    let simulator = SequenceSimulator::spawn(with_book_numbering(presence_plans(), &["Journal"]))
+        .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let read = &response["structuredContent"]["result"]["numbering_read"];
+    assert_eq!(read["state"], "read", "{response}");
+    assert_eq!(read["read_before_window"], true, "{response}");
+    assert_eq!(read["types"][0]["voucher_type"], "Journal", "{response}");
+    assert_eq!(read["types"][0]["declared"], "manual", "{response}");
+    assert_eq!(read["types"][0]["book"]["method"], "manual", "{response}");
+    assert_eq!(
+        read["types"][0]["book"]["duplicates"], "prevented",
+        "{response}"
+    );
+    assert_eq!(read["types"][0]["agrees"], true, "{response}");
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_eq!(sent, 34 + SERIES_READ_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_type_the_book_holds_manual_with_duplicates_not_prevented_is_refused() {
+    // The captured Receipt series: Manual, `PREVENTDUPLICATES` No (the default a type
+    // switched to Manual reads), edited nowhere. A number is an identity only where
+    // the book also refuses a second voucher with it.
+    let simulator = SequenceSimulator::spawn(with_book_numbering_answers(
+        presence_plans(),
+        agent_import::numbering_fixtures::series_as_captured(CAPTURED_GUID),
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([
+            {"voucher_type":"Journal","numbering_method":"automatic"},
+            {"voucher_type":"Receipt","numbering_method":"manual"},
+        ]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("Receipt", "observed")],
+        sent,
+    );
+    let row = &response["structuredContent"]["result"]["error"]["candidates"][0];
+    assert_eq!(row["book"]["method"], "manual", "{response}");
+    assert_eq!(row["book"]["duplicates"], "not_prevented", "{response}");
+    assert_eq!(row["agrees"], false, "{response}");
+}
+
+#[tokio::test]
+async fn a_type_the_book_holds_manual_with_duplicates_prevented_proceeds() {
+    // The captured Payment series: Manual, `PREVENTDUPLICATES` Yes, edited nowhere.
+    let simulator = SequenceSimulator::spawn(with_book_numbering_answers(
+        presence_plans(),
+        agent_import::numbering_fixtures::series_as_captured(CAPTURED_GUID),
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([
+            {"voucher_type":"Journal","numbering_method":"automatic"},
+            {"voucher_type":"Payment","numbering_method":"manual"},
+        ]),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let read = &response["structuredContent"]["result"]["numbering_read"];
+    assert_eq!(read["types"][1]["book"]["method"], "manual", "{response}");
+    assert_eq!(
+        read["types"][1]["book"]["duplicates"], "prevented",
+        "{response}"
+    );
+    assert_eq!(read["types"][1]["agrees"], true, "{response}");
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_eq!(sent, 34 + SERIES_READ_REQUESTS);
+}
+
+#[tokio::test]
+async fn the_rows_of_types_declared_automatic_or_unknown_are_returned_and_agree_with_nothing() {
+    let simulator = SequenceSimulator::spawn(with_book_numbering_answers(
+        presence_plans(),
+        agent_import::numbering_fixtures::series_as_captured(CAPTURED_GUID),
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([
+            {"voucher_type":"Payment","numbering_method":"manual"},
+            {"voucher_type":"Journal","numbering_method":"automatic"},
+            {"voucher_type":"Contra","numbering_method":"unknown"},
+        ]),
+    )
+    .await;
+    simulator.cancel();
+    let _ = simulator.finish();
+    assert_eq!(response["isError"], false, "{response}");
+    let read = &response["structuredContent"]["result"]["numbering_read"];
+    assert!(read["master_mark"].is_u64(), "{response}");
+    let rows = read["types"].as_array().expect("rows");
+    let row = |name: &str| {
+        rows.iter()
+            .find(|row| row["voucher_type"] == name)
+            .unwrap_or_else(|| panic!("{name} row: {response}"))
+    };
+    assert_eq!(row("Journal")["declared"], "automatic", "{response}");
+    assert_eq!(row("Journal")["agrees"], Value::Null, "{response}");
+    assert_eq!(row("Journal")["book"]["method"], "automatic", "{response}");
+    assert_eq!(
+        row("Journal")["book"]["duplicates"],
+        "not_prevented",
+        "{response}"
+    );
+    assert_eq!(row("Contra")["declared"], "unknown", "{response}");
+    assert_eq!(row("Contra")["agrees"], Value::Null, "{response}");
+    assert_eq!(row("Payment")["agrees"], true, "{response}");
+}
+
+#[test]
+fn the_book_s_reading_of_a_series_the_check_cannot_use_is_shown_as_it_is() {
+    use bridge_tally_protocol::native_voucher_type_numbering::{
+        DuplicateSetting, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
+    };
+    let observed = |method, duplicates| VoucherTypeNumbering::Observed { method, duplicates };
+    let (book, passes) = book_numbering_json(Some(&VoucherTypeNumbering::FieldInvalid(
+        "series_field_repeated",
+    )));
+    assert_eq!(book["state"], "field_invalid");
+    assert_eq!(book["code"], "series_field_repeated");
+    assert!(!passes);
+    for (sub, printed) in [
+        (NumberingSubMethod::Absent, "absent"),
+        (
+            NumberingSubMethod::Unrecognised("Odd".to_string()),
+            "unrecognised",
+        ),
+    ] {
+        let (book, passes) = book_numbering_json(Some(&observed(
+            SeriesNumberingMethod::Automatic(sub),
+            DuplicateSetting::NotPrevented,
+        )));
+        assert_eq!(book["sub_method"], printed);
+        assert_eq!(book["duplicates"], "not_prevented");
+        assert!(!passes);
+    }
+    // Manual passes only with duplicates prevented, whatever sub-method it prints.
+    for (duplicates, expected) in [
+        (DuplicateSetting::Prevented, true),
+        (DuplicateSetting::NotPrevented, false),
+    ] {
+        let (_, passes) =
+            book_numbering_json(Some(&observed(SeriesNumberingMethod::Manual, duplicates)));
+        assert_eq!(passes, expected);
+    }
+}
+
+#[tokio::test]
+async fn a_call_that_declares_no_type_manual_reads_no_numbering_and_says_so() {
+    let simulator = SequenceSimulator::spawn(presence_plans()).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"automatic"}]),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let read = &response["structuredContent"]["result"]["numbering_read"];
+    assert_eq!(read["state"], "not_read", "{response}");
+    assert_eq!(read["reason"], "no_type_declared_manual", "{response}");
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_eq!(
+        sent, 34,
+        "an unchanged number of requests when nothing is declared Manual"
+    );
+}
+
+#[tokio::test]
+async fn a_numbering_read_that_fails_refuses_a_manual_declaration_before_the_window() {
+    let unreadable = "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA>\
+                      <LINEERROR>Could not read</LINEERROR></DATA></BODY></ENVELOPE>"
+        .to_string();
+    let simulator = SequenceSimulator::spawn(with_book_numbering_answers(
+        presence_plans(),
+        (unreadable.clone(), unreadable),
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "presence_numbering_unreadable",
+        "{response}"
+    );
+    // It stopped inside the numbering read, where the masters answer is read:
+    // the mark read (6), the mode probe and identity (3), the masters pair (4).
+    assert_eq!(
+        sent,
+        BEFORE_SERIES_READ + 6 + 3 + 4,
+        "stopped at another step"
+    );
+}
+
+#[tokio::test]
+async fn a_master_mark_read_that_fails_refuses_a_manual_declaration_with_its_own_code() {
+    let unreadable = "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA>\
+                      <LINEERROR>Could not read</LINEERROR></DATA></BODY></ENVELOPE>"
+        .to_string();
+    let (masters, numbering) =
+        agent_import::numbering_fixtures::manual_answers_preventing_duplicates(
+            CAPTURED_GUID,
+            &["Journal"],
+        );
+    let simulator = SequenceSimulator::spawn(splice_numbering(
+        presence_plans(),
+        (masters, numbering),
+        licensed_companies_xml(),
+        unreadable,
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "agent_read_protocol_invalid",
+        "{response}"
+    );
+    assert!(
+        sent <= BEFORE_SERIES_READ + 6,
+        "the window or the numbering was read after a failed mark: {sent}"
+    );
+}
+
+#[tokio::test]
+async fn a_declaration_whose_case_differs_from_the_book_s_type_name_is_not_a_match() {
+    // Declarations match exactly (ADR 0017), so a Manual declaration written
+    // `journal` is not the book's `Journal`.
+    let simulator = SequenceSimulator::spawn(with_book_numbering(presence_plans(), &["Journal"]))
+        .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([
+            {"voucher_type":"Journal","numbering_method":"automatic"},
+            {"voucher_type":"journal","numbering_method":"manual"},
+        ]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("journal", "not_in_book")],
+        sent,
+    );
+}
+
+#[tokio::test]
+async fn a_type_with_several_series_is_not_read_as_manual() {
+    let plans = agent_import::numbering_fixtures::with_series_text(
+        with_book_numbering(presence_plans(), &["Journal"]),
+        "Journal",
+        "</VOUCHERNUMBERSERIES.LIST>",
+        "</VOUCHERNUMBERSERIES.LIST><VOUCHERNUMBERSERIES.LIST></VOUCHERNUMBERSERIES.LIST>",
+    );
+    let simulator = SequenceSimulator::spawn(plans).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("Journal", "series_count")],
+        sent,
+    );
+    let row = &response["structuredContent"]["result"]["error"]["candidates"][0];
+    assert_eq!(row["book"]["series"], 2, "{response}");
+}
+
+#[tokio::test]
+async fn a_proposed_type_the_book_numbers_automatic_is_refused_before_the_window() {
+    // The book numbers Journal Automatic (Tally assigns its own numbers), so a
+    // Manual declaration for the type the proposals name is refused.
+    let simulator =
+        SequenceSimulator::spawn(with_book_numbering(presence_plans(), &[])).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("Journal", "observed")],
+        sent,
+    );
+    assert_eq!(sent, BEFORE_SERIES_READ + SERIES_READ_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_company_that_never_held_a_voucher_still_has_its_numbering_checked() {
+    // No ALTVCHID: the book has never held a voucher. The numbering check needs
+    // only the master axis, so it runs and refuses on the book's own reading,
+    // not on the empty book (the build path refuses that book on purpose).
+    let no_voucher_axis = high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "");
+    let plans = splice_numbering(
+        presence_plans(),
+        agent_import::numbering_fixtures::numbering_answers(CAPTURED_GUID, &[]),
+        licensed_companies_xml(),
+        no_voucher_axis,
+    );
+    let simulator = SequenceSimulator::spawn(plans).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("Journal", "observed")],
+        sent,
+    );
+}
+
+#[tokio::test]
+async fn education_mode_refuses_a_manual_declaration_with_the_reads_own_code() {
+    let education = licensed_companies_xml().replace(
+        "<EDUMODE TYPE=\"Logical\">No</EDUMODE>",
+        "<EDUMODE TYPE=\"Logical\">Yes</EDUMODE>",
+    );
+    assert_ne!(
+        education,
+        licensed_companies_xml(),
+        "the capture names the mode"
+    );
+    let plans = splice_numbering(
+        presence_plans(),
+        agent_import::numbering_fixtures::numbering_answers(CAPTURED_GUID, &["Journal"]),
+        education,
+        high_water_xml(),
+    );
+    let simulator = SequenceSimulator::spawn(plans).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "masters_education_unqualified",
+        "{response}"
+    );
+    assert!(
+        sent <= BEFORE_SERIES_READ + 6 + 3,
+        "the read went past its mode probe: {sent} requests"
+    );
+}
+
+#[tokio::test]
+async fn a_manual_override_series_and_an_unrecognised_method_are_not_read_as_manual() {
+    for (printed, method) in [
+        ("Automatic (Manual Override)", "automatic_manual_override"),
+        ("Something Else", "unrecognised"),
+    ] {
+        let plans = agent_import::numbering_fixtures::with_series_text(
+            with_book_numbering(presence_plans(), &["Journal"]),
+            "Journal",
+            "<NUMBERINGMETHOD>Manual</NUMBERINGMETHOD>",
+            &format!("<NUMBERINGMETHOD>{printed}</NUMBERINGMETHOD>"),
+        );
+        let simulator = SequenceSimulator::spawn(plans).expect("simulator");
+        let directory = tempfile::tempdir().expect("directory");
+        let server = presence_server(&simulator, directory.path());
+        let response = presence_under(
+            &server,
+            json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+        )
+        .await;
+        simulator.cancel();
+        let sent = answered(&simulator.finish().expect("requests"));
+        assert_numbering_refusal(
+            &response,
+            "presence_numbering_method_differs_from_book",
+            &[("Journal", "observed")],
+            sent,
+        );
+        let row = &response["structuredContent"]["result"]["error"]["candidates"][0];
+        assert_eq!(row["book"]["method"], method, "{printed}: {response}");
+    }
+}
+
+#[test]
+fn the_numbering_rows_are_bounded_by_their_own_budget() {
+    let row = |name: &str, agrees: bool| json!({"voucher_type": name, "declared": "manual", "book": {"state": "observed", "method": "manual"}, "agrees": agrees});
+    // Fifty declared types with the longest names the schema admits: a sibling of
+    // `items` that `fit_response` cannot trim, so it must bound itself.
+    let long = "T".repeat(1024);
+    let rows = (0..50)
+        .map(|n| row(&format!("{long}{n}"), n % 2 == 0))
+        .collect::<Vec<_>>();
+    let bounded = bounded_numbering_rows(rows.clone(), 200_000 / NUMBERING_ROWS_SHARE);
+    assert_eq!(bounded["types_omitted"], true);
+    assert_eq!(bounded["declared"], 50);
+    assert_eq!(bounded["agreeing"], 25);
+    assert!(bounded.get("types").is_none());
+    assert!(bounded.to_string().len() < 200, "{bounded}");
+    // A few ordinary rows are returned whole.
+    let few = vec![row("Journal", true), row("Payment", true)];
+    let kept = bounded_numbering_rows(few.clone(), 200_000 / NUMBERING_ROWS_SHARE);
+    assert_eq!(kept["types"], json!(few));
+}
+
+#[tokio::test]
+async fn numbering_rows_that_would_not_fit_come_back_as_counts_through_the_tool() {
+    let simulator = SequenceSimulator::spawn(with_book_numbering_answers(
+        presence_plans(),
+        agent_import::numbering_fixtures::series_as_captured(CAPTURED_GUID),
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    // The rows' budget is one part in NUMBERING_ROWS_SHARE of the 200,000-byte response.
+    // The most types a call may declare (50), 48 of them with 1,000-character names the
+    // book does not hold and declared automatic, take about twice that.
+    let mut declared = vec![
+        json!({"voucher_type":"Journal","numbering_method":"automatic"}),
+        json!({"voucher_type":"Payment","numbering_method":"manual"}),
+    ];
+    for n in 0..48 {
+        let name = format!("{}{n:02}", "T".repeat(998));
+        declared.push(json!({"voucher_type": name, "numbering_method": "automatic"}));
+    }
+    assert_eq!(declared.len(), 50);
+    let rows_size: usize = declared.iter().map(|row| row.to_string().len()).sum();
+    assert!(rows_size > 200_000 / NUMBERING_ROWS_SHARE, "{rows_size}");
+    let response = presence_under(&server, Value::Array(declared.clone())).await;
+    simulator.cancel();
+    let _ = simulator.finish();
+    assert_eq!(response["isError"], false, "{response}");
+    let read = &response["structuredContent"]["result"]["numbering_read"];
+    assert_eq!(read["types_omitted"], true, "{response}");
+    assert_eq!(read["declared"], declared.len(), "{response}");
+    assert_eq!(read["agreeing"], 1, "{response}");
+    assert!(read.get("types").is_none(), "{response}");
 }

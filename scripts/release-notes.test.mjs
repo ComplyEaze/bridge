@@ -47,7 +47,8 @@ const changelog = [
 
 test("release tags map to changelog versions", () => {
   assert.equal(versionFromTag("mcp-preview-0.3.0"), "0.3.0");
-  assert.equal(versionFromTag("mcp-preview-1.2.3-rc.1"), "1.2.3-rc.1");
+  assert.equal(versionFromTag("mcp-v0.4.0"), "0.4.0");
+  assert.equal(versionFromTag("mcp-preview-1.2.3-rc.1"), undefined, "a release is exactly X.Y.Z");
   assert.equal(versionFromTag("v0.1.0"), undefined);
   assert.equal(versionFromTag("mcp-preview-0.3"), undefined);
 });
@@ -96,9 +97,11 @@ test("notes fall back from the version section to a non-empty Unreleased to noth
   assert.deepEqual(pickNotes(emptyUnreleased, "mcp-preview-0.5.0"), { mode: "none", body: "" });
   const emptyOwn = parseChangelog("## [0.5.0] - 2026-10-01\n\n## [Unreleased]\n\nNext words.\n");
   assert.equal(pickNotes(emptyOwn, "mcp-preview-0.5.0").mode, "unreleased");
-  assert.throws(() => pickNotes(sections, "v0.1.0"), /not an mcp-preview tag/);
+  assert.throws(() => pickNotes(sections, "v0.1.0"), /not a release tag/);
   assert.equal(composeBody({ mode: "none", body: "" }, "Footer.\n"), "Footer.\n");
   assert.equal(composeBody({ mode: "version", body: "Body" }, "Footer.\n"), "Body\n\n---\n\nFooter.\n");
+  assert.equal(composeBody({ mode: "version", body: "Body" }, "Footer.\n", "Header.\n"), "Header.\n\n---\n\nBody\n\n---\n\nFooter.\n");
+  assert.equal(composeBody({ mode: "none", body: "" }, "Footer.\n", "Header.\n"), "Header.\n\n---\n\nFooter.\n");
 });
 
 test("the page renderer escapes everything and links only https URLs and issue numbers", () => {
@@ -111,7 +114,7 @@ test("the page renderer escapes everything and links only https URLs and issue n
   assert.doesNotMatch(html, /<script|<img|<b>/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt; a &amp; b &quot;q&quot;/);
   assert.match(html, /<code>&lt;img src=x onerror=alert\(1\)&gt;<\/code>/);
-  assert.match(html, /<strong>&lt;b&gt;bold&lt;\/b&gt;<\/strong> \(<a href="https:\/\/github\.com\/lamemustafa\/bridge\/issues\/77">#77<\/a>\)/);
+  assert.match(html, /<strong>&lt;b&gt;bold&lt;\/b&gt;<\/strong> \(<a href="https:\/\/github\.com\/ComplyEaze\/bridge\/issues\/77">#77<\/a>\)/);
   assert.match(html, /<a href="https:\/\/example\.invalid\/a\?x=1&amp;y=2">ok<\/a>/);
   assert.doesNotMatch(html, /href="javascript/);
   assert.doesNotMatch(html, /href="https:\/\/x\.invalid\/"/);
@@ -214,6 +217,7 @@ function inTemporaryRepository(callback) {
     mkdirSync(join(dir, "packaging", "mcpb"), { recursive: true });
     mkdirSync(join(dir, "tmp"));
     writeFileSync(join(dir, "packaging", "mcpb", "UNSIGNED_PREVIEW_RELEASE.md"), "Footer.\n");
+    writeFileSync(join(dir, "packaging", "mcpb", "INSTALL_AND_CHECK_RELEASE.md"), "Header.\n");
     return callback(dir);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -235,18 +239,26 @@ test("the compose step publishes the version section, then Unreleased, then the 
   inTemporaryRepository((dir) => {
     copyFileSync(join(root, "scripts", "release-notes.mjs"), join(dir, "scripts", "release-notes.mjs"));
     writeFileSync(join(dir, "CHANGELOG.md"), changelog);
-    assert.equal(compose(dir, "mcp-preview-0.4.0").notes, "### In plain words\n\n- Four (#12).\n\n```\n## [9.9.9] - inside a fence, not a section\n```\n\n---\n\nFooter.\n");
+    assert.equal(compose(dir, "mcp-preview-0.4.0").notes, "Header.\n\n---\n\n### In plain words\n\n- Four (#12).\n\n```\n## [9.9.9] - inside a fence, not a section\n```\n\n---\n\nFooter.\n");
     const unreleased = compose(dir, "mcp-preview-0.5.0");
-    assert.equal(unreleased.notes, "Next words.\n\n---\n\nFooter.\n");
+    assert.equal(unreleased.notes, "Header.\n\n---\n\nNext words.\n\n---\n\nFooter.\n");
     assert.match(unreleased.stdout, /::warning::.*no 0\.5\.0 section/);
     writeFileSync(join(dir, "CHANGELOG.md"), "## [0.3.0] - 2026-09-26\n\n- Three.\n");
     const none = compose(dir, "mcp-preview-0.5.0");
-    assert.equal(none.notes, "Footer.\n");
+    assert.equal(none.notes, "Header.\n\n---\n\nFooter.\n");
     assert.match(none.stdout, /::warning::.*no section/);
     rmSync(join(dir, "CHANGELOG.md"));
     const missing = compose(dir, "mcp-preview-0.5.0");
-    assert.equal(missing.notes, "Footer.\n");
+    assert.equal(missing.notes, "Header.\n\n---\n\nFooter.\n");
     assert.match(missing.stdout, /::warning::could not read release notes/);
+  });
+  inTemporaryRepository((dir) => {
+    copyFileSync(join(root, "scripts", "release-notes.mjs"), join(dir, "scripts", "release-notes.mjs"));
+    writeFileSync(join(dir, "CHANGELOG.md"), changelog);
+    rmSync(join(dir, "packaging", "mcpb", "INSTALL_AND_CHECK_RELEASE.md"));
+    const headerless = compose(dir, "mcp-preview-0.5.0");
+    assert.equal(headerless.notes, "Next words.\n\n---\n\nFooter.\n");
+    assert.match(headerless.stdout, /::warning::could not read the release header/);
   });
   inTemporaryRepository((dir) => {
     const crashed = compose(dir, "mcp-preview-0.5.0");
@@ -307,7 +319,7 @@ test("the publish and deploy workflows keep the notes wiring in order", () => {
     assert.equal(optional.if, undefined);
   }
 
-  const deploy = workflow(".github/workflows/deploy-install-page.yml").jobs.deploy;
+  const deploy = workflow(".github/workflows/deploy-install-page.yml").jobs.build;
   const render = step(deploy, "Render the changelog page");
   const upload = deploy.steps.find((candidate) => candidate.uses?.startsWith("actions/upload-pages-artifact@"));
   assert.ok(deploy.steps.indexOf(render) < deploy.steps.indexOf(upload), "the changelog page is rendered before the site is uploaded");

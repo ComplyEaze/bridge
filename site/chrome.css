@@ -1,0 +1,526 @@
+@font-face { font-family: 'Bricolage Grotesque Variable'; font-style: normal; font-display: swap; font-weight: 200 800;
+  src: url(fonts/bricolage-wght-latin.woff2) format('woff2-variations'); unicode-range: U+0020-007E,U+00A0-00FF,U+0131,U+0152-0153,U+02C6,U+02DA,U+02DC,U+2010-2027,U+2030-203A,U+20AC,U+2122,U+2212; }
+@font-face { font-family: 'Bricolage Grotesque Variable'; font-style: normal; font-display: swap; font-weight: 200 800;
+  src: url(fonts/bricolage-wght-rupee.woff2) format('woff2-variations'); unicode-range: U+20B9; }
+@font-face { font-family: 'Geist Variable'; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url(fonts/geist-latin.woff2) format('woff2-variations'); unicode-range: U+0020-007E,U+00A0-00FF,U+0131,U+0152-0153,U+02C6,U+02DA,U+02DC,U+2010-2027,U+2030-203A,U+20AC,U+2122,U+2212; }
+@font-face { font-family: 'Geist Variable'; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url(fonts/geist-rupee.woff2) format('woff2-variations'); unicode-range: U+20B9; }
+@font-face { font-family: 'Geist Mono Variable'; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url(fonts/geist-mono-latin.woff2) format('woff2-variations'); unicode-range: U+0020-007E,U+00A0-00FF,U+0131,U+0152-0153,U+02C6,U+02DA,U+02DC,U+2010-2027,U+2030-203A,U+20AC,U+2122,U+2212; }
+@font-face { font-family: 'Geist Mono Variable'; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url(fonts/geist-mono-rupee.woff2) format('woff2-variations'); unicode-range: U+20B9; }
+
+/* ComplyEaze Bridge shared base: fonts, both colour worlds' tokens, the header and the footer,
+   loaded by every page. Class names are prefixed ce- to avoid collisions with page-specific styles. */
+
+:root {
+  --cobalt: #1f3fbf;
+  --cobalt-deep: #14297f;
+  --cobalt-darker: #0e1d5c;
+  --cobalt-ground: #08123f;
+  --paper: #f6f8fb;
+  --paper-line: rgba(11, 20, 54, 0.12);
+  --cobalt-line: rgba(246, 248, 251, 0.16);
+  --ink: #0b1436;
+  --ink-soft: rgba(11, 20, 54, 0.68);
+  --ink-faint: rgba(11, 20, 54, 0.64);
+  --on-cobalt: #f6f8fb;
+  --on-cobalt-soft: rgba(246, 248, 251, 0.74);
+  --on-cobalt-faint: rgba(246, 248, 251, 0.68); /* AA on the darkest ground */
+  --flag-green: #3ddc84;
+  --tick: #b3261e;
+  --font-head: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+  --font-display: 'Geist Variable', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  --gutter: clamp(20px, 5vw, 56px);
+  --header-h: 64px;
+  /* the cobalt world's ink room: the header's scrolled tint, the footer, and the inner pages' title band */
+  --header-ground: #0b1027;
+  --footer-ground: #080c1e;
+  --band: radial-gradient(120% 160% at 78% 0%, #1a2250 0%, #121936 48%, #0b1027 100%);
+  --card: #fff;
+  --link: #14297f;
+  --cover: #1f3fbf;
+  --w-ui: 600;
+  --w-brand: 650;
+
+  /* one radius system: three sizes plus a pill */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+  --radius: var(--r-lg); /* kept for the 3D-prop cards, which key off this name */
+
+  /* one spacing system (8px base, one off-scale 4px for tight gaps) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* a real type scale: 12/14/16/18/22/28/40/56 */
+  --fs-2xs: 12px;
+  --fs-xs: 14px;
+  --fs-sm: 16px;
+  --fs-md: 18px;
+  --fs-lg: 22px;
+  --fs-xl: 28px;
+  --fs-2xl: 40px;
+  --fs-3xl: 56px;
+}
+
+html[data-theme="red"] {
+  /* the ground is pulled to brown-black (#2a1512 centre, #120a09 edge) so the cloth is the only large saturated red on screen */
+  --cobalt: #2a1512;
+  --cobalt-deep: #1d0f0d;
+  --cobalt-darker: #170c0a;
+  --cobalt-ground: #120a09;
+  --cobalt-line: rgba(255, 240, 220, 0.16);
+  --paper: #fbeec9;
+  --on-cobalt: #fff5e8;
+  --on-cobalt-soft: rgba(255, 245, 232, 0.82);
+  --on-cobalt-faint: rgba(255, 245, 232, 0.7);
+  /* brown-black ink and its secondary on the cream paper (the cobalt navy would be "pink + navy") */
+  --ink: #2b0e0c;
+  --ink-soft: #6b4a3a;
+  --ink-faint: #7a5a48;
+  --paper-line: rgba(43, 14, 12, 0.14);
+  --tick: #b3261e;
+  --header-ground: #170c0a;
+  --footer-ground: #120a09;
+  --band: radial-gradient(120% 160% at 78% 0%, #2a1512 0%, #1d0f0d 55%, #120a09 100%);
+  --card: #fffaf0;
+  --link: #7a170f;
+  --cover: #8e1d14;
+  --red-card-line: #e3d3a6;
+  --red-card-shadow: 0 18px 44px rgba(20, 3, 2, 0.42);
+}
+
+/* pages did not set border-box, so a shared max-width plus
+   padding rendered wider here than on the home page, and the header/footer
+   brand jumped between the two. One box model everywhere. */
+*, *::before, *::after { box-sizing: border-box; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* one button spec: every primary/secondary CTA, on the home
+   page and on every page, is this element sized this way. Only the colours
+   invert for the surface they sit on (see the ce-header rule below, and
+   home.css's .panel .btn-primary for the hero). */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 44px;
+  padding: 0 var(--space-5);
+  font-family: var(--font-display);
+  font-weight: var(--w-ui);
+  font-size: var(--fs-sm);
+  line-height: 1;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  text-decoration: none;
+  transition: transform 0.15s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary { background: var(--cobalt); color: var(--on-cobalt); }
+.btn-secondary { background: var(--paper); color: var(--ink); border-color: var(--paper-line); }
+
+.ce-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 10px 16px;
+  z-index: 1000;
+  border-radius: 0 0 8px 0;
+  font-family: var(--font-display);
+  text-decoration: none;
+}
+.ce-skip-link:focus { left: 0; }
+
+/* First element in body: a 1px flow marker so the header can tell "at the
+   very top" from "scrolled", via IntersectionObserver rather than a scroll
+   listener. It occupies no visible space. */
+.ce-header__sentinel { height: 1px; margin-bottom: -1px; }
+
+/* ---------------------------------------------------------------- header */
+
+.ce-header {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 80;
+  height: var(--header-h);
+  padding: 0 var(--gutter); /* the footer's own padding: header and footer content share one left and right edge */
+  line-height: 1.5;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  transition: background-color 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease;
+}
+.ce-header.is-scrolled {
+  background: var(--header-ground);
+  background: color-mix(in srgb, var(--header-ground) 78%, transparent);
+  border-bottom-color: var(--cobalt-line);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+.ce-header__inner {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: 1280px; /* content-box: the same 1280 the footer's inner uses */
+  margin: 0 auto;
+}
+
+.ce-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--on-cobalt);
+  font-family: var(--font-display);
+  font-weight: 650;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  white-space: nowrap; /* "ComplyEaze Bridge" is one line at every width */
+  flex: none;
+  text-shadow: 0 1px 6px rgba(3, 7, 25, 0.4);
+}
+/* wordmark-led lockup: "ComplyEaze" carries the weight,
+   "Bridge" sits softer, same line. The mark itself is a folded file corner
+   in currentColor, so it re-themes with the four worlds. */
+/* one wordmark, one colour: "Bridge" in soft grey read as "ComplyEaze" at a glance */
+.ce-brand__sub { font-weight: 500; color: inherit; }
+.ce-mark { flex: none; display: block; color: var(--on-cobalt); }
+
+/* logo left; nav, the GitHub link and the CTA right, one gap */
+.ce-header__right { display: flex; align-items: center; gap: var(--space-5); }
+
+.ce-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+}
+.ce-nav a {
+  color: var(--on-cobalt-soft);
+  text-decoration: none;
+  padding: 4px 1px;
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.ce-nav a:hover,
+.ce-nav a:focus-visible,
+.ce-nav a[aria-current='page'] {
+  color: var(--on-cobalt);
+  border-bottom-color: currentColor;
+}
+
+.ce-header__actions { display: flex; align-items: center; gap: var(--space-3); }
+
+/* GitHub is a quiet icon link: the Download button carries the emphasis. */
+.ce-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(246, 248, 251, 0.45);
+  background: rgba(246, 248, 251, 0.06);
+  color: var(--on-cobalt-soft);
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.ce-star:hover, .ce-star:focus-visible {
+  background: rgba(246, 248, 251, 0.14);
+  border-color: rgba(246, 248, 251, 0.4);
+  color: var(--on-cobalt);
+  transform: translateY(-1px);
+}
+.ce-star__icon { flex: none; }
+/* Icon plus the word "GitHub". The word comes from CSS while the span is empty; a number put in
+   the span would take the mono figure style. */
+.ce-star__count {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: left;
+}
+.ce-star__count:empty::before { content: 'GitHub'; }
+.ce-star__count:not(:empty) {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* the menu's own GitHub item: shown only where the header star is hidden */
+.ce-nav__github { display: none; }
+
+/* the header sits over the dark story/hero ground, so its CTA takes the
+   same light-on-dark inversion as the hero button (home.css,
+   .panel .btn-primary). */
+.ce-header .btn-primary { background: var(--paper); color: var(--ink); }
+
+.ce-menu-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(246, 248, 251, 0.45);
+  background: rgba(246, 248, 251, 0.06);
+  cursor: pointer;
+}
+.ce-menu-toggle__bar {
+  display: block;
+  width: 16px;
+  height: 1.5px;
+  background: var(--on-cobalt);
+  border-radius: 1px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.ce-menu-toggle[aria-expanded='true'] .ce-menu-toggle__bar:nth-child(1) { transform: translateY(5.5px) rotate(45deg); }
+.ce-menu-toggle[aria-expanded='true'] .ce-menu-toggle__bar:nth-child(2) { opacity: 0; }
+.ce-menu-toggle[aria-expanded='true'] .ce-menu-toggle__bar:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); }
+
+@media (max-width: 640px) {
+  .ce-nav {
+    position: absolute;
+    top: var(--header-h);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: var(--header-ground);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--cobalt-line);
+    padding: 4px var(--gutter) 12px;
+    transform: translateY(-8px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s step-end;
+  }
+  .ce-nav.ce-nav--open {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s;
+  }
+  .ce-nav a { padding: 12px 2px; border-bottom: 1px solid var(--cobalt-line); }
+  .ce-menu-toggle { display: flex; }
+  .ce-header__right { gap: var(--space-3); }
+  .ce-header__actions { gap: 8px; }
+}
+
+@media (max-width: 480px) {
+  /* the full wordmark stays at every width: the star moves into the menu
+     (as a GitHub item) so wordmark + Download + menu fit a 360px screen */
+  .ce-star { display: none; }
+  .ce-nav__github { display: block; }
+  .ce-cta { padding: 0 14px; }
+  .ce-header__inner { gap: 12px; }
+  .ce-brand { gap: 7px; }
+  .ce-header__right { gap: var(--space-2); }
+  .ce-header__actions { gap: 8px; }
+}
+
+@media (max-width: 380px) {
+  .ce-brand { font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ce-header, .ce-nav, .ce-menu-toggle__bar { transition: none !important; }
+}
+
+/* ---------------------------------------------------------------- footer */
+
+.ce-footer {
+  background: var(--footer-ground);
+  border-top: 1px solid var(--cobalt-line);
+  padding: 56px var(--gutter) 30px;
+}
+.ce-footer__inner { max-width: 1280px; margin: 0 auto; }
+
+/* four columns: the about column, then Product / Project / Legal, so the
+   right edge of the links lines up under the header CTA */
+.ce-footer__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 2fr) minmax(0, 2fr) minmax(0, 2fr);
+  gap: 40px;
+  padding-bottom: 34px;
+  border-bottom: 1px solid var(--cobalt-line);
+}
+
+.ce-footer__brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--on-cobalt);
+  font-family: var(--font-display);
+  font-weight: 650;
+  font-size: 15px;
+  margin: 0 0 var(--space-4);
+}
+.ce-footer__brand .ce-mark { color: var(--on-cobalt); }
+
+/* four honest facts in place of one long trust paragraph */
+.ce-footer__facts {
+  display: grid;
+  gap: 6px;
+  max-width: 48ch;
+  margin: 0 0 var(--space-4);
+}
+.ce-footer__facts > div { display: flex; gap: 8px; font-size: 14px; line-height: 1.5; }
+.ce-footer__facts dt { flex: none; font-weight: var(--w-ui); color: var(--on-cobalt); margin: 0; }
+.ce-footer__facts dd { margin: 0; color: var(--on-cobalt-soft); }
+.ce-footer__synthetic {
+  color: var(--on-cobalt-faint);
+  font-family: var(--font-display);
+  font-size: 12px;
+  margin: 0;
+}
+
+.ce-footer__col h3 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--on-cobalt-faint);
+  margin: 0 0 14px;
+}
+.ce-footer__col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
+.ce-footer__col a {
+  color: var(--on-cobalt-soft);
+  text-decoration: none;
+  font-size: 14px;
+  border-bottom: 1px solid transparent;
+}
+.ce-footer__col a:hover, .ce-footer__col a:focus-visible {
+  color: var(--on-cobalt);
+  border-bottom-color: currentColor;
+}
+
+.ce-footer__base {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 18px;
+  align-items: center;
+  padding-top: 20px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--on-cobalt-faint);
+}
+.ce-footer__base a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+@media (max-width: 760px) {
+  .ce-footer__grid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+}
+
+/* ComplyEaze Bridge lockup (F1, Outfit; final): one symbol in
+   brand/lockup.svg, coloured by currentColor so each world's
+   on-dark ink applies (paper on cobalt, cream on bahi-khata red). Clear space
+   is the lowercase x-height on every side; 24 px tall gives the 16 px cap height
+   the usage note sets as the minimum. */
+.ce-logo { display: block; height: 24px; width: auto; aspect-ratio: 898.5 / 105; color: var(--on-cobalt); flex: none; }
+.ce-brand { padding: 4px 0; }
+.ce-footer__brand .ce-logo--footer { height: 24px; color: var(--on-cobalt); }
+
+/* The wordmark and the footer brand line */
+.ce-brand, .ce-footer__brand { font-family: var(--font-head); font-weight: var(--w-brand); font-size: 16px; }
+
+/* ----------------------------------------------------------- colour switch */
+/* Built by chrome.js (no script, no switch), in the header at every width: two swatches, the
+   pressed one ringed. Each button is named for a screen reader and has a tooltip. */
+.ce-theme { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+/* the word that says what the two swatches are, where the header has room for it */
+.ce-theme::before { content: 'Theme'; margin-right: 4px; font: 500 14px/1 var(--font-display); color: var(--on-cobalt-soft); }
+@media (max-width: 900px) { .ce-theme::before { content: none; } }
+.ce-theme__opt {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.ce-theme__opt::before {
+  content: '';
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1f3fbf;
+  box-shadow: 0 0 0 1.5px rgba(246, 248, 251, 0.6);
+}
+.ce-theme__opt--red::before { background: #a3231a; }
+.ce-theme__opt[aria-pressed='true']::before { box-shadow: 0 0 0 2px var(--header-ground), 0 0 0 4px var(--on-cobalt); }
+.ce-theme__opt:hover::before { box-shadow: 0 0 0 1.5px var(--on-cobalt); }
+.ce-theme__opt[aria-pressed='true']:hover::before { box-shadow: 0 0 0 2px var(--header-ground), 0 0 0 4px var(--on-cobalt); }
+
+/* A phone header holds the wordmark, the switch and the menu; Download is the menu's first row
+   (and the page's own button). */
+.ce-nav__download { display: none; }
+@media (max-width: 640px) {
+  .ce-cta { display: none; }
+  .ce-nav__download { display: block; }
+}
+@media (max-width: 380px) {
+  .ce-header { padding: 0 14px; }
+  .ce-header__inner { gap: 8px; }
+  .ce-theme__opt { width: 28px; }
+}
+
+/* Without JavaScript the menu button cannot open anything: it is not shown, and the footer carries the links. */
+html:not(.js) .ce-menu-toggle { display: none; }
+@media (max-width: 640px) { html:not(.js) .ce-cta { display: inline-flex; } }
+
+/* ------------------------------------------------------------- inner pages */
+/* Download, Releases and Changelog: a title band on the world's dark ground
+   (the home page's ground, not a second blue) closed by a rule in the world's cover colour, then
+   one 760px column on paper. */
+.ce-page { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-display); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+html:has(.ce-page) { background: var(--footer-ground); }
+.ce-page :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; box-shadow: 0 0 0 2px var(--paper); }
+.ce-page .ce-header :focus-visible, .ce-page .ce-footer :focus-visible, .ce-page .page-hero :focus-visible { outline-color: #fff; box-shadow: 0 0 0 2px var(--ink); }
+.ce-page .ce-header.is-scrolled { background: var(--header-ground); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.page-hero { padding: calc(var(--header-h) + 56px) var(--gutter) 56px; background: var(--band); color: var(--on-cobalt); border-bottom: 6px solid var(--cover); }
+.page-hero__inner { max-width: 760px; margin: 0 auto; }
+.page-hero :is(h1, .page-hero__title) { font-family: var(--font-head); font-size: clamp(34px, 4vw, 52px); font-weight: 700; line-height: 1.06; letter-spacing: -0.03em; margin: 0 0 14px; max-width: 18ch; text-wrap: balance; }
+.page-hero p:not(.page-hero__title) { color: var(--on-cobalt-soft); font-size: 16px; line-height: 1.6; max-width: 56ch; margin: 0; }
+.page-section { width: min(100% - 2 * var(--gutter), 760px); margin: 0 auto; padding: 48px 0; }
+.page-section + .page-section { border-top: 1px solid var(--paper-line); }
+.page-section h2 { font-family: var(--font-head); font-size: 22px; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 18px; }
+.ce-page main a:not(.btn) { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+.ce-page .btn-primary { background: var(--cover); color: #fff; }
+.ce-page .btn-secondary { background: var(--card); color: var(--ink); border-color: var(--ink-faint); }
+.ce-page .ce-header .btn-primary { background: var(--paper); color: var(--ink); }
+html:not(.js) :is(#dlLoading, #relLoading) { display: none; }

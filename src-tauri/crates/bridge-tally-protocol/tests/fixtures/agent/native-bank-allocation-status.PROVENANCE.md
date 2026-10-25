@@ -28,5 +28,6 @@ element path only. It does not establish field semantics, completeness of the
 bank-allocation shape, behaviour on another Tally release or edition, or any
 compatibility-cell promotion. The observation was read-only; no write was sent.
 
-The captured responses that establish the counts above contain customer data and
-are retained privately by the maintainer. They are not part of this repository.
+The captured responses behind the counts above contain customer data and are not part
+of this repository, so the counts are UNVERIFIED here: nothing in this tree reproduces
+them. The fixture rests only on what it states above, the element path.

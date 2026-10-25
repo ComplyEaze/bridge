@@ -1,4 +1,4 @@
-export const repository = "lamemustafa/bridge";
+export const repository = "ComplyEaze/bridge";
 const platforms = ["windows-x64", "macos-arm64"];
 
 // A preview is identified by its tag and its complete asset set, not by GitHub's pre-release
@@ -6,7 +6,7 @@ const platforms = ["windows-x64", "macos-arm64"];
 // installable from this page when that happens.
 export function isInstallablePreview(release) {
   return !release.draft
-    && /^mcp-preview-[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z]+)*$/.test(release.tag_name)
+    && /^mcp-(?:preview-|v)[0-9]+\.[0-9]+\.[0-9]+$/.test(release.tag_name)
     && platforms.every((platform) => releaseAssets(release, platform));
 }
 
@@ -52,6 +52,13 @@ export function releaseAssets(release, platform) {
   return { bundle, checksum };
 }
 
+// GitHub reports "sha256:" and 64 lowercase hex characters for an asset it stored. Anything else
+// (absent on an old release, null in the snapshot, another algorithm) gives nothing to show.
+export function sha256Digest(asset) {
+  const match = /^sha256:([0-9a-f]{64})$/.exec(asset?.digest ?? "");
+  return match ? match[1] : undefined;
+}
+
 export function releaseLabel(release) {
-  return `${release.tag_name} (unsigned preview)`;
+  return `${release.tag_name} (not yet code-signed)`;
 }

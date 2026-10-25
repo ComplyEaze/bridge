@@ -7,8 +7,8 @@ type TallyErrorDetails = {
 
 function localProfileStoreUnavailable() {
   return {
-    category: "Bridge's saved company profiles are unavailable",
-    action: "Bridge could not read its local saved company profiles. Restart Bridge. If this happens again, keep Tally unchanged and ask for help with Bridge's local data.",
+    category: "ComplyEaze Bridge's saved company profiles are unavailable",
+    action: "ComplyEaze Bridge could not read its local saved company profiles. Restart ComplyEaze Bridge. If this happens again, keep Tally unchanged and ask for help with ComplyEaze Bridge's local data.",
   };
 }
 
@@ -16,15 +16,18 @@ export function classifyTallyError({ code, message }: TallyErrorDetails) {
   if (code === "persisted_tally_company_profiles_unavailable") {
     return localProfileStoreUnavailable();
   }
+  if (code === "tally_mirror_key_missing" || code === "tally_mirror_key_invalid") {
+    return localMirrorKeyUnavailable();
+  }
   if (code === "tally_request_deadline_exceeded") {
     return {
       category: "Tally is taking longer than expected",
-      action: "Bridge did not change data in Tally. Do not repeat the same request. Wait until Tally is responsive, then review the connection and company before making a changed request.",
+      action: "ComplyEaze Bridge did not change data in Tally. Do not repeat the same request. Wait until Tally is responsive, then review the connection and company before making a changed request.",
     };
   }
   if (code === "response_validation_failed") {
     return {
-      category: "Tally returned a result Bridge could not safely use",
+      category: "Tally returned a result ComplyEaze Bridge could not safely use",
       action: "Keep the result unverified. Confirm that Tally is responsive and the intended company is open, then check Tally again.",
     };
   }
@@ -43,8 +46,19 @@ export function classifyTallyError({ code, message }: TallyErrorDetails) {
   return classifyUnstructuredTallyError(message);
 }
 
+function localMirrorKeyUnavailable() {
+  return {
+    category: "The local Tally mirror cannot be opened",
+    action: "Retrying does not help. Open ComplyEaze Bridge as the same computer user and restore that user's credential store (see the technical details), then open ComplyEaze Bridge again. Nothing was deleted and nothing changed in Tally.",
+  };
+}
+
 export function classifyUnstructuredTallyError(message: string) {
   const value = message.toLowerCase();
+  // A command that reports its error as a plain string leads with the code.
+  if (value.includes("tally_mirror_key_missing") || value.includes("tally_mirror_key_invalid")) {
+    return localMirrorKeyUnavailable();
+  }
   if (value.includes("persisted_tally_company_profiles_unavailable")) {
     return localProfileStoreUnavailable();
   }
@@ -52,7 +66,7 @@ export function classifyUnstructuredTallyError(message: string) {
     return { category: "Permission or mode", action: "Confirm this operation is supported by the active Tally mode and company permissions." };
   }
   if (value.includes("parse") || value.includes("xml") || value.includes("schema") || value.includes("payload")) {
-    return { category: "Tally response needs review", action: "Bridge kept the result unverified. Check Tally, then start a fresh connection check." };
+    return { category: "Tally response needs review", action: "ComplyEaze Bridge kept the result unverified. Check Tally, then start a fresh connection check." };
   }
   if (value.includes("reconcil") || value.includes("mismatch") || value.includes("proof")) {
     return { category: "Results need review", action: "Keep the result unverified and review the saved evidence before making another request." };
@@ -64,7 +78,7 @@ export function classifyUnstructuredTallyError(message: string) {
     return { category: "Check the Tally address", action: "Confirm the local address and Tally XML server, then start a fresh connection check." };
   }
   return {
-    category: "Bridge could not complete this request",
-    action: "Bridge cannot confirm the final state. Do not retry the same request yet; check Tally and the connection first.",
+    category: "ComplyEaze Bridge could not complete this request",
+    action: "ComplyEaze Bridge cannot confirm the final state. Do not retry the same request yet; check Tally and the connection first.",
   };
 }

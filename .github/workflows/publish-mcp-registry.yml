@@ -1,0 +1,112 @@
+name: Publish to the MCP registry
+
+# Publishes registry/server.json to the official MCP registry as
+# io.github.ComplyEaze/bridge-tally, for a release that is already published. Run it by hand after
+# registry/server.json has been updated for that release (docs/release-process.md, "When a
+# listing exists").
+#
+# Why it runs here: signing in to the registry from a laptop with a GitHub device login did not
+# grant the ComplyEaze organisation namespace (modelcontextprotocol/registry issues 1649, 1537,
+# 1527 and 1551). Signing in with the workflow's own OIDC token grants io.github.<repository
+# owner>/* (internal/api/handlers/v0/auth/github_oidc.go, buildPermissions), here ComplyEaze.
+# A registry version's configuration cannot be edited once published, so the first job refuses to
+# let the second run unless registry/server.json agrees with the manifest and with the published
+# release (it is final, and its recorded asset digests and .sha256 files equal the file's hashes).
+#
+# What guards the namespace: the registry accepts a valid GitHub Actions token from any job of any
+# repository owned by ComplyEaze that holds id-token: write, and checks nothing else (not the
+# workflow, branch or environment). Restricting this workflow, or this repository's workflow
+# files, is therefore not the whole control. The 'if' and the environment below gate runs of this
+# file from the default branch. As set up on 2 October 2026 the environment names one required
+# reviewer, the owner, with prevention of self-review off (the owner is the only reviewer) and
+# administrator bypass off: a run waits for the owner's own confirmation click, and there is no
+# second person. Create the environment BEFORE the first run (a run creates it with no rules if it
+# is missing).
+#
+# The same publish permission also lets a token deprecate or delete a published version through
+# the registry's status endpoint (it needs "publish or edit" permission); it does not allow editing
+# a version's configuration, which needs the edit permission the OIDC sign-in does not grant.
+# Withdrawing a version is a separate, owner-only step that needs its own id-token run; it is
+# deliberately not part of this workflow (docs/release-process.md, "When a listing exists").
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Published release tag that registry/server.json lists, for example mcp-v0.4.1"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-mcp-registry
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check registry/server.json
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # no id-token here: this job runs before anyone approves the publication
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .node-version
+      - name: Check registry/server.json against the manifest and the published release
+        shell: bash
+        run: node scripts/check-registry-server-json.mjs --published "$RELEASE_TAG"
+
+  publish:
+    name: Publish registry/server.json
+    needs: check
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    environment: mcp-registry-publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write # lets the job ask GitHub for the OIDC token the registry accepts
+      contents: read
+    env:
+      # mcp-publisher v1.8.1, linux amd64: the digest GitHub shows for the asset and the line in
+      # the release's registry_1.8.1_checksums.txt (both read on 2 October 2026).
+      PUBLISHER_VERSION: v1.8.1
+      PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Download mcp-publisher and check it against the pinned digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://github.com/modelcontextprotocol/registry/releases/download/${PUBLISHER_VERSION}"
+          asset="mcp-publisher_linux_amd64.tar.gz"
+          curl --fail --silent --show-error --location --output "${RUNNER_TEMP}/${asset}" "${base}/${asset}"
+          curl --fail --silent --show-error --location --output "${RUNNER_TEMP}/checksums.txt" "${base}/registry_${PUBLISHER_VERSION#v}_checksums.txt"
+          actual="$(sha256sum "${RUNNER_TEMP}/${asset}" | cut -d' ' -f1)"
+          listed="$(awk -v name="${asset}" '$2 == name { print $1 }' "${RUNNER_TEMP}/checksums.txt")"
+          test "${actual}" = "${PUBLISHER_SHA256}" || { echo "the download does not match the pinned digest"; exit 1; }
+          test "${listed}" = "${PUBLISHER_SHA256}" || { echo "the release's checksum file does not list the pinned digest"; exit 1; }
+          tar --extract --gzip --file "${RUNNER_TEMP}/${asset}" --directory "${RUNNER_TEMP}" mcp-publisher
+          chmod 0755 "${RUNNER_TEMP}/mcp-publisher"
+      - name: Validate registry/server.json
+        shell: bash
+        working-directory: registry
+        run: '"${RUNNER_TEMP}/mcp-publisher" validate'
+      - name: Sign in with the workflow's OIDC token
+        shell: bash
+        working-directory: registry
+        run: '"${RUNNER_TEMP}/mcp-publisher" login github-oidc'
+      - name: Publish
+        shell: bash
+        working-directory: registry
+        run: '"${RUNNER_TEMP}/mcp-publisher" publish'

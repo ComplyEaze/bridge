@@ -16,42 +16,47 @@ parses from the captured, synthetic-company catalogue
 the production binder, and its `evidence` digests are copied from the sidecar. Its own `provenance`
 object says the same. `src-tauri/src/source_draft/catalog_tests.rs` asserts that `targets`,
 `bindings` and `evidence` still equal the live producer's output; `scripts/source-draft-screen.test.tsx`
-serves it as a mocked backend response. No byte count or SHA-256 is declared for it.
+serves it as a mocked backend response. No capture byte count or SHA-256 is declared for it; its
+integrity digest, at the end, pins the committed bytes only.
 
-## Re-deriving them
+## How they were made
 
-`../sanitise-bbox-capture.py` is the whole procedure and the fixtures reproduce from it byte for byte:
+They were made once from two real statements by a sanitiser script, which has been removed with the
+Python bank-statement tool (#1748): a capture is not re-derived, and not remade. The sanitiser
+kept every coordinate, word break, line break and entity encoding of the PDF producer's output, and
+replaced every customer value with a fabricated one; the banner comment of each file says what is
+real and what is not. What now pins them are the byte counts and SHA-256 digests below.
 
-```bash
-pdftotext -bbox-layout -opw "$PASSWORD" statement.pdf raw.xml
-python3 scripts/sanitise-bbox-capture.py raw.xml \
-  scripts/fixtures/hdfc-bbox-capture.xml hdfc \
-  0:0-800 2:200-330,700-800 3:200-300
-```
+## Byte integrity
 
-```bash
-python3 scripts/sanitise-bbox-capture.py raw.xml \
-  scripts/fixtures/sbi-bbox-capture.xml sbi \
-  0:90-741 1:0-165
-```
+`scripts/fixtures/**` is `-text` in `.gitattributes` and the directory is registered in
+`scripts/fixture-roots.mjs`. Line-ending normalisation would rewrite the geometry these fixtures
+exist to preserve.
+A capture for a new bank is not added (see the next section).
 
-The page ranges are chosen to keep each parser rule load-bearing: a full first page with its account
-header, a continuation page that repeats the column header while a row is in progress, the page that
-carries the end-of-statement marker, and — for HDFC — one page *after* that marker, so the marker
-cannot be removed without a test noticing.
+## No new real captures
 
-The bank argument is a closed parser selection (`hdfc` or `sbi`). The sanitiser parses every selected
-source region and the complete generated regions, using the same retained geometry before writing the destination. It refuses empty,
-incomplete accounting rows, misaligned or party-class-changing evidence; captured geometry remains fixture evidence and does not
-qualify raw customer data.
+The two bank captures above are the last of their kind. A statement's text layer places every
+word, and the width and position of a word that has been masked can still identify it, so a
+sanitised `pdftotext -bbox-layout` capture is not committed for a new bank or a new layout: the
+Union Bank and Bank of Baroda layouts were added from shapes measured on statements that stay
+private, and `src-tauri/crates/bridge-bank-statement/examples/layout_probe.rs` prints no position of
+a masked word on its line. A future public fixture from a real statement needs a design that follows that
+contract, written when it is needed; until then none is added. A person reviews any capture that
+is. `src-tauri/crates/bridge-bank-statement/tests/committed_captures_tests.rs` is only a tripwire
+over `*-bbox-capture.xml` here: it fails on a character outside ASCII in the text, once the XML's
+entities are decoded and the XML comments (the banner) are set aside, and it would pass on the raw text layer
+of an English statement.
 
-## Adding a capture for a new bank
+## Integrity digests
 
-1. Sanitise, then **diff the result against the source** and scan for surviving tokens (the script's
-   `--help` prints the one-liner). Everything that survives should be bank vocabulary.
-2. If a customer value survives, do not add it to `TEMPLATE`. Work out why the rule matched it.
-3. Byte integrity is enforced: `scripts/fixtures/**` is `-text` in `.gitattributes` and the
-   directory is registered in `scripts/check-fixture-byte-integrity.mjs`. Line-ending normalisation
-   would rewrite the geometry these fixtures exist to preserve. That is also why the sanitiser
-   itself lives in `scripts/`, not here — this directory holds evidence, and a tool whose bytes are
-   pinned as evidence is a category error.
+Each row is the SHA-256 of the file's committed bytes, which
+`scripts/check-fixture-provenance.mjs` checks (#838). A digest pins the bytes as
+committed and claims nothing about where they came from: the Capture column
+repeats only what this note says above.
+
+| Fixture | Bytes | SHA-256 (integrity digest) | Capture |
+| --- | ---: | --- | --- |
+| `hdfc-bbox-capture.xml` | 34,113 | `ff01bde0f4330141907f2d6e9eeba8e2cf49c77c53437f3f8cdb10fc374bb6e2` | sanitised from a real statement, as above |
+| `sbi-bbox-capture.xml` | 21,091 | `615280486efa461bb15a4d0d4103fc66ea9706799171966cf739bd1447828916` | sanitised from a real statement, as above |
+| `source-draft-capture-bindings.json` | 1,936 | `8e7b43f90a93086ece50c270b9747c83ba473ee1fc4246c8d23cf160592dfe2e` | not a capture, as above |

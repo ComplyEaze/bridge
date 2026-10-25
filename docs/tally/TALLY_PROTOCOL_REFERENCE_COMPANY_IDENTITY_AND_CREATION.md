@@ -72,6 +72,8 @@ Three findings:
 **Required:** Bridge must verify company identity *in the response* — via the company GUID —
 rather than trusting that the request was honoured. Tally reports success either way.
 
+**Read again on licensed TallyPrime 7.1 Silver, 2026-10-13 (one run; Confidence: PARTIAL).** Branch `lab/m1-create-lands-where-answers`, `7c2ff6a1` (not for merge; the run is described in §9.11d). A `List of Ledgers` read whose `SVCURRENTCOMPANY` named a company that existed and was **not loaded** answered HTTP 200, `STATUS` 1 and a `COLLECTION` with no rows, with every `CMPINFO` count 0 and no error line. The same request sent after that company had been loaded and **renamed**, so that its text was the former name, answered the same 2,994 bytes. Neither returned the rows of the company that was loaded. So finding 2 holds on that release for both cases: zero rows from such a read does not show that the company holds no ledger. The request computes the company's GUID into every row, and with no row there was nothing to carry it; in this run it was the `Company` collection read beside each ledger list that showed which companies were loaded.
+
 ### 9.11a How to read the company GUID — **VERIFIED, and this closes §9.11's requirement**
 
 **VERIFIED 2026-07-30.** A single-object export returns the full company definition,
@@ -124,6 +126,18 @@ against a schema that can contain same-GUID books.
 pin by guessing fields from a current listing: re-observe and review the full tuple. This rule
 is implemented by the composite-identity migration and `snapshot_source_pin`.
 
+**Shape of the GUID.** **VERIFIED on the captured releases; UNVERIFIED for other releases.**
+The captured releases are those named in each fixture's provenance file. Every XML file under
+`src-tauri` that git tracks was decoded by its bytes as UTF-8 or UTF-16. The files that parse as
+XML hold 211 `COMPANY` elements with a `GUID` child, 28 distinct GUIDs in 46 files, all in the
+lowercase `8-4-4-4-12` hexadecimal form; some of those files are synthetic. The files that do not
+parse as XML were searched as text, and none holds a `COMPANY` element with a `GUID`. Bridge therefore accepts only that shape (either case,
+stored lowercase) when it builds a verified company identity, and refuses any other spelling at
+the point a company is selected or verified. The type's parse never trims, but company
+discovery and the desktop selection trim surrounding whitespace before it. A release that
+writes a different spelling is not covered by this capture and would be refused there until it
+is observed.
+
 ### 9.11c Extent reads must retain the verified company tuple — **VERIFIED on one endpoint**
 
 **VERIFIED 2026-09-09 field and versioned request observations on one endpoint.**
@@ -153,7 +167,7 @@ not a financial report, another endpoint, a compatibility cell, or accounting
 writes. V1 remains for historical corpus interpretation; production extent reads
 use V2 without fallback.
 
-### 9.11e The audit read's company part is the one admitted Object export — **CODE; live unmeasured**
+### 9.11e The audit read's company part is the one admitted Object export — **PARTIAL: shape measured live once; failure cases unmeasured**
 
 **Code, 2026-09-21.** Every agent read passes `AgentReadRequest::parse`, which admits
 only an `Export` of `TYPE=Collection`. The tally-read v1 read also needs a `company` part
@@ -170,6 +184,14 @@ never through `parse`:
   - It carries a `FETCHLIST` of exactly `GUID`, `NAME`, `BOOKSFROM` and `ISINTEGRATED`.
   - It has no TDL, filter, compute, `ORIGINALNAME` or wildcard. A structural test pins
     every element of the rendered request.
+- **A second Object export (12 Oct 2026).** The invoice build's HSN/SAC check reads the
+  company object through `AgentReadRequest::invoice_company_hsn_named(&str)`, built from the
+  verified company's name that the admission carries (the identity-typed
+  `invoice_company_hsn(&VerifiedCompanyIdentity)` is used only in tests; typing the name is a
+  named follow-up), which renders the pinned `invoice_company_hsn_v1` template: the same envelope with a
+  `FETCHLIST` of `*`, the shape §9.11a measured, because the company-level HSN/SAC lists came
+  back in it (§9.16). It is the only Object export besides this one, and it is built the same
+  way: the verified name is its only variable, and its answer is admitted by GUID.
 - **Everything else stays refused.** `parse` is unchanged and refuses every `TYPE=Object`
   envelope, including this one and its case, whitespace, subtype, fetch and
   Collection-plus-Object variants. So no XML from outside the constructor can use the
@@ -191,21 +213,45 @@ never through `parse`:
     name comparison could refuse the right company. The GUID and `BOOKSFROM` already bind
     the part.
 
+**Measured 2026-10-12 (VERIFIED for the shape, on one book).** The request above, as Bridge
+renders and encodes it, was sent once with curl (not Bridge's transport) to a lab TallyPrime
+7.1 (`PRODMAJORREL`/`PRODMINORREL` in the answer) for a synthetic company, `BRIDGE BATCH LAB`:
+HTTP 200, 4,216 bytes of BOM-less UTF-16LE, `STATUS` `1`, only CRLF after `</ENVELOPE>`. The
+bytes of the request (896, with a BOM) and the answer are committed with their hashes in
+[`COMPANY_AUDIT_OBJECT_CAPTURE_PROVENANCE.md`](../../src-tauri/crates/bridge-tally-protocol/tests/fixtures/COMPANY_AUDIT_OBJECT_CAPTURE_PROVENANCE.md).
+One test proves the profile renders and encodes to those request bytes; another admits the
+answer for the verified GUID and `BOOKSFROM` (`audit_company_part_tests.rs`). Bridge's own
+HTTP framing and admission on a live dispatch were not exercised.
+
+- There is one `DATA/TALLYMESSAGE` with one `COMPANY` child, whose `NAME` attribute is the
+  company name. `GUID` and `BOOKSFROM` occur once each in the whole document.
+- **An explicit `FETCHLIST` narrowed this single-object Company export (inferred: the control
+  is another book).** The answer has 56 distinct tags and the `COMPANY` 7 children, against
+  the 565 distinct tags of the `FETCH *` answer in §9.11a, which was a different book; no
+  same-book `FETCH *` was sent. The four named fields came back (`BOOKSFROM`, `NAME`, `GUID`, `ISINTEGRATED` = `No`)
+  with three that the list does not name: `ISDEEMEDPOSITIVE` (empty), `CANDELETE` (`No`) and
+  `MASTERID` (`29`). So the answer is not limited to the list, and admission still checks
+  the fields the consumers need, not the absence of the rest.
+- The only other `COMPANY` element is `DESC/CMPINFO/COMPANY`, which read `2`, with no children
+  and no GUID. With one company loaded the counter read `2`; this is recorded as observed
+  and nothing is concluded from it.
+- Not repeated: a second send, so byte-stability is still unmeasured.
+
 **Unmeasured, and required before any use on a client book:**
 
 - what an `ID` that does not resolve does, for example a company unloaded between the
   listing and the read: a refusal, an empty response, or the §1.2 modal;
 - names with `&`, quotes or non-ASCII text in the `ID` (§9.11a measured one plain name);
-- whether an explicit `FETCHLIST` narrows an Object export (only `FETCH *` was measured,
-  §9.11a);
 - whether two sends of the same Object export are byte-stable, since the `CMPINFO`
-  counters could differ;
+  counters could differ (one send was measured, above);
 - the part read while another user is writing to the company. Gold differs from Silver only in
   allowing several users, so a book changing during a read is the normal case there. The read's
   company high-water bracket, not this part, is what refuses a moved book.
 
-The first live use is one request on a synthetic company on the licensed lab, with an
-operator watching the Tally screen (§1.2), stopping on the first silence.
+The first live use was one request on a synthetic company on the lab (above). Any
+further request that can fail in Tally's UI, such as an `ID` that does not resolve, is sent
+one at a time with an operator watching the Tally screen (§1.2), stopping on the first
+silence.
 
 ## 9.10 Company creation over XML — **PARTIAL: symbol element found, formal-name element not**
 
@@ -256,6 +302,28 @@ to and cannot, and ignores a name resolving to nothing. **That is a hypothesis.*
 box's company list was never enumerated, so "matches nothing" is inferred from the transposition,
 not established. Settling it needs one session: enumerate the companies, then import twice —
 once naming an existing-but-unloaded company, once naming a string known to match nothing.
+(2026-10-13: a run that used a ledger `Create` instead of a voucher import listed the loaded companies
+before each request and sent the name of a company that was shut and, later, a former name that no loaded
+company carried, below; companies in the data folder that were not loaded were not listed. A voucher import naming a string known to match nothing is still open.)
+
+**A ledger `Create` that named a company landed in that company or in neither. Measured 2026-10-13, licensed TallyPrime 7.1 Silver on Windows, two new synthetic companies, one run of each step. Confidence: PARTIAL.** Branch `lab/m1-create-lands-where-answers`, `7c2ff6a1` (not for merge), bridge#690. Every figure below was read from the branch's 43 answers (40 of them XML, read with an XML parser); each answer's size equals its `CONTENT-LENGTH` and its hash the one in the branch's send log. The release and licence, which company was active, and that a company was shut or renamed on Tally's screen, are from the branch's notes (its screenshots are not on the branch).
+
+The paragraphs above are about a voucher import. These five requests were master imports over the gateway (`Import Data`, `REPORTNAME` `All Masters`), each one `LEDGER` with `ACTION="Create"` (a new name, a parent group and the bill-wise flag), and each with `SVCURRENTCOMPANY` naming company A. Before and after each, a `Company` collection read gave the loaded companies by GUID with their `ALTMSTID`, and a ledger list was read from every loaded company.
+
+| loaded; active | answer to the `Create` | ledger lists after | `ALTMSTID` of A / of B |
+|---|---|---|---|
+| A and B; A | `CREATED` 1, every other counter 0 | the new ledger in A; B's rows unchanged | 208 to 209 / 208 |
+| A and B; **B** | `CREATED` 1, every other counter 0 | the new ledger in A; B's rows unchanged | 209 to 210 / 208 |
+| B only (A shut) | one `LINEERROR`, no counter | B's rows unchanged; A's unchanged when it was loaded again | 210 before the shut and after the reload / 208 |
+| A only, **renamed**; the request named its former name | the same | A's rows unchanged | 211 / not loaded |
+| A under its new name, and B; B | the same | A's and B's rows unchanged | 211 / 208 |
+
+- **With the named company loaded, the ledger was created in it whichever company was active.** In the second row B was the active company and the ledger appeared in A, under A's GUID; B's ledger list read the same rows before and after.
+- **With no loaded company carrying the name, nothing was created in either company.** The three answers are byte-identical: a `RESPONSE` of 248 bytes holding one `LINEERROR`, `Could not set 'SVCurrentCompany' to 'BRIDGE M1 LAB A'`, and none of `CREATED`, `ALTERED`, the other counters, `LASTVCHID` or `LASTMID`; HTTP 200. No ledger row and no `ALTMSTID` changed in any loaded company. It is a counter-less answer of another shape than §9.1a's, and it needs the same handling: a missing counter is not a zero. Each of the three also carried the response header `RESPSTATUS: 0`; the run's other 40 answers, the two `CREATED` 1 answers among them, carried `RESPSTATUS: 1`, and so did all 95 answers of the 2026-10-12 masters run (`lab/masters-m1-answers`, `e783e7cb`), its `Duplicate Entry!` refusal included. So the header marked this refusal and not that one; what else sets it to 0 is not established.
+- **In no step did the ledger land in the active company in place of the named one,** and no answer read `ALTERED` above 0.
+- **A rename moved `ALTMSTID` by one; shutting and loading did not.** A's mark read 210 before and after it was shut and loaded again, 211 after the rename and 212 after it was renamed back. Its GUID did not change, and its four ledger rows read the same before and after the first rename, apart from the company name the request computes into each row (no ledger list was read after the second).
+- **How this sits with the two cases above.** The row "a company that exists but is not loaded" now also holds for a master import. The former name in the last two rows was carried by no company loaded at the time, and it was refused, where the 2026-09-10 voucher import with a transposed name was created in the loaded company. The two differ in more than one way (a file imported through Tally's Import menu against a request over the gateway, a voucher against a ledger, Gold against Silver, a transposed name against a former one), so this run does not say which of them decides, and point 1 below stands. The table's second row and the hypothesis under it are therefore about a voucher import only: for a ledger `Create`, a name that no loaded company carried was refused here, as §9.11's table has it for a non-existent name.
+- **Not established:** Gold and Education; other releases; a company with Tally's security on; a company named in another case or with trailing spaces (§9.11 measured those on a read); a `Create` on an existing ledger name; a voucher import in the same five states; three or more loaded companies; a second run.
 
 **What is established, and it is enough to design against:**
 
@@ -264,7 +332,10 @@ once naming an existing-but-unloaded company, once naming a string known to matc
    aimed, and the failure is invisible — the import succeeds and looks correct.
 2. **The dangerous case is the likely one.** A typo, a renamed company or a year-suffixed name
    is the ordinary operator error, and that is the shape that passed. The shape that fails
-   closed is the rarer, more deliberate one.
+   closed is the rarer, more deliberate one. *(Scoped correction, 2026-10-13: what passed was a
+   voucher import with a transposed name. A renamed company's former name was refused in both
+   ledger `Create`s that carried one, above; a voucher import carrying a former name is not
+   measured.)*
 3. **Establish identity before the write and confirm after it.** Read the company and compare
    the GUID (§9.11a), then read the posted voucher back. This is what the read path already
    does via GUID binding; the write path needs the same discipline.
@@ -427,11 +498,9 @@ show no figures, only which ledgers were left out. Among several masters, a book
 identified, or not INR, is refused before any bill. No surface in a shipped build (the desktop, the
 sweep, MCP) admits a book as INR on an operator's word: the desktop's confirmation for one master Tally
 does not name INR was removed after three client-derived lab copies, one master each, were all found
-INR by their mailing names (not committed; live client books beyond them are unmeasured). The
-non-default `voucher-scan` feature's calibrated read still takes an explicit INR assertion. It is not
-compiled into shipped builds; CI builds, tests and lints it on macOS only, and only runtime tests and
-the ignored live calibration harness call it. Every other path still refuses a book with several masters, until it
-compares each ledger's own currency with the base.
+INR by their mailing names (not committed; live client books beyond them are unmeasured). Every
+path still refuses a book with several masters, until it compares each ledger's own currency with
+the base.
 
 **Not established:**
 - that `ORIGINALNAME` rather than `NAME` is the match on every book. The two differ on the FOREX
@@ -612,7 +681,7 @@ the voucher type) and that is a hypothesis, not a default.
 
 **Procedure for the first write of an untested invoice type.** It costs one voucher and settles the
 question — but it *deliberately risks the silent one-sided write described above*, and its cleanup
-depends on a `Delete` that is itself not qualified on a licensed book (§9.12b). So run it where a
+depends on a `Delete` that is qualified on a licensed book for one voucher only, and PARTIAL (§9.12b). So run it where a
 bad voucher does not matter:
 
 1. **Use a disposable synthetic company, and take a backup first** — `docs/adr/0004-tally-write-safety.md`
@@ -830,6 +899,18 @@ the Delete + Create path §9.7 argues for, outside the lab.
 Worth noting against `IMPLEMENTATION_GUIDE.md` §3.3a, which records that Tally overwrites the
 attribute with a value of its own: the client-supplied string still **worked as a delete key**
 afterwards. Whatever the export shows, the value you sent remains addressable.
+
+**Repeated on Gold. PARTIAL — observed once, on one voucher (licensed TallyPrime 7.1 Gold, one
+client book, 2026-09-28).**
+- **The voucher.** It was first created by a direct gateway import with a client-supplied `REMOTEID`,
+  not by Bridge's native post.
+- **The delete.** It used a `VOUCHER` element with that creation `REMOTEID` and
+  `ACTION="Delete"`. It returned `DELETED=1`, with every other counter 0.
+- **Read-back.** A vouchers read of that day no longer held the voucher. After a replacement Contra
+  was created, the day's count was back to its count before the delete.
+- **Confidence.** PARTIAL by §9.14's convention: one voucher, one session, one client book, not
+  repeated. The counters and the read-back agree, but only one voucher was read back. The
+  deleted voucher's type was not recorded.
 
 **`Alter` is UNVERIFIED on this profile — not ruled out.** This experiment exercised only `Delete`.
 The `Alter` failures on record (§9.6, and `IMPLEMENTATION_GUIDE.md` §3.1) came from an

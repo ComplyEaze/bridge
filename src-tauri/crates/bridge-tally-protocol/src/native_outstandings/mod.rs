@@ -14,7 +14,7 @@
 //!   `DATA`-scoped Ledger collection grammar (`CMPINFO` counter trap).
 //! - [`model`] — row and result types; reuses `OutstandingsReport` so this
 //!   path is a drop-in for the UI.
-//! - [`compute`] — assembles the report and the on-account residual
+//! - [`compute`] — assembles the report and the unallocated residual
 //!   cross-check.
 
 mod compute;
@@ -38,13 +38,16 @@ pub use model::{
     NativeOutstandingsResult, NativeOverdueCrosscheck, PartyResidual,
 };
 pub use request::{
-    render_company_base_currency_request, render_company_currency_request,
+    parent_filter_parts, render_company_base_currency_request, render_company_currency_request,
     render_company_currency_request_with_originalname, render_native_bills_request,
     render_native_group_snapshot_request, render_native_ledger_export_request,
-    render_native_ledger_snapshot_request, render_native_voucher_export_request,
-    render_native_voucher_type_export_request, render_party_ledger_master_request,
-    NativeBillsReportKind, NativeLedgerExportPeriod, NativeLedgerExportPeriodError,
-    NativeLedgerSnapshotPeriod, NativeLedgerSnapshotPeriodError,
+    render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_parents,
+    render_native_voucher_export_request, render_native_voucher_type_export_request,
+    render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
+    render_party_ledger_master_request_for_parents_with_gst_details,
+    render_party_ledger_master_request_with_gst_details, NativeBillsReportKind,
+    NativeLedgerExportPeriod, NativeLedgerExportPeriodError, NativeLedgerSnapshotPeriod,
+    NativeLedgerSnapshotPeriodError,
 };
 pub(crate) use wire::is_foreign_currency_balance;
 pub use wire::{

@@ -23,11 +23,13 @@ fn unallocated(party: &str, amount: &str) -> UnallocatedParty {
         party: party.to_string(),
         amount: ExactDecimal::parse(amount).unwrap(),
         direction: ExposureDirection::Receivable,
+        opening_balance: None,
+        composition: None,
     }
 }
 
 /// Sums decimal literals through the same `checked_add` accumulation
-/// `build_party_statement` uses, so an expectation here lands in
+/// `build_party_statement_with_ageing_anchor` uses, so an expectation here lands in
 /// whatever canonical form the accumulator itself produces (e.g.
 /// trailing fractional zeros dropped) instead of a hand-normalised
 /// guess that can drift from `ExactDecimal`'s actual output.
@@ -73,12 +75,13 @@ fn builds_a_statement_sorted_oldest_first_and_filtered_to_the_party() {
     ];
     let unallocated_rows = vec![unallocated("Aarav Textiles", "150.25")];
 
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Lab Co",
         "20260808",
         "Aarav Textiles",
         &bills,
         &unallocated_rows,
+        OutstandingsAgeingAnchor::DueDate,
     )
     .expect("party has exposure");
 
@@ -167,8 +170,15 @@ fn aged_bucket_subtotals_sum_to_exactly_the_bill_total() {
             ExposureDirection::Receivable,
         ),
     ];
-    let statement = build_party_statement("Lab Co", "20260808", "Party", &bills, &[])
-        .expect("party has exposure");
+    let statement = build_party_statement_with_ageing_anchor(
+        "Lab Co",
+        "20260808",
+        "Party",
+        &bills,
+        &[],
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .expect("party has exposure");
 
     assert_eq!(
         statement.subtotals.receivable.days_0_30,
@@ -187,8 +197,11 @@ fn aged_bucket_subtotals_sum_to_exactly_the_bill_total() {
         exact_sum(&["70.70", "80.80"])
     );
     assert!(statement.subtotals.receivable.not_yet_due.is_zero());
-    assert!(statement.subtotals.payable.total().unwrap().is_zero());
-    assert_eq!(statement.subtotals.total().unwrap(), statement.bill_total);
+    assert_eq!(
+        statement.subtotals.payable,
+        DirectionalAgeingSubtotals::zero()
+    );
+    assert_eq!(subtotals_sum(&statement.subtotals), statement.bill_total);
     assert_eq!(
         statement.bill_total,
         exact_sum(&["10.10", "20.20", "30.30", "40.40", "50.50", "60.60", "70.70", "80.80",]),
@@ -215,25 +228,33 @@ fn aged_and_unaged_subtotals_reconcile_to_the_exact_bill_total() {
             ExposureDirection::Receivable,
         ),
     ];
-    let statement = build_party_statement("Lab Co", "20260808", "Party", &bills, &[])
-        .expect("party has exposure");
+    let statement = build_party_statement_with_ageing_anchor(
+        "Lab Co",
+        "20260808",
+        "Party",
+        &bills,
+        &[],
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .expect("party has exposure");
 
     assert_eq!(
         statement.subtotals.receivable.not_yet_due,
         exact_sum(&["20.20"])
     );
-    assert_eq!(statement.subtotals.total().unwrap(), statement.bill_total);
+    assert_eq!(subtotals_sum(&statement.subtotals), statement.bill_total);
 }
 
 #[test]
 fn a_party_with_only_unallocated_exposure_and_no_bills_still_builds() {
     let unallocated_rows = vec![unallocated("On Account Only", "42.00")];
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Lab Co",
         "20260808",
         "On Account Only",
         &[],
         &unallocated_rows,
+        OutstandingsAgeingAnchor::DueDate,
     )
     .expect("party has unallocated exposure");
     assert!(statement.bills.is_empty());
@@ -251,8 +272,15 @@ fn an_unknown_party_is_rejected_rather_than_producing_an_empty_statement() {
         Some(5),
         ExposureDirection::Receivable,
     )];
-    let error =
-        build_party_statement("Lab Co", "20260808", "Unknown Party", &bills, &[]).unwrap_err();
+    let error = build_party_statement_with_ageing_anchor(
+        "Lab Co",
+        "20260808",
+        "Unknown Party",
+        &bills,
+        &[],
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .unwrap_err();
     assert_eq!(error, PartyStatementError::PartyNotFound);
 }
 
@@ -269,8 +297,15 @@ fn a_party_with_a_zero_unallocated_residual_is_treated_as_having_none() {
         ExposureDirection::Receivable,
     )];
     let unallocated_rows = vec![unallocated("Party", "0")];
-    let statement =
-        build_party_statement("Lab Co", "20260808", "Party", &bills, &unallocated_rows).unwrap();
+    let statement = build_party_statement_with_ageing_anchor(
+        "Lab Co",
+        "20260808",
+        "Party",
+        &bills,
+        &unallocated_rows,
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .unwrap();
     assert!(statement.unallocated.is_zero());
     assert_eq!(statement.grand_total, statement.bill_total);
 }

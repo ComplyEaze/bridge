@@ -69,8 +69,11 @@ z
 w
 `;
 
+// The temporary repositories hold no .gitattributes, so a host's own core.autocrlf=true (the system
+// setting on Windows runners) would check every document out with CRLF and the gate would read no
+// headings at all (#1471). Each call keeps the bytes as written.
 const git = (cwd, ...args) => {
-  const out = spawnSync("git", args, { cwd, encoding: "utf8" });
+  const out = spawnSync("git", ["-c", "core.autocrlf=false", ...args], { cwd, encoding: "utf8" });
   if (out.status !== 0) throw new Error(`git ${args.join(" ")}: ${out.stderr}`);
   return out.stdout;
 };
@@ -80,14 +83,13 @@ const upstream = join(root, "upstream");
 const work = join(root, "work");
 const DOC = "docs/tally/TALLY_PROTOCOL_REFERENCE.md";
 const SURFACE = "docs/tally/compatibility/compatibility-surface.json";
-const TEST_SHA256 = "0".repeat(64);
 const writeSurface = (repository, paths) => {
   mkdirSync(dirname(join(repository, SURFACE)), { recursive: true });
   writeFileSync(
     join(repository, SURFACE),
     JSON.stringify({
-      schema_version: 2,
-      files: paths.map((path) => ({ path, sha256: TEST_SHA256 })),
+      schema_version: 3,
+      files: paths.map((path) => ({ path })),
     }),
   );
 };
@@ -104,6 +106,13 @@ git(upstream, "add", "-A");
 git(upstream, "commit", "-qm", "base");
 git(upstream, "branch", "-M", "master");
 git(root, "clone", "-q", upstream, "work");
+
+// The gate compares against where the checked-out tree left origin/master (the merge-base). These cases treat the clone as a
+// branch that sits on the newest upstream commit, so after each fetch HEAD and the index follow it (the working tree is left as it is).
+const advance = () => {
+  git(work, "fetch", "-q", "origin");
+  git(work, "reset", "-q", "origin/master");
+};
 
 // The gate resolves its repository from its own module URL and reads
 // `origin/master` there, so it must be run from inside the clone.
@@ -339,7 +348,7 @@ const runSplitGate = (first, second, omitted) => {
 writeFileSync(join(upstream, DOC), SPLIT_BASE_DOC);
 git(upstream, "add", DOC);
 git(upstream, "commit", "-qm", "use the admitted split-heading grammar");
-git(work, "fetch", "-q", "origin");
+advance();
 
 {
   const second = "# Part B\n\n## 9.7 Second claimant in another part\n\nq\n";
@@ -763,8 +772,8 @@ for (const [name, example] of [
   writeFileSync(
     join(work, SURFACE),
     JSON.stringify({
-      schema_version: 2,
-      files: [{ path: DOC }],
+      schema_version: 3,
+      files: [{ path: 5 }],
     }),
   );
   out = runGate();
@@ -1158,7 +1167,7 @@ const sep = "\\";`);
   writeFileSync(join(upstream, DOC), unnumberedBase);
   git(upstream, "add", DOC);
   git(upstream, "commit", "-qm", "add an unnumbered route source");
-  git(work, "fetch", "-q", "origin");
+  advance();
   expectRoute(
     "a first-generation unnumbered alias is refused instead of guessing a destination",
     index + alias + routeBlock({
@@ -1173,7 +1182,7 @@ const sep = "\\";`);
   writeFileSync(join(upstream, DOC), SPLIT_BASE_DOC);
   git(upstream, "add", DOC);
   git(upstream, "commit", "-qm", "restore the numbered route fixture");
-  git(work, "fetch", "-q", "origin");
+  advance();
   expectRoute("legacy aliases cannot target a nonexistent heading",
     index + alias.replace("#10-alpha-revised)", "#missing-heading)"), "do not resolve");
 
@@ -1184,7 +1193,7 @@ const sep = "\\";`);
   writeFileSync(join(upstream, DOC), splitBaseNewAliasIndex);
   git(upstream, "add", "-A");
   git(upstream, "commit", "-qm", "split reference before a new retitle");
-  git(work, "fetch", "-q", "origin");
+  advance();
   const splitRetitledFirst = splitBaseNewAliasFirst.replace("## 30 Plain source", "## 30 Retitled source");
   writeFileSync(join(work, PART_A), splitRetitledFirst);
   writeFileSync(join(work, PART_B), second);
@@ -1221,13 +1230,13 @@ const sep = "\\";`);
   writeFileSync(join(upstream, DOC), splitBaseContent + fencedBaseExample);
   git(upstream, "add", "-A");
   git(upstream, "commit", "-qm", "split reference with a fenced route example");
-  git(work, "fetch", "-q", "origin");
+  advance();
   expectRoute("a fenced route example in the base does not become an inherited alias", splitBaseContent);
 
   writeFileSync(join(upstream, DOC), splitBaseContent);
   git(upstream, "add", DOC);
   git(upstream, "commit", "-qm", "retain only rendered split routes");
-  git(work, "fetch", "-q", "origin");
+  advance();
   expectRoute("an inherited alias remains valid on a later split-base edit", splitBaseContent);
   expectRoute("a later split-base edit cannot drop its inherited alias", splitBaseIndex, "legacy section anchor(s) missing");
   expectRoute("an inherited alias cannot retain a dead destination",
@@ -1293,7 +1302,7 @@ const sep = "\\";`);
   writeFileSync(join(upstream, DOC), numberedBaseContent);
   git(upstream, "add", DOC);
   git(upstream, "commit", "-qm", "allocate a number in the split index");
-  git(work, "fetch", "-q", "origin");
+  advance();
   expectRoute("an unchanged numbered split index passes without becoming a legacy route", numberedBaseContent);
   expectRoute(
     "deleting a base index number is caught",
@@ -1314,6 +1323,57 @@ const sep = "\\";`);
   rmSync(join(work, PART_B));
 }
 
+// A pull request's merge ref can lag the base branch. The base is the merge-base of origin/master and the checked-out tree, so
+// a retitle with redirects that landed on master after the tree was made is not held against it.
+{
+  const first = SPLIT_BASE_DOC;
+  const second = "# Part B\n";
+  const baseIndex = splitIndex([first, second]);
+  writeFileSync(join(upstream, PART_A), first);
+  writeFileSync(join(upstream, PART_B), second);
+  writeFileSync(join(upstream, DOC), baseIndex);
+  writeSurface(upstream, [DOC, PART_A, PART_B]);
+  git(upstream, "add", "-A");
+  git(upstream, "commit", "-qm", "split base for the stale merge-ref controls");
+  advance();
+  writeFileSync(join(work, PART_A), first);
+  writeFileSync(join(work, PART_B), second);
+  writeFileSync(join(work, DOC), baseIndex);
+  writeSurface(work, [DOC, PART_A, PART_B]);
+
+  // master moves on: a heading is retitled and its old fragment redirected, as one merged pull request did.
+  const retitled = first.replace("## 10 Alpha", "## 10 Alpha revised");
+  const alias = routeBlock({ anchor: "10-alpha", title: "10 Alpha", path: PART_A, target: "10-alpha-revised" }) + "\n";
+  writeFileSync(join(upstream, PART_A), retitled);
+  writeFileSync(join(upstream, DOC), splitIndex([retitled, second]) + alias);
+  git(upstream, "add", "-A");
+  git(upstream, "commit", "-qm", "retitle a heading and redirect its old fragment");
+  git(work, "fetch", "-q", "origin");
+
+  const staleOut = runGate();
+  const staleText = `${staleOut.stdout}${staleOut.stderr}`;
+  if (staleOut.status === 0) {
+    console.log("ok   a tree made before a retitle with redirects landed on master is not held against it");
+  } else {
+    failed += 1;
+    console.error(`FAIL a stale tree must pass against the merge-base\n  exit ${staleOut.status}: ${staleText.split("\n").slice(0, 6).join("\n  ")}`);
+  }
+
+  // The same tree on a branch that already has the retitle must still be refused for dropping the redirect.
+  git(work, "reset", "-q", "origin/master");
+  const droppedOut = runGate();
+  const droppedText = `${droppedOut.stdout}${droppedOut.stderr}`;
+  if (droppedOut.status !== 0 && droppedText.includes("10-alpha")) {
+    console.log("ok   a tree that sits on the retitle but drops the redirect is still refused");
+  } else {
+    failed += 1;
+    console.error(`FAIL a tree on the retitle must keep the redirect\n  exit ${droppedOut.status}: ${droppedText.split("\n").slice(0, 6).join("\n  ")}`);
+  }
+  git(work, "checkout", "-q", "--", DOC);
+  rmSync(join(work, PART_A), { force: true });
+  rmSync(join(work, PART_B), { force: true });
+}
+
 // --- #533 container visibility gaps -----------------------------------------
 // Reset the disposable two-repository fixture to one split base. These controls
 // exercise the actual base comparison so a convenient fixture-only failure
@@ -1327,7 +1387,7 @@ const sep = "\\";`);
   writeSurface(upstream, [DOC, PART_A, PART_B]);
   git(upstream, "add", "-A");
   git(upstream, "commit", "-qm", "reset split fixture for container controls");
-  git(work, "fetch", "-q", "origin");
+  advance();
 
   writeFileSync(join(work, PART_A), first);
   writeFileSync(join(work, PART_B), second);

@@ -1,0 +1,119 @@
+{
+ "company": {
+  "books_from": "20250401",
+  "company_number": "100021",
+  "guid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+  "identity_state": "verified_tuple",
+  "missing_field": null,
+  "name": "BRIDGE SHAPE LAB"
+ },
+ "evidence": {
+  "bytes": 1060760,
+  "duration_ms": 7049,
+  "read_at": "2026-10-01T17:55:04.870Z",
+  "request_sha256": "2829c3b84923b963b8e09a8e3a50fe3bcaefd1af74e2659c5756f3b7e4527351",
+  "response_sha256": "c95e03a000ddcb81ef8766dbae99b500c04aa44e93ab272774f1e82008d067fb",
+  "state": "complete"
+ },
+ "read_at": "2026-10-01T17:54:57.820Z",
+ "result": {
+  "coverage": "items are the Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes; tax is taken only from the GST duty head recorded on a ledger master, never from a name or an amount; every other voucher type that touches those ledgers is listed apart (whether it belongs in a return is the CA's call); Purchase and Debit Note vouchers with no entry on a Duties & Taxes ledger are counted in purchase_vouchers_without_duties_taxes_entry, not returned as items",
+  "items": [
+   {
+    "alter_id": 10,
+    "cancelled": false,
+    "date": "20250428",
+    "duties_taxes_entries_with_unrecognised_head": [],
+    "duties_taxes_entries_without_gst_head": [],
+    "entries_on_ledgers_with_unresolved_group": [],
+    "guid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000000a",
+    "has_taxable_entry": true,
+    "is_invoice": false,
+    "optional": false,
+    "other_entries": [],
+    "party": "Chem Supplier 1",
+    "party_entries": [
+     {
+      "amount": "-1180.00",
+      "bill_allocations": [
+       {
+        "amount": "-1180.00",
+        "bill_type": "On Account",
+        "reference": {
+         "kind": "on_account"
+        }
+       }
+      ],
+      "is_deemed_positive": "Yes",
+      "ledger": "Chem Supplier 1"
+     }
+    ],
+    "party_group": "Sundry Creditors",
+    "post_dated": false,
+    "status": "complete",
+    "tax_in_books": [
+     {
+      "amount": "90.00",
+      "bill_allocations": [],
+      "head": "cgst",
+      "is_deemed_positive": "No",
+      "ledger": "CGST",
+      "raw_head": "CGST"
+     },
+     {
+      "amount": "90.00",
+      "bill_allocations": [],
+      "head": "state_tax",
+      "is_deemed_positive": "No",
+      "ledger": "State Tax",
+      "raw_head": "State Tax"
+     }
+    ],
+    "taxable_entries": [
+     {
+      "amount": "1000.00",
+      "bill_allocations": [],
+      "is_deemed_positive": "No",
+      "ledger": "Purchase - Local"
+     }
+    ],
+    "voucher_class": "Debit Note",
+    "voucher_number": "1",
+    "voucher_type": "Debit Note"
+   }
+  ],
+  "ledger_masters_observed": 44,
+  "next_offset": null,
+  "offset": 0,
+  "other_voucher_types_touching_duties_taxes": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "profile": "agent_purchase_register_v1",
+  "purchase_vouchers_without_duties_taxes_entry": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "reason": null,
+  "register_classes": [
+   "Purchase",
+   "Debit Note"
+  ],
+  "state": "complete",
+  "total": 1,
+  "unclassified_voucher_type": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "vouchers_observed": 1,
+  "vouchers_with_unplaced_ledgers": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  }
+ },
+ "truncated": false
+}

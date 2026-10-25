@@ -39,7 +39,9 @@ fn captured_bill_allocations_preserve_raw_fields_and_empty_entries() {
         json!([{
             "reference": {"kind": "named", "name": "SET-INV-001"},
             "bill_type": "New Ref",
-            "amount": "-1137.50"
+            "amount": "-1137.50",
+            "bill_date": "20250408",
+            "credit_period": {"value": 30, "unit": "days"}
         }])
     );
     assert_eq!(rows[0]["amounts"][1]["bill_allocations"], json!([]));
@@ -424,7 +426,10 @@ fn numeric_voucher_ids_distinguish_absence_from_invalid_observations() {
     }
     let rows = parse_agent_rows(&captured, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
     assert_eq!(rows[0]["alter_id"], 1);
-    assert_eq!(rows[0]["master_id"], " 1");
+    // The capture carries Tally's padded `<MASTERID TYPE="Number"> 1</MASTERID>`;
+    // the row carries the plain number text (#989).
+    assert!(captured.contains("> 1</MASTERID>"));
+    assert_eq!(rows[0]["master_id"], "1");
     assert_eq!(parse_optional_tally_u64(None, "invalid"), Ok(None));
     assert_eq!(
         parse_optional_tally_u64(Some(" 0001 "), "invalid"),
@@ -766,15 +771,19 @@ fn repeated_captured_voucher_identities_are_refused_before_selection_or_movement
         first_start + captured[first_start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
     let first = &captured[first_start..first_end];
     let guid = original[0]["guid"].as_str().unwrap();
-    let master = original[0]["master_id"].as_str().unwrap();
+    // The first voucher's master ID as the capture spells it, padded. The row's
+    // `master_id` is the trimmed "1" (#989), which would match nothing here.
+    let master = "> 1</MASTERID>";
+    assert_eq!(original[0]["master_id"], "1");
+    assert!(first.contains(master), "{first}");
     for duplicate in [
         first.to_string(),
         first
             .replace(guid, &guid.to_ascii_uppercase())
-            .replace(&format!(">{master}</MASTERID>"), ">999</MASTERID>"),
+            .replace(master, ">999</MASTERID>"),
         first
             .replace(guid, &format!("{CAPTURED_VOUCHER_COMPANY_GUID}-distinct"))
-            .replace(&format!(">{master}</MASTERID>"), ">0001</MASTERID>"),
+            .replace(master, ">0001</MASTERID>"),
     ] {
         let repeated = captured.replacen("</COLLECTION>", &format!("{duplicate}</COLLECTION>"), 1);
         for require_identity in [false, true] {
@@ -1145,73 +1154,72 @@ fn reference_is_invoice_and_party_gstin_are_optional_and_non_conflated() {
     assert!(rows[0].get("party_gstin").is_none());
 }
 
-fn captured_utf16le(bytes: &[u8]) -> String {
-    String::from_utf16(
-        &bytes
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect::<Vec<_>>(),
-    )
-    .unwrap()
-}
-
-/// `TALLY_PROTOCOL_REFERENCE.md` §1.1(d): the agent parsers read `&#4;` as
-/// the marker the protocol crate's native parsers produce, not as U+0004.
-const MARKED_ROOT: &str = "\u{fffd}#4; Primary";
-
+/// `reference_date` (#1257), checked on injected shapes: the captured three-voucher fixture was taken before
+/// the request named REFERENCEDATE, so these elements are derived. The shapes Tally sent under this request
+/// (`TYPE="Date"`, empty or `YYYYMMDD`) are tested on captured rows in
+/// `the_captured_rows_give_a_reference_date_only_where_tally_sent_one`; the forms injected here that no capture
+/// shows (no `TYPE` attribute, a self-closing element, a padded value) are accepted by the parse but not
+/// observed. The test also pins the refusal of a value that is not a date.
 #[test]
-fn a_captured_group_parent_reads_as_the_marker_in_the_changed_master_feed() {
-    // The captured Group collection carries `&#4; Primary` in PARENT. It was
-    // fetched without a NAME element, which the changed-master reader
-    // requires, so each row's own NAME attribute is copied into one; nothing
-    // else in the capture is touched.
-    let captured = captured_utf16le(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-groups.utf16le.xml"
-    ));
-    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
-    let named = captured
-        .split("<GROUP NAME=\"")
-        .enumerate()
-        .map(|(index, part)| {
-            if index == 0 {
-                return part.to_string();
-            }
-            let name = part.split('"').next().unwrap();
-            let open_end = part.find('>').unwrap() + 1;
-            format!(
-                "<GROUP NAME=\"{}<NAME>{name}</NAME>{}",
-                &part[..open_end],
-                &part[open_end..]
-            )
-        })
-        .collect::<String>();
-    let rows = parse_agent_changed_masters(&named).expect("captured groups parse");
-    let native = bridge_tally_protocol::native_outstandings::parse_native_group_snapshot(
-        &captured,
-        company_guid,
-    )
-    .expect("the same capture parses natively");
-    let root_rows = rows
-        .iter()
-        .filter(|row| row["parent"] == MARKED_ROOT)
-        .count();
-    assert_eq!(
-        root_rows,
-        captured
-            .matches("<PARENT TYPE=\"String\">&#4; Primary</PARENT>")
-            .count()
-    );
-    assert!(root_rows > 0);
-    assert!(!rows.iter().any(|row| row["parent"]
-        .as_str()
-        .is_some_and(|parent| parent.contains('\u{4}'))));
-    for row in &rows {
-        let group = native
-            .iter()
-            .find(|group| row["name"] == group.name.as_str())
-            .expect("both readers see the same groups");
-        assert_eq!(row["parent"].as_str(), group.parent.returned_text());
+fn reference_date_is_optional_a_date_when_present_and_refused_otherwise() {
+    let captured = captured_native_vouchers();
+    for rows in [
+        parse_agent_rows(&captured, CAPTURED_VOUCHER_COMPANY_GUID).unwrap(),
+        parse_agent_changed_rows(&captured, CAPTURED_VOUCHER_COMPANY_GUID).unwrap(),
+    ] {
+        assert!(
+            rows.iter().all(|row| row.get("reference_date").is_none()),
+            "reference_date must not be invented when Tally did not report it"
+        );
     }
+    // Populated on voucher 1 only, with and without the `TYPE="Date"` attribute.
+    for element in [
+        "<REFERENCEDATE>20260415</REFERENCEDATE>",
+        "<REFERENCEDATE TYPE=\"Date\">20260415</REFERENCEDATE>",
+    ] {
+        let populated = with_injected_voucher_element(element);
+        let rows = parse_agent_rows(&populated, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+        assert_eq!(rows[0]["reference_date"], "20260415", "{element}");
+        assert!(rows[1].get("reference_date").is_none(), "{element}");
+        assert!(rows[2].get("reference_date").is_none(), "{element}");
+    }
+    // An empty element, closed or self-closing, is not observed, exactly like an absent one.
+    for element in [
+        "<REFERENCEDATE TYPE=\"Date\"></REFERENCEDATE>",
+        "<REFERENCEDATE/>",
+    ] {
+        let empty = with_injected_voucher_element(element);
+        let rows = parse_agent_rows(&empty, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+        assert!(rows[0].get("reference_date").is_none(), "{element}");
+    }
+    // A padded value is read as the date it holds, and returned trimmed.
+    let padded = with_injected_voucher_element("<REFERENCEDATE>  20260415 </REFERENCEDATE>");
+    let rows = parse_agent_rows(&padded, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    assert_eq!(rows[0]["reference_date"], "20260415");
+    // A value that is not a date refuses the read rather than passing as unobserved.
+    for bad in ["15-Apr-2026", "20261340", "20260230", "2026"] {
+        let malformed =
+            with_injected_voucher_element(&format!("<REFERENCEDATE>{bad}</REFERENCEDATE>"));
+        assert_eq!(
+            parse_agent_rows(&malformed, CAPTURED_VOUCHER_COMPANY_GUID),
+            Err("voucher_reference_date_invalid".to_string()),
+            "{bad}"
+        );
+    }
+    // The change feed reads the same rows: a value that is not a date refuses it, as it refuses the window read.
+    let malformed = with_injected_voucher_element("<REFERENCEDATE>15-Apr-2026</REFERENCEDATE>");
+    assert_eq!(
+        parse_agent_changed_rows(&malformed, CAPTURED_VOUCHER_COMPANY_GUID),
+        Err("voucher_reference_date_invalid".to_string())
+    );
+    // A repeated element is the scalar rule's refusal, as for every other scalar.
+    let twice = with_injected_voucher_element(
+        "<REFERENCEDATE>20260415</REFERENCEDATE><REFERENCEDATE>20260416</REFERENCEDATE>",
+    );
+    assert_eq!(
+        parse_agent_rows(&twice, CAPTURED_VOUCHER_COMPANY_GUID),
+        Err("agent_read_protocol_invalid".to_string())
+    );
 }
 
 #[test]
@@ -1267,7 +1275,9 @@ fn a_captured_forbidden_reference_in_voucher_text_reads_as_the_marker() {
 fn a_literal_replacement_character_that_looks_like_a_marker_reads_back_escaped() {
     // The rule keeps its rewrite reversible by escaping a literal U+FFFD that
     // is followed by `#`, digits and `;`. A voucher Bridge posted with such
-    // text would read back as other text; `validate_payload` refuses it.
+    // text would read back as other text: `validate_payload` refuses it in a
+    // voucher number or ledger name, and the build and a native post refuse it
+    // in a narration.
     let captured = captured_entry_wildcard_vouchers();
     // The capture's first non-empty narration, whatever it says.
     let open = "<NARRATION TYPE=\"String\">";
@@ -1525,13 +1535,70 @@ fn the_captured_empty_rate_composite_withholds_too() {
 
 #[test]
 fn the_captured_request_is_what_vouchers_renders_today() {
+    // The forex capture was taken before the read named REFERENCEDATE; the one word the read has
+    // added since is captured in `vouchers-reference-date-20260420.request.xml` (tested below).
     let request = include_str!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-composite-20260915.request.xml"
-    );
+    )
+    .replacen("PARTYGSTIN</FETCH>", "PARTYGSTIN,REFERENCEDATE</FETCH>", 1);
     assert_eq!(
-        render_agent_vouchers("BRIDGE CORPUS FOREX", "20260915", "20260915", None).unwrap(),
+        render_agent_vouchers(
+            "BRIDGE CORPUS FOREX",
+            &tally_date("20260915"),
+            &tally_date("20260915"),
+            None
+        )
+        .unwrap(),
         request
     );
+}
+
+const SHAPE_LAB_COMPANY_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+
+/// The request the read sends with `REFERENCEDATE` named, as a live read sent it (#1257): captured, not
+/// rendered by hand. Fail-first: the read without the word renders another request.
+#[test]
+fn the_captured_reference_date_request_is_what_vouchers_renders_today() {
+    let request = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-reference-date-20260420.request.xml"
+    );
+    assert_eq!(
+        render_agent_vouchers(
+            "BRIDGE SHAPE LAB",
+            &tally_date("20260420"),
+            &tally_date("20260420"),
+            None
+        )
+        .unwrap(),
+        request
+    );
+    assert!(request.contains("PARTYGSTIN,REFERENCEDATE</FETCH>"));
+}
+
+/// Two voucher rows of a live read of a synthetic book with `REFERENCEDATE` named (#1257): the first has the
+/// element empty (`TYPE="Date"`), the second has it populated with the voucher's own date. Fail-first: before
+/// the element was allow-listed and parsed, neither row carried `reference_date`.
+#[test]
+fn the_captured_rows_give_a_reference_date_only_where_tally_sent_one() {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-reference-date-year-rows.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    assert!(xml.contains("<REFERENCEDATE TYPE=\"Date\"></REFERENCEDATE>"));
+    assert!(xml.contains("<REFERENCEDATE TYPE=\"Date\">20250401</REFERENCEDATE>"));
+    let rows = parse_agent_rows(&xml, SHAPE_LAB_COMPANY_GUID).unwrap();
+    assert_eq!(rows.len(), 2);
+    assert!(rows[0].get("reference_date").is_none());
+    assert!(rows[0].get("reference").is_none());
+    assert_eq!(rows[1]["reference_date"], "20250401");
+    assert_eq!(rows[1]["reference"], "SHAPELAB-MANUAL-1");
+    assert_eq!(rows[1]["date"], "20250401");
 }
 
 /// Synthetic mutation: the captured forex voucher with the party entry's own
@@ -1596,4 +1663,366 @@ fn a_composite_on_an_entry_with_no_bill_allocation_withholds_or_refuses_by_its_o
     let rows = parse_agent_rows_withholding(&entry_only, FOREX_COMPANY_GUID).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(withheld_view(&rows[0])["voucher_number"], "1");
+}
+
+// ---- the bill's own date and credit period on an allocation -------------------
+
+const GST_CREDIT_PERIODS_COMPANY_GUID: &str = "46faa869-1208-4119-8961-f28db4df3b8e";
+const REOPEN_COMPANY_GUID: &str = "ec4454ae-5c4c-4bfa-b3b0-68182a749689";
+
+fn utf16_fixture(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// Live capture, TallyPrime 7.1 Silver: 40 New Ref allocations, 34 of them with a
+/// credit period in five serialisations, and 100 untyped placeholder containers.
+fn gst_credit_period_vouchers() -> String {
+    utf16_fixture(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/vouchers_gst_credit_periods_live.utf16le.xml"
+    ))
+}
+
+/// Live capture: bills settled and reopened, so Agst Ref allocations sit on
+/// vouchers dated after the bill.
+fn reopen_vouchers() -> String {
+    utf16_fixture(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/vouchers_settle_then_reopen_live.utf16le.xml"
+    ))
+}
+
+fn allocations_of(rows: &[serde_json::Value]) -> Vec<&serde_json::Value> {
+    rows.iter()
+        .flat_map(|row| row["amounts"].as_array().unwrap())
+        .flat_map(|amount| amount["bill_allocations"].as_array().unwrap())
+        .collect()
+}
+
+#[test]
+fn an_allocation_carries_its_bill_date_and_typed_credit_period_from_a_live_capture() {
+    let rows = parse_agent_rows(
+        &gst_credit_period_vouchers(),
+        GST_CREDIT_PERIODS_COMPANY_GUID,
+    )
+    .expect("the capture parses");
+    let allocations = allocations_of(&rows);
+    // The expected counts are read off the wire bytes of the capture, not from
+    // the parser: 40 New Ref allocations, each with a BILLDATE, and 34 of them
+    // with a non-empty BILLCREDITPERIOD (15 Days x7, 30 Days x7, 2 Weeks x7,
+    // 1 Months x7, 2 Months x6).
+    assert_eq!(
+        allocations.len(),
+        40,
+        "untyped placeholders are still skipped"
+    );
+    for allocation in &allocations {
+        let date = allocation["bill_date"]
+            .as_str()
+            .expect("every New Ref has a BILLDATE");
+        assert_eq!(date.len(), 8);
+        assert!(date.bytes().all(|byte| byte.is_ascii_digit()));
+    }
+    let mut periods = std::collections::BTreeMap::<String, usize>::new();
+    for allocation in &allocations {
+        if let Some(period) = allocation.get("credit_period") {
+            *periods.entry(period.to_string()).or_default() += 1;
+        }
+    }
+    let expected = [
+        (r#"{"unit":"days","value":15}"#, 7),
+        (r#"{"unit":"days","value":30}"#, 7),
+        (r#"{"unit":"weeks","value":2}"#, 7),
+        (r#"{"unit":"months","value":1}"#, 7),
+        (r#"{"unit":"months","value":2}"#, 6),
+    ]
+    .into_iter()
+    .map(|(text, count)| (text.to_string(), count))
+    .collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(periods, expected);
+    assert_eq!(
+        allocations
+            .iter()
+            .filter(|allocation| allocation.get("credit_period").is_none())
+            .count(),
+        6,
+        "an allocation whose credit period element is empty or absent carries no credit_period key"
+    );
+}
+
+#[test]
+fn a_reopening_allocation_carries_the_original_bill_date_not_its_vouchers() {
+    let rows =
+        parse_agent_rows(&reopen_vouchers(), REOPEN_COMPANY_GUID).expect("the capture parses");
+    let mut agst_with_a_later_voucher = 0;
+    for row in &rows {
+        let voucher_date = row["date"].as_str().unwrap();
+        for amount in row["amounts"].as_array().unwrap() {
+            for allocation in amount["bill_allocations"].as_array().unwrap() {
+                if allocation["bill_type"] == "Agst Ref" {
+                    assert_eq!(allocation["bill_date"], "20260810", "{allocation}");
+                    assert!(
+                        allocation["credit_period"]["value"].is_u64(),
+                        "{allocation}"
+                    );
+                    if voucher_date != "20260810" {
+                        agst_with_a_later_voucher += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        agst_with_a_later_voucher > 0,
+        "the capture has Agst Ref allocations on vouchers after the bill date"
+    );
+}
+
+#[test]
+fn on_account_and_an_empty_credit_period_carry_no_bill_fields() {
+    let rows = parse_agent_rows(
+        &captured_entry_wildcard_vouchers(),
+        WILDCARD_ALLOCATION_COMPANY_GUID,
+    )
+    .expect("the capture parses");
+    let allocations = allocations_of(&rows);
+    let on_account = allocations
+        .iter()
+        .find(|allocation| allocation["bill_type"] == "On Account")
+        .expect("the capture has an On Account allocation");
+    assert!(on_account.get("bill_date").is_none(), "{on_account}");
+    assert!(on_account.get("credit_period").is_none(), "{on_account}");
+    let new_ref = allocations
+        .iter()
+        .find(|allocation| allocation["bill_type"] == "New Ref")
+        .expect("the capture has a New Ref allocation");
+    assert_eq!(new_ref["bill_date"], "20250627");
+    assert!(
+        new_ref.get("credit_period").is_none(),
+        "an empty BILLCREDITPERIOD is not observed, and is not a zero period: {new_ref}"
+    );
+}
+
+#[test]
+fn a_malformed_bill_date_refuses_the_read_and_an_empty_one_is_absent() {
+    let captured = captured_entry_wildcard_vouchers();
+    let needle = "<BILLDATE TYPE=\"Date\">20250627</BILLDATE>";
+    assert_eq!(captured.matches(needle).count(), 1, "fault injection point");
+    for malformed in ["20250230", "not-a-date", "2025-06-27", "0"] {
+        let invalid = captured.replace(
+            needle,
+            &format!("<BILLDATE TYPE=\"Date\">{malformed}</BILLDATE>"),
+        );
+        assert_eq!(
+            parse_agent_rows(&invalid, WILDCARD_ALLOCATION_COMPANY_GUID),
+            Err("bill_allocation_date_invalid".to_string()),
+            "{malformed}"
+        );
+    }
+    let emptied = captured.replace(needle, "<BILLDATE TYPE=\"Date\"></BILLDATE>");
+    let rows = parse_agent_rows(&emptied, WILDCARD_ALLOCATION_COMPANY_GUID)
+        .expect("an empty date is not observed");
+    assert!(allocations_of(&rows)
+        .iter()
+        .all(|allocation| allocation.get("bill_date").is_none()));
+}
+
+#[test]
+fn an_unrecognised_credit_period_is_carried_as_such_and_does_not_refuse_the_window() {
+    let captured = gst_credit_period_vouchers();
+    let needle = "<BILLCREDITPERIOD JD=\"45747\" P=\"15 Days\">15 Days</BILLCREDITPERIOD>";
+    assert!(
+        captured.matches(needle).count() >= 1,
+        "fault injection point"
+    );
+    let baseline = parse_agent_rows(&captured, GST_CREDIT_PERIODS_COMPANY_GUID).unwrap();
+    for (wire, text) in [
+        ("1 Years", "1 Years"),
+        ("10000 Days", "10000 Days"),
+        ("soon", "soon"),
+    ] {
+        let injected = captured.replacen(
+            needle,
+            &format!("<BILLCREDITPERIOD>{wire}</BILLCREDITPERIOD>"),
+            1,
+        );
+        let rows = parse_agent_rows(&injected, GST_CREDIT_PERIODS_COMPANY_GUID)
+            .expect("a credit period label does not refuse the window");
+        let unrecognised = allocations_of(&rows)
+            .into_iter()
+            .filter(|allocation| allocation["credit_period"]["unit"] == "unrecognised")
+            .collect::<Vec<_>>();
+        assert_eq!(unrecognised.len(), 1, "{wire}");
+        assert_eq!(unrecognised[0]["credit_period"]["text"], text);
+        assert!(unrecognised[0]["credit_period"].get("value").is_none());
+        // Every other allocation reads exactly as in the uninjected capture.
+        assert_eq!(allocations_of(&rows).len(), allocations_of(&baseline).len());
+    }
+}
+
+#[test]
+fn an_unrecognised_credit_period_text_is_capped_and_says_so() {
+    let captured = gst_credit_period_vouchers();
+    let needle = "<BILLCREDITPERIOD JD=\"45747\" P=\"15 Days\">15 Days</BILLCREDITPERIOD>";
+    let long = "x".repeat(41) + "TAIL";
+    let injected = captured.replacen(
+        needle,
+        &format!("<BILLCREDITPERIOD>{long}</BILLCREDITPERIOD>"),
+        1,
+    );
+    let rows = parse_agent_rows(&injected, GST_CREDIT_PERIODS_COMPANY_GUID).unwrap();
+    let period = allocations_of(&rows)
+        .into_iter()
+        .map(|allocation| &allocation["credit_period"])
+        .find(|period| period["unit"] == "unrecognised")
+        .expect("the injected text is carried")
+        .clone();
+    assert_eq!(period["text"].as_str().unwrap(), "x".repeat(40));
+    assert_eq!(period["truncated"], true);
+    // A text at the cap is carried whole and is not marked.
+    let at_cap = "y".repeat(40);
+    let injected = captured.replacen(
+        needle,
+        &format!("<BILLCREDITPERIOD>{at_cap}</BILLCREDITPERIOD>"),
+        1,
+    );
+    let rows = parse_agent_rows(&injected, GST_CREDIT_PERIODS_COMPANY_GUID).unwrap();
+    let period = allocations_of(&rows)
+        .into_iter()
+        .map(|allocation| &allocation["credit_period"])
+        .find(|period| period["unit"] == "unrecognised")
+        .unwrap()
+        .clone();
+    assert_eq!(period["text"].as_str().unwrap(), at_cap);
+    assert!(period.get("truncated").is_none());
+}
+
+#[test]
+fn a_bill_date_on_an_on_account_allocation_is_carried_like_any_other() {
+    // The live On Account allocation has no BILLDATE, so the capture alone cannot
+    // show what the parser does with one. Inject one and pin it.
+    let captured = captured_entry_wildcard_vouchers();
+    let on_account = "<BILLTYPE>On Account</BILLTYPE>";
+    assert_eq!(
+        captured.matches(on_account).count(),
+        1,
+        "fault injection point"
+    );
+    let injected = captured.replace(
+        on_account,
+        "<BILLDATE TYPE=\"Date\">20250701</BILLDATE><BILLTYPE>On Account</BILLTYPE>",
+    );
+    let rows = parse_agent_rows(&injected, WILDCARD_ALLOCATION_COMPANY_GUID).unwrap();
+    let allocation = allocations_of(&rows)
+        .into_iter()
+        .find(|allocation| allocation["bill_type"] == "On Account")
+        .unwrap()
+        .clone();
+    assert_eq!(allocation["bill_date"], "20250701");
+    assert_eq!(allocation["reference"], json!({"kind": "on_account"}));
+}
+
+#[test]
+fn a_repeated_or_nested_bill_date_is_a_protocol_error() {
+    let captured = captured_entry_wildcard_vouchers();
+    let needle = "<BILLDATE TYPE=\"Date\">20250627</BILLDATE>";
+    assert_eq!(captured.matches(needle).count(), 1, "fault injection point");
+    let repeated = captured.replace(needle, &format!("{needle}{needle}"));
+    assert_eq!(
+        parse_agent_rows(&repeated, WILDCARD_ALLOCATION_COMPANY_GUID),
+        Err("agent_read_protocol_invalid".to_string())
+    );
+    let nested = captured.replace(
+        needle,
+        "<BILLDATE TYPE=\"Date\">20250627<X>1</X></BILLDATE>",
+    );
+    assert_eq!(
+        parse_agent_rows(&nested, WILDCARD_ALLOCATION_COMPANY_GUID),
+        Err("agent_read_protocol_invalid".to_string())
+    );
+    // The same for the credit period.
+    let gst = gst_credit_period_vouchers();
+    let period = "<BILLCREDITPERIOD JD=\"45747\" P=\"15 Days\">15 Days</BILLCREDITPERIOD>";
+    let repeated = gst.replacen(period, &format!("{period}{period}"), 1);
+    assert_eq!(
+        parse_agent_rows(&repeated, GST_CREDIT_PERIODS_COMPANY_GUID),
+        Err("agent_read_protocol_invalid".to_string())
+    );
+    let nested = gst.replacen(
+        period,
+        "<BILLCREDITPERIOD>15 Days<X>1</X></BILLCREDITPERIOD>",
+        1,
+    );
+    assert_eq!(
+        parse_agent_rows(&nested, GST_CREDIT_PERIODS_COMPANY_GUID),
+        Err("agent_read_protocol_invalid".to_string())
+    );
+}
+
+/// The one allocation of the GST capture whose credit period text is replaced.
+fn carried_credit_period(text: &str) -> serde_json::Value {
+    let captured = gst_credit_period_vouchers();
+    let needle = "<BILLCREDITPERIOD JD=\"45747\" P=\"15 Days\">15 Days</BILLCREDITPERIOD>";
+    let injected = captured.replacen(
+        needle,
+        &format!("<BILLCREDITPERIOD>{text}</BILLCREDITPERIOD>"),
+        1,
+    );
+    let rows = parse_agent_rows(&injected, GST_CREDIT_PERIODS_COMPANY_GUID).unwrap();
+    allocations_of(&rows)
+        .into_iter()
+        .map(|allocation| allocation["credit_period"].clone())
+        .find(|period| period["unit"] == "unrecognised")
+        .expect("the injected text is carried")
+}
+
+#[test]
+fn the_credit_period_text_cap_counts_characters_and_never_splits_one() {
+    // 41 ASCII characters: one over the cap, so cut and marked.
+    let period = carried_credit_period(&"a".repeat(41));
+    assert_eq!(period["text"].as_str().unwrap(), "a".repeat(40));
+    assert_eq!(period["truncated"], true);
+    // 40 Devanagari characters are 120 bytes: at the cap by characters, so carried
+    // whole and not marked (a byte count would cut and mark it).
+    let at_cap = "\u{0915}".repeat(40);
+    assert_eq!(at_cap.len(), 120);
+    let period = carried_credit_period(&at_cap);
+    assert_eq!(period["text"].as_str().unwrap(), at_cap);
+    assert!(period.get("truncated").is_none());
+    // 41 Devanagari characters: cut to 40 whole characters, never mid-code-point.
+    let over = "\u{0915}".repeat(41);
+    let period = carried_credit_period(&over);
+    assert_eq!(period["text"].as_str().unwrap(), at_cap);
+    assert_eq!(period["truncated"], true);
+    // A combining sequence counts by scalar value: 40 of them, cut at the 40th.
+    let mixed = "e\u{0301}".repeat(21);
+    let period = carried_credit_period(&mixed);
+    assert_eq!(period["text"].as_str().unwrap().chars().count(), 40);
+    assert_eq!(period["truncated"], true);
+}
+
+#[test]
+fn a_whitespace_only_or_self_closing_bill_date_is_not_observed() {
+    let captured = captured_entry_wildcard_vouchers();
+    let needle = "<BILLDATE TYPE=\"Date\">20250627</BILLDATE>";
+    for replacement in [
+        "<BILLDATE TYPE=\"Date\">   </BILLDATE>",
+        "<BILLDATE TYPE=\"Date\"/>",
+    ] {
+        let injected = captured.replace(needle, replacement);
+        let rows = parse_agent_rows(&injected, WILDCARD_ALLOCATION_COMPANY_GUID).unwrap();
+        assert!(allocations_of(&rows)
+            .iter()
+            .all(|allocation| allocation.get("bill_date").is_none()));
+    }
+    // A padded date is carried trimmed.
+    let padded = captured.replace(needle, "<BILLDATE TYPE=\"Date\"> 20250627 </BILLDATE>");
+    let rows = parse_agent_rows(&padded, WILDCARD_ALLOCATION_COMPANY_GUID).unwrap();
+    assert!(allocations_of(&rows)
+        .iter()
+        .any(|allocation| allocation["bill_date"] == "20250627"));
 }

@@ -11,12 +11,14 @@ import contextlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import threading
 import time
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -235,6 +237,12 @@ class Select(unittest.TestCase):
     def test_the_runner_and_its_results_are_inert(self):
         self.assertEqual(self.picked(list(mu.INERT)), set())
 
+    def test_the_local_parity_example_is_inert(self):
+        self.assertIn("examples/local_parity.rs", mu.INERT)
+        self.assertEqual(self.picked(["examples/local_parity.rs"]), set())
+        # Another example is not inert: it is not named, so its change selects everything.
+        self.assertNotEqual(self.picked(["examples/other.rs"]), set())
+
     def test_a_change_to_the_list_selects_only_the_entries_it_changes(self):
         changed = ["parity/mutations.json"]
         added = mutation("N1", "src/book.rs")
@@ -437,6 +445,69 @@ class RunOne(unittest.TestCase):
         self.assertEqual(mu.baseline([FakeWorker(self.crate, [BUILT, (*PASSED, 0.1)])], 5, 5), [])
 
 
+class BaselineOutput(unittest.TestCase):
+    """A refused baseline says why: the first compiler lines travel with the typed reason."""
+
+    def setUp(self):
+        self.t = tempfile.TemporaryDirectory()
+        self.addCleanup(self.t.cleanup)
+        self.crate = Path(self.t.name)
+        (self.crate / "src").mkdir()
+        (self.crate / "src/a.rs").write_text("x\n")
+
+    def test_the_baseline_returns_the_compiler_lines_of_a_build_that_fails(self):
+        details: list[str] = []
+        broken = FakeWorker(self.crate, [(101, "   Compiling x\nerror[E0308]: mismatched types\n  --> src/a.rs:1:1\n")])
+        problems = mu.baseline([broken], 5, 5, details)
+        self.assertEqual(problems, [f"{self.crate.name}: compile_error"])
+        self.assertEqual(details[:2], ["error[E0308]: mismatched types", "  --> src/a.rs:1:1"])
+
+    def test_the_lines_are_bounded(self):
+        details: list[str] = []
+        out = "error[E0308]: first\n" + "".join(f"  line {i}\n" for i in range(500))
+        mu.baseline([FakeWorker(self.crate, [(101, out)])], 5, 5, details)
+        self.assertLessEqual(len(details), mu.REFUSAL_LINES)
+        self.assertLessEqual(max(len(line) for line in details), mu.REFUSAL_LINE_CHARS)
+
+    def test_a_clean_baseline_has_no_lines(self):
+        details: list[str] = []
+        self.assertEqual(mu.baseline([FakeWorker(self.crate, [BUILT, PASSED])], 5, 5, details), [])
+        self.assertEqual(details, [])
+
+
+class KillGroup(unittest.TestCase):
+    """`_kill_group` on the process groups a worker starts (its own session, as `Worker.run` does)."""
+
+    def start(self, *argv: str) -> subprocess.Popen:
+        proc = subprocess.Popen(list(argv), start_new_session=True)
+        self.addCleanup(lambda: proc.poll() is None and (proc.kill(), proc.wait()))
+        return proc
+
+    def test_a_group_whose_leader_exited_unreaped_is_already_gone(self):
+        # macOS answers killpg with EPERM here (the crash that stopped a night run); Linux delivers it.
+        proc = self.start("/bin/sh", "-c", "exit 0")
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            with contextlib.suppress(ProcessLookupError):
+                if os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT):
+                    break
+            time.sleep(0.01)
+        mu._kill_group(proc)
+        self.assertEqual(proc.returncode, 0)
+
+    def test_a_running_group_is_ended(self):
+        proc = self.start("/bin/sleep", "30")
+        mu._kill_group(proc)
+        self.assertEqual(proc.returncode, -15)
+
+    def test_eperm_from_a_running_leader_is_raised(self):
+        proc = self.start("/bin/sleep", "30")
+        with unittest.mock.patch.object(mu.os, "killpg", side_effect=PermissionError(1, "denied")):
+            with self.assertRaises(PermissionError):
+                mu._kill_group(proc)
+        self.assertIsNone(proc.poll())
+
+
 class Shard(unittest.TestCase):
     def test_shards_partition_the_list_by_whole_files(self):
         muts = [mutation(f"M{i}", f"src/f{i % 5}.rs") for i in range(23)]
@@ -489,6 +560,32 @@ class Report(unittest.TestCase):
         self.assertNotIn("- `M100`", text)
         self.assertIn("... and 50 more", text)
         self.assertEqual(len(mu.failing_ids(issue(text))), mu.REPORT_ROWS + 50, "the line is never capped")
+
+    def test_the_ids_of_a_shard_that_refused_are_listed_apart_from_ids_nobody_ran(self):
+        both = [m["id"] for m in mu.shard(self.muts, 1, 2)], [m["id"] for m in mu.shard(self.muts, 2, 2)]
+        refused = {"2/2": {"shard": "2/2", "problems": ["w0: compile_error"],
+                           "output": ["error[E0463]: can't find crate for core"]}}
+        merged = {i: self.killed[i] for i in both[0]}
+        text, failed = mu.report(self.muts, merged, self.committed, refused=refused)
+        self.assertTrue(failed)
+        self.assertIn("Shards that refused to run (1)", text)
+        self.assertIn("`2/2`: w0: compile_error", text)
+        self.assertIn("error[E0463]: can't find crate for core", text)
+        self.assertIn(f"Not run, their shard refused ({len(both[1])})", text)
+        self.assertNotIn("## Not run (", text, "nothing is missing beyond the refused shard's ids")
+        # The ids still go on the failing line, so a crate change must re-prove them.
+        self.assertEqual(mu.failing_ids(issue(text)), sorted(both[1], key=[m["id"] for m in self.muts].index))
+        # An id outside every refused shard that is missing stays "Not run".
+        merged = {i: self.killed[i] for i in both[0][1:]}
+        text, _ = mu.report(self.muts, merged, self.committed, refused=refused)
+        self.assertIn("## Not run (1)", text)
+        self.assertIn(f"Not run, their shard refused ({len(both[1])})", text)
+
+    def test_a_refusal_with_no_ids_still_fails_the_run(self):
+        refused = {"9/9": {"shard": "9/9", "problems": ["w0: build_timeout"], "output": []}}
+        text, failed = mu.report(self.muts, self.killed, self.committed, refused=refused)
+        self.assertTrue(failed, text)
+        self.assertIn("`9/9`: w0: build_timeout", text)
 
     def test_warnings_do_not_fail_the_run(self):
         merged = dict(self.killed, A=record(self.muts[0], ["tests/x.rs::t"]),
@@ -704,6 +801,62 @@ class GitRepo(unittest.TestCase):
         self.assertEqual(rc, 1, out)
         self.assertIn("B1: accepted as a survivor but no longer in the list", out)
 
+    def anchors(self, ids: list[str], *argv: str) -> tuple[int, set[str]]:
+        """(exit, which of `ids` the output names) of `--check-anchors`: judged by id, never by message text."""
+        rc, out = self.main("--check-anchors", *argv)
+        return rc, {i for i in ids if re.search(rf"(?<![\w.-]){re.escape(i)}(?![\w.-])", out)}
+
+    def test_check_anchors_exits_2_on_an_anchor_not_exactly_once_in_heads_bytes(self):
+        work = self.root.parent / "mutants"
+        self.write("tests/deep.rs", "#[test] fn recurse() {}\n#[test] fn again() {}\n")
+        twice = dict(mutation("D2", "tests/deep.rs"), **{"from": "#[test] fn", "to": "#[ignore] fn"})
+        never = dict(mutation("Z0", "src/support.rs"), **{"from": "not in the file", "to": "x"})
+        ids = ["B1", "D2", "Z0"]  # B1 is the clean control
+        stale, clean = json.dumps([self.muts[0], twice, never]), json.dumps([self.muts[0]])
+        self.write("parity/mutations.json", stale)
+        self.commit("an anchor twice in a tests/ file, one nowhere in a src/ file")
+        self.assertEqual(self.anchors(ids, "--workdir", str(work)), (2, {"D2", "Z0"}))
+        # The working tree differs from HEAD in the list and in a file; HEAD's answer stands ...
+        self.write("parity/mutations.json", clean)
+        self.write("tests/deep.rs", "#[test] fn recurse() {}\n")
+        self.assertEqual(self.anchors(ids, "--workdir", str(work)), (2, {"D2", "Z0"}))
+        sh(self.repo, "checkout", "-q", "--", ".")
+        self.write("parity/mutations.json", clean)
+        self.commit("only the clean control")
+        self.assertEqual(self.anchors(ids, "--workdir", str(work)), (0, set()))
+        # ... both ways: a clean HEAD is not made stale by its working tree.
+        self.write("parity/mutations.json", stale)
+        self.write("src/book.rs", "// nothing to mutate\n")
+        self.assertEqual(self.anchors(ids, "--workdir", str(work)), (0, set()))
+        sh(self.repo, "checkout", "-q", "--", ".")
+        self.assertFalse(work.exists(), "no worker copy is made")
+        self.assertEqual(sh(self.repo, "status", "--porcelain"), "")
+
+    def test_check_anchors_names_at_most_report_rows_ids(self):
+        many = [dict(mutation(f"S{i}", "src/support.rs"), **{"from": f"absent {i};"})
+                for i in range(mu.REPORT_ROWS + 1)]
+        self.write("parity/mutations.json", json.dumps(many))
+        self.commit("more stale anchors than a report shows")
+        rc, named = self.anchors([m["id"] for m in many])
+        self.assertEqual((rc, len(named)), (2, mu.REPORT_ROWS))
+
+    def test_check_anchors_refuses_a_head_list_the_runner_cannot_judge(self):
+        for bad in ([self.muts[0], self.muts[0]], [dict(self.muts[0], id="B 1")]):  # every anchor is clean
+            self.write("parity/mutations.json", json.dumps(bad))
+            self.commit(f"a list the runner cannot judge: {bad}")
+            self.write("parity/mutations.json", json.dumps(self.muts))  # a good list, not committed
+            self.assertEqual(self.anchors(["B1"])[0], 2, bad)
+            sh(self.repo, "checkout", "-q", "--", ".")
+
+    def test_check_anchors_with_ids_or_another_mode_or_option_refuses(self):
+        out = self.root.parent / "out.json"
+        for extra in (["B1"], ["--verify"], ["--list"], ["--merge", str(out)], ["--changed-since", "HEAD"],
+                      ["--results", str(out)], ["--nightly-issues", str(out)], ["--report", str(out)],
+                      ["--full"], ["--shard", "1/2"]):
+            self.assertEqual(self.anchors([], *extra)[0], 2, extra)  # every anchor is clean: 2 is the refusal
+        self.assertFalse(out.exists(), "a refusal writes nothing")
+        self.assertEqual(self.anchors([])[0], 0, "the same list alone passes")
+
     def test_a_run_refuses_a_dirty_tree_and_a_held_workdir_before_any_build(self):
         work = self.root.parent / "mutants"
         self.prove("B1", "R1")
@@ -787,6 +940,182 @@ class GitRepo(unittest.TestCase):
             self.assertEqual(rc, 1, "B1 is killed, but a stale mutation in the list fails the run")
             self.assertIn("STALE X1", out)
         self.assertEqual(sh(self.repo, "status", "--porcelain"), "", "the working tree is never touched")
+
+    def test_a_shard_that_cannot_build_writes_a_typed_refusal_and_prints_the_compiler_lines(self):
+        outside = Path(self.t.name)
+        work, results = outside / "mutants", outside / "shard-1.json"
+        with fake_cargo(outside, FAKE_CARGO, FAKE_BUILD_FAIL="1"):
+            rc, out = self.main("--full", "--shard", "1/1", "--workdir", str(work), "--results", str(results))
+        self.assertEqual(rc, 2, out)
+        self.assertIn("error[E0463]: can't find crate for core", out)
+        doc = json.loads(results.read_text())
+        self.assertEqual(list(doc), ["refused"])
+        self.assertEqual(doc["refused"]["shard"], "1/1")
+        self.assertEqual(doc["refused"]["problems"][0].split(": ", 1)[1], "compile_error")
+        self.assertIn("error[E0463]: can't find crate for core", doc["refused"]["output"])
+        # Not a shard run: no results file, as before.
+        with fake_cargo(outside, FAKE_CARGO, FAKE_BUILD_FAIL="1"):
+            rc, out = self.main("B1", "--workdir", str(work), "--results", str(outside / "plain.json"))
+        self.assertEqual(rc, 2, out)
+        self.assertFalse((outside / "plain.json").exists())
+
+    def test_a_shard_that_crashes_before_any_mutation_writes_a_typed_refusal_and_exits_2(self):
+        """Python exits 1 on an uncaught exception, which the shard step reads as "a mutation not killed" and
+        leaves green. Any crash is exit 2, and before the first mutation it is a typed refusal like a baseline
+        failure."""
+        outside = Path(self.t.name)
+        results = outside / "shard-1.json"
+        saved = mu.committed_files
+
+        def boom(*_a):
+            raise OSError("disk gone")
+
+        mu.committed_files = boom
+        try:
+            with fake_cargo(outside, FAKE_CARGO):
+                rc, out = self.main("--full", "--shard", "1/1", "--workdir", str(outside / "mutants"),
+                                    "--results", str(results))
+        finally:
+            mu.committed_files = saved
+        self.assertEqual(rc, 2, out)
+        doc = json.loads(results.read_text())
+        self.assertEqual(list(doc), ["refused"])
+        self.assertEqual(doc["refused"]["shard"], "1/1")
+        self.assertEqual(doc["refused"]["problems"], ["crashed: OSError"])
+        self.assertTrue(doc["refused"]["output"][0].startswith("OSError: disk gone"), doc)
+        self.assertIn("OSError: disk gone", out)
+
+    def test_a_crash_after_a_mutation_has_run_keeps_its_records_and_exits_2(self):
+        outside = Path(self.t.name)
+        results = outside / "shard-1.json"
+        saved, calls = mu.run_one, []
+
+        def second_crashes(*a, **k):
+            calls.append(1)
+            if len(calls) == 2:
+                raise RuntimeError("worker died")
+            return saved(*a, **k)
+
+        mu.run_one = second_crashes
+        try:
+            with fake_cargo(outside, FAKE_CARGO):
+                rc, out = self.main("B1", "R1", "--full", "--shard", "1/1", "--workdir", str(outside / "mutants"),
+                                    "--results", str(results))
+        finally:
+            mu.run_one = saved
+        self.assertEqual(rc, 2, out)
+        doc = json.loads(results.read_text())
+        self.assertNotIn("refused", doc, "records already made are never replaced by a refusal")
+        self.assertEqual(sorted(doc), ["B1"])
+
+    def test_a_crash_whose_refusal_cannot_be_written_still_exits_2(self):
+        outside = Path(self.t.name)
+        unwritable = outside / "shard-1.json"
+        unwritable.mkdir()  # replacing a directory with the refusal file fails
+        saved = mu.committed_files
+
+        def boom(*_a):
+            raise OSError("disk gone")
+
+        mu.committed_files = boom
+        try:
+            with fake_cargo(outside, FAKE_CARGO):
+                rc, out = self.main("--full", "--shard", "1/1", "--workdir", str(outside / "mutants"),
+                                    "--results", str(unwritable))
+        finally:
+            mu.committed_files = saved
+        self.assertEqual(rc, 2, out)
+        self.assertIn("OSError: disk gone", out)
+
+    def test_a_crash_in_a_run_that_is_not_a_shard_exits_2_and_writes_no_file(self):
+        outside = Path(self.t.name)
+        saved = mu.committed_files
+
+        def boom(*_a):
+            raise OSError("disk gone")
+
+        mu.committed_files = boom
+        try:
+            with fake_cargo(outside, FAKE_CARGO):
+                rc, out = self.main("B1", "--workdir", str(outside / "mutants"), "--results", str(outside / "r.json"))
+        finally:
+            mu.committed_files = saved
+        self.assertEqual(rc, 2, out)
+        self.assertFalse((outside / "r.json").exists())
+
+    def test_a_shard_run_without_results_never_overwrites_the_committed_results_file(self):
+        outside = Path(self.t.name)
+        before = mu.RESULTS.read_bytes() if mu.RESULTS.exists() else None
+        with fake_cargo(outside, FAKE_CARGO, FAKE_BUILD_FAIL="1"):
+            rc, out = self.main("--full", "--shard", "1/1", "--workdir", str(outside / "mutants"))
+        self.assertEqual(rc, 2, out)
+        self.assertEqual(mu.RESULTS.read_bytes() if mu.RESULTS.exists() else None, before)
+
+    def test_a_corrupt_refusal_document_is_not_read_and_does_not_stop_the_merge(self):
+        parent = self.root.parent
+        good = parent / "shard-2.json"
+        good.write_text(json.dumps({m["id"]: record(m, ["tests/registry.rs::registry_ok"]) for m in self.muts}))
+        corrupt = [
+            '"refused"',                                                   # a string, not a document
+            json.dumps({"refused": None}),
+            json.dumps({"refused": "x"}),
+            json.dumps({"refused": {"problems": [], "output": []}}),         # no shard
+            json.dumps({"refused": {"shard": "abc", "problems": [], "output": []}}),
+            json.dumps({"refused": {"shard": "0/0", "problems": [], "output": []}}),
+            json.dumps({"refused": {"shard": "3/2", "problems": [], "output": []}}),
+            json.dumps({"refused": {"shard": "1/2", "problems": "w0", "output": []}}),
+            json.dumps({"refused": {"shard": "1/2", "problems": [], "output": [7]}}),
+        ]
+        for i, text in enumerate(corrupt):
+            bad = parent / f"bad-{i}.json"
+            bad.write_text(text)
+            rc, out = self.main("--merge", str(bad), str(good), "--results", str(parent / "all.json"),
+                                "--report", str(parent / "r.md"))
+            report = (parent / "r.md").read_text()
+            self.assertEqual(rc, 1, f"{text}: {out}")
+            self.assertIn("Shard results not read (1)", report, text)
+            self.assertNotIn("Shards that refused to run", report, text)
+
+    def test_a_shard_file_that_is_json_but_not_records_is_not_read_and_does_not_stop_the_merge(self):
+        # Valid JSON that is not an object of records (#1041): each is "not read", the run fails
+        # naming every id, and the good shard's records still merge. Read after the good shard, so
+        # a shape that merged would overwrite its records rather than hide behind them.
+        parent = self.root.parent
+        good = parent / "shard-1.json"
+        records = {m["id"]: record(m, ["tests/registry.rs::registry_ok"]) for m in self.muts}
+        good.write_text(json.dumps(records))
+        self.prove("B1", "R1")
+        for text in ("null", "5", '""', "[]", "[1, 2]", json.dumps({"B1": "text"})):
+            with self.subTest(shard=text):
+                bad = parent / "shard-2.json"
+                bad.write_text(text)
+                for written in (parent / "all.json", parent / "r.md"):  # never read a previous shape's
+                    written.unlink(missing_ok=True)
+                rc, out = self.main("--merge", str(good), str(bad), "--results", str(parent / "all.json"),
+                                    "--report", str(parent / "r.md"))
+                self.assertEqual(rc, 1, out)
+                report = (parent / "r.md").read_text()
+                self.assertIn("Shard results not read (1)", report)
+                self.assertEqual(mu.failing_ids(issue(report)), ["B1", "R1"])
+                self.assertEqual(json.loads((parent / "all.json").read_text()), records)
+
+    def test_merge_reads_a_refusal_apart_from_results_and_never_writes_it_into_them(self):
+        parent = self.root.parent
+        refused = parent / "shard-1.json"
+        refused.write_text(json.dumps({"refused": {"shard": "1/2", "problems": ["w0: compile_error"],
+                                                    "output": ["error[E0463]: x"]}}))
+        good = parent / "shard-2.json"
+        ids2 = [m["id"] for m in mu.shard(self.muts, 2, 2)]
+        good.write_text(json.dumps({m["id"]: record(m, ["tests/registry.rs::registry_ok"])
+                                    for m in self.muts if m["id"] in ids2}))
+        self.prove("B1", "R1")
+        rc, out = self.main("--merge", str(refused), str(good), "--results", str(parent / "all.json"),
+                            "--report", str(parent / "r.md"))
+        self.assertEqual(rc, 1, out)
+        report = (parent / "r.md").read_text()
+        self.assertIn("Shards that refused to run (1)", report)
+        self.assertNotIn("Shard results not read", report)
+        self.assertNotIn("refused", json.loads((parent / "all.json").read_text()))
 
     def test_an_accepted_survivor_passes_every_path_through_main(self):
         outside = Path(self.t.name)
@@ -873,7 +1202,9 @@ class GitRepo(unittest.TestCase):
 
 FAKE_CARGO = """#!/bin/sh
 # A stand-in for cargo: builds instantly; the suite fails when the copy holds B1's mutation.
-case " $* " in *" --no-run "*) echo "    Finished"; exit 0;; esac
+case " $* " in *" --no-run "*)
+  if [ -n "$FAKE_BUILD_FAIL" ]; then echo "error[E0463]: can't find crate for core"; exit 101; fi
+  echo "    Finished"; exit 0;; esac
 echo "     Running tests/registry.rs (/x)"
 if [ -n "$FAKE_FAIL" ] || grep -q koob src/book.rs; then echo "test registry_ok ... FAILED"; exit 101; fi
 echo "test registry_ok ... ok"

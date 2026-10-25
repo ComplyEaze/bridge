@@ -1,0 +1,284 @@
+//! Thin MCP presentation of the shared masters read.
+use super::trial_balance::page_boundary;
+use super::*;
+use crate::tally::runtime::{MastersKind, MastersRows};
+use bridge_tally_protocol::native_masters::{
+    NativeMasterDetail, NativeMasterKind, NativeMasterRow, NativeNumberingMethod,
+};
+use bridge_tally_protocol::native_voucher_type_numbering::{
+    DuplicateSetting, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
+};
+
+impl Server {
+    pub(super) async fn masters(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
+        let guid = required_string(args, "company_guid")?;
+        // Before any read: a refused kind costs no Tally request.
+        let kind = MastersKind::parse(required_string(args, "kind")?)
+            .ok_or_else(|| "argument_invalid:kind".to_string())?;
+        let (company, identity, mut prior) = self.verified_company(guid).await?;
+        let offset = arg_usize(args, "offset", 0)?;
+        let limit =
+            arg_positive_usize(args, "limit", self.settings.max_rows)?.min(self.settings.max_rows);
+        let snapshot_id = optional_string(args, "snapshot_id")?;
+        let listing = ListingKind::Masters { kind };
+        // A first page always reads fresh; a later page is served from its
+        // listing's snapshot only while the book's extent is unchanged (#630).
+        let reused = self
+            .continued_listing(
+                &identity,
+                &listing,
+                offset,
+                snapshot_id.as_deref(),
+                &mut prior,
+            )
+            .await
+            .map_err(|failure| failure.with_prior_evidence(prior.clone()))?;
+        let snapshot = match reused.clone() {
+            Some(held) => held,
+            None => {
+                let (read, extent) = self
+                    .runtime
+                    .fetch_masters_with_extent(self.tally_config(), &identity, kind)
+                    .await
+                    .map_err(|error| {
+                        ToolFailure::from_runtime("masters_read_failed", error)
+                            .with_prior_evidence(prior.clone())
+                    })?;
+                let rows = match &read.rows {
+                    MastersRows::Native(masters) => masters
+                        .rows
+                        .iter()
+                        .map(|row| native_row(row, marks_party_text(kind)))
+                        .collect::<Vec<_>>(),
+                    MastersRows::VoucherTypes(types) => types
+                        .iter()
+                        .map(|(row, numbering)| {
+                            let mut json = native_row(row, marks_party_text(kind));
+                            json["series_numbering"] = series_numbering_json(numbering);
+                            json
+                        })
+                        .collect::<Vec<_>>(),
+                    MastersRows::Groups(groups) => groups
+                        .iter()
+                        .map(|group| {
+                            json!({
+                                "name": group.name,
+                                "parent": group.parent.nonempty_returned_text(),
+                                "reserved_name": group.reserved_name,
+                            })
+                        })
+                        .collect::<Vec<_>>(),
+                };
+                self.hold_listing(ListingSnapshot::new(
+                    &identity,
+                    listing,
+                    extent,
+                    rows,
+                    None,
+                    Value::Null,
+                    evidence_from_runtime_read(read.evidence),
+                ))?
+            }
+        };
+        // A page served from a snapshot records only what it sent: the
+        // identity and extent reads, not its first page's read again.
+        let evidence = match reused {
+            Some(_) => prior,
+            None => combine_evidence(prior, snapshot.evidence.clone()),
+        };
+        let total = snapshot.rows.len();
+        let rows = snapshot
+            .rows
+            .iter()
+            .skip(offset)
+            .take(limit)
+            .cloned()
+            .collect::<Vec<_>>();
+        let (truncated, next_offset) = page_boundary(offset, rows.len(), total);
+        let mut limitations = vec![
+            "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only",
+            "One kind per call; no counts or hints; a master's aliases are not returned",
+            if marks_party_text(kind) {
+                "Under mask_parties, godown, stock-group, cost-centre and cost-category names, parents and categories are masked, because a job-work godown, a supplier-named stock group or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is left as it is"
+            } else {
+                "Voucher-type, unit and account-group names are not masked by mask_parties: they are configuration labels, not counterparties (godown, stock-group, cost-centre and cost-category names are masked)"
+            },
+        ];
+        match kind {
+            MastersKind::Native(NativeMasterKind::VoucherTypes) => limitations.extend([
+                "numbering_method is the type-level value as Tally reported it, not the voucher type's numbering method: it read `None` for types set to Automatic and to Manual on the screen (one synthetic book, Windows). It can differ from the number series that decides what a supplied number does; do not pass it to voucher_presence's numbering. A value other than Automatic, Manual or Default is returned raw under `unrecognised`",
+                "`default` is Tally's reported value, not evidence that the type numbers automatically",
+                "The company's voucher-type count (NUMVOUCHERTYPES) did not equal the rows returned on two books (35 vs 26, 33 vs 24), and on one book equalled the number-series count (inferred to count series, unmeasured): do not check these rows against it",
+                "The completeness of this list is unverified: absence from it is not evidence that a voucher type is absent from the book",
+                "Voucher types are read whole with no size check before the read, and so is the numbering read that follows it; rows, AlterIDs and response size are checked after each",
+                "series_numbering is the numbering a voucher type's series prints (series level), read from a second paired read of the voucher-type export and joined to each row by GUID with the name as a second equality. A read whose numbering cannot be trusted returns no rows and refuses as `masters_numbering_names_differ` (a type in one read only), `masters_numbering_identity_differs` (a GUID and name that disagree between the two reads), `masters_numbering_collection_changed` (the numbering read changed between its two reads) or `masters_bound_premise_violated` (the numbering answer's row count or size); a numbering answer that does not parse, a missing or repeated GUID among the causes, refuses at once with a `masters_*` cause; a moved book is reported as `masters_extent_changed` in place of a join or premise refusal",
+                "series_numbering was measured on one synthetic book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series named `Default`, of which three (Journal Automatic, Payment Manual with duplicates prevented, Receipt Manual with duplicates not prevented) were checked against Tally's screen; Automatic (Manual Override) through this tool (it is mapped from the series text measured on a synthetic book on 13 October 2026), more than one series (returned as `series_count`, with nothing read from it), Multi-user Auto, a single series not named `Default`, a voucher type created new and other releases were not measured",
+                "An `unrecognised` series method is never `manual`; a series that lacks a method or duplicate setting, repeats one, or prints a duplicate setting other than Yes or No is returned as `field_invalid`, never defaulted",
+                "Under `automatic`, and under no other method, series_numbering carries `sub_method`, the series' own NUMBERINGSUBMETHOD: `auto_retain` (the screen's Retain Original Voucher No.), `auto_renumber` (Renumber Vouchers), `absent` when the series printed none, or the raw text under `unrecognised` for any other text, a blank one included, never read as `auto_retain`; a series that repeats it is `field_invalid`. A Manual series printed `Auto Retain` too on both books read, which is not the numbering in force there, so it is not returned for one",
+                "sub_method was measured on a second synthetic book (TallyPrime 7.1 Silver, Windows) and one voucher type, Receipt, whose screen was set to Renumber Vouchers and back: it read `Auto Retain`, `Auto Renumber`, then `Auto Retain`, and with the type on Renumber Vouchers numbers already in the book changed, at the switch, when a voucher with an earlier date was entered by hand, and when one was sent by import without a number (the import's answer reported nothing altered and no voucher's AlterID moved). Not measured: any other wording, a series that prints no sub-method, other voucher types, a batch of several vouchers, Gold, other releases and the same through ComplyEaze Bridge's own post",
+                "The integrated read, the two requests sent as one tool call, was run live on 14 October 2026 on two synthetic books (TallyPrime 7.1 Silver, Windows; 24 voucher types each, each with exactly one series, whose name is not read): it was not refused, and on the six types whose numbering was set or checked on Tally's screen it returned that numbering (Manual with duplicates prevented, Manual with duplicates not prevented, Automatic); the other types, left at a new company's defaults and not checked on screen, read Automatic",
+            ]),
+            MastersKind::Native(NativeMasterKind::CostCentres | NativeMasterKind::CostCategories) => {
+                limitations.extend([
+                    "Cost centres and categories are returned whether or not the company's Cost Centres setting is on: a book with the setting off was read with its two centres and two categories and a book with it on with its three centres, one under another, and its one category (two synthetic books, the same shape); this call does not return the setting",
+                    "An empty list of cost centres does not say whether the feature is off or no centre is defined; one book with none defined answered an empty list",
+                    "An empty list of cost categories is refused, on the expectation that the predefined Primary Cost Category always exists: it was present in the two books whose categories were captured (one with the setting at No, one at Yes), and the categories of a book with none defined were not captured",
+                    "ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool reads those allocations yet, so their absence from any other tool's answer says nothing",
+                    "Measured on three synthetic books for cost centres and two for cost categories (the first two on one release; the third was captured in a separate sitting, and that sitting's own status read recorded TallyPrime 7.1, licence Silver, Education mode off; the status answer is not committed); centres nested more than one level deep, a centre with an alias beyond its own name and a larger book are not measured, and a larger book is refused when its master mark is too large for the response budget",
+                ]);
+            }
+            MastersKind::Groups => limitations.push(
+                "Groups are read whole from the group snapshot, with no size check before the read",
+            ),
+            _ => {}
+        }
+        Ok(ToolOutcome {
+            payload: json!({
+                "company": company_json(&company, std::slice::from_ref(&company)),
+                "result": {
+                    "state": "observed", "basis": "tally_native_masters",
+                    "company_guid": guid, "kind": kind.as_str(),
+                    "masters": rows, "total": total,
+                    "offset": offset, "next_offset": next_offset,
+                    "verification": "stable_paired_source_with_company_mode_and_extent_guards",
+                    "snapshot": snapshot.describe(reused.is_some()),
+                    "limitations": limitations,
+                },
+            }),
+            evidence,
+            company_guid: Some(guid.to_string()),
+            truncated,
+        })
+    }
+}
+
+/// Whether `mask_parties` masks this kind's names and parents. Godown and
+/// stock-group names are free text a user types, and a job-work godown or a
+/// supplier-named stock group can carry a party's name, so they go out under
+/// the party-name marker. Voucher-type and unit names are Tally configuration
+/// labels, and account groups are read from the group snapshot as the group
+/// tree is: none of these is marked.
+const fn marks_party_text(kind: MastersKind) -> bool {
+    matches!(
+        kind,
+        MastersKind::Native(
+            NativeMasterKind::Godowns
+                | NativeMasterKind::StockGroups
+                | NativeMasterKind::CostCentres
+                | NativeMasterKind::CostCategories
+        )
+    )
+}
+
+/// One voucher type's series-level numbering as the tool returns it.
+/// `sub_method` is returned under `automatic` only: a Manual series printed
+/// `Auto Retain` too, and returning it there would read as the numbering in
+/// force.
+fn series_numbering_json(result: &VoucherTypeNumbering) -> Value {
+    match result {
+        VoucherTypeNumbering::Observed { method, duplicates } => {
+            let (method, sub_method) = match method {
+                SeriesNumberingMethod::Automatic(sub_method) => (
+                    json!("automatic"),
+                    Some(match sub_method {
+                        NumberingSubMethod::AutoRetain => json!("auto_retain"),
+                        NumberingSubMethod::AutoRenumber => json!("auto_renumber"),
+                        NumberingSubMethod::Absent => json!("absent"),
+                        NumberingSubMethod::Unrecognised(raw) => json!({"unrecognised": raw}),
+                    }),
+                ),
+                SeriesNumberingMethod::Manual => (json!("manual"), None),
+                SeriesNumberingMethod::AutomaticManualOverride => {
+                    (json!("automatic_manual_override"), None)
+                }
+                SeriesNumberingMethod::Unrecognised(raw) => (json!({"unrecognised": raw}), None),
+            };
+            let mut observed = json!({
+                "observation": "observed",
+                "method": method,
+                "duplicates": match duplicates {
+                    DuplicateSetting::Prevented => "prevented",
+                    DuplicateSetting::NotPrevented => "not_prevented",
+                },
+            });
+            if let Some(sub_method) = sub_method {
+                observed["sub_method"] = sub_method;
+            }
+            observed
+        }
+        VoucherTypeNumbering::SeriesCount(count) => {
+            json!({"observation": "series_count", "count": count})
+        }
+        VoucherTypeNumbering::FieldInvalid(code) => {
+            json!({"observation": "field_invalid", "code": code})
+        }
+    }
+}
+
+/// One native row as the tool returns it: the fields every kind has, then its
+/// kind's own. `parent` is null where it does not apply or is absent. With
+/// `mark_party_text`, `name` and `parent` carry the party-name marker; Tally's
+/// reserved root as a parent is a fixed string, not user text, and stays plain.
+fn native_row(row: &NativeMasterRow, mark_party_text: bool) -> Value {
+    let mut json = json!({
+        "name": row.name, "guid": row.guid,
+        "master_id": row.master_id, "alter_id": row.alter_id,
+        "parent": row.parent,
+    });
+    if mark_party_text {
+        mark_party_field(&mut json, "name");
+        // A null parent keeps its key: only a text parent that is not the reserved root is user text.
+        if row
+            .parent
+            .as_deref()
+            .is_some_and(|parent| !bridge_tally_protocol::is_tally_reserved_root(parent))
+        {
+            mark_party_field(&mut json, "parent");
+        }
+    }
+    match &row.detail {
+        NativeMasterDetail::Plain => {}
+        NativeMasterDetail::VoucherType {
+            active,
+            optional,
+            numbering,
+        } => {
+            json["active"] = json!(active);
+            json["optional"] = json!(optional);
+            json["numbering_method"] = match numbering {
+                None => Value::Null,
+                Some(NativeNumberingMethod::Automatic) => json!("automatic"),
+                Some(NativeNumberingMethod::Manual) => json!("manual"),
+                Some(NativeNumberingMethod::Default) => json!("default"),
+                Some(NativeNumberingMethod::Unrecognised(raw)) => json!({"unrecognised": raw}),
+            };
+        }
+        NativeMasterDetail::Unit {
+            decimal_places,
+            simple,
+        } => {
+            json["decimal_places"] = json!(decimal_places);
+            json["simple"] = json!(simple);
+        }
+        NativeMasterDetail::CostCentre { category } => {
+            json["category"] = json!(category);
+            if mark_party_text {
+                mark_party_field(&mut json, "category");
+            }
+        }
+        NativeMasterDetail::CostCategory {
+            allocates_revenue,
+            allocates_non_revenue,
+            affects_stock,
+        } => {
+            json["allocates_revenue"] = json!(allocates_revenue);
+            json["allocates_non_revenue"] = json!(allocates_non_revenue);
+            json["affects_stock"] = json!(affects_stock);
+        }
+    }
+    json
+}
+
+#[cfg(test)]
+#[path = "agent_masters_tests.rs"]
+mod tests;

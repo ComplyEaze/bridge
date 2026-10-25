@@ -51,6 +51,9 @@ async fn captured_native_ledger_refusals_reach_command_validation_classification
     let ledger_xml = decode(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-period-opening.utf16le.xml"
     ));
+    let currency_xml = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
     let companies = bridge_tally_protocol::parse_companies_from_collection(&companies_xml).unwrap();
     let selected = companies
         .iter()
@@ -58,7 +61,7 @@ async fn captured_native_ledger_refusals_reach_command_validation_classification
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         selected.name.clone(),
-        selected.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&selected.guid.clone().unwrap()),
         selected.company_number.clone().unwrap(),
         selected.books_from.clone().unwrap(),
         &companies,
@@ -95,6 +98,7 @@ async fn captured_native_ledger_refusals_reach_command_validation_classification
         let company = xml(companies_xml.clone());
         let extent = xml(extent_xml.clone());
         let ledger = xml(fault);
+        let currency = xml(currency_xml.clone());
         let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
         let plans = vec![
             status.clone(),
@@ -104,22 +108,28 @@ async fn captured_native_ledger_refusals_reach_command_validation_classification
             status.clone(),
             extent,
             status.clone(),
+            // The ledger export checks the book's single INR master first.
+            currency.clone(),
+            status.clone(),
+            currency,
+            status.clone(),
             ledger.clone(),
             status.clone(),
             ledger,
             status,
         ];
-        let expected_bytes: usize = [0, 1, 7, 9]
+        let expected_bytes: usize = [0, 1, 7, 9, 11, 13]
             .into_iter()
             .map(|i| encode(&plans[i].fixture.body(), plans[i].encoding).len())
             .sum();
         let simulator = SequenceSimulator::spawn(plans).unwrap();
-        // TallyRuntime::fetch_ledgers is the native ledger admission runtime
-        // operation; this asserts on its raw error chain directly rather than
-        // through a command-layer classifier (its only #[tauri::command]
-        // caller, fetch_tally_ledgers, was deleted as unreachable in #474).
+        // TallyRuntime::fetch_ledgers_with_opening_as_of_evidence is the native
+        // ledger admission runtime operation; this asserts on its raw error
+        // chain directly rather than through a command-layer classifier (its
+        // only #[tauri::command] caller, fetch_tally_ledgers, was deleted as
+        // unreachable in #474).
         let error = TallyRuntime::default()
-            .fetch_ledgers(
+            .fetch_ledgers_with_opening_as_of_evidence(
                 TallyConfig {
                     host: simulator.address().ip().to_string(),
                     port: simulator.address().port(),
@@ -128,7 +138,7 @@ async fn captured_native_ledger_refusals_reach_command_validation_classification
             )
             .await
             .unwrap_err();
-        assert_eq!(simulator.finish().unwrap().len(), 11);
+        assert_eq!(simulator.finish().unwrap().len(), 15);
         assert_eq!(
             error
                 .chain()

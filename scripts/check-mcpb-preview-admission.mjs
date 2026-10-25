@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(import.meta.dirname, "..");
-const previewTag = /^mcp-preview-([0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z]+)*)$/;
+// Two forms are accepted: the current `mcp-vX.Y.Z` and the older `mcp-preview-X.Y.Z`, which the
+// published 0.2.0 and 0.3.0 use. Keep the pattern equal to the other consumers (see
+// scripts/release-tag-forms.test.mjs).
+const previewTag = /^mcp-(?:preview-|v)([0-9]+\.[0-9]+\.[0-9]+)$/;
 
 export function previewVersion(releaseTag) {
   const match = previewTag.exec(releaseTag);
-  if (!match) throw new Error("release tag must be an immutable mcp-preview semantic version");
+  if (!match) throw new Error("release tag must be an immutable mcp-v or mcp-preview- semantic version");
   return match[1];
 }
 
@@ -41,4 +45,4 @@ async function main() {
   });
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) await main();

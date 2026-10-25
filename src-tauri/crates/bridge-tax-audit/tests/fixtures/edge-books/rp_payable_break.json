@@ -1,0 +1,273 @@
+{
+ "comment": "related_parties_cl23: the paid identity check. The salary payable ledger's Trial Balance row carries its debit and credit transposed (opening and closing are right, so the voucher tie holds): paid = opening payable + accrued - closing payable fails and the module's check reports it. The rent payable row's debit is 100 paise over (within the 100-paise tolerance: silent); the interest payable row's is 101 over (reported).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Indirect Incomes": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Sundry Creditors": "Current Liabilities"
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_payable_break-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-rp_payable_break-001"
+  },
+  {
+   "name": "Interest Expense",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_payable_break-002"
+  },
+  {
+   "name": "Pay Interest Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-rp_payable_break-003"
+  },
+  {
+   "name": "Pay Rent Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-rp_payable_break-004"
+  },
+  {
+   "name": "Pay Salary Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-rp_payable_break-005"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_payable_break-006"
+  },
+  {
+   "name": "Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_payable_break-007"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-rp_payable_break-008"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 30000000,
+   "debit": 0,
+   "credit": 11130000,
+   "closing": 18870000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -27000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -27000000
+  },
+  {
+   "ledger": "Interest Expense",
+   "opening": 0,
+   "debit": 40000,
+   "credit": 0,
+   "closing": 40000
+  },
+  {
+   "ledger": "Pay Interest Payable",
+   "opening": 0,
+   "debit": 40101,
+   "credit": 40000,
+   "closing": 0
+  },
+  {
+   "ledger": "Pay Rent Payable",
+   "opening": 0,
+   "debit": 90100,
+   "credit": 90000,
+   "closing": 0
+  },
+  {
+   "ledger": "Pay Salary Payable",
+   "opening": -3000000,
+   "debit": 12000000,
+   "credit": 11000000,
+   "closing": -4000000
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 90000,
+   "credit": 0,
+   "closing": 90000
+  },
+  {
+   "ledger": "Salary",
+   "opening": 0,
+   "debit": 12000000,
+   "credit": 0,
+   "closing": 12000000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "j01",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Salary",
+     12000000
+    ],
+    [
+     "Pay Salary Payable",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-10-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Pay Salary Payable",
+     11000000
+    ],
+    [
+     "Bank A",
+     -11000000
+    ]
+   ]
+  },
+  {
+   "guid": "j02",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Rent",
+     90000
+    ],
+    [
+     "Pay Rent Payable",
+     -90000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-10-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Pay Rent Payable",
+     90000
+    ],
+    [
+     "Bank A",
+     -90000
+    ]
+   ]
+  },
+  {
+   "guid": "j03",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Expense",
+     40000
+    ],
+    [
+     "Pay Interest Payable",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2025-10-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Pay Interest Payable",
+     40000
+    ],
+    [
+     "Bank A",
+     -40000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ],
+ "related_parties": {
+  "Person P": {
+   "relationship": "son of the proprietor",
+   "ledgers_by_nature": {
+    "salary": [
+     "Pay Salary Payable"
+    ],
+    "rent": [
+     "Pay Rent Payable"
+    ],
+    "interest": [
+     "Pay Interest Payable"
+    ]
+   },
+   "payable_natures": [
+    "salary",
+    "rent",
+    "interest"
+   ]
+  }
+ }
+}

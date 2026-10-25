@@ -69,6 +69,8 @@ pub(crate) const REVIEWED_TALLY_TERMINAL_CODES: &[&str] = &[
     "canary_cache_unavailable",
     "capability_cache_unavailable",
     "capability_probe_required",
+    "company_altmstid_missing",
+    "company_book_extent_drifted",
     "company_export_invalid",
     "company_identity_mismatch",
     "connector_context_invalid",
@@ -87,6 +89,7 @@ pub(crate) const REVIEWED_TALLY_TERMINAL_CODES: &[&str] = &[
     "period_report_scope_mismatch",
     "query_profile_not_supported",
     "reconciliation_record_budget_exceeded",
+    "request_deadline_exceeded",
     "request_size_limit_exceeded",
     "response_content_encoding_unsupported",
     "response_encoding_invalid",
@@ -119,8 +122,6 @@ pub enum MirrorError {
     IdentityCollision,
     #[error("a fallback identity cannot be upgraded without an explicit audit event")]
     IdentityUpgradeRequiresAudit,
-    #[error("the record has already been observed in this batch")]
-    DuplicateObservation,
     #[error("the replayed observation conflicts with the record already stored in this batch")]
     ObservationConflict,
     #[error("the snapshot window attempt is no longer open")]
@@ -229,14 +230,6 @@ pub struct SourceIdentityInput {
     pub master_id: Option<String>,
     pub fallback_fingerprint: Option<String>,
     pub confidence: Option<Confidence>,
-}
-
-#[derive(Debug, Clone)]
-pub struct CompanyInput {
-    pub endpoint_id: String,
-    pub display_name: String,
-    pub identity: SourceIdentityInput,
-    pub observed_at_unix_ms: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -450,149 +443,6 @@ pub struct WriteFixtureEnrollmentRef {
     pub enrolled_at_unix_ms: i64,
 }
 
-#[derive(Debug, Clone)]
-pub struct WriteCanaryReservationInput {
-    pub company_id: String,
-    pub review_commitment_sha256: String,
-    pub reserved_at_unix_ms: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WriteCanaryReservationRef {
-    pub id: String,
-    pub enrollment_id: String,
-    /// Exact immutable commitment needed only by private coordinators to bind
-    /// the fixed canary payload. This reference is never serialized to a UI
-    /// or exposed through a Tauri command.
-    pub reservation_payload_sha256: String,
-    pub reserved_at_unix_ms: i64,
-}
-
-#[derive(Debug, Clone)]
-pub struct WriteCanaryPayloadBindingInput {
-    pub company_id: String,
-    pub review_commitment_sha256: String,
-    pub reservation_id: String,
-    pub reservation_payload_sha256: String,
-    pub wire_sha256: String,
-    pub intended_state_sha256: String,
-    pub identity_query_sha256: String,
-    pub bound_at_unix_ms: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WriteCanaryPayloadBindingRef {
-    pub id: String,
-    pub reservation_id: String,
-    pub bound_at_unix_ms: i64,
-}
-
-/// The complete immutable commitment set a future canary coordinator must
-/// re-present immediately before it considers a readback or dispatch step.
-/// This lookup never creates a binding and is not, by itself, an authority to
-/// send data to Tally.
-#[derive(Debug, Clone)]
-pub struct ActiveWriteCanaryPayloadBindingInput {
-    pub company_id: String,
-    pub review_commitment_sha256: String,
-    pub reservation_id: String,
-    pub reservation_payload_sha256: String,
-    pub wire_sha256: String,
-    pub intended_state_sha256: String,
-    pub identity_query_sha256: String,
-}
-
-/// A one-time, durable claim to run the sealed preflight read for the exact
-/// canary binding. It is intentionally not an authority to dispatch a write.
-#[derive(Debug, Clone)]
-pub struct BeginWriteCanaryPreflightInput {
-    pub binding: ActiveWriteCanaryPayloadBindingInput,
-    pub started_at_unix_ms: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WriteCanaryPreflightAttemptRef {
-    pub id: String,
-    pub payload_binding_id: String,
-    pub started_at_unix_ms: i64,
-}
-
-/// Digest-only evidence from the sealed canary readback. No raw response,
-/// ledger value, or dispatch authority is persisted or returned.
-#[derive(Debug, Clone)]
-pub struct WriteCanaryPreflightEvidenceInput {
-    pub attempt_id: String,
-    pub readback_state_sha256: String,
-    pub identity_coverage_sha256: String,
-    pub canonical_endpoint_sha256: String,
-    pub company_identity_sha256: String,
-    pub verified_at_unix_ms: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WriteCanaryPreflightEvidenceRef {
-    pub id: String,
-    pub attempt_id: String,
-    pub verified_at_unix_ms: i64,
-}
-
-/// The complete durable evidence commitment a future dispatch coordinator must
-/// re-present. Verifying it remains read-only and cannot issue a Tally import.
-#[derive(Debug, Clone)]
-pub struct ActiveWriteCanaryPreflightEvidenceInput {
-    pub binding: ActiveWriteCanaryPayloadBindingInput,
-    pub attempt_id: String,
-    pub evidence_id: String,
-    pub readback_state_sha256: String,
-    pub identity_coverage_sha256: String,
-    pub canonical_endpoint_sha256: String,
-    pub company_identity_sha256: String,
-}
-
-/// A one-time, durable claim that a future reviewed coordinator may consider
-/// dispatching the exact synthetic canary. The claim itself cannot send data.
-#[derive(Debug, Clone)]
-pub struct BeginWriteCanaryDispatchInput {
-    pub evidence: ActiveWriteCanaryPreflightEvidenceInput,
-    pub claimed_at_unix_ms: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WriteCanaryDispatchAttemptRef {
-    pub id: String,
-    pub evidence_id: String,
-    pub claimed_at_unix_ms: i64,
-}
-
-/// The complete immutable commitment set a final verdict must re-present.
-/// This lookup remains local and cannot construct, send, or retry a Tally
-/// import.
-#[derive(Debug, Clone)]
-pub struct ActiveWriteCanaryDispatchAttemptInput {
-    pub evidence: ActiveWriteCanaryPreflightEvidenceInput,
-    pub dispatch_attempt_id: String,
-    pub claimed_at_unix_ms: i64,
-}
-
-/// Digest-only record of an exact semantic observation correlated to one
-/// durable dispatch claim. It deliberately stores no raw Tally response,
-/// readback, payload, configuration, or transport detail.
-#[derive(Debug, Clone)]
-pub struct WriteCanaryFinalVerdictInput {
-    pub dispatch: ActiveWriteCanaryDispatchAttemptInput,
-    pub import_response_sha256: String,
-    pub readback_state_sha256: String,
-    pub identity_coverage_sha256: String,
-    pub recorded_at_unix_ms: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WriteCanaryFinalVerdictRef {
-    pub id: String,
-    pub dispatch_attempt_id: String,
-    pub recorded_at_unix_ms: i64,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct MirrorExplorerRecord {
     pub local_alias: String,
@@ -626,25 +476,10 @@ pub struct BeginBatchInput {
     pub started_at_unix_ms: i64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ObservationStatus {
-    Accepted,
-    Rejected,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObserveRecordOutcome {
     Inserted { observation_id: String },
     AlreadyPresentIdentical { observation_id: String },
-}
-
-impl ObservationStatus {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Accepted => "accepted",
-            Self::Rejected => "rejected",
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -655,16 +490,14 @@ pub struct ObservedRecordInput {
     pub identity: SourceIdentityInput,
     pub observed_at_unix_ms: i64,
     pub raw_source_sha256: String,
-    pub canonical_sha256: Option<String>,
-    pub canonical_payload: Option<Value>,
+    pub canonical_sha256: String,
+    pub canonical_payload: Value,
     pub exact_decimals: BTreeMap<String, String>,
     pub observed_alter_id: Option<String>,
-    pub status: ObservationStatus,
-    pub safe_rejection_code: Option<String>,
 }
 
 struct PreparedObservedRecord {
-    canonical_payload_json: Option<String>,
+    canonical_payload_json: String,
     exact_decimals_json: String,
 }
 
@@ -1269,667 +1102,6 @@ impl TallyMirrorRepository {
         })
     }
 
-    /// Atomically consumes the one canary slot for an active, reviewed fixture.
-    /// A replay with the same reviewed commitment returns the same reservation;
-    /// a different commitment can never allocate a second slot.
-    pub async fn reserve_write_canary(
-        &self,
-        input: WriteCanaryReservationInput,
-    ) -> Result<WriteCanaryReservationRef, MirrorError> {
-        validate_nonempty(&input.company_id, 128, "fixture_company_id")?;
-        validate_sha256(&input.review_commitment_sha256)?;
-        if input.reserved_at_unix_ms <= 0 {
-            return Err(MirrorError::InvalidInput("canary_reserved_at"));
-        }
-
-        let mut transaction = self.pool.begin().await?;
-        // SQLite starts deferred transactions. Acquire its write lock before
-        // observing an enrollment so concurrent callers serialize around the
-        // single durable reservation rather than racing into a lock error.
-        sqlx::query("UPDATE tally_schema_migrations SET version = version WHERE version = 4")
-            .execute(&mut *transaction)
-            .await?;
-        let enrollment = sqlx::query(
-            "SELECT enrollment.id AS enrollment_id, enrollment.enrollment_payload_sha256, \
-             company.id AS company_id, endpoint.canonical_origin, company.company_guid \
-             FROM tally_write_fixture_enrollments AS enrollment \
-             JOIN tally_companies AS company ON company.id = enrollment.company_id \
-             JOIN tally_endpoints AS endpoint ON endpoint.id = company.endpoint_id \
-             WHERE enrollment.company_id = ?1 \
-               AND enrollment.review_commitment_sha256 = ?2 \
-               AND company.identity_confidence = 'observed' \
-               AND company.company_guid IS NOT NULL \
-               AND TRIM(company.company_guid) <> '' \
-               AND NOT EXISTS ( \
-                 SELECT 1 FROM tally_write_fixture_revocations AS revocation \
-                 WHERE revocation.enrollment_id = enrollment.id \
-               )",
-        )
-        .bind(&input.company_id)
-        .bind(&input.review_commitment_sha256)
-        .fetch_optional(&mut *transaction)
-        .await?
-        .ok_or(MirrorError::InvalidInput("fixture_enrollment_not_active"))?;
-        let enrollment_id: String = enrollment.try_get("enrollment_id")?;
-        let enrollment_payload_sha256: String = enrollment.try_get("enrollment_payload_sha256")?;
-        let company_id: String = enrollment.try_get("company_id")?;
-        let canonical_origin: String = enrollment.try_get("canonical_origin")?;
-        let company_guid: String = enrollment.try_get("company_guid")?;
-        let company_guid_ascii_casefolded = company_guid.to_ascii_lowercase();
-        let reservation_payload_sha256 =
-            canary_reservation_payload_sha256(&CanaryReservationCommitment {
-                schema: "bridge.tally.write-canary-reservation/1",
-                enrollment_id: &enrollment_id,
-                enrollment_payload_sha256: &enrollment_payload_sha256,
-                company_id: &company_id,
-                canonical_origin: &canonical_origin,
-                company_guid_ascii_casefolded: &company_guid_ascii_casefolded,
-                review_commitment_sha256: &input.review_commitment_sha256,
-                contract_version: 1,
-            })?;
-
-        sqlx::query(
-            "INSERT INTO tally_write_canary_reservations( \
-               id, enrollment_id, reservation_payload_sha256, contract_version, reserved_at_unix_ms \
-             ) VALUES (?1, ?2, ?3, 1, ?4) \
-             ON CONFLICT(enrollment_id) DO NOTHING",
-        )
-        .bind(Uuid::new_v4().to_string())
-        .bind(&enrollment_id)
-        .bind(&reservation_payload_sha256)
-        .bind(input.reserved_at_unix_ms)
-        .execute(&mut *transaction)
-        .await?;
-        let reservation = sqlx::query(
-            "SELECT id, reservation_payload_sha256, reserved_at_unix_ms \
-             FROM tally_write_canary_reservations WHERE enrollment_id = ?1",
-        )
-        .bind(&enrollment_id)
-        .fetch_one(&mut *transaction)
-        .await?;
-        let existing_payload_sha256: String = reservation.try_get("reservation_payload_sha256")?;
-        if existing_payload_sha256 != reservation_payload_sha256 {
-            return Err(MirrorError::InvalidInput("canary_slot_already_reserved"));
-        }
-        let result = WriteCanaryReservationRef {
-            id: reservation.try_get("id")?,
-            enrollment_id,
-            reservation_payload_sha256: existing_payload_sha256,
-            reserved_at_unix_ms: reservation.try_get("reserved_at_unix_ms")?,
-        };
-        transaction.commit().await?;
-        Ok(result)
-    }
-
-    /// Atomically binds the only reserved canary slot to its exact immutable
-    /// wire, intended-state, and readback-query commitments.
-    pub async fn bind_write_canary_payload(
-        &self,
-        input: WriteCanaryPayloadBindingInput,
-    ) -> Result<WriteCanaryPayloadBindingRef, MirrorError> {
-        validate_nonempty(&input.company_id, 128, "fixture_company_id")?;
-        validate_sha256(&input.review_commitment_sha256)?;
-        validate_nonempty(&input.reservation_id, 128, "canary_reservation_id")?;
-        validate_sha256(&input.reservation_payload_sha256)?;
-        validate_sha256(&input.wire_sha256)?;
-        validate_sha256(&input.intended_state_sha256)?;
-        validate_sha256(&input.identity_query_sha256)?;
-        if input.bound_at_unix_ms <= 0 {
-            return Err(MirrorError::InvalidInput("canary_payload_bound_at"));
-        }
-
-        let mut transaction = self.pool.begin().await?;
-        // Serialize the active-enrollment check and binding insert so a
-        // revocation cannot race an otherwise valid payload commitment.
-        sqlx::query("UPDATE tally_schema_migrations SET version = version WHERE version = 4")
-            .execute(&mut *transaction)
-            .await?;
-        let reservation_exists = sqlx::query_scalar::<_, i64>(
-            r#"
-                SELECT COUNT(*)
-                FROM tally_write_canary_reservations AS reservation
-                JOIN tally_write_fixture_enrollments AS enrollment
-                  ON enrollment.id = reservation.enrollment_id
-                WHERE reservation.id = ?1
-                  AND enrollment.company_id = ?2
-                  AND enrollment.review_commitment_sha256 = ?3
-                  AND reservation.reservation_payload_sha256 = ?4
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM tally_write_fixture_revocations AS revocation
-                    WHERE revocation.enrollment_id = enrollment.id
-                  )
-            "#,
-        )
-        .bind(&input.reservation_id)
-        .bind(&input.company_id)
-        .bind(&input.review_commitment_sha256)
-        .bind(&input.reservation_payload_sha256)
-        .fetch_one(&mut *transaction)
-        .await?;
-        if reservation_exists != 1 {
-            return Err(MirrorError::InvalidInput("canary_reservation_not_active"));
-        }
-        sqlx::query(
-            r#"
-                INSERT INTO tally_write_canary_payload_bindings(
-                  id, reservation_id, wire_sha256, intended_state_sha256, identity_query_sha256,
-                  contract_version, bound_at_unix_ms
-                ) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6)
-                ON CONFLICT(reservation_id) DO NOTHING
-            "#,
-        )
-        .bind(Uuid::new_v4().to_string())
-        .bind(&input.reservation_id)
-        .bind(&input.wire_sha256)
-        .bind(&input.intended_state_sha256)
-        .bind(&input.identity_query_sha256)
-        .bind(input.bound_at_unix_ms)
-        .execute(&mut *transaction)
-        .await?;
-        let binding = sqlx::query(
-            r#"
-                SELECT id, wire_sha256, intended_state_sha256, identity_query_sha256,
-                       bound_at_unix_ms
-                FROM tally_write_canary_payload_bindings
-                WHERE reservation_id = ?1
-            "#,
-        )
-        .bind(&input.reservation_id)
-        .fetch_one(&mut *transaction)
-        .await?;
-        let existing_wire_sha256: String = binding.try_get("wire_sha256")?;
-        let existing_intended_state_sha256: String = binding.try_get("intended_state_sha256")?;
-        let existing_identity_query_sha256: String = binding.try_get("identity_query_sha256")?;
-        if existing_wire_sha256 != input.wire_sha256
-            || existing_intended_state_sha256 != input.intended_state_sha256
-            || existing_identity_query_sha256 != input.identity_query_sha256
-        {
-            return Err(MirrorError::InvalidInput("canary_payload_already_bound"));
-        }
-        let result = WriteCanaryPayloadBindingRef {
-            id: binding.try_get("id")?,
-            reservation_id: input.reservation_id,
-            bound_at_unix_ms: binding.try_get("bound_at_unix_ms")?,
-        };
-        transaction.commit().await?;
-        Ok(result)
-    }
-
-    /// Verifies that one active, durable fixture enrollment has already bound
-    /// exactly these canary commitments. This deliberately performs no insert
-    /// or state transition: a later coordinator must make its own atomic
-    /// attempt claim before network activity.
-    pub async fn active_write_canary_payload_binding(
-        &self,
-        input: ActiveWriteCanaryPayloadBindingInput,
-    ) -> Result<WriteCanaryPayloadBindingRef, MirrorError> {
-        validate_nonempty(&input.company_id, 128, "fixture_company_id")?;
-        validate_sha256(&input.review_commitment_sha256)?;
-        validate_nonempty(&input.reservation_id, 128, "canary_reservation_id")?;
-        validate_sha256(&input.reservation_payload_sha256)?;
-        validate_sha256(&input.wire_sha256)?;
-        validate_sha256(&input.intended_state_sha256)?;
-        validate_sha256(&input.identity_query_sha256)?;
-
-        let binding = sqlx::query(
-            r#"
-                SELECT binding.id, binding.reservation_id, binding.bound_at_unix_ms
-                FROM tally_write_canary_payload_bindings AS binding
-                JOIN tally_write_canary_reservations AS reservation
-                  ON reservation.id = binding.reservation_id
-                JOIN tally_write_fixture_enrollments AS enrollment
-                  ON enrollment.id = reservation.enrollment_id
-                WHERE binding.reservation_id = ?1
-                  AND enrollment.company_id = ?2
-                  AND enrollment.review_commitment_sha256 = ?3
-                  AND reservation.reservation_payload_sha256 = ?4
-                  AND binding.wire_sha256 = ?5
-                  AND binding.intended_state_sha256 = ?6
-                  AND binding.identity_query_sha256 = ?7
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM tally_write_fixture_revocations AS revocation
-                    WHERE revocation.enrollment_id = enrollment.id
-                  )
-            "#,
-        )
-        .bind(&input.reservation_id)
-        .bind(&input.company_id)
-        .bind(&input.review_commitment_sha256)
-        .bind(&input.reservation_payload_sha256)
-        .bind(&input.wire_sha256)
-        .bind(&input.intended_state_sha256)
-        .bind(&input.identity_query_sha256)
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or(MirrorError::InvalidInput(
-            "canary_payload_binding_not_active",
-        ))?;
-        Ok(WriteCanaryPayloadBindingRef {
-            id: binding.try_get("id")?,
-            reservation_id: binding.try_get("reservation_id")?,
-            bound_at_unix_ms: binding.try_get("bound_at_unix_ms")?,
-        })
-    }
-
-    /// Atomically consumes the one available preflight-read attempt for an
-    /// active, exact canary binding. The caller receives no write capability;
-    /// this records only the durable precondition for a future sealed
-    /// readback. A second call is rejected rather than retried automatically.
-    pub async fn begin_write_canary_preflight(
-        &self,
-        input: BeginWriteCanaryPreflightInput,
-    ) -> Result<WriteCanaryPreflightAttemptRef, MirrorError> {
-        let binding = input.binding;
-        validate_nonempty(&binding.company_id, 128, "fixture_company_id")?;
-        validate_sha256(&binding.review_commitment_sha256)?;
-        validate_nonempty(&binding.reservation_id, 128, "canary_reservation_id")?;
-        validate_sha256(&binding.reservation_payload_sha256)?;
-        validate_sha256(&binding.wire_sha256)?;
-        validate_sha256(&binding.intended_state_sha256)?;
-        validate_sha256(&binding.identity_query_sha256)?;
-        if input.started_at_unix_ms <= 0 {
-            return Err(MirrorError::InvalidInput("canary_preflight_started_at"));
-        }
-
-        let mut transaction = self.pool.begin().await?;
-        // SQLite starts deferred transactions. Take its write lock before
-        // checking revocation and claiming the only preflight attempt so those
-        // decisions cannot race one another.
-        sqlx::query("UPDATE tally_schema_migrations SET version = version WHERE version = 4")
-            .execute(&mut *transaction)
-            .await?;
-        let payload_binding_id = sqlx::query_scalar::<_, String>(
-            r#"
-                SELECT binding.id
-                FROM tally_write_canary_payload_bindings AS binding
-                JOIN tally_write_canary_reservations AS reservation
-                  ON reservation.id = binding.reservation_id
-                JOIN tally_write_fixture_enrollments AS enrollment
-                  ON enrollment.id = reservation.enrollment_id
-                WHERE binding.reservation_id = ?1
-                  AND enrollment.company_id = ?2
-                  AND enrollment.review_commitment_sha256 = ?3
-                  AND reservation.reservation_payload_sha256 = ?4
-                  AND binding.wire_sha256 = ?5
-                  AND binding.intended_state_sha256 = ?6
-                  AND binding.identity_query_sha256 = ?7
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM tally_write_fixture_revocations AS revocation
-                    WHERE revocation.enrollment_id = enrollment.id
-                  )
-            "#,
-        )
-        .bind(&binding.reservation_id)
-        .bind(&binding.company_id)
-        .bind(&binding.review_commitment_sha256)
-        .bind(&binding.reservation_payload_sha256)
-        .bind(&binding.wire_sha256)
-        .bind(&binding.intended_state_sha256)
-        .bind(&binding.identity_query_sha256)
-        .fetch_optional(&mut *transaction)
-        .await?
-        .ok_or(MirrorError::InvalidInput(
-            "canary_payload_binding_not_active",
-        ))?;
-        let attempt_id = Uuid::new_v4().to_string();
-        let inserted = sqlx::query(
-            "INSERT INTO tally_write_canary_preflight_attempts( \
-               id, payload_binding_id, contract_version, started_at_unix_ms \
-             ) VALUES (?1, ?2, 1, ?3) ON CONFLICT(payload_binding_id) DO NOTHING",
-        )
-        .bind(&attempt_id)
-        .bind(&payload_binding_id)
-        .bind(input.started_at_unix_ms)
-        .execute(&mut *transaction)
-        .await?
-        .rows_affected();
-        if inserted != 1 {
-            return Err(MirrorError::InvalidInput(
-                "canary_preflight_attempt_already_started",
-            ));
-        }
-        transaction.commit().await?;
-        Ok(WriteCanaryPreflightAttemptRef {
-            id: attempt_id,
-            payload_binding_id,
-            started_at_unix_ms: input.started_at_unix_ms,
-        })
-    }
-
-    /// Stores only the digest evidence for a sealed preflight readback after
-    /// rechecking that its originating fixture enrollment is still active.
-    /// An exact replay is idempotent; changed evidence fails closed.
-    pub async fn record_write_canary_preflight_evidence(
-        &self,
-        input: WriteCanaryPreflightEvidenceInput,
-    ) -> Result<WriteCanaryPreflightEvidenceRef, MirrorError> {
-        validate_nonempty(&input.attempt_id, 128, "canary_preflight_attempt_id")?;
-        validate_sha256(&input.readback_state_sha256)?;
-        validate_sha256(&input.identity_coverage_sha256)?;
-        validate_sha256(&input.canonical_endpoint_sha256)?;
-        validate_sha256(&input.company_identity_sha256)?;
-        if input.verified_at_unix_ms <= 0 {
-            return Err(MirrorError::InvalidInput("canary_preflight_verified_at"));
-        }
-
-        let mut transaction = self.pool.begin().await?;
-        sqlx::query("UPDATE tally_schema_migrations SET version = version WHERE version = 4")
-            .execute(&mut *transaction)
-            .await?;
-        let started_at_unix_ms = sqlx::query_scalar::<_, i64>(
-            r#"
-                SELECT attempt.started_at_unix_ms
-                FROM tally_write_canary_preflight_attempts AS attempt
-                JOIN tally_write_canary_payload_bindings AS binding
-                  ON binding.id = attempt.payload_binding_id
-                JOIN tally_write_canary_reservations AS reservation
-                  ON reservation.id = binding.reservation_id
-                JOIN tally_write_fixture_enrollments AS enrollment
-                  ON enrollment.id = reservation.enrollment_id
-                WHERE attempt.id = ?1
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM tally_write_fixture_revocations AS revocation
-                    WHERE revocation.enrollment_id = enrollment.id
-                  )
-            "#,
-        )
-        .bind(&input.attempt_id)
-        .fetch_optional(&mut *transaction)
-        .await?;
-        let started_at_unix_ms =
-            started_at_unix_ms.ok_or(MirrorError::InvalidInput("canary_preflight_not_active"))?;
-        if input.verified_at_unix_ms < started_at_unix_ms {
-            return Err(MirrorError::InvalidInput(
-                "canary_preflight_evidence_before_attempt",
-            ));
-        }
-        sqlx::query(
-            "INSERT INTO tally_write_canary_preflight_evidence( \
-               id, attempt_id, readback_state_sha256, identity_coverage_sha256, \
-               canonical_endpoint_sha256, company_identity_sha256, contract_version, verified_at_unix_ms \
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7) ON CONFLICT(attempt_id) DO NOTHING",
-        )
-        .bind(Uuid::new_v4().to_string())
-        .bind(&input.attempt_id)
-        .bind(&input.readback_state_sha256)
-        .bind(&input.identity_coverage_sha256)
-        .bind(&input.canonical_endpoint_sha256)
-        .bind(&input.company_identity_sha256)
-        .bind(input.verified_at_unix_ms)
-        .execute(&mut *transaction)
-        .await?;
-        let evidence = sqlx::query(
-            "SELECT id, readback_state_sha256, identity_coverage_sha256, canonical_endpoint_sha256, \
-             company_identity_sha256, verified_at_unix_ms \
-             FROM tally_write_canary_preflight_evidence WHERE attempt_id = ?1",
-        )
-        .bind(&input.attempt_id)
-        .fetch_one(&mut *transaction)
-        .await?;
-        let existing_state_sha256: String = evidence.try_get("readback_state_sha256")?;
-        let existing_coverage_sha256: String = evidence.try_get("identity_coverage_sha256")?;
-        let existing_endpoint_sha256: String = evidence.try_get("canonical_endpoint_sha256")?;
-        let existing_company_sha256: String = evidence.try_get("company_identity_sha256")?;
-        if existing_state_sha256 != input.readback_state_sha256
-            || existing_coverage_sha256 != input.identity_coverage_sha256
-            || existing_endpoint_sha256 != input.canonical_endpoint_sha256
-            || existing_company_sha256 != input.company_identity_sha256
-        {
-            return Err(MirrorError::InvalidInput(
-                "canary_preflight_evidence_already_recorded",
-            ));
-        }
-        let result = WriteCanaryPreflightEvidenceRef {
-            id: evidence.try_get("id")?,
-            attempt_id: input.attempt_id,
-            verified_at_unix_ms: evidence.try_get("verified_at_unix_ms")?,
-        };
-        transaction.commit().await?;
-        Ok(result)
-    }
-
-    /// Verifies that immutable evidence belongs to the exact active fixture
-    /// binding and one-time preflight attempt. This does not create a token or
-    /// grant dispatch authority; a later, separately reviewed coordinator
-    /// must still perform its own final check immediately before any import.
-    pub async fn active_write_canary_preflight_evidence(
-        &self,
-        input: ActiveWriteCanaryPreflightEvidenceInput,
-    ) -> Result<WriteCanaryPreflightEvidenceRef, MirrorError> {
-        let binding = input.binding;
-        validate_nonempty(&binding.company_id, 128, "fixture_company_id")?;
-        validate_sha256(&binding.review_commitment_sha256)?;
-        validate_nonempty(&binding.reservation_id, 128, "canary_reservation_id")?;
-        validate_sha256(&binding.reservation_payload_sha256)?;
-        validate_sha256(&binding.wire_sha256)?;
-        validate_sha256(&binding.intended_state_sha256)?;
-        validate_sha256(&binding.identity_query_sha256)?;
-        validate_nonempty(&input.attempt_id, 128, "canary_preflight_attempt_id")?;
-        validate_nonempty(&input.evidence_id, 128, "canary_preflight_evidence_id")?;
-        validate_sha256(&input.readback_state_sha256)?;
-        validate_sha256(&input.identity_coverage_sha256)?;
-        validate_sha256(&input.canonical_endpoint_sha256)?;
-        validate_sha256(&input.company_identity_sha256)?;
-
-        let evidence = sqlx::query(
-            r#"
-                SELECT evidence.id, evidence.attempt_id, evidence.verified_at_unix_ms
-                FROM tally_write_canary_preflight_evidence AS evidence
-                JOIN tally_write_canary_preflight_attempts AS attempt
-                  ON attempt.id = evidence.attempt_id
-                JOIN tally_write_canary_payload_bindings AS binding
-                  ON binding.id = attempt.payload_binding_id
-                JOIN tally_write_canary_reservations AS reservation
-                  ON reservation.id = binding.reservation_id
-                JOIN tally_write_fixture_enrollments AS enrollment
-                  ON enrollment.id = reservation.enrollment_id
-                WHERE evidence.id = ?1
-                  AND evidence.attempt_id = ?2
-                  AND evidence.readback_state_sha256 = ?3
-                  AND evidence.identity_coverage_sha256 = ?4
-                  AND evidence.canonical_endpoint_sha256 = ?5
-                  AND evidence.company_identity_sha256 = ?6
-                  AND binding.reservation_id = ?7
-                  AND enrollment.company_id = ?8
-                  AND enrollment.review_commitment_sha256 = ?9
-                  AND reservation.reservation_payload_sha256 = ?10
-                  AND binding.wire_sha256 = ?11
-                  AND binding.intended_state_sha256 = ?12
-                  AND binding.identity_query_sha256 = ?13
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM tally_write_fixture_revocations AS revocation
-                    WHERE revocation.enrollment_id = enrollment.id
-                  )
-            "#,
-        )
-        .bind(&input.evidence_id)
-        .bind(&input.attempt_id)
-        .bind(&input.readback_state_sha256)
-        .bind(&input.identity_coverage_sha256)
-        .bind(&input.canonical_endpoint_sha256)
-        .bind(&input.company_identity_sha256)
-        .bind(&binding.reservation_id)
-        .bind(&binding.company_id)
-        .bind(&binding.review_commitment_sha256)
-        .bind(&binding.reservation_payload_sha256)
-        .bind(&binding.wire_sha256)
-        .bind(&binding.intended_state_sha256)
-        .bind(&binding.identity_query_sha256)
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or(MirrorError::InvalidInput(
-            "canary_preflight_evidence_not_active",
-        ))?;
-        Ok(WriteCanaryPreflightEvidenceRef {
-            id: evidence.try_get("id")?,
-            attempt_id: evidence.try_get("attempt_id")?,
-            verified_at_unix_ms: evidence.try_get("verified_at_unix_ms")?,
-        })
-    }
-
-    /// Atomically consumes the sole no-send dispatch claim after rechecking
-    /// exact immutable preflight evidence and active enrollment. It creates no
-    /// transport capability and a replay fails closed rather than retrying.
-    pub async fn begin_write_canary_dispatch_attempt(
-        &self,
-        input: BeginWriteCanaryDispatchInput,
-    ) -> Result<WriteCanaryDispatchAttemptRef, MirrorError> {
-        if input.claimed_at_unix_ms <= 0 {
-            return Err(MirrorError::InvalidInput("canary_dispatch_claimed_at"));
-        }
-        let evidence = self
-            .active_write_canary_preflight_evidence(input.evidence)
-            .await?;
-        let mut transaction = self.pool.begin().await?;
-        sqlx::query("UPDATE tally_schema_migrations SET version = version WHERE version = 4")
-            .execute(&mut *transaction)
-            .await?;
-        if input.claimed_at_unix_ms < evidence.verified_at_unix_ms {
-            return Err(MirrorError::InvalidInput(
-                "canary_dispatch_claim_before_evidence",
-            ));
-        }
-        let attempt_id = Uuid::new_v4().to_string();
-        let inserted = sqlx::query(
-            "INSERT INTO tally_write_canary_dispatch_attempts( \
-               id, evidence_id, contract_version, claimed_at_unix_ms \
-             ) VALUES (?1, ?2, 1, ?3) ON CONFLICT(evidence_id) DO NOTHING",
-        )
-        .bind(&attempt_id)
-        .bind(&evidence.id)
-        .bind(input.claimed_at_unix_ms)
-        .execute(&mut *transaction)
-        .await?
-        .rows_affected();
-        if inserted != 1 {
-            return Err(MirrorError::InvalidInput(
-                "canary_dispatch_attempt_already_claimed",
-            ));
-        }
-        transaction.commit().await?;
-        Ok(WriteCanaryDispatchAttemptRef {
-            id: attempt_id,
-            evidence_id: evidence.id,
-            claimed_at_unix_ms: input.claimed_at_unix_ms,
-        })
-    }
-
-    /// Rechecks that one immutable no-send dispatch claim is tied to the exact
-    /// active fixture, payload commitments, and preflight evidence. It is a
-    /// local read only; no Tally transport can be reached through this method.
-    pub async fn active_write_canary_dispatch_attempt(
-        &self,
-        input: ActiveWriteCanaryDispatchAttemptInput,
-    ) -> Result<WriteCanaryDispatchAttemptRef, MirrorError> {
-        validate_nonempty(
-            &input.dispatch_attempt_id,
-            128,
-            "canary_dispatch_attempt_id",
-        )?;
-        if input.claimed_at_unix_ms <= 0 {
-            return Err(MirrorError::InvalidInput("canary_dispatch_claimed_at"));
-        }
-        let evidence = self
-            .active_write_canary_preflight_evidence(input.evidence)
-            .await?;
-        let dispatch = sqlx::query(
-            "SELECT id, evidence_id, claimed_at_unix_ms \
-             FROM tally_write_canary_dispatch_attempts \
-             WHERE id = ?1 AND evidence_id = ?2 AND claimed_at_unix_ms = ?3",
-        )
-        .bind(&input.dispatch_attempt_id)
-        .bind(&evidence.id)
-        .bind(input.claimed_at_unix_ms)
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or(MirrorError::InvalidInput(
-            "canary_dispatch_attempt_not_active",
-        ))?;
-        Ok(WriteCanaryDispatchAttemptRef {
-            id: dispatch.try_get("id")?,
-            evidence_id: dispatch.try_get("evidence_id")?,
-            claimed_at_unix_ms: dispatch.try_get("claimed_at_unix_ms")?,
-        })
-    }
-
-    /// Persists exactly one immutable, digest-only final verdict for an active
-    /// dispatch claim. Exact replays are safe; any changed observation fails
-    /// closed. This is not a transport or import API.
-    pub async fn record_write_canary_final_verdict(
-        &self,
-        input: WriteCanaryFinalVerdictInput,
-    ) -> Result<WriteCanaryFinalVerdictRef, MirrorError> {
-        validate_sha256(&input.import_response_sha256)?;
-        validate_sha256(&input.readback_state_sha256)?;
-        validate_sha256(&input.identity_coverage_sha256)?;
-        if input.recorded_at_unix_ms <= 0 {
-            return Err(MirrorError::InvalidInput(
-                "canary_final_verdict_recorded_at",
-            ));
-        }
-        let dispatch = self
-            .active_write_canary_dispatch_attempt(input.dispatch)
-            .await?;
-        if input.recorded_at_unix_ms < dispatch.claimed_at_unix_ms {
-            return Err(MirrorError::InvalidInput(
-                "canary_final_verdict_before_dispatch_claim",
-            ));
-        }
-
-        let mut transaction = self.pool.begin().await?;
-        sqlx::query("UPDATE tally_schema_migrations SET version = version WHERE version = 4")
-            .execute(&mut *transaction)
-            .await?;
-        sqlx::query(
-            "INSERT INTO tally_write_canary_final_verdicts( \
-               id, dispatch_attempt_id, import_response_sha256, \
-               readback_state_sha256, identity_coverage_sha256, contract_version, \
-               recorded_at_unix_ms \
-             ) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6) \
-             ON CONFLICT(dispatch_attempt_id) DO NOTHING",
-        )
-        .bind(Uuid::new_v4().to_string())
-        .bind(&dispatch.id)
-        .bind(&input.import_response_sha256)
-        .bind(&input.readback_state_sha256)
-        .bind(&input.identity_coverage_sha256)
-        .bind(input.recorded_at_unix_ms)
-        .execute(&mut *transaction)
-        .await?;
-        let verdict = sqlx::query(
-            "SELECT id, import_response_sha256, readback_state_sha256, \
-             identity_coverage_sha256, recorded_at_unix_ms \
-             FROM tally_write_canary_final_verdicts WHERE dispatch_attempt_id = ?1",
-        )
-        .bind(&dispatch.id)
-        .fetch_one(&mut *transaction)
-        .await?;
-        let existing_import_response_sha256: String = verdict.try_get("import_response_sha256")?;
-        let existing_readback_state_sha256: String = verdict.try_get("readback_state_sha256")?;
-        let existing_identity_coverage_sha256: String =
-            verdict.try_get("identity_coverage_sha256")?;
-        if existing_import_response_sha256 != input.import_response_sha256
-            || existing_readback_state_sha256 != input.readback_state_sha256
-            || existing_identity_coverage_sha256 != input.identity_coverage_sha256
-        {
-            return Err(MirrorError::InvalidInput(
-                "canary_final_verdict_already_recorded",
-            ));
-        }
-        let result = WriteCanaryFinalVerdictRef {
-            id: verdict.try_get("id")?,
-            dispatch_attempt_id: dispatch.id,
-            recorded_at_unix_ms: verdict.try_get("recorded_at_unix_ms")?,
-        };
-        transaction.commit().await?;
-        Ok(result)
-    }
-
     pub async fn write_fixture_enrollment_status(
         &self,
         company_id: &str,
@@ -2101,54 +1273,6 @@ impl TallyMirrorRepository {
                 )
             }),
         )
-    }
-
-    /// Retains the ordinary observed-support contract used by non-snapshot capability flows.
-    pub async fn capability_snapshot_matches_plan(
-        &self,
-        snapshot_id: &str,
-        company_id: &str,
-        profile_version: u16,
-        product: &str,
-        release: Option<&str>,
-        mode: Option<&str>,
-    ) -> Result<bool, MirrorError> {
-        validate_nonempty(snapshot_id, 128, "capability_snapshot_id")?;
-        validate_nonempty(company_id, 128, "company_id")?;
-        if profile_version == 0 {
-            return Err(MirrorError::InvalidInput("profile_version"));
-        }
-        validate_nonempty(product, 128, "product")?;
-        validate_optional_text(release, 128, "release")?;
-        validate_optional_text(mode, 64, "mode")?;
-        let matches = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM tally_capability_snapshots AS snapshot \
-             JOIN tally_companies AS company ON company.endpoint_id = snapshot.endpoint_id \
-             WHERE snapshot.id = ?1 AND company.id = ?2 \
-               AND snapshot.profile_version = ?3 AND snapshot.product = ?4 \
-               AND snapshot.release IS ?5 AND snapshot.mode IS ?6 \
-               AND EXISTS (SELECT 1 FROM tally_capability_items AS transport \
-                 WHERE transport.snapshot_id = snapshot.id \
-                   AND transport.capability_kind = 'transport' \
-                   AND transport.capability_key = 'xml_http' \
-                   AND transport.capability_state = 'supported' \
-                   AND transport.confidence = 'observed') \
-               AND EXISTS (SELECT 1 FROM tally_capability_items AS pack \
-                 WHERE pack.snapshot_id = snapshot.id \
-                   AND pack.capability_kind = 'pack' \
-                   AND pack.capability_key = 'core_accounting' \
-                   AND pack.capability_state = 'supported' \
-                   AND pack.confidence = 'observed')",
-        )
-        .bind(snapshot_id)
-        .bind(company_id)
-        .bind(i64::from(profile_version))
-        .bind(product)
-        .bind(release)
-        .bind(mode)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(matches == 1)
     }
 
     pub async fn migrate(&self) -> Result<(), MirrorError> {
@@ -2620,88 +1744,6 @@ impl TallyMirrorRepository {
         })
     }
 
-    pub async fn upsert_company(&self, input: CompanyInput) -> Result<CompanyRef, MirrorError> {
-        validate_company_input(&input)?;
-        let mut transaction = self.pool.begin().await?;
-        let company = Self::upsert_company_in_transaction(&mut transaction, input).await?;
-        transaction.commit().await?;
-        Ok(company)
-    }
-
-    async fn upsert_company_in_transaction(
-        transaction: &mut Transaction<'_, Sqlite>,
-        input: CompanyInput,
-    ) -> Result<CompanyRef, MirrorError> {
-        let matches = find_identity_matches(
-            transaction,
-            "tally_companies",
-            "endpoint_id",
-            &input.endpoint_id,
-            None,
-            &input.identity,
-        )
-        .await?;
-
-        let id = match unique_match(matches)? {
-            Some(existing) => {
-                ensure_no_silent_identity_change(&existing, &input.identity)?;
-                let incoming_confidence = generic_company_confidence(&input.identity).as_str();
-                let observed_row_refreshed = sqlx::query(
-                    "UPDATE tally_companies SET last_observed_at_unix_ms = ?1 \
-                     WHERE id = ?2 AND identity_confidence = 'observed'",
-                )
-                .bind(input.observed_at_unix_ms)
-                .bind(&existing.id)
-                .execute(&mut **transaction)
-                .await?;
-                if observed_row_refreshed.rows_affected() == 0 {
-                    sqlx::query(
-                        "UPDATE tally_companies SET display_name = ?1, last_observed_at_unix_ms = ?2, \
-                         identity_confidence = CASE \
-                           WHEN ?3 = 'documented' THEN 'documented' \
-                           WHEN ?3 = 'inferred' AND identity_confidence = 'unknown' THEN 'inferred' \
-                           ELSE identity_confidence END \
-                         WHERE id = ?4 AND identity_confidence <> 'observed'",
-                    )
-                    .bind(&input.display_name)
-                    .bind(input.observed_at_unix_ms)
-                    .bind(incoming_confidence)
-                    .bind(&existing.id)
-                    .execute(&mut **transaction)
-                    .await?;
-                }
-                existing.id
-            }
-            None => {
-                let id = Uuid::new_v4().to_string();
-                let incoming_confidence = generic_company_confidence(&input.identity).as_str();
-                sqlx::query(
-                    "INSERT INTO tally_companies(\
-                       id, endpoint_id, display_name, company_guid, remote_id, master_id, \
-                       fallback_fingerprint, identity_confidence, first_observed_at_unix_ms, \
-                       last_observed_at_unix_ms\
-                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
-                )
-                .bind(&id)
-                .bind(&input.endpoint_id)
-                .bind(&input.display_name)
-                .bind(&input.identity.guid)
-                .bind(&input.identity.remote_id)
-                .bind(&input.identity.master_id)
-                .bind(&input.identity.fallback_fingerprint)
-                .bind(incoming_confidence)
-                .bind(input.observed_at_unix_ms)
-                .execute(&mut **transaction)
-                .await?;
-                id
-            }
-        };
-        Ok(CompanyRef {
-            id,
-            display_name: input.display_name,
-        })
-    }
-
     /// Persists only a complete, directly observed company tuple. This path is
     /// deliberately separate from the generic source-record identity helper:
     /// a Tally GUID is not unique after a year-end split, so a GUID match must
@@ -3011,15 +2053,7 @@ impl TallyMirrorRepository {
         Ok(id)
     }
 
-    pub async fn observe_record(&self, input: ObservedRecordInput) -> Result<String, MirrorError> {
-        match self.observe_record_idempotent(input).await {
-            Ok(ObserveRecordOutcome::Inserted { observation_id }) => Ok(observation_id),
-            Ok(ObserveRecordOutcome::AlreadyPresentIdentical { .. })
-            | Err(MirrorError::ObservationConflict) => Err(MirrorError::DuplicateObservation),
-            Err(error) => Err(error),
-        }
-    }
-
+    #[cfg(test)]
     pub async fn observe_record_idempotent(
         &self,
         input: ObservedRecordInput,
@@ -3056,12 +2090,10 @@ impl TallyMirrorRepository {
             return Err(MirrorError::BatchClosed);
         }
 
-        let matches = find_identity_matches(
+        let matches = find_source_record_matches(
             transaction,
-            "tally_source_records",
-            "company_id",
             &company_id,
-            Some(&input.object_type),
+            &input.object_type,
             &input.identity,
         )
         .await?;
@@ -3087,23 +2119,21 @@ impl TallyMirrorRepository {
                         && stored
                             .try_get::<Option<String>, _>("canonical_sha256")?
                             .as_deref()
-                            == input.canonical_sha256.as_deref()
+                            == Some(input.canonical_sha256.as_str())
                         && stored
                             .try_get::<Option<String>, _>("canonical_payload_json")?
                             .as_deref()
-                            == prepared.canonical_payload_json.as_deref()
+                            == Some(prepared.canonical_payload_json.as_str())
                         && stored.try_get::<String, _>("exact_decimals_json")?.as_str()
                             == prepared.exact_decimals_json.as_str()
                         && stored
                             .try_get::<Option<String>, _>("observed_alter_id")?
                             .as_deref()
                             == input.observed_alter_id.as_deref()
-                        && stored.try_get::<String, _>("validation_status")?.as_str()
-                            == input.status.as_str()
+                        && stored.try_get::<String, _>("validation_status")?.as_str() == "accepted"
                         && stored
                             .try_get::<Option<String>, _>("safe_rejection_code")?
-                            .as_deref()
-                            == input.safe_rejection_code.as_deref();
+                            .is_none();
                     if !identical {
                         return Err(MirrorError::ObservationConflict);
                     }
@@ -3153,8 +2183,8 @@ impl TallyMirrorRepository {
             "INSERT INTO tally_record_observations(\
                id, batch_id, source_record_id, observed_at_unix_ms, raw_source_sha256, \
                canonical_sha256, canonical_payload_json, exact_decimals_json, observed_alter_id, \
-               validation_status, safe_rejection_code\
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+               validation_status\
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'accepted')",
         )
         .bind(&observation_id)
         .bind(&input.batch_id)
@@ -3165,8 +2195,6 @@ impl TallyMirrorRepository {
         .bind(&prepared.canonical_payload_json)
         .bind(&prepared.exact_decimals_json)
         .bind(&input.observed_alter_id)
-        .bind(input.status.as_str())
-        .bind(&input.safe_rejection_code)
         .execute(&mut **transaction)
         .await?;
         Ok(ObservedTransactionResult {
@@ -3264,15 +2292,6 @@ impl TallyMirrorRepository {
             },
             prior_abandonment,
         })
-    }
-
-    pub async fn stage_snapshot_window_membership(
-        &self,
-        attempt: &SnapshotWindowAttemptRef,
-        membership: SnapshotWindowMembershipInput,
-    ) -> Result<StageSnapshotWindowMembershipsResult, MirrorError> {
-        self.stage_snapshot_window_memberships(attempt, vec![membership])
-            .await
     }
 
     pub async fn abandon_snapshot_window_attempt(
@@ -3451,12 +2470,8 @@ impl TallyMirrorRepository {
                     };
                     (
                         record_key,
-                        observation
-                            .canonical_sha256
-                            .expect("validated accepted observation"),
-                        prepared
-                            .canonical_payload_json
-                            .expect("validated accepted observation"),
+                        observation.canonical_sha256,
+                        prepared.canonical_payload_json,
                         prepared.exact_decimals_json,
                         "observed",
                         Some(observed.source_record_id),
@@ -3903,9 +2918,14 @@ impl TallyMirrorRepository {
         .fetch_one(&mut *transaction)
         .await?;
 
+        // No path in this build writes a rejected observation, but the schema
+        // still admits one; a batch that holds one is refused whatever its
+        // verification state, so the hashed count stays zero.
+        if rejected_records != 0 {
+            return Err(MirrorError::VerificationInvariant);
+        }
         if input.verification == VerificationState::Verified
             && (input.outcome != RunOutcome::Completed
-                || rejected_records != 0
                 || !input.gap_codes.is_empty()
                 || input.snapshot_sha256.is_none()
                 || input.checkpoint_after.is_none())
@@ -4189,27 +3209,10 @@ impl TallyMirrorRepository {
         })
     }
 
-    pub async fn commit_receipt_for_batch(
-        &self,
-        batch_id: &str,
-        run_id: &str,
-    ) -> Result<CommitResult, MirrorError> {
-        self.proof_receipt_for_batch(batch_id, run_id, true).await
-    }
-
     pub(crate) async fn historical_commit_receipt_for_batch(
         &self,
         batch_id: &str,
         run_id: &str,
-    ) -> Result<CommitResult, MirrorError> {
-        self.proof_receipt_for_batch(batch_id, run_id, false).await
-    }
-
-    async fn proof_receipt_for_batch(
-        &self,
-        batch_id: &str,
-        run_id: &str,
-        require_current_checkpoint: bool,
     ) -> Result<CommitResult, MirrorError> {
         validate_nonempty(batch_id, 128, "batch_id")?;
         validate_nonempty(run_id, 128, "run_id")?;
@@ -4316,22 +3319,8 @@ impl TallyMirrorRepository {
         }
 
         let checkpoint_advanced = if verification == VerificationState::Verified {
-            let checkpoint_after = checkpoint_after
-                .as_deref()
-                .ok_or(MirrorError::VerificationInvariant)?;
-            if require_current_checkpoint {
-                let matches = sqlx::query_scalar::<_, i64>(
-                    "SELECT COUNT(*) FROM tally_checkpoints WHERE proof_id = ?1 AND run_id = ?2 \
-                     AND checkpoint_token = ?3",
-                )
-                .bind(&proof_id)
-                .bind(run_id)
-                .bind(checkpoint_after)
-                .fetch_one(&self.pool)
-                .await?;
-                if matches != 1 {
-                    return Err(MirrorError::VerificationInvariant);
-                }
+            if checkpoint_after.is_none() {
+                return Err(MirrorError::VerificationInvariant);
             }
             true
         } else {
@@ -4874,54 +3863,29 @@ struct IdentityRow {
     fallback_fingerprint: Option<String>,
 }
 
-async fn find_identity_matches(
+async fn find_source_record_matches(
     transaction: &mut Transaction<'_, Sqlite>,
-    table: &'static str,
-    owner_column: &'static str,
-    owner_id: &str,
-    object_type: Option<&str>,
+    company_id: &str,
+    object_type: &str,
     identity: &SourceIdentityInput,
 ) -> Result<Vec<IdentityRow>, MirrorError> {
-    let rows = match (table, owner_column) {
-        ("tally_companies", "endpoint_id") => {
-            sqlx::query(
-                "SELECT id, company_guid AS guid, remote_id, master_id, fallback_fingerprint \
-             FROM tally_companies WHERE endpoint_id = ?1 AND (\
-               (?2 IS NOT NULL AND company_guid = ?2 COLLATE NOCASE) OR \
-               (?3 IS NOT NULL AND remote_id = ?3) OR \
-               (?4 IS NOT NULL AND master_id = ?4) OR \
-               (?5 IS NOT NULL AND fallback_fingerprint = ?5)\
-             )",
-            )
-            .bind(owner_id)
-            .bind(identity.guid.as_deref())
-            .bind(identity.remote_id.as_deref())
-            .bind(identity.master_id.as_deref())
-            .bind(identity.fallback_fingerprint.as_deref())
-            .fetch_all(&mut **transaction)
-            .await?
-        }
-        ("tally_source_records", "company_id") => {
-            sqlx::query(
-                "SELECT id, source_guid AS guid, remote_id, master_id, fallback_fingerprint \
-             FROM tally_source_records WHERE company_id = ?1 AND object_type = ?2 AND (\
-               (?3 IS NOT NULL AND source_guid = ?3) OR \
-               (?4 IS NOT NULL AND remote_id = ?4) OR \
-               (?5 IS NOT NULL AND master_id = ?5) OR \
-               (?6 IS NOT NULL AND fallback_fingerprint = ?6)\
-             )",
-            )
-            .bind(owner_id)
-            .bind(object_type.ok_or(MirrorError::InvalidInput("object_type"))?)
-            .bind(identity.guid.as_deref())
-            .bind(identity.remote_id.as_deref())
-            .bind(identity.master_id.as_deref())
-            .bind(identity.fallback_fingerprint.as_deref())
-            .fetch_all(&mut **transaction)
-            .await?
-        }
-        _ => return Err(MirrorError::InvalidInput("identity_query_scope")),
-    };
+    let rows = sqlx::query(
+        "SELECT id, source_guid AS guid, remote_id, master_id, fallback_fingerprint \
+         FROM tally_source_records WHERE company_id = ?1 AND object_type = ?2 AND (\
+           (?3 IS NOT NULL AND source_guid = ?3) OR \
+           (?4 IS NOT NULL AND remote_id = ?4) OR \
+           (?5 IS NOT NULL AND master_id = ?5) OR \
+           (?6 IS NOT NULL AND fallback_fingerprint = ?6)\
+         )",
+    )
+    .bind(company_id)
+    .bind(object_type)
+    .bind(identity.guid.as_deref())
+    .bind(identity.remote_id.as_deref())
+    .bind(identity.master_id.as_deref())
+    .bind(identity.fallback_fingerprint.as_deref())
+    .fetch_all(&mut **transaction)
+    .await?;
 
     rows.into_iter()
         .map(|row| {
@@ -4987,15 +3951,6 @@ fn identity_confidence(identity: &SourceIdentityInput) -> Confidence {
             Confidence::Observed
         },
     )
-}
-
-/// Generic identity matching lacks the complete Company-collection tuple, so
-/// it cannot create or promote an observed company pin.
-fn generic_company_confidence(identity: &SourceIdentityInput) -> Confidence {
-    match identity_confidence(identity) {
-        Confidence::Observed => Confidence::Documented,
-        confidence => confidence,
-    }
 }
 
 fn license_tier_key(tier: bridge_tally_core::LicenseTier) -> &'static str {
@@ -5324,16 +4279,6 @@ fn validate_books_from_yyyymmdd(value: &str) -> Result<(), MirrorError> {
         .map_err(|_| MirrorError::InvalidInput("books_from_yyyymmdd"))
 }
 
-fn validate_company_input(input: &CompanyInput) -> Result<(), MirrorError> {
-    validate_nonempty(&input.endpoint_id, 128, "endpoint_id")?;
-    validate_nonempty(&input.display_name, 512, "display_name")?;
-    validate_identity(&input.identity)?;
-    if let Some(guid) = input.identity.guid.as_deref() {
-        validate_company_guid(guid)?;
-    }
-    Ok(())
-}
-
 fn validate_identity(identity: &SourceIdentityInput) -> Result<(), MirrorError> {
     for value in [
         identity.guid.as_deref(),
@@ -5351,24 +4296,6 @@ fn validate_identity(identity: &SourceIdentityInput) -> Result<(), MirrorError> 
         return Err(MirrorError::InvalidInput("source_identity"));
     }
     Ok(())
-}
-
-fn validate_observation_shape(input: &ObservedRecordInput) -> Result<(), MirrorError> {
-    match input.status {
-        ObservationStatus::Accepted
-            if input.canonical_sha256.is_some()
-                && input.canonical_payload.is_some()
-                && input.safe_rejection_code.is_none() =>
-        {
-            Ok(())
-        }
-        ObservationStatus::Rejected
-            if input.canonical_payload.is_none() && input.safe_rejection_code.is_some() =>
-        {
-            Ok(())
-        }
-        _ => Err(MirrorError::InvalidInput("observation_status_shape")),
-    }
 }
 
 async fn acquire_mirror_write_lock(
@@ -5440,7 +4367,6 @@ fn validate_snapshot_window_membership_input(
             let (object_type, source_id) = validate_snapshot_window_record_key(record_key)?;
             if observation.batch_id != batch_id
                 || observation.object_type != object_type
-                || observation.status != ObservationStatus::Accepted
                 || ![
                     observation.identity.guid.as_deref(),
                     observation.identity.remote_id.as_deref(),
@@ -5478,17 +4404,11 @@ fn prepare_observed_record(
     validate_safe_code(&input.object_type)?;
     validate_identity(&input.identity)?;
     validate_sha256(&input.raw_source_sha256)?;
-    validate_optional_sha256(input.canonical_sha256.as_deref())?;
+    validate_sha256(&input.canonical_sha256)?;
     validate_optional_text(input.display_name.as_deref(), 512, "display_name")?;
     validate_optional_token(input.observed_alter_id.as_deref())?;
-    validate_optional_safe_code(input.safe_rejection_code.as_deref())?;
-    validate_observation_shape(input)?;
     Ok(PreparedObservedRecord {
-        canonical_payload_json: input
-            .canonical_payload
-            .as_ref()
-            .map(canonical_json)
-            .transpose()?,
+        canonical_payload_json: canonical_json(&input.canonical_payload)?,
         exact_decimals_json: validate_and_serialize_decimals(&input.exact_decimals)?,
     })
 }
@@ -5684,24 +4604,6 @@ struct FixtureEnrollmentCommitment<'a> {
 
 fn fixture_enrollment_payload_sha256(
     material: &FixtureEnrollmentCommitment<'_>,
-) -> Result<String, MirrorError> {
-    sha256_json(material)
-}
-
-#[derive(Serialize)]
-struct CanaryReservationCommitment<'a> {
-    schema: &'static str,
-    enrollment_id: &'a str,
-    enrollment_payload_sha256: &'a str,
-    company_id: &'a str,
-    canonical_origin: &'a str,
-    company_guid_ascii_casefolded: &'a str,
-    review_commitment_sha256: &'a str,
-    contract_version: u16,
-}
-
-fn canary_reservation_payload_sha256(
-    material: &CanaryReservationCommitment<'_>,
 ) -> Result<String, MirrorError> {
     sha256_json(material)
 }

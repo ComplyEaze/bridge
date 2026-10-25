@@ -8,8 +8,8 @@
 //! The strongest claim here is row equality: PDFium's words, fed through the
 //! parser, produce exactly the rows that `pdftotext -bbox-layout` words of the
 //! same file produce. The `.pdftotext.xml` beside each PDF is poppler's output
-//! for it (see fixtures/PROVENANCE.md), and the pinned digests were computed by
-//! the Python reference over that same capture.
+//! for it (see fixtures/PROVENANCE.md), and the pinned digests were computed once by
+//! the removed Python tool over that same capture.
 
 mod common;
 
@@ -123,10 +123,11 @@ fn assert_geometry_matches_poppler(pages: &[Page], reference: &[Page]) {
 fn pdfium_reproduces_poppler_rows_on_the_synthetic_hdfc_statement() {
     let bank = Bank::Hdfc;
     let pages = extract_pages(pdfium(), &pdf("hdfc-synthetic.pdf"), "synthetic-user-4321").unwrap();
+    let pages = pages.pages();
     let reference = poppler("hdfc-synthetic.pdftotext.xml");
-    assert_geometry_matches_poppler(&pages, &reference);
+    assert_geometry_matches_poppler(pages, &reference);
 
-    let rows = parse_pages(&pages, bank);
+    let rows = parse_pages(pages, bank);
     assert_eq!(rows, parse_pages(&reference, bank));
     assert_eq!(rows.len(), 6, "the post-footer row and page 3 are not rows");
     assert_python_digests(
@@ -151,11 +152,11 @@ fn pdfium_reproduces_poppler_rows_on_the_synthetic_hdfc_statement() {
 
     // the phone line also ends 4321, but only the account line binds
     assert_eq!(
-        require_account_match(&pages, bank, "xx4321").unwrap(),
+        require_account_match(pages, bank, "xx4321").unwrap(),
         "00000000004321"
     );
     refuses(
-        require_account_match(&pages, bank, "xx9876"),
+        require_account_match(pages, bank, "xx9876"),
         "account_not_in_statement",
     );
 
@@ -216,9 +217,10 @@ fn an_owner_password_only_statement_opens_with_its_owner_password() {
     let bank = Bank::Sbi;
     let bytes = pdf("sbi-owner-password-only.pdf");
     let pages = extract_pages(pdfium(), &bytes, "synthetic-owner-7788").unwrap();
+    let pages = pages.pages();
     let reference = poppler("sbi-owner-password-only.pdftotext.xml");
-    assert_geometry_matches_poppler(&pages, &reference);
-    let rows = parse_pages(&pages, bank);
+    assert_geometry_matches_poppler(pages, &reference);
+    let rows = parse_pages(pages, bank);
     assert_eq!(rows, parse_pages(&reference, bank));
     assert_python_digests(
         &rows,
@@ -237,7 +239,7 @@ fn an_owner_password_only_statement_opens_with_its_owner_password() {
         ("UPI".to_string(), "712345678901 (blue@okzz)".to_string())
     );
     assert_eq!(
-        require_account_match(&pages, bank, "xx7788").unwrap(),
+        require_account_match(pages, bank, "xx7788").unwrap(),
         "00000000007788"
     );
     let controls = Controls::parse("50,000.00", "51,998.50", "1,250.75", "3,249.25").unwrap();
@@ -259,7 +261,8 @@ fn an_owner_password_only_statement_opens_with_its_owner_password() {
 fn a_union_bank_statement_reads_one_row_per_line() {
     let bank = Bank::Ubi;
     let pages = extract_pages(pdfium(), &pdf("ubi-synthetic.pdf"), "synthetic-user-7788").unwrap();
-    let rows = parse_statement(&pages, bank).unwrap();
+    let pages = pages.pages();
+    let rows = parse_statement(pages, bank).unwrap();
     let read: Vec<[&str; 6]> = rows
         .iter()
         .map(|row| {
@@ -321,11 +324,11 @@ fn a_union_bank_statement_reads_one_row_per_line() {
     );
     // the masked line and the CIF ID also print digits; only the account line binds
     assert_eq!(
-        require_account_match(&pages, bank, "UBI SB xx7788").unwrap(),
+        require_account_match(pages, bank, "UBI SB xx7788").unwrap(),
         "000000000007788"
     );
     refuses(
-        require_account_match(&pages, bank, "UBI SB xx1234"),
+        require_account_match(pages, bank, "UBI SB xx1234"),
         "account_not_in_statement",
     );
     let controls = Controls::parse_optional("10,000.00", "500.00", None, None).unwrap();
@@ -354,4 +357,154 @@ fn malformed_input_is_refused_not_parsed() {
         engine(std::path::Path::new("/nonexistent/libpdfium")),
         "pdf_engine_unavailable",
     );
+}
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn a_pdf_with_no_text_with_figures_is_refused_under_its_own_name() {
+    for name in [
+        // one image per page
+        "scan-image-only.pdf",
+        // every character drawn as a path
+        "print-to-pdf-vector-glyphs.pdf",
+        // an image under a scanner app's stamp, which has words and no digit
+        "scan-with-visible-stamp.pdf",
+        // an image under a hidden OCR layer, whose figures are not read
+        "scan-with-ocr-layer.pdf",
+    ] {
+        refuses(
+            extract_pages(pdfium(), &pdf(name), "synthetic-user-4321"),
+            "no_readable_text",
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn a_scan_with_a_dated_stamp_over_a_hidden_ocr_layer_reads_only_the_stamp() {
+    let text = extract_pages(
+        pdfium(),
+        &pdf("scan-ocr-with-stamp.pdf"),
+        "synthetic-user-4321",
+    )
+    .unwrap();
+    // only the stamp is drawn, so only the stamp is read
+    let words: Vec<&str> = text.pages()[0]
+        .iter()
+        .map(|word| word.text.as_str())
+        .collect();
+    assert_eq!(words, ["SCANNED", "12/08/2026", "PAGE", "1", "OF", "1"]);
+    // the hidden layer is most of the text, so a refusal of these words is
+    // reported as no_readable_text (pipeline::prepare_text; the tool test runs it)
+    assert!(text.mostly_hidden());
+    refuses(
+        require_account_match(text.pages(), Bank::Hdfc, "xx4321"),
+        "no_account_number_line",
+    );
+}
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn hidden_text_inside_a_statement_row_is_not_read() {
+    let read = |name: &str| {
+        extract_pages(pdfium(), &pdf(name), "synthetic-user-4321")
+            .unwrap()
+            .pages()
+            .to_vec()
+    };
+    let (with_hidden, plain) = (read("hdfc-hidden-cells.pdf"), read("hdfc-synthetic.pdf"));
+    let words = |pages: &[Page]| -> Vec<Vec<String>> {
+        pages
+            .iter()
+            .map(|page| page.iter().map(|word| word.text.clone()).collect())
+            .collect()
+    };
+    assert_eq!(words(&with_hidden), words(&plain));
+    assert_eq!(
+        parse_statement(&with_hidden, Bank::Hdfc).unwrap(),
+        parse_statement(&plain, Bank::Hdfc).unwrap()
+    );
+}
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn a_logo_and_a_watermark_do_not_change_the_words_that_are_read() {
+    let words =
+        |pages: &[Page]| -> Vec<String> { pages[0].iter().map(|word| word.text.clone()).collect() };
+    let with_images = extract_pages(
+        pdfium(),
+        &pdf("hdfc-logo-and-watermark.pdf"),
+        "synthetic-user-4321",
+    )
+    .unwrap();
+    let with_images = with_images.pages();
+    let plain = extract_pages(pdfium(), &pdf("hdfc-synthetic.pdf"), "synthetic-user-4321").unwrap();
+    let plain = plain.pages();
+    assert_eq!(with_images.len(), 1);
+    assert_eq!(words(with_images), words(plain));
+}
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn a_bob_statement_reads_newest_first_with_each_amount_on_its_own_line() {
+    let bank = Bank::Bob;
+    // opened with the empty user password, as a downloaded statement is
+    let pages = extract_pages(pdfium(), &pdf("bob-synthetic.pdf"), "").unwrap();
+    let pages = pages.pages();
+    assert_eq!(pages.len(), 2);
+    let rows = parse_statement(pages, bank).unwrap();
+    assert_eq!(rows.len(), 14);
+
+    // the dates run oldest first after the read; the wrapped rows are whole
+    assert_eq!(rows[0].get("date"), "03/08/2026");
+    assert_eq!(rows[13].get("date"), "10/08/2026");
+    assert_eq!(
+        rows[2].get("narr"),
+        "UPI/600000000002/11:20:45/UPI/northwind.traders.synthetic@okzzzzzz/SYNTH"
+    );
+    assert_eq!(
+        rows[4].get("narr"),
+        "RTGS-ZZZZZ00000000000000002-GREEN FIELD LTD"
+    );
+    assert_eq!(rows[11].get("chq"), "000417");
+    assert_eq!(
+        rows[11].get("narr"),
+        "SYNTHETIC SUPPLIES-MICR INWARD CLG (CTS)"
+    );
+    // the balance crosses zero on row 12 (an overdrawn Dr balance is negative)
+    assert_eq!(rows[10].get("bal"), "4858.84");
+    assert_eq!(rows[11].get("bal"), "-75141.16");
+    assert_eq!(rows[13].get("bal"), "-16141.16");
+    // amounts on their own line (+6pt, +11pt) and on the date line all land on their row
+    assert_eq!(rows[2].get("cr"), "9876.54");
+    assert_eq!(rows[6].get("dr"), "5.90");
+    assert_eq!(rows[0].get("cr"), "750.50");
+
+    let parties: Vec<String> = rows.iter().map(|row| bank.party(row)).collect();
+    assert_eq!(
+        parties,
+        [
+            "CASH DEPOSIT",
+            "nw@okzz",
+            "northwind.traders.synthetic@okzzzzzz",
+            "ACME INDUSTRIES-EAST",
+            "GREEN FIELD LTD",
+            "UNRESOLVED",
+            "BANK CHARGES",
+            "Loan Recovery For00000000000001",
+            "BANK CHARGES",
+            "UNRESOLVED",
+            "UNRESOLVED",
+            "UNRESOLVED",
+            "UNRESOLVED",
+            "BLUE RIVER CO",
+        ]
+    );
+    assert_eq!(
+        require_account_match(pages, bank, "BOB CA 12399999999456").unwrap(),
+        "123XXXXXXXX456"
+    );
+    // opening 10,000.00 Cr; the statement prints neither it nor a closing balance
+    let controls = Controls::parse_optional("10,000.00", "-16,141.16", None, None).unwrap();
+    reconcile(&rows, &controls.opening, &controls.closing).unwrap();
 }

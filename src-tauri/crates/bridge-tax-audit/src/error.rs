@@ -18,6 +18,11 @@ pub enum AuditError {
     /// The engagement or rules configuration is missing a key or has the wrong type.
     #[error("config: {0}")]
     Config(String),
+    /// A value in a client table that a test refuses when it reads the table, as the reference's
+    /// `ConfigValueRefused(table, name)` does: `table` is the dotted table, `name` the key (a
+    /// ledger, as bound) of the first offending entry.
+    #[error("config: {table}.{name:?} is not an accepted value")]
+    ConfigValueRefused { table: &'static str, name: String },
     /// Two different ledgers in the same Book normalise to the same non-blank Tally GUID (a
     /// corrupt read); see `ledger_ids::check_no_duplicate_ledger_guids`.
     #[error("duplicate ledger GUID: {0}")]
@@ -26,6 +31,33 @@ pub enum AuditError {
     /// derived; ledgers fall back to a name hash instead (`docs/tax-audit/parity-spec-v1.md` §11).
     #[error("{0} has no Tally GUID; refusing to derive a stable id from its name")]
     MissingGuid(String),
+    /// A test named one figure id twice. The reference's `fig` raises there, so the test is
+    /// refused rather than the process ended.
+    #[error("figure id {0} would repeat")]
+    DuplicateFigureId(String),
+    /// The reference's bank-statement reader refuses this statement (no declared opening or closing
+    /// balance, a row outside its own period, or a date that steps back in an order its running
+    /// balance does not confirm). Not a malformed document: `bank_reconciliation::refused` reports
+    /// it, with [`crate::documents::StatementRefusal::reason`].
+    #[error("{0}")]
+    StatementRefused(crate::documents::StatementRefusal),
+    /// Two vouchers of one population would take one key (`book::voucher_keys`), which only a
+    /// voucher GUID holding a NUL can make; no read produces one. The reference raises the same
+    /// wherever it forms the keys; `partners_40b_194t` forms them only for a configured partner (as
+    /// the reference does), so a firm with none is not refused there.
+    #[error("a voucher GUID holds a NUL character, so two vouchers would take one key")]
+    VoucherKeysNotUnique,
+    /// A test's own invariant check stops where the reference's stops with an internal error,
+    /// after forming the message whose code and detail are carried here: `narration_payees`' NP-2
+    /// on a cited GUID whose last population voucher has no bank leg (its spec pack's README
+    /// section 13). `module` is the test id; `code` names the invariant, as `Refused` names its
+    /// rule, so a test asserts the code rather than the message.
+    #[error("{module}: {code}: {detail}")]
+    ModuleInvariant {
+        module: &'static str,
+        code: &'static str,
+        detail: String,
+    },
     #[error("{path}: {source}")]
     Io {
         path: String,

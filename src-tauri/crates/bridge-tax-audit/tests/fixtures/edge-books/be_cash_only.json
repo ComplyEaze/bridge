@@ -1,0 +1,71 @@
+{
+ "comment": "books_examined with a cash ledger and no bank ledger (the Bank Accounts and Bank OD A/c groups exist and hold nothing): the cash book part is listed and the bank books part is not; one Payment; a Trial Balance; no document loaded.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-be_cash_only-000"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-be_cash_only-001"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 500000,
+   "closing": -500000
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "c01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent",
+     500000
+    ],
+    [
+     "Cash",
+     -500000
+    ]
+   ]
+  }
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "books_examined"
+ ],
+ "documents_read": []
+}

@@ -13,6 +13,9 @@
 //!   `Duties & Taxes`, except that a voucher also carrying a `Purchase Accounts`/`Sales Accounts`
 //!   line puts the mapped line's OWN amount into the goods-invoice bucket, and a credit on a cash or
 //!   bank ledger goes to the payee-not-named bucket (never for a section that only reverses).
+//! * A row keeps each voucher by its [`VoucherKey`], unique per voucher, so two vouchers sharing a
+//!   GUID (blank, or repeated) are two bills (#1243); a citation, and the client's list of
+//!   reversals, name a voucher by its GUID.
 //! * A reversal (payee Dr, mapped expense Cr) lowers nothing: it is recorded against the payee's
 //!   row and named on its finding, with the CA's classification from `[tds_payees.reversals]`.
 //! * Each credit is read GROSS of the TDS on its own bill where the payee is the one party the bill
@@ -60,7 +63,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 
-use crate::book::{Book, Voucher};
+use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::ledger_ids::stable_ledger_tag;
@@ -449,36 +452,45 @@ fn nature_key(nature: &str, ledger: &str, cfg: &TdsConfig) -> (String, String) {
     (nature.to_string(), cat)
 }
 
-/// One (nature key, entity) row: what each voucher credited, the vouchers by GUID, and the
-/// reversals recorded against it (voucher GUID -> the voucher and the payee's debit on it).
+/// One (nature key, entity) row: what each voucher credited, the vouchers, and the reversals
+/// recorded against it (the voucher and the payee's debit on it), each by the voucher's own key.
 #[derive(Default, Clone)]
 struct Row<'a> {
-    by_voucher: BTreeMap<&'a str, i64>,
-    vouchers: BTreeMap<&'a str, &'a Voucher>,
-    reversals: BTreeMap<&'a str, (&'a Voucher, i64)>,
+    by_voucher: BTreeMap<&'a VoucherKey, i64>,
+    vouchers: BTreeMap<&'a VoucherKey, &'a Voucher>,
+    reversals: BTreeMap<&'a VoucherKey, (&'a Voucher, i64)>,
 }
 
 impl<'a> Row<'a> {
-    fn add(&mut self, v: &'a Voucher, amount: i64) -> Result<()> {
-        let slot = self.by_voucher.entry(v.guid.as_str()).or_insert(0);
+    fn add(&mut self, k: &'a VoucherKey, v: &'a Voucher, amount: i64) -> Result<()> {
+        let slot = self.by_voucher.entry(k).or_insert(0);
         *slot = slot.checked_add(amount).ok_or_else(|| overflow(TEST_ID))?;
-        self.vouchers.insert(v.guid.as_str(), v);
+        self.vouchers.insert(k, v);
         Ok(())
+    }
+
+    /// The GUIDs of the vouchers credited on this row: the client's list names a bill by GUID.
+    fn credited_guids(&self) -> BTreeSet<&'a str> {
+        self.by_voucher
+            .keys()
+            .map(|k| self.vouchers[k].guid.as_str())
+            .collect()
     }
 }
 
 type NatureKey = (String, String);
 type RowKey = (NatureKey, String);
 
-/// The reference's `compute_payee_rows`.
+/// The reference's `compute_payee_rows`, over the population with its voucher keys.
 fn compute_payee_rows<'a>(
-    pop: &[&'a Voucher],
+    pop: &'a [(VoucherKey, &'a Voucher)],
     book: &Book,
     cfg: &TdsConfig,
 ) -> Result<BTreeMap<RowKey, Row<'a>>> {
     let mut rows: BTreeMap<RowKey, Row<'a>> = BTreeMap::new();
-    let mut reversals: BTreeMap<RowKey, BTreeMap<&'a str, (&'a Voucher, i64)>> = BTreeMap::new();
-    for &v in pop {
+    let mut reversals: BTreeMap<RowKey, BTreeMap<&'a VoucherKey, (&'a Voucher, i64)>> =
+        BTreeMap::new();
+    for (k, v) in pop.iter().map(|(k, v)| (k, *v)) {
         if v.base_type == "Contra" {
             continue;
         }
@@ -513,7 +525,7 @@ fn compute_payee_rows<'a>(
             for (key, amounts) in &expense_lines {
                 rows.entry((key.clone(), WITHIN_GOODS_INVOICE.to_string()))
                     .or_default()
-                    .add(v, sum(amounts.iter().copied())?)?;
+                    .add(k, v, sum(amounts.iter().copied())?)?;
             }
             continue;
         }
@@ -547,11 +559,11 @@ fn compute_payee_rows<'a>(
                     let rv = reversals
                         .entry(((*key).clone(), alias(cfg, &l.ledger).to_string()))
                         .or_default();
-                    let prior = rv.get(v.guid.as_str()).map_or(0, |(_, a)| *a);
+                    let prior = rv.get(k).map_or(0, |(_, a)| *a);
                     let total = prior
                         .checked_add(l.amount_paise)
                         .ok_or_else(|| overflow(TEST_ID))?;
-                    rv.insert(v.guid.as_str(), (v, total));
+                    rv.insert(k, (v, total));
                 }
             }
         }
@@ -587,7 +599,7 @@ fn compute_payee_rows<'a>(
                 };
                 rows.entry((key.clone(), entity))
                     .or_default()
-                    .add(v, amount)?;
+                    .add(k, v, amount)?;
             }
         }
     }
@@ -614,16 +626,16 @@ fn read_reversals<'a>(row: &Row<'a>, cfg: &TdsConfig) -> ReadReversals<'a> {
         credit_notes: Vec::new(),
         not_applied: Vec::new(),
     };
-    for (guid, (v, _)) in &row.reversals {
+    // The client's list names a voucher by its GUID: it reads on every voucher holding it.
+    let credited = row.credited_guids();
+    for (v, _) in row.reversals.values() {
         let v: &'a Voucher = v;
-        match cfg.reversals.get(*guid) {
+        match cfg.reversals.get(&v.guid) {
             Some(Reversal::CreditNote) => out.credit_notes.push(v),
-            Some(Reversal::BillSpecific(bill)) if row.by_voucher.contains_key(bill.as_str()) => {
+            Some(Reversal::BillSpecific(bill)) if credited.contains(bill.as_str()) => {
                 out.not_applied.push((v, "bill_specific", bill.clone()));
             }
-            Some(Reversal::DuplicateOrError(bill))
-                if row.by_voucher.contains_key(bill.as_str()) =>
-            {
+            Some(Reversal::DuplicateOrError(bill)) if credited.contains(bill.as_str()) => {
                 out.not_applied
                     .push((v, "duplicate_or_error", bill.clone()));
             }
@@ -641,9 +653,9 @@ struct Adjusted<'a> {
     gst_counted: i64,
     tds_grossed_up: i64,
     possibly_netted: i64,
-    netted_by_voucher: BTreeMap<&'a str, i64>,
+    netted_by_voucher: BTreeMap<&'a VoucherKey, i64>,
     shared_tds: i64,
-    shared_by_voucher: BTreeMap<&'a str, i64>,
+    shared_by_voucher: BTreeMap<&'a VoucherKey, i64>,
     also_debited: i64,
 }
 
@@ -787,15 +799,15 @@ struct Summary<'a> {
     credited: i64,
     max_single: i64,
     months: BTreeMap<String, i64>,
-    vouchers: BTreeMap<&'a str, &'a Voucher>,
+    vouchers: BTreeMap<&'a VoucherKey, &'a Voucher>,
 }
 
 fn summarise<'a>(row: &Row<'a>) -> Result<Summary<'a>> {
     let credited = sum(row.by_voucher.values().copied())?;
     let max_single = row.by_voucher.values().copied().max().unwrap_or(0);
     let mut months: BTreeMap<String, i64> = BTreeMap::new();
-    for (guid, amount) in &row.by_voucher {
-        let slot = months.entry(month_key(row.vouchers[guid])).or_insert(0);
+    for (k, amount) in &row.by_voucher {
+        let slot = months.entry(month_key(row.vouchers[k])).or_insert(0);
         *slot = slot.checked_add(*amount).ok_or_else(|| overflow(TEST_ID))?;
     }
     Ok(Summary {
@@ -954,12 +966,16 @@ struct Limits {
     s194h: Option<i64>,
 }
 
-/// The reference's `_row_tranches`: the vouchers whose credits attract TDS.
-fn row_tranche_guids<'a>(nature: &str, row: &Row<'a>, limits: Limits) -> Result<BTreeSet<&'a str>> {
-    let credits: Vec<(TallyDate, &'a str, i64)> = row
+/// The reference's `_row_tranches`: the vouchers whose credits attract TDS, by their keys.
+fn row_tranche_keys<'a>(
+    nature: &str,
+    row: &Row<'a>,
+    limits: Limits,
+) -> Result<BTreeSet<&'a VoucherKey>> {
+    let credits: Vec<(TallyDate, &'a VoucherKey, i64)> = row
         .by_voucher
         .iter()
-        .map(|(g, p)| (row.vouchers[g].date.clone(), *g, *p))
+        .map(|(k, p)| (row.vouchers[k].date.clone(), *k, *p))
         .collect();
     let tranches = match nature {
         "194C" => crossing_tranches(
@@ -969,7 +985,8 @@ fn row_tranche_guids<'a>(nature: &str, row: &Row<'a>, limits: Limits) -> Result<
             TEST_ID,
         )?,
         "194I" => {
-            let mut by_month: BTreeMap<String, Vec<(TallyDate, &'a str, i64)>> = BTreeMap::new();
+            let mut by_month: BTreeMap<String, Vec<(TallyDate, &'a VoucherKey, i64)>> =
+                BTreeMap::new();
             for c in credits {
                 let s = c.0.as_str();
                 by_month
@@ -991,24 +1008,30 @@ fn row_tranche_guids<'a>(nature: &str, row: &Row<'a>, limits: Limits) -> Result<
         "194H" => crossing_tranches(&credits, None, limits.s194h, TEST_ID)?,
         _ => crossing_tranches(&credits, None, Some(limits.s194j), TEST_ID)?,
     };
-    Ok(tranches.into_iter().flat_map(|t| t.guids).collect())
+    Ok(tranches.into_iter().flat_map(|t| t.ids).collect())
 }
 
-/// Sort GUIDs by (voucher date, GUID), as the reference's `key=lambda g: (date, g)`.
-fn by_date<'a>(guids: impl IntoIterator<Item = &'a str>, row: &Row<'a>) -> Vec<&'a str> {
-    let mut out: Vec<&'a str> = guids.into_iter().collect();
+/// Sort keys by (voucher date, key), as the reference's `key=lambda g: (date, g)`.
+fn by_date<'a>(
+    keys: impl IntoIterator<Item = &'a VoucherKey>,
+    row: &Row<'a>,
+) -> Vec<&'a VoucherKey> {
+    let mut out: Vec<&'a VoucherKey> = keys.into_iter().collect();
     out.sort_by(|a, b| (&row.vouchers[a].date, a).cmp(&(&row.vouchers[b].date, b)));
     out
 }
 
-fn voucher_ref(g: &str, v: &Voucher) -> EvidenceRef {
-    EvidenceRef::with_label("voucher", g, &voucher_label(v))
+/// A voucher as evidence: its GUID and label, never the key a row holds it under (the
+/// reference's `_ref`).
+fn voucher_ref(v: &Voucher) -> EvidenceRef {
+    EvidenceRef::with_label("voucher", &v.guid, &voucher_label(v))
 }
 
-/// Voucher refs sorted by id, each once (the reference's `sorted({...}, key=id)`).
-fn voucher_refs<'a>(items: impl IntoIterator<Item = (&'a str, &'a Voucher)>) -> Vec<EvidenceRef> {
-    let mut ev: Vec<EvidenceRef> = items.into_iter().map(|(g, v)| voucher_ref(g, v)).collect();
-    ev.sort_by(|a, b| a.id.cmp(&b.id).then_with(|| a.key().cmp(&b.key())));
+/// The distinct refs of some vouchers, sorted by (id, label): vouchers sharing a GUID are each
+/// cited unless their refs are identical too (the reference's `_refs`).
+fn voucher_refs<'a>(vouchers: impl IntoIterator<Item = &'a Voucher>) -> Vec<EvidenceRef> {
+    let mut ev: Vec<EvidenceRef> = vouchers.into_iter().map(voucher_ref).collect();
+    ev.sort_by(|a, b| (&a.id, &a.label).cmp(&(&b.id, &b.label)));
     ev.dedup();
     ev
 }
@@ -1056,7 +1079,7 @@ fn tds_seen_limit(
     prefix: &str,
     rid: &str,
     h: &str,
-    seen: &BTreeMap<&str, &Voucher>,
+    seen: &BTreeMap<&VoucherKey, &Voucher>,
     tds_ledgers: &BTreeSet<String>,
 ) -> Result<String> {
     if tds_ledgers.is_empty() {
@@ -1079,8 +1102,8 @@ client's statutory dues classify no ledger as TDS payable."
 client's statutory dues classified as TDS payable, net, on every voucher that carries one and names \
 the payee or credits it."
         ),
-        voucher_refs(seen.iter().map(|(g, v)| (*g, *v))),
-    );
+        voucher_refs(seen.values().copied()),
+    )?;
     if seen.is_empty() {
         return Ok(
             "No TDS line (a ledger the client's statutory dues classify as TDS payable) is \
@@ -1118,7 +1141,7 @@ fn clause_21b(
     mut limits: Vec<String>,
     clauses: Vec<String>,
     facts: &mut Vec<(String, String)>,
-    seen: &BTreeMap<&str, &Voucher>,
+    seen: &BTreeMap<&VoucherKey, &Voucher>,
 ) -> Result<(Vec<String>, Vec<String>)> {
     let drop_21b: Vec<String> = clauses
         .iter()
@@ -1140,9 +1163,9 @@ year's turnover (its deductor status), so nothing is listed in clause 21(b)."
     let taxable = if x.list_all || !seen.is_empty() {
         by_date(row.by_voucher.keys().copied(), row)
     } else {
-        by_date(row_tranche_guids(x.nature, row, ctx.limits)?, row)
+        by_date(row_tranche_keys(x.nature, row, ctx.limits)?, row)
     };
-    let mut own: Vec<&str> = Vec::new();
+    let mut own: Vec<&VoucherKey> = Vec::new();
     for g in &taxable {
         let v = row.vouchers[g];
         if tds_on(v, tds_ledgers)? > 0
@@ -1179,7 +1202,7 @@ year's turnover (its deductor status), so nothing is listed in clause 21(b)."
                     || alias(ctx.cfg, &l.ledger) == e
             }))
     };
-    let mut rated: Vec<&str> = Vec::new();
+    let mut rated: Vec<&VoucherKey> = Vec::new();
     if low_high.is_some() {
         for g in &own {
             if plain(row.vouchers[g])? {
@@ -1190,7 +1213,7 @@ year's turnover (its deductor status), so nothing is listed in clause 21(b)."
     // Q2-d, as a fact per bill: its own voucher's TDS against the section's rates, on the bill's
     // value before TDS -- the payee's net credit plus its own TDS.
     let (mut short, mut mid) = (Vec::new(), Vec::new());
-    let mut bases: BTreeMap<&str, i64> = BTreeMap::new();
+    let mut bases: BTreeMap<&VoucherKey, i64> = BTreeMap::new();
     if let Some((low, high)) = low_high {
         let floor_rate = |base: i64, bp: i64| -> i128 {
             (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100
@@ -1218,18 +1241,18 @@ year's turnover (its deductor status), so nothing is listed in clause 21(b)."
             .iter()
             .any(|l| tds_ledgers.contains(&l.ledger) && l.amount_paise > 0)
     });
-    let candidates: Vec<&str> = rated
+    let candidates: Vec<&VoucherKey> = rated
         .iter()
         .copied()
         .filter(|g| SHORT_LEAVES_A || !short.contains(g))
         .collect();
     // P2-2: tax deducted on its own voucher, so not (ii)(A).
-    let deducted: Vec<&str> = if reversal {
+    let deducted: Vec<&VoucherKey> = if reversal {
         Vec::new()
     } else {
         candidates.clone()
     };
-    let b_rows: Vec<&str> = match ctx.deposited {
+    let b_rows: Vec<&VoucherKey> = match ctx.deposited {
         Some(deposited) if !seen.is_empty() => own
             .iter()
             .copied()
@@ -1244,12 +1267,12 @@ year's turnover (its deductor status), so nothing is listed in clause 21(b)."
         _ => Vec::new(),
     };
     // Listed on the TDS question, for their deposit.
-    let off_a: Vec<&str> = deducted
+    let off_a: Vec<&VoucherKey> = deducted
         .iter()
         .copied()
         .filter(|g| !b_rows.contains(g))
         .collect();
-    let listed: Vec<&str> = taxable
+    let listed: Vec<&VoucherKey> = taxable
         .iter()
         .copied()
         .filter(|g| !b_rows.contains(g) && !off_a.contains(g))
@@ -1266,8 +1289,8 @@ year's turnover (its deductor status), so nothing is listed in clause 21(b)."
 its date.",
                 x.h, x.nature, x.cat_note
             ),
-            vec![voucher_ref(g, row.vouchers[g])],
-        );
+            vec![voucher_ref(row.vouchers[g])],
+        )?;
         facts.push((format!("payment_a:{:03}", n + 1), id));
     }
     if listed.is_empty() {
@@ -1284,7 +1307,7 @@ summed. Each is its own item in clause 21(b); this total is not.",
                 x.h
             ),
             Vec::new(),
-        );
+        )?;
         facts.push(("inadmissible_payments_total".to_string(), id));
     }
 
@@ -1341,7 +1364,7 @@ challans recorded show nothing deposited by the s.139(1) due date, are listed in
         .values()
         .map(|v| tds_on(v, tds_ledgers))
         .collect::<Result<Vec<_>>>()?)?;
-    let mut ordered: Vec<(&str, &Voucher)> = seen.iter().map(|(g, v)| (*g, *v)).collect();
+    let mut ordered: Vec<(&VoucherKey, &Voucher)> = seen.iter().map(|(g, v)| (*g, *v)).collect();
     ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));
     let labels: Vec<String> = ordered.iter().map(|(_, v)| voucher_label(v)).collect();
     let shown = labels
@@ -1364,11 +1387,11 @@ challans recorded show nothing deposited by the s.139(1) due date, are listed in
             x.h
         ),
         Vec::new(),
-    );
+    )?;
     let mut q_facts = vec![("tds_seen".to_string(), tds_seen_id)];
     for (n, g) in off_a.iter().enumerate() {
         let v = row.vouchers[g];
-        let ev1 = vec![voucher_ref(g, v)];
+        let ev1 = vec![voucher_ref(v)];
         let id = r.fig(
             &format!("{}_row_21b_deducted_{}_{:03}", x.prefix, x.rid, n + 1),
             Value::Int(row.by_voucher[g]),
@@ -1381,7 +1404,7 @@ determines. The voucher cited gives its date.",
                 x.h, x.nature, x.cat_note
             ),
             ev1.clone(),
-        );
+        )?;
         q_facts.push((format!("deducted_payment:{:03}", n + 1), id));
         let id = r.fig(
             &format!("{}_row_21b_deducted_tds_{}_{:03}", x.prefix, x.rid, n + 1),
@@ -1389,7 +1412,7 @@ determines. The voucher cited gives its date.",
             Unit::Paise,
             &format!("The TDS on that payment's own voucher (tag {}).", x.h),
             ev1,
-        );
+        )?;
         q_facts.push((format!("deducted_tds:{:03}", n + 1), id));
     }
     if !off_a.is_empty() {
@@ -1403,7 +1426,7 @@ their own vouchers (not in clause 21(b)(ii)(A) or (ii)(B) in this draft), summed
                 x.h
             ),
             Vec::new(),
-        );
+        )?;
         q_facts.push(("deducted_payments_total".to_string(), id));
     }
     let mut guard = if reversal && !candidates.is_empty() {
@@ -1429,7 +1452,7 @@ covers, and its deposit, are the CA's to determine",
             x.nature, x.cat_note
         ),
         facts: q_facts,
-        evidence: voucher_refs(seen.iter().map(|(g, v)| (*g, *v))),
+        evidence: voucher_refs(seen.values().copied()),
         confidence: Confidence::JudgementRequired,
         limits: vec![format!(
             "TDS of {} (net) is seen on {} voucher(s) touching this payee: {shown}{more}. The CA \
@@ -1468,7 +1491,7 @@ it."
     });
     if low_high.is_some() {
         // A bill carrying TDS whose rate is not tested is counted and said, never dropped silently.
-        let mut untested: Vec<&str> = Vec::new();
+        let mut untested: Vec<&VoucherKey> = Vec::new();
         for g in &taxable {
             if !rated.contains(g) && tds_on(row.vouchers[g], tds_ledgers)? > 0 {
                 untested.push(*g);
@@ -1490,8 +1513,8 @@ another tax, another party or ledger), or more than one section"
 not tested, because {why}.",
                     x.h, x.nature, x.cat_note
                 ),
-                untested.iter().map(|g| voucher_ref(g, row.vouchers[g])).collect(),
-            );
+                untested.iter().map(|g| voucher_ref(row.vouchers[g])).collect(),
+            )?;
             limits.push(format!(
                 "{} bill(s) carrying TDS are not tested against the section's rate: {why}.",
                 untested.len()
@@ -1509,14 +1532,14 @@ fn not_deposited_finding(
     r: &mut TestResult,
     rules: &Rules,
     x: &Row21b,
-    b_rows: &[&str],
+    b_rows: &[&VoucherKey],
     tds_ledgers: &BTreeSet<String>,
 ) -> Result<()> {
     let row = x.row;
     let mut facts = Vec::new();
     for (n, g) in b_rows.iter().enumerate() {
         let v = row.vouchers[g];
-        let ev1 = vec![voucher_ref(g, v)];
+        let ev1 = vec![voucher_ref(v)];
         let id = r.fig(
             &format!("{}_row_21b_b_{}_{:03}", x.prefix, x.rid, n + 1),
             Value::Int(row.by_voucher[g]),
@@ -1528,7 +1551,7 @@ deposited by the s.139(1) due date; its full amount. The voucher cited gives its
                 x.h, x.nature, x.cat_note
             ),
             ev1.clone(),
-        );
+        )?;
         facts.push((format!("payment_b:{:03}", n + 1), id));
         let id = r.fig(
             &format!("{}_row_21b_b_tds_{}_{:03}", x.prefix, x.rid, n + 1),
@@ -1540,7 +1563,7 @@ date: nothing.",
                 x.h
             ),
             ev1,
-        );
+        )?;
         facts.push((format!("tax_deducted_b:{:03}", n + 1), id));
     }
     let id = r.fig(
@@ -1553,7 +1576,7 @@ Each is its own item in clause 21(b); this total is not.",
             x.h
         ),
         Vec::new(),
-    );
+    )?;
     facts.push(("inadmissible_payments_total".to_string(), id));
     r.findings.push(Finding {
         id: format!("{TEST_ID}/not_deposited/{}", x.rid),
@@ -1563,7 +1586,7 @@ Each is its own item in clause 21(b); this total is not.",
             x.nature, x.cat_note
         ),
         facts,
-        evidence: voucher_refs(b_rows.iter().map(|g| (*g, row.vouchers[g]))),
+        evidence: voucher_refs(b_rows.iter().map(|g| row.vouchers[g])),
         confidence: Confidence::NeedsDocument,
         limits: vec![
             format!(
@@ -1629,12 +1652,12 @@ fn in_kerala_hc(state: &str) -> bool {
 fn short_deduction_finding(
     r: &mut TestResult,
     x: &Row21b,
-    short: &[&str],
-    mid: &[&str],
+    short: &[&VoucherKey],
+    mid: &[&VoucherKey],
     (low, high): (i64, i64),
     ctx: &Ctx,
-    bases: &BTreeMap<&str, i64>,
-    listed_a: &[&str],
+    bases: &BTreeMap<&VoucherKey, i64>,
+    listed_a: &[&VoucherKey],
 ) -> Result<()> {
     let row = x.row;
     // i64 -> f64 is exact below 2^53, as Python's `bp / 100` is.
@@ -1644,7 +1667,7 @@ fn short_deduction_finding(
     let mut facts = Vec::new();
     for (n, g) in rows.iter().enumerate() {
         let v = row.vouchers[g];
-        let ev1 = vec![voucher_ref(g, v)];
+        let ev1 = vec![voucher_ref(v)];
         let id = r.fig(
             &format!("{}_row_short_{}_{:03}", x.prefix, x.rid, n + 1),
             Value::Int(row.by_voucher[g]),
@@ -1655,7 +1678,7 @@ the section's rate; its full amount. The voucher cited gives its date.",
                 x.h, x.nature, x.cat_note
             ),
             ev1.clone(),
-        );
+        )?;
         facts.push((format!("short_payment:{:03}", n + 1), id));
         let id = r.fig(
             &format!("{}_row_short_tds_{}_{:03}", x.prefix, x.rid, n + 1),
@@ -1663,7 +1686,7 @@ the section's rate; its full amount. The voucher cited gives its date.",
             Unit::Paise,
             &format!("The TDS on that payment's own voucher (tag {}).", x.h),
             ev1.clone(),
-        );
+        )?;
         facts.push((format!("short_tds:{:03}", n + 1), id));
         let id = r.fig(
             &format!("{}_row_short_base_{}_{:03}", x.prefix, x.rid, n + 1),
@@ -1676,7 +1699,7 @@ expense, the payee and its TDS).",
                 x.h
             ),
             ev1,
-        );
+        )?;
         facts.push((format!("short_base:{:03}", n + 1), id));
     }
     let id = r.fig(
@@ -1689,7 +1712,7 @@ rate, summed.",
             x.h
         ),
         Vec::new(),
-    );
+    )?;
     facts.push(("short_deducted_payments_total".to_string(), id));
     let mut limits = Vec::new();
     if !short.is_empty() {
@@ -1758,7 +1781,7 @@ conservative choice there."
             x.nature, x.cat_note
         ),
         facts,
-        evidence: voucher_refs(rows.iter().map(|g| (*g, row.vouchers[g]))),
+        evidence: voucher_refs(rows.iter().map(|g| row.vouchers[g])),
         confidence: Confidence::JudgementRequired,
         limits,
         ask_client: vec![
@@ -1776,7 +1799,7 @@ fn s194c6_question(
     r: &mut TestResult,
     rid: &str,
     h: &str,
-    vouchers: &BTreeMap<&str, &Voucher>,
+    vouchers: &BTreeMap<&VoucherKey, &Voucher>,
     goods_carriage: &BTreeSet<String>,
     book: &Book,
 ) -> Result<()> {
@@ -1799,7 +1822,7 @@ fn s194c6_question(
 conditions are evidenced"
             .to_string(),
         facts: Vec::new(),
-        evidence: vouchers.iter().map(|(g, v)| voucher_ref(g, v)).collect(),
+        evidence: voucher_refs(vouchers.values().copied()),
         confidence: Confidence::JudgementRequired,
         limits: vec![
             format!(
@@ -1822,6 +1845,16 @@ carriages it owned in the year."
         ],
     });
     Ok(())
+}
+
+/// The hash in a payee row's id under one nature (`<prefix>_<hash>`): the first 8 hex digits of
+/// the SHA-1 of `<prefix>:` and the entity's ledger tag. `narration_payees` finds this test's
+/// finding for unnamed 194C payees by it.
+pub(crate) fn row_hash(book: &Book, prefix: &str, entity: &str) -> Result<String> {
+    Ok(hash8(&format!(
+        "{prefix}:{}",
+        stable_ledger_tag(book, entity)?
+    )))
 }
 
 /// Run the test. `entity_type` is `[client].entity_type`; `cfg` is `[tds]`/`[tds_payees]`, bound;
@@ -1900,7 +1933,7 @@ firm/LLP/company always; individual/HUF only if previous-year business turnover 
 rules' turnover limit for an individual or HUF -- never assumed from the current year's books \
 alone.",
         Vec::new(),
-    );
+    )?;
     if status == "unknown" {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/deductor_status"),
@@ -1940,16 +1973,16 @@ figure only; existence or absence of such a ledger is not itself a conclusion ab
             .iter()
             .map(|n| EvidenceRef::with_label("ledger", n, n))
             .collect(),
-    );
+    )?;
 
     // ---------------------------------------------------------------- payee rows
-    let rows = compute_payee_rows(&pop, book, cfg)?;
+    // Each voucher's own key: a row keeps a voucher's credit, date and count by it, so two vouchers
+    // sharing a GUID are two bills (#1243).
+    let keyed = voucher_keys(&pop)?;
+    let rows = compute_payee_rows(&keyed, book, cfg)?;
     // A classification counts only on the row holding its bill; one whose bill is a credit to no
     // payee at all is a mistake in the client's list, refused rather than ignored.
-    let credited: BTreeSet<&str> = rows
-        .values()
-        .flat_map(|d| d.by_voucher.keys().copied())
-        .collect();
+    let credited: BTreeSet<&str> = rows.values().flat_map(Row::credited_guids).collect();
     for (guid, c) in &cfg.reversals {
         let bill = match c {
             Reversal::CreditNote => continue,
@@ -1973,18 +2006,15 @@ figure only; existence or absence of such a ledger is not itself a conclusion ab
         .map(|(_, e)| e.as_str())
         .filter(|e| *e != WITHIN_GOODS_INVOICE && *e != PAYEE_NOT_NAMED)
         .collect();
-    let mut tds_touching: BTreeMap<&str, BTreeMap<&str, &Voucher>> = BTreeMap::new();
+    let mut tds_touching: BTreeMap<&str, BTreeMap<&VoucherKey, &Voucher>> = BTreeMap::new();
     if !inputs.tds_ledgers.is_empty() {
-        for &v in &pop {
+        for (k, v) in &keyed {
             if v.base_type == "Contra" || !has_tds_line(v, &inputs.tds_ledgers) {
                 continue;
             }
             let touched: BTreeSet<&str> = v.lines.iter().map(|l| alias(cfg, &l.ledger)).collect();
             for e in touched.intersection(&entities) {
-                tds_touching
-                    .entry(e)
-                    .or_default()
-                    .insert(v.guid.as_str(), v);
+                tds_touching.entry(e).or_default().insert(k, v);
             }
         }
     }
@@ -2008,7 +2038,7 @@ figure only; existence or absence of such a ledger is not itself a conclusion ab
     // Entries in the client's lists that match nothing in these books.
     let reversal_vouchers: BTreeSet<&str> = rows
         .values()
-        .flat_map(|d| d.reversals.keys().copied())
+        .flat_map(|d| d.reversals.values().map(|(v, _)| v.guid.as_str()))
         .collect();
     let mut unmatched: Vec<String> = Vec::new();
     unmatched.extend(
@@ -2141,7 +2171,7 @@ Accounts line{cat_note}: inside a goods invoice, not a separate contract with th
 from the per-payee tests."
             ),
             Vec::new(),
-        );
+        )?;
 
         let payee_entities: BTreeMap<&str, &Summary> = summaries
             .iter()
@@ -2159,7 +2189,7 @@ once; 'payee not named' counted as one entity, 'within supplier goods invoices' 
 expense ledger line{cat_note}."
             ),
             Vec::new(),
-        );
+        )?;
         r.fig(
             &format!("{prefix}_credited_total"),
             Value::Int(credited_total),
@@ -2169,7 +2199,7 @@ expense ledger line{cat_note}."
 expense ledger line{cat_note} (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test."
             ),
             Vec::new(),
-        );
+        )?;
 
         let is_unmapped_194j = nature == "194J" && subcat == CATEGORY_UNMAPPED;
         let s194h_limit = limits_paise.s194h.unwrap_or(i64::MAX);
@@ -2255,10 +2285,11 @@ expense ledger line{cat_note} (excludes the goods-invoice bucket). Never summed 
                 if over.contains_key(e) || adj.shared_tds == 0 {
                     continue;
                 }
-                let credit_of = |g: &str| {
+                let credit_of = |g: &VoucherKey| {
                     adj.row.by_voucher.get(g).copied().ok_or_else(|| {
                         AuditError::Config(format!(
-                            "{TEST_ID}: a shared-TDS bill {g} is not among the payee's credits"
+                            "{TEST_ID}: a shared-TDS bill {} is not among the payee's credits",
+                            rows[&row_key(e)].vouchers[g].guid
                         ))
                     })
                 };
@@ -2320,22 +2351,16 @@ whose {nature}{cat_note} test trips (single sum/aggregate for \
 'unmapped', which is never threshold-tested)."
             ),
             Vec::new(),
-        );
+        )?;
 
         let mut ordered: Vec<(&str, &Summary)> = over.into_iter().collect();
         ordered.sort_by_key(|(e, _)| hash8(e));
         for (entity, s) in ordered {
-            let h = hash8(&format!("{prefix}:{}", stable_ledger_tag(book, entity)?));
+            let h = row_hash(book, prefix, entity)?;
             let rid = format!("{prefix}_{h}");
-            let evidence = voucher_refs(s.vouchers.iter().map(|(g, v)| (*g, *v)));
-            // Two over-limit entities with one tag would repeat a figure id: the reference raises
-            // there, so this refuses rather than letting `TestResult::fig` panic.
-            let row_figure = format!("{TEST_ID}.{prefix}_row_credited_{rid}");
-            if r.figures.iter().any(|f| f.id == row_figure) {
-                return Err(AuditError::Config(format!(
-                    "{TEST_ID}: two payee entities share the figure id {row_figure}"
-                )));
-            }
+            let evidence = voucher_refs(s.vouchers.values().copied());
+            // Two over-limit entities with one tag repeat this figure id: the reference raises
+            // there, and `fig` refuses.
             let f_credited = r.fig(
                 &format!("{prefix}_row_credited_{rid}"),
                 Value::Int(s.credited),
@@ -2345,7 +2370,7 @@ whose {nature}{cat_note} test trips (single sum/aggregate for \
 across every population voucher touching a mapped expense ledger."
                 ),
                 evidence.clone(),
-            );
+            )?;
             let f_max_single = r.fig(
                 &format!("{prefix}_row_max_single_{rid}"),
                 Value::Int(s.max_single),
@@ -2355,7 +2380,7 @@ across every population voucher touching a mapped expense ledger."
 under {nature}{cat_note}."
                 ),
                 Vec::new(),
-            );
+            )?;
             // An unmapped-category or "possibly over" amount is never a computed TDS default: its
             // fact key keeps it out of the clause amount sums while the finding still counts.
             let credited_key = if is_unmapped_194j {
@@ -2380,7 +2405,7 @@ under {nature}{cat_note}."
 under 194-I."
                     ),
                     Vec::new(),
-                );
+                )?;
                 facts.push(("max_month".to_string(), f_month));
             }
 
@@ -2481,7 +2506,13 @@ verified rule."
             let key = row_key(entity);
             let adj = &adjusted[&key];
             let row_adj = &adj.row;
-            let bills = &rows[&key].vouchers;
+            // By GUID, as the client's list of reversals names a bill; a GUID's bills in the books'
+            // order, as the reference reads its row, which is their keys' order (the place is
+            // zero-padded).
+            let mut bills: BTreeMap<&str, Vec<&Voucher>> = BTreeMap::new();
+            for v in rows[&key].vouchers.values() {
+                bills.entry(v.guid.as_str()).or_default().push(v);
+            }
             if adj.tds_grossed_up != 0 {
                 limits.push(format!(
                     "TDS of {} deducted on this payee's own bills is added back: the credits are \
@@ -2507,7 +2538,7 @@ payable in the client's statutory dues to count them gross.",
                 ));
             }
             let pair = rate_pair(prefix);
-            let mut seen: BTreeMap<&str, &Voucher> =
+            let mut seen: BTreeMap<&VoucherKey, &Voucher> =
                 tds_touching.get(entity).cloned().unwrap_or_default();
             for (g, v) in &row_adj.vouchers {
                 if has_tds_line(v, &inputs.tds_ledgers) {
@@ -2571,7 +2602,7 @@ limit: every credit to it is listed (the list may overstate).",
                                 .any(|(k, _)| k.starts_with("deducted_payment:"))
                     });
                 if nature == "194C" && !cfg.goods_carriage_ledgers.is_empty() && listed {
-                    let on_goods_carriage: BTreeMap<&str, &Voucher> = row_adj
+                    let on_goods_carriage: BTreeMap<&VoucherKey, &Voucher> = row_adj
                         .vouchers
                         .iter()
                         .filter(|(_, v)| {
@@ -2637,7 +2668,11 @@ cannot yet be read. Adjust for them in judging this payee: {}.",
                             } else {
                                 "duplicate or error"
                             },
-                            voucher_label(bills[bill.as_str()])
+                            bills[bill.as_str()]
+                                .iter()
+                                .map(|b| voucher_label(b))
+                                .collect::<Vec<_>>()
+                                .join(" or ")
                         ))
                         .collect::<Vec<_>>()
                         .join("; ")
@@ -2715,6 +2750,8 @@ mod tests {
             chain: vec![group.to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: guid.to_string(),
             masterid: None,
         };
@@ -2765,7 +2802,7 @@ mod tests {
         let inputs = Inputs::default();
         let err = run(&book, &rules, "firm", &cfg, &inputs).unwrap_err();
         assert!(
-            matches!(&err, AuditError::Config(m) if m.contains("two payee entities share the figure id")),
+            matches!(&err, AuditError::DuplicateFigureId(id) if id.contains("_row_credited_")),
             "{err}"
         );
         // The control: without the colliding alias both payees are reported.
@@ -2959,6 +2996,8 @@ mod tests {
             chain: vec![group.to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: String::new(),
             masterid: None,
         };

@@ -105,15 +105,16 @@ fn outstanding_destination_approvals_remain_independent() {
 fn traversal_like_party_name_cannot_escape_the_selected_directory() {
     let destination = tempfile::tempdir().expect("temporary destination");
     let approved = approved_destination(destination.path());
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "xlsx",
-        &[bill("../../etc/passwd", "15.00")],
-        &[],
-        |_| Ok(b"synthetic workbook".to_vec()),
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "xlsx",
+        open_bills: &[bill("../../etc/passwd", "15.00")],
+        unallocated_by_party: &[],
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |_: &PartyStatement| Ok(b"synthetic workbook".to_vec()),
+    })
     .expect("statement batch succeeds");
 
     assert_eq!(result.written.len(), 1);
@@ -134,21 +135,22 @@ fn traversal_like_party_name_cannot_escape_the_selected_directory() {
 fn renderer_failure_is_recorded_in_result_and_manifest_while_other_parties_write() {
     let destination = tempfile::tempdir().expect("temporary destination");
     let approved = approved_destination(destination.path());
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "pdf",
-        &[bill("Good Party", "10.00"), bill("Broken Party", "20.00")],
-        &[],
-        |statement| {
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "pdf",
+        open_bills: &[bill("Good Party", "10.00"), bill("Broken Party", "20.00")],
+        unallocated_by_party: &[],
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |statement: &PartyStatement| {
             if statement.party == "Broken Party" {
                 Err("synthetic renderer failure".to_string())
             } else {
                 Ok(b"synthetic PDF".to_vec())
             }
         },
-    )
+    })
     .expect("partial batch result is returned");
 
     assert_eq!(result.written.len(), 1);
@@ -180,17 +182,20 @@ fn manifest_totals_keep_receivable_and_payable_directions_separate() {
         party: "Mixed Party".to_string(),
         amount: ExactDecimal::parse("3.00").expect("synthetic decimal"),
         direction: ExposureDirection::Payable,
+        opening_balance: None,
+        composition: None,
     }];
 
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "pdf",
-        &[bill("Mixed Party", "10.00"), payable_bill],
-        &unallocated,
-        |_| Ok(b"synthetic PDF".to_vec()),
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "pdf",
+        open_bills: &[bill("Mixed Party", "10.00"), payable_bill],
+        unallocated_by_party: &unallocated,
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |_: &PartyStatement| Ok(b"synthetic PDF".to_vec()),
+    })
     .expect("mixed statement writes");
 
     assert_eq!(result.written[0].receivable_amount, "10");
@@ -221,15 +226,16 @@ fn manifest_discloses_the_selected_ageing_anchor() {
 fn per_party_file_creation_failure_is_retained_in_the_manifest() {
     let destination = tempfile::tempdir().expect("temporary destination");
     let approved = approved_destination(destination.path());
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "pdf/invalid",
-        &[bill("Write Failure", "10.00")],
-        &[],
-        |_| Ok(b"synthetic PDF".to_vec()),
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "pdf/invalid",
+        open_bills: &[bill("Write Failure", "10.00")],
+        unallocated_by_party: &[],
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |_: &PartyStatement| Ok(b"synthetic PDF".to_vec()),
+    })
     .expect("a partial batch result is returned");
 
     assert!(result.written.is_empty());
@@ -262,15 +268,16 @@ fn write_failure_reason_never_carries_the_local_destination_path_into_the_manife
         .to_string();
     let approved = approved_destination(destination.path());
 
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "pdf/invalid",
-        &[bill("Write Failure", "10.00")],
-        &[],
-        |_| Ok(b"synthetic PDF".to_vec()),
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "pdf/invalid",
+        open_bills: &[bill("Write Failure", "10.00")],
+        unallocated_by_party: &[],
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |_: &PartyStatement| Ok(b"synthetic PDF".to_vec()),
+    })
     .expect("a partial batch result is returned");
 
     assert_eq!(result.failures.len(), 1);
@@ -293,15 +300,16 @@ fn write_failure_reason_never_carries_the_local_destination_path_into_the_manife
 fn colliding_safe_names_are_written_to_distinct_files() {
     let destination = tempfile::tempdir().expect("temporary destination");
     let approved = approved_destination(destination.path());
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "xlsx",
-        &[bill("A/B", "10.00"), bill("A:B", "20.00")],
-        &[],
-        |_| Ok(b"synthetic workbook".to_vec()),
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "xlsx",
+        open_bills: &[bill("A/B", "10.00"), bill("A:B", "20.00")],
+        unallocated_by_party: &[],
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |_: &PartyStatement| Ok(b"synthetic workbook".to_vec()),
+    })
     .expect("statements write");
 
     assert_eq!(result.written.len(), 2);
@@ -319,16 +327,22 @@ fn party_count_deduplicates_nonzero_bill_and_unallocated_parties() {
             party: "Bill and On Account".to_string(),
             amount: ExactDecimal::parse("25.00").expect("synthetic decimal"),
             direction: ExposureDirection::Receivable,
+            opening_balance: None,
+            composition: None,
         },
         UnallocatedParty {
             party: "On Account Only".to_string(),
             amount: ExactDecimal::parse("10.00").expect("synthetic decimal"),
             direction: ExposureDirection::Receivable,
+            opening_balance: None,
+            composition: None,
         },
         UnallocatedParty {
             party: "Zero Balance".to_string(),
             amount: ExactDecimal::zero(),
             direction: ExposureDirection::Receivable,
+            opening_balance: None,
+            composition: None,
         },
     ];
 
@@ -343,46 +357,6 @@ fn party_count_deduplicates_nonzero_bill_and_unallocated_parties() {
         ),
         3
     );
-}
-
-/// bridge#833: every statement and the manifest a batch writes are recorded as
-/// Bridge's own exports, so the documents uploader leaves them out of a
-/// folder the user syncs.
-#[test]
-fn every_file_a_batch_writes_is_recorded_as_an_export() {
-    crate::export_registry::init_for_tests();
-    let destination = tempfile::tempdir().expect("temporary destination");
-    let approved = approved_destination(destination.path());
-    let marker = uuid::Uuid::new_v4().to_string();
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "xlsx",
-        &[
-            bill("Synthetic Party A", "15.00"),
-            bill("Synthetic Party B", "20.00"),
-        ],
-        &[],
-        |statement| Ok(format!("{marker} {}", statement.party).into_bytes()),
-    )
-    .expect("statement batch succeeds");
-    assert_eq!(result.written.len(), 2);
-    let recorded = crate::export_registry::recorded().expect("read the registry");
-    let mut files = result
-        .written
-        .iter()
-        .map(|written| destination.path().join(&written.file_name))
-        .collect::<Vec<_>>();
-    files.push(PathBuf::from(&result.manifest_path));
-    for file in files {
-        let bytes = fs::read(&file).expect("written file");
-        assert!(
-            recorded.contains(&crate::export_registry::content_sha256(&bytes)),
-            "{}",
-            file.display()
-        );
-    }
 }
 
 fn request<'a, Render>(
@@ -416,55 +390,29 @@ fn files_in(folder: &Path) -> Vec<(String, Vec<u8>)> {
         .collect()
 }
 
-/// bridge#833: each statement and the manifest are recorded before any of
-/// their bytes reach the folder, and no staging file is left behind.
+/// A batch leaves its statements and the manifest in the folder, and no
+/// staging file behind.
 #[test]
-fn every_file_is_recorded_before_its_bytes_reach_the_folder() {
+fn a_batch_leaves_only_its_statements_and_manifest() {
     let destination = tempfile::tempdir().expect("temporary destination");
     let approved = approved_destination(destination.path());
     let bills = [
         bill("Synthetic Party A", "15.00"),
         bill("Synthetic Party B", "20.00"),
     ];
-    let recorded = std::cell::RefCell::new(Vec::<Vec<u8>>::new());
-    let record = |bytes: &[u8]| {
-        for (name, on_disk) in files_in(destination.path()) {
-            assert_ne!(on_disk, bytes, "{name} was written before it was recorded");
-        }
-        recorded.borrow_mut().push(bytes.to_vec());
-        Ok(())
-    };
-    let result = write_recorded_bulk_party_statements(
-        request(&approved, &bills, |statement: &PartyStatement| {
-            Ok(format!("synthetic {}", statement.party).into_bytes())
-        }),
-        &record,
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(request(
+        &approved,
+        &bills,
+        |statement: &PartyStatement| Ok(format!("synthetic {}", statement.party).into_bytes()),
+    ))
     .expect("statement batch succeeds");
     assert_eq!(result.written.len(), 2);
     let on_disk = files_in(destination.path());
     assert_eq!(on_disk.len(), 3, "two statements and the manifest");
-    for (name, bytes) in &on_disk {
+    for (name, _) in &on_disk {
         assert!(
             !name.starts_with('.'),
             "{name} is a staging file left behind"
         );
-        assert!(recorded.borrow().contains(bytes), "{name} was not recorded");
     }
-}
-
-/// bridge#833: a statement or manifest that cannot be recorded is not written.
-#[test]
-fn nothing_is_written_when_the_registry_refuses() {
-    let destination = tempfile::tempdir().expect("temporary destination");
-    let approved = approved_destination(destination.path());
-    let bills = [bill("Synthetic Party A", "15.00")];
-    let result = write_recorded_bulk_party_statements(
-        request(&approved, &bills, |_: &PartyStatement| {
-            Ok(b"synthetic".to_vec())
-        }),
-        &|_| Err("export_registry_write_failed".to_string()),
-    );
-    assert_eq!(result.err().as_deref(), Some(UNRECORDED_EXPORT));
-    assert!(files_in(destination.path()).is_empty());
 }

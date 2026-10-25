@@ -1,5 +1,15 @@
 # Proposed: an order-independent compatibility seal
 
+> **Status note, 30 Sep 2026: superseded by schema 3.** The surface file no longer
+> stores per-file hashes, `scripts/reseal.sh`, `rehash-surface` and the merge driver
+> are gone, and the surface digest is computed from the live bytes of the pinned
+> files. A pull request that changes a pinned file now adds an acknowledgement file
+> instead of resealing; see `docs/release-process.md`. The text below is the
+> historical design and is kept unedited; where it says "reseal" it describes the
+> schema 2 procedure, which no longer exists. Where it speaks of raising
+> `MAX_SURFACE_FILES`, that constant is now a fixed parse bound (1024) that a new pin
+> does not touch.
+
 Status: **adopted and implemented.** Approved by the maintainer on 26 Sep 2026
 (the merge-queue decision, and a direct go on this design). This document is the design
 behind option A of bridge#740; the measurements and the merge-queue follow-up

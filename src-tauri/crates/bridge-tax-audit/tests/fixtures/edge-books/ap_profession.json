@@ -1,0 +1,30 @@
+{
+ "comment": "applicability_44ab, a client recorded as carrying on a profession, turnover between the two thresholds and the cash share within 5%: s.44AB(a) is undetermined and the s.44AB(b) question names the profession and the limit; a full-coverage GSTR-1 turnover is differenced and an AIS figure is not supplied; presumptive history is supplied.",
+ "entity_type": "individual",
+ "groups": {},
+ "ledgers": [],
+ "tb": [],
+ "vouchers": [],
+ "cash": [],
+ "bank": [],
+ "a44_turnover": {
+  "books_turnover_paise": 2000000000,
+  "gstr1_turnover_paise": 1975000000,
+  "gstr1_coverage": "full"
+ },
+ "a44_cash_share": {
+  "receipts_bp": 100,
+  "payments_bp": 100,
+  "limits": [
+   "The cash share is read from the books only."
+  ]
+ },
+ "tests": [
+  "applicability_44ab"
+ ],
+ "deductor_activity": "profession",
+ "presumptive_history": {
+  "ay": "2024-25",
+  "opted_44ad": true
+ }
+}

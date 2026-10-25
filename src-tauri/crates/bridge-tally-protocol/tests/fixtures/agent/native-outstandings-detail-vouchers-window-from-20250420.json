@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE OUTSTANDINGS LAB, seeded for #945: one request of an `outstandings` party-detail call made through a debug `bridge_mcp` built from commit 3f097e8654bb389126b7e7a0002d0cc8cce2601f (binary sha256 6b3ecf49c54ed5a2ed93c04a94ad819fe86ae69a13145293c290862dba0d303a), recorded by a serial read-only relay between the binary and the gateway",
+  "observed_date": "2026-10-01",
+  "requested_as_of": "20260630",
+  "source_response_bytes": 563236,
+  "source_response_sha256": "9efefa926d63277345dace48308cfaccc569a98970da29436f50d1d5d7dd7a9f",
+  "source_request_bytes": 1726,
+  "source_request_sha256": "93d4a3570908e304a201c60772911491e89adb43b84ac348dd05d36768cba1c7",
+  "request_rendered_by": "render_agent_vouchers(company, 20250420, 20260630, None)",
+  "fixture_bytes": 563236,
+  "fixture_sha256": "9efefa926d63277345dace48308cfaccc569a98970da29436f50d1d5d7dd7a9f",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "17 vouchers in the window 20250420 to 20260630 (the requested dates) with every ledger entry and bill allocation (34 entries, 34 allocation lists), as Tally returned them.",
+  "provenance_limit": "One synthetic book on one build, seeded by this project over raw import (15 ledgers, 20 vouchers), so the capture shows how Tally answers these requests for those shapes; it is not evidence about a client's book. The request is the one Bridge itself sent during the tool call. Bridge sent it 2 times, in the `bill_trail` call only (a paired read). Every answer to it was byte-identical to this one.",
+  "sensitivity_review": "Synthetic company name, synthetic ledger names (prefix OL), synthetic GUIDs; no party, person, GSTIN, address or credential."
+}

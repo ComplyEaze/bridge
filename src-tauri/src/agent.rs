@@ -26,6 +26,10 @@ mod lab;
 mod bank_statement;
 #[path = "agent_catalog.rs"]
 mod catalog;
+// Nothing calls the pairing view until the import journal is wired to it.
+#[allow(dead_code)]
+#[path = "agent_transfer_pairing.rs"]
+mod transfer_pairing;
 #[cfg(test)]
 use catalog::tool_definitions;
 use catalog::validate_tool_arguments;
@@ -39,21 +43,57 @@ use agent_protocol::serve_stdio;
 #[path = "agent_company.rs"]
 mod company;
 use company::*;
-#[path = "agent_changes.rs"]
-mod changes;
+#[path = "agent_cash_flow.rs"]
+mod cash_flow;
+#[path = "agent_company_features.rs"]
+mod company_features;
+#[path = "agent_gst_status.rs"]
+mod gst_status;
+#[path = "agent_gst_uncertain.rs"]
+mod gst_uncertain;
+#[path = "agent_headline.rs"]
+mod headline;
+#[path = "agent_ledger_candidates.rs"]
+mod ledger_candidates;
+#[path = "agent_month_register.rs"]
+mod month_register;
+use ledger_candidates::{
+    ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
+    CatalogueLedger,
+};
 #[path = "agent_ledgers.rs"]
 mod ledgers;
+#[path = "agent_masters.rs"]
+mod masters;
+#[path = "agent_stock_summary.rs"]
+mod stock_summary;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
+use vouchers::VoucherPages;
+#[path = "agent_bill_trail.rs"]
+mod bill_trail;
 #[path = "agent_outstandings.rs"]
 mod outstandings;
 #[path = "agent_presence.rs"]
 mod presence;
+#[path = "agent_voucher_search.rs"]
+mod voucher_search;
 #[path = "agent_vouchers.rs"]
 mod vouchers;
+use voucher_search::VoucherSearch;
+#[path = "agent_voucher_groups.rs"]
+mod voucher_groups;
+#[path = "agent_voucher_summary.rs"]
+mod voucher_summary;
 #[cfg(test)]
 use outstandings::*;
+use voucher_groups::Placements;
+use voucher_summary::{SummaryGroup, SummaryRequest};
 #[path = "agent_movement.rs"]
 mod movement;
+#[path = "agent_register.rs"]
+mod register;
+#[path = "agent_statement_tie_out.rs"]
+mod statement_tie_out;
 #[path = "agent_statements.rs"]
 mod statements;
 #[path = "agent_trial_balance.rs"]
@@ -75,6 +115,14 @@ use change_parse::*;
 #[path = "agent_read_profiles.rs"]
 mod read_profiles;
 use read_profiles::*;
+#[path = "agent_audit_read.rs"]
+mod audit_read;
+#[path = "agent_audit_run.rs"]
+mod audit_run;
+#[path = "agent_read_cost.rs"]
+mod read_cost;
+#[path = "agent_read_cost_preview.rs"]
+mod read_cost_preview;
 #[path = "agent_voucher_window.rs"]
 mod voucher_window;
 use voucher_window::*;
@@ -87,18 +135,20 @@ use movement_math::*;
 #[path = "agent_egress.rs"]
 mod egress;
 use egress::{append_egress_line, read_egress_tail};
+#[path = "agent_terms.rs"]
+mod terms;
 
 use crate::tally::runtime::RuntimeReadEvidence;
 use crate::tally::{
     ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor, OutstandingsLoadResult, TallyConfig,
-    TallyRuntime, UnallocatedParty, VerifiedCompanyIdentity,
+    TallyRuntime, UnallocatedComposition, UnallocatedParty, VerifiedCompanyIdentity,
 };
 use bridge_tally_protocol::xml_read_profiles::{
     ReadOnlyProfile, ValidatedCompanyName, ValidatedDateRange,
 };
 use bridge_tally_protocol::{TallyCompany, TallyLedger};
 use bridge_tally_transport::{canonical_loopback_origin, TallyEndpointConfig};
-use chrono::{DateTime, Duration, Local, NaiveDate, TimeZone};
+use chrono::{DateTime, Local, NaiveDate, TimeZone};
 use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -179,11 +229,6 @@ fn mark_voucher_party_names(mut voucher: Value) -> Value {
     voucher
 }
 
-fn mark_changed_master_party_name(mut master: Value) -> Value {
-    mark_party_field(&mut master, "name");
-    master
-}
-
 fn open_bill_json(bill: &OpenBillRow) -> Value {
     let mut value = serde_json::to_value(bill).unwrap_or_default();
     mark_party_field(&mut value, "party");
@@ -193,6 +238,17 @@ fn open_bill_json(bill: &OpenBillRow) -> Value {
 fn unallocated_party_json(party: &UnallocatedParty) -> Value {
     let mut value = serde_json::to_value(party).unwrap_or_default();
     mark_party_field(&mut value, "party");
+    // The ledger's bill-wise flag, written from the composition that carries it
+    // so the two cannot disagree. Absent with the composition.
+    if let (Some(object), Some(composition)) = (value.as_object_mut(), party.composition) {
+        object.insert(
+            "ledger_bill_wise".to_string(),
+            Value::Bool(matches!(
+                composition,
+                UnallocatedComposition::BillWiseLedgerComponentsNotSeparated
+            )),
+        );
+    }
     value
 }
 
@@ -242,11 +298,51 @@ struct Settings {
     max_bytes: usize,
     redaction: Redaction,
     import_enabled: bool,
-    writes_enabled: bool,
-    /// `BRIDGE_AGENT_ENABLE_BATCH_POST`: lets `post_import` post 2 to 50
-    /// vouchers of one batch in one import. Off by default and not in the
-    /// extension's settings until a live batch post through Bridge is proved.
-    batch_post_enabled: bool,
+    posting: Posting,
+    /// Whether the tax-audit tool (`audit_test_run`) is listed and callable. Off by default:
+    /// the extension's setting turns it on.
+    audit_enabled: bool,
+}
+
+/// Whether this server may post to Tally. One setting governs every post: one
+/// voucher per approval, or a saved batch of 2 to 50 under one approval of its
+/// summary (#1090). Off by default.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Posting {
+    Off,
+    On,
+    /// Posting is on, but the retired `BRIDGE_AGENT_ENABLE_BATCH_POST` is still
+    /// set. Someone may have set it off on purpose to keep to one voucher at a
+    /// time, so `post_import` refuses in band (`setting_retired`) until it is
+    /// removed, rather than widening posting silently or stopping every tool.
+    RetiredSettingPresent,
+}
+
+impl Posting {
+    /// The posting setting, and whether the retired batch setting is present
+    /// with any value. The retired one matters only while posting is on.
+    fn from_settings(enabled: bool, retired_present: bool) -> Self {
+        match (enabled, retired_present) {
+            (false, _) => Self::Off,
+            (true, true) => Self::RetiredSettingPresent,
+            (true, false) => Self::On,
+        }
+    }
+
+    /// Posting is configured on: the posting tools are listed and reachable,
+    /// even when the retired setting still makes `post_import` refuse.
+    pub(super) fn enabled(self) -> bool {
+        self != Self::Off
+    }
+
+    #[cfg(test)]
+    pub(super) fn from_enabled(enabled: bool) -> Self {
+        if enabled {
+            Self::On
+        } else {
+            Self::Off
+        }
+    }
 }
 
 impl Settings {
@@ -281,7 +377,8 @@ impl Settings {
             #[cfg(unix)]
             DirectoryAdmissionError::Permissions => "agent_data_dir_permissions_failed".to_string(),
         })?;
-        let writes_enabled = enabled_setting("BRIDGE_AGENT_ENABLE_WRITES")?;
+        let posting = posting_from_env(process_variable)?;
+        let writes_enabled = posting.enabled();
         Ok(Self {
             endpoint,
             data_dir,
@@ -289,21 +386,95 @@ impl Settings {
             max_bytes,
             redaction,
             import_enabled: enabled_setting("BRIDGE_AGENT_ENABLE_IMPORT")? || writes_enabled,
-            writes_enabled,
-            // Validated even when posting is off, so a typo never hides.
-            batch_post_enabled: enabled_setting("BRIDGE_AGENT_ENABLE_BATCH_POST")?
-                && writes_enabled,
+            posting,
+            audit_enabled: audit_from_env(process_variable)?,
         })
     }
 }
 
 fn enabled_setting(name: &str) -> Result<bool, String> {
     match env::var(name) {
-        Err(env::VarError::NotPresent) => Ok(false),
-        Ok(value) if matches!(value.as_str(), "1" | "true") => Ok(true),
-        Ok(value) if matches!(value.as_str(), "0" | "false") => Ok(false),
-        _ => Err("boolean_setting_invalid".into()),
+        Err(env::VarError::NotPresent) => boolean_setting(None),
+        Ok(value) => boolean_setting(Some(&value)),
+        Err(env::VarError::NotUnicode(_)) => Err("boolean_setting_invalid".into()),
     }
+}
+
+/// A boolean setting's raw value: absent is off, and anything but `true`,
+/// `false`, `1` or `0` fails loud.
+fn boolean_setting(value: Option<&str>) -> Result<bool, String> {
+    match value {
+        None => Ok(false),
+        Some("1" | "true") => Ok(true),
+        Some("0" | "false") => Ok(false),
+        Some(_) => Err("boolean_setting_invalid".into()),
+    }
+}
+
+/// The version of the posting consent the extension's setting asks for. The
+/// manifest names the setting after it (`enable_posting_2026_10`), so a change
+/// in what posting covers means a new setting and a new prompt: a "true" stored
+/// for the old one-voucher setting cannot stand for batch posting. A test ties
+/// the key and its placeholder to `packaging/mcpb/manifest.json`.
+#[cfg(test)]
+pub(super) const POSTING_SETTING_KEY: &str = "enable_posting_2026_10";
+const POSTING_PLACEHOLDER: &str = "${user_config.enable_posting_2026_10}";
+/// Retired 12 Oct 2026: batch posting follows the posting setting.
+const RETIRED_BATCH_POST_SETTING: &str = "BRIDGE_AGENT_ENABLE_BATCH_POST";
+
+/// The posting setting's raw value. An upgrade stores nothing for the new key,
+/// so a host may pass its placeholder unresolved, or an empty string: both read
+/// as off, so the upgrader starts with posting off and every read keeps working.
+/// Anything else that is not a plain boolean still fails loud.
+fn posting_setting(value: Option<&str>) -> Result<bool, String> {
+    match value {
+        Some("" | POSTING_PLACEHOLDER) => Ok(false),
+        other => boolean_setting(other),
+    }
+}
+
+/// The extension's tax-audit setting, named after the version of what it offers, as the posting
+/// one is. A test ties the key and its placeholder to `packaging/mcpb/manifest.json`.
+#[cfg(test)]
+pub(super) const AUDIT_SETTING_KEY: &str = "enable_tax_audit_2026_10";
+const AUDIT_PLACEHOLDER: &str = "${user_config.enable_tax_audit_2026_10}";
+/// The environment variable the setting is mapped to.
+pub(super) const AUDIT_SETTING_VARIABLE: &str = "BRIDGE_AGENT_ENABLE_TAX_AUDIT";
+
+/// The tax-audit setting, read through `var` as [`posting_from_env`] reads posting: absent,
+/// empty or the unresolved placeholder is off; anything but a plain boolean fails loud.
+fn audit_from_env(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<bool, String> {
+    let value = var(AUDIT_SETTING_VARIABLE)
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| "boolean_setting_invalid".to_string())
+        })
+        .transpose()?;
+    match value.as_deref() {
+        Some("" | AUDIT_PLACEHOLDER) => Ok(false),
+        other => boolean_setting(other),
+    }
+}
+
+fn process_variable(name: &str) -> Option<std::ffi::OsString> {
+    env::var_os(name)
+}
+
+/// The posting setting and whether the retired batch setting is present, read
+/// through `var`: the process environment in `Settings::from_env`, a map in tests.
+fn posting_from_env(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<Posting, String> {
+    let writes = var("BRIDGE_AGENT_ENABLE_WRITES")
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| "boolean_setting_invalid".to_string())
+        })
+        .transpose()?;
+    Ok(Posting::from_settings(
+        posting_setting(writes.as_deref())?,
+        var(RETIRED_BATCH_POST_SETTING).is_some(),
+    ))
 }
 
 fn tally_port(value: Option<String>) -> Result<u16, String> {
@@ -367,6 +538,8 @@ struct EgressContext {
     tool: String,
     args_sha256: String,
     company_guid: Option<String>,
+    /// What each Tally send of the call was and how it ended (#918).
+    request_trail: Option<Value>,
 }
 
 struct ToolResponse {
@@ -388,9 +561,16 @@ struct Server {
     /// Ledger listings read once and served page by page (#630). In memory
     /// only; see `agent_ledgers.rs`.
     listings: Arc<Mutex<ListingSnapshots>>,
+    /// `vouchers` windows read once and served page by page (#485). In memory
+    /// only; see `agent_vouchers.rs`.
+    voucher_pages: Arc<Mutex<VoucherPages>>,
     /// A post dialog or approval that outlived the call which asked it
     /// (#725). In memory only; see `agent_import_approval.rs`.
     post_approvals: Arc<agent_import::PostApprovals>,
+    /// The Terms-of-Use gate. Open for tests and the desktop app's local views; the server that
+    /// answers an MCP client is built by [`Server::for_mcp`], which closes it until the user has
+    /// accepted the Terms (see `agent_terms.rs`).
+    terms: terms::TermsGate,
 }
 
 struct ToolOutcome {
@@ -408,14 +588,19 @@ struct ToolFailure {
     /// is known. `code` keeps naming what failed.
     cause: Option<&'static str>,
     /// How many rows a refused read returned against how many it was counted
-    /// to hold, when the refusal is that disagreement. Numbers only.
-    counts: Option<RowCounts>,
+    /// to hold, when the refusal is that disagreement. Numbers only; boxed to
+    /// keep the refusal under clippy's 128-byte large-error limit on every
+    /// other path.
+    counts: Option<Box<RowCounts>>,
     /// What each request of a window read cost up to its failure (#595), when
     /// the failure came out of one. Data-free.
     window_timings: Option<Box<WindowReadTimings>>,
-    /// The count and estimate a read was refused on before it was sent (#637).
+    /// The mark and estimate a read was refused on before it was sent (#637).
     /// Numbers only; boxed to keep the refusal small on every other path.
     read_size: Option<Box<ReadSize>>,
+    /// How many ledgers a parent-group read was refused over because their
+    /// parent group name cannot be carried in a filter. A count only.
+    unsupported_parent_ledgers: Option<u64>,
     /// Set when no response reached Tally-protocol parsing (#629). The refusal
     /// then names the configured endpoint, so a wrong or reset port is visible
     /// instead of reading as a Tally data problem.
@@ -424,6 +609,75 @@ struct ToolFailure {
     /// one (bridge#625, bridge#664). Boxed to keep the refusal small on every
     /// other path.
     candidates: Option<Box<Candidates>>,
+    /// What the refusal says about the read it depends on (#945): why that
+    /// read was not complete, or how many requests it needed. Codes and
+    /// numbers only; both in one box to keep the refusal under clippy's
+    /// 128-byte large-error limit.
+    read_detail: Option<Box<ReadDetail>>,
+}
+
+/// See [`ToolFailure::read_detail`].
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct ReadDetail {
+    /// The partial result's own reason, kept beside a refusal that needed a
+    /// complete read instead of being replaced by its code.
+    incomplete_read: Option<IncompleteRead>,
+    /// How many data requests a refused window read needed, at least, against
+    /// the allowance it may spend.
+    planned_reads: Option<PlannedReads>,
+    /// The report kind and 1-based row of a Bills report whose row could not be
+    /// read (bridge#1091). A word and a number: never the bill's party or reference.
+    bill_row: Option<BillRowRef>,
+    /// The ledger a group summary could not place (#1230). Shown as a party name, so `mask_parties`
+    /// masks it; a group is never named (its name is in the book's groups, and only the ledger is known).
+    unplaced_ledger: Option<String>,
+}
+
+/// See [`ReadDetail::bill_row`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct BillRowRef {
+    report: Option<&'static str>,
+    row: u32,
+}
+
+impl ToolFailure {
+    /// The planned size of a refused window read, when it is one.
+    #[cfg(test)]
+    fn planned_reads(&self) -> Option<&PlannedReads> {
+        self.read_detail.as_ref()?.planned_reads.as_ref()
+    }
+
+    fn with_planned_reads(mut self, reads: PlannedReads) -> Self {
+        self.read_detail
+            .get_or_insert_with(Box::default)
+            .planned_reads = Some(reads);
+        self
+    }
+
+    fn with_incomplete_read(mut self, read: IncompleteRead) -> Self {
+        self.read_detail
+            .get_or_insert_with(Box::default)
+            .incomplete_read = Some(read);
+        self
+    }
+}
+
+/// A window read refused as needing more requests than one call may spend:
+/// `needed_at_least` (exact when the plan was made, a lower bound when the
+/// census stopped early) against `allowed`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PlannedReads {
+    needed_at_least: usize,
+    allowed: usize,
+}
+
+/// The reason a partial read gave, carried by a refusal that needed a complete
+/// one: its scalar `partial_reason` and, where the result derives them, its
+/// `partial_reasons`. Codes only, never a name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct IncompleteRead {
+    partial_reason: String,
+    partial_reasons: Vec<&'static str>,
 }
 
 /// The types a refusal offers instead, and the name the caller asked for when
@@ -432,34 +686,84 @@ struct ToolFailure {
 struct Candidates {
     requested: Option<String>,
     items: Vec<Value>,
+    /// Set for a ledger name that was not found or was ambiguous: what the
+    /// listing means, so an empty or cut list is never read as "no such
+    /// ledger".
+    miss: Option<ledger_candidates::LedgerMiss>,
 }
 
-/// A compliance read refused on its size before the master request was sent:
-/// the master mark, the ledgers a catalogue counted (none when the mark alone
-/// was refused), the estimated response and the budget it exceeded.
+/// A compliance read refused before any ledger request was sent because its
+/// master mark is past the census's reach and the catalogue that would count
+/// its ledgers is over the response limit: the master mark, the estimated
+/// catalogue response, the limit it exceeded and the largest mark the census
+/// counts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ReadSize {
     master_alter_id: u64,
-    counted_ledgers: Option<u64>,
     estimated_bytes: u64,
-    budget_bytes: u64,
+    limit_bytes: u64,
+    limit_master_alter_id: u64,
 }
 
-fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
+fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
     error.chain().find_map(|cause| {
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
-            crate::tally::connection::PartyLedgerMasterSourceValidationError::TooLarge {
+            crate::tally::connection::PartyLedgerMasterSourceValidationError::ParentPartition {
+                source:
+                    bridge_tally_protocol::parent_partition::ParentPartitionError::ParentNameUnsupported {
+                        ledgers,
+                    },
+            } => Some(*ledgers),
+            _ => None,
+        }
+    })
+}
+
+fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
+    error.chain().find_map(|cause| {
+        if let Some(crate::tally::runtime::MastersReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
+        if let Some(crate::tally::runtime::StockSummaryReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
+        match cause
+            .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
+        {
+            crate::tally::connection::PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
                 master_alter_id,
-                counted_ledgers,
                 estimated_bytes,
-                budget_bytes,
+                limit_bytes,
+                mark_limit,
             } => Some(ReadSize {
                 master_alter_id: *master_alter_id,
-                counted_ledgers: *counted_ledgers,
                 estimated_bytes: *estimated_bytes,
-                budget_bytes: *budget_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *mark_limit,
             }),
             _ => None,
         }
@@ -508,6 +812,8 @@ fn unanswered_cause(error: &anyhow::Error) -> Option<Unanswered> {
                 | Transport::ResponseTooLarge { .. }
                 | Transport::ResponseTruncated
                 | Transport::ResponseReadFailed => None,
+                // The call was withdrawn (#778): not a Tally answer missing.
+                Transport::SendWithdrawn => None,
             };
         }
         match cause.downcast_ref::<Control>()? {
@@ -540,8 +846,10 @@ impl From<String> for ToolFailure {
             counts: None,
             window_timings: None,
             read_size: None,
+            unsupported_parent_ledgers: None,
             unanswered: None,
             candidates: None,
+            read_detail: None,
         }
     }
 }
@@ -564,6 +872,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         if cause.is::<crate::tally::connection::NativeReportPairDrift>() {
             return Some(crate::tally::connection::NativeReportPairDrift::SAFE_CODE);
         }
+        // The named company is not loaded in Tally, was renamed, or was listed more than once
+        // (#1699): the read failed closed, and this says why.
+        if let Some(identity) = crate::tally::runtime::company_identity_cause(cause) {
+            return Some(identity);
+        }
         if let Some(catalogue) =
             cause.downcast_ref::<bridge_tally_protocol::StandardLedgerCatalogError>()
         {
@@ -573,10 +886,62 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(amount.safe_code());
         }
+        // A native collection's whole-response refusal (#676), the ledger
+        // collection's included (#718): before this, the class was decided in
+        // the parser and then lost here.
+        if let Some(collection) = cause.downcast_ref::<bridge_tally_protocol::NativeCollectionError>()
+        {
+            return Some(collection.safe_code());
+        }
+        if let Some(masters) =
+            cause.downcast_ref::<bridge_tally_protocol::native_masters::NativeMastersError>()
+        {
+            return Some(masters.code());
+        }
+        if let Some(crate::tally::runtime::MastersReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        {
+            return Some(reason);
+        }
+        if let Some(stock) =
+            cause.downcast_ref::<bridge_tally_protocol::native_stock_summary::NativeStockError>()
+        {
+            return Some(stock.code());
+        }
+        if let Some(crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        {
+            return Some(reason);
+        }
         if let Some(statement) = cause
             .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
         {
             return Some(statement.code());
+        }
+        if let Some(cash_flow) =
+            cause.downcast_ref::<bridge_tally_protocol::native_cash_flow::NativeCashFlowError>()
+        {
+            return Some(cash_flow.code());
+        }
+        if let Some(register) = cause
+            .downcast_ref::<bridge_tally_protocol::native_month_register::NativeMonthRegisterError>()
+        {
+            return Some(register.code());
+        }
+        if let Some(check) =
+            cause.downcast_ref::<crate::reports::cash_flow::CashFlowCheckError>()
+        {
+            return Some(check.code());
+        }
+        if let Some(features) = cause
+            .downcast_ref::<bridge_tally_protocol::native_company_features::NativeCompanyFeaturesError>()
+        {
+            return Some(features.code());
+        }
+        if let Some(outstandings) =
+            cause.downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
+        {
+            return Some(outstandings.code());
         }
         if let Some(derivation) =
             cause.downcast_ref::<crate::reports::statements::StatementsError>()
@@ -601,6 +966,19 @@ const GENERIC_RUNTIME_READ_FAILURE: &str = "agent_runtime_read_failed";
 /// gives it up.
 const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
 
+/// The floor for a ledger refusal's candidate list. The whole refusal is
+/// framed twice (as a structured result and as its text copy) and an error
+/// object has no page to trim, so a list that does not fit costs the caller
+/// the refusal code. At a sixteenth of this budget, the list, the guidance
+/// and the framing together stay well inside it.
+const LEDGER_CANDIDATES_MIN_RESPONSE_BUDGET: usize = 16_384;
+
+/// The causes of a movement's ledger catalogue read that outlived its deadline
+/// or the response cap. The catalogue lists every ledger in the book, so it does
+/// not shrink with the voucher window.
+const MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED: &str = "movement_catalogue_deadline_exceeded";
+const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
+
 /// Guidance for refusals whose remedy a caller cannot derive from the code alone.
 ///
 /// Deliberately sparse. A code without a documented, concrete next step returns
@@ -609,9 +987,43 @@ const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
 /// This never softens a refusal — it only says what to do about one.
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "company_identity_absent_or_ambiguous" | "company_identity_not_matched" => Some(
+            "Tally did not confirm the selected company as exactly one loaded company, so nothing \
+             was returned. The company may not be loaded in Tally, may have been renamed since \
+             list_companies, or Tally may list it more than once. Ask the user to open the company \
+             in Tally, then call list_companies again and repeat the request with the \
+             company_guid it returns.",
+        ),
+        "setting_retired" => Some(
+            "BRIDGE_AGENT_ENABLE_BATCH_POST was retired: batch posting now follows the posting \
+             setting (BRIDGE_AGENT_ENABLE_WRITES), which covers one voucher or a saved batch of \
+             2 to 50. Remove BRIDGE_AGENT_ENABLE_BATCH_POST from ComplyEaze Bridge's environment \
+             and start it again. Nothing was sent to Tally.",
+        ),
+        "terms_not_accepted" => Some(
+            "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
+             them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
+             extension settings and tick \"I accept the ComplyEaze Bridge Terms of Use\" \
+             there, then quit Claude completely and reopen it so ComplyEaze Bridge starts again. Nothing \
+             was read from Tally.",
+        ),
+        "terms_record_unavailable" => Some(
+            "ComplyEaze Bridge could not read or write terms-acceptance.jsonl in its local \
+             folder, so it is off although the Terms of Use are accepted. Check that the folder \
+             can be written; if the file is damaged, move it aside and ComplyEaze Bridge will record your \
+             acceptance again. Then quit Claude completely and reopen it. Nothing was read from \
+             Tally.",
+        ),
+        "statement_password_file_permissions" => Some(
+            "The password file is not private to you: someone else may be able to read or change \
+             it, so ComplyEaze Bridge did not read the password and parsed nothing. On a Mac, \
+             turn off the file's group and other permissions (chmod 600). On Windows, make a new \
+             copy of it in a folder of your own on this computer, then delete the original: moving \
+             it keeps who can read it. Then run the parse again.",
+        ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
-             mark and Bridge has no \"before\" to attribute an import against. Record one \
+             mark and ComplyEaze Bridge has no \"before\" to attribute an import against. Record one \
              voucher in this company by another route and confirm it in Tally, then build \
              this batch again.",
         ),
@@ -619,51 +1031,372 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // `ledger_movement_read_failed` (#716).
         "company_several_currency_masters" => Some(
             "This company keeps more than one Currency master. The opening balances these \
-             reads return (and ledger_movement's movements) name no currency, so Bridge \
+             reads return (and ledger_movement's movements) name no currency, so ComplyEaze Bridge \
              refused before reading any ledger. ledger_masters with fields=compliance reads \
              such a book through the base currency Tally identifies: it returns the plain \
              base-currency ledgers and names the ones it leaves out (#551). The basic read \
              and ledger_movement do not support it yet (#716). Retrying this read refuses \
              again.",
         ),
+        "register_ledger_currency_excluded" => Some(
+            "A voucher in this window touches a ledger that the compliance read of the ledger \
+             masters set aside because it is kept in another currency (or its balance is a \
+             currency composite), so the purchase or sales register cannot classify the voucher and refuses \
+             the whole window rather than leave it out. Narrow from and to so the window holds \
+             no such voucher, or read it with `vouchers`. Retrying the same window refuses \
+             again.",
+        ),
+        "register_master_mark_unavailable" => Some(
+            "Tally did not report the company's master-alteration mark, which the purchase and sales \
+             registers need to bind the ledger masters to the voucher window. It cannot be answered \
+             from this book as Tally reports it; `ledger_masters` with fields=compliance and \
+             `vouchers` still read it separately.",
+        ),
+        "ledger_not_found" => Some(
+            "No ledger in this company is spelled this way, even ignoring ASCII case and extra \
+             spaces (a symbol, an accent or the case of a letter outside A-Z is not ignored), and \
+             ComplyEaze Bridge chose none. Show the user the ledgers in \
+             `candidates`, if there are any, and ask which one they meant: even one candidate \
+             needs the user's confirmation, and none is marked best: the order is by rule \
+             strength and then name, not by likelihood. Then call again with that name exactly \
+             as listed. `candidates_listing` says what an empty list means: `none` (nothing \
+             resembles the name: ask the user to check the spelling, and do not say the ledger \
+             does not exist), `withheld` (too many ledgers resemble it to list: ask for more \
+             of the name), `truncated` (more were found than are listed: ask for more of the \
+             name), `names_masked` (the redaction setting hides the names: ask the user to \
+             type the full name) or `unavailable` (the search could not run: ask the user for \
+             the exact name). If `candidates_total_is_lower_bound` is true, there may be more \
+             ledgers than are counted. If `candidates_listing` is absent, no candidates were \
+             attached because the response budget is small: ask the user for the exact name.",
+        ),
+        "ledger_ambiguous" => Some(
+            "More than one ledger in this company matches this name once case and spaces are \
+             ignored (they differ only in case or whitespace, such as a trailing line break), and \
+             none is spelled exactly as requested, so ComplyEaze Bridge chose none. Show the user every ledger in `candidates` and \
+             ask which one they meant, then call again with that name exactly as listed. If \
+             `candidates_listing` is `truncated`, more ledgers match than are listed, and if \
+             it is `names_masked` or absent the names are not shown: ask the user to type the \
+             full name of the ledger exactly as spelled in Tally, since the names that clash \
+             may differ only in case or whitespace.",
+        ),
+        "ledger_name_masked" => Some(
+            "Refused: ask the user to type the full ledger name exactly as spelled in Tally. \
+             This name looks like a shortened, masked name (party names are shortened with `…` \
+             when masking is on), and using it could open a different ledger from the one \
+             meant, so ComplyEaze Bridge did not use it.",
+        ),
         "ledger_masters_as_of_requires_compliance" => Some(
             "`as_of` selects the date `party_gstin` is read as of, which only \
              fields=compliance returns. Pass fields=compliance, or drop `as_of`: a basic \
              read's opening balance is dated by `opening_balance_as_of`, not by `as_of`.",
         ),
+        "ledger_masters_gst_details_requires_compliance" => Some(
+            "`include_gst_details` adds each ledger's dated GST rate details, which only \
+             fields=compliance reads. Pass fields=compliance, or drop `include_gst_details`.",
+        ),
         // A cause, reached through `ledger_export_invalid` (#675).
         "foreign_currency_ledger_balance" => Some(
             "A ledger in this company holds its opening balance in a foreign currency, which \
-             Tally writes as `<amount> @ <rate> = <base amount>` rather than a number. Bridge \
+             Tally writes as `<amount> @ <rate> = <base amount>` rather than a number. ComplyEaze Bridge \
              does not read those amounts yet (#551, #683), so this read is refused on purpose, \
              not because the response was damaged. Retrying refuses again.",
         ),
+        // The masters read's own size refusal (`size` carries the mark).
+        "masters_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case row of this kind is over ComplyEaze Bridge's response budget \
+             (`size.limit_bytes`), so no request for masters was sent. The mark also counts \
+             masters of every other kind, so a company with fewer masters of this kind may \
+             be refused. A larger book refuses; retrying this call refuses again.",
+        ),
+        // Causes of `ledger_movement_read_failed`: the ledger catalogue is read whole,
+        // whatever voucher window is asked for (#485).
+        MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED | MOVEMENT_CATALOGUE_TOO_LARGE => Some(
+            "The book's ledger catalogue, which ledger_movement reads whole whatever \
+             voucher window it is given, took longer than one request may or was larger than \
+             one response may be. It lists every ledger in the book, so it does not shrink \
+             when the window does: narrowing from and to is not known to help, and calling \
+             again sends the same read again, so do not retry in a loop. trial_balance \
+             reads Tally's own period figures per ledger without this catalogue read (a \
+             whole-book read of its own, on a different basis: not literal voucher \
+             movement).",
+        ),
+        // The stock summary read's own size refusal (`size` carries the mark).
+        "stock_summary_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case stock-item row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
+             so no request for stock items was sent. The mark counts masters of every kind, so \
+             a company with few stock items may be refused. A larger book refuses; retrying \
+             this call refuses again.",
+        ),
+        // The stock summary read whose rows differ from Tally's own item count
+        // (`counts` carries both numbers).
+        "stock_summary_item_count_differs" => Some(
+            "Tally's own count of this company's stock items (`counts.counted`) differs from \
+             the number ComplyEaze Bridge read (`counts.returned`), so nothing is returned: with fewer \
+             rows the list may be incomplete, and with more rows the count is not counting \
+             the list ComplyEaze Bridge read. The book did not change during the read, so the same call \
+             now gives the same refusal. Give the user both numbers and ask them to open the \
+             Stock Summary in Tally for this company; why they differ is not known. Once the \
+             user has looked, the next call is stock_summary with the same `company_guid` \
+             and `as_of`.",
+        ),
+        // Causes, reached through `stock_summary_read_failed`.
+        "stock_report_unknown" => Some(
+            "Tally answered ComplyEaze Bridge's request for its Stock Summary without the report, both \
+             times it was asked, so stock values cannot be checked and nothing is returned. \
+             ComplyEaze Bridge cannot tell why. The book did not change during the read, so do not retry. \
+             Tell the user ComplyEaze Bridge could not read stock from this Tally and that the Stock \
+             Summary in Tally itself is the place to read it.",
+        ),
+        "stock_item_count_unavailable" => Some(
+            "Tally gave no usable count of this company's stock items, both times it was asked, \
+             so ComplyEaze Bridge cannot tell whether it read every item and returns nothing. Do not \
+             retry. Tell the user that stock for this company has to be read in Tally itself.",
+        ),
+        // The stock summary's date refusal: it costs no Tally request.
+        "stock_summary_as_of_not_measured" => Some(
+            "stock_summary reads only an `as_of` that is a 31 March (a financial-year end), \
+             and no request was sent. Ask for a 31 March `as_of`; retrying the same date \
+             refuses again. Only the period ending 31 March 2026 has been measured for \
+             stock: another year's 31 March is read, but its figures are unmeasured.",
+        ),
+        "summary_group_unresolved" => Some(
+            "A ledger in this window could not be placed under a group, so no group total was \
+             given: a total that is short of an entry it could not place would mislead. `ledger` \
+             names the ledger and `cause` says why: `no_parent` (the book gives it no parent \
+             group, or one ComplyEaze Bridge will not carry: a name with a control character or \
+             over 1,024 bytes), `group_absent` (its parent group is not in the group list), \
+             `group_name_repeated`, `cycle`, `exhausted` (its chain is longer than the walk allows), \
+             `reserved_name_missing`, `top_group_not_under_root` (the top group of its chain has \
+             no parent, or none that is the root) or `ledger_not_in_catalogue` (the ledger list \
+             does not hold it). Only the first such ledger is named: correct it and call again. Show the person the \
+             ledger and the cause. Call ledger_masters for that ledger's `parent` and masters with \
+             kind groups for the groups, and ask them to correct it in Tally; or summarise by \
+             ledger, month or voucher_type instead. Retrying this call refuses again until the \
+             book is corrected.",
+        ),
+        "summary_group_book_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) is above the limit a \
+             group summary reads the ledger list at (`size.limit_master_alter_id`), so no request \
+             for the ledgers was sent. The limit is provisional and computed, not measured on this \
+             list: 16 MiB, a size chosen here and not verified, over an estimate of 1,400 bytes a \
+             ledger. A response past the transport's response cap is cut off mid-read, which can \
+             leave Tally's gateway unable to answer (#637); this limit is about half of that cap. \
+             The mark is an UPPER BOUND on ledgers, since every other master raises it too, so a \
+             company with fewer ledgers may be refused. Tell the person the limit is provisional. \
+             Summarise by ledger, month or voucher_type instead, and read ledger_masters for each \
+             ledger's group. Retrying this call refuses again.",
+        ),
+        // The company's voucher mark, or another part of its book extent, differed between the two
+        // reads that bracket a read (#1633). Codes and causes alike: the same text answers a
+        // divided window read, the registers and every report read between two extent reads. One
+        // measured case: a GST return export raised the voucher mark by 3 with no voucher change.
+        "voucher_window_changed_during_read"
+        | "native_ledger_extent_changed"
+        | "party_ledger_extent_changed"
+        | "company_book_extent_changed"
+        | "company_features_extent_changed"
+        | "currency_extent_changed"
+        | "currency_to_master_extent_changed"
+        | "masters_extent_changed"
+        | "month_register_extent_changed"
+        | "stock_summary_extent_changed" => Some(
+            "The company's books changed in Tally while this call was being read, so the call \
+             stopped and nothing was changed in Tally. Saving in Tally can do it, and so can a report that raises the voucher \
+             mark without changing a voucher: one GST return export raised it by 3. Nothing is \
+             wrong with the request. Ask the person whether anything is being saved or exported \
+             in Tally, then run the same request again once, when that has finished.",
+        ),
+        // A later page asked for the held listing and could not have it: the book moved, or the
+        // snapshot is gone (#1633).
+        "listing_snapshot_changed" => Some(
+            "A later page cannot be served from the listing the first page held: the company's \
+             books changed in Tally since that page, or the held listing has expired, been \
+             replaced or was never held. Run the request again from the first page, without snapshot_id, and page \
+             through that result. If the person is saving or exporting in Tally, wait for it to \
+             finish first.",
+        ),
+        "group_snapshot_drifted" => Some(
+            "A ledger's group, or a group's place in the tree, changed in Tally while this call \
+             was being read, so the groups read before the window and after it differ and no \
+             group total was given. Nothing is wrong with the book: ask the person whether \
+             anyone is editing it, then call this again once they have stopped.",
+        ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
-        "ledger_masters_too_large" => Some(
-            "The estimated compliance response is over Bridge's budget, so no master request \
-             was sent: a read of that size has left Tally's gateway unable to answer (#637). \
-             When `size.counted_ledgers` is a number, Bridge counted that many ledgers with a \
-             catalogue read and refused on the count. When it is null, the company's \
-             master-alteration mark (`size.master_alter_id`) is too high to count within \
-             budget and was refused as it stands; the mark is an UPPER BOUND on ledgers, since \
-             stock items, units and every other master raise it too, so a company with fewer \
-             ledgers may be refused. Call ledger_masters with fields=basic, which returns \
-             names, parents and opening balances without the compliance fields. Retrying this \
-             call refuses again. A `group` filter does not narrow the request.",
+        "ledger_catalogue_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) is above what \
+             ComplyEaze Bridge can count ledgers for (400,000), so no request for ledgers was sent: a \
+             response past the transport's response cap is cut off mid-read, which can leave \
+             Tally's gateway unable to answer (#637). The mark is an UPPER BOUND on ledgers, \
+             since stock items, units and every other master raise it too, so a company with \
+             fewer ledgers may be refused. Call ledger_masters with fields=basic, which \
+             returns names, parents and opening balances without the compliance fields. \
+             Retrying this call refuses again. A `group` filter does not narrow the request.",
+        ),
+        // Causes reached through `party_ledger_master_read_failed` when a book whose mark is
+        // past what its catalogue can be read for is counted by AlterID span (#679).
+        "ledger_span_slice_over_bound"
+        | "ledger_span_duplicate_identity"
+        | "ledger_span_census_empty" => Some(
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span before reading them, because its \
+             master-alteration mark is too high to read a catalogue for, and the count could not \
+             be trusted: a slice returned more ledgers than its span can hold (Tally may have \
+             ignored its filter), a ledger was seen twice, no ledger was found at all (a closed or \
+             absent company answers an empty slice exactly like a book without ledgers). No \
+             master was requested. A ledger added or deleted \
+             during the count can cause it; retry once while the book is quiet. A repeat means \
+             Tally's answer to the slice request is not what ComplyEaze Bridge expects: call ledger_masters \
+             with fields=basic instead.",
+        ),
+        "ledger_span_slice_malformed" | "ledger_span_identity_mismatch" => Some(
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span before reading them, and a slice \
+             of the answer was damaged, held a field it should not, or answered for another \
+             company. No master was requested. Switching or closing the company in Tally during \
+             the count can cause it; retry once with the company left alone. A repeat means \
+             Tally's answer to the slice request is not what ComplyEaze Bridge expects: call ledger_masters \
+             with fields=basic instead.",
+        ),
+        // Not reachable after admission (the plan is bounded before it is made); named so
+        // a refusal here is never read as a transient one.
+        "ledger_span_too_many_slices" | "ledger_span_plan_invalid" | "ledger_span_incomplete" => Some(
+            "ComplyEaze Bridge could not plan or finish the AlterID-span count of this book's ledgers. No \
+             master was requested. Retrying this call refuses again; call ledger_masters with \
+             fields=basic instead.",
+        ),
+        "ledger_span_slice_response_too_large" => Some(
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span, and one slice's answer was \
+             larger than ComplyEaze Bridge's response limit, far more than the slice's span can account \
+             for: Tally may have ignored the slice's filter. ComplyEaze Bridge sent nothing after that \
+             response and released nothing. Retrying is expected to refuse again; call \
+             ledger_masters with fields=basic.",
+        ),
+        "ledger_count_differs" => Some(
+            "Two counts of this book's ledgers, taken by different requests, disagree: the \
+             AlterID-span census against the catalogue, or the catalogue's or census's count \
+             against the ledgers the master read returned. A ledger added or deleted during the \
+             read can cause it; retry once while the book is quiet. A repeat means Tally answers \
+             one of the reads wrongly or, for a census, that a ledger's AlterID lies above the \
+             book's master-alteration mark: call ledger_masters with fields=basic instead. ComplyEaze Bridge \
+             released nothing.",
+        ),
+        "ledger_count_company_differs" => Some(
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span, and Tally's own count \
+             of the company's ledgers is higher than that census found: the census missed ledgers, \
+             because a ledger was added during the read or (reasoned, not reproduced) because a \
+             ledger was altered during it before its slice was read, so its new AlterID is past \
+             every slice, or the company was closed and reopened while it ran, and a read sized \
+             from the low \
+             count would have been sized too small. No master was requested. Retry once with the company left alone and \
+             nobody editing it in Tally. A repeat means the census and Tally's count disagree \
+             about this book: call ledger_masters with fields=basic instead."
+        ),
+        "ledger_count_company_invalid" => Some(
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span and asked Tally for the company's \
+             own count of its ledgers to check it, and the answer was damaged, named another \
+             company (or the company is no longer loaded), or held a count that is not a plain \
+             number. No master was requested. Retry once with the company left alone. A repeat \
+             means Tally's answer to that request is not what ComplyEaze Bridge expects: call ledger_masters \
+             with fields=basic instead."
+        ),
+        "ledger_count_company_response_too_large" => Some(
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span and asked Tally for the \
+             company's own count of its ledgers to check it, and the answer was larger than \
+             ComplyEaze Bridge's response limit, far more than one company's count can account \
+             for. No master was requested, and nothing was sent after that response. Retry once \
+             with the company left alone. A repeat means Tally's answer to that request is not \
+             what ComplyEaze Bridge expects: call ledger_masters with fields=basic instead.",
+        ),
+        "ledger_count_catalogue_too_large" => Some(
+            "The census counted more ledgers than one compliance read holds, so ComplyEaze Bridge would \
+             read them in parts by parent group, but the catalogue that names their parents \
+             would itself be larger than ComplyEaze Bridge's response limit. Nothing was requested after \
+             the census. Call ledger_masters with fields=basic. Retrying this call refuses again.",
+        ),
+        // Causes reached through `party_ledger_master_read_failed` when a book too
+        // large for one compliance read is read as parts by parent group (#679).
+        "parent_over_budget" | "parent_partition_too_many_parts" => Some(
+            "This book has more ledgers than one compliance read may carry, so ComplyEaze Bridge reads it \
+             as parts by immediate parent group, and it cannot be split that way: either one \
+             group holds more ledgers than a part may, or the ledgers under parent groups whose \
+             names a filter cannot carry, read together as one last part, are more than a part \
+             may hold (ComplyEaze Bridge splits neither), or the groups need more parts than ComplyEaze Bridge will \
+             send. No master was requested. Call \
+             ledger_masters with fields=basic, which returns names, parents and opening \
+             balances without the compliance fields. Retrying this call refuses again.",
+        ),
+        "parent_part_response_too_large" => Some(
+            "This book is read as parts by parent group, and one part's answer was larger than \
+             ComplyEaze Bridge's response limit, more than the catalogue can account for under that \
+             part's groups: Tally may have ignored the part's filter. ComplyEaze Bridge sent nothing \
+             after that response and released nothing. Retrying is expected to refuse again; call \
+             ledger_masters with fields=basic.",
+        ),
+        "parent_complement_over_budget" => Some(
+            "This book is too large for one compliance read and ComplyEaze Bridge reads it by parent \
+             group, but reaching the ledgers under parent groups whose names a filter cannot \
+             carry needs a filter larger than ComplyEaze Bridge will send. No master was requested. Call \
+             ledger_masters with fields=basic. Retrying this call refuses again.",
+        ),
+        "parent_partition_voucher_witness_absent" => Some(
+            "This book is too large for one compliance read, so ComplyEaze Bridge reads it as several \
+             parts, and balances read at different moments only agree if no voucher was \
+             written between them. ComplyEaze Bridge proves that with the company's voucher high-water \
+             (`voucher_alter_id` in the company extent), and this Tally did not report one. \
+             No part was requested. Call ledger_masters with fields=basic. Retrying this \
+             call refuses again.",
+        ),
+        "parent_name_unsupported" => Some(
+            "This book is too large for one compliance read and ComplyEaze Bridge reads it by parent \
+             group, but all `unsupported_parent_ledgers` of its ledgers sit under parent \
+             groups whose names a filter cannot carry (a quotation mark, a control character, \
+             an empty name or an unexpected replacement character), so there is no named \
+             group to read them apart from. No master was requested. Call ledger_masters with \
+             fields=basic. Retrying this call refuses again.",
+        ),
+        "ledger_without_parent" | "parent_partition_duplicate_ledger_identity" => Some(
+            "This book is too large for one compliance read and ComplyEaze Bridge reads it by parent \
+             group, but its ledger catalogue holds a ledger with no parent group or a repeated \
+             ledger identity. No master was requested. Call ledger_masters with fields=basic. \
+             Retrying this call refuses again.",
+        ),
+        "parent_part_row_count_differs"
+        | "parent_part_row_outside_parents"
+        | "parent_part_row_not_in_catalogue"
+        | "parent_part_row_differs_from_catalogue"
+        | "parent_part_row_repeated"
+        | "parent_part_rows_missing" => Some(
+            "The parts of this parent-group read did not add up to the ledger catalogue that \
+             planned them, so ComplyEaze Bridge released nothing: a part returned a ledger it should not \
+             have, returned one twice, or missed one, or a ledger's name or group differs \
+             between the catalogue and the part. A part whose master came back with a different \
+             ledger count ends the read after that master: its balance, any later part and the \
+             group read are never requested, though the master was sent, including for the last \
+             part, the one that reads ledgers under parent names a filter cannot carry. A ledger added, renamed, moved or deleted \
+             during the read can cause it; retry once while the book is quiet. A repeat means \
+             Tally's filtered read and its catalogue disagree about this book: call \
+             ledger_masters with fields=basic instead.",
         ),
         // Narration, reference and voucher number share this code for several
         // unrelated text failures (empty, over the schema's character cap, a
-        // control character); the least discoverable of them is specific to
-        // the voucher number, so it is named here rather than left for a
-        // caller to reverse-engineer.
+        // control character); the least discoverable of them applies to the
+        // voucher number and the narration, so it is named here rather than
+        // left for a caller to reverse-engineer.
         "voucher_text_invalid" => Some(
-            "The voucher number is empty, longer than the schema allows, holds a control \
-             character, or — the one cause that is not visible by inspection — begins a \
-             literal U+FFFD immediately followed by `#`, digits and `;` (for example \
-             U+FFFD#5;). Bridge's own agent readers rewrite exactly that sequence before \
-             parsing, so a voucher number carrying it would read back as different text and \
-             could never be confirmed as posted. Remove that sequence from the voucher number \
-             and resubmit; narration and reference may carry it freely.",
+            "A narration, reference or voucher number is empty, longer than the schema \
+             allows, or holds a control character; or — the one cause that is not visible by \
+             inspection — the voucher number or narration holds a literal U+FFFD immediately \
+             followed by `#`, digits and `;` (for example U+FFFD#5;). ComplyEaze Bridge's own agent \
+             readers rewrite exactly that sequence before parsing, so a voucher number \
+             carrying it could never be confirmed as posted, and a native post of a narration \
+             carrying it could never be bound to the voucher it created, so never confirmed \
+             either. A narration is also refused when it holds a character that draws nothing \
+             (Unicode Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the \
+             prepended concatenation marks). Remove that sequence or character from the \
+             voucher number or narration and build the batch again with build_import_xml (for \
+             proposals from an earlier parse_bank_statement, run parse_bank_statement again \
+             first): a saved batch cannot be changed, and post_import refuses one saved with \
+             such a narration. The reference may carry either freely.",
         ),
         // Same shared-code shape as voucher_text_invalid, for a ledger name
         // instead of the voucher number.
@@ -671,32 +1404,462 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "A ledger name is empty, longer than the schema allows, holds a control character, \
              pairs with an amount that is not a valid two-decimal figure, or — the one cause \
              that is not visible by inspection — begins a literal U+FFFD immediately followed \
-             by `#`, digits and `;` (for example U+FFFD#5;). Bridge's own agent readers rewrite \
+             by `#`, digits and `;` (for example U+FFFD#5;). ComplyEaze Bridge's own agent readers rewrite \
              exactly that sequence before parsing, so a ledger name carrying it would read back \
              as different text and could never be confirmed as posted. Rename the ledger to \
              drop that sequence and resubmit.",
+        ),
+        // A cause, reached through `voucher_window_part_not_admitted`. Since
+        // #985 a window read whole is admitted against the census that sized
+        // it, so this is reachable on an ordinary day's read, not only on a
+        // divided one.
+        "part_census_mismatch" => Some(
+            "ComplyEaze Bridge counted this window's vouchers before reading them, and the read returned \
+             different vouchers from the ones it counted (`counts` gives returned against \
+             counted), so it released nothing. A voucher created, altered, re-dated or deleted \
+             between the count and the read causes it: call the same tool again with the same \
+             arguments, once, while the book is quiet. A repeat on a quiet book may mean Tally \
+             did not honour the read's filter, or a fault in ComplyEaze Bridge; read this window in Tally \
+             itself.",
         ),
         // A product limit of the bounded window read (protocol reference §11c):
         // the census walks the book's AlterIDs whatever the window, so the
         // obvious retry — a shorter window — cannot succeed, and saying so is
         // the whole point of naming a step.
         "voucher_window_book_too_large" => Some(
-            "This company's voucher history is too large for Bridge to count before reading \
+            "This company's voucher history is too large for ComplyEaze Bridge to count before reading \
              it in bounded requests: its voucher high-water mark is above about 2.1 million. \
              A shorter date window will not help, because the count covers the whole book. \
              Read this company with Tally's own reports, or split the company in Tally so \
              that each part's books are smaller.",
         ),
+        // The `outstandings` party detail (#945) refuses, never cuts, an answer
+        // over its row limit; each kind has its own code and its own remedy.
+        "trail_too_large" => Some(
+            "The party's bill trail has more than 500 allocations, so it was refused rather \
+             than cut. Ask for one bill at a time with `reference`, using a reference that \
+             `open_bills` lists for the party.",
+        ),
+        // The party detail's window read needs more requests than one call may
+        // spend (`reads` gives how many against how many). Refused, never read
+        // in part; `window` lists any part already read before the refusal.
+        "trail_window_too_large" => Some(
+            "The company's vouchers from the start of the books to as_of, which a bill trail \
+             reads to find the party's allocations, need more requests than one call may \
+             spend (`reads.needed_at_least` against `reads.allowed`), so the bill trail was \
+             refused rather than read in part; `window` lists any part already read. Ask for \
+             one bill with `reference`, using a reference that `open_bills` lists for the \
+             party: the read then starts at that bill's date, so a recent bill reads less. \
+             The same call refuses again.",
+        ),
+        "named_bill_window_too_large" => Some(
+            "The company's vouchers from the named bill's earliest date in Tally's bills \
+             reports (or from the start of the books, when they do not list it) to as_of \
+             need more requests than one call may spend (`reads.needed_at_least` against `reads.allowed`), so \
+             the bill's trail was refused rather than read in part; `window` lists any part \
+             already read. Nothing narrows it further, so this bill's trail is not available \
+             on this book. The party's vouchers, with their bill allocations, can still be \
+             read untied with `vouchers` and `ledger` over shorter date windows. The same call \
+             refuses again.",
+        ),
+        "unadjusted_window_too_large" => Some(
+            "The company's vouchers from the start of the books to as_of, which the \
+             unadjusted detail reads to find the party's allocations, need more requests than \
+             one call may spend (`reads.needed_at_least` against `reads.allowed`), so it was \
+             refused rather than read in part; `window` lists any part already read. Nothing \
+             narrows it, because it needs every voucher from the start of the books, so it is \
+             not available for this party on this book. The party's vouchers, with their bill \
+             allocations, can still be read untied with `vouchers` and `ledger` over shorter \
+             date windows. The same call refuses again.",
+        ),
+        "unadjusted_detail_too_large" => Some(
+            "The party's unadjusted detail has more than 500 on-account, advance and pending \
+             note rows, so it was refused rather than cut, and no argument narrows it: \
+             `reference` applies only to `bill_trail`. The detail is not available for this \
+             party. Its vouchers, with their bill allocations, can still be read with \
+             `vouchers` and `ledger` over shorter date windows, without the tie-out.",
+        ),
         // #697: every Bridge process sends to one Tally one request at a time.
         "tally_endpoint_busy" => Some(
-            "Another Bridge window or AI client was talking to this Tally for the whole \
+            "Another ComplyEaze Bridge window or AI client was talking to this Tally for the whole \
              bounded wait, so nothing was sent. Call again after retry_after_s seconds; the \
              same request is safe to repeat.",
         ),
         "import_post_window_not_bounded" => Some(
-            "Before posting, Bridge checks the batch's whole date range in one request, and \
+            "Before posting, ComplyEaze Bridge checks the batch's whole date range in one request, and \
              this range holds too many vouchers for one request to stay within its bound. \
              Build the batch again over fewer days, then post that batch.",
+        ),
+        // build_import_xml refuses this before any live read (`refuse_mixed_shapes`):
+        // the two shapes come from separate qualifications (protocol reference
+        // §9.8 and §9.13), and no file mixing them has been imported (#1082).
+        "voucher_type_shapes_mixed" => Some(
+            "A batch holds either Journals only, or Payment, Receipt and Contra vouchers only \
+             (those three may share a batch). Split the vouchers into one batch of each kind \
+             and build them separately; nothing was written or sent.",
+        ),
+        // A Sales invoice's number is the document number GSTR-1 reports, and
+        // rule 46(b) of the CGST Rules fixes what it may be. Neither text says
+        // what was or was not written: the first code is also a build refusal,
+        // the second also a refusal of a post whose number came into use.
+        "invoice_number_invalid" => Some(
+            "An invoice number must follow GST rule 46(b): at most 16 characters, made only of \
+             letters, digits, the hyphen (-) and the slash (/), and unique in the financial \
+             year. This number is longer than that or has a space or another character the rule \
+             does not allow, so ComplyEaze Bridge refuses it. Do not shorten or change the \
+             number yourself: tell the user the rule and ask which invoice number to use.",
+        ),
+        "invoice_number_already_used" => Some(
+            "GST rule 46(b) needs an invoice number to be unique in the financial year (1 April \
+             to 31 March), and the read of that year's Sales vouchers found this number already \
+             in use, so ComplyEaze Bridge refuses it. The voucher that has the number may be this \
+             same invoice, already in the book: open it in Tally first, and if an earlier \
+             batch for this invoice was sent, run verify_import on it. Only if it is another \
+             invoice, tell the user the number is in use and ask which invoice number to \
+             use. Do not pick another number yourself.",
+        ),
+        // The control beside the number read (`NumberAbsence`): a read that
+        // matches nothing must never pass as a number not in use.
+        "invoice_number_control_missing" => Some(
+            "Before trusting that this invoice number is not in use, ComplyEaze Bridge read for an \
+             earlier invoice it posted in this company and verified, and Tally did not return \
+             it, so the read cannot be trusted here and the build is refused. The detail names \
+             the batch that posted that invoice. Run verify_import on it. If it no longer reads \
+             verified, it no longer checks new numbers, and a batch ComplyEaze Bridge sent then \
+             stops the company's invoices until the user releases it (invoice_company_stopped \
+             says how). If it still reads \
+             posted and verified, Tally holds the invoice and the number check does not work on \
+             this book: stop, tell the user, and do not post this invoice through ComplyEaze \
+             Bridge.",
+        ),
+        "invoice_company_stopped" => Some(
+            "An earlier invoice of this company was sent to Tally and is not verified posted, so \
+             ComplyEaze Bridge builds and posts no further invoice for this company until a \
+             person decides about it. The detail names its batch. Run verify_import on that \
+             batch: if it reads posted and verified, the stop lifts by itself; a batch whose \
+             answer was lost or was not clean may never read so. If it does not, tell the \
+             user to check that invoice in Tally, then call acknowledge_post_review with that \
+             batch_id and doubt invoice_stop (available when posting is enabled): a native \
+             dialog asks the user, and nothing but their answer releases the stop.",
+        ),
+        "invoice_stop_unreadable" => Some(
+            "ComplyEaze Bridge could not read its own import journal to see whether an earlier \
+             invoice of this company stops this one, so the build is refused. Tell the user and \
+             stop.",
+        ),
+        "invoice_number_control_unavailable" => Some(
+            "An earlier invoice of this company was sent to Tally and none is verified posted \
+             now, so ComplyEaze Bridge has no known invoice to check its number read against, \
+             and refuses the build. Run verify_import on the earlier invoice batch: if it reads \
+             as posted and verified, build this invoice again. If Tally never took that invoice \
+             (it declined the post, or it was deleted), the user can release it with \
+             acknowledge_post_review (that batch_id, doubt invoice_stop) after checking Tally; \
+             until then this refusal stands.",
+        ),
+        "invoice_number_control_unreadable" => Some(
+            "ComplyEaze Bridge could not read its own import journal, or the earlier invoice it \
+             names, to check the number read, so the build is refused. Tell the user and \
+             stop.",
+        ),
+        // The qualified list (`LIVE_QUALIFIED_VOUCHER_TYPES`) is what
+        // `voucher_schema` offers. The text names no type, so it stays true as
+        // the list grows.
+        "import_voucher_type_unqualified" => Some(
+            "ComplyEaze Bridge builds and posts only the voucher types voucher_schema lists. \
+             This voucher's type is not one of them, so it was refused: a build stops before \
+             anything is read from Tally and writes no file, and a saved batch of that type \
+             is not posted. Tell the user this voucher has to be entered in Tally itself. Do \
+             not rebuild it as a Journal: a GST invoice entered as a Journal is not filed as \
+             an invoice.",
+        ),
+        // The build of an invoice post_import would refuse for its approval
+        // text. These are the invoice build's own codes: the post's codes
+        // (`import_review_*`) also refuse a Journal, Payment, Receipt or
+        // Contra, whose advice is not this one.
+        "invoice_review_layout_text" | "invoice_review_format_text" => Some(
+            "A name or text in this invoice (the company, a ledger, the customer, the narration \
+             or the reference) holds a line break or a character the approval dialog cannot \
+             show faithfully, so it cannot be approved or posted, and no file was written. \
+             Ask the user to correct that text, then build the invoice again; do not offer to \
+             import it by hand.",
+        ),
+        "invoice_review_too_large" => Some(
+            "The approval text for this invoice does not fit in one native dialog, so it \
+             cannot be approved or posted, and no file was written. Ask the user to shorten \
+             the narration or reference, then build the invoice again; do not offer to import \
+             it by hand.",
+        ),
+        "invoice_post_not_enabled" => Some(
+            "An invoice is posted by post_import and in no other way, and voucher posting is \
+             switched off, so ComplyEaze Bridge built nothing and wrote no file. Tell the \
+             user that invoices need voucher posting switched on in the ComplyEaze Bridge \
+             settings; do not offer to import a file by hand, and do not enter the invoice \
+             as a Journal. An invoice that post_import would refuse for another reason is \
+             refused with that reason's code instead, and no file is written for it.",
+        ),
+        "import_invoice_masters_changed" => Some(
+            "Since this invoice was built, what Tally says about it has changed: the \
+             customer's GSTIN, state, registration type or bill-wise setting, the voucher \
+             type, the sales ledgers or the HSN/SAC warnings on their codes, or the state of \
+             the company's GST registration. Nothing was posted. Build the invoice again, so it \
+             is checked against the book as it is now, and show the user the new approval \
+             text.",
+        ),
+        "invoice_sales_ledger_hsn_unresolved" => Some(
+            "The named sales ledger has no HSN/SAC code on the invoice date: not on the \
+             ledger, not on any group above it, and not at company level. Nothing was \
+             written. Ask the user to set the code in Tally on the ledger, a group or the \
+             company, dated on or before the invoice date, then build again. Do not post \
+             first and fix the code after: in a lab test, Tally marked an invoice saved \
+             without a code as uncertain in GSTR-1, correcting the master did not clear it, \
+             and only opening and saving the invoice again did. ComplyEaze Bridge does not \
+             choose or suggest the code.",
+        ),
+        "invoice_sales_ledger_hsn_source_not_measured" => Some(
+            "The HSN/SAC code of the named sales ledger, or the company's GST settings for \
+             it, are set up in a way ComplyEaze Bridge has not checked against Tally, so it \
+             cannot confirm that Tally will accept the code: for example a code from GST \
+             classification, several entries on one date, no entry in force on the invoice \
+             date, a code that would have to come from further up than two groups, a code \
+             shorter than the minimum \
+             length in the company's GST details, or company HSN/SAC settings other than \
+             the ones checked. Nothing was written. Tell the user which ledger it is and \
+             ask them to check its HSN/SAC details and the company's GST details in Tally. \
+             Do not change the invoice to get past this.",
+        ),
+        "invoice_company_registration_absent"
+        | "invoice_company_registration_not_yet_in_force"
+        | "invoice_company_registration_inactive"
+        | "invoice_company_registration_ambiguous"
+        | "invoice_company_registration_not_regular"
+        | "invoice_company_registration_incomplete"
+        | "invoice_company_registration_inconsistent"
+        | "invoice_company_registration_unbound" => Some(
+            "The company's own GST registration in Tally does not let ComplyEaze Bridge \
+             issue a tax invoice on this date: it needs exactly one GST registration in force \
+             on the invoice date, of type Regular and not inactive, whose GSTIN is valid and \
+             belongs to the registration's state. The code names which of these failed. \
+             Nothing was sent to Tally. Ask the user to check the company's GST registration \
+             details in Tally, and the date they apply from, then build again. Do not change \
+             the invoice's date or figures to get past this.",
+        ),
+        "invoice_company_registration_unread" | "invoice_tax_unit_without_guid" => Some(
+            "Tally's answer about the company's GST registrations could not be read: it \
+             listed no tax unit at all, or a unit without its identifier. Nothing was \
+             sent to Tally. Check that the company is still open in Tally, then build again; if it \
+             repeats, report it rather than retrying.",
+        ),
+        "invoice_party_registration_type_not_reported" => Some(
+            "Tally's ledger for this customer does not say what kind of GST registration it \
+             holds on the invoice date (it may carry a GSTIN with no dated registration \
+             details), so it is read neither as a Regular customer nor as an unregistered one. \
+             Ask the user to check the customer's GST registration details in Tally: the \
+             registration type, the GSTIN and the date they apply from. Then build again.",
+        ),
+        "invoice_party_registration_not_in_force" => Some(
+            "This customer's GST registration details in Tally apply from a date after the \
+             invoice date, so nothing says what the customer was on that day, and it is not \
+             read as unregistered. Ask the user to check the invoice date and the date the \
+             customer's GST registration applies from in Tally. Then build again.",
+        ),
+        "invoice_ledger_parent_unnameable"
+        | "invoice_scope_parent_folds"
+        | "invoice_ledger_scope_too_large"
+        | "invoice_ledger_scope_unplannable" => Some(
+            "ComplyEaze Bridge reads a ledger's tax rate only for the ledgers under the groups \
+             of the ledgers this invoice names, and it could not name that read safely: a \
+             ledger's group has no name it can write into a request (it is empty, holds a \
+             quote or a control character, or starts or ends with a space), or another group \
+             of the book differs from one of these only in letter case (the filter Tally was \
+             measured to apply would return both), or the groups hold more ledgers than one \
+             read may. Where `detail` is shown it names the ledger, the group or the cause. \
+             Nothing was written, and building again gives the same refusal until the book \
+             changes. Ask the user to check the group of the ledgers on the invoice in Tally, \
+             or tell them this invoice has to be entered in Tally itself.",
+        ),
+        "invoice_ledger_rates_rows_differ" => Some(
+            "Tally's answer about the tax rates of this invoice's ledgers did not hold exactly \
+             the ledgers ComplyEaze Bridge asked for: `detail` names how it differs (a \
+             different number of ledgers, a ledger it did not ask for, one missing or repeated, \
+             or one whose name or group has changed). Nothing was written. A ledger may have \
+             been created, renamed or moved in Tally while this ran: build once more; if the \
+             refusal repeats, report it rather than retrying.",
+        ),
+        "invoice_book_too_large" | "invoice_book_too_many_vouchers" => Some(
+            "ComplyEaze Bridge builds an invoice only on a company within its size limits: a \
+             voucher mark of 25,000 or less, and a master mark of 5,000 or less or else 2,000 \
+             ledgers or fewer. `detail` gives the count that is over. Building again gives the \
+             same refusal while the company is that size. Tell the user this invoice has to be \
+             entered in Tally itself.",
+        ),
+        "invoice_book_size_unknown" | "invoice_book_size_unreadable" => Some(
+            "Tally did not report the company's size (its voucher mark, its master mark or its \
+             ledger count), so ComplyEaze Bridge could not tell whether the company is within \
+             the limits for an invoice, and nothing was written. Build once more; if the \
+             refusal repeats, tell the user this invoice has to be entered in Tally itself.",
+        ),
+        "import_invoice_figures_unreadable" => Some(
+            "An invoice of this batch has an amount or a date ComplyEaze Bridge cannot read, so \
+             it cannot check that invoice against the other batches this computer has sent. This \
+             can come before a post or while verifying a batch that may already be in Tally, so \
+             do not build or send it again on this answer alone: look for the invoice in Tally \
+             first, and if it is not there, tell the user this invoice has to be entered in \
+             Tally itself.",
+        ),
+        // A date argument a caller can correct. `TallyDate` admits years 0001
+        // to 9999, and the edge codes come from widening an empty window past
+        // either end of that (#1268).
+        "invalid_date" | "invalid_date_range" | "tally_date_overflow" | "tally_date_underflow" => {
+            Some(DATE_REMEDIATION)
+        }
+        // One next step for both numbering refusals (bridge#724): a batch that
+        // holds a voucher type of each is named
+        // `import_voucher_numbering_not_automatic`.
+        "import_voucher_numbering_not_automatic" | "import_voucher_numbering_not_retain" => {
+            Some(agent_import::POST_NUMBERING_NEXT_STEP)
+        }
+        // The two refusals of the numbering check in `voucher_presence` (#1691).
+        "presence_numbering_method_differs_from_book" => Some(PRESENCE_NUMBERING_REMEDIATION),
+        "presence_numbering_unreadable" => Some(PRESENCE_NUMBERING_UNREADABLE_REMEDIATION),
+        _ => None,
+    }
+}
+
+/// The next step of the numbering refusal of `voucher_presence` (#1691): the
+/// types it names are in the refusal's candidates, each with what the book says.
+const PRESENCE_NUMBERING_REMEDIATION: &str = "A voucher type you declared manual is not numbered Manual with exactly one series that prevents duplicate numbers in the book, or the book holds no type of that exact name; the types, and what the book says of each, are in the candidates. Correct the spelling to the book's own type name, or declare the type automatic or unknown to compare by resemblance only. The check reads the book's numbering as it is now.";
+
+/// The next step when the numbering could not be read for a manual declaration.
+const PRESENCE_NUMBERING_UNREADABLE_REMEDIATION: &str = "The book's numbering could not be read, so a manual declaration cannot be checked. Declare the types automatic or unknown to compare by resemblance only, or ask again once the numbering can be read.";
+
+/// The one next step every date refusal gives (#1268).
+const DATE_REMEDIATION: &str = "Give each date as YYYYMMDD (YYYY-MM-DD also works), a real \
+     calendar day from 0001-01-01 to 9999-12-31, with from no later than to. A window that \
+     starts on 0001-01-01 or ends on 9999-12-31 cannot be widened to look for vouchers next \
+     to it, so read one inside those days.";
+
+/// A refused argument whose fix is to send it again in the right form, not to
+/// make a different read. Seen in use: "last month" sent as `from`, and a
+/// company's name sent as `company_guid`; both were refused with a bare code.
+/// One type gives both the guidance and the typed `expected` field, so the two
+/// cannot disagree. Only a refusal made before any read gets it:
+/// `company_guid_invalid` is also returned after a read when Tally itself lists
+/// a company whose GUID is malformed, and there the caller's GUID was right.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ArgumentRepair {
+    /// `from`, `to` or `as_of` was not shaped like a date (the published
+    /// pattern accepts YYYYMMDD or YYYY-MM-DD).
+    CalendarDate(&'static str),
+    /// `company_guid` was not the hyphenated GUID `list_companies` returns.
+    CompanyGuid,
+}
+
+impl ArgumentRepair {
+    fn of(code: &str) -> Option<Self> {
+        match code {
+            "argument_invalid:from" => Some(Self::CalendarDate("from")),
+            "argument_invalid:to" => Some(Self::CalendarDate("to")),
+            "argument_invalid:as_of" => Some(Self::CalendarDate("as_of")),
+            "company_guid_invalid" => Some(Self::CompanyGuid),
+            _ => None,
+        }
+    }
+
+    fn remediation(self) -> &'static str {
+        match self {
+            Self::CalendarDate(_) => {
+                "Send the date as text, YYYYMMDD (for example 20260930) or YYYY-MM-DD. If the \
+                 user said \"last month\" or \"this financial year\" (1 April to 31 March), work \
+                 out the exact dates yourself and tell the user which dates you used. Nothing was \
+                 read from Tally."
+            }
+            Self::CompanyGuid => {
+                "company_guid must be the 36-character ID that list_companies gives for the \
+                 company, not its name. Call list_companies and use the company the user named; if \
+                 more than one fits, ask which. Nothing was read from Tally."
+            }
+        }
+    }
+
+    /// What the argument should have been, as a typed field beside the code.
+    fn expected(self) -> Value {
+        match self {
+            Self::CalendarDate(argument) => json!({
+                "argument": argument,
+                "kind": "calendar_date",
+                "formats": ["YYYYMMDD", "YYYY-MM-DD"],
+            }),
+            Self::CompanyGuid => json!({
+                "argument": "company_guid",
+                "kind": "company_guid",
+                "from_tool": "list_companies",
+            }),
+        }
+    }
+}
+
+/// The next step when no response answered a request (#1458): the two reasons a person meets
+/// first, Tally not running and the hold-back that follows repeated failures. It is consulted
+/// last, so a code's or a typed cause's own next step wins, and it is a function of its own,
+/// not arms of `refusal_remediation`, which is also asked with a code or a typed cause. The
+/// other unanswered reasons name no step yet.
+fn unanswered_remediation(reason: &str) -> Option<&'static str> {
+    match reason {
+        "endpoint_unreachable" => Some(
+            "Tell the user to confirm Tally is running with the XML server enabled on the port named in this error. Do not repeat the request until they have.",
+        ),
+        "endpoint_circuit_cooldown" => Some(
+            "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated.",
+        ),
+        _ => None,
+    }
+}
+
+/// The next step for a refusal: its own code's, else its cause's, and the outstandings
+/// causes' only under the outstandings code.
+fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
+    refusal_remediation(code)
+        .or_else(|| cause.and_then(refusal_remediation))
+        .or_else(|| {
+            (code == "native_outstandings_read_failed")
+                .then(|| cause.and_then(outstandings_cause_remediation))
+                .flatten()
+        })
+}
+
+/// The next step for a cause of `native_outstandings_read_failed` (bridge#1091). It is chosen
+/// only under that code: the same cause codes reach other tools through `?` sites that never
+/// read the Bills report, and the text below would be wrong for them. A refusal is whole:
+/// leaving one bill out would change the totals, so nothing is returned.
+fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
+    match cause {
+        cause if cause.starts_with("native_date_") => Some(
+            "A date in Tally's Bills Receivable or Payable report is not one ComplyEaze Bridge can \
+             read, so no figures were returned. When the refusal carries a `bill_row`, it names the \
+             report and the row in the order Tally sent them, which may not be the order on screen, \
+             and leaving that bill out would change the totals: look in that report for a bill \
+             with a very long credit period or an unusual date and tell the user what Tally shows. \
+             A refusal about the book's date window has no `bill_row`: tell the user what the cause \
+             says. The book did not change during the read, so retrying gives the same refusal. Do \
+             not retry.",
+        ),
+        cause if cause.starts_with("bills_") => Some(
+            "Tally's Bills Receivable or Payable report came back in a shape ComplyEaze Bridge \
+             does not recognise (the cause names the rule it broke; `bill_row` names the report \
+             and row when a row is the problem), so no figures were returned. The book did not \
+             change during the read, so retrying gives the same refusal. Do not retry; tell the \
+             user what the cause says.",
+        ),
+        "native_amount_invalid" | "native_arithmetic_overflow" => Some(
+            "A bill amount in Tally's Bills report could not be read exactly, so no figures were \
+             returned. When the refusal carries a `bill_row`, it names the report and the row \
+             in the order Tally sent them, which may not be the order on screen. Do not retry; \
+             tell the user what the cause says.",
+        ),
+        "native_tally_reported_failure" => Some(
+            "Tally answered the Bills report request with a failure, so no figures were returned. \
+             Ask the user to check that the company is open in Tally and that its Bills \
+             Receivable report opens, then call outstandings once more.",
         ),
         _ => None,
     }
@@ -750,10 +1913,11 @@ impl ToolFailure {
             None
         };
         // A withdrawn call names the withdrawal, whatever operation it stopped.
-        let code = if error
-            .chain()
-            .any(|cause| cause.is::<crate::tally::runtime::ToolCancelled>())
-        {
+        let code = if error.chain().any(|cause| {
+            cause.is::<crate::tally::runtime::ToolCancelled>()
+                || cause.downcast_ref::<bridge_tally_transport::TallyTransportError>()
+                    == Some(&bridge_tally_transport::TallyTransportError::SendWithdrawn)
+        }) {
             "request_cancelled"
         } else if let Some(refusal) = crate::endpoint_wire::wire_refusal(&error)
             // Never in place of an unknown post outcome: that code is what
@@ -772,6 +1936,22 @@ impl ToolFailure {
             "window_part_boundary_unsupported_in_education"
         } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::TrialBalanceReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::MonthRegisterReadError>()
         }) {
             error.safe_code()
         } else if error.chain().any(|cause| {
@@ -835,6 +2015,12 @@ impl ToolFailure {
                 .map(|failure| Box::new(evidence_from_runtime_read(failure.evidence.clone())))
         });
         let cause = runtime_refusal_cause(&error).filter(|cause| *cause != code);
+        let bill_row = error.chain().find_map(|cause| {
+            cause
+                .downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
+                .and_then(|error| error.bill_row())
+                .map(|(report, row)| BillRowRef { report, row })
+        });
         Self {
             code: code.to_string(),
             evidence,
@@ -842,8 +2028,15 @@ impl ToolFailure {
             counts: None,
             window_timings: None,
             read_size: read_size_refusal(&error).map(Box::new),
+            unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
+            read_detail: bill_row.map(|bill_row| {
+                Box::new(ReadDetail {
+                    bill_row: Some(bill_row),
+                    ..ReadDetail::default()
+                })
+            }),
         }
     }
 
@@ -866,8 +2059,24 @@ impl Server {
             runtime: TallyRuntime::default(),
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
+            voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
             post_approvals,
+            terms: terms::TermsGate::NotRequired,
         }
+    }
+
+    /// The server that answers an MCP client: every tool refuses until the user has accepted the
+    /// Terms of Use (`BRIDGE_TERMS_ACCEPTED`). `run_stdio` is its only production caller.
+    fn for_mcp(settings: Settings) -> Self {
+        let accepted = env::var(terms::TERMS_ENV).ok();
+        Self::for_mcp_with(settings, accepted.as_deref())
+    }
+
+    fn for_mcp_with(settings: Settings, accepted: Option<&str>) -> Self {
+        let terms = terms::TermsGate::for_mcp(accepted, &settings.data_dir);
+        let mut server = Self::new(settings);
+        server.terms = terms;
+        server
     }
 
     fn tally_config(&self) -> TallyConfig {
@@ -891,11 +2100,22 @@ impl Server {
         identity: &VerifiedCompanyIdentity,
         request: ReadRequest,
     ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
-        let request = request.into_xml();
-        let admitted = crate::tally::agent_read_request::AgentReadRequest::parse(request.clone())
-            .map_err(|error| error.to_string())?;
+        let admitted =
+            crate::tally::agent_read_request::AgentReadRequest::parse(request.into_xml())
+                .map_err(|error| error.to_string())?;
+        self.post_admitted_read(identity, admitted).await
+    }
+
+    /// One admitted read, paired and inside the company's identity brackets.
+    /// An invoice plan carries its requests already admitted (#1337), so the
+    /// build sends the very request the queue will send again.
+    async fn post_admitted_read(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        admitted: crate::tally::agent_read_request::AgentReadRequest,
+    ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
         let request_sha256 = sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
-            &request,
+            &admitted.clone().into_xml(),
         ));
         let response = self
             .runtime
@@ -929,8 +2149,12 @@ impl Server {
 
     async fn call_tool_response(&self, name: &str, args: Value) -> ToolResponse {
         let started = Utc::now();
-        let result = self.tool_payload(name, &args).await;
-        self.finish_tool_response(name, &args, started, result)
+        let (result, request_trail) =
+            crate::request_trail::with_request_trail(Box::pin(self.tool_payload(name, &args)))
+                .await;
+        let mut response = self.finish_tool_response(name, &args, started, result);
+        response.egress.request_trail = request_trail;
+        response
     }
 
     fn finish_tool_response(
@@ -955,9 +2179,16 @@ impl Server {
                 counts,
                 window_timings,
                 read_size,
+                unsupported_parent_ledgers,
                 unanswered,
                 candidates,
+                read_detail,
             }) => {
+                // Nothing was read when the failure carries no evidence of a read.
+                let repair = evidence
+                    .is_none()
+                    .then(|| ArgumentRepair::of(&code))
+                    .flatten();
                 let mut evidence = evidence.map(|value| *value).unwrap_or_else(|| Evidence {
                     request_sha256: sha256_hex(format!("{name}:{args_sha256}").as_bytes()),
                     response_sha256: sha256_hex(code.as_bytes()),
@@ -969,7 +2200,8 @@ impl Server {
                 });
                 evidence.state = "partial";
                 evidence.reason_code = Some(code.clone());
-                let mut error = json!({"code": code, "message": "Bridge refused this operation."});
+                let mut error =
+                    json!({"code": code, "message": "ComplyEaze Bridge refused this operation."});
                 // Retryable as it stands (#697): another Bridge window or AI
                 // client held the Tally endpoint for the whole bounded wait.
                 // A few bytes, so it is kept under any response budget.
@@ -991,11 +2223,21 @@ impl Server {
                 // A shared operation code can still have a cause with its own
                 // next step (#637), so the cause is consulted when the code has
                 // none.
-                if let Some(remediation) =
-                    refusal_remediation(&code).or_else(|| cause.and_then(refusal_remediation))
+                if let Some(remediation) = refusal_remediation(&code)
+                    .or_else(|| repair.map(ArgumentRepair::remediation))
+                    .or_else(|| remediation_for(&code, cause))
+                    .or_else(|| {
+                        unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
+                    })
                 {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);
+                    }
+                }
+                // Same budget rule: what a refused argument should have been.
+                if let Some(repair) = repair {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["expected"] = repair.expected();
                     }
                 }
                 // A typed validation cause wins; otherwise a request that no
@@ -1013,13 +2255,18 @@ impl Server {
                         error["cause"] = json!(cause);
                     }
                 }
+                if let Some(ledgers) = unsupported_parent_ledgers {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["unsupported_parent_ledgers"] = json!(ledgers);
+                    }
+                }
                 if let Some(size) = read_size {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["size"] = json!({
                             "master_alter_id": size.master_alter_id,
-                            "counted_ledgers": size.counted_ledgers,
                             "estimated_bytes": size.estimated_bytes,
-                            "budget_bytes": size.budget_bytes,
+                            "limit_bytes": size.limit_bytes,
+                            "limit_master_alter_id": size.limit_master_alter_id,
                         });
                     }
                 }
@@ -1033,19 +2280,114 @@ impl Server {
                         error["endpoint"] = json!(endpoint);
                     }
                 }
-                // The list grows with the window, so it is kept only within a
-                // quarter of the response budget, like `window` below: the
-                // refusal code must survive the byte cap.
+                // A voucher-type list grows with the window, so it is kept only
+                // within a quarter of the response budget, like `window` below:
+                // the refusal code must survive the byte cap. A ledger list
+                // rides in the response twice and grows with the book, so it
+                // has its own larger floor and a sixteenth of the budget; the
+                // states that carry no list only need the guidance floor.
                 if let Some(candidates) = candidates {
+                    let max_bytes = self.settings.max_bytes;
+                    match &candidates.miss {
+                        Some(miss) => {
+                            let floor = if miss.listing.has_list() {
+                                LEDGER_CANDIDATES_MIN_RESPONSE_BUDGET
+                            } else {
+                                REMEDIATION_MIN_RESPONSE_BUDGET
+                            };
+                            if max_bytes >= floor {
+                                use ledger_candidates::Listing;
+                                match miss.listing {
+                                    // Masked: the state only, no names and no
+                                    // count. A count is a yes or no on every
+                                    // prefix a caller tries.
+                                    Listing::NamesMasked => {
+                                        error["candidates_listing"] = json!(miss.listing.as_str());
+                                    }
+                                    // The search could not run: the state and
+                                    // why, and no count (a 0 would read as
+                                    // "no ledgers").
+                                    Listing::Unavailable => {
+                                        error["candidates_listing"] = json!(miss.listing.as_str());
+                                        if let Some(reason) = miss.reason {
+                                            error["candidates_reason"] = json!(reason);
+                                        }
+                                    }
+                                    Listing::None
+                                    | Listing::Withheld
+                                    | Listing::Listed
+                                    | Listing::Truncated => {
+                                        let fields =
+                                            candidate_fields(&candidates.items, max_bytes / 16);
+                                        for (key, value) in fields {
+                                            error[key] = value;
+                                        }
+                                        // A list cut to fit is `truncated`;
+                                        // `candidates_truncated` says whether
+                                        // anything was left out, which a
+                                        // withheld family also is.
+                                        let cut = error["candidates_truncated"] == json!(true);
+                                        let word = miss.listing_word(cut);
+                                        error["candidates_listing"] = json!(word);
+                                        error["candidates_truncated"] =
+                                            json!(word == "truncated" || word == "withheld");
+                                        error["candidates_total"] = json!(miss.found);
+                                        error["candidates_total_is_lower_bound"] =
+                                            json!(miss.found_is_lower_bound);
+                                        if let Some(reason) = miss.reason {
+                                            error["candidates_reason"] = json!(reason);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        None if max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET => {
+                            if let Some(requested) = &candidates.requested {
+                                error["requested"] = json!(requested);
+                            }
+                            for (key, value) in candidate_fields(&candidates.items, max_bytes / 4) {
+                                error[key] = value;
+                            }
+                        }
+                        None => {}
+                    }
+                }
+                // The partial read's own reason, under the same budget rule:
+                // a few codes, kept beside the refusal's code.
+                let (incomplete_read, planned_reads, bill_row, unplaced_ledger) = read_detail
+                    .map(|detail| {
+                        (
+                            detail.incomplete_read,
+                            detail.planned_reads,
+                            detail.bill_row,
+                            detail.unplaced_ledger,
+                        )
+                    })
+                    .unwrap_or_default();
+                if let Some(ledger) = unplaced_ledger {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
-                        if let Some(requested) = &candidates.requested {
-                            error["requested"] = json!(requested);
+                        error["ledger"] = party_name_value(ledger);
+                    }
+                }
+                if let Some(bill_row) = bill_row {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["bill_row"] = json!({"report": bill_row.report, "row": bill_row.row});
+                    }
+                }
+                if let Some(read) = incomplete_read {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["partial_reason"] = json!(read.partial_reason);
+                        if !read.partial_reasons.is_empty() {
+                            error["partial_reasons"] = json!(read.partial_reasons);
                         }
-                        let fields =
-                            candidate_fields(&candidates.items, self.settings.max_bytes / 4);
-                        for (key, value) in fields {
-                            error[key] = value;
-                        }
+                    }
+                }
+                if let Some(reads) = planned_reads {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["reads"] = json!({
+                            "needed_at_least": reads.needed_at_least,
+                            "allowed": reads.allowed,
+                        });
                     }
                 }
                 if let Some(counts) = counts {
@@ -1057,14 +2399,28 @@ impl Server {
                 // Same budget rule again, and the per-part list, which grows
                 // with the window, is given up first: it is kept only while it
                 // takes at most a quarter of the response budget. Only the
-                // `vouchers` tool reports it (#595); the other tools that read a
-                // window keep their refusal shape.
+                // `vouchers` tool (#595) and the `outstandings` party detail
+                // (#945), whose window can be refused after parts were read,
+                // report it; the other tools that read a window keep their
+                // refusal shape.
                 if let Some(timings) = window_timings {
-                    if name == "vouchers"
+                    if matches!(name, "vouchers" | "outstandings")
                         && self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET
                     {
                         error["window"] =
                             window_timings_within(&timings, self.settings.max_bytes / 4);
+                        // Only `vouchers` says what the read cost; `outstandings`
+                        // reports its timings as before (bridge#1239).
+                        if name == "vouchers" {
+                            let len = error.to_string().len();
+                            read_cost::add_read_cost(
+                                &mut error["window"],
+                                len,
+                                &timings,
+                                read_cost::Ended::Stopped,
+                                self.settings.max_bytes,
+                            );
+                        }
                     }
                 }
                 ToolOutcome {
@@ -1088,17 +2444,20 @@ impl Server {
         });
         evidence.read_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
         evidence.duration_ms = Some((Utc::now() - started).num_milliseconds().max(0) as u128);
-        let response_value = redact_tool_response(
-            name,
-            json!({
-                "company": payload.get("company").cloned().unwrap_or_else(|| json!({"state":"not_company_scoped"})),
-                "read_at": started.to_rfc3339_opts(SecondsFormat::Millis, true),
-                "evidence": evidence,
-                "truncated": truncated,
-                "result": payload.get("result").cloned().unwrap_or(payload),
-            }),
-            self.settings.redaction,
-        );
+        // A tool that states its outcome in words carries it as `headline`
+        // beside `result`; it sorts ahead of `result` in the serialized form.
+        let headline = payload.get("headline").cloned();
+        let mut envelope = json!({
+            "company": payload.get("company").cloned().unwrap_or_else(|| json!({"state":"not_company_scoped"})),
+            "read_at": started.to_rfc3339_opts(SecondsFormat::Millis, true),
+            "evidence": evidence,
+            "truncated": truncated,
+            "result": payload.get("result").cloned().unwrap_or(payload),
+        });
+        if let Some(headline) = headline {
+            envelope["headline"] = headline;
+        }
+        let response_value = redact_tool_response(name, envelope, self.settings.redaction);
         let (response_value, _bytes_truncated, surviving_rows) =
             match enforce_response_byte_cap(response_value, self.settings.max_bytes) {
                 Ok(value) => value,
@@ -1116,6 +2475,7 @@ impl Server {
                             tool: name.to_string(),
                             args_sha256,
                             company_guid,
+                            request_trail: None,
                         },
                     };
                 }
@@ -1141,6 +2501,7 @@ impl Server {
                     tool: name.to_string(),
                     args_sha256,
                     company_guid,
+                    request_trail: None,
                 },
             };
         }
@@ -1152,6 +2513,7 @@ impl Server {
                 tool: name.to_string(),
                 args_sha256,
                 company_guid,
+                request_trail: None,
             },
         }
     }
@@ -1166,16 +2528,24 @@ impl Server {
     }
 
     async fn tool_payload(&self, name: &str, args: &Value) -> Result<ToolOutcome, ToolFailure> {
-        if name == "changed_since" {
-            return Err("changed_since_unqualified".to_string().into());
+        // First, before any argument or Tally request: every tool refuses until the Terms of Use
+        // are accepted.
+        if let Some(code) = self.terms.refusal() {
+            return Err(code.to_string().into());
         }
         if matches!(name, "build_import_xml" | "parse_bank_statement") {
             self.import_enabled()?;
         }
         if matches!(name, "post_import" | "acknowledge_post_review")
-            && !self.settings.writes_enabled
+            && !self.settings.posting.enabled()
         {
             return Err("import_posting_disabled".to_string().into());
+        }
+        if name == "post_import" && self.settings.posting == Posting::RetiredSettingPresent {
+            return Err("setting_retired".to_string().into());
+        }
+        if name == "audit_test_run" && !self.settings.audit_enabled {
+            return Err("audit_tool_disabled".to_string().into());
         }
         #[cfg(feature = "lab-writes")]
         if matches!(
@@ -1186,15 +2556,20 @@ impl Server {
         }
         validate_tool_arguments(name, args)?;
         match name {
-            "tally_status" => {
-                let (result, evidence) = self.status().await?;
-                Ok(ToolOutcome {
-                    payload: json!({"result": result}),
-                    evidence,
-                    company_guid: None,
-                    truncated: false,
-                })
+            "acknowledge_post_review" => self.acknowledge_post_review(args).await,
+            "audit_test_run" => self.audit_test_run(args).await,
+            "balance_sheet" => self.balance_sheet(args).await,
+            "build_import_xml" => {
+                self.import_enabled()?;
+                self.build_import_xml(args).await
             }
+            "cash_flow" => self.cash_flow(args).await,
+            "company_features" => self.company_features(args).await,
+            "egress_log" => self.egress_log(args).map_err(Into::into),
+            "gst_status" => self.gst_status(args).await,
+            "gst_uncertain_vouchers" => self.gst_uncertain_vouchers(args).await,
+            "ledger_masters" => self.ledger_masters(args).await,
+            "ledger_movement" => self.ledger_movement(args).await,
             "list_companies" => {
                 let (companies, evidence) = self.companies().await?;
                 let flagged = companies
@@ -1208,30 +2583,37 @@ impl Server {
                     truncated: false,
                 })
             }
-            "voucher_schema" => self.voucher_schema().map_err(Into::into),
-            "validate_masters" => self.validate_masters(args).await,
-            "post_import" => self.post_import(args).await,
-            "acknowledge_post_review" => self.acknowledge_post_review(args).await,
-            "build_import_xml" => {
-                self.import_enabled()?;
-                self.build_import_xml(args).await
-            }
-            "verify_import" => self.verify_import(args).await,
+            "local_data_report" => self.local_data_report().map_err(Into::into),
+            "masters" => self.masters(args).await,
+            "month_register" => self.month_register(args).await,
+            "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;
                 self.parse_bank_statement(args).await
             }
-            "ledger_masters" => self.ledger_masters(args).await,
-            "vouchers" => self.vouchers(args).await,
-            "voucher_presence" => self.voucher_presence(args).await,
-            "changed_since" => self.changed_since(args).await,
-            "outstandings" => self.outstandings(args).await,
-            "ledger_movement" => self.ledger_movement(args).await,
-            "trial_balance" => self.trial_balance(args).await,
+            "post_import" => self.post_import(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
-            "balance_sheet" => self.balance_sheet(args).await,
+            "purchase_register" => self.register(register::RegisterKind::Purchase, args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
-            "egress_log" => self.egress_log(args).map_err(Into::into),
+            "sales_register" => self.register(register::RegisterKind::Sales, args).await,
+            "statement_tie_out" => self.statement_tie_out(args).await,
+            "stock_summary" => self.stock_summary(args).await,
+            "tally_status" => {
+                let (result, evidence) = self.status().await?;
+                Ok(ToolOutcome {
+                    payload: json!({"result": result}),
+                    evidence,
+                    company_guid: None,
+                    truncated: false,
+                })
+            }
+            "trial_balance" => self.trial_balance(args).await,
+            "validate_masters" => self.validate_masters(args).await,
+            "verify_import" => self.verify_import(args).await,
+            "voucher_presence" => self.voucher_presence(args).await,
+            "voucher_read_cost" => self.voucher_read_cost(args).await,
+            "voucher_schema" => self.voucher_schema().map_err(Into::into),
+            "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
             #[cfg(feature = "lab-writes")]
@@ -1279,6 +2661,35 @@ impl Server {
             evidence,
             company_guid: None,
             truncated,
+        })
+    }
+
+    /// What Bridge stores locally, by class: counts, sizes, ages and whether the
+    /// import journal is settled. Reads Bridge's own data folder and the per-user
+    /// lease-lock folder, and names no path: the result enters the AI conversation. The call is logged in the
+    /// egress log like any tool call.
+    fn local_data_report(&self) -> Result<ToolOutcome, String> {
+        let (payload, incomplete) = agent_import::local_data::tool_payload(&self.settings.data_dir);
+        let evidence = Evidence {
+            request_sha256: sha256_hex(b"local_data_report"),
+            response_sha256: sha256_json(&payload),
+            bytes: 0,
+            // A report that could not read part of what it reports on says so
+            // in its evidence too, not only in its body.
+            state: if incomplete.is_some() {
+                "partial"
+            } else {
+                "complete"
+            },
+            read_at: None,
+            duration_ms: None,
+            reason_code: incomplete.map(str::to_string),
+        };
+        Ok(ToolOutcome {
+            payload: json!({"result": payload}),
+            evidence,
+            company_guid: None,
+            truncated: false,
         })
     }
 
@@ -1341,8 +2752,8 @@ pub(crate) async fn desktop_selected_vouchers(
             // continues to apply its independently configured response policy.
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         },
         runtime.clone(),
     );
@@ -1359,23 +2770,19 @@ pub(crate) async fn desktop_selected_vouchers(
         &server,
         &json!({
             "company_guid": company_guid,
-            "from": normalized_from,
-            "to": normalized_to,
+            "from": normalized_from.as_str(),
+            "to": normalized_to.as_str(),
             "ledger": ledger,
             "offset": offset,
             "limit": limit,
         }),
-        vouchers::VoucherOperationScope {
-            guid: company_guid,
-            from: normalized_from,
-            to: normalized_to,
+        vouchers::VoucherOperationScope::desktop(
+            company_guid,
+            normalized_from,
+            normalized_to,
             company,
             identity,
-            initial_evidence: None,
-            // The desktop screen cannot show a withheld voucher, so a
-            // foreign-currency composite still refuses its window (#674).
-            composites: vouchers::VoucherComposites::Refuse,
-        },
+        ),
     )
     .await
     .map_err(|failure| failure.code)?;
@@ -1406,9 +2813,9 @@ fn ledger_master_fields(fields: &str) -> Result<bool, String> {
 
 fn response_too_large(name: &str, code: &str) -> Value {
     let message = if code == "agent_response_too_large" {
-        "Bridge response exceeds the configured byte cap."
+        "ComplyEaze Bridge response exceeds the configured byte cap."
     } else {
-        "Bridge withheld this response; recover the retained batch before continuing."
+        "ComplyEaze Bridge withheld this response; recover the retained batch before continuing."
     };
     json!({
         "content": [{"type":"text", "text": format!("{name}: read withheld\\n{code}")}],
@@ -1421,12 +2828,18 @@ fn page_is_truncated(total: usize, offset: usize, page_len: usize) -> bool {
     offset.saturating_add(page_len) < total
 }
 
-fn ensure_movement_window_within_books(from: &str, books_from: &str) -> Result<(), String> {
+fn ensure_movement_window_within_books(
+    from: &bridge_tally_core::TallyDate,
+    books_from: &bridge_tally_core::TallyDate,
+) -> Result<(), String> {
     (from >= books_from)
         .then_some(())
         .ok_or_else(|| "window_precedes_books_from".to_string())
 }
 
+/// Letters and digits only, lower-cased. It never resolves a name (#1076): it
+/// offers the ledger a looser spelling may mean as a `lookup_key_equal`
+/// candidate, and it is how a retyped masked name is recognised.
 fn ledger_lookup_key(value: &str) -> String {
     value
         .chars()
@@ -1435,21 +2848,155 @@ fn ledger_lookup_key(value: &str) -> String {
         .collect()
 }
 
+/// What may resolve without asking: ASCII case and ASCII spaces (trimmed and
+/// collapsed). It is the part of the measured fold (reference 9.4d) that never
+/// changes which ledger is meant. A non-ASCII letter's case is not folded
+/// (9.4f), and neither is any symbol, accent or separator (#1076, decision A).
+fn ledger_spelling_key(value: &str) -> String {
+    value
+        .split(' ')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+}
+
+/// Any case and any whitespace. It never resolves; it finds the ledgers a
+/// name is nearly identical to, such as a twin that differs only by a
+/// trailing CR LF (9.4e), which no one can type.
+fn ledger_twin_key(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+/// A requested ledger name, resolved. `resolve_ledger_name` is its only
+/// producer, by convention: the type does not enforce it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LedgerMatch {
+    /// Spelled exactly as in the book. `similar` holds the other ledgers that
+    /// differ from it only in case or whitespace: they are named in the
+    /// answer, never a reason to refuse, because the exact spelling is how a
+    /// twin is reached at all (an import binds the exact name, 9.4e).
+    Exact { name: String, similar: Vec<String> },
+    /// One ledger differs from the request only in ASCII case and ASCII
+    /// spaces, and no other ledger is that close to it.
+    CaseOrSpacing { name: String },
+}
+
+impl LedgerMatch {
+    fn name(&self) -> &str {
+        match self {
+            Self::Exact { name, .. } | Self::CaseOrSpacing { name } => name,
+        }
+    }
+
+    /// The `ledger_match` object a result carries, so the answer says which
+    /// ledger was read and how the request reached it. Under `mask_parties`
+    /// it names no similar ledger and gives no count of them, as a masked
+    /// refusal gives none.
+    fn to_json(&self, redaction: Redaction) -> Value {
+        let (matched, similar) = match self {
+            Self::Exact { similar, .. } => ("exact", similar.as_slice()),
+            Self::CaseOrSpacing { .. } => ("case_or_spacing", &[][..]),
+        };
+        if redaction == Redaction::MaskParties {
+            return redact_value(
+                json!({
+                    "ledger": party_name_value(self.name().to_string()),
+                    "matched": matched,
+                }),
+                redaction,
+            );
+        }
+        redact_value(
+            json!({
+                "ledger": party_name_value(self.name().to_string()),
+                "matched": matched,
+                // Bounded like a candidate list; the total says how many.
+                "similar_ledgers": similar
+                    .iter()
+                    .take(bridge_tally_core::master_binding::MAX_CANDIDATES_PER_ENTITY)
+                    .map(|name| party_name_value(name.clone()))
+                    .collect::<Vec<_>>(),
+                "similar_ledgers_total": similar.len(),
+            }),
+            redaction,
+        )
+    }
+}
+
+/// Why a requested ledger name did not resolve.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LedgerRefusal {
+    NotFound,
+    /// More than one ledger is that close, sorted: the set the user chooses from.
+    Ambiguous(Vec<String>),
+    /// The exact spelling typed is the row spelling or the stored name of more
+    /// than one ledger, sorted (#1085).
+    SharedSpelling(Vec<String>),
+}
+
+impl LedgerRefusal {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::NotFound => "ledger_not_found",
+            Self::Ambiguous(_) | Self::SharedSpelling(_) => "ledger_ambiguous",
+        }
+    }
+}
+
+/// Resolves a requested ledger name: an exact spelling, or else the one ledger
+/// equal to it in ASCII case and spaces when no other ledger is a twin of
+/// it. Anything looser asks the user (#1076): a sole loose match is a
+/// candidate, never the answer (reference 9.4b).
 fn resolve_ledger_name<'a>(
     ledger_names: impl Iterator<Item = &'a str>,
     requested: &str,
-) -> Result<String, String> {
-    let requested_key = ledger_lookup_key(requested);
-    let exact = ledger_names
-        .filter(|name| ledger_lookup_key(name) == requested_key)
-        .collect::<Vec<_>>();
-    if let Some(name) = exact.iter().find(|name| **name == requested) {
-        return Ok((*name).to_string());
+) -> Result<LedgerMatch, LedgerRefusal> {
+    let mut names = ledger_names.collect::<Vec<_>>();
+    // A name listed twice is one ledger to the user, not a clash.
+    names.sort_unstable();
+    names.dedup();
+    let twins_of = |name: &str| {
+        let key = ledger_twin_key(name);
+        let mut twins = names
+            .iter()
+            .filter(|candidate| ledger_twin_key(candidate) == key)
+            .map(|candidate| (*candidate).to_string())
+            .collect::<Vec<_>>();
+        twins.sort_unstable();
+        twins.dedup();
+        twins
+    };
+    if names.contains(&requested) {
+        let similar = twins_of(requested)
+            .into_iter()
+            .filter(|name| name != requested)
+            .collect();
+        return Ok(LedgerMatch::Exact {
+            name: requested.to_string(),
+            similar,
+        });
     }
-    match exact.as_slice() {
-        [] => Err("ledger_not_found".to_string()),
-        [name] => Ok((*name).to_string()),
-        _ => Err("ledger_ambiguous".to_string()),
+    let key = ledger_spelling_key(requested);
+    let spelled = names
+        .iter()
+        .filter(|name| ledger_spelling_key(name) == key)
+        .collect::<Vec<_>>();
+    // Names equal in ASCII case and spaces are equal in any case and
+    // whitespace, so the twins of the first are every ledger that close.
+    match spelled.as_slice() {
+        [] => Err(LedgerRefusal::NotFound),
+        [only] => match twins_of(only).as_slice() {
+            [_] => Ok(LedgerMatch::CaseOrSpacing {
+                name: (**only).to_string(),
+            }),
+            twins => Err(LedgerRefusal::Ambiguous(twins.to_vec())),
+        },
+        [first, ..] => Err(LedgerRefusal::Ambiguous(twins_of(first))),
     }
 }
 
@@ -1505,8 +3052,10 @@ fn corroborate_empty_voucher_window(
     if !widened_rows.is_empty() {
         // Boundary-day rows only prove that this wider read returned *some*
         // data. They provide no independent cardinality for the nonempty
-        // response, so they cannot promote the original empty window.
-        return Ok((true, Some("nonempty_uncorroborated")));
+        // response, so they cannot promote the original empty window. The
+        // reason names the wider read as the nonempty one: the window's own
+        // read found nothing.
+        return Ok((true, Some("empty_window_wider_read_nonempty")));
     }
     match company_high_water {
         Some(0) => Ok((false, Some("company_has_no_vouchers"))),
@@ -1521,19 +3070,22 @@ fn row_in_window(row: &Value, from: &str, to: &str) -> bool {
         .is_some_and(|date| date >= from && date <= to)
 }
 
-fn widened_window(from: &str, to: &str) -> Result<(String, String), String> {
-    let from = NaiveDate::parse_from_str(from, "%Y%m%d").map_err(|_| "invalid_date".to_string())?;
-    let to = NaiveDate::parse_from_str(to, "%Y%m%d").map_err(|_| "invalid_date".to_string())?;
-    Ok((
-        from.checked_sub_signed(Duration::days(1))
-            .ok_or_else(|| "empty_uncorroborated".to_string())?
-            .format("%Y%m%d")
-            .to_string(),
-        to.checked_add_signed(Duration::days(1))
-            .ok_or_else(|| "empty_uncorroborated".to_string())?
-            .format("%Y%m%d")
-            .to_string(),
-    ))
+fn widened_window(
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
+) -> Result<(bridge_tally_core::TallyDate, bridge_tally_core::TallyDate), String> {
+    // A window at either end of the calendar has no day beyond it to read. It
+    // is refused by `TallyDate`'s own code (`tally_date_overflow`,
+    // `tally_date_underflow`) rather than sent on as a date that is not eight
+    // digits (#861).
+    let step = |stepped: Result<bridge_tally_core::TallyDate, bridge_tally_core::TallyError>| {
+        match stepped {
+            Ok(date) => Ok(date),
+            Err(bridge_tally_core::TallyError::InvalidData { code }) => Err(code),
+            Err(_) => Err("invalid_date".to_string()),
+        }
+    };
+    Ok((step(from.previous_day())?, step(to.next_day())?))
 }
 
 /// Tally is local to the Bridge host; accounting-day defaults therefore use
@@ -1608,6 +3160,15 @@ fn optional_string(args: &Value, key: &str) -> Result<Option<String>, String> {
         Some(_) => Err(format!("argument_invalid:{key}")),
     }
 }
+/// An optional argument that must be a real JSON boolean: a string or a number
+/// is `argument_invalid:<key>`, never read as true or false.
+fn optional_bool(args: &Value, key: &str) -> Result<Option<bool>, String> {
+    match args.get(key) {
+        None => Ok(None),
+        Some(Value::Bool(value)) => Ok(Some(*value)),
+        Some(_) => Err(format!("argument_invalid:{key}")),
+    }
+}
 fn required_string<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
     args.get(key)
         .and_then(Value::as_str)
@@ -1630,10 +3191,11 @@ fn arg_positive_usize(args: &Value, key: &str, default: usize) -> Result<usize, 
         .then_some(value)
         .ok_or_else(|| "pagination_invalid".to_string())
 }
-fn normalized_date(value: &str) -> Result<String, String> {
-    let value = value.replace('-', "");
-    bridge_tally_core::TallyDate::parse(value.clone()).map_err(|_| "invalid_date".to_string())?;
-    Ok(value)
+/// A tool's date argument, parsed once at the boundary: every `-` is dropped, and
+/// the rest must be a valid `YYYYMMDD` date.
+fn normalized_date(value: &str) -> Result<bridge_tally_core::TallyDate, String> {
+    bridge_tally_core::TallyDate::parse(value.replace('-', ""))
+        .map_err(|_| "invalid_date".to_string())
 }
 
 fn add_decimal(left: &str, right: &str) -> Result<String, String> {
@@ -1728,8 +3290,26 @@ fn mask(value: &str) -> String {
     )
 }
 
+/// `bridge_mcp --local-data-report [--show-paths]`: a read-only report of the
+/// local data Bridge keeps. `None` when the first argument is not this mode; a
+/// malformed use exits 2 with the usage, never starts the server.
+pub fn run_local_data_report_from_args(mut args: impl Iterator<Item = String>) -> Option<i32> {
+    if args.next().as_deref() != Some("--local-data-report") {
+        return None;
+    }
+    let show_paths = match (args.next().as_deref(), args.next()) {
+        (None, _) => false,
+        (Some("--show-paths"), None) => true,
+        _ => {
+            eprintln!("usage: bridge_mcp --local-data-report [--show-paths]");
+            return Some(2);
+        }
+    };
+    Some(agent_import::local_data::run(show_paths))
+}
+
 pub async fn run_stdio() -> Result<(), String> {
-    let server = Server::new(Settings::from_env()?);
+    let server = Server::for_mcp(Settings::from_env()?);
     let stdin = BufReader::new(tokio::io::stdin());
     let mut stdout = tokio::io::stdout();
     serve_stdio(server, stdin, &mut stdout).await
@@ -1753,6 +3333,9 @@ fn attach_build_egress_failure(response: &mut Value) -> bool {
     true
 }
 
+#[cfg(test)]
+#[path = "agent_parse_record_tests.rs"]
+mod parse_record_tests;
 #[cfg(test)]
 #[path = "agent_tests.rs"]
 mod tests;

@@ -1,9 +1,15 @@
 //! The file wire lock against another process: the child is this test binary
 //! re-invoked with an environment variable, never an executable written for
 //! the test.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
+use crate::local_files::file::open_local_file;
 use bridge_tally_transport::{TallyHttpTransport, TallyTransportError};
 use std::fs;
+use std::fs::File;
 use std::path::Path;
 use std::process::{Child, Command};
 use std::sync::Mutex;
@@ -103,11 +109,32 @@ fn the_wire_lock_and_the_dispatch_lease_are_separate_files() {
     );
 }
 
+/// The wire lock is taken under every root: a send held under the second
+/// root alone (a build on the other side of a package boundary) refuses this
+/// one as busy, not as unavailable.
+#[test]
+fn a_wire_lock_held_under_any_one_root_refuses_a_send_as_busy() {
+    let _window = fork_window();
+    let directory = tempfile::tempdir().unwrap();
+    let roots = vec![directory.path().join("old"), directory.path().join("new")];
+    let endpoint = endpoint("127.0.0.1", 9001);
+    for held in &roots {
+        let path = wire_lock_path(&WireRoot::at(held.clone()), &endpoint);
+        let holder = open_local_file(&path, true).unwrap();
+        holder.try_lock().unwrap();
+        let gate = FileWireGate::new(WireRoot::at_all(roots.clone()), endpoint.clone());
+        assert_eq!(gate.try_acquire().err(), Some(WireRefusal::Busy));
+        holder.unlock().unwrap();
+        drop(holder);
+        drop(gate.try_acquire().expect("taken once released"));
+    }
+}
+
 #[test]
 fn an_unusable_root_fails_closed() {
     let gate = FileWireGate::new(
         WireRoot {
-            path: None,
+            paths: None,
             _isolated: None,
         },
         endpoint("127.0.0.1", 9001),
@@ -130,6 +157,9 @@ async fn a_send_waits_out_another_process_then_goes_through() {
     let child = ChildHolder::spawn(&root, endpoint.port, &ready, &release);
     wait_for(&ready).unwrap();
     let _lease = hold_dispatch_lease(&root, &endpoint);
+    // The clock starts before the releaser's timer, so no stall between the two can
+    // make a correct send look early (#1255).
+    let started = Instant::now();
     let releaser = {
         let release = release.clone();
         thread::spawn(move || {
@@ -137,7 +167,6 @@ async fn a_send_waits_out_another_process_then_goes_through() {
             fs::write(release, b"release").unwrap();
         })
     };
-    let started = Instant::now();
     let response = transport(
         &root,
         &endpoint,
@@ -146,7 +175,7 @@ async fn a_send_waits_out_another_process_then_goes_through() {
     .post_xml_decoded("<ENVELOPE/>".into())
     .await
     .expect("sent once the other process let go");
-    assert!(started.elapsed() >= Duration::from_millis(300));
+    assert!(started.elapsed() >= Duration::from_millis(400));
     assert!(response.request_body_sha256().is_some());
     releaser.join().unwrap();
     assert!(child.wait().success());
@@ -200,23 +229,26 @@ async fn runtime_operations_in_one_call_share_one_wait_budget() {
     let runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(WireGateConfig {
         root: WireRoot::at(root.clone()),
         retry: WireRetryPolicy::new(Duration::from_millis(50), budget).unwrap(),
+        busy_at: None,
     });
     let _other = gate(&root, &endpoint).try_acquire().unwrap();
-    let busy = |result: anyhow::Result<crate::tally::ConnectionStatus>| {
-        wire_refusal(&result.expect_err("the wire lock is held")) == Some(WireRefusal::Busy)
-    };
+    fn busy<T>(result: anyhow::Result<T>) -> bool {
+        let error = result.err().expect("the wire lock is held");
+        wire_refusal(&error) == Some(WireRefusal::Busy)
+    }
     crate::tally::runtime::with_operation_wire_budget(async {
         let started = Instant::now();
-        assert!(busy(runtime.check_connection(endpoint.clone()).await));
+        assert!(busy(runtime.fetch_companies(endpoint.clone()).await));
         assert!(started.elapsed() >= budget);
         // The call's second operation has nothing left to wait.
         let started = Instant::now();
-        assert!(busy(runtime.check_connection(endpoint.clone()).await));
-        assert!(started.elapsed() < budget / 2);
+        assert!(busy(runtime.fetch_companies(endpoint.clone()).await));
+        // Nothing left to wait: well under a full budget, which a fresh one would take.
+        assert!(started.elapsed() < budget);
     })
     .await;
     let started = Instant::now();
-    assert!(busy(runtime.check_connection(endpoint.clone()).await));
+    assert!(busy(runtime.fetch_companies(endpoint.clone()).await));
     assert!(started.elapsed() >= budget);
 }
 

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Helpers shared by the test modules ported from batch 1 onward: the reference's voucher
-//! evidence label, the tag -> ledger lookup the module invariants resolve figures through, and
-//! checked counts and sums.
+//! evidence label and refs, the tag -> ledger lookup the module invariants resolve figures
+//! through, and checked counts and sums.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use crate::book::{Book, Voucher};
 use crate::error::{AuditError, Result};
-use crate::findings::Value;
+use crate::findings::{EvidenceRef, Value};
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::iso;
 use crate::text_tables;
@@ -32,6 +32,22 @@ pub(crate) fn voucher_label(v: &Voucher) -> String {
         v.number.as_str()
     };
     format!("{} {} on {}", v.vtype, num, iso(&v.date))
+}
+
+/// Vouchers as evidence, as the reference's `_evidence` cites them: each voucher's own ref (its
+/// GUID and label), distinct, in (GUID, label) order by code point. Vouchers that share a GUID are
+/// each cited, unless their refs are identical too (#1195, #1243). The one shared copy; the modules
+/// that still keep their own move here in a cleanup.
+pub(crate) fn voucher_refs<'a>(
+    vouchers: impl IntoIterator<Item = &'a Voucher>,
+) -> Vec<EvidenceRef> {
+    vouchers
+        .into_iter()
+        .map(|v| (v.guid.as_str(), voucher_label(v)))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|(guid, label)| EvidenceRef::with_label("voucher", guid, &label))
+        .collect()
 }
 
 /// Every ledger by its stable tag, for resolving a `<figure>_<tag>` id back to its ledger. If two
@@ -189,7 +205,6 @@ pub(crate) fn py_is_word(c: char) -> bool {
 
 /// Python 3.13's `str.split()` with no argument: split on runs of Python whitespace, dropping empty
 /// pieces.
-#[cfg_attr(not(test), allow(dead_code))] // first caller: the batch-2 ports
 pub(crate) fn py_split(text: &str) -> Vec<&str> {
     text.split(py_isspace).filter(|p| !p.is_empty()).collect()
 }
@@ -540,6 +555,24 @@ pub(crate) mod text_probe_tests {
             src.contains(&format!("Rust char tables, Unicode {a}.{b}.{c};")),
             "text_tables.rs was generated against other Unicode tables: rerun parity/text_semantics.py"
         );
+        // `unicode_tables.rs` depends on the normalisation library's tables, not the compiler's.
+        let src = include_str!("unicode_tables.rs");
+        let (a, b, c) = unicode_normalization::UNICODE_VERSION;
+        assert!(
+            src.contains(&format!(
+                "unicode-normalization tables, Unicode {a}.{b}.{c}; Python 3.13."
+            )) && src.contains(", Unicode 15.1.0."),
+            "unicode_tables.rs was generated against other tables: rerun parity/unicode_tables.py"
+        );
+        // The generator's own counts: a dropped or added range fails here.
+        assert_eq!(
+            (
+                crate::unicode_tables::LETTER_OR_NUMBER.len(),
+                crate::unicode_tables::MARK.len(),
+                crate::unicode_tables::LATE.len(),
+            ),
+            (748, 310, 22)
+        );
     }
 
     #[test]
@@ -663,7 +696,7 @@ mod tests {
         assert_eq!(
             unicode_normalization::UNICODE_VERSION,
             (17, 0, 0),
-            "NFC tables moved"
+            "NFC tables moved: regenerate with parity/unicode_tables.py"
         );
         for list in [&UPPER_UNCHANGED[..], &LOWER_UNCHANGED[..]] {
             assert!(list.windows(2).all(|w| w[0] < w[1]), "sorted and unique");
@@ -704,7 +737,7 @@ mod tests {
 }
 
 /// The reference's `_hash`: the first 8 hex characters of the text's SHA-1, as figure and finding
-/// ids use it. The one shared copy; the modules that still keep their own move here in a cleanup.
+/// ids use it. The one copy.
 pub(crate) fn hash8(text: &str) -> String {
     use sha1::{Digest, Sha1};
     crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()
@@ -717,5 +750,60 @@ mod hash8_tests {
         // hashlib.sha1(b"").hexdigest()[:8] and hashlib.sha1("é".encode()).hexdigest()[:8]
         assert_eq!(super::hash8(""), "da39a3ee");
         assert_eq!(super::hash8("é"), "bf15be71");
+    }
+}
+
+/// The names the vouchers of a pooled row with no party ledger print (`party_field`), shown with
+/// the row and never used to key or attribute it (the reference's `usable_printed_party` and
+/// `unnamed_row_label`, shared by `high_value_register` and `cash_payments_40a3`).
+#[derive(Debug, Default, Clone)]
+pub(crate) struct PrintedNames {
+    names: BTreeSet<String>,
+    unprinted: bool,
+}
+
+impl PrintedNames {
+    /// Record what one voucher prints. A printed name is usable unless it is blank (after Python's
+    /// `strip`), a cash or bank ledger, or one of the voucher's own ledgers: Tally prints the
+    /// debited Purchases or credited Sales ledger there, which names no one.
+    pub(crate) fn note(&mut self, v: &Voucher, money: [&BTreeSet<String>; 2]) {
+        let printed = py_strip(&v.party_field);
+        let unusable = printed.is_empty()
+            || money.iter().any(|set| set.contains(printed))
+            || v.lines.iter().any(|l| l.ledger == printed);
+        if unusable {
+            self.unprinted = true;
+        } else {
+            self.names.insert(printed.to_string());
+        }
+    }
+
+    /// Every usable name, quoted as the books hold it (a name may itself contain " or ") and
+    /// sorted; empty when none is usable.
+    pub(crate) fn quoted(&self) -> String {
+        let quoted: Vec<String> = self.names.iter().map(|p| format!("'{p}'")).collect();
+        quoted.join(" or ")
+    }
+
+    /// Whether some vouchers print no usable name.
+    pub(crate) fn any_unprinted(&self) -> bool {
+        self.unprinted
+    }
+
+    /// How the pooled row is cited: `bucket`, then every usable printed name, and whether some
+    /// vouchers print none.
+    pub(crate) fn label(&self, bucket: &str) -> String {
+        if self.names.is_empty() {
+            return bucket.to_string();
+        }
+        format!(
+            "{bucket} (printed as {}{})",
+            self.quoted(),
+            if self.unprinted {
+                ", and vouchers printing no usable name"
+            } else {
+                ""
+            }
+        )
     }
 }

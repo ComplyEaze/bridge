@@ -106,3 +106,317 @@ fn the_same_capture_is_refused_for_a_different_expected_company_name() {
     .expect_err("a different expected company name must be refused");
     assert_eq!(error, StandardLedgerCatalogError::CompanyIdentityMismatch);
 }
+
+/// A live capture of a licensed Silver 7.1 company (`BRIDGE SHAPE LAB`), 43
+/// ledgers, taken before #1085. One row's `NAME` attribute is `ROUND OFF` and
+/// its stored name `Round Off`.
+const SHAPE_LAB_COMPANY_NAME: &str = "BRIDGE SHAPE LAB";
+const SHAPE_LAB_COMPANY_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+const SHAPE_LAB_LEDGER_CATALOGUE: &[u8] =
+    include_bytes!("fixtures/agent/native-shape-lab-ledger-catalogue.utf16le.xml");
+
+fn decoded_shape_lab_catalogue() -> String {
+    decode_tally_xml_response_bytes_limited(
+        SHAPE_LAB_LEDGER_CATALOGUE,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        SHAPE_LAB_LEDGER_CATALOGUE.len(),
+    )
+    .expect("captured BOM-less UTF-16LE response decodes")
+    .text
+}
+
+/// The `(row spelling, stored name)` pairs the catalogue holds for `xml`.
+fn shape_lab_spellings(xml: &str) -> Vec<(String, Option<String>)> {
+    parse_standard_ledger_catalog_with_identities(
+        xml,
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("the shape lab capture parses")
+    .spellings()
+    .map(|(row, stored)| (row.to_string(), stored.map(str::to_string)))
+    .collect()
+}
+
+/// A ledger whose name arrives in the row's attribute and in its own list
+/// under two spellings carries both; every other ledger of the capture, whose
+/// two spellings are one (several hold escaped markup and line breaks), carries
+/// its row spelling alone.
+#[test]
+fn a_ledger_whose_stored_name_differs_carries_both_spellings() {
+    let spellings = shape_lab_spellings(&decoded_shape_lab_catalogue());
+    assert_eq!(spellings.len(), 43);
+    let differing = spellings
+        .iter()
+        .filter(|(_, stored)| stored.is_some())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        differing,
+        [&("ROUND OFF".to_string(), Some("Round Off".to_string()))]
+    );
+}
+
+/// Edits of the captured `ROUND OFF` row, to its list only. The capture holds
+/// one name there; these are the shapes the parser must still decide.
+fn shape_lab_with_round_off_list(list: &str) -> String {
+    let xml = decoded_shape_lab_catalogue();
+    let start = xml.find("<LEDGER NAME=\"ROUND OFF\"").unwrap();
+    let from = start + xml[start..].find("<LANGUAGENAME.LIST>").unwrap();
+    let to = start + xml[start..].find("</LEDGER>").unwrap();
+    format!("{}{list}{}", &xml[..from], &xml[to..])
+}
+
+fn round_off_stored(list: &str) -> Option<String> {
+    shape_lab_spellings(&shape_lab_with_round_off_list(list))
+        .into_iter()
+        .find(|(row, _)| row == "ROUND OFF")
+        .expect("the row is still there")
+        .1
+}
+
+const ROUND_OFF_LIST_HEAD: &str = "<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\">";
+const ROUND_OFF_LIST_TAIL: &str = "</NAME.LIST><LANGUAGEID>0</LANGUAGEID></LANGUAGENAME.LIST>";
+
+/// Only the first name is the ledger's own; the others are aliases and never
+/// identity, whatever they say.
+#[test]
+fn a_later_name_in_the_list_is_an_alias_and_never_the_stored_name() {
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>Round Off</NAME><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_stored(&list).as_deref(), Some("Round Off"));
+}
+
+/// An empty or unusable first name leaves the ledger on its row spelling:
+/// the alias after it is not promoted, and the read is not refused.
+#[test]
+fn an_unusable_first_name_leaves_the_row_spelling_and_does_not_promote_an_alias() {
+    let blank =
+        format!("{ROUND_OFF_LIST_HEAD}<NAME>   </NAME><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}");
+    assert_eq!(round_off_stored(&blank), None);
+    let bidi = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>Round\u{202e}Off</NAME><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_stored(&bidi), None);
+}
+
+/// A row with no list is known by its row spelling, and a second list adds
+/// nothing: only the first can name the ledger.
+#[test]
+fn a_row_without_a_list_has_no_stored_name_and_a_second_list_names_nothing() {
+    assert_eq!(round_off_stored(""), None);
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>   </NAME>{ROUND_OFF_LIST_TAIL}\
+         {ROUND_OFF_LIST_HEAD}<NAME>Second List</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_stored(&list), None);
+}
+
+/// A name outside `NAME.LIST` is not the ledger's own.
+#[test]
+fn a_name_outside_the_name_list_is_not_the_stored_name() {
+    let list =
+        "<LANGUAGENAME.LIST><NAME>Round Off</NAME><LANGUAGEID>0</LANGUAGEID></LANGUAGENAME.LIST>";
+    assert_eq!(round_off_stored(list), None);
+}
+
+/// A first name Tally wrote with an entity this parser cannot decode is unusable,
+/// not fatal: the catalogue still parses (the skip it replaced never decoded the
+/// list), the ledger keeps its row spelling, and the alias after it is not promoted.
+#[test]
+fn an_undecodable_first_name_leaves_the_row_spelling_and_fails_no_read() {
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>A &bogus; B</NAME><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_stored(&list), None);
+}
+
+/// A self-closing first name is still the first name: the alias after it is not
+/// promoted to the ledger's own name.
+#[test]
+fn a_self_closing_first_name_does_not_let_an_alias_in() {
+    let list = format!("{ROUND_OFF_LIST_HEAD}<NAME/><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}");
+    assert_eq!(round_off_stored(&list), None);
+}
+
+/// Only a `NAME` of a `NAME.LIST` is a name: one nested in another child of the
+/// list is not the ledger's own.
+#[test]
+fn a_name_nested_in_another_child_of_the_list_is_not_the_stored_name() {
+    let list =
+        "<LANGUAGENAME.LIST><LANGUAGEID><NAME>Round Off</NAME></LANGUAGEID></LANGUAGENAME.LIST>";
+    assert_eq!(round_off_stored(list), None);
+}
+
+// ---- The V2 catalogue on captures of a live Tally (#1234) ------------------------------------------
+//
+// Four synthetic books answered Bridge's own `StandardLedgerCatalogV2` request on 6 Oct 2026: V1's rows, each with
+// the ledger's `ISBILLWISEON`. Each provenance file records the request that was sent and the response's hash.
+
+use bridge_tally_protocol::{
+    encode_tally_xml_request_utf16le, parse_standard_ledger_catalog_v2_with_identities,
+    xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
+    BillWiseFlag,
+};
+use sha2::{Digest, Sha256};
+
+fn sha256(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+struct V2Capture {
+    company: &'static str,
+    guid: &'static str,
+    xml: &'static [u8],
+    provenance: &'static str,
+    ledgers: usize,
+    bill_wise: usize,
+}
+
+const V2_CAPTURES: [V2Capture; 4] = [
+    V2Capture {
+        company: "BRIDGE OUTSTANDINGS LAB",
+        guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
+        xml: include_bytes!(
+            "fixtures/agent/native-outstandings-detail-ledger-catalogue-v2.utf16le.xml"
+        ),
+        provenance: include_str!(
+            "fixtures/agent/native-outstandings-detail-ledger-catalogue-v2.json"
+        ),
+        ledgers: 17,
+        bill_wise: 10,
+    },
+    V2Capture {
+        company: "BRIDGE AMEND LAB",
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536",
+        xml: include_bytes!("fixtures/agent/d3-amend-lab-ledger-catalogue-v2.utf16le.xml"),
+        provenance: include_str!("fixtures/agent/d3-amend-lab-ledger-catalogue-v2.json"),
+        ledgers: 19,
+        bill_wise: 4,
+    },
+    V2Capture {
+        company: "BRIDGE SHAPE LAB",
+        guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+        xml: include_bytes!("fixtures/agent/native-shape-lab-ledger-catalogue-v2.utf16le.xml"),
+        provenance: include_str!("fixtures/agent/native-shape-lab-ledger-catalogue-v2.json"),
+        ledgers: 44,
+        bill_wise: 18,
+    },
+    V2Capture {
+        company: "WR2 Unicode Lab",
+        guid: "61c6de69-1748-461c-ad3f-162cb949df9f",
+        xml: include_bytes!("fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"),
+        provenance: include_str!("fixtures/agent/native-ledger-catalogue-v2.json"),
+        ledgers: 9,
+        bill_wise: 2,
+    },
+];
+
+fn decoded(bytes: &[u8]) -> String {
+    decode_tally_xml_response_bytes_limited(
+        bytes,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        bytes.len(),
+    )
+    .expect("captured BOM-less UTF-16LE response decodes")
+    .text
+}
+
+#[test]
+fn every_ledger_of_each_v2_capture_carries_a_flag() {
+    for capture in &V2_CAPTURES {
+        let catalogue = parse_standard_ledger_catalog_v2_with_identities(
+            &decoded(capture.xml),
+            capture.company,
+            capture.guid,
+        )
+        .unwrap_or_else(|error| panic!("{}: {error}", capture.company));
+        let flags = catalogue
+            .bill_wise_flags()
+            .map(|(_, _, flag)| flag)
+            .collect::<Vec<_>>();
+        assert_eq!(flags.len(), capture.ledgers, "{}", capture.company);
+        assert_eq!(
+            flags
+                .iter()
+                .filter(|flag| **flag == BillWiseFlag::On)
+                .count(),
+            capture.bill_wise,
+            "{}",
+            capture.company
+        );
+        // The same body is not a V1 answer: the V1 parser refuses the new field.
+        assert_eq!(
+            parse_standard_ledger_catalog_with_identities(
+                &decoded(capture.xml),
+                capture.company,
+                capture.guid
+            )
+            .unwrap_err(),
+            StandardLedgerCatalogError::MalformedResponse
+        );
+    }
+}
+
+#[test]
+fn each_v2_capture_is_the_answer_to_the_request_the_profile_renders() {
+    for capture in &V2_CAPTURES {
+        let provenance: serde_json::Value = serde_json::from_str(capture.provenance).unwrap();
+        let company = ValidatedCompanyName::new(capture.company).unwrap();
+        let request = ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render();
+        assert_eq!(
+            provenance["source_request_sha256"].as_str().unwrap(),
+            sha256(&encode_tally_xml_request_utf16le(&request)),
+            "{}",
+            capture.company
+        );
+        assert_eq!(
+            provenance["source_response_sha256"].as_str().unwrap(),
+            sha256(capture.xml),
+            "{}",
+            capture.company
+        );
+        assert_eq!(
+            provenance["fixture_sha256"],
+            provenance["source_response_sha256"]
+        );
+        assert_eq!(provenance["transformation"], serde_json::json!([]));
+    }
+}
+
+/// A ledger whose name ends in a carriage return and line feed (the case the
+/// separate outstandings snapshot could not read) comes back in the V2
+/// catalogue as an escaped attribute, with a flag like any other. One of the
+/// four is bill-wise (`Yes`), the case the approval's ledger name must carry.
+#[test]
+fn ledger_names_ending_in_crlf_carry_a_flag_in_the_v2_catalogue() {
+    let mut crlf = Vec::new();
+    for capture in [&V2_CAPTURES[1], &V2_CAPTURES[2]] {
+        let catalogue = parse_standard_ledger_catalog_v2_with_identities(
+            &decoded(capture.xml),
+            capture.company,
+            capture.guid,
+        )
+        .unwrap();
+        crlf.extend(
+            catalogue
+                .bill_wise_flags()
+                .filter(|(name, _, _)| name.ends_with("\r\n"))
+                .map(|(name, _, flag)| (name.to_string(), flag)),
+        );
+    }
+    assert_eq!(
+        crlf,
+        [
+            ("LF708 A\r\n".to_string(), BillWiseFlag::Off),
+            ("LF708 B\r\n".to_string(), BillWiseFlag::Off),
+            ("lf708 c\r\n".to_string(), BillWiseFlag::Off),
+            ("CRLF Supplier\r\n".to_string(), BillWiseFlag::On),
+        ]
+    );
+}

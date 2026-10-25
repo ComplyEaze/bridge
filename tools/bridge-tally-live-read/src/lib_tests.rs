@@ -1,4 +1,5 @@
 use super::*;
+use bridge_tally_compatibility::SurfacePin;
 use tally_protocol_simulator::{Fixture, ScenarioPlan, Simulator, WireEncoding};
 
 const SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -26,19 +27,8 @@ fn fixture() -> SyntheticFixtureManifest {
         dataset_tier: DatasetTier::SyntheticSmall,
         company_marker: "BRIDGE-PR14-SYNTHETIC-019f605f-e6cf-77b2-ac95-31722887a911".to_string(),
         ledger_sentinel: "BRIDGE-LEDGER-019f605f-e6cf-77b2-ac95-31722887a911".to_string(),
-        voucher_number_sentinel: "BRIDGE-VOUCHER-019f605f-e6cf-77b2-ac95-31722887a911".to_string(),
-        empty_voucher_range: DateWindow {
-            from_yyyymmdd: "20260403".to_string(),
-            to_yyyymmdd: "20260403".to_string(),
-        },
-        populated_voucher_range: DateWindow {
-            from_yyyymmdd: "20260401".to_string(),
-            to_yyyymmdd: "20260402".to_string(),
-        },
         minimum_ledger_count: 1,
         maximum_ledger_count: 100,
-        minimum_populated_voucher_count: 1,
-        maximum_populated_voucher_count: 20,
     }
 }
 
@@ -56,7 +46,6 @@ fn metadata() -> RunMetadata {
 
 fn receipt() -> LiveCompatibilityReceipt {
     let company = ValidatedCompanyName::new(fixture().company_marker).unwrap();
-    let range = ValidatedDateRange::new("20260403", "20260403").unwrap();
     let profile = ReadOnlyProfile::CompanyListV1;
     let mut operations = vec![not_attempted(
         ReadProfileId::XmlCompanyEnumerationV1,
@@ -68,7 +57,7 @@ fn receipt() -> LiveCompatibilityReceipt {
         profile.template_sha256(),
         "endpoint_not_queried",
     ));
-    append_company_reads_not_attempted(&mut operations, &company, &range);
+    append_company_reads_not_attempted(&mut operations, &company);
     seal_receipt(
         &config(9001),
         &fixture(),
@@ -94,17 +83,11 @@ fn inputs(port: u16, binding: &str, expires_at_unix_ms: i64) -> LiveRunInputs {
 }
 
 #[test]
-fn fixture_requires_reviewed_sentinels_bounded_counts_and_disjoint_ranges() {
+fn fixture_requires_reviewed_sentinels_and_bounded_counts() {
     assert!(validate_fixture(&fixture()).is_ok());
     let mut invalid = fixture();
     invalid.company_marker = "synthetic".to_string();
     assert_eq!(validate_fixture(&invalid), Err(error("fixture_invalid")));
-    let mut overlap = fixture();
-    overlap.empty_voucher_range = overlap.populated_voucher_range.clone();
-    assert_eq!(
-        validate_fixture(&overlap),
-        Err(error("fixture_ranges_overlap"))
-    );
     let mut invalid_bounds = fixture();
     invalid_bounds.maximum_ledger_count = 0;
     assert_eq!(
@@ -131,7 +114,6 @@ fn unknown_profile_fields_are_rejected_before_network_and_cannot_be_laundered() 
     config.locale = LocaleProfile::Unknown;
     assert_eq!(validate_config(&config), Err(error("config_invalid")));
     let company = ValidatedCompanyName::new(fixture().company_marker).unwrap();
-    let range = ValidatedDateRange::new("20260403", "20260403").unwrap();
     let profile = ReadOnlyProfile::CompanyListV1;
     let mut operations = vec![not_attempted(
         ReadProfileId::XmlCompanyEnumerationV1,
@@ -143,7 +125,7 @@ fn unknown_profile_fields_are_rejected_before_network_and_cannot_be_laundered() 
         profile.template_sha256(),
         "endpoint_not_queried",
     ));
-    append_company_reads_not_attempted(&mut operations, &company, &range);
+    append_company_reads_not_attempted(&mut operations, &company);
     let receipt = seal_receipt(
         &config,
         &fixture(),
@@ -184,7 +166,7 @@ async fn empty_company_response_stops_after_one_request_and_retains_no_marker() 
                 continue;
             }
         };
-        assert_eq!(receipt.operations.len(), 5);
+        assert_eq!(receipt.operations.len(), 3);
         assert_eq!(receipt.operations[0].safe_reason_code.as_deref(), None);
         assert_eq!(receipt.operations[0].outcome, OperationOutcome::Passed);
         assert_eq!(receipt.operations[1].outcome, OperationOutcome::Failed);
@@ -318,9 +300,8 @@ fn public_save_consumes_a_repository_bound_target_and_rechecks_no_overwrite() {
 }
 
 #[tokio::test]
-async fn an_education_run_refuses_the_ledger_and_voucher_reads_before_sending_them() {
+async fn an_education_run_refuses_the_ledger_read_before_sending_it() {
     let company = ValidatedCompanyName::new("Synthetic Co").unwrap();
-    let range = ValidatedDateRange::new("20260401", "20260430").unwrap();
     let simulator = tally_protocol_simulator::SequenceSimulator::spawn(vec![ScenarioPlan::new(
         Fixture::EmptyExport,
     )
@@ -328,16 +309,11 @@ async fn an_education_run_refuses_the_ledger_and_voucher_reads_before_sending_th
     .unwrap();
     let port = simulator.address().port();
     let education = read_transport(&config(port)).unwrap();
-    for profile in [
-        ReadOnlyProfile::LedgersV1 { company: &company },
-        ReadOnlyProfile::VouchersV2 {
-            company: &company,
-            range: &range,
-        },
-    ] {
-        let refused = education.send(profile).await.unwrap_err();
-        assert_eq!(refused.safe_code(), "education_report_family_unsupported");
-    }
+    let refused = education
+        .send(ReadOnlyProfile::LedgersV1 { company: &company })
+        .await
+        .unwrap_err();
+    assert_eq!(refused.safe_code(), "education_report_family_unsupported");
     assert_eq!(simulator.received(), 0);
     let mut licensed = config(port);
     licensed.mode = TallyMode::Licensed;
@@ -347,4 +323,268 @@ async fn an_education_run_refuses_the_ledger_and_voucher_reads_before_sending_th
         .await;
     assert!(sent.is_ok(), "{sent:?}");
     assert_eq!(simulator.finish().unwrap().len(), 1);
+}
+
+fn git_in(directory: &Path, arguments: &[&str]) {
+    let status = git_command(directory)
+        .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
+        .args(arguments)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {arguments:?} failed");
+}
+
+fn status_is_clean(directory: &Path) -> bool {
+    git_output(directory, &["status", "--porcelain"])
+        .unwrap()
+        .is_empty()
+}
+
+/// A throwaway repository with `a.rs` ("one\n") and `[b].rs` committed, removed on drop.
+struct Repo(PathBuf);
+
+impl Repo {
+    fn new(label: &str) -> Self {
+        let directory = std::env::temp_dir().join(format!(
+            "bridge-live-read-drift-{label}-{}-{}",
+            std::process::id(),
+            now_unix_ms().unwrap()
+        ));
+        fs::create_dir(&directory).unwrap();
+        git_in(&directory, &["init", "-q"]);
+        fs::write(directory.join("a.rs"), b"one\n").unwrap();
+        fs::write(directory.join("[b].rs"), b"two\n").unwrap();
+        fs::write(directory.join("b.rs"), b"three\n").unwrap();
+        git_in(&directory, &["add", "."]);
+        git_in(&directory, &["commit", "-q", "-m", "base"]);
+        Self(directory)
+    }
+
+    fn check(&self, paths: &[&str]) -> Result<(), LiveReadError> {
+        refuse_drifted_paths(&self.0, paths, "surface_changed")
+    }
+}
+
+impl Drop for Repo {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+const DRIFT: Result<(), LiveReadError> = Err(LiveReadError {
+    code: "surface_changed",
+});
+
+#[test]
+fn clean_committed_pins_pass_and_an_edit_of_any_kind_is_refused() {
+    let repo = Repo::new("edit");
+    assert_eq!(repo.check(&["a.rs", "[b].rs"]), Ok(()));
+    // Pathspecs are literal: "[b].rs" must not stand for "b.rs".
+    fs::write(repo.0.join("b.rs"), b"changed\n").unwrap();
+    assert_eq!(repo.check(&["[b].rs"]), Ok(()));
+    fs::write(repo.0.join("a.rs"), b"edited\n").unwrap();
+    assert_eq!(repo.check(&["a.rs", "[b].rs"]), DRIFT);
+    // A staged edit counts too.
+    git_in(&repo.0, &["add", "a.rs"]);
+    assert_eq!(repo.check(&["a.rs"]), DRIFT);
+}
+
+#[test]
+fn an_index_flag_cannot_hide_an_edit() {
+    for flag in ["--assume-unchanged", "--skip-worktree"] {
+        let repo = Repo::new("flag");
+        git_in(&repo.0, &["update-index", flag, "a.rs"]);
+        fs::write(repo.0.join("a.rs"), b"edited\n").unwrap();
+        assert!(
+            status_is_clean(&repo.0),
+            "premise: git status is fooled by {flag}"
+        );
+        assert_eq!(repo.check(&["a.rs"]), DRIFT, "{flag}");
+    }
+}
+
+#[test]
+fn a_line_ending_rule_after_git_add_cannot_hide_an_edit() {
+    let repo = Repo::new("eol");
+    fs::write(repo.0.join(".git/info/attributes"), b"a.rs text eol=lf\n").unwrap();
+    fs::write(repo.0.join("a.rs"), b"one\r\n").unwrap();
+    git_in(&repo.0, &["add", "a.rs"]);
+    assert!(
+        status_is_clean(&repo.0),
+        "premise: the CRLF edit normalises to the committed blob"
+    );
+    assert_eq!(repo.check(&["a.rs"]), DRIFT);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_clean_filter_after_git_add_cannot_hide_an_edit() {
+    let repo = Repo::new("filter");
+    fs::write(
+        repo.0.join(".git/info/attributes"),
+        b"a.rs filter=restore\n",
+    )
+    .unwrap();
+    git_in(
+        &repo.0,
+        &["config", "filter.restore.clean", "sed s/edited/one/"],
+    );
+    fs::write(repo.0.join("a.rs"), b"edited\n").unwrap();
+    git_in(&repo.0, &["add", "a.rs"]);
+    assert!(
+        status_is_clean(&repo.0),
+        "premise: the filter maps the edit back to the committed blob"
+    );
+    assert_eq!(repo.check(&["a.rs"]), DRIFT);
+}
+
+#[test]
+fn a_stale_stat_cache_cannot_hide_a_same_size_edit() {
+    let repo = Repo::new("stat");
+    git_in(&repo.0, &["config", "core.checkStat", "minimal"]);
+    // An old mtime, so the index entry is not "racily clean" (git re-reads those regardless).
+    let modified = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+    let set_modified = |when| {
+        fs::OpenOptions::new()
+            .write(true)
+            .open(repo.0.join("a.rs"))
+            .unwrap()
+            .set_modified(when)
+            .unwrap();
+    };
+    set_modified(modified);
+    git_in(&repo.0, &["add", "a.rs"]);
+    fs::write(repo.0.join("a.rs"), b"two\n").unwrap();
+    set_modified(modified);
+    assert!(
+        status_is_clean(&repo.0),
+        "premise: same size and mtime, so git status is fooled"
+    );
+    assert_eq!(repo.check(&["a.rs"]), DRIFT);
+}
+
+#[test]
+fn an_untracked_ignored_or_uncommitted_pin_is_refused() {
+    let repo = Repo::new("untracked");
+    fs::write(repo.0.join("untracked.rs"), b"new\n").unwrap();
+    assert_eq!(repo.check(&["untracked.rs"]), DRIFT);
+    fs::write(repo.0.join(".gitignore"), b"ignored.rs\n").unwrap();
+    fs::write(repo.0.join("ignored.rs"), b"new\n").unwrap();
+    assert_eq!(repo.check(&["ignored.rs"]), DRIFT);
+    // Added to the index but not committed: not at HEAD.
+    git_in(&repo.0, &["add", "untracked.rs"]);
+    assert_eq!(repo.check(&["untracked.rs"]), DRIFT);
+    // A committed pin that is gone from disk is an error, never a clean answer.
+    fs::remove_file(repo.0.join("a.rs")).unwrap();
+    assert!(repo.check(&["a.rs"]).is_err());
+}
+
+#[test]
+fn a_pin_spelled_in_another_case_is_refused() {
+    // On a case-insensitive filesystem the file would still be read; git does not know the name.
+    let repo = Repo::new("case");
+    assert_eq!(repo.check(&["A.rs"]), DRIFT);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_committed_symlink_is_refused() {
+    let repo = Repo::new("symlink");
+    std::os::unix::fs::symlink("a.rs", repo.0.join("link.rs")).unwrap();
+    git_in(&repo.0, &["add", "link.rs"]);
+    git_in(&repo.0, &["commit", "-q", "-m", "link"]);
+    assert_eq!(repo.check(&["link.rs"]), DRIFT);
+}
+
+#[test]
+fn a_tree_that_is_not_the_repository_git_answers_for_is_refused() {
+    let repo = Repo::new("nested");
+    // An archive extract: same file names, no .git of its own, inside another repository.
+    let nested = repo.0.join("extract");
+    fs::create_dir(&nested).unwrap();
+    fs::write(nested.join("a.rs"), b"one\n").unwrap();
+    assert_eq!(
+        refuse_drifted_paths(&nested, &["a.rs"], "surface_changed"),
+        DRIFT
+    );
+    // A directory that is no repository at all is a failed query.
+    let outside = std::env::temp_dir().join(format!(
+        "bridge-live-read-drift-none-{}-{}",
+        std::process::id(),
+        now_unix_ms().unwrap()
+    ));
+    fs::create_dir(&outside).unwrap();
+    let failed = refuse_drifted_paths(&outside, &["a.rs"], "surface_changed");
+    fs::remove_dir_all(&outside).unwrap();
+    assert!(failed.is_err());
+}
+
+#[test]
+fn an_inherited_git_environment_cannot_redirect_the_check() {
+    use std::sync::Mutex;
+    static ENVIRONMENT: Mutex<()> = Mutex::new(());
+    let _guard = ENVIRONMENT
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let repo = Repo::new("env-checkout");
+    let elsewhere = Repo::new("env-elsewhere");
+    fs::write(elsewhere.0.join("a.rs"), b"edited\n").unwrap();
+    // The variables point at a checkout whose pinned file differs; the check must ignore them.
+    std::env::set_var("GIT_DIR", elsewhere.0.join(".git"));
+    std::env::set_var("GIT_WORK_TREE", &elsewhere.0);
+    std::env::set_var("GIT_INDEX_FILE", elsewhere.0.join(".git/index"));
+    let clean_checkout = repo.check(&["a.rs"]);
+    fs::write(repo.0.join("a.rs"), b"edited\n").unwrap();
+    let edited_checkout = repo.check(&["a.rs"]);
+    for name in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] {
+        std::env::remove_var(name);
+    }
+    assert_eq!(clean_checkout, Ok(()));
+    assert_eq!(edited_checkout, DRIFT);
+}
+
+#[test]
+fn every_git_call_runs_without_the_redirecting_environment() {
+    let command = git_command(Path::new("."));
+    let removed: Vec<_> = command
+        .get_envs()
+        .filter(|(_, value)| value.is_none())
+        .map(|(name, _)| name.to_string_lossy().into_owned())
+        .collect();
+    for name in GIT_REDIRECTING_ENVIRONMENT {
+        assert!(
+            removed.iter().any(|removed| removed == name),
+            "{name} not removed"
+        );
+    }
+}
+
+#[test]
+fn the_pin_list_itself_is_drift_checked() {
+    let pins = SurfacePins {
+        schema_version: 3,
+        files: vec![SurfacePin {
+            path: "a.rs".to_string(),
+            reason: None,
+        }],
+    };
+    assert_eq!(paths_to_guard(&pins), vec!["a.rs", SURFACE_RELATIVE_PATH]);
+    // The pin list is checked like any pin: an uncommitted edit that drops an entry refuses.
+    let repo = Repo::new("pinlist");
+    let directory = repo.0.join("docs/tally/compatibility");
+    fs::create_dir_all(&directory).unwrap();
+    let list = directory.join("compatibility-surface.json");
+    fs::write(
+        &list,
+        b"{\"schema_version\":3,\"files\":[{\"path\":\"a.rs\"}]}\n",
+    )
+    .unwrap();
+    git_in(&repo.0, &["add", "."]);
+    git_in(&repo.0, &["commit", "-q", "-m", "list"]);
+    let paths = paths_to_guard(&pins);
+    assert_eq!(repo.check(&paths), Ok(()));
+    fs::write(&list, b"{\"schema_version\":3,\"files\":[]}\n").unwrap();
+    assert_eq!(repo.check(&paths), DRIFT);
 }

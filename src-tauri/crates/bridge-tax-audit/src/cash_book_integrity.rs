@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 
-use crate::book::{Book, Voucher};
+use crate::book::{Book, OpeningStock, Voucher};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::ledger_ids::stable_ledger_tag;
@@ -179,7 +179,7 @@ pub fn run(
 receipt came before every same-day payment."
             ),
             Vec::new(),
-        );
+        )?;
         let f_worst = r.fig(
             &format!("negative_days_worst_case_{h}"),
             count(worst_neg)?,
@@ -188,7 +188,7 @@ receipt came before every same-day payment."
                 "Days on which cash ledger (tag {h}) is below zero if same-day payments came first."
             ),
             Vec::new(),
-        );
+        )?;
         // The first day at the lowest closing, as Python's min() returns the first minimum.
         let lowest = best_neg.iter().fold(None::<&&Day>, |acc, d| match acc {
             Some(a) if a.close <= d.close => Some(a),
@@ -207,14 +207,14 @@ receipt came before every same-day payment."
 below zero."
             ),
             ev(best_vouchers.iter().copied()),
-        );
+        )?;
         let f_low_day = r.fig(
             &format!("lowest_best_case_date_{h}"),
             Value::Text(lowest.map_or(String::new(), |d| iso(&d.date))),
             Unit::Text,
             "Date of that lowest best-case closing (blank when none).",
             Vec::new(),
-        );
+        )?;
         if !best_neg.is_empty() {
             let mut evidence = ev(best_vouchers.iter().copied());
             evidence.push(EvidenceRef::new("ledger", led));
@@ -253,11 +253,61 @@ cash was actually paid."
         "opening_difference",
         Value::Int(diff),
         Unit::Paise,
-        "Sum of every ledger's Trial Balance opening balance (Dr positive). Tally shows a non-zero \
-sum as 'Difference in opening balances'.",
+        "Sum of every ledger's Trial Balance opening balance (Dr positive). Without integrated \
+inventory, Tally shows a non-zero sum as 'Difference in opening balances'; with it, the sum also \
+leaves out the opening stock, and the difference in opening balances is the figure after opening \
+stock.",
         Vec::new(),
-    );
-    if diff != 0 {
+    )?;
+    // Opening stock is held on the stock items, never on a ledger, so on a book with integrated
+    // inventory the ledger sum also carries minus the opening stock (#1497, #1486; the date a
+    // stock item's opening value stands at is not measured: TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_
+    // AND_OPEN_QUESTIONS.md §12a.13). A known term is added and the remainder is the difference;
+    // an unknown one is named, and nothing is added.
+    let mut facts = vec![("difference".to_string(), f_diff.clone())];
+    let mut limits = vec![
+        "The books cannot show which opening is missing or wrong; the prior year's closing \
+balance sheet settles it."
+            .to_string(),
+    ];
+    let remainder = match book.opening_stock {
+        OpeningStock::Valued(stock) if stock != 0 => {
+            let f_stock = r.fig(
+                "opening_stock",
+                Value::Int(stock),
+                Unit::Paise,
+                "Opening stock on the stock items as at the Trial Balance's first day (Dr \
+positive). Tally holds it on no ledger, so the ledger openings sum to minus it plus any difference \
+in opening balances.",
+                Vec::new(),
+            )?;
+            let rest = add(diff, stock)?;
+            let f_rest = r.fig(
+                "opening_difference_after_stock",
+                Value::Int(rest),
+                Unit::Paise,
+                "The ledger openings' sum plus the opening stock: the difference in opening \
+balances.",
+                Vec::new(),
+            )?;
+            facts = vec![
+                ("difference".to_string(), f_rest),
+                ("ledger_sum".to_string(), f_diff),
+                ("opening_stock".to_string(), f_stock),
+            ];
+            rest
+        }
+        OpeningStock::Unknown(why) => {
+            limits.push(format!(
+                "Opening stock is held on the stock items, not on a ledger, and was {}; part of \
+this difference may be opening stock.",
+                why.as_str()
+            ));
+            diff
+        }
+        OpeningStock::NotApplicable | OpeningStock::Valued(_) => diff,
+    };
+    if remainder != 0 {
         let openings: Vec<EvidenceRef> = book
             .tb
             .iter()
@@ -268,14 +318,10 @@ sum as 'Difference in opening balances'.",
             id: format!("{TEST_ID}/opening_difference/all"),
             clauses: Vec::new(),
             title: "Opening balances do not balance".to_string(),
-            facts: vec![("difference".to_string(), f_diff)],
+            facts,
             evidence: openings,
             confidence: Confidence::Computed,
-            limits: vec![
-                "The books cannot show which opening is missing or wrong; the prior year's closing \
-balance sheet settles it."
-                    .to_string(),
-            ],
+            limits,
             ask_client: vec![
                 "Provide the balance sheet as at the start of the year (the prior year's closing)."
                     .to_string(),
@@ -296,7 +342,7 @@ balance sheet settles it."
         "Own-account narration terms set for this client. Zero means the own-account check looked at \
 nothing.",
         Vec::new(),
-    );
+    )?;
     let mut out_v: Vec<(&Voucher, i64)> = Vec::new();
     let mut in_v: Vec<(&Voucher, i64)> = Vec::new();
     if !terms.is_empty() {
@@ -327,7 +373,7 @@ nothing.",
         "Contra entries debiting cash whose bank narration names the assessee's own account \
 (money sent to another account, booked as cash in hand).",
         ev(out_v.iter().map(|(v, _)| *v)),
-    );
+    )?;
     let f_out_n = r.fig(
         "own_account_booked_as_withdrawal_count",
         count(out_v.len())?,
@@ -335,7 +381,7 @@ nothing.",
         "Number of Contra entries debiting cash whose bank narration names the assessee's own account \
 (money sent to another account, booked as cash in hand).",
         Vec::new(),
-    );
+    )?;
     let f_in = r.fig(
         "own_account_booked_as_deposit_total",
         Value::Int(total(&in_v)?),
@@ -343,7 +389,7 @@ nothing.",
         "Contra entries crediting cash whose bank narration names the assessee's own account \
 (money received from another account, booked as cash deposited).",
         ev(in_v.iter().map(|(v, _)| *v)),
-    );
+    )?;
     let f_in_n = r.fig(
         "own_account_booked_as_deposit_count",
         count(in_v.len())?,
@@ -351,7 +397,7 @@ nothing.",
         "Number of Contra entries crediting cash whose bank narration names the assessee's own \
 account (money received from another account, booked as cash deposited).",
         Vec::new(),
-    );
+    )?;
     if !out_v.is_empty() || !in_v.is_empty() {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/own_account_as_cash/all"),
@@ -408,14 +454,14 @@ transfers were used for."
             Unit::Paise,
             &format!("Money received into cash or bank credited to expense ledger (tag {h})."),
             ev(rows.iter().map(|(v, _)| *v)),
-        );
+        )?;
         let f_n = r.fig(
             &format!("expense_credit_count_{h}"),
             count(rows.len())?,
             Unit::Count,
             &format!("Entries in that total (ledger tag {h})."),
             Vec::new(),
-        );
+        )?;
         let mut evidence = ev(rows.iter().map(|(v, _)| *v));
         evidence.push(EvidenceRef::new("ledger", name));
         r.findings.push(Finding {
@@ -442,7 +488,7 @@ the expense; any other receipt does not, and an unexplained credit is a s.68 que
         Unit::Paise,
         "Sum of money received credited to any expense ledger.",
         Vec::new(),
-    );
+    )?;
 
     // 5. cash paid through journals, and repeated narrations among them
     let mut jv: BTreeMap<&str, Vec<(&Voucher, i64)>> = BTreeMap::new();
@@ -492,14 +538,14 @@ the expense; any other receipt does not, and an unexplained credit is a s.68 que
             Unit::Paise,
             &format!("Cash paid through Journal entries to expense ledger (tag {h})."),
             ev(rows.iter().map(|(v, _)| *v)),
-        );
+        )?;
         let f_n = r.fig(
             &format!("journal_cash_count_{h}"),
             count(rows.len())?,
             Unit::Count,
             &format!("Journal entries paying cash to expense ledger (tag {h})."),
             Vec::new(),
-        );
+        )?;
         let f_rep = r.fig(
             &format!("journal_cash_repeated_narration_total_{h}"),
             Value::Int(total(&repeated)?),
@@ -509,7 +555,7 @@ the expense; any other receipt does not, and an unexplained credit is a s.68 que
 is identical to another such entry's."
             ),
             ev(repeated.iter().map(|(v, _)| *v)),
-        );
+        )?;
         let f_rep_n = r.fig(
             &format!("journal_cash_repeated_narration_count_{h}"),
             count(repeated.len())?,
@@ -519,7 +565,7 @@ is identical to another such entry's."
 identical to another such entry's."
             ),
             Vec::new(),
-        );
+        )?;
         let f_un = r.fig(
             &format!("journal_cash_unnarrated_total_{h}"),
             Value::Int(total(&unnarrated)?),
@@ -529,7 +575,7 @@ identical to another such entry's."
 narration at all."
             ),
             ev(unnarrated.iter().map(|(v, _)| *v)),
-        );
+        )?;
         let f_un_n = r.fig(
             &format!("journal_cash_unnarrated_count_{h}"),
             count(unnarrated.len())?,
@@ -539,7 +585,7 @@ narration at all."
 all."
             ),
             Vec::new(),
-        );
+        )?;
         let mut evidence = ev(rows.iter().map(|(v, _)| *v));
         evidence.push(EvidenceRef::new("ledger", name));
         r.findings.push(Finding {
@@ -578,7 +624,7 @@ entry."
         Unit::Paise,
         "Cash paid through Journal entries to any expense ledger.",
         Vec::new(),
-    );
+    )?;
     Ok(r)
 }
 
@@ -622,4 +668,216 @@ pub fn check_invariants(book: &Book, result: &TestResult) -> Result<Vec<String>>
         }
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::book::{OpeningStock, OpeningStockUnknown, TbRow};
+    use crate::findings::Figure;
+
+    const ORIGINAL_LIMIT: &str = "The books cannot show which opening is missing or wrong; the \
+prior year's closing balance sheet settles it.";
+
+    /// An invented book of two ledgers whose Trial Balance openings sum to `sum`, with `stock` as
+    /// its opening stock and no vouchers.
+    fn book(sum: i64, stock: OpeningStock) -> Book {
+        let row = |opening_paise: i64| TbRow {
+            opening_paise,
+            debit_paise: 0,
+            credit_paise: 0,
+            closing_paise: opening_paise,
+        };
+        let mut b = Book::default();
+        b.tb.insert("Owner Capital".to_string(), row(sum - 300_000));
+        b.tb.insert("Shop Bank".to_string(), row(300_000));
+        b.opening_stock = stock;
+        b
+    }
+
+    fn run_on(b: &Book) -> TestResult {
+        let none = BTreeSet::new();
+        run(b, &Rules::vendored().unwrap(), &none, &none, &[]).unwrap()
+    }
+
+    /// Section 2's figures (every id under `opening_`), whole, in the order they are made.
+    fn opening_figures(r: &TestResult) -> String {
+        let figures: Vec<&Figure> = r
+            .figures
+            .iter()
+            .filter(|f| f.id.starts_with("cash_book_integrity.opening_"))
+            .collect();
+        format!("{figures:?}")
+    }
+
+    /// Section 2's finding, whole, or "None".
+    fn opening_finding(r: &TestResult) -> String {
+        let finding = r
+            .findings
+            .iter()
+            .find(|f| f.id == "cash_book_integrity/opening_difference/all");
+        format!("{finding:?}")
+    }
+
+    fn figure(name: &str, value: i64, definition: &str) -> Figure {
+        Figure {
+            id: format!("cash_book_integrity.{name}"),
+            value: Value::Int(value),
+            unit: Unit::Paise,
+            definition: definition.to_string(),
+            evidence: Vec::new(),
+        }
+    }
+
+    fn ledger_sum(value: i64) -> Figure {
+        figure(
+            "opening_difference",
+            value,
+            "Sum of every ledger's Trial Balance opening balance (Dr positive). Without \
+integrated inventory, Tally shows a non-zero sum as 'Difference in opening balances'; with it, \
+the sum also leaves out the opening stock, and the difference in opening balances is the figure \
+after opening stock.",
+        )
+    }
+
+    fn stock_figures(sum: i64, stock: i64) -> String {
+        format!(
+            "{:?}",
+            vec![
+                &ledger_sum(sum),
+                &figure(
+                    "opening_stock",
+                    stock,
+                    "Opening stock on the stock items as at the Trial Balance's first day (Dr \
+positive). Tally holds it on no ledger, so the ledger openings sum to minus it plus any difference \
+in opening balances.",
+                ),
+                &figure(
+                    "opening_difference_after_stock",
+                    sum + stock,
+                    "The ledger openings' sum plus the opening stock: the difference in opening \
+balances.",
+                ),
+            ]
+        )
+    }
+
+    fn finding(facts: &[(&str, &str)], limits: &[&str]) -> String {
+        let f = Finding {
+            id: "cash_book_integrity/opening_difference/all".to_string(),
+            clauses: Vec::new(),
+            title: "Opening balances do not balance".to_string(),
+            facts: facts
+                .iter()
+                .map(|(n, f)| ((*n).to_string(), format!("cash_book_integrity.{f}")))
+                .collect(),
+            evidence: vec![
+                EvidenceRef::new("ledger", "Owner Capital"),
+                EvidenceRef::new("ledger", "Shop Bank"),
+            ],
+            confidence: Confidence::Computed,
+            limits: limits.iter().map(|l| (*l).to_string()).collect(),
+            ask_client: vec![
+                "Provide the balance sheet as at the start of the year (the prior year's closing)."
+                    .to_string(),
+            ],
+        };
+        format!("{:?}", Some(&f))
+    }
+
+    const STOCK_FACTS: [(&str, &str); 3] = [
+        ("difference", "opening_difference_after_stock"),
+        ("ledger_sum", "opening_difference"),
+        ("opening_stock", "opening_stock"),
+    ];
+
+    /// #1497: ledger openings that opening stock exactly offsets are not a difference.
+    #[test]
+    fn opening_stock_that_offsets_the_ledger_openings_raises_no_finding() {
+        let r = run_on(&book(-800_000, OpeningStock::Valued(800_000)));
+        assert_eq!(opening_figures(&r), stock_figures(-800_000, 800_000));
+        assert_eq!(opening_finding(&r), "None");
+    }
+
+    /// What remains after the stock is the finding's difference; the ledger sum and the stock
+    /// stand beside it, so the remainder is traceable.
+    #[test]
+    fn a_difference_left_after_opening_stock_is_the_findings_difference() {
+        let r = run_on(&book(-1_000_000, OpeningStock::Valued(800_000)));
+        assert_eq!(opening_figures(&r), stock_figures(-1_000_000, 800_000));
+        assert_eq!(
+            opening_finding(&r),
+            finding(&STOCK_FACTS, &[ORIGINAL_LIMIT])
+        );
+    }
+
+    /// Stock that more than offsets the ledgers leaves a debit difference, sign kept; ledgers
+    /// that sum to zero beside opening stock report the whole stock.
+    #[test]
+    fn opening_stock_that_more_than_offsets_keeps_its_sign() {
+        for (sum, stock) in [(-500_000, 800_000), (0, 800_000), (-800_001, 800_000)] {
+            let r = run_on(&book(sum, OpeningStock::Valued(stock)));
+            assert_eq!(opening_figures(&r), stock_figures(sum, stock));
+            assert_eq!(
+                opening_finding(&r),
+                finding(&STOCK_FACTS, &[ORIGINAL_LIMIT])
+            );
+        }
+    }
+
+    /// An opening stock that could not be taken is named, with its reason, in the finding's
+    /// limits, so the ledger sum is not read as a pure difference; nothing is added to it.
+    #[test]
+    fn an_unknown_opening_stock_is_named_in_the_findings_limits() {
+        for (why, text) in [
+            (OpeningStockUnknown::NotRead, "not read"),
+            (
+                OpeningStockUnknown::NotAtBooksStart,
+                "not taken: the read does not show the trial balance starting on the books' \
+first day",
+            ),
+            (OpeningStockUnknown::Unreadable, "unreadable"),
+        ] {
+            let r = run_on(&book(-1_000_000, OpeningStock::Unknown(why)));
+            assert_eq!(
+                opening_figures(&r),
+                format!("{:?}", vec![&ledger_sum(-1_000_000)])
+            );
+            let limit = format!(
+                "Opening stock is held on the stock items, not on a ledger, and was {text}; part \
+of this difference may be opening stock."
+            );
+            assert_eq!(
+                opening_finding(&r),
+                finding(
+                    &[("difference", "opening_difference")],
+                    &[ORIGINAL_LIMIT, &limit]
+                )
+            );
+            let r = run_on(&book(0, OpeningStock::Unknown(why)));
+            assert_eq!(opening_finding(&r), "None");
+        }
+    }
+
+    /// With no stock term the whole result is what it was before #1497: no new figure, the same
+    /// finding.
+    #[test]
+    fn no_stock_term_gives_the_result_as_before() {
+        let plain = run_on(&book(-1_000_000, OpeningStock::NotApplicable));
+        let zero = run_on(&book(-1_000_000, OpeningStock::Valued(0)));
+        assert_eq!(
+            format!("{:?}", (&plain.figures, &plain.findings)),
+            format!("{:?}", (&zero.figures, &zero.findings))
+        );
+        assert_eq!(
+            opening_figures(&plain),
+            format!("{:?}", vec![&ledger_sum(-1_000_000)])
+        );
+        assert_eq!(
+            opening_finding(&plain),
+            finding(&[("difference", "opening_difference")], &[ORIGINAL_LIMIT])
+        );
+        let balanced = run_on(&book(0, OpeningStock::NotApplicable));
+        assert_eq!(opening_finding(&balanced), "None");
+    }
 }

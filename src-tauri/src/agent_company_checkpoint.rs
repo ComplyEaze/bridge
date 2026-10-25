@@ -92,7 +92,7 @@ fn company_high_water_rows(xml: &str) -> Result<Vec<BTreeMap<String, String>>, S
                     Event::Start(event) | Event::Empty(event) => event,
                     _ => unreachable!(),
                 };
-                let name = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let name = event.name().as_ref().to_ascii_uppercase();
                 if scope.field("COMPANY") && scalar(&tag) {
                     return Err(invalid());
                 }
@@ -103,12 +103,9 @@ fn company_high_water_rows(xml: &str) -> Result<Vec<BTreeMap<String, String>>, S
                     let mut row = BTreeMap::new();
                     for attribute in event.attributes().with_checks(true) {
                         let attribute = attribute.map_err(|_| invalid())?;
-                        if attribute.key.as_ref().eq_ignore_ascii_case(b"NAME") {
+                        if attribute.key.as_ref().eq_ignore_ascii_case("NAME") {
                             let value = attribute
-                                .decoded_and_normalized_value(
-                                    quick_xml::XmlVersion::Implicit1_0,
-                                    reader.decoder(),
-                                )
+                                .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                                 .map_err(|_| invalid())?;
                             if row
                                 .insert(COMPANY_NAME_ATTRIBUTE.to_string(), value.into_owned())
@@ -152,15 +149,11 @@ fn company_high_water_rows(xml: &str) -> Result<Vec<BTreeMap<String, String>>, S
                     .as_mut()
                     .filter(|_| scope.field("COMPANY") && scalar(&tag))
                 {
-                    append_agent_text(
-                        row,
-                        &tag,
-                        text.decode().map_err(|_| invalid())?.into_owned(),
-                    );
+                    append_agent_text(row, &tag, text.to_string());
                 }
             }
             Ok(Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 if scope.row("COMPANY") {
                     rows.push(current.take().ok_or_else(invalid)?);
                 }
@@ -232,11 +225,22 @@ pub(in crate::agent) fn company_voucher_high_water(
     xml: &str,
     expected_guid: &str,
 ) -> Result<u64, String> {
+    company_voucher_mark(xml, expected_guid).map(|mark| mark.unwrap_or(0))
+}
+
+/// The company's voucher mark as Tally answered it: `None` when the answer
+/// omits it (a company holding no voucher), which is not the same answer as
+/// a mark of zero (AGENTS.md P3).
+pub(in crate::agent) fn company_voucher_mark(
+    xml: &str,
+    expected_guid: &str,
+) -> Result<Option<u64>, String> {
     match parse_company_high_water(xml, expected_guid) {
         Ok(mark) => mark["altvchid"]
             .as_u64()
+            .map(Some)
             .ok_or_else(|| "voucher_checkpoint_invalid".to_string()),
-        Err(code) if code == VOUCHER_CHECKPOINT_NOT_OBSERVED => Ok(0),
+        Err(code) if code == VOUCHER_CHECKPOINT_NOT_OBSERVED => Ok(None),
         Err(code) => Err(code),
     }
 }

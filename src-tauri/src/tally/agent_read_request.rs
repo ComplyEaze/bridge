@@ -5,12 +5,20 @@ use quick_xml::events::Event;
 /// the dispatch operation; it does not prove arbitrary embedded TDL side-effect free.
 /// The private field and crate-private API keep external library callers out of
 /// the agent's raw dispatch path.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AgentReadRequest(String);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 #[error("agent_write_dispatch_forbidden")]
 pub(crate) struct AgentReadRequestError;
+
+/// The verified company's name, validated for a pinned Object template.
+fn verified_company_name(
+    identity: &super::VerifiedCompanyIdentity,
+) -> Result<bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName, AgentReadRequestError> {
+    bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(identity.display_name())
+        .map_err(|_| AgentReadRequestError)
+}
 
 impl AgentReadRequest {
     pub(crate) fn parse(xml: String) -> Result<Self, AgentReadRequestError> {
@@ -23,7 +31,7 @@ impl AgentReadRequest {
         loop {
             match reader.read_event().map_err(|_| AgentReadRequestError)? {
                 Event::Start(event) => {
-                    let name = event.name().as_ref().to_vec();
+                    let name = event.name().as_ref().as_bytes().to_vec();
                     if path.is_empty() {
                         roots += 1;
                         if name != b"ENVELOPE" || roots != 1 {
@@ -39,7 +47,6 @@ impl AgentReadRequest {
                         let value = reader
                             .read_text(event.name())
                             .map_err(|_| AgentReadRequestError)?;
-                        let value = value.decode().map_err(|_| AgentReadRequestError)?;
                         let target = if name == b"TALLYREQUEST" {
                             &mut operation
                         } else {
@@ -53,28 +60,24 @@ impl AgentReadRequest {
                     }
                 }
                 Event::End(event) => {
-                    if path.pop().as_deref() != Some(event.name().as_ref()) {
+                    if path.pop().as_deref() != Some(event.name().as_ref().as_bytes()) {
                         return Err(AgentReadRequestError);
                     }
                 }
                 Event::Empty(event) => {
                     let name = event.name();
+                    let name = name.as_ref().as_bytes();
                     if path.is_empty()
-                        || (path == [b"ENVELOPE".to_vec()] && name.as_ref() == b"HEADER")
+                        || (path == [b"ENVELOPE".to_vec()] && name == b"HEADER")
                         || (path == [b"ENVELOPE".to_vec(), b"HEADER".to_vec()]
-                            && matches!(name.as_ref(), b"TALLYREQUEST" | b"TYPE"))
+                            && matches!(name, b"TALLYREQUEST" | b"TYPE"))
                     {
                         return Err(AgentReadRequestError);
                     }
                 }
                 Event::DocType(_) => return Err(AgentReadRequestError),
                 Event::Text(text) if path.is_empty() => {
-                    if !text
-                        .decode()
-                        .map_err(|_| AgentReadRequestError)?
-                        .trim()
-                        .is_empty()
-                    {
+                    if !text.trim().is_empty() {
                         return Err(AgentReadRequestError);
                     }
                 }
@@ -101,29 +104,69 @@ impl AgentReadRequest {
     /// exactly the verified company, rendered from the pinned
     /// `AuditCompanyObjectV1` template.
     ///
-    /// This is the only way an Object export reaches dispatch. [`Self::parse`]
-    /// stays Collection-only and refuses every `TYPE=Object` envelope, so no
-    /// XML from anywhere else can use this shape: the company name is the only
+    /// This and [`Self::invoice_company_hsn_named`] are the only ways an Object
+    /// export reaches dispatch in production ([`Self::invoice_company_hsn`], the
+    /// identity-typed builder, is used only in tests). [`Self::parse`] stays Collection-only and
+    /// refuses every `TYPE=Object` envelope, so no XML from anywhere else can
+    /// use this shape: the company name is the only
     /// variable, it comes from a verified identity, and it is validated and
     /// escaped. The response still has to be admitted by GUID, because Tally
     /// resolves the `ID` by name.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "sent by the audit_read orchestrator, plan step 7")
-    )]
     pub(crate) fn company_object(
         identity: &super::VerifiedCompanyIdentity,
     ) -> Result<Self, AgentReadRequestError> {
-        let company = bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(
-            identity.display_name(),
-        )
-        .map_err(|_| AgentReadRequestError)?;
+        let company = verified_company_name(identity)?;
         Ok(Self(
             bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::AuditCompanyObjectV1 {
                 company: &company,
             }
             .render(),
         ))
+    }
+
+    /// The company object an invoice build reads for the company-level
+    /// HSN/SAC, rendered from the pinned `InvoiceCompanyHsnV1` template under
+    /// the same rules as [`Self::company_object`]: the verified company's name
+    /// is the only variable, and the response is admitted by GUID. Production
+    /// does not call this one: the invoice admission builds the request with
+    /// [`Self::invoice_company_hsn_named`] from the verified company's name
+    /// (a follow-up types that name so the identity cannot be left out).
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the admission renders it by the identity's name")
+    )]
+    pub(crate) fn invoice_company_hsn(
+        identity: &super::VerifiedCompanyIdentity,
+    ) -> Result<Self, AgentReadRequestError> {
+        Self::invoice_company_hsn_named(identity.display_name())
+    }
+
+    /// [`Self::invoice_company_hsn`] for a company named by the verified
+    /// identity's display name, which the invoice admission carries: the same
+    /// validation, the same template, so the request is the identity's. This is
+    /// the production builder; the response is admitted by GUID, because Tally
+    /// resolves the `ID` by name.
+    pub(crate) fn invoice_company_hsn_named(name: &str) -> Result<Self, AgentReadRequestError> {
+        let company = bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(name)
+            .map_err(|_| AgentReadRequestError)?;
+        Ok(Self(
+            bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::InvoiceCompanyHsnV1 {
+                company: &company,
+            }
+            .render(),
+        ))
+    }
+
+    /// Whether this is an Object export. [`Self::company_object`] and the invoice
+    /// company HSN/SAC builders are the only ways to build one ([`Self::parse`] refuses
+    /// every `Object` envelope), and only the first is sent as an audit part, so on the
+    /// audit read a request that says so is that template. The text is tested, not a
+    /// stored flag: a flag made `cargo clippy` fail `large_enum_variant` in `agent_import_post.rs` (measured). A
+    /// collection whose embedded TDL merely contained the words would only have the five
+    /// numeric release fields set aside from its answer; every other check of the envelope
+    /// still applies. Its answer's `HEADER` carries those fields (item 697-S0A).
+    pub(crate) fn is_company_object(&self) -> bool {
+        self.0.contains("<TYPE>Object</TYPE>")
     }
 
     /// Whether every `SVFROMDATE`/`SVTODATE` this request sends is a boundary
@@ -144,14 +187,14 @@ impl AgentReadRequest {
             match reader.read_event() {
                 Ok(Event::Start(event))
                     if matches!(
-                        event.name().as_ref().to_ascii_uppercase().as_slice(),
-                        b"SVFROMDATE" | b"SVTODATE"
+                        event.name().as_ref().to_ascii_uppercase().as_str(),
+                        "SVFROMDATE" | "SVTODATE"
                     ) =>
                 {
                     let accepted = reader
                         .read_text(event.name())
                         .ok()
-                        .and_then(|text| text.decode().ok().map(|text| text.trim().to_string()))
+                        .map(|text| text.trim().to_string())
                         .and_then(|text| bridge_tally_core::TallyDate::parse(text).ok())
                         .is_some_and(|date| profile.accepts_boundary(&date));
                     if !accepted {
@@ -160,8 +203,8 @@ impl AgentReadRequest {
                 }
                 Ok(Event::Empty(event))
                     if matches!(
-                        event.name().as_ref().to_ascii_uppercase().as_slice(),
-                        b"SVFROMDATE" | b"SVTODATE"
+                        event.name().as_ref().to_ascii_uppercase().as_str(),
+                        "SVFROMDATE" | "SVTODATE"
                     ) =>
                 {
                     return false;

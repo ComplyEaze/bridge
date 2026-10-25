@@ -3,7 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -17,13 +17,14 @@ const workflow = readFileSync(workflowPath, "utf8");
 const failures = [];
 const metadataByWorkspace = new Map();
 
-// These suites may skip in the frontend job, which intentionally has no Rust.
-// Bind their real execution to an existing required job with the pinned toolchain.
+// The surface acknowledgement check runs in this job: it runs on every event, has the full
+// history, and is required through `Required checks`. The step enforces: a pinned-file change
+// without its acknowledgement file fails the job. It must stay, keep its exact shape (no
+// `continue-on-error`, no step-level `if`, no `--report-only` flag), and any change to it is a
+// pinned ci.yml change with its own acknowledgement.
 const workflowConsistency = jobBlock(workflow, "workflow-consistency");
 const toolchain = readFileSync(resolve(repositoryRoot, "rust-toolchain.toml"), "utf8").match(/^channel *= *"([^"]+)"/m)?.[1];
 if (!toolchain) throw new Error("could not read [toolchain].channel from rust-toolchain.toml");
-const pinnedRustPreflight = `rustup which --toolchain ${toolchain} rustc`;
-const resealRegressions = "node --test scripts/reseal.test.mjs scripts/reseal-merge-driver.test.mjs";
 const pinnedRustSetup = new RegExp(
   `^      - uses: dtolnay/rust-toolchain@[^\\n]+\\n        with:\\n          toolchain: ${escapeRegex(toolchain)}$`,
   "m",
@@ -31,12 +32,29 @@ const pinnedRustSetup = new RegExp(
 if (!pinnedRustSetup.test(workflowConsistency)) {
   failures.push("workflow-consistency must install the repository's pinned Rust toolchain");
 }
-const preflightOffset = exactRunStepOffset(workflowConsistency, "Require pinned Rust for reseal regressions", pinnedRustPreflight);
-const regressionOffset = exactRunStepOffset(workflowConsistency, "Test reseal and merge-driver regressions", resealRegressions);
-if (preflightOffset === -1) failures.push("workflow-consistency must fail when pinned Rust is unavailable");
-if (regressionOffset === -1) failures.push("workflow-consistency must run the reseal regression suites");
-if (preflightOffset !== -1 && regressionOffset !== -1 && preflightOffset > regressionOffset) {
-  failures.push("workflow-consistency must require pinned Rust before running reseal regressions");
+const surfaceAckStep = [
+  "      - name: Check the surface acknowledgement",
+  "        env:",
+  "          PR_NUMBER: ${{ github.event.pull_request.number }}",
+  "          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}",
+  "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
+  "          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || github.event_name == 'push' && 'push' || 'workflow_dispatch' }}",
+  '        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE"',
+].join("\n");
+// The step block runs from its `- name:` line up to the next step (or the job end), so a line
+// appended after `run:` (`continue-on-error`, `if`, ...) is a difference, not a pass. Blank and
+// full-line comment lines at step indentation just before the next step belong to that step.
+const surfaceAckLines = workflowConsistency.split("\n");
+const surfaceAckStart = surfaceAckLines.indexOf("      - name: Check the surface acknowledgement");
+let surfaceAckBlock = null;
+if (surfaceAckStart !== -1) {
+  let end = surfaceAckStart + 1;
+  while (end < surfaceAckLines.length && !surfaceAckLines[end].startsWith("      - ")) end += 1;
+  while (end > surfaceAckStart + 1 && /^(?: {6}#.*)?$/.test(surfaceAckLines[end - 1])) end -= 1;
+  surfaceAckBlock = surfaceAckLines.slice(surfaceAckStart, end).join("\n");
+}
+if (surfaceAckBlock !== surfaceAckStep) {
+  failures.push("workflow-consistency must run the surface acknowledgement check with its exact shape");
 }
 
 // bridge#583: the release positive control is what makes a clean seam scan of the shipped
@@ -52,8 +70,8 @@ const expectedSeamControl = [
   "    # rather than after it: it builds the bridge lib unit-test executable in",
   "    # release and requires the marker there, so a clean scan of the shipped",
   "    # executables means the scan could have seen the seam. Same scope and",
-  "    # platforms as bundle-smoke, whose runs it guards.",
-  "    if: github.event_name != 'pull_request' || needs.changes.outputs.bundle == 'true'",
+  "    # platforms as bundle-smoke, whose runs it guards (on a pull request, Windows only).",
+  "    if: needs.changes.outputs.bundle == 'true'",
   "    runs-on: ${{ matrix.os }}",
   "    timeout-minutes: 45",
   "    permissions:",
@@ -61,7 +79,7 @@ const expectedSeamControl = [
   "    strategy:",
   "      fail-fast: false",
   "      matrix:",
-  "        os: [windows-latest, macos-latest]",
+  "        os: ${{ fromJSON(github.event_name == 'pull_request' && '[\"windows-latest\"]' || '[\"windows-latest\", \"macos-latest\"]') }}",
   "    steps:",
   "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7",
   "        with:",
@@ -120,14 +138,46 @@ if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
 // over its exact committed UTF-8 text from its key through that step (line endings included, so
 // even a whitespace or CRLF change trips it). Change a step and its copy, or a job and its digest, together
 // and deliberately; the failure prints the new digest for a reviewed change.
+// The per-test timings artifact is public for 7 days and what it carries is set in nextest.toml, outside the pinned
+// upload step: one JUnit table with the output stores off, and no setup scripts (their command, arguments and
+// environment names would join the report). TOML has many spellings of the same table (a bracketed header, a dotted
+// key, an inline table, a key written with an escape), and no TOML parser is a dependency of this repository, so the
+// file is pinned by its lines instead: every line that is not blank and not a full-line comment must equal the list
+// below, in order. A change to the file's settings is then a change to this list, made on purpose. A failing test's
+// panic text still reaches the report, which is why the upload runs only after a passing test step.
+const nextestConfig = readFileSync(resolve(repositoryRoot, "src-tauri/.config/nextest.toml"), "utf8").replace(/\r\n/g, "\n");
+const nextestLines = [
+  "[profile.default]",
+  'slow-timeout = { period = "60s", terminate-after = 6 }',
+  "[[profile.default.overrides]]",
+  "filter = 'test(/access::tests::on_windows::/)'",
+  'success-output = "immediate"',
+  "[profile.default.junit]",
+  'path = "junit.xml"',
+  "store-success-output = false",
+  "store-failure-output = false",
+];
+const nextestEffective = nextestConfig.split("\n").filter((line) => !/^\s*(?:#.*)?$/.test(line));
+if (nextestEffective.length !== nextestLines.length || nextestEffective.some((line, index) => line !== nextestLines[index])) {
+  failures.push("src-tauri/.config/nextest.toml must hold exactly one JUnit report table, the pinned one with both output stores off, and no setup scripts: every line that is not a blank or a full-line comment must equal nextestLines in scripts/check-ci-workflow-consistency.mjs");
+}
 const releaseWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/release-mcpb-preview.yml"), "utf8");
-jobIds(releaseWorkflow);
+// The release workflow's jobs are pinned by name: a job block is read up to the next `  name:` line, so an
+// unexpected job key would cut the previous job's block short.
+if (jobIds(releaseWorkflow).join(",") !== "release-admission,package,attest,publish-preview") {
+  failures.push("release-mcpb-preview.yml must have exactly the jobs release-admission, package, attest and publish-preview");
+}
+// Line-based readers split on \n (and \r\n); a lone \r, U+0085, U+2028 or U+2029 is a line break to other
+// YAML readers but not to them, so neither workflow may contain one.
+for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
+  if (/\r(?!\n)|[\u0085\u2028\u2029]/.test(source)) failures.push(`${name} must use only \\n or \\r\\n line breaks`);
+}
 for (const [source, job, expected, digest] of [
   [workflow, "native", [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "85fdd243e10222a6e10dabffa5e5ef0a765a3d8ca00469bdfc382c91dd9928d4"],
+  ], "39470f78610b804ee819cc124f4cebebf78bf7fac0dfddadaa2bb6b1cb10289f"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -138,27 +188,31 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "1b60d4c3772bff9479bb4bf7925e91e039db62f2e76b1d4de78a0fa2a39e816a"],
-  [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "02ffb0e75b37aad5c1238ce91ce19f82aa713deb1941978cb3687ad2757c8122"],
+  ], "8e37fac9f60813953a1d5b39abbd1a4e6904e9506b16392e7650291c4998be21"],
+  [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs src-tauri/target/release/${{ matrix.binary }}",
-  ], "b0f27a021c9d0fe13a3021a2177a3e649b5afa33e7e90e6738e4f7fd9b72fee4"],
+  ], "b8f6b70bdced2019e32e8fee1c1d20a7dcce0d270384849636182953702a384a"],
 ]) {
   if (stepBlock(jobBlock(source, job), expected[0]) !== expected.join("\n")) {
     failures.push(`${job}: step "${expected[0].trim()}" changed shape; review it and update its pinned copy`);
   }
   const actual = sha256(jobThrough(source, job, expected[0]));
   if (actual !== digest) failures.push(`${job} changed before "${expected[0].trim()}"; its digest is now ${actual}`);
+  // The digest covers the job only up to the pinned step. A job-level key (container, env, services,
+  // defaults, ...) written after the steps is outside it, so `steps:` must be the job's last key.
+  const jobKeys = jobBlock(source, job).split("\n").filter((line) => /^ {4}[^ \t#-]/.test(line));
+  if (jobKeys.at(-1)?.trimEnd() !== "    steps:") failures.push(`${job}: \`steps:\` must be the job's last key; a job-level key after the steps is outside its pinned text`);
 }
 // Each workflow's header (triggers, permissions, concurrency, env, defaults) applies to every job;
 // jobIds refuses a workflow-level key after the jobs map, so the header is all of them.
 // And native, bundle-smoke and package run a local composite action before their scans; a local
 // action can call another, so every tracked file under .github/actions/ is pinned by its bytes.
 for (const [name, source, digest] of [
-  ["ci.yml", workflow, "a8652d2207debc644fc71c5a32a32e48f09bf7c39da4a559c7c5519508ba0da9"],
-  ["release-mcpb-preview.yml", releaseWorkflow, "cf1da8bf810c3134d781b2b95e08803b9c1e58b48d20992931ec17660bd73c42"],
+  ["ci.yml", workflow, "25526dcdd7691fef35c27e07c0bb0291543cbf3ba55e7ac4ee40bd59f802b1e9"],
+  ["release-mcpb-preview.yml", releaseWorkflow, "c4a747416c492779cfd43305cfd619728d2c9821a17f3efb73da08f67dc56144"],
 ]) {
   const lines = source.split("\n");
   const jobs = lines.findIndex((line) => line.replace(/\r$/, "") === "jobs:");
@@ -170,14 +224,200 @@ for (const path of trackedFiles().filter((file) => file.startsWith(".github/acti
   localActions.update(`${path}\0`).update(readFileSync(resolve(repositoryRoot, path))).update("\0");
 }
 const localActionsDigest = localActions.digest("hex");
-if (localActionsDigest !== "5635b365035c4d709a17c29be7dcd2a6f3890ad23d7376162ca18d6b1b047543") {
+if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a851ab2db5479da") {
   failures.push(`.github/actions/ changed; its digest is now ${localActionsDigest}`);
 }
-if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: github.event_name != 'pull_request' || needs.changes.outputs.native == 'true'") {
+// The lookup that decides whether a master push may skip heavy jobs is pinned by its bytes: a change
+// to it is a change to what can be skipped, so it needs this file edited (and acknowledged) with it.
+const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/master-push-reuse.mjs"))).digest("hex");
+if (reuseScriptDigest !== "61371911fafdcec785d115f07e4fb1cc811fa78a773c289a12ac396fcf179f2d") {
+  failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
+}
+if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
+// The native tests run as two halves, one per shard, by nextest's partitioning. What would silently lose
+// coverage is pinned: a shard list other than [1, 2], a partition count that does not match it, a step
+// that was meant to run once per operating system but never runs (or runs twice), and any other use of the
+// shard number. A half that never runs is a green check with half the tests missing.
+const nativeJob = jobBlock(workflow, "native");
+const shardRows = nativeJob.match(/^ {8}shard:.*$/gm) ?? [];
+if (shardRows.length !== 1 || shardRows[0] !== "        shard: [1, 2]") {
+  failures.push("native must split its tests into exactly two shards: one matrix row `shard: [1, 2]`");
+}
+// An `exclude:` or `include:` entry under the matrix would drop or add a leg without touching the `shard:` row above
+// (for example `exclude: [{os: macos-latest, shard: 2}]` silently runs half the macOS tests), so neither is allowed.
+if (/^ {8}(?:include|exclude)\s*:/m.test(nativeJob)) {
+  failures.push("native: the matrix must not use include: or exclude: (a leg dropped or added there changes which tests run)");
+}
+const nativeTestStep = [
+  "      - name: Test native workspace",
+  "        id: native-tests",
+  "        run: >-",
+  "          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml",
+  "          --workspace --no-fail-fast --retries 0 --test-threads num-cpus --timings",
+  "          --partition count:${{ matrix.shard }}/2",
+].join("\n");
+if (stepBlock(nativeJob, "      - name: Test native workspace") !== nativeTestStep) {
+  failures.push("native: the test step must run nextest on its own half of the tests (`--partition count:${{ matrix.shard }}/2`) and be exactly the pinned text");
+}
+const onceSteps = [
+  ["      - name: Fetch pinned PDFium", 1],
+  ["      - name: Test PDF extraction through PDFium", 1],
+  ["      - name: Test native workspace doctests", 1],
+  ["      - name: Test Tally qualification tools workspace", 1],
+  ["      - name: Test isolated native outstandings qualification feature", 1],
+  ["      - name: Lint the native workspace", 2],
+  ["      - name: Census the Tally-path egress lints", 2],
+  ["      - name: Lint Tally qualification tools workspace", 2],
+  ["      - name: Lint isolated native outstandings qualification feature", 2],
+];
+for (const [head, shard] of onceSteps) {
+  if (stepBlock(nativeJob, head)?.split("\n")[1] !== `        if: matrix.shard == ${shard}`) {
+    failures.push(`native: step "${head.trim()}" must have \`if: matrix.shard == ${shard}\` as its first key, so it runs once per operating system`);
+  }
+}
+const allowedShardLines = new Set([
+  "    name: Native checks (${{ matrix.os }}, shard ${{ matrix.shard }} of 2)",
+  "          save-if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && matrix.shard == 1 }}",
+  "          --partition count:${{ matrix.shard }}/2",
+  "          save-cache: ${{ matrix.shard == 1 }}",
+  "          name: native-test-timings-macos-shard-${{ matrix.shard }}",
+  "          name: native-crash-stacks-macos-shard-${{ matrix.shard }}",
+  "          name: native-crash-binaries-macos-shard-${{ matrix.shard }}",
+  "          name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}",
+  "        if: matrix.shard == 1",
+  "        if: matrix.shard == 2",
+]);
+const shardUses = nativeJob.split("\n").filter((line) => line.includes("matrix.shard"));
+if (shardUses.some((line) => !allowedShardLines.has(line))
+  || shardUses.filter((line) => line === "        if: matrix.shard == 1").length !== 5
+  || shardUses.filter((line) => line === "        if: matrix.shard == 2").length !== 4) {
+  failures.push("native: matrix.shard may appear only in the pinned lines (job name, cache save, partition flag, artifact names, and nine once-per-system step conditions)");
+}
+// Every non-condition line must be present exactly once: an artifact name without the shard would make both
+// shards upload to one name (the second upload fails), and a dropped line would go unseen above.
+for (const line of allowedShardLines) {
+  if (line.startsWith("        if:")) continue;
+  if (nativeJob.split("\n").filter((candidate) => candidate === line).length !== 1) {
+    failures.push(`native: the pinned shard line must appear exactly once: ${line.trim()}`);
+  }
+}
+// `continue-on-error` is refused everywhere (a failure would report success) except on these five
+// diagnostics-only artifact uploads. Each runs under `always()`, has no `id`, and nothing in this
+// repository downloads or reads its outcome; a GitHub service timeout in one of them (a merge-queue
+// entry was dropped on 3 Oct 2026 by `CreateArtifact ETIMEDOUT`) is not a failure of the code under
+// test. Left out on purpose: the failed-run executable evidence and the unsigned bundle
+// upload, whose absence or failure must stay visible. Each allowed step is pinned
+// whole (its job, its text and the upload action's SHA), so the flag cannot move to another step or
+// take an expression, and the count and exact line are checked below.
+const diagnosticUploads = [
+  ["native", [
+    "      - name: Retain minimized macOS test crash stacks",
+    "        if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: native-crash-stacks-macos-shard-${{ matrix.shard }}",
+    "          path: ${{ runner.temp }}/bridge-native-crashes.json",
+    "          if-no-files-found: error",
+    "          retention-days: 7",
+  ]],
+  ["native", [
+    "      - name: Retain native compiler timings",
+    "        if: ${{ always() }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}",
+    "          path: src-tauri/target/cargo-timings/*.html",
+    "          if-no-files-found: warn",
+    "          retention-days: 7",
+  ]],
+  ["native", [
+    "      - name: Retain macOS per-test timings",
+    "        if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'success' }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: native-test-timings-macos-shard-${{ matrix.shard }}",
+    "          path: src-tauri/target/nextest/default/junit.xml",
+    "          if-no-files-found: warn",
+    "          retention-days: 7",
+  ]],
+  ["bundle-smoke", [
+    "      - name: Retain macOS package diagnostics",
+    "        if: ${{ always() && runner.os == 'macOS' && (steps.macos-bundle.outcome == 'success' || steps.macos-bundle.outcome == 'failure') }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: macos-package-diagnostics",
+    "          path: |",
+    "            package-diagnostics/**",
+    "            src-tauri/target/release/bundle/dmg/bundle_dmg.sh",
+    "            src-tauri/target/cargo-timings/*.html",
+    "          if-no-files-found: warn",
+    "          retention-days: 7",
+  ]],
+  ["bundle-smoke", [
+    "      - name: Upload package compiler cache statistics",
+    "        if: ${{ always() && steps.package-sccache-start.outcome == 'success' }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: package-compiler-cache-${{ matrix.os }}",
+    "          path: package-compiler-cache.json",
+    "          if-no-files-found: error",
+    "          retention-days: 7",
+  ]],
+];
+for (const [job, lines] of diagnosticUploads) {
+  if (stepBlock(jobBlock(workflow, job), lines[0]) !== lines.join("\n")) {
+    failures.push(`${job}: diagnostics-only upload "${lines[0].trim()}" changed shape; review it and update diagnosticUploads`);
+  }
+}
+const flagLines = workflow.split("\n").filter((line) => line.includes("continue-on-error"));
+if (flagLines.length !== diagnosticUploads.length || flagLines.some((line) => line.replace(/\r$/, "") !== "        continue-on-error: true")) {
+  failures.push("ci.yml must not use continue-on-error except the one exact line in each pinned diagnostics-only upload: a failure would report success");
+}
+// The Playwright browsers cache is saved only by push, manual and scheduled runs (other caches, such as the Node
+// package cache, still save from every ref). The combined restore-and-save cache action saves from
+// every ref, and a pull-request or merge-queue ref saves a copy only that ref can read: on 15 Oct 2026 five copies of
+// the 365 MiB Playwright browsers, saved by pull-request and merge-queue refs, sat in a repository cache that was at
+// 9.96 of 10 GiB, and the eviction left the Windows runs cold. So the browsers are restored with the restore action and saved by one pinned step that runs after the install.
+if (/actions\/cache@/.test(workflow)) {
+  failures.push("ci.yml must not use the combined restore-and-save cache action (actions/cache@): a pull-request ref would save a copy of its own");
+}
+const playwrightSave = [
+  "      - name: Save Playwright browsers",
+  "        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}",
+  "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+  "        with:",
+  "          path: ~/.cache/ms-playwright",
+  "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}",
+].join("\n");
+const playwrightRestore = [
+  "      - name: Restore Playwright browsers",
+  "        id: playwright-cache",
+  "        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+  "        with:",
+  "          path: ~/.cache/ms-playwright",
+  "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}",
+].join("\n");
+const frontendJob = jobBlock(workflow, "frontend");
+if (stepBlock(frontendJob, "      - name: Restore Playwright browsers") !== playwrightRestore) {
+  failures.push("the Playwright browsers restore step changed shape: its key must equal the save step's and it must have no restore-keys; review it and update playwrightRestore");
+}
+const playwrightInstallAt = frontendJob.indexOf("      - name: Install Playwright browsers and system dependencies\n");
+const playwrightSaveAt = frontendJob.indexOf("      - name: Save Playwright browsers\n");
+if (stepBlock(frontendJob, "      - name: Save Playwright browsers") !== playwrightSave || frontendJob.split("actions/cache/save@").length !== 2 || playwrightInstallAt === -1 || playwrightSaveAt < playwrightInstallAt) {
+  failures.push("the Playwright browsers save step changed shape, or does not follow the install step; review it and update playwrightSave");
+}
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
-  if (source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);
+  if (name !== "ci.yml" && source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);
+  // A quoted key can spell a refused key with an escape, which the text rule above cannot read; refuse
+  // one at the start of a line. (Other YAML spellings of a key are not covered by this line.)
+  if (/^\s*(?:-\s+)?["'][^"'\n]*["']\s*:/m.test(source)) failures.push(`${name} must not start a line with a quoted mapping key: the continue-on-error rule reads keys as plain text`);
   // A step without its own `shell:` runs under the workflow's or job's defaults.
   if (/^\s*defaults\s*:/m.test(source)) failures.push(`${name} must not set defaults: they change how unpinned-shell steps run`);
 }
@@ -230,6 +470,8 @@ const expectedChanges = [
   "    timeout-minutes: 5",
   "    permissions:",
   "      contents: read",
+  "      # Only to read this workflow's own merge-queue runs and their jobs (scripts/master-push-reuse.mjs).",
+  "      actions: read",
   "    outputs:",
   "      bundle: ${{ steps.scope.outputs.bundle }}",
   "      native: ${{ steps.scope.outputs.native }}",
@@ -245,12 +487,43 @@ const expectedChanges = [
   "          EVENT_NAME: ${{ github.event_name }}",
   "          BEFORE_SHA: ${{ github.event.before }}",
   "          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
+  "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
+  "          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}",
   "        run: |",
   "          set -euo pipefail",
   "",
-  "          if [[ \"$EVENT_NAME\" == \"workflow_dispatch\" ]]; then",
+  "          # The unscoped run: every heavy job runs, whatever changed.",
+  "          full_run() {",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
+  "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
+  "            exit 0",
+  "          }",
+  "",
+  "          if [[ \"$EVENT_NAME\" == \"workflow_dispatch\" || \"$EVENT_NAME\" == \"schedule\" ]]; then",
+  "            full_run",
+  "          fi",
+  "",
+  "          # A push to master runs a family of heavy jobs unless the merge queue already RAN that family",
+  "          # on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped",
+  "          # the family by scope is no evidence, so it is run here as it always was. Any error or doubt",
+  "          # in the lookup runs both: a non-zero exit discards whatever was printed (its status goes to the job",
+  "          # summary), and only an exact",
+  "          # `reuse_<family>=true` line among the first two skips anything. tax_audit is cheap and always runs on a push.",
+  "          # To turn the reuse off, delete this block: every push is then a full run again.",
+  "          if [[ \"$EVENT_NAME\" == \"push\" ]]; then",
+  "            lookup_status=0",
+  "            decision=\"$(node scripts/master-push-reuse.mjs)\" || lookup_status=$?",
+  "            if [[ \"$lookup_status\" -ne 0 ]]; then decision=''; fi",
+  "            printf '%s\\n' \"$decision\"",
+  "            { echo '### Master push reuse'; echo '```'; printf '%s\\n' \"$decision\"; echo '```'; echo \"Lookup exit status: $lookup_status\"; } >> \"$GITHUB_STEP_SUMMARY\"",
+  "            for family in native bundle; do",
+  "              if printf '%s\\n' \"$decision\" | head -n 2 | grep -qx \"reuse_${family}=true\"; then",
+  "                echo \"${family}=false\" >> \"$GITHUB_OUTPUT\"",
+  "              else",
+  "                echo \"${family}=true\" >> \"$GITHUB_OUTPUT\"",
+  "              fi",
+  "            done",
   "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
   "            exit 0",
   "          fi",
@@ -258,35 +531,32 @@ const expectedChanges = [
   "          if [[ \"$EVENT_NAME\" == \"pull_request\" ]]; then",
   "            base=\"$PR_BASE_SHA\"",
   "          else",
-  "            base=\"$BEFORE_SHA\"",
+  "            base=\"$MERGE_GROUP_BASE_SHA\"",
   "          fi",
   "",
-  "          # A new branch has no useful predecessor. Keep the conservative path.",
+  "          # A missing base has no useful predecessor. Keep the conservative path.",
   "          if [[ -z \"$base\" || \"$base\" =~ ^0+$ ]]; then",
-  "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
-  "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
-  "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
-  "            exit 0",
+  "            full_run",
   "          fi",
   "",
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
   "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
-  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs)'; then",
+  "          if grep -Eq '^(\\.github/workflows/|\\.github/actions/|rust-toolchain\\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.mjs$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes(\\.test)?\\.mjs$|retain-macos-test-binaries(\\.test)?\\.mjs$))' <<< \"$changed_files\"; then",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
   "          fi",
   "",
   "          # The mutation records check runs when the crate it guards changes, or this workflow does.",
-  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/ci\\.yml|src-tauri/crates/bridge-tax-audit/)'; then",
+  "          if grep -Eq '^(\\.github/workflows/ci\\.yml|src-tauri/crates/bridge-tax-audit/)' <<< \"$changed_files\"; then",
   "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'tax_audit=false' >> \"$GITHUB_OUTPUT\"",
   "          fi",
   "",
   "          # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.",
-  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.py|capture-package-log(\\.test)?\\.py|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)'; then",
+  "          if grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",
@@ -294,6 +564,61 @@ const expectedChanges = [
 ].join("\n");
 if (jobBlock(workflow, "changes").trimEnd() !== expectedChanges) {
   failures.push("changes changed shape; review its scope rules and update expectedChanges");
+}
+// The native job runs on a pull request only when the scope above selects it. A test in it that reads
+// a file the scope does not list is skipped, with the file's change, by the queue, and only a master
+// push would find the break. So: every file a Rust test pulls in from outside src-tauri/ and tools/
+// through include_str!/include_bytes!, and every file listed below that a test or a native-job step
+// reads at run time, must be matched by the native scope's own pattern. Tests in tools/ are not listed: `Tally
+// portable core` runs that workspace on every pull request, whatever the scope selects.
+const nativeScope = new RegExp(/grep -Eq '(\^\([^']+\))' <<< "\$changed_files"; then\n\s+echo 'native=true'/.exec(jobBlock(workflow, "changes"))?.[1] ?? "(unreadable)");
+const tracked = trackedFiles();
+const readAtRunTime = [
+  [".cargo/config.toml", "src-tauri/tests/approval_seam_gate.rs (read if present; none is tracked today)", true],
+  [".gitattributes", "byte-exact fixture checkout on Windows"],
+  ["package.json", "src-tauri/tests/approval_seam_gate.rs"],
+  [".github/actions/", "src-tauri/tests/approval_seam_gate.rs (every composite action)"],
+  ["glama/Dockerfile", "src-tauri/tests/approval_seam_gate.rs (it starts cargo)"],
+  ["scripts/check-no-test-seam.mjs", "src-tauri/tests/approval_seam_gate.rs (it starts cargo)"],
+  ["scripts/package-mcpb.mjs", "src-tauri/tests/approval_seam_gate.rs (it starts cargo)"],
+  ["packaging/pdfium/pdfium.lock.json", "the native job's PDFium step"],
+  ["scripts/fetch-pdfium.mjs", "the native job's PDFium step"],
+  ["scripts/collect-macos-test-crashes.mjs", "the native job's macOS crash steps"],
+  ["scripts/retain-macos-test-binaries.mjs", "the native job's macOS crash steps"],
+  ["scripts/check-tally-request-builder-hazards.mjs", "src-tauri/src/tally/tdl_engine.rs"],
+  ["scripts/fixtures/", "src-tauri/crates/bridge-bank-statement/tests/common/mod.rs"],
+  ["docs/tally/compatibility/compatibility-surface.json", "src-tauri/tests/admission_and_egress_files_stay_pinned.rs"],
+  ["LICENSE", "tauri.conf.json bundle resources, copied by the build script"],
+  ["NOTICE", "tauri.conf.json bundle resources, copied by the build script"],
+  ["THIRD_PARTY_LICENSES.txt", "tauri.conf.json bundle resources, copied by the build script"],
+  ["THIRD_PARTY_LICENSES_RUST.txt", "tauri.conf.json bundle resources, copied by the build script"],
+];
+for (const [entry, reader, optional] of readAtRunTime) {
+  // A listed directory stands for every tracked file in it, each of which must be selected.
+  const files = entry.endsWith("/") ? tracked.filter((path) => path.startsWith(entry)) : tracked.filter((path) => path === entry);
+  if (files.length === 0 && optional) { if (!nativeScope.test(entry)) failures.push(`the native scope omits ${entry}, which ${reader} reads`); }
+  else if (files.length === 0) failures.push(`the run-time read list names ${entry}, which has no tracked file; update the list (${reader})`);
+  for (const file of files) if (!nativeScope.test(file)) failures.push(`the native scope omits ${file}, which ${reader} reads`);
+}
+for (const file of tracked.filter((path) => /^(?:src-tauri|tools)\/.+\.rs$/.test(path))) {
+  const source = readFileSync(resolve(repositoryRoot, file), "utf8").replace(/^\s*\/\/.*$/gm, "");
+  for (const opening of source.matchAll(/include_(?:str|bytes)!\(/g)) {
+    // The argument runs to the matching parenthesis, so a nested concat!(env!(..), "..") is read whole.
+    let depth = 1;
+    let end = opening.index + opening[0].length;
+    while (end < source.length && depth > 0) depth += source[end] === "(" ? 1 : source[end] === ")" ? -1 : 0, end += 1;
+    const argument = source.slice(opening.index + opening[0].length, end - 1);
+    const literal = /^\s*"([^"]+)"\s*,?\s*$/.exec(argument)?.[1];
+    if (literal === undefined) {
+      // A form this scan cannot resolve (concat!, env!) that climbs out of the crate must be listed by hand above.
+      if (argument.includes("..")) failures.push(`${file} includes a path this check cannot resolve (${argument.trim().slice(0, 80)}); list it in readAtRunTime`);
+      continue;
+    }
+    const resolved = posix.normalize(posix.join(posix.dirname(file), literal));
+    if (!/^(?:src-tauri|tools)\//.test(resolved) && !nativeScope.test(resolved)) {
+      failures.push(`the native scope omits ${resolved}, which ${file} includes`);
+    }
+  }
 }
 const expectedRequiredChecks = [
   "  required-checks:",
@@ -324,7 +649,7 @@ const expectedRequiredChecks = [
   "          printf '%s\\n' \"$NEEDS_JSON\"",
   "          failed=\"$(",
   "            printf '%s' \"$NEEDS_JSON\" \\",
-  "              | python3 -c \"import json,sys; d=json.load(sys.stdin); failed=[k for k,v in d.items() if v.get('result') in ('failure','cancelled')]; failed += [] if d.get('workflow-consistency', {}).get('result') == 'success' else ['workflow-consistency']; print(' '.join(dict.fromkeys(failed)))\"",
+  "              | node -e 'const d = JSON.parse(require(\"fs\").readFileSync(0, \"utf8\")); const failed = Object.keys(d).filter((k) => [\"failure\", \"cancelled\"].includes(d[k].result)); if (d[\"workflow-consistency\"]?.result !== \"success\") failed.push(\"workflow-consistency\"); console.log([...new Set(failed)].join(\" \"))'",
   "          )\"",
   "          if [[ -n \"$failed\" ]]; then",
   "            echo \"Required jobs did not pass: $failed\"",
@@ -478,19 +803,25 @@ function jobThrough(source, job, head) {
   const start = lines.findIndex((line) => line.replace(/\r$/, "") === `  ${job}:`);
   const step = lines.findIndex((line, index) => index > start && line.replace(/\r$/, "") === head);
   if (start === -1 || step === -1) return "";
-  let end = step + 1;
-  while (end < lines.length && !/^ {0,6}\S/.test(lines[end])) end += 1;
-  while (end > step + 1 && lines[end - 1].replace(/\r$/, "") === "") end -= 1;
-  return lines.slice(start, end).join("\n");
+  return lines.slice(start, stepEnd(lines, step + 1)).join("\n");
+}
+
+// A step ends at the next line that is not blank, not a comment and is indented six spaces or less.
+// A comment line never ends a step, whatever its indentation: YAML ignores a comment's indentation, so
+// the keys after it still belong to the step and are part of its pinned text. Blank lines and comments
+// indented six spaces or less just before the next step are that step's, not this one's.
+function stepEnd(lines, from) {
+  let end = from;
+  while (end < lines.length && !/^ {0,6}[^\s#]/.test(lines[end])) end += 1;
+  while (end > from && /^ {0,6}(?:#.*)?$/.test(lines[end - 1].replace(/\r$/, ""))) end -= 1;
+  return end;
 }
 
 function stepBlock(job, head) {
   const lines = job.split("\n");
   const starts = lines.flatMap((line, index) => (line === head ? [index] : []));
   if (starts.length !== 1) return undefined;
-  let end = starts[0] + 1;
-  while (end < lines.length && !/^ {0,6}\S/.test(lines[end])) end += 1;
-  return lines.slice(starts[0], end).join("\n").trimEnd();
+  return lines.slice(starts[0], stepEnd(lines, starts[0] + 1)).join("\n").trimEnd();
 }
 
 function escapeRegex(value) {

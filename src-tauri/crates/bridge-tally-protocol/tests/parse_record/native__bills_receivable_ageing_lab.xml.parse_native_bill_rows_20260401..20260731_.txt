@@ -1,0 +1,85 @@
+# fixture: tests/fixtures/native/bills_receivable_ageing_lab.xml
+# parser: parse_native_bill_rows(20260401..20260731)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "Ageing Customer A",
+        reference: "CANARY-1",
+        bill_date: TallyDate(
+            "20260501",
+        ),
+        due_date: TallyDate(
+            "20260501",
+        ),
+        closing_balance: ExactDecimal(
+            "-1000.00",
+        ),
+        tally_overdue_days: Some(
+            91,
+        ),
+    },
+    NativeBillRow {
+        party: "Ageing Customer A",
+        reference: "CREDIT-30",
+        bill_date: TallyDate(
+            "20260501",
+        ),
+        due_date: TallyDate(
+            "20260531",
+        ),
+        closing_balance: ExactDecimal(
+            "-4000.00",
+        ),
+        tally_overdue_days: Some(
+            61,
+        ),
+    },
+    NativeBillRow {
+        party: "Ageing Customer A",
+        reference: "BD-DIFF",
+        bill_date: TallyDate(
+            "20260531",
+        ),
+        due_date: TallyDate(
+            "20260531",
+        ),
+        closing_balance: ExactDecimal(
+            "-2000.00",
+        ),
+        tally_overdue_days: Some(
+            61,
+        ),
+    },
+    NativeBillRow {
+        party: "Ageing Customer A",
+        reference: "MP-A",
+        bill_date: TallyDate(
+            "20260702",
+        ),
+        due_date: TallyDate(
+            "20260702",
+        ),
+        closing_balance: ExactDecimal(
+            "-1000.00",
+        ),
+        tally_overdue_days: Some(
+            29,
+        ),
+    },
+    NativeBillRow {
+        party: "Ageing Customer A",
+        reference: "BWOFF-TEST",
+        bill_date: TallyDate(
+            "20260731",
+        ),
+        due_date: TallyDate(
+            "20260731",
+        ),
+        closing_balance: ExactDecimal(
+            "-777.00",
+        ),
+        tally_overdue_days: Some(
+            0,
+        ),
+    },
+])

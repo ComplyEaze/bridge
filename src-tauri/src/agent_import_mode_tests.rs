@@ -92,13 +92,24 @@ async fn import_build_requires_an_observed_mode_bracket_and_retains_probe_eviden
     ];
     let rejected = ["unknown", "product", "editlog", "unknown_product"];
     for fault in accepted.into_iter().chain(rejected) {
-        let admitted = accepted.contains(&fault);
+        // Education is admitted by the build's own mode bracket and refused by
+        // its numbering read, which reads the same mode first (bridge#724).
+        let numbering_refused = fault == "education";
+        let admitted = accepted.contains(&fault) && !numbering_refused;
         let plans = if admitted {
             [
                 import_profile_probe(fault),
-                import_cycle_plans()[..16].to_vec(),
-                import_cycle_plans()[4..10].to_vec(),
+                import_family_cycle_plans()[..16].to_vec(),
+                build_numbering_plans_probed(&[], &import_profile_probe(fault)),
+                import_family_cycle_plans()[4..10].to_vec(),
                 build_preflight_plans(),
+                import_profile_probe(fault),
+            ]
+            .concat()
+        } else if numbering_refused {
+            [
+                import_profile_probe(fault),
+                import_family_cycle_plans()[..16].to_vec(),
                 import_profile_probe(fault),
             ]
             .concat()
@@ -121,8 +132,8 @@ async fn import_build_requires_an_observed_mode_bracket_and_retains_probe_eviden
             max_bytes: 200_000,
             redaction: super::super::super::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         });
         let result = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
@@ -139,8 +150,9 @@ async fn import_build_requires_an_observed_mode_bracket_and_retains_probe_eviden
                 result.payload["result"]["verification_preflight"],
                 json!({
                     "state":"current_window_readable", "from":"20260901", "to":"20260902",
-                    "source_rows":0, "paired_source_bytes":responses[25].len() * 2,
-                    "response_sha256":sha256_hex(&responses[25])
+                    "source_rows":0,
+                    "paired_source_bytes":responses[25 + BUILD_NUMBERING_PLANS].len() * 2,
+                    "response_sha256":sha256_hex(&responses[25 + BUILD_NUMBERING_PLANS])
                 })
             );
             let batch = result.payload["result"]["batch_id"].as_str().unwrap();
@@ -161,7 +173,12 @@ async fn import_build_requires_an_observed_mode_bracket_and_retains_probe_eviden
             result.evidence
         } else {
             let error = result.err().unwrap();
-            assert_eq!(error.code, "import_mode_unqualified", "{fault}");
+            let code = if numbering_refused {
+                "masters_education_unqualified"
+            } else {
+                "import_mode_unqualified"
+            };
+            assert_eq!(error.code, code, "{fault}");
             assert!(!directory.path().join("imports").exists());
             assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
             *error.evidence.unwrap()
@@ -173,16 +190,41 @@ async fn import_build_requires_an_observed_mode_bracket_and_retains_probe_eviden
         let mut request_hash = join(&request(0), &request(1));
         let mut response_hash = join(&response(0), &response(1));
         let mut bytes = responses[0].len() + responses[1].len();
-        if admitted {
-            assert_eq!(observed.len(), 32);
-            for i in [2, 7, 13, 19, 25] {
+        if admitted || numbering_refused {
+            for i in [2, 7, 13] {
                 request_hash = join(&request_hash, &request(i));
                 response_hash = join(&response_hash, &response(i));
                 bytes += 2 * responses[i].len();
             }
-            request_hash = join(&request_hash, &join(&request(30), &request(31)));
-            response_hash = join(&response_hash, &join(&response(30), &response(31)));
-            bytes += responses[30].len() + responses[31].len();
+        }
+        if admitted {
+            assert_eq!(observed.len(), QUALIFIED_BUILD_REQUESTS);
+            let (numbering_request, numbering_response, numbering_bytes) =
+                numbering_evidence_link(&observed, &responses, 18);
+            request_hash = join(&request_hash, &numbering_request);
+            response_hash = join(&response_hash, &numbering_response);
+            bytes += numbering_bytes;
+            for i in [19 + BUILD_NUMBERING_PLANS, 25 + BUILD_NUMBERING_PLANS] {
+                request_hash = join(&request_hash, &request(i));
+                response_hash = join(&response_hash, &response(i));
+                bytes += 2 * responses[i].len();
+            }
+            let closing = 30 + BUILD_NUMBERING_PLANS;
+            request_hash = join(
+                &request_hash,
+                &join(&request(closing), &request(closing + 1)),
+            );
+            response_hash = join(
+                &response_hash,
+                &join(&response(closing), &response(closing + 1)),
+            );
+            bytes += responses[closing].len() + responses[closing + 1].len();
+        } else if numbering_refused {
+            // The numbering read's own mode probe, and nothing after it.
+            assert_eq!(observed.len(), 20);
+            request_hash = join(&request_hash, &join(&request(18), &request(19)));
+            response_hash = join(&response_hash, &join(&response(18), &response(19)));
+            bytes += responses[18].len() + responses[19].len();
         } else {
             assert_eq!(observed.len(), 2);
         }
@@ -211,8 +253,8 @@ async fn education_build_refuses_an_unsupported_voucher_date_before_any_catalogu
         max_bytes: 200_000,
         redaction: super::super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let mut payload = captured_catalogue_payload();
     payload.vouchers[0].date = "20260915".into();
@@ -258,9 +300,10 @@ async fn education_build_refuses_an_unsupported_voucher_date_before_any_catalogu
 #[tokio::test]
 async fn import_build_rechecks_captured_catalogue_before_persistence() {
     for fault in ["none", "rename", "identity", "parent", "delete"] {
-        let mut plans = qualified_import_cycle_plans()[..32].to_vec();
+        let mut plans = qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec();
         if fault != "none" {
-            for index in [19, 21] {
+            // The catalogue repeat, after the mark and the numbering read.
+            for index in [19 + BUILD_NUMBERING_PLANS, 21 + BUILD_NUMBERING_PLANS] {
                 let xml = plans[index].fixture.body().into_owned();
                 let changed = match fault {
                     "rename" => xml.replace("Bridge Nested Debtor WR4", "Renamed Debtor"),
@@ -282,7 +325,7 @@ async fn import_build_rechecks_captured_catalogue_before_persistence() {
                 assert_ne!(changed, xml);
                 plans[index].fixture = Fixture::SyntheticXml(changed);
             }
-            plans.truncate(24);
+            plans.truncate(24 + BUILD_NUMBERING_PLANS);
         }
         let responses = plans
             .iter()
@@ -300,8 +343,8 @@ async fn import_build_rechecks_captured_catalogue_before_persistence() {
             max_bytes: 200_000,
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         });
         let result = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
@@ -316,7 +359,10 @@ async fn import_build_rechecks_captured_catalogue_before_persistence() {
             *error.evidence.unwrap()
         };
         let observed = simulator.finish().unwrap();
-        assert_eq!(observed.len(), if fault == "none" { 32 } else { 24 });
+        assert_eq!(
+            observed.len(),
+            BUILD_NUMBERING_PLANS + if fault == "none" { 32 } else { 24 }
+        );
         let join = |a: &str, b: &str| sha256_hex(format!("{a}:{b}").as_bytes());
         let mut request = join(
             &observed[0].request_body_sha256,
@@ -324,31 +370,45 @@ async fn import_build_rechecks_captured_catalogue_before_persistence() {
         );
         let mut response = join(&sha256_hex(&responses[0]), &sha256_hex(&responses[1]));
         let mut bytes = responses[0].len() + responses[1].len();
-        for i in [2, 7, 13, 19] {
+        for i in [2, 7, 13] {
             request = join(&request, &observed[i].request_body_sha256);
             response = join(&response, &sha256_hex(&responses[i]));
             bytes += 2 * responses[i].len();
         }
+        let (numbering_request, numbering_response, numbering_bytes) =
+            numbering_evidence_link(&observed, &responses, 18);
+        request = join(&request, &numbering_request);
+        response = join(&response, &numbering_response);
+        bytes += numbering_bytes;
+        let repeat = 19 + BUILD_NUMBERING_PLANS;
+        request = join(&request, &observed[repeat].request_body_sha256);
+        response = join(&response, &sha256_hex(&responses[repeat]));
+        bytes += 2 * responses[repeat].len();
         assert_eq!(
             observed[7].request_body_sha256,
-            observed[19].request_body_sha256
+            observed[repeat].request_body_sha256
         );
         if fault == "none" {
-            request = join(&request, &observed[25].request_body_sha256);
-            response = join(&response, &sha256_hex(&responses[25]));
-            bytes += responses[25].len() * 2;
+            let preflight = 25 + BUILD_NUMBERING_PLANS;
+            let closing = 30 + BUILD_NUMBERING_PLANS;
+            request = join(&request, &observed[preflight].request_body_sha256);
+            response = join(&response, &sha256_hex(&responses[preflight]));
+            bytes += responses[preflight].len() * 2;
             request = join(
                 &request,
                 &join(
-                    &observed[30].request_body_sha256,
-                    &observed[31].request_body_sha256,
+                    &observed[closing].request_body_sha256,
+                    &observed[closing + 1].request_body_sha256,
                 ),
             );
             response = join(
                 &response,
-                &join(&sha256_hex(&responses[30]), &sha256_hex(&responses[31])),
+                &join(
+                    &sha256_hex(&responses[closing]),
+                    &sha256_hex(&responses[closing + 1]),
+                ),
             );
-            bytes += responses[30].len() + responses[31].len();
+            bytes += responses[closing].len() + responses[closing + 1].len();
         }
         assert_eq!(evidence.request_sha256, request);
         assert_eq!(evidence.response_sha256, response);

@@ -3,13 +3,10 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{
-    atomic::{AtomicU64, AtomicU8, Ordering},
+    atomic::{AtomicU8, Ordering},
     Arc,
 };
-#[cfg(feature = "voucher-scan")]
-use std::time::{Duration, Instant};
 
-use super::xml_parser::{TallyLedger, TallyVoucher};
 use super::{
     standard_ledger_catalog::{
         parse_standard_ledger_catalog_response, render_standard_ledger_catalog_request,
@@ -20,7 +17,9 @@ use super::{
     VerifiedCompanyIdentity,
 };
 use crate::endpoint_wire::WireGateConfig;
-use crate::reports::party_ledger_master::{PartyLedgerMasterRow, PartyLedgerMasterSource};
+use crate::reports::party_ledger_master::{
+    BalanceDateBasis, PartyLedgerMasterRow, PartyLedgerMasterSource,
+};
 use crate::tally::runtime::{
     with_read_evidence, PartyLedgerMasterCurrencyAssertion, RuntimeReadEvidence,
 };
@@ -28,33 +27,33 @@ use bridge_tally_core::{
     CapabilityEvidence, CapabilityFeatureId, CapabilityPackId, CapabilityProfile, CapabilityState,
     EvidenceConfidence, LicenseTier, TransportId,
 };
-#[cfg(feature = "voucher-scan")]
-use bridge_tally_protocol::outstandings::{
-    parse_ledger_opening_coverage, verify_empty_partition_witness_pair_with_wire_evidence,
-    verify_segment_pair_with_wire_evidence, voucher_empty_partition_witness_request,
-    voucher_outstandings_request, AlterIdRange, LedgerOpeningCoverage, NarrowDateWindow,
-    PinnedCompany, SegmentVerification, SegmentWireEvidence, VoucherOutstandingsRequestXml,
-    WitnessPairVerification,
-};
 use bridge_tally_protocol::{
+    ledger_census::{
+        render_ledger_census_slice_request, CensusLimits, LedgerCensus, LedgerCensusError,
+        LedgerCensusPlan, LedgerCount,
+    },
     native_outstandings::{
         parse_compliance_ledger_snapshot_for_company, parse_native_group_snapshot_with_evidence,
         parse_native_ledger_snapshot_for_company, render_native_group_snapshot_request,
-        render_native_ledger_export_request, render_native_ledger_snapshot_request,
-        render_native_voucher_export_request, render_party_ledger_master_request,
-        NativeLedgerExportPeriod, NativeLedgerSnapshotPeriod, NativeOutstandingsError,
+        render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_parents,
+        render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
+        render_party_ledger_master_request_for_parents_with_gst_details,
+        render_party_ledger_master_request_with_gst_details, BaseCurrencyName,
+        ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
+        NativeLedgerSnapshotPeriod, NativeOutstandingsError,
     },
     outstandings_shared::{
-        parse_company_book_extent_v2, require_master_witness, CompanyBookExtent,
+        parse_company_book_extent_v2, parse_company_ledger_count,
+        render_company_ledger_count_request, require_master_witness, CompanyBookExtent,
         DateBoundaryProfile, OutstandingsError,
     },
+    parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
     parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
-    parse_native_ledger_source_records_with_evidence,
-    parse_native_party_ledger_master_records_leaving_unparsed,
-    parse_native_party_ledger_master_structure, parse_native_voucher_source_records_with_evidence,
-    parse_standard_ledger_catalog, parse_standard_ledger_identity_observation,
+    parse_ledger_census_slice, parse_native_party_ledger_master_records_leaving_unparsed,
+    parse_native_party_ledger_master_structure, parse_standard_ledger_identity_observation,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
-    StandardLedgerCatalogError, TallyTextEncoding,
+    ParsedExport, ParsedSourceRecord, PartyLedgerMasterRecord, StandardLedgerCatalogError,
+    TallyTextEncoding, MAX_STANDARD_LEDGER_IDENTITY_ROWS,
 };
 use bridge_tally_transport::{
     canonical_loopback_origin as transport_canonical_origin, TallyEndpointConfig,
@@ -112,6 +111,11 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
     MasterPeriod,
     #[error("Tally closing-balance period is unsupported")]
     BalancePeriod,
+    /// The date the CA chose for the balances is before the start of the
+    /// books (#903). Raised from the opening extent, before any ledger master,
+    /// balance or group request is sent.
+    #[error("The date chosen for the balances precedes the start of the books")]
+    AsOfPrecedesBooksFrom,
     #[error("Tally ledger master omitted GUID")]
     MasterGuid,
     #[error("Tally ledger master omitted MASTERID")]
@@ -139,17 +143,18 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         #[source]
         source: anyhow::Error,
     },
-    /// The estimated master response is over the budget, so no master
-    /// request was sent (#637): on the ledgers a paired catalogue counted
-    /// (`counted_ledgers`), or, with none counted, on the company's
-    /// master-alteration mark, an upper bound on its ledgers (#668). Numbers
-    /// only.
-    #[error("Tally compliance master read is estimated beyond Bridge's response budget")]
-    TooLarge {
+    /// The company's master-alteration mark, an upper bound on its ledgers, is
+    /// past the largest mark the census counts (#679), and the catalogue that
+    /// would count the ledgers instead is estimated beyond the transport's
+    /// response cap, so nothing was sent after the opening extent: the mark
+    /// times the catalogue's bytes per ledger is over the limit. Numbers only.
+    #[error("Tally ledger catalogue is estimated beyond Bridge's response limit")]
+    CatalogueTooLarge {
         master_alter_id: u64,
-        counted_ledgers: Option<u64>,
         estimated_bytes: u64,
-        budget_bytes: u64,
+        limit_bytes: u64,
+        /// The largest master mark the census can count.
+        mark_limit: u64,
     },
     /// The ledger catalogue that counts a marked book's ledgers before its
     /// master read (#668) failed validation: another company, a damaged
@@ -159,6 +164,95 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         #[source]
         source: StandardLedgerCatalogError,
     },
+    /// A book too large to read whole (#668) could not be read as parts by
+    /// immediate parent group (#679): a group too large for one part, too many
+    /// parts, a ledger or group name the filter cannot carry, or a part whose
+    /// rows are not the catalogue's. Nothing is released from a partial read.
+    #[error("Tally compliance master read could not be split by parent group")]
+    ParentPartition {
+        #[source]
+        source: ParentPartitionError,
+    },
+    /// A book read as several parts (#679) reads each part's balances at a
+    /// different moment, so its balances only agree if no voucher was written
+    /// meanwhile, and only the company's voucher high-water proves that. This
+    /// Tally did not report one in its extent, so no part was requested.
+    #[error("Tally did not report the voucher high-water a multi-part ledger read needs")]
+    VoucherWitnessAbsent,
+    /// The ledger census (#679), which counts a book whose master mark is past
+    /// what its catalogue can be read for, refused: a slice held more rows than
+    /// its span, one ledger was seen twice, no ledger was found, or the
+    /// census stopped early. Nothing was sized from it.
+    #[error("Tally ledger census could not count the book's ledgers")]
+    LedgerSpan {
+        #[source]
+        source: LedgerCensusError,
+    },
+    /// The company's own count of its ledgers (`NUMLEDGERS`, #938) is higher
+    /// than the census counted: the census missed ledgers (a ledger was added
+    /// during the read or, by reasoning only, the company was closed and
+    /// reopened while it ran), and a read sized from it would be sized too small.
+    /// Nothing was requested after the company-count read. Numbers only.
+    #[error("Tally's own ledger count is higher than the ledger census counted")]
+    LedgerCountCompanyDiffers { company: u64, census: u64 },
+    /// Tally's answer to the company ledger-count request (#938) was damaged,
+    /// named another company or none of the loaded ones, or held a count that
+    /// is not a plain number. Nothing was sized from it.
+    #[error("Tally's answer to the company ledger-count request failed validation")]
+    LedgerCountCompanyInvalid {
+        #[source]
+        source: OutstandingsError,
+    },
+    /// Tally's answer to the company ledger-count request (#938) ran past the
+    /// transport's response cap (#1033), far more than one company's count can
+    /// account for. The transport drops the connection with the rest of the
+    /// response unread. Nothing was sized from it, and nothing after it was sent.
+    #[error("Tally's answer to the company ledger-count request ran past ComplyEaze Bridge's response limit")]
+    LedgerCountCompanyResponseTooLarge {
+        #[source]
+        source: anyhow::Error,
+    },
+    /// A slice of the ledger census (#679) failed validation: another company,
+    /// a damaged response, a foreign field, or a ledger seen twice within the
+    /// slice. Nothing was sized from it.
+    #[error("Tally ledger census slice failed validation")]
+    LedgerSpanSliceInvalid {
+        #[source]
+        source: StandardLedgerCatalogError,
+    },
+    /// One slice of the ledger census answered past the transport's response
+    /// cap (#679), more than the slice's span can account for: Tally may have
+    /// ignored the slice's filter. The transport drops the connection with the
+    /// rest of the response unread. Nothing after that response was sent.
+    #[error("Tally ledger census slice answered past Bridge's response limit")]
+    LedgerSpanSliceResponseTooLarge {
+        #[source]
+        source: anyhow::Error,
+    },
+    /// Two counts of one book's ledgers disagreed (#679): the census, or the
+    /// catalogue that counted them, against the ledgers the master read
+    /// returned or against each other. The book changed under the read, or
+    /// Tally answered one of them wrongly; nothing is released. Numbers only.
+    #[error("Tally ledger counts disagreed")]
+    LedgerCountDiffers { expected: u64, observed: u64 },
+    /// The census counted ledgers the whole read cannot hold and the catalogue
+    /// that would name their parents is estimated beyond Bridge's response
+    /// limit (#679), so nothing was sent after the census. Numbers only.
+    #[error("Tally ledger catalogue for the counted ledgers is beyond Bridge's response limit")]
+    CountedCatalogueTooLarge {
+        ledgers: u64,
+        estimated_bytes: u64,
+        limit_bytes: u64,
+    },
+    /// A parent part's answer passed the transport's response cap (#679):
+    /// more than the catalogue can account for under the part's parents,
+    /// possibly because Tally did not apply the part's filter. The transport
+    /// error stays in the chain.
+    #[error("Tally answered a parent part beyond Bridge's response limit")]
+    ParentPartResponseTooLarge {
+        #[source]
+        source: anyhow::Error,
+    },
 }
 
 impl PartyLedgerMasterSourceValidationError {
@@ -167,6 +261,7 @@ impl PartyLedgerMasterSourceValidationError {
         match self {
             Self::MasterPeriod => "master_period_unsupported",
             Self::BalancePeriod => "balance_period_unsupported",
+            Self::AsOfPrecedesBooksFrom => "as_of_precedes_books_from",
             Self::MasterGuid => "master_guid_missing",
             Self::MasterId => "master_id_missing",
             Self::MasterAlterId => "master_alter_id_missing",
@@ -181,9 +276,63 @@ impl PartyLedgerMasterSourceValidationError {
             Self::BalanceCompanyIdentityUnverified => "balance_company_identity_unverified",
             Self::GroupCompanyIdentityUnverified => "group_company_identity_unverified",
             Self::MasterResponseInvalid { .. } => "master_response_invalid",
-            Self::TooLarge { .. } => "ledger_masters_too_large",
+            Self::CatalogueTooLarge { .. } => "ledger_catalogue_too_large",
             Self::LedgerCountInvalid { source } => source.safe_code(),
+            Self::ParentPartition { source } => source.safe_code(),
+            Self::VoucherWitnessAbsent => "parent_partition_voucher_witness_absent",
+            Self::ParentPartResponseTooLarge { .. } => "parent_part_response_too_large",
+            Self::LedgerSpan { source } => source.safe_code(),
+            Self::LedgerCountCompanyDiffers { .. } => "ledger_count_company_differs",
+            Self::LedgerCountCompanyInvalid { .. } => "ledger_count_company_invalid",
+            Self::LedgerCountCompanyResponseTooLarge { .. } => {
+                "ledger_count_company_response_too_large"
+            }
+            Self::LedgerSpanSliceInvalid { source } => match source {
+                StandardLedgerCatalogError::DuplicateIdentity => "ledger_span_duplicate_identity",
+                StandardLedgerCatalogError::CompanyIdentityMismatch => {
+                    "ledger_span_identity_mismatch"
+                }
+                StandardLedgerCatalogError::BoundsViolation => "ledger_span_slice_over_bound",
+                // The census slice has no bill-wise flag to be missing, so the
+                // flag errors cannot arrive here; they read as malformed.
+                StandardLedgerCatalogError::MalformedResponse
+                | StandardLedgerCatalogError::LedgerNameUnusable
+                | StandardLedgerCatalogError::BillWiseFlagMissing
+                | StandardLedgerCatalogError::BillWiseFlagInvalid
+                | StandardLedgerCatalogError::BillWiseFlagRepeated => "ledger_span_slice_malformed",
+            },
+            Self::LedgerSpanSliceResponseTooLarge { .. } => "ledger_span_slice_response_too_large",
+            Self::LedgerCountDiffers { .. } => "ledger_count_differs",
+            Self::CountedCatalogueTooLarge { .. } => "ledger_count_catalogue_too_large",
         }
+    }
+}
+
+/// Names a parent part's read that ran past the response cap as such, so the
+/// caller learns the part's filter was probably ignored; a whole-book read has
+/// no filter to blame and any other failure is left as it came.
+fn parent_part_response_error(part: Option<&ParentPart>, error: anyhow::Error) -> anyhow::Error {
+    let over_the_cap = error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<TallyTransportError>(),
+            Some(TallyTransportError::ResponseTooLarge { .. })
+        )
+    });
+    if part.is_some() && over_the_cap {
+        // The read evidence a failed pair carries must stay the chain's root,
+        // where the caller's `with_read_evidence` merges it.
+        let completed = error
+            .downcast_ref::<super::runtime::RuntimeReadFailure>()
+            .map(|failure| failure.evidence.clone());
+        let named = anyhow::Error::new(
+            PartyLedgerMasterSourceValidationError::ParentPartResponseTooLarge { source: error },
+        );
+        match completed {
+            Some(evidence) => with_read_evidence(named, evidence),
+            None => named,
+        }
+    } else {
+        error
     }
 }
 
@@ -200,21 +349,175 @@ impl PartyLedgerMasterSourceValidationError {
 /// on a row: party rows cost 3.2 to 3.3 KB there.
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 
+/// Bytes one ledger is estimated to add to the compliance master response when
+/// the request also names each ledger's `GSTDETAILS.LIST`
+/// ([`ComplianceRead::WithGstDetails`]). UNVERIFIED. The one capture (14
+/// ledgers, a lab book) measured 2,138 to 2,704 bytes for a ledger with an
+/// empty list and 5,248 to 5,394 with one dated entry (UTF-16 bytes per
+/// `<LEDGER>` row). 8,000 is sized above the largest ledger of that one
+/// capture. It is NOT shown to cover a second dated entry: by the capture's own
+/// sizes (the empty-list block is 80 bytes, a dated entry's list block 2,874 to
+/// 3,264) a ledger with two dated entries could take about 8,600 bytes at the
+/// largest row, and a party ledger with two about 9,100 (extrapolated: the
+/// capture holds no party ledger with a dated entry). The admission uses the mean over a read
+/// (the estimated count times this figure against the budget), so a book in
+/// which most ledgers hold two or more entries could exceed the 16 MB response
+/// budget while still admitted. UNVERIFIED until measured on more books; it is
+/// not a bound. The shared [`COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED`] is
+/// for reads without the details.
+const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_000;
+
+/// What a compliance master read asks Tally for. [`Self::Standard`] is the
+/// production request, and every caller other than a `ledger_masters` call
+/// that asked for the GST details passes it. [`Self::WithGstDetails`] names
+/// each ledger's dated GST details in the request's `FETCH` and is sized by
+/// its own per-ledger estimate everywhere the standard one would be.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ComplianceRead {
+    Standard,
+    WithGstDetails,
+}
+
+impl ComplianceRead {
+    /// The bytes one ledger is estimated to add to this read's master response.
+    const fn bytes_per_ledger(self) -> u64 {
+        match self {
+            Self::Standard => COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
+            Self::WithGstDetails => COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED,
+        }
+    }
+}
+
+/// The most ledgers one master read of this kind is admitted for: the budget
+/// over its per-ledger estimate. The whole-read bound and the per-part bound
+/// of a book read in parts are this one figure.
+pub(crate) const fn compliance_master_ledgers_per_read(read: ComplianceRead) -> u64 {
+    COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED / read.bytes_per_ledger()
+}
+
 /// The largest estimated compliance master response Bridge will request
 /// (#637). UNVERIFIED: 0.8 MB/s is that book's 35.6 MB over about 44 s,
 /// averaged over more than one request, so 16 MB is about one 20 s request at
 /// that average, right at the deadline. A basic ledger read of about 22 MB
 /// completed on the same book in 7-11 s.
-const COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED: u64 = 16_000_000;
+///
+/// One constant with the masters read's budget, in the protocol crate.
+const COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED: u64 =
+    bridge_tally_protocol::native_masters::MASTERS_RESPONSE_BUDGET_BYTES as u64;
 
 /// Bytes one ledger is estimated to add to the balance-free ledger catalogue
 /// response that counts a marked book's ledgers (#668). PARTIAL: a synthetic
 /// book of 1,989 ledgers read 1,104 bytes per ledger (2.2 MB, 0.35 s;
-/// 2026-09-29), so 1,600 leaves about 45% for longer names. It bounds the
-/// mark, not the ledgers: past `budget / 1,600` = 10,000 the mark alone is
-/// refused. That reach is Bridge's own choice, not a measured limit: a
-/// catalogue of about 9,500 ledgers read about 11.6 MB in about 1.5 s.
-const LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL: u64 = 1_600;
+/// 2026-09-29) and a real book of about 9,500 ledgers read about 1,221 (about
+/// 11.6 MB in about 1.5 s), so 1,400 leaves about 15% over the larger.
+const LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL: u64 = 1_400;
+
+/// The largest estimated catalogue response Bridge will request (#679). A
+/// catalogue is not read in parts, and a response over the transport's cap
+/// (`XML_RESPONSE_MAX_BYTES`, 32 MiB) makes the transport return as soon as the
+/// running total passes it, dropping the connection with the rest of the
+/// response unread: an abandoned read, which can leave Tally's gateway busy.
+/// So the catalogue is bounded before it is sent, not left to the cap. 32 MB
+/// is under the cap by about 1.5 MB. UNVERIFIED as a margin: it is Bridge's
+/// own choice. At 1,400 bytes per unit of mark it admits a mark of 22,857.
+const LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED: u64 = 32_000_000;
+
+/// AlterIDs one census slice spans (#679), hence the most ledgers it may
+/// return. UNVERIFIED as a size bound: chosen so that a slice of ledgers with
+/// the longest name Bridge assumes fits [`COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED`]
+/// (asserted by a test), which is about half the transport's cap. Measured at
+/// 800, 1,000, 4,000 and 8,000 wide, on three books (section 11e, PARTIAL).
+const LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED: u64 = 4_000;
+
+/// Most slices one census makes (#679): Bridge's own bound on the serial
+/// requests a census may spend, not a measured limit. With the slice width it
+/// admits a master mark of 400,000, so a book whose mark is above that is
+/// refused before anything is sent after the extent.
+const LEDGER_CENSUS_MAX_SLICES_UNVERIFIED: usize = 100;
+
+/// Characters of a GUID-only census row that do not depend on the ledger's
+/// name, counting the row's separators: 391 in the committed eight-row capture
+/// (a row is 2 x name + about 390 characters). An earlier run whose rows are not
+/// committed averaged 846 bytes a row, 423 characters, with names whose length
+/// was not recorded. 415 is above the capture's figure, so a change that
+/// lowered it below the capture fails a test; it is a margin, not a
+/// measurement. PARTIAL: one capture, and no row with aliases.
+const LEDGER_CENSUS_ROW_FIXED_CHARS_PARTIAL: u64 = 415;
+
+/// The longest ledger name (in characters) a census row is assumed to carry.
+/// UNVERIFIED: the longest name observed on any book is 88 characters (#917
+/// tracks measuring it); Tally's own limit is not known to be lower. A ledger
+/// with aliases carries each alias in the row too, which this does not bound.
+const LEDGER_CENSUS_NAME_CHARS_UNVERIFIED: u64 = 128;
+
+/// The bytes of the largest census row assumed: the row's fixed characters plus
+/// the name twice, each character at most six characters when escaped
+/// (`&#NNN;`), all in UTF-16 (2 bytes a character).
+const fn ledger_census_worst_row_bytes() -> u64 {
+    2 * (LEDGER_CENSUS_ROW_FIXED_CHARS_PARTIAL + 12 * LEDGER_CENSUS_NAME_CHARS_UNVERIFIED)
+}
+
+// A full slice of the longest names assumed fits the budget the master read is
+// held to (#679): raising the width or the assumed name length past it does not
+// compile.
+const _: () = assert!(
+    LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED * ledger_census_worst_row_bytes()
+        <= COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+);
+
+fn ledger_census_limits() -> CensusLimits {
+    CensusLimits {
+        slice_width: LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED,
+        max_slices: LEDGER_CENSUS_MAX_SLICES_UNVERIFIED,
+    }
+}
+
+/// The largest master mark a census covers.
+const fn ledger_census_mark_limit() -> u64 {
+    LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED * LEDGER_CENSUS_MAX_SLICES_UNVERIFIED as u64
+}
+
+/// Most immediate parent groups one part's `$Parent = "A" OR $Parent = "B"`
+/// formula names (#679). Measured on a synthetic book of 4,339 ledgers: an `OR`
+/// of 1, 8, 50 and 200 parents answered in 0.1 to 0.6 s with every row
+/// returned. 200 is the most measured; above it nothing is measured and a
+/// longer formula may not be answered, so 200 is the cap and it is UNVERIFIED
+/// above 200. With `PARENT_PART_MAX_PARTS_UNVERIFIED` parts that bounds a book
+/// at 2,400 parents (typed `parent_partition_too_many_parts` above that), and a
+/// book has about one parent per ten ledgers, so a book of about 1,350 parents
+/// fits in seven parts.
+const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
+
+/// The ceiling on one parent group is the whole-read bound: a group with more
+/// ledgers than one part may carry is refused as `parent_over_budget`, never
+/// split, because a group cannot be read in pieces by `$Parent`. That figure is
+/// the budget over the read's per-ledger constant, not a measurement: 4,266
+/// ledgers for a [`ComplianceRead::Standard`] read and 2,000 for a
+/// [`ComplianceRead::WithGstDetails`] one.
+///
+/// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
+/// the serial requests one call may spend (four per part), not a measured
+/// limit. It admits about 51,000 ledgers (about 24,000 with the GST details),
+/// far past what the mark bound admits.
+const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
+
+/// Most bytes of `NOT` formula text the complement part's request may carry
+/// (#679). UNVERIFIED: Bridge's own bound. One live probe sent 54 KB of
+/// request for 1,354 parents; the 12-part, 200-parents-per-part limits already
+/// cap the parents at 2,400, so this is a backstop against very long names.
+const PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED: usize = 262_144;
+
+/// The limits a book's parent parts must fit (#679): each part's estimated
+/// master response is inside the same budget a whole read is admitted by, so
+/// the per-part ledger bound is the whole-read bound.
+pub(crate) fn parent_partition_limits(read: ComplianceRead) -> PartitionLimits {
+    PartitionLimits {
+        max_ledgers_per_part: compliance_master_ledgers_per_read(read),
+        max_parents_per_part: PARENT_PART_MAX_PARENTS_UNVERIFIED,
+        max_parts: PARENT_PART_MAX_PARTS_UNVERIFIED,
+        max_complement_formula_bytes: PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED,
+    }
+}
 
 /// A compliance master response estimate for a ledger count, or an upper
 /// bound on one, and whether it
@@ -223,12 +526,18 @@ const LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL: u64 = 1_600;
 /// figures as arguments so the boundary is tested exactly, whatever the
 /// measured constants become.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ComplianceEstimate {
-    estimated_bytes: u64,
-    fits: bool,
+pub(crate) struct ComplianceEstimate {
+    pub(crate) estimated_bytes: u64,
+    pub(crate) fits: bool,
 }
 
-fn compliance_estimate(count: u64, bytes_per_ledger: u64, budget_bytes: u64) -> ComplianceEstimate {
+/// Also sizes the masters read (`runtime_masters.rs`), which shares this
+/// budget.
+pub(crate) fn compliance_estimate(
+    count: u64,
+    bytes_per_ledger: u64,
+    budget_bytes: u64,
+) -> ComplianceEstimate {
     let estimated_bytes = count.saturating_mul(bytes_per_ledger);
     ComplianceEstimate {
         estimated_bytes,
@@ -236,32 +545,78 @@ fn compliance_estimate(count: u64, bytes_per_ledger: u64, budget_bytes: u64) -> 
     }
 }
 
-/// [`compliance_estimate`] at the two UNVERIFIED constants.
-fn compliance_estimate_unverified(count: u64) -> ComplianceEstimate {
+/// [`compliance_estimate`] at the budget and the read's per-ledger constant,
+/// both UNVERIFIED.
+fn compliance_estimate_unverified(count: u64, read: ComplianceRead) -> ComplianceEstimate {
     compliance_estimate(
         count,
-        COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
+        read.bytes_per_ledger(),
         COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED,
     )
+}
+
+/// What the census's count was checked against (#938), kept so a reader can see
+/// whether the check ran. The company's own count never admits or sizes a read:
+/// it can only refuse a census that counted fewer ledgers than Tally says the
+/// company holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CountCrossCheck {
+    /// Tally's own count equals the census's.
+    Matched,
+    /// Tally's own count is below the census's: not the hazardous direction,
+    /// so the read goes on (the other direction is checked by the count against
+    /// the rows the read returns).
+    CompanyCountLower,
+    /// The company's answer carried no ledger count, so the check did not run.
+    Unavailable,
+}
+
+impl CountCrossCheck {
+    pub(crate) const fn code(self) -> &'static str {
+        match self {
+            Self::Matched => "matched",
+            Self::CompanyCountLower => "company_count_lower",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
+/// What one master-and-balance pair of a compliance read covers: the whole
+/// book, with the number of ledgers a count already said it holds (#679), or
+/// one parent part, whose own ledger count is checked instead.
+#[derive(Clone, Copy)]
+enum PartyLedgerRead<'a> {
+    Whole { expected_ledgers: Option<u64> },
+    Part(&'a ParentPart),
 }
 
 /// What sizing a compliance master read decided before any ledger request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ComplianceAdmission {
     Admitted,
-    /// The mark does not fit but a paired catalogue read does: count the
+    /// The mark does not fit whole but its catalogue can be read: count the
     /// ledgers, then admit again with the count (#668).
     CountFirst,
+    /// The mark is past what the catalogue can be read for, but within what
+    /// the census covers: count the ledgers by AlterID span (#679), then admit
+    /// again with the count.
+    CensusFirst,
+    /// The counted ledgers do not fit one read: read them in parts by parent
+    /// group (#679).
+    InParts,
 }
 
-/// Sizes a compliance read before any master request is sent (#637, #668).
+/// Sizes a compliance read before any master request is sent (#637, #668, #679).
 ///
 /// With `counted` ledgers the count decides: the estimate is `counted` times
-/// the per-ledger constant. Without one, the company's master-alteration mark
-/// (`ALTMSTID`, from the opening extent; the extent read already fails closed
-/// without it, `require_master_witness`) stands in: it fits, or it is within
-/// reach of a catalogue read ([`ComplianceAdmission::CountFirst`]), or it is
-/// refused with no count.
+/// the per-ledger constant of `read` (larger when the request also names the
+/// GST details), and a count that does not fit is read in parts.
+/// Without one, the company's master-alteration mark (`ALTMSTID`, from the
+/// opening extent; the extent read already fails closed without it,
+/// `require_master_witness`) stands in: it fits, or the catalogue that counts
+/// the book fits the transport ([`ComplianceAdmission::CountFirst`]), or the
+/// census can count it by AlterID span ([`ComplianceAdmission::CensusFirst`]),
+/// or the read is refused before anything is sent after the extent.
 ///
 /// The mark is an UPPER BOUND on ledgers, not a count: every master of every
 /// type (stock items, units, groups and the rest) raises it, and so does every
@@ -271,33 +626,98 @@ enum ComplianceAdmission {
 /// and a ledger capture (8 small lab companies, 6-88 ledgers against marks of
 /// 213-328, not captured at the same moment; and a synthetic book of 1,989
 /// ledgers against a mark of 2,197), which is not a proof. If the assumption
-/// is ever false, a book this admits is read as it was before #637.
+/// is ever false, a book this admits is read as it was before #637, and the
+/// census (which covers `(0, mark]` only) undercounts: the count is compared
+/// with the ledgers the read returns, and a difference is refused
+/// (`ledger_count_differs`).
 fn admit_compliance_master_read(
     master_alter_id: u64,
     counted: Option<u64>,
+    read: ComplianceRead,
 ) -> Result<ComplianceAdmission, PartyLedgerMasterSourceValidationError> {
-    let too_large = |estimate: ComplianceEstimate| {
-        Err(PartyLedgerMasterSourceValidationError::TooLarge {
-            master_alter_id,
-            counted_ledgers: counted,
-            estimated_bytes: estimate.estimated_bytes,
-            budget_bytes: COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED,
-        })
-    };
-    let estimate = compliance_estimate_unverified(counted.unwrap_or(master_alter_id));
-    if estimate.fits {
+    if compliance_estimate_unverified(counted.unwrap_or(master_alter_id), read).fits {
         return Ok(ComplianceAdmission::Admitted);
     }
-    let catalogue_fits = compliance_estimate(
+    if counted.is_some() {
+        return Ok(ComplianceAdmission::InParts);
+    }
+    let catalogue = compliance_estimate(
         master_alter_id,
         LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL,
-        COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED,
-    )
-    .fits;
-    if counted.is_none() && catalogue_fits {
+        LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED,
+    );
+    if catalogue.fits {
         return Ok(ComplianceAdmission::CountFirst);
     }
-    too_large(estimate)
+    if master_alter_id <= ledger_census_mark_limit() {
+        return Ok(ComplianceAdmission::CensusFirst);
+    }
+    Err(PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
+        master_alter_id,
+        estimated_bytes: catalogue.estimated_bytes,
+        limit_bytes: LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED,
+        mark_limit: ledger_census_mark_limit(),
+    })
+}
+
+/// Whether the catalogue that names a counted book's parents fits the
+/// transport (#679): the census counted more ledgers than one read holds, so
+/// the parts are planned from the named catalogue, and that catalogue is bounded
+/// by the count instead of by the mark. A refusal here sends nothing more.
+fn admit_counted_catalogue(ledgers: u64) -> Result<(), PartyLedgerMasterSourceValidationError> {
+    let catalogue = compliance_estimate(
+        ledgers,
+        LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL,
+        LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED,
+    );
+    if catalogue.fits {
+        return Ok(());
+    }
+    Err(
+        PartyLedgerMasterSourceValidationError::CountedCatalogueTooLarge {
+            ledgers,
+            estimated_bytes: catalogue.estimated_bytes,
+            limit_bytes: LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED,
+        },
+    )
+}
+
+/// Names a census slice's read that ran past the response cap as such, so the
+/// caller learns the slice's filter was probably ignored: a slice holds at most
+/// its width in ledgers, far under the cap. Any other failure is left as it
+/// came.
+fn ledger_span_response_error(error: anyhow::Error) -> anyhow::Error {
+    named_past_the_cap(error, |source| {
+        PartyLedgerMasterSourceValidationError::LedgerSpanSliceResponseTooLarge { source }
+    })
+}
+
+/// Names the company ledger-count read (#938) that ran past the response cap
+/// as such (#1033), so the refusal carries its own cause rather than none. Any
+/// other failure is left as it came.
+fn company_count_response_error(error: anyhow::Error) -> anyhow::Error {
+    named_past_the_cap(error, |source| {
+        PartyLedgerMasterSourceValidationError::LedgerCountCompanyResponseTooLarge { source }
+    })
+}
+
+/// `error` wrapped by `name` when the transport refused the response as past
+/// its cap; any other failure unchanged.
+fn named_past_the_cap(
+    error: anyhow::Error,
+    name: fn(anyhow::Error) -> PartyLedgerMasterSourceValidationError,
+) -> anyhow::Error {
+    let over_the_cap = error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<TallyTransportError>(),
+            Some(TallyTransportError::ResponseTooLarge { .. })
+        )
+    });
+    if over_the_cap {
+        anyhow::Error::new(name(error))
+    } else {
+        error
+    }
 }
 
 /// A paired or bracketed read observed movement in the endpoint's data. This
@@ -329,10 +749,37 @@ pub(crate) enum PairedReadValidationError {
     CompanyCurrencyName,
     #[error("Tally's own statement changed between paired reads")]
     NativeStatement,
+    #[error("Tally's own Cash Flow changed between paired reads")]
+    NativeCashFlow,
+    #[error("Tally's Company collection changed between paired reads")]
+    CompanyFeatures,
+    #[error("Tally company book changed during the company features read")]
+    CompanyFeaturesExtent,
     #[error("Tally company book changed during currency detection")]
     CurrencyExtent,
     #[error("Tally company changed between the currency read and the master read")]
     CurrencyToMasterExtent,
+    #[error("Tally masters collection changed between paired reads")]
+    MastersCollection,
+    /// The voucher-type numbering collection, the second read of a
+    /// `voucher_types` masters read: its own variant, so a refusal says which
+    /// of the two reads drifted.
+    #[error("Tally voucher-type numbering collection changed between paired reads")]
+    MastersNumberingCollection,
+    #[error("Tally company book changed during masters read")]
+    MastersExtent,
+    #[error("Tally stock collection changed between paired reads")]
+    StockSummaryCollection,
+    #[error("Tally company book changed during stock summary read")]
+    StockSummaryExtent,
+    #[error("Tally's own month-wise register changed between paired reads")]
+    MonthRegister,
+    #[error("Tally company book changed during the month-wise register read")]
+    MonthRegisterExtent,
+    /// The company's inventory flags, read beside a statement that offers
+    /// Tally's own closing stock.
+    #[error("Tally company inventory flags changed between paired reads beside a statement")]
+    StatementInventoryFlags,
 }
 
 impl PairedReadValidationError {
@@ -351,8 +798,19 @@ impl PairedReadValidationError {
             Self::CurrencyMaster => "currency_master_changed",
             Self::CompanyCurrencyName => "company_currency_name_changed",
             Self::NativeStatement => "native_statement_changed",
+            Self::NativeCashFlow => "native_cash_flow_changed",
+            Self::CompanyFeatures => "company_features_changed",
+            Self::CompanyFeaturesExtent => "company_features_extent_changed",
             Self::CurrencyExtent => "currency_extent_changed",
             Self::CurrencyToMasterExtent => "currency_to_master_extent_changed",
+            Self::MastersCollection => "masters_collection_changed",
+            Self::MastersNumberingCollection => "masters_numbering_collection_changed",
+            Self::MastersExtent => "masters_extent_changed",
+            Self::MonthRegister => "month_register_changed",
+            Self::MonthRegisterExtent => "month_register_extent_changed",
+            Self::StockSummaryCollection => "stock_summary_collection_changed",
+            Self::StockSummaryExtent => "stock_summary_extent_changed",
+            Self::StatementInventoryFlags => "statement_inventory_flags_changed",
         }
     }
 }
@@ -363,20 +821,6 @@ pub(crate) enum DirectCompanyBootstrapError {
     CandidateGuidMismatch,
     #[error("Tally direct company candidate omitted a complete identity tuple")]
     IncompleteTuple,
-}
-
-#[cfg(feature = "voucher-scan")]
-#[derive(Debug)]
-pub(crate) struct OutstandingsSegmentObservation {
-    pub(crate) verification: SegmentVerification,
-    pub(crate) first_read_elapsed: Duration,
-    pub(crate) second_read_elapsed: Duration,
-}
-
-#[cfg(feature = "voucher-scan")]
-pub(crate) enum LedgerOpeningCoverageRead {
-    Stable(LedgerOpeningCoverage),
-    Drifted,
 }
 
 /// An HTTP response entity kept byte for byte, with its decoded text.
@@ -520,13 +964,6 @@ impl NativePairedRead {
     }
 }
 
-#[cfg(feature = "voucher-scan")]
-struct OutstandingsWireResponse {
-    text: String,
-    encoded_bytes: usize,
-    encoded_sha256: String,
-}
-
 #[derive(Debug, Clone, Serialize)]
 pub enum TallyProduct {
     TallyPrime,
@@ -549,7 +986,6 @@ pub struct TallyProbeResult {
     pub connection: ConnectionStatus,
     pub companies: Vec<TallyCompany>,
     pub profile: CapabilityProfile,
-    pub selected_read_scope: Option<SelectedReadScopeEvidence>,
     pub passport_snapshot_id: Option<String>,
 }
 
@@ -622,52 +1058,12 @@ impl GatewayProductModeEvidence {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct SelectedReadScopeEvidence {
-    pub scope_version: u16,
-    pub ledger_profile_id: String,
-    pub voucher_profile_id: String,
-    pub voucher_from_yyyymmdd: String,
-    pub voucher_to_yyyymmdd: String,
-    pub scope_commitment_sha256: String,
-    #[serde(skip_serializing)]
-    pub(crate) parent_review_sha256: String,
-    #[serde(skip_serializing)]
-    pub(crate) company_guid_ascii_casefolded: String,
-    #[serde(skip_serializing)]
-    pub(crate) company_number: String,
-    #[serde(skip_serializing)]
-    pub(crate) books_from_yyyymmdd: String,
-    #[serde(skip_serializing)]
-    pub(crate) observations: Vec<SelectedReadCapabilityObservation>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SelectedReadCapabilityObservation {
-    pub capability_key: &'static str,
-    pub state: CapabilityState,
-    pub confidence: EvidenceConfidence,
-    pub safe_reason_code: &'static str,
-    pub result_bucket: &'static str,
-    pub request_sha256: Option<String>,
-    pub decoded_response_sha256: Option<String>,
-    pub response_encoding: Option<&'static str>,
-    pub company_context_verified: bool,
-    pub schema_verified: bool,
-    pub record_count_verified: bool,
-    pub identity_evidence_state: &'static str,
-    pub date_window_verified: bool,
-}
-
 #[derive(Clone)]
 pub struct TallyClient {
-    config: TallyConfig,
     http: TallyHttpTransport,
-    observed_body_bytes: Arc<AtomicU64>,
     observed_encoding: Arc<AtomicU8>,
 }
 
-const BODY_BYTES_UNAVAILABLE: u64 = u64::MAX;
 const ENCODING_UNAVAILABLE: u8 = 0;
 const ENCODING_UTF8: u8 = 1;
 const ENCODING_UTF8_BOM: u8 = 2;
@@ -678,6 +1074,7 @@ const ENCODING_UTF16_BE_BOM: u8 = 5;
 impl TallyClient {
     /// Every send takes the endpoint's wire lock (`endpoint_wire`), at the
     /// shared per-user coordination root.
+    #[cfg(test)]
     pub fn new(config: TallyConfig) -> anyhow::Result<Self> {
         Self::with_wire(config, &WireGateConfig::default())
     }
@@ -685,11 +1082,10 @@ impl TallyClient {
     /// As [`Self::new`], gating every send on `wire`'s root and retry bound.
     pub(crate) fn with_wire(config: TallyConfig, wire: &WireGateConfig) -> anyhow::Result<Self> {
         let http = TallyHttpTransport::new(config.clone())?
-            .with_wire_gate(wire.gate_for(&config), wire.retry());
+            .with_wire_gate(wire.gate_for(&config), wire.retry())
+            .with_send_observer(crate::request_trail::observer());
         Ok(Self {
-            config,
             http,
-            observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         })
     }
@@ -705,8 +1101,20 @@ impl TallyClient {
         }
     }
 
-    pub fn canonical_origin(&self) -> anyhow::Result<String> {
-        canonical_loopback_origin(&self.config)
+    /// A clone whose sends start only while `token` is not cancelled (#778):
+    /// a withdrawn call finishes the send in flight and starts no other. Each
+    /// send asks before it takes the wire lock and again once it holds it.
+    pub(crate) fn withdrawable(&self, token: tokio_util::sync::CancellationToken) -> Self {
+        struct NotWithdrawn(tokio_util::sync::CancellationToken);
+        impl bridge_tally_transport::SendAdmission for NotWithdrawn {
+            fn admits(&self) -> bool {
+                !self.0.is_cancelled()
+            }
+        }
+        Self {
+            http: self.http.with_send_admission(Arc::new(NotWithdrawn(token))),
+            ..self.clone()
+        }
     }
 
     #[cfg(test)]
@@ -718,11 +1126,10 @@ impl TallyClient {
             builder,
         )
         .expect("build synthetic Tally HTTP transport")
-        .with_wire_gate(wire.gate_for(&config), wire.retry());
+        .with_wire_gate(wire.gate_for(&config), wire.retry())
+        .with_send_observer(crate::request_trail::observer());
         Self {
-            config,
             http,
-            observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         }
     }
@@ -735,37 +1142,19 @@ impl TallyClient {
     ) -> anyhow::Result<Self> {
         let http =
             TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?
-                .with_wire_gate(wire.gate_for(&config), wire.retry());
+                .with_wire_gate(wire.gate_for(&config), wire.retry())
+                .with_send_observer(crate::request_trail::observer());
         Ok(Self {
-            config,
             http,
-            observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         })
     }
 
-    pub async fn check_connection(&self) -> anyhow::Result<ConnectionStatus> {
-        match self.check_connection_strict().await {
-            Ok(status) => Ok(status),
-            Err(error) => Ok(ConnectionStatus {
-                reachable: false,
-                compatible: false,
-                server_text: String::new(),
-                product: TallyProduct::Unknown,
-                error: Some(safe_connection_failure_code(&error).to_string()),
-            }),
-        }
-    }
-
-    pub(crate) async fn check_connection_strict(&self) -> anyhow::Result<ConnectionStatus> {
-        self.check_connection_strict_with_wire_evidence()
-            .await
-            .map(|(status, _)| status)
-    }
-
+    /// The `/status` read. Its one failure is the transport's own, so a caller
+    /// reports it by the transport's safe code, never by matching its text.
     async fn check_connection_strict_with_wire_evidence(
         &self,
-    ) -> anyhow::Result<(ConnectionStatus, RuntimeReadEvidence)> {
+    ) -> Result<(ConnectionStatus, RuntimeReadEvidence), TallyTransportError> {
         let response = self.http.get_status_decoded().await?;
         let wire_evidence = RuntimeReadEvidence {
             // GET /status has an empty request body. This is a body commitment,
@@ -777,7 +1166,6 @@ impl TallyClient {
             response_sha256: response.encoded_sha256().to_string(),
             bytes: response.encoded_bytes(),
         };
-        self.record_observed_body_bytes(response.encoded_bytes());
         self.record_observed_encoding(response.encoding());
         let response_text = response.into_text();
         let product = detect_product(&response_text);
@@ -820,7 +1208,7 @@ impl TallyClient {
                         compatible: false,
                         server_text: String::new(),
                         product: TallyProduct::Unknown,
-                        error: Some(safe_connection_failure_code(&error).to_string()),
+                        error: Some(error.safe_code().to_string()),
                     },
                     RuntimeReadEvidence::empty(),
                 ),
@@ -1008,7 +1396,6 @@ impl TallyClient {
                     features,
                     packs,
                 },
-                selected_read_scope: None,
                 passport_snapshot_id: None,
             },
             wire_evidence,
@@ -1167,7 +1554,6 @@ impl TallyClient {
             response_sha256: response.encoded_sha256().to_string(),
             bytes: response.encoded_bytes(),
         };
-        self.record_observed_body_bytes(response.encoded_bytes());
         self.record_observed_encoding(response.encoding());
         *evidence = evidence.clone().combine(wire);
         Ok(response.into_text())
@@ -1186,45 +1572,8 @@ impl TallyClient {
         let response = self.http.post_xml_decoded(xml).await?;
         let encoded_bytes = response.encoded_bytes();
         let encoded_sha256 = response.encoded_sha256().to_string();
-        self.record_observed_body_bytes(encoded_bytes);
         self.record_observed_encoding(response.encoding());
         Ok((response.into_text(), encoded_bytes, encoded_sha256))
-    }
-
-    #[cfg(feature = "voucher-scan")]
-    async fn post_outstandings_xml_with_encoded_bytes(
-        &self,
-        request: VoucherOutstandingsRequestXml,
-    ) -> anyhow::Result<OutstandingsWireResponse> {
-        let response = self.http.post_outstandings_xml_decoded(request).await?;
-        let encoded_bytes = response.encoded_bytes();
-        let encoded_sha256 = response.encoded_sha256().to_string();
-        self.record_observed_body_bytes(encoded_bytes);
-        self.record_observed_encoding(response.encoding());
-        Ok(OutstandingsWireResponse {
-            text: response.into_text(),
-            encoded_bytes,
-            encoded_sha256,
-        })
-    }
-
-    /// Uses the ordinary 32 MiB XML cap. Only the wildcard outstandings
-    /// profile is allowed through `post_outstandings_xml_decoded`.
-    #[cfg(feature = "voucher-scan")]
-    async fn post_xml_with_wire_evidence(
-        &self,
-        request: String,
-    ) -> anyhow::Result<OutstandingsWireResponse> {
-        let response = self.http.post_xml_decoded(request).await?;
-        let encoded_bytes = response.encoded_bytes();
-        let encoded_sha256 = response.encoded_sha256().to_string();
-        self.record_observed_body_bytes(encoded_bytes);
-        self.record_observed_encoding(response.encoding());
-        Ok(OutstandingsWireResponse {
-            text: response.into_text(),
-            encoded_bytes,
-            encoded_sha256,
-        })
     }
 
     /// Discovers companies through Tally's documented `Company` collection
@@ -1330,61 +1679,38 @@ impl TallyClient {
         })
     }
 
-    pub async fn fetch_ledgers(
-        &self,
-        identity: &VerifiedCompanyIdentity,
-        boundary_profile: DateBoundaryProfile,
-    ) -> anyhow::Result<Vec<TallyLedger>> {
-        let opening_extent = self.fetch_company_book_extent(identity).await?;
-        let period = NativeLedgerExportPeriod::new(
-            boundary_profile,
-            opening_extent.books_from().clone(),
-            opening_extent.last_voucher_date().clone(),
-        )
-        .map_err(|_| {
-            anyhow::anyhow!(
-                "Tally master ledger export period is not supported by the endpoint compatibility profile"
-            )
-        })?;
-        let paired = self
-            .fetch_native_report_paired(render_native_ledger_export_request(
-                identity.display_name(),
-                &period,
-            ))
-            .await?;
-        let (body, _, _) =
-            paired.require_stable(PairedReadValidationError::NativeLedgerCollection)?;
-        let parsed =
-            parse_native_ledger_source_records_with_evidence(&body, identity.company_guid())?;
-        let closing_extent = self.fetch_company_book_extent(identity).await?;
-        if closing_extent != opening_extent {
-            return Err(anyhow::Error::new(
-                PairedReadValidationError::NativeLedgerExtent,
-            ));
-        }
-        Ok(parsed
-            .records
-            .into_iter()
-            .map(|record| record.record)
-            .collect())
-    }
-
     /// Reads the identity-bearing ledger master and the existing period-bound
     /// balance snapshot as one bracketed source for a customer workbook. The
     /// balance parser requires row GUID evidence for the selected company
     /// before any `(name, parent)` join can attach money to a master. The second
-    /// value is the evidence of the catalogue pair that counted a marked book's
-    /// ledgers (#668), empty when the mark alone admitted the read.
+    /// value is the evidence of the reads that counted a marked book's ledgers:
+    /// the catalogue pair (#668), the census's slices (#679), or both, empty
+    /// when the mark alone admitted the read. `basis` is the host's calendar
+    /// date, or a date the CA typed. With the host's date the balance snapshot
+    /// ends no later than it (the next admissible boundary at or after),
+    /// whatever the extent's last voucher date says (#875). A typed date ends
+    /// it at the next admissible boundary at or after that date instead, and is
+    /// refused, before any ledger request, when it precedes the start of the
+    /// books (#903).
     pub(crate) async fn fetch_party_ledger_master_source(
         &self,
         identity: &VerifiedCompanyIdentity,
         boundary_profile: DateBoundaryProfile,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
+        basis: &BalanceDateBasis,
+        read: ComplianceRead,
     ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let mut evidence = RuntimeReadEvidence::empty();
         let mut count_evidence = RuntimeReadEvidence::empty();
         let result = async {
             let opening_extent = self.fetch_company_book_extent(identity).await?;
+            if let BalanceDateBasis::Requested(requested) = basis {
+                if requested < opening_extent.books_from() {
+                    return Err(anyhow::Error::new(
+                        PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom,
+                    ));
+                }
+            }
             let ledger_currency_base = currency_assertion.ledger_currency_base().cloned();
             let master_mark = opening_extent
                 .master_alter_id_high_water()
@@ -1393,7 +1719,7 @@ impl TallyClient {
             // Sized before any ledger request is sent (#637): by the mark when
             // it fits, otherwise by the count of a balance-free catalogue read
             // once the local checks below have passed (#668).
-            let admission = admit_compliance_master_read(master_mark, None)?;
+            let admission = admit_compliance_master_read(master_mark, None, read)?;
             let currency = currency_assertion.require_opening_extent(&opening_extent)?;
             let master_period = NativeLedgerExportPeriod::new(
                 boundary_profile,
@@ -1403,15 +1729,56 @@ impl TallyClient {
             .map_err(|_| {
                 anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterPeriod)
             })?;
-            let balance_period = party_ledger_master_balance_period(
-                boundary_profile,
-                opening_extent.books_from().clone(),
-                opening_extent.last_voucher_date().clone(),
-            )
+            let balance_period = match basis {
+                BalanceDateBasis::HostToday(today) => party_ledger_master_balance_period(
+                    boundary_profile,
+                    opening_extent.books_from().clone(),
+                    opening_extent.last_voucher_date().clone(),
+                    today,
+                ),
+                BalanceDateBasis::Requested(requested) => party_ledger_master_closing_period(
+                    boundary_profile,
+                    opening_extent.books_from().clone(),
+                    requested,
+                ),
+            }
             .map_err(|_| {
                 anyhow::Error::new(PartyLedgerMasterSourceValidationError::BalancePeriod)
             })?;
-            if admission == ComplianceAdmission::CountFirst {
+            let mut partition = None;
+            // How many ledgers the whole read must return, once a count says.
+            let mut expected_ledgers = None;
+            // A census counts a book whose mark is past what its catalogue can
+            // be read for (#679); its count admits the read like a catalogue's.
+            let mut census_count = None;
+            // Whether the census's count was checked against the company's own.
+            let mut count_cross_check = None;
+            if admission == ComplianceAdmission::CensusFirst {
+                let (census, cross_check) = self
+                    .count_ledgers_by_span(
+                        identity,
+                        &opening_extent,
+                        master_mark,
+                        &mut evidence,
+                        &mut count_evidence,
+                    )
+                    .await?;
+                let counted = census.get();
+                count_cross_check = Some(cross_check);
+                census_count = Some(counted);
+                if admit_compliance_master_read(master_mark, Some(counted), read)?
+                    == ComplianceAdmission::InParts
+                {
+                    // Their parents are named by the catalogue, which the
+                    // count now bounds.
+                    admit_counted_catalogue(counted)?;
+                } else {
+                    expected_ledgers = Some(counted);
+                }
+            }
+            if admission == ComplianceAdmission::CountFirst
+                || (census_count.is_some() && expected_ledgers.is_none())
+            {
                 let catalogue_request =
                     render_standard_ledger_catalog_request(identity.display_name())?;
                 let catalogue_pair = self
@@ -1419,109 +1786,132 @@ impl TallyClient {
                     .await?;
                 let (catalogue_body, catalogue_bytes, catalogue_sha256) = catalogue_pair
                     .require_stable(PairedReadValidationError::PartyLedgerCatalogue)?;
-                count_evidence = RuntimeReadEvidence::paired(
+                let catalogue_read = RuntimeReadEvidence::paired(
                     &catalogue_request,
                     catalogue_sha256,
                     catalogue_bytes,
                 );
-                evidence = evidence.clone().combine(count_evidence.clone());
-                let counted = parse_standard_ledger_catalog_response(
+                count_evidence = count_evidence.clone().combine(catalogue_read.clone());
+                evidence = evidence.clone().combine(catalogue_read);
+                let catalogue = parse_standard_ledger_catalog_response(
                     &catalogue_body,
                     identity.display_name(),
                     identity.company_guid(),
                 )
-                .map_err(
-                    |source| PartyLedgerMasterSourceValidationError::LedgerCountInvalid { source },
-                )?
-                .names()
-                .count() as u64;
-                admit_compliance_master_read(master_mark, Some(counted))?;
-            }
-            let requests = [
-                render_party_ledger_master_request(identity.display_name(), &master_period),
-                render_native_ledger_snapshot_request(identity.display_name(), &balance_period),
-                render_native_group_snapshot_request(identity.display_name()),
-            ];
-            let request_sha256 = party_ledger_request_commitment(&requests);
-            let [master_request, balance_request, group_request] = requests;
-            let master_pair = self
-                .fetch_native_report_paired(master_request.clone())
-                .await?;
-            let (master_body, master_response_bytes, master_response_sha256) =
-                master_pair.require_stable(PairedReadValidationError::PartyLedgerMaster)?;
-            evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
-                &master_request,
-                master_response_sha256.clone(),
-                master_response_bytes,
-            ));
-            // Refuse a wrong or damaged master before any further request; its
-            // amounts are admitted below, once the snapshot names the ledgers
-            // set aside (bridge#551).
-            let structure =
-                parse_native_party_ledger_master_structure(&master_body, identity.company_guid())
-                    .map_err(party_ledger_master_master_snapshot_error)?;
-            if !structure.evidence.duplicate_identities.is_empty() {
-                return Err(anyhow::Error::new(
-                    PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
-                ));
-            }
-            let balance_pair = self
-                .fetch_native_report_paired(balance_request.clone())
-                .await?;
-            let (balance_body, balance_response_bytes, balance_response_sha256) =
-                balance_pair.require_stable(PairedReadValidationError::PartyLedgerBalance)?;
-            evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
-                &balance_request,
-                balance_response_sha256.clone(),
-                balance_response_bytes,
-            ));
-            // Each ledger's own currency is compared with the base before any
-            // balance is parsed (bridge#551): a foreign ledger's balance is a
-            // composite display string, never rupees, so the ledger leaves the
-            // source, its master row included, and is named instead. So does a
-            // base-currency ledger with any composite balance: a rupee ledger a
-            // foreign-currency entry touched. A base of one master refuses a
-            // ledger in another currency outright. An assertion with no base
-            // (one master whose NAME was not read) keeps the unclassified read.
-            let (balances, foreign_currency_ledgers_excluded, mixed_currency_ledgers_excluded) =
-                match &ledger_currency_base {
-                    Some(base) => {
-                        let classified = parse_compliance_ledger_snapshot_for_company(
-                            &balance_body,
-                            identity.company_guid(),
-                            base,
-                        )
-                        .map_err(party_ledger_master_balance_snapshot_error)?;
-                        (classified.base, classified.foreign, classified.mixed)
+                .map_err(|source| {
+                    PartyLedgerMasterSourceValidationError::LedgerCountInvalid { source }
+                })?;
+                let counted = catalogue.names().count() as u64;
+                // Two counts of one book, taken by different requests: they
+                // agree, or one of them is wrong.
+                if let Some(census) = census_count {
+                    if census != counted {
+                        return Err(anyhow::Error::new(
+                            PartyLedgerMasterSourceValidationError::LedgerCountDiffers {
+                                expected: census,
+                                observed: counted,
+                            },
+                        ));
                     }
-                    None => (
-                        parse_native_ledger_snapshot_for_company(
-                            &balance_body,
-                            identity.company_guid(),
+                }
+                // A count the whole read cannot fit is read as parts by parent
+                // group (#679); the catalogue that counted the book also
+                // names each ledger's parent, so nothing more is asked first.
+                if admit_compliance_master_read(master_mark, Some(counted), read)?
+                    == ComplianceAdmission::InParts
+                {
+                    let planned = ParentPartition::plan(
+                        catalogue.identified_parents(),
+                        parent_partition_limits(read),
+                    )
+                    .map_err(|source| {
+                        PartyLedgerMasterSourceValidationError::ParentPartition { source }
+                    })?;
+                    // Each part's balances are read at a different moment; the
+                    // closing extent equalling the opening only proves nothing
+                    // was written between them when it carries the voucher
+                    // high-water, so several parts need it to be there.
+                    if planned.parts().len() > 1
+                        && opening_extent.voucher_alter_id_high_water().is_none()
+                    {
+                        return Err(anyhow::Error::new(
+                            PartyLedgerMasterSourceValidationError::VoucherWitnessAbsent,
+                        ));
+                    }
+                    partition = Some(planned);
+                } else {
+                    expected_ledgers = Some(counted);
+                }
+            }
+            let group_request = render_native_group_snapshot_request(identity.display_name());
+            let part_requests = match &partition {
+                None => vec![(
+                    match read {
+                        ComplianceRead::Standard => render_party_ledger_master_request(
+                            identity.display_name(),
+                            &master_period,
+                        ),
+                        ComplianceRead::WithGstDetails => {
+                            render_party_ledger_master_request_with_gst_details(
+                                identity.display_name(),
+                                &master_period,
+                            )
+                        }
+                    },
+                    render_native_ledger_snapshot_request(identity.display_name(), &balance_period),
+                )],
+                Some(partition) => partition
+                    .parts()
+                    .iter()
+                    .map(|part| {
+                        (
+                            match read {
+                                ComplianceRead::Standard => {
+                                    render_party_ledger_master_request_for_parents(
+                                        identity.display_name(),
+                                        &master_period,
+                                        part,
+                                    )
+                                }
+                                ComplianceRead::WithGstDetails => {
+                                    render_party_ledger_master_request_for_parents_with_gst_details(
+                                        identity.display_name(),
+                                        &master_period,
+                                        part,
+                                    )
+                                }
+                            },
+                            render_native_ledger_snapshot_request_for_parents(
+                                identity.display_name(),
+                                &balance_period,
+                                part,
+                            ),
                         )
-                        .map_err(party_ledger_master_balance_snapshot_error)?,
-                        Vec::new(),
-                        Vec::new(),
-                    ),
-                };
-            // Ledger names are unique within a Tally company, so a ledger set
-            // aside is the master row with its name. The master is parsed only
-            // now, leaving those rows' openings unparsed.
-            let set_aside = foreign_currency_ledgers_excluded
+                    })
+                    .collect(),
+            };
+            let committed_requests = part_requests
                 .iter()
-                .map(|ledger| ledger.ledger.clone())
-                .chain(mixed_currency_ledgers_excluded.iter().cloned())
-                .collect::<BTreeSet<_>>();
-            let master = parse_native_party_ledger_master_records_leaving_unparsed(
-                &master_body,
-                identity.company_guid(),
-                &set_aside,
-            )
-            .map_err(party_ledger_master_master_snapshot_error)?;
-            if !master.evidence.duplicate_identities.is_empty() {
-                return Err(anyhow::Error::new(
-                    PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
-                ));
+                .flat_map(|(master, balance)| [master.clone(), balance.clone()])
+                .chain(std::iter::once(group_request.clone()))
+                .collect::<Vec<_>>();
+            let request_sha256 = party_ledger_request_commitment(&committed_requests);
+            let mut reads = Vec::with_capacity(part_requests.len());
+            for (index, (master_request, balance_request)) in part_requests.iter().enumerate() {
+                reads.push(
+                    self.read_party_ledger_master_part(
+                        identity,
+                        master_request,
+                        balance_request,
+                        match &partition {
+                            Some(partition) => PartyLedgerRead::Part(&partition.parts()[index]),
+                            None => PartyLedgerRead::Whole { expected_ledgers },
+                        },
+                        ledger_currency_base.as_ref(),
+                        &mut evidence,
+                    )
+                    .await?,
+                );
             }
             let group_pair = self
                 .fetch_native_report_paired(group_request.clone())
@@ -1545,75 +1935,64 @@ impl TallyClient {
                     PairedReadValidationError::PartyLedgerExtent,
                 ));
             }
-
-            let mut balances_by_key = HashMap::new();
-            for balance in balances {
-                let key = ledger_display_key(&balance.name, balance.parent.as_deref());
-                if balances_by_key.insert(key, balance).is_some() {
-                    return Err(anyhow::Error::new(
-                        PartyLedgerMasterSourceValidationError::DuplicateBalanceDisplayKey,
-                    ));
-                }
-            }
-            let mut rows = Vec::with_capacity(master.records.len());
-            for source in master
-                .records
-                .into_iter()
-                .filter(|source| !set_aside.contains(&source.record.ledger.name))
-            {
-                let key = ledger_display_key(
-                    &source.record.ledger.name,
-                    source.record.ledger.parent.nonempty_returned_text(),
-                );
-                let balance = balances_by_key.remove(&key).ok_or_else(|| {
-                    anyhow::Error::new(
-                        PartyLedgerMasterSourceValidationError::BalanceMissingMasterLedger,
-                    )
-                })?;
-                let guid = source.identities.guid.ok_or_else(|| {
-                    anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterGuid)
-                })?;
-                let master_id = source.identities.master_id.ok_or_else(|| {
-                    anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterId)
-                })?;
-                let alter_id = source.alter_id.ok_or_else(|| {
-                    anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterAlterId)
-                })?;
-                let master_opening =
-                    source
-                        .record
-                        .ledger
-                        .opening_balance
-                        .as_deref()
-                        .ok_or_else(|| {
-                            anyhow::Error::new(
-                                PartyLedgerMasterSourceValidationError::MasterOpeningBalance,
-                            )
+            // The parts together must be the catalogue's ledgers, each once, in
+            // the part its parent names, and with the catalogue's name and
+            // parent: a part that lost, doubled or renamed a row is withheld.
+            if let Some(partition) = &partition {
+                let mut coverage = partition.coverage();
+                for (index, read) in reads.iter().enumerate() {
+                    for source in &read.master.records {
+                        let guid = source.identities.guid.as_deref().ok_or_else(|| {
+                            anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterGuid)
                         })?;
-                if !party_ledger_master_openings_agree(master_opening, &balance.opening_balance)? {
-                    return Err(anyhow::Error::new(
-                        PartyLedgerMasterSourceValidationError::OpeningBalancesDisagreed,
-                    ));
+                        coverage
+                            .accept(
+                                index,
+                                guid,
+                                &source.record.ledger.name,
+                                source.record.ledger.parent.nonempty_returned_text(),
+                            )
+                            .map_err(|source| {
+                                PartyLedgerMasterSourceValidationError::ParentPartition { source }
+                            })?;
+                    }
                 }
-                rows.push(PartyLedgerMasterRow {
-                    name: source.record.ledger.name,
-                    parent: source.record.ledger.parent,
-                    party_gstin: source.record.ledger.party_gstin,
-                    fields: source.record.fields,
-                    guid,
-                    master_id,
-                    alter_id,
-                    opening_balance: balance.opening_balance,
-                    closing_balance: balance.closing_balance,
-                });
+                coverage.finish().map_err(|source| {
+                    PartyLedgerMasterSourceValidationError::ParentPartition { source }
+                })?;
             }
-            if !balances_by_key.is_empty() {
-                return Err(anyhow::Error::new(
-                    PartyLedgerMasterSourceValidationError::BalanceLedgerAbsentFromMasterEvidence,
-                ));
+
+            let (master_response_sha256, master_response_bytes) =
+                aggregate_part_evidence(reads.iter().map(|read| {
+                    (
+                        read.master_response_sha256.as_str(),
+                        read.master_response_bytes,
+                    )
+                }));
+            let (balance_response_sha256, balance_response_bytes) =
+                aggregate_part_evidence(reads.iter().map(|read| {
+                    (
+                        read.balance_response_sha256.as_str(),
+                        read.balance_response_bytes,
+                    )
+                }));
+            let several_parts = reads.len() > 1;
+            let mut rows = Vec::new();
+            let mut foreign_currency_ledgers_excluded = Vec::new();
+            let mut mixed_currency_ledgers_excluded = Vec::new();
+            for read in reads {
+                foreign_currency_ledgers_excluded.extend(read.foreign.iter().cloned());
+                mixed_currency_ledgers_excluded.extend(read.mixed.iter().cloned());
+                rows.extend(join_party_ledger_master_part(read)?);
+            }
+            if several_parts {
+                foreign_currency_ledgers_excluded
+                    .sort_by(|left, right| left.ledger.cmp(&right.ledger));
+                mixed_currency_ledgers_excluded.sort();
             }
             rows.sort_by(|left, right| left.name.cmp(&right.name).then(left.guid.cmp(&right.guid)));
             let source = PartyLedgerMasterSource {
+                count_cross_check,
                 company: identity.display_name().to_string(),
                 company_guid: identity.company_guid().to_string(),
                 currency_assertion: currency.assertion,
@@ -1623,6 +2002,8 @@ impl TallyClient {
                 // the date Tally was actually asked to honor, not merely the last
                 // voucher date used by the identity/master read.
                 to: balance_period.to().clone(),
+                balance_date_basis: basis.clone(),
+                last_voucher_date: opening_extent.last_voucher_date().clone(),
                 rows,
                 request_sha256,
                 master_response_sha256,
@@ -1641,57 +2022,252 @@ impl TallyClient {
         result.map_err(|error| crate::tally::runtime::with_read_evidence(error, evidence))
     }
 
-    /// Reads the documented standard ledger collection as an explicitly limited
-    /// compatibility catalog. It is not a fallback for Bridge's custom export
-    /// and cannot establish snapshot, voucher, or write capability.
-    pub async fn fetch_standard_ledger_catalog(
+    /// Counts a marked book's ledgers by AlterID span (#679): one single read
+    /// per slice of `(0, mark]`, each asking for the ledgers' GUIDs only, and
+    /// no slice is read twice. Stability of the book across the census is not
+    /// proven here: the caller's opening and closing company extent, which
+    /// carry the master mark and the company GUID, are the bracket (and the
+    /// extent is read again here, before the count is returned, after Tally's
+    /// own count of the company's ledgers was read once and compared, #938), and an empty
+    /// slice is the same body a closed or absent company answers with, so a
+    /// census that found no ledger at all is refused rather than counted.
+    /// Each slice whose answer was received in full is added to `evidence` and
+    /// to `count_evidence` as it completes, so a refusal still accounts for
+    /// what was received; a slice whose request failed, or whose answer passed
+    /// the response cap, adds nothing.
+    async fn count_ledgers_by_span(
         &self,
-        company: &str,
-        expected_company_guid: &str,
-    ) -> anyhow::Result<Vec<TallyLedger>> {
-        let xml = self
-            .post_xml(tdl_engine::standard_ledger_catalog_request(company))
+        identity: &VerifiedCompanyIdentity,
+        opening_extent: &CompanyBookExtent,
+        master_mark: u64,
+        evidence: &mut RuntimeReadEvidence,
+        count_evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<(LedgerCount, CountCrossCheck)> {
+        let plan = LedgerCensusPlan::new(master_mark, ledger_census_limits())
+            .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
+        let mut census = LedgerCensus::new(plan);
+        while let Some(slice) = census.next_slice() {
+            let request = render_ledger_census_slice_request(identity.display_name(), &slice);
+            let (body, bytes, sha256) = self
+                .post_xml_with_encoded_bytes(request.clone())
+                .await
+                .map_err(ledger_span_response_error)?;
+            let read = RuntimeReadEvidence::single(&request, sha256, bytes);
+            *evidence = evidence.clone().combine(read.clone());
+            *count_evidence = count_evidence.clone().combine(read);
+            // The parser only bounds what it will hold; the slice's span is
+            // enforced once, by the census, under its own typed refusal.
+            let guids = parse_ledger_census_slice(
+                &body,
+                identity.company_guid(),
+                MAX_STANDARD_LEDGER_IDENTITY_ROWS as u64,
+            )
+            .map_err(|source| {
+                PartyLedgerMasterSourceValidationError::LedgerSpanSliceInvalid { source }
+            })?;
+            census
+                .accept(guids)
+                .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
+        }
+        let counted = census
+            .finish()
+            .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
+        // A company closed, reopened or switched during the census answers the
+        // remaining slices with the same empty body as a slice past every
+        // ledger, so the count can be low, and the count sizes the next read.
+        // Two checks run before the count leaves this function, so no caller
+        // can use a count without them. Tally's own count of the company's
+        // ledgers is read and must not be higher than the census's: that is
+        // meant to catch a company closed and reopened with equal marks, which
+        // the extent cannot see (by reasoning: no live reproduction), and it
+        // also refuses a ledger added during the read (#938), and, by reasoning
+        // only (#965), one altered during it before its slice was read: its new
+        // AlterID is past every slice, while Tally still counts it. A ledger
+        // altered after its slice was read was counted; the extent read below
+        // refuses that case instead. Then the extent (company GUID and marks) is
+        // read again, and a change in either refuses the call.
+        let cross_check = self
+            .cross_check_census_count(identity, counted.get(), evidence, count_evidence)
             .await?;
-        Ok(parse_standard_ledger_catalog(
-            &xml,
-            company,
-            expected_company_guid,
-        )?)
+        if self.fetch_company_book_extent(identity).await? != *opening_extent {
+            return Err(anyhow::Error::new(
+                PairedReadValidationError::PartyLedgerExtent,
+            ));
+        }
+        Ok((counted, cross_check))
     }
 
-    /// One extra paired read per scan: bill-wise OPENING balances live on
-    /// ledger masters, so a voucher-only scan is blind to them.
-    ///
-    /// Takes the already GUID-verified `PinnedCompany` rather than a bare name.
-    /// The ledger profile fetches every master GUID and verifies its company
-    /// GUID prefix, so a name-only selection cannot make another loaded
-    /// company's coverage look like the pinned book.
-    #[cfg(feature = "voucher-scan")]
-    pub(crate) async fn fetch_ledger_opening_coverage(
+    /// Reads Tally's own count of the company's ledgers once and compares it
+    /// with the census's (#938). Refuse-only: a count higher than the census's
+    /// refuses the call; equal, lower, or absent never admits or sizes anything.
+    /// A response for another company, or a value that is not a plain integer,
+    /// is refused as any damaged answer is. The request is one read, not a
+    /// pair: the extent bracket around the census is what proves the book did
+    /// not move, and this count is compared, never relied on.
+    async fn cross_check_census_count(
         &self,
-        company: &PinnedCompany,
-    ) -> anyhow::Result<LedgerOpeningCoverageRead> {
-        let company_name = ValidatedCompanyName::new(company.name().to_string())?;
-        let request = ReadOnlyProfile::LedgerOpeningCoverageV1 {
-            company: &company_name,
-        }
-        .render();
-        let first = self.post_xml(request.clone()).await?;
-        self.http
-            .get_status_decoded()
+        identity: &VerifiedCompanyIdentity,
+        census: u64,
+        evidence: &mut RuntimeReadEvidence,
+        count_evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<CountCrossCheck> {
+        let request = render_company_ledger_count_request(identity.display_name());
+        let (body, bytes, sha256) = self
+            .post_xml_with_encoded_bytes(request.clone())
             .await
-            .context("Tally health check between ledger opening reads failed")?;
-        let second = self.post_xml(request).await?;
-        self.http
-            .get_status_decoded()
+            .map_err(company_count_response_error)?;
+        let read = RuntimeReadEvidence::single(&request, sha256, bytes);
+        *evidence = evidence.clone().combine(read.clone());
+        *count_evidence = count_evidence.clone().combine(read);
+        let company =
+            parse_company_ledger_count(&body, identity.display_name(), identity.company_guid())
+                .map_err(|source| {
+                    PartyLedgerMasterSourceValidationError::LedgerCountCompanyInvalid { source }
+                })?;
+        Ok(match company.map(|count| count.get()) {
+            None => CountCrossCheck::Unavailable,
+            Some(company) if company > census => {
+                return Err(anyhow::Error::new(
+                    PartyLedgerMasterSourceValidationError::LedgerCountCompanyDiffers {
+                        company,
+                        census,
+                    },
+                ));
+            }
+            Some(company) if company == census => CountCrossCheck::Matched,
+            Some(_) => CountCrossCheck::CompanyCountLower,
+        })
+    }
+
+    /// One master-and-balance pair of a compliance ledger read: the whole book,
+    /// or one parent part of it (#679). Each response is checked against the
+    /// selected company and classified before any other request is sent.
+    async fn read_party_ledger_master_part(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        master_request: &str,
+        balance_request: &str,
+        scope: PartyLedgerRead<'_>,
+        ledger_currency_base: Option<&BaseCurrencyName>,
+        evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<PartyLedgerMasterPartRead> {
+        let part = match scope {
+            PartyLedgerRead::Part(part) => Some(part),
+            PartyLedgerRead::Whole { .. } => None,
+        };
+        let master_pair = self
+            .fetch_native_report_paired(master_request.to_owned())
             .await
-            .context("Tally health check after ledger opening reads failed")?;
-        let first = parse_ledger_opening_coverage(&first, company)?;
-        let second = parse_ledger_opening_coverage(&second, company)?;
-        if first != second {
-            return Ok(LedgerOpeningCoverageRead::Drifted);
+            .map_err(|error| parent_part_response_error(part, error))?;
+        let (master_body, master_response_bytes, master_response_sha256) =
+            master_pair.require_stable(PairedReadValidationError::PartyLedgerMaster)?;
+        *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
+            master_request,
+            master_response_sha256.clone(),
+            master_response_bytes,
+        ));
+        // Refuse a wrong or damaged master before any further request; its
+        // amounts are admitted below, once the snapshot names the ledgers
+        // set aside (bridge#551).
+        let structure =
+            parse_native_party_ledger_master_structure(&master_body, identity.company_guid())
+                .map_err(party_ledger_master_master_snapshot_error)?;
+        if !structure.evidence.duplicate_identities.is_empty() {
+            return Err(anyhow::Error::new(
+                PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
+            ));
         }
-        Ok(LedgerOpeningCoverageRead::Stable(first))
+        // A part that came back short or long means Tally did not apply its
+        // filter as asked. Its master pair is already sent, the complement's
+        // too; this keeps back its balance and every later request, the next
+        // part's among them, whose filter rests on the same assumption.
+        if let Some(part) = part {
+            part.check_row_count(structure.records.len())
+                .map_err(
+                    |source| PartyLedgerMasterSourceValidationError::ParentPartition { source },
+                )?;
+        } else if let PartyLedgerRead::Whole {
+            expected_ledgers: Some(expected),
+        } = scope
+        {
+            // A whole read after a count: the count was taken by another
+            // request, and the master read returns the same collection.
+            let observed = structure.records.len() as u64;
+            if observed != expected {
+                return Err(anyhow::Error::new(
+                    PartyLedgerMasterSourceValidationError::LedgerCountDiffers {
+                        expected,
+                        observed,
+                    },
+                ));
+            }
+        }
+        let balance_pair = self
+            .fetch_native_report_paired(balance_request.to_owned())
+            .await
+            .map_err(|error| parent_part_response_error(part, error))?;
+        let (balance_body, balance_response_bytes, balance_response_sha256) =
+            balance_pair.require_stable(PairedReadValidationError::PartyLedgerBalance)?;
+        *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
+            balance_request,
+            balance_response_sha256.clone(),
+            balance_response_bytes,
+        ));
+        // Each ledger's own currency is compared with the base before any
+        // balance is parsed (bridge#551): a foreign ledger's balance is a
+        // composite display string, never rupees, so the ledger leaves the
+        // source, its master row included, and is named instead. So does a
+        // base-currency ledger with any composite balance: a rupee ledger a
+        // foreign-currency entry touched. A base of one master refuses a
+        // ledger in another currency outright. An assertion with no base
+        // (one master whose NAME was not read) keeps the unclassified read.
+        let (balances, foreign, mixed) = match ledger_currency_base {
+            Some(base) => {
+                let classified = parse_compliance_ledger_snapshot_for_company(
+                    &balance_body,
+                    identity.company_guid(),
+                    base,
+                )
+                .map_err(party_ledger_master_balance_snapshot_error)?;
+                (classified.base, classified.foreign, classified.mixed)
+            }
+            None => (
+                parse_native_ledger_snapshot_for_company(&balance_body, identity.company_guid())
+                    .map_err(party_ledger_master_balance_snapshot_error)?,
+                Vec::new(),
+                Vec::new(),
+            ),
+        };
+        // Ledger names are unique within a Tally company, so a ledger set
+        // aside is the master row with its name. The master is parsed only
+        // now, leaving those rows' openings unparsed.
+        let set_aside = foreign
+            .iter()
+            .map(|ledger| ledger.ledger.clone())
+            .chain(mixed.iter().cloned())
+            .collect::<BTreeSet<_>>();
+        let master = parse_native_party_ledger_master_records_leaving_unparsed(
+            &master_body,
+            identity.company_guid(),
+            &set_aside,
+        )
+        .map_err(party_ledger_master_master_snapshot_error)?;
+        if !master.evidence.duplicate_identities.is_empty() {
+            return Err(anyhow::Error::new(
+                PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
+            ));
+        }
+        Ok(PartyLedgerMasterPartRead {
+            master,
+            balances,
+            foreign,
+            mixed,
+            set_aside,
+            master_response_sha256,
+            master_response_bytes,
+            balance_response_sha256,
+            balance_response_bytes,
+        })
     }
 
     pub async fn fetch_company_book_extent(
@@ -1756,11 +2332,10 @@ impl TallyClient {
     /// closing snapshot.
     ///
     /// These responses are small — measured 11 KB for 48 bills and 41 KB for 88
-    /// ledgers — so the whole-response byte comparison this performs is cheap,
-    /// and it replaces the date/AlterID partition-completeness machinery the
-    /// voucher scan needs. A drift between the two reads means the book moved
-    /// mid-sequence; the caller must treat that as Partial rather than pick a
-    /// side.
+    /// ledgers — so the whole-response byte comparison this performs is cheap
+    /// and needs no date/AlterID partition-completeness machinery. A drift
+    /// between the two reads means the book moved mid-sequence; the caller
+    /// must treat that as Partial rather than pick a side.
     ///
     /// Health checks bracket both requests and sit between them, so a gateway
     /// that stalls mid-pair is distinguishable from a clean pair. See the
@@ -1843,7 +2418,6 @@ impl TallyClient {
     /// The decoded text is returned beside it for admission.
     pub(crate) async fn post_xml_raw(&self, xml: String) -> anyhow::Result<RawTallyResponse> {
         let response = self.http.post_xml(xml).await?;
-        self.record_observed_body_bytes(response.encoded_bytes());
         self.record_observed_encoding(response.encoding());
         let encoded_body = response.encoded_body().to_vec();
         let encoded_sha256 = sha256_hex(&encoded_body);
@@ -1907,169 +2481,6 @@ impl TallyClient {
         Ok(())
     }
 
-    #[cfg(feature = "voucher-scan")]
-    pub(crate) async fn fetch_outstandings_segment_pair(
-        &self,
-        company: &PinnedCompany,
-        segment_window: NarrowDateWindow,
-        alter_id_range: AlterIdRange,
-    ) -> anyhow::Result<OutstandingsSegmentObservation> {
-        let request = voucher_outstandings_request(company, &segment_window, alter_id_range);
-        let range_label = format!(
-            "{}..{}",
-            alter_id_range.exclusive_start(),
-            alter_id_range.inclusive_end()
-        );
-        let first_started = Instant::now();
-        let first = self
-            .post_outstandings_xml_with_encoded_bytes(request.clone())
-            .await
-            .with_context(|| {
-                format!("outstandings first segment read failed for AlterID {range_label}")
-            })?;
-        let first_read_elapsed = first_started.elapsed();
-        self.http.get_status_decoded().await.with_context(|| {
-            format!(
-                "Tally health check between outstandings reads failed for AlterID {range_label}"
-            )
-        })?;
-        let second_started = Instant::now();
-        let second = self
-            .post_outstandings_xml_with_encoded_bytes(request)
-            .await
-            .with_context(|| {
-                format!("outstandings second segment read failed for AlterID {range_label}")
-            })?;
-        let second_read_elapsed = second_started.elapsed();
-        self.http.get_status_decoded().await.with_context(|| {
-            format!("Tally health check after outstandings reads failed for AlterID {range_label}")
-        })?;
-        let verification = verify_segment_pair_with_wire_evidence(
-            SegmentWireEvidence::new(&first.text, first.encoded_bytes, &first.encoded_sha256),
-            SegmentWireEvidence::new(&second.text, second.encoded_bytes, &second.encoded_sha256),
-            company,
-            segment_window.into_date_window(),
-            alter_id_range,
-        )?;
-        Ok(OutstandingsSegmentObservation {
-            verification,
-            first_read_elapsed,
-            second_read_elapsed,
-        })
-    }
-
-    /// Executes one paired, date-only I5 witness read. This is intentionally
-    /// separate from `fetch_outstandings_segment_pair`: it has no AlterID
-    /// predicate and uses the ordinary 32 MiB transport cap. Its supervised
-    /// live qualification is recorded in TALLY_PROTOCOL_REFERENCE.md §12.7;
-    /// runtime may use it only for a primary-empty partition's control or
-    /// shifted cover.
-    #[cfg(feature = "voucher-scan")]
-    pub(crate) async fn fetch_empty_partition_witness_pair(
-        &self,
-        company: &PinnedCompany,
-        window: NarrowDateWindow,
-    ) -> anyhow::Result<WitnessPairVerification> {
-        let request = voucher_empty_partition_witness_request(company, &window).into_xml();
-        let label = format!("{}..{}", window.from().as_str(), window.to().as_str());
-        let first = self
-            .post_xml_with_wire_evidence(request.clone())
-            .await
-            .with_context(|| format!("empty-date witness first read failed for {label}"))?;
-        self.http.get_status_decoded().await.with_context(|| {
-            format!("Tally health check between empty-date witness reads for {label}")
-        })?;
-        let second = self
-            .post_xml_with_wire_evidence(request)
-            .await
-            .with_context(|| format!("empty-date witness second read failed for {label}"))?;
-        self.http.get_status_decoded().await.with_context(|| {
-            format!("Tally health check after empty-date witness reads for {label}")
-        })?;
-        verify_empty_partition_witness_pair_with_wire_evidence(
-            SegmentWireEvidence::new(&first.text, first.encoded_bytes, &first.encoded_sha256),
-            SegmentWireEvidence::new(&second.text, second.encoded_bytes, &second.encoded_sha256),
-            company,
-            window.into_date_window(),
-        )
-        .map_err(anyhow::Error::from)
-    }
-
-    pub async fn fetch_vouchers(
-        &self,
-        identity: &VerifiedCompanyIdentity,
-        from: &str,
-        to: &str,
-    ) -> anyhow::Result<Vec<TallyVoucher>> {
-        // Fail closed: `from`/`to` feed a quoted `$$Date:"..."` TDL formula
-        // argument, where XML escaping alone cannot contain an embedded
-        // quote (Tally decodes `&quot;` back to `"` before evaluating the
-        // formula). Requiring a validated `TallyDate` -- exactly 8 ASCII
-        // digits -- closes that off at the source instead of sanitising.
-        let from = bridge_tally_core::TallyDate::parse(from)
-            .context("voucher export from-date must be a valid YYYYMMDD date")?;
-        let to = bridge_tally_core::TallyDate::parse(to)
-            .context("voucher export to-date must be a valid YYYYMMDD date")?;
-        let xml = self
-            .post_xml(render_native_voucher_export_request(
-                identity.display_name(),
-                &from,
-                &to,
-            ))
-            .await?;
-        let parsed =
-            parse_native_voucher_source_records_with_evidence(&xml, identity.company_guid())?;
-        if parsed.records.is_empty() {
-            // A native Voucher collection carries no envelope company GUID,
-            // so a zero-row response has no per-row identity to bind to the
-            // pinned company either -- `parse_native_voucher_source_records_with_evidence`
-            // accepts it unauthenticated. Since the voucher request is now
-            // filtered by date, a refused period boundary yields the exact
-            // same zero-row, byte-identical response as a genuinely empty
-            // window. Confirm the pinned company out-of-band with the same
-            // GUID-verified, paired book-extent bracket the core window uses
-            // for exactly this situation (see `RuntimeTallyConnector::extract_core_window`
-            // in connector.rs), instead of accepting the empty result as-is.
-            // Paid only here: a non-empty response keeps its existing
-            // row-GUID binding and issues no extra request.
-            self.fetch_company_book_extent(identity).await.context(
-                "empty voucher response could not confirm the pinned company book extent",
-            )?;
-        }
-        Ok(parsed
-            .records
-            .into_iter()
-            .map(|record| record.record)
-            .collect())
-    }
-
-    pub(crate) fn reset_observed_body_bytes(&self) {
-        self.observed_body_bytes
-            .store(BODY_BYTES_UNAVAILABLE, Ordering::Release);
-    }
-
-    pub(crate) fn observed_body_bytes(&self) -> Option<u64> {
-        match self.observed_body_bytes.load(Ordering::Acquire) {
-            BODY_BYTES_UNAVAILABLE => None,
-            bytes => Some(bytes),
-        }
-    }
-
-    fn record_observed_body_bytes(&self, bytes: usize) {
-        let bytes = u64::try_from(bytes).unwrap_or(u64::MAX - 1);
-        let _ = self.observed_body_bytes.fetch_update(
-            Ordering::AcqRel,
-            Ordering::Acquire,
-            |observed| {
-                Some(if observed == BODY_BYTES_UNAVAILABLE {
-                    bytes
-                } else {
-                    observed.max(bytes)
-                })
-            },
-        );
-    }
-
     fn record_observed_encoding(&self, encoding: TallyTextEncoding) {
         let value = match encoding {
             TallyTextEncoding::Utf8 => ENCODING_UTF8,
@@ -2108,16 +2519,42 @@ fn party_ledger_master_balance_period(
     boundary_profile: DateBoundaryProfile,
     books_from: bridge_tally_core::TallyDate,
     last_voucher_date: bridge_tally_core::TallyDate,
+    today: &bridge_tally_core::TallyDate,
+) -> Result<
+    NativeLedgerSnapshotPeriod,
+    bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriodError,
+> {
+    // A voucher saved under a mistyped far-future date makes the extent's last
+    // voucher date that date, and Tally applies a far-future `SVTODATE` as given
+    // (protocol reference 11e), so the closing balance would take in everything
+    // up to it. The snapshot therefore ends no later than the host's today, like
+    // the outstandings read; the source keeps the last voucher date so the
+    // workbook can say a later-dated voucher exists. A host clock before
+    // `books_from` (a book for a coming year) falls back to `books_from`, never
+    // an inverted period.
+    let reference = last_voucher_date.min(today.clone()).max(books_from.clone());
+    party_ledger_master_closing_period(boundary_profile, books_from, &reference)
+}
+
+/// The snapshot from the start of the books to the next admissible boundary
+/// at or after `reference`. The caller has already chosen `reference`: for the
+/// host's date, from the last voucher date and the clock; for a date the CA
+/// typed (#903), the date itself: the clamp above guards against a mistyped
+/// voucher date, not against a date the CA chose (protocol reference 11e).
+fn party_ledger_master_closing_period(
+    boundary_profile: DateBoundaryProfile,
+    books_from: bridge_tally_core::TallyDate,
+    reference: &bridge_tally_core::TallyDate,
 ) -> Result<
     NativeLedgerSnapshotPeriod,
     bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriodError,
 > {
     // This workbook must be safe when a capability profile is not cached.
     // The strict Education boundary set is the known common admissible set;
-    // choosing the next such date includes the final voucher rather than
-    // silently requesting a refused boundary or shrinking the period.
+    // choosing the next such date includes the reference rather than silently
+    // requesting a refused boundary or shrinking the period.
     let closing_boundary = DateBoundaryProfile::EducationRestricted
-        .earliest_boundary_at_or_after(&last_voucher_date)
+        .earliest_boundary_at_or_after(reference)
         .ok_or(
             bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriodError::UnsupportedBoundary,
         )?;
@@ -2230,7 +2667,113 @@ fn has_presentation_equivalent_guid_siblings(companies: &[TallyCompany]) -> bool
     })
 }
 
-fn party_ledger_request_commitment(requests: &[String; 3]) -> String {
+/// One master-and-balance pair as read and classified, before it is joined
+/// (#679): the whole book's, or one parent part's.
+struct PartyLedgerMasterPartRead {
+    master: ParsedExport<ParsedSourceRecord<PartyLedgerMasterRecord>>,
+    balances: Vec<LedgerSnapshotEntry>,
+    foreign: Vec<ForeignCurrencyLedger>,
+    mixed: Vec<String>,
+    set_aside: BTreeSet<String>,
+    master_response_sha256: String,
+    master_response_bytes: usize,
+    balance_response_sha256: String,
+    balance_response_bytes: usize,
+}
+
+/// A single read's own response hash and size, unchanged. For several parts the
+/// hash is NOT a response hash: it is the SHA-256 of the parts' response hashes
+/// joined in part order, so it identifies the set of parts read, and the size is
+/// their sum.
+fn aggregate_part_evidence<'a>(parts: impl Iterator<Item = (&'a str, usize)>) -> (String, usize) {
+    let parts = parts.collect::<Vec<_>>();
+    if let [(sha256, bytes)] = parts.as_slice() {
+        return ((*sha256).to_owned(), *bytes);
+    }
+    let joined = parts
+        .iter()
+        .map(|(sha256, _)| *sha256)
+        .collect::<Vec<_>>()
+        .join(":");
+    let bytes = parts
+        .iter()
+        .fold(0usize, |total, (_, bytes)| total.saturating_add(*bytes));
+    (sha256_hex(joined.as_bytes()), bytes)
+}
+
+/// Joins one read's master rows to its balances by `(name, parent)`, leaving out
+/// the ledgers set aside for currency, and refuses any row or balance the other
+/// side lacks.
+fn join_party_ledger_master_part(
+    read: PartyLedgerMasterPartRead,
+) -> anyhow::Result<Vec<PartyLedgerMasterRow>> {
+    let mut balances_by_key = HashMap::new();
+    for balance in read.balances {
+        let key = ledger_display_key(&balance.name, balance.parent.as_deref());
+        if balances_by_key.insert(key, balance).is_some() {
+            return Err(anyhow::Error::new(
+                PartyLedgerMasterSourceValidationError::DuplicateBalanceDisplayKey,
+            ));
+        }
+    }
+    let mut rows = Vec::with_capacity(read.master.records.len());
+    for source in read
+        .master
+        .records
+        .into_iter()
+        .filter(|source| !read.set_aside.contains(&source.record.ledger.name))
+    {
+        let key = ledger_display_key(
+            &source.record.ledger.name,
+            source.record.ledger.parent.nonempty_returned_text(),
+        );
+        let balance = balances_by_key.remove(&key).ok_or_else(|| {
+            anyhow::Error::new(PartyLedgerMasterSourceValidationError::BalanceMissingMasterLedger)
+        })?;
+        let guid = source.identities.guid.ok_or_else(|| {
+            anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterGuid)
+        })?;
+        let master_id = source
+            .identities
+            .master_id
+            .ok_or_else(|| anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterId))?;
+        let alter_id = source.alter_id.ok_or_else(|| {
+            anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterAlterId)
+        })?;
+        let master_opening = source
+            .record
+            .ledger
+            .opening_balance
+            .as_deref()
+            .ok_or_else(|| {
+                anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterOpeningBalance)
+            })?;
+        if !party_ledger_master_openings_agree(master_opening, &balance.opening_balance)? {
+            return Err(anyhow::Error::new(
+                PartyLedgerMasterSourceValidationError::OpeningBalancesDisagreed,
+            ));
+        }
+        rows.push(PartyLedgerMasterRow {
+            name: source.record.ledger.name,
+            parent: source.record.ledger.parent,
+            party_gstin: source.record.ledger.party_gstin,
+            fields: source.record.fields,
+            guid,
+            master_id,
+            alter_id,
+            opening_balance: balance.opening_balance,
+            closing_balance: balance.closing_balance,
+        });
+    }
+    if !balances_by_key.is_empty() {
+        return Err(anyhow::Error::new(
+            PartyLedgerMasterSourceValidationError::BalanceLedgerAbsentFromMasterEvidence,
+        ));
+    }
+    Ok(rows)
+}
+
+fn party_ledger_request_commitment(requests: &[String]) -> String {
     let hashes = requests
         .iter()
         .map(|request| {
@@ -2247,26 +2790,6 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
-}
-
-fn safe_connection_failure_code(error: &anyhow::Error) -> &'static str {
-    if let Some(transport) = error.downcast_ref::<TallyTransportError>() {
-        return transport.safe_code();
-    }
-    let message = error.to_string().to_ascii_lowercase();
-    if message.contains("cancel") {
-        "request_cancelled"
-    } else if message.contains("queue deadline") {
-        "endpoint_queue_deadline_exceeded"
-    } else if message.contains("circuit") {
-        "endpoint_circuit_open"
-    } else if message.contains("response exceeded") {
-        "response_size_limit_exceeded"
-    } else if message.contains("decode") || message.contains("utf") {
-        "response_encoding_invalid"
-    } else {
-        "endpoint_unreachable"
-    }
 }
 
 pub(crate) fn canonical_loopback_origin(config: &TallyConfig) -> anyhow::Result<String> {

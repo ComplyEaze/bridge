@@ -1,0 +1,58 @@
+# fixture: tests/fixtures/builtin_cash_flow_probe_b_apr_jun_live.utf16le.xml
+# parser: parse_native_cash_flow(20250401..20250630)
+# source: captured
+Ok(NativeCashFlow {
+    rows: [
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 4,
+            },
+            debit: Present(
+                ExactDecimal(
+                    "-3864.02",
+                ),
+            ),
+            credit: Empty,
+            closing: Present(
+                ExactDecimal(
+                    "-3864.02",
+                ),
+            ),
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 5,
+            },
+            debit: Present(
+                ExactDecimal(
+                    "-1786801.00",
+                ),
+            ),
+            credit: Empty,
+            closing: Present(
+                ExactDecimal(
+                    "-1786801.00",
+                ),
+            ),
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 6,
+            },
+            debit: Present(
+                ExactDecimal(
+                    "-5472348.20",
+                ),
+            ),
+            credit: Empty,
+            closing: Present(
+                ExactDecimal(
+                    "-5472348.20",
+                ),
+            ),
+        },
+    ],
+})

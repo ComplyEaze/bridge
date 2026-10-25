@@ -65,7 +65,7 @@ no voucher population walk is used to compute them."
             Unit::Count,
             &format!("Ledgers under Tally's '{group}' group."),
             Vec::new(),
-        );
+        )?;
         r.fig(
             &format!("{role}_active_count"),
             support::count(TEST_ID, active.len())?,
@@ -76,7 +76,7 @@ without its sign, is over ₹{}.",
                 ACTIVE_TOL_PAISE / 100
             ),
             ledger_refs(active.keys().copied()),
-        );
+        )?;
         r.fig(
             &format!("{role}_active_closing_total_paise"),
             Value::Int(sum(&active)?),
@@ -87,7 +87,7 @@ balance, taken without its sign, is over ₹{}.",
                 ACTIVE_TOL_PAISE / 100
             ),
             Vec::new(),
-        );
+        )?;
         let f_stale_count = r.fig(
             &format!("{role}_stale_count"),
             support::count(TEST_ID, stale.len())?,
@@ -99,7 +99,7 @@ closing; no voucher touched them).",
                 ACTIVE_TOL_PAISE / 100
             ),
             ledger_refs(stale.keys().copied()),
-        );
+        )?;
         let f_stale_total = r.fig(
             &format!("{role}_stale_closing_total_paise"),
             Value::Int(sum(&stale)?),
@@ -110,7 +110,7 @@ balance, taken without its sign, is over ₹{} and whose period debit and credit
                 ACTIVE_TOL_PAISE / 100
             ),
             Vec::new(),
-        );
+        )?;
         for (name, t) in &stale {
             let h = stable_ledger_tag(book, name)?;
             r.fig(
@@ -121,7 +121,7 @@ balance, taken without its sign, is over ₹{} and whose period debit and credit
                     "TB closing balance of one stale {role} ledger (tag {h}), unchanged all year."
                 ),
                 vec![EvidenceRef::new("ledger", name)],
-            );
+            )?;
         }
 
         if stale.is_empty() {

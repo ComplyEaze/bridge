@@ -20,6 +20,7 @@ fn reserved_root_policy_matches_canonical_window_for_marker_carrying_parents() {
             parent: Some("Sundry Debtors".to_string()),
             closing_balance: Some(ExactDecimal::zero()),
             opening_balance: ExactDecimal::zero(),
+            opening_balance_observed: Some(ExactDecimal::zero()),
             bill_wise_on: false,
             currency_name: None,
         }];
@@ -43,6 +44,7 @@ fn reserved_root_policy_matches_canonical_window_for_marker_carrying_parents() {
             parent: Some(parent),
             closing_balance: Some(ExactDecimal::zero()),
             opening_balance: ExactDecimal::zero(),
+            opening_balance_observed: Some(ExactDecimal::zero()),
             bill_wise_on: false,
             currency_name: None,
         }];
@@ -53,5 +55,33 @@ fn reserved_root_policy_matches_canonical_window_for_marker_carrying_parents() {
                 "ledger_group_parent_unresolved"
             ))
         ));
+    }
+}
+
+/// The span a bill's age is now read from gives the same days as this
+/// module's own day count, over three years of start dates and spans across
+/// month ends, a leap day and whole years, and neither exists in reverse
+/// (bridge#1097).
+#[test]
+fn a_date_span_agrees_with_the_bills_day_count() {
+    let start = TallyDate::parse("20231201").unwrap();
+    for offset in 0..(3 * 366) {
+        let from = start.add_days(offset).unwrap();
+        for days in [0, 1, 27, 28, 29, 30, 31, 59, 365, 366, 1_461] {
+            let to = from.add_days(days).unwrap();
+            let span = bridge_tally_primitives::DateSpan::new(&from, &to)
+                .unwrap_or_else(|| panic!("{} to {}", from.as_str(), to.as_str()));
+            assert_eq!(span.days(), days, "{} to {}", from.as_str(), to.as_str());
+            assert_eq!(age_in_days(&from, &to), Ok(days), "{}", from.as_str());
+            if days > 0 {
+                assert_eq!(bridge_tally_primitives::DateSpan::new(&to, &from), None);
+                assert_eq!(
+                    age_in_days(&to, &from),
+                    Err(NativeOutstandingsError::InvalidDate(
+                        "native_date_after_as_of"
+                    ))
+                );
+            }
+        }
     }
 }

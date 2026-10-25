@@ -1,7 +1,8 @@
 //! Replay observed source shapes, then inject a concurrent voucher edit.
 use super::*;
 use tally_protocol_simulator::{
-    Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    Delivery, Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator,
+    WireEncoding,
 };
 
 fn captured(bytes: &[u8]) -> ScenarioPlan {
@@ -85,13 +86,35 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
     let end = start + original[start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
     let mut reduced = original.to_string();
     reduced.replace_range(start..end, "");
-    for change in ["stable", "edit", "posting", "deletion", "incomplete"] {
-        let changed = change != "stable";
+    // The `stable` read's result, which the `zero` read must equal (#1251).
+    let mut stable_result = None;
+    for change in [
+        "stable",
+        "zero",
+        "edit",
+        "posting",
+        "deletion",
+        "incomplete",
+    ] {
+        let changed = !matches!(change, "stable" | "zero");
         let mut before = voucher.clone();
         let mut after = voucher.clone();
         // Inject concurrent changes into captured rows in memory. The source
         // captures stay byte-exact; no live concurrency experiment is claimed.
         match change {
+            "zero" => {
+                // One more entry on the selected ledger whose amount is `-0.00` and which Tally flags
+                // deemed-positive, in both paired reads. A zero adds nothing to either column and
+                // nothing to the voucher's balance, so the read must succeed with the same figures.
+                let zero_entry = "<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">WR2 Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">Yes</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">-0.00</AMOUNT></ALLLEDGERENTRIES.LIST>";
+                let at = original.find("</ALLLEDGERENTRIES.LIST>").unwrap()
+                    + "</ALLLEDGERENTRIES.LIST>".len();
+                let mut with_zero = original.to_string();
+                with_zero.insert_str(at, zero_entry);
+                assert_ne!(with_zero, original);
+                before.fixture = Fixture::SyntheticXml(with_zero.clone());
+                after.fixture = Fixture::SyntheticXml(with_zero);
+            }
             "edit" => {
                 let altered = original.replace("-101.01", "-201.01").replace(
                     "<AMOUNT TYPE=\"Amount\">101.01</AMOUNT>",
@@ -142,8 +165,8 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         });
         let response = server
             .call_tool(
@@ -185,6 +208,16 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
                 response["structuredContent"]["result"]["voucher_rows_observed"],
                 3
             );
+            // #1076: the answer says which ledger it read and how.
+            let ledger_match = &response["structuredContent"]["result"]["ledger_match"];
+            assert_eq!(ledger_match["ledger"], "WR2 Sales", "{ledger_match}");
+            assert_eq!(ledger_match["matched"], "exact", "{ledger_match}");
+            let result = response["structuredContent"]["result"].clone();
+            match change {
+                "stable" => stable_result = Some(result),
+                // A zero entry on the selected ledger changes no figure.
+                _ => assert_eq!(Some(&result), stable_result.as_ref(), "{change}"),
+            }
         }
         let observations = simulator.finish().unwrap();
         assert_eq!(
@@ -192,6 +225,160 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
             // Each opening read now includes its paired currency read (#716).
             if change == "incomplete" { 38 } else { 66 }
         );
+    }
+}
+
+/// An empty movement window whose widened read finds rows only on the
+/// neighbouring days is refused, and the refusal's code is the corroboration's
+/// own reason, `empty_window_wider_read_nonempty`: a public code, since the
+/// refusal is how `ledger_movement` reports a partial window. The window's
+/// answers are the captured empty collection; the widened answer is the
+/// captured three-voucher response unchanged (its vouchers are all dated
+/// 1 August 2026, outside the window of 2 August, inside the widened read of 1
+/// to 3 August).
+#[tokio::test]
+async fn an_empty_movement_window_beside_a_busy_day_is_refused_by_the_wider_reads_rows() {
+    let company = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    ));
+    let extent = captured_utf8(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    ));
+    let ledger = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-period-opening.utf16le.xml"
+    ));
+    let currency = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let busy_neighbour = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+    ));
+    let empty = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-empty-collection.utf16le.xml"
+    ));
+    let high_water = captured_utf8(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>61c6de69-1748-461c-ad3f-162cb949df9f</GUID><ALTVCHID>3</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>",
+    );
+    let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let paired = |body: &ScenarioPlan| {
+        vec![
+            company.clone(),
+            body.clone(),
+            status.clone(),
+            body.clone(),
+            status.clone(),
+            company.clone(),
+        ]
+    };
+    let mut plans = vec![
+        company.clone(),
+        status.clone(),
+        company.clone(),
+        status.clone(),
+    ];
+    // The movement's opening read: identity, extent, currency, ledger, extent
+    // and identity again, each paired (22 legs, as in the other movement tests).
+    plans.extend([
+        status.clone(),
+        company.clone(),
+        company.clone(),
+        extent.clone(),
+        status.clone(),
+        extent.clone(),
+        status.clone(),
+        currency.clone(),
+        status.clone(),
+        currency.clone(),
+        status.clone(),
+        ledger.clone(),
+        status.clone(),
+        ledger.clone(),
+        status.clone(),
+        extent.clone(),
+        status.clone(),
+        extent.clone(),
+        status.clone(),
+        company.clone(),
+        status.clone(),
+        company.clone(),
+    ]);
+    // The window's pre-flight mark, the window (empty), and the corroboration's
+    // widened read (rows), which reuses that mark. The refusal ends the call: no
+    // closing read follows.
+    plans.extend(paired(&high_water));
+    plans.extend(paired(&empty));
+    plans.extend(paired(&busy_neighbour));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: crate::agent::Posting::Off,
+        audit_enabled: false,
+    });
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260802", "to":"20260802", "ledger":"WR2 Sales"
+            }),
+        )
+        .await;
+    simulator.cancel();
+    let observed = simulator.finish().unwrap();
+    assert_eq!(response["isError"], true, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "empty_window_wider_read_nonempty",
+        "{response}"
+    );
+    // A refusal: no figure and no row of the window is returned.
+    assert_eq!(result["voucher_rows_observed"], Value::Null, "{response}");
+    assert_eq!(result["rows"], Value::Null, "{response}");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"],
+        "partial"
+    );
+    // 4 prelude legs, the 22-leg opening read, then three paired reads of six
+    // legs: mark, window, widened window.
+    assert_eq!(observed.len(), 44);
+    let identity = {
+        let companies =
+            bridge_tally_protocol::parse_companies_from_collection(&company.fixture.body())
+                .unwrap();
+        let row = companies
+            .iter()
+            .find(|row| row.guid.as_deref() == Some("61c6de69-1748-461c-ad3f-162cb949df9f"))
+            .unwrap();
+        row.name.clone()
+    };
+    let day = |text: &str| bridge_tally_core::TallyDate::parse(text).unwrap();
+    let sha = |xml: &str| {
+        sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
+            xml,
+        ))
+    };
+    let mark = render_agent_company_high_water(&identity);
+    let window =
+        render_agent_movement_vouchers(&identity, &day("20260802"), &day("20260802")).unwrap();
+    let wider = render_agent_vouchers(&identity, &day("20260801"), &day("20260803"), None).unwrap();
+    for (leg, request) in [
+        (27, &mark),
+        (29, &mark),
+        (33, &window),
+        (35, &window),
+        (39, &wider),
+        (41, &wider),
+    ] {
+        assert_eq!(observed[leg].request_body_sha256, sha(request), "leg {leg}");
     }
 }
 
@@ -332,8 +519,8 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
             max_bytes: 16_000_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         });
         let response = server
             .call_tool(
@@ -350,6 +537,10 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
                 response["structuredContent"]["result"]["voucher_rows_observed"],
                 200
             );
+            // A quick call's result is unchanged: no block, nothing left out (#1239).
+            let result = &response["structuredContent"]["result"];
+            assert!(result.get("read_cost").is_none(), "{result}");
+            assert!(result.get("read_cost_left_out").is_none(), "{result}");
         } else {
             assert_eq!(response["isError"], true, "{response}");
             assert_eq!(
@@ -381,8 +572,8 @@ async fn movement_call(plans: Vec<ScenarioPlan>, guid: &str, ledger: &str) -> (V
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server
         .call_tool(
@@ -516,4 +707,398 @@ async fn a_movement_on_a_non_inr_book_is_refused_before_any_ledger() {
     assert_eq!(response["isError"], true, "{response}");
     assert_eq!(error["code"], "ledger_movement_read_failed");
     assert_eq!(error["cause"], "company_base_currency_not_inr");
+}
+
+// -- The movement's ledger catalogue read: one attempt, a typed cause, and the
+// -- ledger named before any voucher is read.
+
+/// Identity, then the movement's first ledger read to its end: the read's own
+/// brackets, its paired currency read, its paired export (positions 15 and 17)
+/// and its closing brackets. The same sequence the happy-path tests replay.
+const FIRST_EXPORT: usize = 15;
+
+fn first_ledger_read() -> Vec<ScenarioPlan> {
+    let company = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    ));
+    let extent = captured_utf8(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    ));
+    let ledger = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-period-opening.utf16le.xml"
+    ));
+    let currency = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    vec![
+        company.clone(),
+        status.clone(),
+        company.clone(),
+        status.clone(),
+        status.clone(),
+        company.clone(),
+        company.clone(),
+        extent.clone(),
+        status.clone(),
+        extent.clone(),
+        status.clone(),
+        currency.clone(),
+        status.clone(),
+        currency,
+        status.clone(),
+        ledger.clone(),
+        status.clone(),
+        ledger,
+        status.clone(),
+        extent.clone(),
+        status.clone(),
+        extent,
+        status.clone(),
+        company.clone(),
+        status,
+        company,
+    ]
+}
+
+fn movement_server(
+    simulator: &SequenceSimulator,
+    policy: bridge_tally_transport::TransportPolicy,
+) -> (Server, tempfile::TempDir) {
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        audit_enabled: false,
+    });
+    server.runtime = TallyRuntime::with_transport_policy(policy);
+    (server, directory)
+}
+
+/// A ledger catalogue export that outlives its deadline is sent once (a 2 s deadline,
+/// a 5 s stall, and a wait past both: a request that is slow enough to fail the
+/// deadline on a loaded machine fails this test rather than passing it). The
+/// script holds a whole second read behind the stalled one, so a retry would
+/// find plans to answer it, and `received` would count them. Agent voucher reads
+/// are single-attempt because a request that timed out queues more work behind
+/// a gateway still building the abandoned response; this read is the same.
+#[tokio::test]
+async fn a_movement_catalogue_read_that_times_out_is_sent_once_and_names_why() {
+    let busy = std::time::Duration::from_millis(5_000);
+    let mut plans = first_ledger_read();
+    plans[FIRST_EXPORT] = plans[FIRST_EXPORT]
+        .clone()
+        .with_delivery(Delivery::SlowHeaders(busy));
+    let stalled = FIRST_EXPORT + 1;
+    // Directly behind the stalled export: a whole read (its brackets, currency
+    // read and export), which is what a retry would send next.
+    plans.truncate(stalled);
+    plans.extend(first_ledger_read().into_iter().skip(4));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy {
+            request_timeout: std::time::Duration::from_millis(2_000),
+            ..Default::default()
+        },
+    );
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger":"WR2 Sales"
+            }),
+        )
+        .await;
+    // Past the stalled response and any retry that would have queued behind it.
+    tokio::time::sleep(busy + std::time::Duration::from_millis(3_000)).await;
+    assert_eq!(
+        simulator.received(),
+        stalled,
+        "nothing was sent after the export that timed out"
+    );
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(error["code"], "ledger_movement_read_failed");
+    assert_eq!(error["cause"], "movement_catalogue_deadline_exceeded");
+    assert!(
+        error["remediation"]
+            .as_str()
+            .is_some_and(|text| text.contains("narrowing from and to is not known to help")),
+        "narrowing the dates is not known to help a whole-book catalogue: {error}"
+    );
+    simulator.cancel();
+}
+
+/// A ledger the first catalogue does not hold is refused as soon as that
+/// catalogue is read. One plan sits behind the catalogue's 26 requests (4
+/// identity and 22 of the read itself): a request after the catalogue would be
+/// answered and counted, so `received` stays at 26 only if none is sent.
+#[tokio::test]
+async fn a_movement_names_an_unknown_ledger_before_reading_any_voucher() {
+    let mut plans = first_ledger_read();
+    let total = plans.len();
+    plans.push(plans[1].clone());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy::default(),
+    );
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger":"No Such Ledger"
+            }),
+        )
+        .await;
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "ledger_not_found"
+    );
+    assert_eq!(
+        simulator.received(),
+        total,
+        "no request after the catalogue"
+    );
+    simulator.cancel();
+}
+
+/// `ledger_movement` for a ledger spelt without its accents: the refusal keeps
+/// its code and lists the catalogue's own spelling for the user to confirm,
+/// from the catalogue already read (no request after it), and says what to do.
+async fn movement_for_ledger(
+    requested: &str,
+    redaction: Redaction,
+    max_bytes: usize,
+) -> (Value, String) {
+    let mut plans = first_ledger_read();
+    let total = plans.len();
+    plans.push(plans[1].clone());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (mut server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy::default(),
+    );
+    server.settings.redaction = redaction;
+    server.settings.max_bytes = max_bytes;
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger": requested
+            }),
+        )
+        .await;
+    assert_eq!(
+        simulator.received(),
+        total,
+        "no request after the catalogue"
+    );
+    simulator.cancel();
+    let text = response.to_string();
+    (response, text)
+}
+
+#[tokio::test]
+async fn a_misspelt_ledger_lists_the_catalogues_spelling_and_asks_the_user() {
+    let (response, _) = movement_for_ledger("Cafe Naive Traders", Redaction::None, 200_000).await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{error}");
+    assert_eq!(error["candidates_listing"], "listed", "{error}");
+    assert_eq!(error["candidates_total"], 1, "{error}");
+    assert_eq!(error["candidates_total_is_lower_bound"], false, "{error}");
+    let names = error["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|candidate| candidate["name"].as_str().unwrap().to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["Café Naïve Traders"], "{error}");
+    assert!(
+        error.get("requested").is_none(),
+        "the request is not echoed"
+    );
+    assert!(error["remediation"]
+        .as_str()
+        .unwrap()
+        .contains("ask which one they meant"));
+}
+
+/// Under `mask_parties` neither the catalogue's spelling nor the request is in
+/// the response, in the structured result or its text copy.
+#[tokio::test]
+async fn masking_keeps_the_ledger_names_out_of_a_ledger_refusal() {
+    let (response, text) =
+        movement_for_ledger("Cafe Naive Traders", Redaction::MaskParties, 200_000).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{error}");
+    assert_eq!(error["candidates_listing"], "names_masked", "{error}");
+    // Not even a count: it would answer "does a ledger start with this?".
+    for key in ["candidates", "candidates_total", "candidates_reason"] {
+        assert!(error.get(key).is_none(), "{key} under masking: {error}");
+    }
+    for name in ["Café Naïve Traders", "Cafe Naive Traders", "Naïve", "Naive"] {
+        assert!(!text.contains(name), "{name} in {text}");
+    }
+}
+
+/// A masked spelling is refused as such, through the tool, and never looked up.
+#[tokio::test]
+async fn a_masked_ledger_spelling_is_refused_before_it_can_resolve_to_another_ledger() {
+    let (response, _) = movement_for_ledger("Ca…fe", Redaction::MaskParties, 200_000).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_name_masked", "{error}");
+    assert!(error["remediation"]
+        .as_str()
+        .unwrap()
+        .contains("type the full ledger name"));
+}
+
+/// Below the budget that carries guidance, the refusal is the bare code: no
+/// candidates and no listing word, so an absent listing is "no search was
+/// made", which the remediation says, and never a claim about the book.
+#[tokio::test]
+async fn under_the_guidance_budget_the_ledger_refusal_is_the_bare_code() {
+    let (response, _) = movement_for_ledger("Cafe Naive Traders", Redaction::None, 4_095).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{response}");
+    for key in ["candidates", "candidates_listing", "remediation"] {
+        assert!(
+            error.get(key).is_none(),
+            "{key} at the small budget: {error}"
+        );
+    }
+}
+
+/// A catalogue export the transport refuses for its size names that too. A
+/// timeout is named already (a request no response answered); an oversized one
+/// was answered, so it needs its own naming. The export is the captured one
+/// padded past a cap that the identity, extent and currency answers stay under.
+#[tokio::test]
+async fn a_movement_catalogue_over_the_response_cap_names_why() {
+    let mut plans = first_ledger_read();
+    let padded = format!(
+        "{}{}",
+        plans[FIRST_EXPORT].fixture.body(),
+        " ".repeat(30_000)
+    );
+    plans[FIRST_EXPORT] = captured_utf8(&padded);
+    plans.truncate(FIRST_EXPORT + 1);
+    // One plan behind the export: an extra send would be answered and counted.
+    plans.push(plans[1].clone());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy {
+            xml_response_max_bytes: 30_000,
+            ..Default::default()
+        },
+    );
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger":"WR2 Sales"
+            }),
+        )
+        .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(error["code"], "ledger_movement_read_failed");
+    assert_eq!(error["cause"], "movement_catalogue_too_large");
+    assert!(
+        error["remediation"]
+            .as_str()
+            .is_some_and(|text| text.contains("do not retry in a loop")),
+        "{error}"
+    );
+    assert_eq!(simulator.received(), FIRST_EXPORT + 1);
+    simulator.cancel();
+}
+
+/// The corroborating catalogue read (the second, after the voucher window) is
+/// sent once as well: it is the same read through the same function, and this
+/// pins it rather than inferring it. The script is the stable happy path up to
+/// the second export, which stalls, with a whole read behind it for a retry.
+#[tokio::test]
+async fn a_movements_second_catalogue_read_that_times_out_is_sent_once() {
+    let company = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    ));
+    let voucher = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+    ));
+    let high_water = captured_utf8(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>61c6de69-1748-461c-ad3f-162cb949df9f</GUID><ALTVCHID>3</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>",
+    );
+    let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let voucher_read = |body: ScenarioPlan| {
+        vec![
+            company.clone(),
+            body.clone(),
+            status.clone(),
+            body,
+            status.clone(),
+            company.clone(),
+        ]
+    };
+    let busy = std::time::Duration::from_millis(5_000);
+    let mut plans = first_ledger_read();
+    plans.extend(voucher_read(high_water));
+    plans.extend(voucher_read(voucher));
+    // The second catalogue read is the first one's requests from the read's own
+    // brackets on (the identity requests are not repeated); its export is the
+    // 12th.
+    let export = FIRST_EXPORT - 4;
+    let mut second = first_ledger_read().into_iter().skip(4).collect::<Vec<_>>();
+    second[export] = second[export]
+        .clone()
+        .with_delivery(Delivery::SlowHeaders(busy));
+    second.truncate(export + 1);
+    plans.extend(second);
+    let stalled = plans.len();
+    plans.extend(first_ledger_read().into_iter().skip(4));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy {
+            request_timeout: std::time::Duration::from_millis(2_000),
+            ..Default::default()
+        },
+    );
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger":"WR2 Sales"
+            }),
+        )
+        .await;
+    tokio::time::sleep(busy + std::time::Duration::from_millis(3_000)).await;
+    assert_eq!(
+        simulator.received(),
+        stalled,
+        "nothing was sent after the second export that timed out"
+    );
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(error["code"], "ledger_movement_read_failed");
+    assert_eq!(error["cause"], "movement_catalogue_deadline_exceeded");
+    simulator.cancel();
 }

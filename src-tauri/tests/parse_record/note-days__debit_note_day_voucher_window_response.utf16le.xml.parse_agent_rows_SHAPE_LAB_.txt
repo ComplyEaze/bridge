@@ -1,0 +1,56 @@
+# fixture: note-days/debit_note_day_voucher_window_response.utf16le.xml
+# parser: parse_agent_rows(SHAPE_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(10),
+        "amounts": Array [
+            Object {
+                "amount": String("-1180.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1180.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Chem Supplier 1"),
+            },
+            Object {
+                "amount": String("1000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Purchase - Local"),
+            },
+            Object {
+                "amount": String("90.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("CGST"),
+            },
+            Object {
+                "amount": String("90.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("State Tax"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250428"),
+        "guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000000a"),
+        "is_invoice": Bool(false),
+        "master_id": String("10"),
+        "narration": String("SHAPELAB-A-debit-note"),
+        "optional": Bool(false),
+        "party": String("Chem Supplier 1"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Debit Note"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Debit Note"),
+        "voucher_type_guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000002a"),
+        "voucher_type_reserved_name": String("Debit Note"),
+    },
+])

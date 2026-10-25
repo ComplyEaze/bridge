@@ -1,0 +1,64 @@
+name: PR labels
+
+# A release proposal classifies merged pull requests by their type label. Failing here, while
+# the author is still on the pull request, keeps a missing label from blocking a release later.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, milestoned, demilestoned]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+# A pull request gets several events within a second (opened, then one per label). Cancelling the older
+# runs in a newer run's group meant the run that decides the required "Type label" check (the newest)
+# could itself end cancelled, which blocks the pull request until that run is re-run by hand. queue: max
+# keeps every waiting run instead of cancelling the older ones, so the burst is run in order and none of
+# it is cancelled by this group (a timeout or a manual cancel still can).
+concurrency:
+  group: pr-labels-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  type-label:
+    name: Type label
+    # Dependabot's pull requests carry the dependencies label, which the release proposal reads.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: .node-version
+      # The queue only admits a pull request that already passed this check, and a merge
+      # group has no labels of its own: report the same check name, pass through.
+      - name: Require exactly one type label
+        if: github.event_name == 'pull_request'
+        env:
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: node scripts/check-pr-type-label.mjs
+
+  milestone:
+    name: Milestone
+    # Dependabot's pull requests are planned by the maintainer who merges them.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: .node-version
+      # A merge group has no milestone of its own and was admitted with one: report the same check name, pass through.
+      - name: Require a milestone
+        if: github.event_name == 'pull_request'
+        env:
+          PR_MILESTONE: ${{ toJSON(github.event.pull_request.milestone.title) }}
+        run: node scripts/check-pr-milestone.mjs

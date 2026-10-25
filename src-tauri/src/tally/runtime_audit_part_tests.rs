@@ -37,7 +37,7 @@ fn lab() -> Lab {
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         company.name.clone(),
-        company.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&company.guid.clone().unwrap()),
         company.company_number.clone().unwrap(),
         company.books_from.clone().unwrap(),
         &companies,
@@ -492,33 +492,6 @@ async fn a_part_queued_behind_an_abandoned_part_is_refused_at_dispatch() {
     assert_eq!(simulator.finish().unwrap().len(), 2);
 }
 
-/// A caller that stops waiting drops the future mid-request. Tally keeps
-/// working, so the debt armed before sending must survive the drop.
-#[tokio::test]
-async fn a_dropped_part_leaves_its_drain_owed() {
-    let lab = lab();
-    let simulator = SequenceSimulator::spawn(vec![
-        utf16(&lab.companies_xml),
-        utf16(&lab.report_xml).with_delivery(Delivery::SlowHeaders(Duration::from_millis(1_000))),
-    ])
-    .unwrap();
-    let runtime = TallyRuntime::default();
-    assert!(tokio::time::timeout(
-        Duration::from_millis(300),
-        part(&runtime, &simulator, &lab, AuditPartShape::Single)
-    )
-    .await
-    .is_err());
-    assert_eq!(
-        part(&runtime, &simulator, &lab, AuditPartShape::Single)
-            .await
-            .expect_err("owed after the drop")
-            .kind,
-        AuditPartFailureKind::DrainRequired
-    );
-    assert_eq!(simulator.finish().unwrap().len(), 2);
-}
-
 #[tokio::test]
 async fn a_request_that_does_not_name_the_verified_company_is_never_sent() {
     let lab = lab();
@@ -600,6 +573,114 @@ async fn an_error_envelope_is_rejected_whole_and_owes_nothing() {
     assert_eq!(simulator.finish().unwrap().len(), 5);
 }
 
+/// The header of a company Object export carries the product release fields
+/// (measured on a live TallyPrime 7.1 Silver, item 697-S0A): the collection
+/// status check refuses it, so the Object request is checked with exactly those
+/// five fields allowed and every other check of the envelope kept. A collection
+/// answer with the same header stays refused.
+fn object_answer(status: &str, release: &str, extra: &str) -> String {
+    format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>{status}</STATUS>{release}{extra}</HEADER>\
+         <BODY><DATA/></BODY></ENVELOPE>"
+    )
+}
+
+const RELEASE_HEADER: &str = "<PRODMAJORVER>1</PRODMAJORVER><PRODMINORVER>1</PRODMINORVER>\
+    <PRODMAJORREL>7</PRODMAJORREL><PRODMINORREL>1</PRODMINORREL><PRODTYPE>5</PRODTYPE>";
+
+async fn object_part(answer: &str) -> Result<AuditPart, AuditPartFailure> {
+    let lab = lab();
+    let simulator = SequenceSimulator::spawn(vec![
+        utf16(&lab.companies_xml),
+        utf16(answer),
+        utf16(&lab.companies_xml),
+    ])
+    .unwrap();
+    let object =
+        super::super::agent_read_request::AgentReadRequest::company_object(&lab.identity).unwrap();
+    assert!(object.is_company_object());
+    let result = TallyRuntime::default()
+        .fetch_audit_part(
+            config(&simulator),
+            &lab.identity,
+            object,
+            AuditPartShape::Single,
+        )
+        .await;
+    drop(simulator);
+    result
+}
+
+#[tokio::test]
+async fn the_company_object_answer_is_admitted_with_its_release_header() {
+    object_part(&object_answer("1", RELEASE_HEADER, ""))
+        .await
+        .expect("the object export is admitted");
+    // The same answer without the release fields is a plain envelope and passes too.
+    object_part(&object_answer("1", "", ""))
+        .await
+        .expect("a plain envelope is admitted");
+}
+
+#[tokio::test]
+async fn the_company_object_answer_keeps_every_other_envelope_check() {
+    let refused = |answer: String, why: &'static str| async move {
+        let failure = object_part(&answer).await.expect_err(why);
+        assert_eq!(
+            failure.kind,
+            AuditPartFailureKind::ResponseRejected,
+            "{why}"
+        );
+    };
+    refused(object_answer("0", RELEASE_HEADER, ""), "a failed status").await;
+    refused(
+        object_answer("1", RELEASE_HEADER, "<EXTRA>1</EXTRA>"),
+        "another header field",
+    )
+    .await;
+    refused(
+        object_answer("1", RELEASE_HEADER, "<PRODTYPE>5</PRODTYPE>"),
+        "a repeated release field",
+    )
+    .await;
+    refused(
+        object_answer("1", "<PRODTYPE>x</PRODTYPE>", ""),
+        "a release field that is not a number",
+    )
+    .await;
+    refused(
+        object_answer("1", RELEASE_HEADER, "").replace("<DATA/>", "<DATA/></ENVELOPE><ENVELOPE>"),
+        "a second root",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn a_collection_answer_with_the_release_header_is_refused() {
+    let lab = lab();
+    let answer = object_answer("1", RELEASE_HEADER, "");
+    let simulator = SequenceSimulator::spawn(vec![
+        utf16(&lab.companies_xml),
+        utf16(&answer),
+        utf16(&lab.companies_xml),
+    ])
+    .unwrap();
+    let collection =
+        super::super::agent_read_request::AgentReadRequest::parse(lab.request.clone()).unwrap();
+    assert!(!collection.is_company_object());
+    let failure = TallyRuntime::default()
+        .fetch_audit_part(
+            config(&simulator),
+            &lab.identity,
+            collection,
+            AuditPartShape::Single,
+        )
+        .await
+        .expect_err("a collection answer with that header is refused");
+    assert_eq!(failure.kind, AuditPartFailureKind::ResponseRejected);
+    drop(simulator);
+}
+
 #[tokio::test]
 async fn a_refused_response_head_owes_a_drain() {
     let lab = lab();
@@ -646,6 +727,18 @@ fn dropped(lab: &Lab) -> Vec<ScenarioPlan> {
     ]
 }
 
+/// Waits until the simulator has read `count` requests. Bounded, so a probe that is
+/// never sent fails the test instead of hanging it.
+async fn until_received(simulator: &SequenceSimulator, count: usize) {
+    for _ in 0..5_000 {
+        if simulator.received() >= count {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    panic!("the simulator never read request {count}");
+}
+
 /// The probe's own 5 s deadline, under the production 20 s session deadline.
 #[tokio::test]
 async fn a_probe_gives_up_at_its_own_deadline_not_the_sessions() {
@@ -665,7 +758,9 @@ async fn a_probe_gives_up_at_its_own_deadline_not_the_sessions() {
     );
     let waited = started.elapsed();
     assert!(waited >= Duration::from_millis(4_900), "{waited:?}");
-    assert!(waited < Duration::from_millis(6_500), "{waited:?}");
+    // No upper bound: `abandoned_probes: 1` above already proves the probe gave up before
+    // the simulator's 7 s answer, so a probe on the session's 20 s deadline fails there
+    // without a clock that a stall could trip.
     assert_eq!(simulator.finish().unwrap().len(), 3);
 }
 
@@ -829,12 +924,12 @@ async fn a_capped_debt_sends_no_probe() {
             ..AuditDrainDebt::armed(0)
         },
     );
-    let started = std::time::Instant::now();
     assert_eq!(
         runtime.drain_probe(config(&simulator)).await,
         AuditDrainStatus::OperatorRequired
     );
-    assert!(started.elapsed() < Duration::from_millis(500));
+    // Nothing was sent: counted, not timed (a stall could trip a clock bound).
+    assert_eq!(simulator.received(), 0);
     assert_eq!(
         part(&runtime, &simulator, &lab, AuditPartShape::Single)
             .await
@@ -876,7 +971,7 @@ async fn a_part_queued_behind_a_clean_part_is_sent_after_it() {
 async fn a_dropped_probe_counts_as_abandoned_once_stale() {
     let lab = lab();
     let mut plans = dropped(&lab);
-    // The dropped probe's answer takes 600 ms; the probe is dropped at 300 ms.
+    // The dropped probe's answer takes 600 ms; the probe is dropped once the responder has read it.
     plans.push(status().with_delivery(Delivery::SlowHeaders(Duration::from_millis(600))));
     plans.push(status());
     let simulator = SequenceSimulator::spawn(plans).unwrap();
@@ -888,12 +983,16 @@ async fn a_dropped_probe_counts_as_abandoned_once_stale() {
         // loaded host cannot turn an answer into a "slow" one.
         .with_audit_drain_probe_slow(AUDIT_DRAIN_PROBE_DEADLINE);
     owe_a_drain(&runtime, &simulator, &lab).await;
-    assert!(tokio::time::timeout(
-        Duration::from_millis(300),
-        runtime.drain_probe(config(&simulator))
-    )
-    .await
-    .is_err());
+    // Drop the probe once the responder has read it (it answers after 600 ms), not after
+    // a fixed 300 ms: `biased`, giving up first, so a long stall cannot let the answer win.
+    let mut probe = Box::pin(runtime.drain_probe(config(&simulator)));
+    let answered = tokio::select! {
+        biased;
+        () = until_received(&simulator, 3) => None,
+        status = &mut probe => Some(status),
+    };
+    assert!(answered.is_none(), "the probe should still be waiting");
+    drop(probe);
     // Still within the stale limit: nothing is sent.
     assert!(matches!(
         runtime.drain_probe(config(&simulator)).await,

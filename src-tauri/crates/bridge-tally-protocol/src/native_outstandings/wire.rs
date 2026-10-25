@@ -67,7 +67,7 @@ pub fn parse_native_bill_rows(
             .map_err(|_| NativeOutstandingsError::InvalidResponse("bills_xml_malformed"))?;
         match event {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if !root_seen {
                     if name != b"ENVELOPE" {
                         return Err(NativeOutstandingsError::InvalidResponse(
@@ -87,8 +87,14 @@ pub fn parse_native_bill_rows(
                     // report shape means Tally reported failure, regardless
                     // of the value carried.
                     b"STATUS" => return Err(NativeOutstandingsError::TallyReportedFailure),
+                    // A refusal raised while a row is read names that row's
+                    // 1-based place in Tally's answer, as the finalising pass
+                    // below does, never its party or reference (bridge#1096).
+                    // The row a scalar belongs to is the last one opened.
                     b"BILLFIXED" => {
-                        let (party, reference, bill_date_raw) = parse_bill_fixed(&mut reader)?;
+                        let row_number = pending.len() + 1;
+                        let (party, reference, bill_date_raw) = parse_bill_fixed(&mut reader)
+                            .map_err(|error| error.in_row(row_number))?;
                         pending.push(PendingBillRow {
                             party,
                             reference,
@@ -101,6 +107,7 @@ pub fn parse_native_bill_rows(
                     }
                     b"BILLCL" => {
                         let text = read_element_text(&mut reader, element.name())?;
+                        let row_number = pending.len();
                         let row =
                             pending
                                 .last_mut()
@@ -110,15 +117,17 @@ pub fn parse_native_bill_rows(
                         if row.closing_balance.is_some() {
                             return Err(NativeOutstandingsError::InvalidResponse(
                                 "bills_duplicate_billcl",
-                            ));
+                            )
+                            .in_row(row_number));
                         }
-                        row.closing_balance = Some(
-                            ExactDecimal::parse(text.trim())
-                                .map_err(|_| NativeOutstandingsError::InvalidAmount)?,
-                        );
+                        row.closing_balance =
+                            Some(ExactDecimal::parse(text.trim()).map_err(|_| {
+                                NativeOutstandingsError::InvalidAmount.in_row(row_number)
+                            })?);
                     }
                     b"BILLDUE" => {
                         let text = read_element_text(&mut reader, element.name())?;
+                        let row_number = pending.len();
                         let row =
                             pending
                                 .last_mut()
@@ -128,19 +137,21 @@ pub fn parse_native_bill_rows(
                         if row.due_date_raw.is_some() {
                             return Err(NativeOutstandingsError::InvalidResponse(
                                 "bills_duplicate_billdue",
-                            ));
+                            )
+                            .in_row(row_number));
                         }
                         row.due_date_raw = Some(text);
                     }
                     b"BILLOVERDUE" => {
                         let text = read_element_text(&mut reader, element.name())?;
+                        let row_number = pending.len();
                         let row =
                             pending
                                 .last_mut()
                                 .ok_or(NativeOutstandingsError::InvalidResponse(
                                     "bills_scalar_before_fixed",
                                 ))?;
-                        set_bill_overdue(row, &text)?;
+                        set_bill_overdue(row, &text).map_err(|error| error.in_row(row_number))?;
                     }
                     _ => {
                         return Err(NativeOutstandingsError::InvalidResponse(
@@ -150,7 +161,7 @@ pub fn parse_native_bill_rows(
                 }
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if !root_seen {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         "bills_root_not_envelope",
@@ -160,13 +171,14 @@ pub fn parse_native_bill_rows(
                     return Err(NativeOutstandingsError::TallyReportedFailure);
                 }
                 if name.as_slice() == b"BILLOVERDUE" {
+                    let row_number = pending.len();
                     let row =
                         pending
                             .last_mut()
                             .ok_or(NativeOutstandingsError::InvalidResponse(
                                 "bills_scalar_before_fixed",
                             ))?;
-                    set_bill_overdue(row, "")?;
+                    set_bill_overdue(row, "").map_err(|error| error.in_row(row_number))?;
                     continue;
                 }
                 return Err(NativeOutstandingsError::InvalidResponse(
@@ -176,7 +188,7 @@ pub fn parse_native_bill_rows(
             Event::End(element) => {
                 if root_seen
                     && !envelope_closed
-                    && element.name().as_ref().eq_ignore_ascii_case(b"ENVELOPE")
+                    && element.name().as_ref().eq_ignore_ascii_case("ENVELOPE")
                 {
                     envelope_closed = true;
                     continue;
@@ -186,10 +198,7 @@ pub fn parse_native_bill_rows(
                 ));
             }
             Event::Text(text) => {
-                let is_blank = text
-                    .decode()
-                    .map(|value| value.trim().is_empty())
-                    .unwrap_or(false);
+                let is_blank = text.trim().is_empty();
                 if !is_blank {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         "bills_unexpected_text",
@@ -206,9 +215,14 @@ pub fn parse_native_bill_rows(
         ));
     }
 
+    // A row that cannot be finalised is named by its 1-based place in Tally's
+    // answer, never by its party or reference (bridge#1091).
     pending
         .into_iter()
-        .map(|row| finalize_bill_row(row, books_from, as_of))
+        .enumerate()
+        .map(|(index, row)| {
+            finalize_bill_row(row, books_from, as_of).map_err(|error| error.in_row(index + 1))
+        })
         .collect()
 }
 
@@ -275,7 +289,7 @@ fn parse_bill_fixed(
             .map_err(|_| NativeOutstandingsError::InvalidResponse("bills_xml_malformed"))?
         {
             Event::Start(child) => {
-                let child_name = child.name().as_ref().to_ascii_uppercase();
+                let child_name = child.name().as_ref().as_bytes().to_ascii_uppercase();
                 let text = read_element_text(reader, child.name())?;
                 match child_name.as_slice() {
                     b"BILLDATE" => {
@@ -290,9 +304,9 @@ fn parse_bill_fixed(
                     }
                 }
             }
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"BILLFIXED") => break,
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("BILLFIXED") => break,
             Event::Empty(child) => {
-                let code = if child.name().as_ref().eq_ignore_ascii_case(b"BILLPARTY") {
+                let code = if child.name().as_ref().eq_ignore_ascii_case("BILLPARTY") {
                     "bills_fixed_empty_billparty"
                 } else {
                     "bills_fixed_field_empty"
@@ -593,7 +607,7 @@ fn parse_native_ledger_snapshot_rows(
             .map_err(|_| NativeOutstandingsError::InvalidResponse("ledger_xml_malformed"))?;
         match event {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if path.is_empty() && name != b"ENVELOPE" {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         "ledger_root_not_envelope",
@@ -635,7 +649,7 @@ fn parse_native_ledger_snapshot_rows(
                 path.push(name);
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 // A self-closing STATUS is no answer, and a second STATUS of
                 // any kind is refused (bridge#717).
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
@@ -657,7 +671,7 @@ fn parse_native_ledger_snapshot_rows(
                 }
             }
             Event::End(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 let expected = path.pop().ok_or(NativeOutstandingsError::InvalidResponse(
                     "ledger_unexpected_close",
                 ))?;
@@ -757,7 +771,7 @@ pub fn parse_native_group_snapshot_with_evidence(
             .map_err(|_| NativeOutstandingsError::InvalidResponse("group_xml_malformed"))?;
         match event {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if path.is_empty() && name != b"ENVELOPE" {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         "group_root_not_envelope",
@@ -822,7 +836,7 @@ pub fn parse_native_group_snapshot_with_evidence(
                 path.push(name);
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 // A self-closing STATUS is no answer, and a second STATUS of
                 // any kind is refused (bridge#717).
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
@@ -842,7 +856,7 @@ pub fn parse_native_group_snapshot_with_evidence(
                 }
             }
             Event::End(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 let expected = path.pop().ok_or(NativeOutstandingsError::InvalidResponse(
                     "group_unexpected_close",
                 ))?;
@@ -916,7 +930,7 @@ fn parse_group_row(
             .read_event()
             .map_err(|_| NativeOutstandingsError::InvalidResponse("group_xml_malformed"))?
         {
-            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case(b"PARENT") => {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("PARENT") => {
                 // Verbatim: this names another group row, and the hop is
                 // matched by exact codepoint. See
                 // `read_element_identifier_text`.
@@ -932,7 +946,7 @@ fn parse_group_row(
                 if child
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"BRIDGECOMPANYGUID") =>
+                    .eq_ignore_ascii_case("BRIDGECOMPANYGUID") =>
             {
                 let value = read_element_text(reader, child.name())?;
                 if std::mem::replace(&mut response_company_guid_seen, true) {
@@ -943,7 +957,7 @@ fn parse_group_row(
                 response_company_guid = (!value.is_empty()).then_some(value);
             }
             Event::Start(_) => skip_subtree(reader)?,
-            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case(b"PARENT") => {
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("PARENT") => {
                 if std::mem::replace(&mut parent_seen, true) {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         "group_duplicate_parent",
@@ -954,7 +968,7 @@ fn parse_group_row(
                 if child
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"BRIDGECOMPANYGUID") =>
+                    .eq_ignore_ascii_case("BRIDGECOMPANYGUID") =>
             {
                 if std::mem::replace(&mut response_company_guid_seen, true) {
                     return Err(NativeOutstandingsError::InvalidResponse(
@@ -963,7 +977,7 @@ fn parse_group_row(
                 }
             }
             Event::Empty(_) => {}
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"GROUP") => break,
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("GROUP") => break,
             Event::Eof => {
                 return Err(NativeOutstandingsError::InvalidResponse(
                     "group_row_unterminated",
@@ -1022,7 +1036,7 @@ fn parse_ledger_row(
             .map_err(|_| NativeOutstandingsError::InvalidResponse("ledger_xml_malformed"))?
         {
             Event::Start(child) => {
-                let child_name = child.name().as_ref().to_ascii_uppercase();
+                let child_name = child.name().as_ref().as_bytes().to_ascii_uppercase();
                 match child_name.as_slice() {
                     b"PARENT" => {
                         // Verbatim: this names a group row, and the hop is
@@ -1091,7 +1105,7 @@ fn parse_ledger_row(
                     _ => skip_subtree(reader)?,
                 }
             }
-            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case(b"CURRENCYNAME") => {
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("CURRENCYNAME") => {
                 if currency_name.replace(None).is_some() {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         "ledger_duplicate_currency_name",
@@ -1102,7 +1116,7 @@ fn parse_ledger_row(
                 if child
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"BRIDGECOMPANYGUID") =>
+                    .eq_ignore_ascii_case("BRIDGECOMPANYGUID") =>
             {
                 if std::mem::replace(&mut response_company_guid_seen, true) {
                     return Err(NativeOutstandingsError::InvalidResponse(
@@ -1111,7 +1125,7 @@ fn parse_ledger_row(
                 }
             }
             Event::Empty(_) => {}
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"LEDGER") => break,
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("LEDGER") => break,
             Event::Eof => {
                 return Err(NativeOutstandingsError::InvalidResponse(
                     "ledger_row_unterminated",
@@ -1155,11 +1169,17 @@ impl ParsedLedgerSnapshotRow {
     fn into_entry(self) -> Result<LedgerSnapshotEntry, NativeOutstandingsError> {
         let closing_balance = parse_ledger_closing_balance(&self.closing_text, &self.name)?;
         let opening_balance = parse_ledger_amount(&self.opening_text)?;
+        let opening_balance_observed = if self.opening_text.is_empty() {
+            None
+        } else {
+            Some(opening_balance.clone())
+        };
         Ok(LedgerSnapshotEntry {
             name: self.name,
             parent: self.parent,
             closing_balance,
             opening_balance,
+            opening_balance_observed,
             bill_wise_on: self.bill_wise_on,
             currency_name: self.currency_name,
         })
@@ -1225,7 +1245,7 @@ fn validate_row_attributes(
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute
             .map_err(|_| NativeOutstandingsError::InvalidResponse(invalid_response_code))?;
-        if !seen.insert(attribute.key.as_ref().to_ascii_lowercase()) {
+        if !seen.insert(attribute.key.as_ref().as_bytes().to_ascii_lowercase()) {
             return Err(NativeOutstandingsError::InvalidResponse(
                 invalid_response_code,
             ));
@@ -1241,7 +1261,7 @@ fn attribute_value(element: &BytesStart<'_>, key: &[u8]) -> Option<String> {
     element
         .attributes()
         .flatten()
-        .find(|attribute| attribute.key.as_ref().eq_ignore_ascii_case(key))
+        .find(|attribute| attribute.key.as_ref().as_bytes().eq_ignore_ascii_case(key))
         .and_then(|attribute| {
             attribute
                 .normalized_value(quick_xml::XmlVersion::Implicit1_0)
@@ -1262,7 +1282,7 @@ fn raw_attribute_value(element: &BytesStart<'_>, key: &[u8]) -> Option<String> {
     element
         .attributes()
         .flatten()
-        .find(|attribute| attribute.key.as_ref().eq_ignore_ascii_case(key))
+        .find(|attribute| attribute.key.as_ref().as_bytes().eq_ignore_ascii_case(key))
         .and_then(|attribute| {
             attribute
                 .normalized_value(quick_xml::XmlVersion::Implicit1_0)
@@ -1296,10 +1316,7 @@ fn read_element_identifier_text(
     let raw = reader
         .read_text(name)
         .map_err(|_| NativeOutstandingsError::InvalidResponse("native_xml_malformed"))?;
-    let decoded = raw
-        .decode()
-        .map_err(|_| NativeOutstandingsError::InvalidResponse("native_xml_invalid_encoding"))?;
-    let unescaped = quick_xml::escape::unescape(&decoded)
+    let unescaped = quick_xml::escape::unescape(&raw)
         .map_err(|_| NativeOutstandingsError::InvalidResponse("native_xml_invalid_escape"))?;
     Ok(unescaped.into_owned())
 }
@@ -1390,7 +1407,7 @@ fn walk_collection_rows(
             .map_err(|_| NativeOutstandingsError::InvalidResponse(codes.malformed))?;
         match event {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if path.is_empty() && name != b"ENVELOPE" {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         codes.root_not_envelope,
@@ -1430,7 +1447,7 @@ fn walk_collection_rows(
                 path.push(name);
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 // A self-closing STATUS is no answer, and a second STATUS of
                 // any kind is refused (bridge#717).
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
@@ -1453,7 +1470,7 @@ fn walk_collection_rows(
                 let expected = path.pop().ok_or(NativeOutstandingsError::InvalidResponse(
                     codes.unexpected_close,
                 ))?;
-                if expected != element.name().as_ref().to_ascii_uppercase() {
+                if expected != element.name().as_ref().as_bytes().to_ascii_uppercase() {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         codes.unexpected_close,
                     ));
@@ -1501,7 +1518,7 @@ fn parse_currency_row(
             .read_event()
             .map_err(|_| NativeOutstandingsError::InvalidResponse("currency_xml_malformed"))?
         {
-            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case(b"ORIGINALNAME") => {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("ORIGINALNAME") => {
                 // Untrimmed: the base is matched to the company's
                 // CURRENCYNAME character for character (§9.10a.2).
                 let text = read_element_identifier_text(reader, child.name())?;
@@ -1511,14 +1528,14 @@ fn parse_currency_row(
                     ));
                 }
             }
-            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case(b"ORIGINALNAME") => {
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("ORIGINALNAME") => {
                 if original_name.replace(String::new()).is_some() {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         "currency_duplicate_original_name",
                     ));
                 }
             }
-            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case(b"MAILINGNAME") => {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("MAILINGNAME") => {
                 let text = read_element_text(reader, child.name())?;
                 if mailing_name.replace(text).is_some() {
                     return Err(NativeOutstandingsError::InvalidResponse(
@@ -1526,7 +1543,7 @@ fn parse_currency_row(
                     ));
                 }
             }
-            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case(b"DECIMALPLACES") => {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("DECIMALPLACES") => {
                 let text = read_element_text(reader, child.name())?;
                 let parsed = text.parse::<u8>().map_err(|_| {
                     NativeOutstandingsError::InvalidResponse("currency_decimal_places_invalid")
@@ -1538,19 +1555,19 @@ fn parse_currency_row(
                 }
             }
             Event::Start(_) => skip_subtree(reader)?,
-            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case(b"MAILINGNAME") => {
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("MAILINGNAME") => {
                 if mailing_name.replace(String::new()).is_some() {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         "currency_duplicate_mailing_name",
                     ));
                 }
             }
-            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case(b"DECIMALPLACES") => {
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("DECIMALPLACES") => {
                 return Err(NativeOutstandingsError::InvalidResponse(
                     "currency_decimal_places_invalid",
                 ));
             }
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"CURRENCY") => break,
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("CURRENCY") => break,
             Event::Eof => {
                 return Err(NativeOutstandingsError::InvalidResponse(
                     "currency_row_unterminated",
@@ -1629,7 +1646,7 @@ fn parse_company_currency_row(
         match reader.read_event().map_err(|_| {
             NativeOutstandingsError::InvalidResponse("company_currency_xml_malformed")
         })? {
-            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case(b"GUID") => {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("GUID") => {
                 let text = read_element_text(reader, child.name())?;
                 if guid.replace(text).is_some() {
                     return Err(NativeOutstandingsError::InvalidResponse(
@@ -1637,7 +1654,7 @@ fn parse_company_currency_row(
                     ));
                 }
             }
-            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case(b"CURRENCYNAME") => {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("CURRENCYNAME") => {
                 // Untrimmed, like the ORIGINALNAME it is matched to.
                 let text = read_element_identifier_text(reader, child.name())?;
                 if currency_name.replace(text).is_some() {
@@ -1646,7 +1663,7 @@ fn parse_company_currency_row(
                     ));
                 }
             }
-            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case(b"CURRENCYNAME") => {
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("CURRENCYNAME") => {
                 if currency_name.replace(String::new()).is_some() {
                     return Err(NativeOutstandingsError::InvalidResponse(
                         "company_currency_duplicate_name",
@@ -1654,7 +1671,7 @@ fn parse_company_currency_row(
                 }
             }
             Event::Start(_) => skip_subtree(reader)?,
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"COMPANY") => break,
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("COMPANY") => break,
             Event::Eof => {
                 return Err(NativeOutstandingsError::InvalidResponse(
                     "company_currency_row_unterminated",

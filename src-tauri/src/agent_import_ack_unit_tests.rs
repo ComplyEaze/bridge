@@ -16,6 +16,21 @@ fn row_json(entries: usize, narration: &str) -> Value {
     })
 }
 
+/// The product is named "ComplyEaze Bridge" in every line a person reads in a
+/// dialog: each "Bridge" in `text` follows "ComplyEaze ".
+fn every_bridge_is_the_brand(text: &str) {
+    assert!(
+        text.contains("ComplyEaze Bridge"),
+        "the product is not named at all: {text}"
+    );
+    for (at, _) in text.match_indices("Bridge") {
+        assert!(
+            text[..at].ends_with("ComplyEaze "),
+            "a bare Bridge at {at}: {text}"
+        );
+    }
+}
+
 fn doubt() -> Value {
     json!({"state":"posted_under_changed_masters","ledgers":["Cash"]})
 }
@@ -28,10 +43,14 @@ fn the_review_shows_the_doubt_and_the_voucher() {
     let voucher: ReadVoucher = serde_json::from_value(voucher).unwrap();
     let preview = review_preview(BATCH, MARKER, "Books", &doubt(), &voucher).unwrap();
     for shown in [
-        "Record that you reviewed ONE Journal in \"Books\"",
+        "Record that you reviewed ONE \"Journal\" in \"Books\"",
         "  \"Cash\"",
         "Date: \"20260907\"  Voucher number: \"2\"  ALTERID: 10",
-        "Narration:\n  \"Paid\"",
+        "\nNarration: below the dashes\nDr 1.00",
+        &format!(
+            "reconciliation_required.\n{}\nNarration: \"Paid\"",
+            post::VOUCHER_TEXT_HEADING
+        ),
         "Dr 1.00  \"Ledger 0\"",
         "Cr 1.00  \"Ledger 1\"",
         &format!("Batch: {BATCH}"),
@@ -39,7 +58,18 @@ fn the_review_shows_the_doubt_and_the_voucher() {
     ] {
         assert!(preview.contains(shown), "{shown}: {preview}");
     }
-    assert!(preview.starts_with("Record that you reviewed ONE Journal"));
+    assert!(preview.starts_with("Record that you reviewed ONE \"Journal\""));
+    assert!(
+        preview.contains("\nComplyEaze Bridge posted it, but these ledgers no longer resolve\n"),
+        "{preview}"
+    );
+    every_bridge_is_the_brand(&preview);
+    assert!(
+        preview.contains(
+            "It is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required."
+        ),
+        "{preview}"
+    );
     assert!(
         preview.contains(&format!("Choosing \"{REVIEW_BUTTON}\"")),
         "names the button the platform shows: {preview}"
@@ -88,38 +118,45 @@ fn a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is() 
 /// a cap that stopped being checked lets its fixture through.
 #[test]
 fn each_review_cap_refuses_on_its_own() {
+    // Every line of the characters fixture is at most 100 wide and there are
+    // at most 24: the text passes 1,600 characters only by being full.
     let wide_ledgers = |entries: usize| {
         let mut voucher = row(entries, "Paid");
         for (index, entry) in voucher.entries.iter_mut().enumerate() {
-            entry.ledger = format!("{index:02}{}", "L".repeat(85));
+            entry.ledger = format!("{index:02}{}", "L".repeat(87));
         }
+        voucher.voucher_number = Some("V".repeat(45));
         voucher
     };
-    let long_doubt = json!({"state":"posted_under_changed_masters","ledgers":["D".repeat(90)]});
+    let long_doubt = json!({"state":"posted_under_changed_masters","ledgers":["D".repeat(96)]});
+    let long_company = "C".repeat(55);
     let cases = [
-        ("line_width", row(2, &"n".repeat(120)), doubt()),
-        ("lines", row(20, "Paid"), doubt()),
+        ("line_width", row(2, &"n".repeat(120)), doubt(), "Books"),
+        ("lines", row(20, "Paid"), doubt(), "Books"),
         (
             "characters",
             {
-                let mut voucher = wide_ledgers(10);
-                voucher.narration = Some("n".repeat(90));
+                let mut voucher = wide_ledgers(8);
+                voucher.narration = Some("n".repeat(87));
                 voucher
             },
             long_doubt,
+            long_company.as_str(),
         ),
     ];
-    for (cap, voucher, doubt) in cases {
-        let preview = review_preview(BATCH, MARKER, "Books", &doubt, &voucher);
+    for (cap, voucher, doubt, company) in cases {
+        let preview = review_preview(BATCH, MARKER, company, &doubt, &voucher);
         assert_eq!(preview, Err("ack_review_too_large".to_string()), "{cap}");
-        let rendered = render_review_text(BATCH, MARKER, "Books", &doubt, &voucher).unwrap();
+        let rendered = render_review_text(BATCH, MARKER, company, &doubt, &voucher).unwrap();
         assert_eq!(caps_exceeded(&rendered), [cap], "{cap}: only its own cap");
     }
 }
 
 #[test]
 fn a_review_too_long_to_show_is_refused_not_truncated() {
-    assert!(review_preview(BATCH, MARKER, "Books", &doubt(), &row(10, "Paid")).is_ok());
+    // Nine entries fit under the narration's heading (#1535); forty do not,
+    // and the review is refused whole.
+    assert!(review_preview(BATCH, MARKER, "Books", &doubt(), &row(9, "Paid")).is_ok());
     assert_eq!(
         review_preview(BATCH, MARKER, "Books", &doubt(), &row(40, "Paid")),
         Err("ack_review_too_large".to_string())
@@ -165,6 +202,59 @@ fn a_value_with_a_line_break_or_hidden_character_is_refused() {
     }
 }
 
+/// #1535: the review shows the narration as the approval does, after every
+/// line ComplyEaze Bridge writes, under the approval's heading: on one line,
+/// or when too long for one, in quoted parts split only at a space, counted
+/// on the line in its place; so a voucher posted with it can be reviewed.
+#[test]
+fn a_long_narration_is_reviewed_in_quoted_parts_under_the_heading() {
+    let narration = "Synthetic statement row: cash deposit at the branch counter 000123 | Synthetic Bank Ledger | 03-08-2026 | cash purpose not confirmed";
+    let preview = review_preview(
+        BATCH,
+        MARKER,
+        "Books",
+        &doubt(),
+        &row(2, &format!("{narration} {MARKER}")),
+    )
+    .unwrap();
+    assert!(
+        preview.contains("\nNarration: below the dashes, in 2 parts\nDr 1.00"),
+        "{preview}"
+    );
+    let (above, below) = preview
+        .split_once(&format!("\n{}\n", post::VOUCHER_TEXT_HEADING))
+        .unwrap();
+    assert!(above.ends_with("reconciliation_required."), "{preview}");
+    let parts: Vec<String> = below
+        .lines()
+        .enumerate()
+        .map(|(at, shown)| {
+            let quoted = shown
+                .strip_prefix(&format!("Narration ({}): ", at + 1))
+                .unwrap_or_else(|| panic!("{shown}: {preview}"));
+            serde_json::from_str(quoted).unwrap()
+        })
+        .collect();
+    assert_eq!(parts.len(), 2, "{preview}");
+    assert_eq!(parts.concat(), narration, "{preview}");
+    assert!(
+        preview.lines().all(|shown| shown.chars().count() <= 100),
+        "{preview}"
+    );
+    // A long one holding a part label's shape is refused, never cut.
+    assert_eq!(
+        review_preview(
+            BATCH,
+            MARKER,
+            "Books",
+            &doubt(),
+            &row(2, &format!("{} (2) end", "word ".repeat(20)))
+        )
+        .unwrap_err(),
+        "ack_review_layout_text"
+    );
+}
+
 /// Only this batch's own marker at the end of the narration is left out;
 /// text after it, a second marker and another batch's marker are all shown,
 /// because the record binds the whole narration.
@@ -173,7 +263,7 @@ fn the_narration_is_shown_whole_except_this_batchs_trailing_marker() {
     let shown = |narration: &str| {
         let preview = review_preview(BATCH, MARKER, "Books", &doubt(), &row(2, narration)).unwrap();
         preview
-            .split_once("Narration:\n  ")
+            .split_once(&format!("{}\nNarration: ", post::VOUCHER_TEXT_HEADING))
             .unwrap()
             .1
             .lines()
@@ -242,6 +332,56 @@ fn each_fingerprinted_field_changed_alone_changes_the_fingerprint() {
     assert_eq!(voucher_fingerprint(&alter), original);
 }
 
+/// The read's dates are parsed where it is admitted: a row whose date is
+/// absent or not a Tally date, or whose effective date is not one, is no
+/// `ReadVoucher` (#1425).
+#[test]
+fn a_read_voucher_holds_only_valid_dates() {
+    for (pointer, value) in [
+        ("/date", Value::Null),
+        ("/date", json!("2026-09-07")),
+        ("/date", json!("20260931")),
+        ("/effective_date", json!("")),
+        ("/effective_date", json!("20260931")),
+    ] {
+        let mut bad = row_json(2, "Paid");
+        *bad.pointer_mut(pointer).unwrap() = value.clone();
+        assert!(
+            serde_json::from_value::<ReadVoucher>(bad).is_err(),
+            "{pointer} {value}"
+        );
+    }
+    let mut absent = row_json(2, "Paid");
+    absent.as_object_mut().unwrap().remove("date");
+    assert!(serde_json::from_value::<ReadVoucher>(absent).is_err());
+    let mut no_effective = row_json(2, "Paid");
+    no_effective
+        .as_object_mut()
+        .unwrap()
+        .remove("effective_date");
+    let read: ReadVoucher = serde_json::from_value(no_effective).unwrap();
+    assert_eq!(read.date.as_str(), "20260907");
+    assert_eq!(read.effective_date, None);
+}
+
+/// A recorded review is bound to these exact digests: a change to how the read
+/// holds a field, such as its dates (#1425), must not change the bytes hashed,
+/// or every review on file would read as stale.
+#[test]
+fn the_fingerprint_of_a_read_voucher_is_unchanged() {
+    assert_eq!(
+        voucher_fingerprint(&row(2, "Paid")),
+        "bd42a82bc3c2cf8bdc5e238f72be946b8831d854e469e768d5c00eb05ecaba4e"
+    );
+    let mut dated = row_json(2, "Paid");
+    *dated.pointer_mut("/effective_date").unwrap() = json!("20260907");
+    let dated: ReadVoucher = serde_json::from_value(dated).unwrap();
+    assert_eq!(
+        voucher_fingerprint(&dated),
+        "6e3f9e74fdce028e34f79fb3c586e9cc619e7a836024d77b4d3b20bf7d32a8bf"
+    );
+}
+
 /// A posted line, as `post_import` saves one: its marker is what
 /// `admit_review` finds the voucher by.
 fn posted_line() -> ImportLedgerLine {
@@ -249,7 +389,7 @@ fn posted_line() -> ImportLedgerLine {
         "batch_id":BATCH, "identity_scheme":"batch_v1",
         "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
         "txn_ids":["T1"],"date_from":"20260907","date_to":"20260907",
-        "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":7},
         "vouchers":[{"bridge_txn_id":"T1","date":"20260907","voucher_type":"Journal",
             "narration":null,"reference":null,"voucher_number":null,
@@ -275,7 +415,15 @@ fn each_readback_guard_refuses_on_its_own_even_under_posted_verified() {
     let marked = || row_json(2, &format!("Paid [BRIDGE:{tag}]"));
     let admit = |row: Value| {
         let row: ReadVoucher = serde_json::from_value(row).unwrap();
-        admit_review(imports.path(), &line, &payload, &[row], DoubtKind::Masters).map(|_| ())
+        admit_review(
+            imports.path(),
+            &line,
+            &payload,
+            &[row],
+            DoubtKind::Masters,
+            None,
+        )
+        .map(|_| ())
     };
     assert_eq!(admit(marked()), Ok(()), "the control is admitted");
     for (pointer, value) in [
@@ -447,6 +595,7 @@ fn a_batch_review_binds_every_voucher_and_refuses_a_partial_read() {
         &verified(3),
         &rows,
         DoubtKind::BatchStep,
+        None,
     )
     .unwrap();
     assert_eq!(shown.doubt_raw, STEP_DOUBT);
@@ -459,7 +608,7 @@ fn a_batch_review_binds_every_voucher_and_refuses_a_partial_read() {
         [("T1", 10), ("T2", 11), ("T3", 12)]
     );
     let refused = |payload: &Value, rows: &[ReadVoucher], kind| {
-        admit_review(imports.path(), &line, payload, rows, kind).err()
+        admit_review(imports.path(), &line, payload, rows, kind, None).err()
     };
     assert_eq!(
         refused(&verified(2), &rows, DoubtKind::BatchStep).as_deref(),
@@ -508,16 +657,20 @@ fn the_batch_review_summarizes_the_doubt_and_the_vouchers_as_read() {
         &format!("Batch: {BATCH}"),
         "I reviewed these 3 vouchers in Tally.",
         "reconciliation_required",
+        "ComplyEaze Bridge posted them, but cannot confirm that only they",
+        "They are correct as they stand.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
     ] {
         assert!(preview.contains(shown), "{shown}: {preview}");
     }
+    every_bridge_is_the_brand(&preview);
     let masters: Value = serde_json::from_slice(MASTERS_DOUBT).unwrap();
     let preview =
         batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &rows).unwrap();
     assert!(
-        preview.contains("these ledgers no longer resolve"),
+        preview.contains("ComplyEaze Bridge posted them, but these ledgers no longer resolve"),
         "{preview}"
     );
+    every_bridge_is_the_brand(&preview);
     assert!(preview.contains("  \"Cash\""), "{preview}");
     // Too many ledgers for one dialog.
     let wide = (0..40)
@@ -547,7 +700,7 @@ fn each_kind_of_step_doubt_is_shown_in_its_own_words() {
     for (step, said, never) in [
         (
             Value::Null,
-            "changed this company's vouchers:\nBridge could not read its voucher mark after posting.\n",
+            "changed this company's vouchers:\nComplyEaze Bridge could not read its voucher mark after posting.\n",
             "Tally reported",
         ),
         (
@@ -589,6 +742,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         &verified(2),
         &rows,
         DoubtKind::Masters,
+        None,
     )
     .unwrap();
     let record = BatchAckRecord {
@@ -608,7 +762,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         serde_json::to_vec(&record).unwrap(),
     )
     .unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["masters"]["state"], "current", "{review}");
     assert_eq!(review["batch_step"]["state"], "absent", "{review}");
     // A masters review does not cover the step doubt, even filed under it.
@@ -617,7 +771,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         DoubtKind::BatchStep.ack_path(imports.path(), BATCH),
     )
     .unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["state"], "stale", "{review}");
     assert_eq!(review["batch_step"]["covers_doubt"], false, "{review}");
     // Even bound to the step doubt's own bytes, a record that names another
@@ -632,7 +786,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         serde_json::to_vec(&misnamed).unwrap(),
     )
     .unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["covers_doubt"], false, "{review}");
     misnamed.doubt = "batch_step".into();
     fs::write(
@@ -640,7 +794,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         serde_json::to_vec(&misnamed).unwrap(),
     )
     .unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["state"], "current", "{review}");
     // A record for the same vouchers in another order covers nothing.
     misnamed.vouchers.reverse();
@@ -649,7 +803,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         serde_json::to_vec(&misnamed).unwrap(),
     )
     .unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["covers_doubt"], false, "{review}");
     misnamed.vouchers.reverse();
     fs::write(
@@ -660,7 +814,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
     // One voucher altered: the masters review is stale and names it.
     let mut edited = rows.clone();
     edited[1].alter_id = Some(99);
-    let review = operator_review(imports.path(), &line, &edited).unwrap();
+    let review = operator_review(imports.path(), &line, &edited, None).unwrap();
     assert_eq!(review["masters"]["state"], "stale", "{review}");
     assert_eq!(
         review["masters"]["changed_vouchers"],
@@ -669,10 +823,117 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
     );
     // A review whose doubt file has gone is stale, not silently absent.
     fs::remove_file(super::batch_step_doubt_path(imports.path(), BATCH)).unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["state"], "stale", "{review}");
     assert_eq!(review["batch_step"]["covers_doubt"], false, "{review}");
     assert_eq!(review["masters"]["state"], "current", "{review}");
+}
+
+/// A batch review record that names another batch or company, binds a
+/// voucher under another GUID, or was written under another fingerprint field
+/// list reads `stale` (#745). Each copy changes one binding and keeps every
+/// other one, so only the check under test can catch it.
+#[test]
+fn a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale() {
+    let imports = tempfile::tempdir().unwrap();
+    let line = posted_batch(2);
+    let rows = batch_rows(&line);
+    fs::write(masters_doubt_path(imports.path(), BATCH), MASTERS_DOUBT).unwrap();
+    let shown = admit_review(
+        imports.path(),
+        &line,
+        &verified(2),
+        &rows,
+        DoubtKind::Masters,
+        None,
+    )
+    .unwrap();
+    let current = || BatchAckRecord {
+        version: BATCH_RECORD_VERSION,
+        batch_id: BATCH.into(),
+        company_guid: line.company_guid.clone(),
+        doubt: "masters".into(),
+        doubt_sha256: sha256_hex(MASTERS_DOUBT),
+        vouchers: shown.vouchers.clone(),
+        voucher_fingerprint_fields: FINGERPRINT_FIELDS.into(),
+        shown: json!([]),
+        reviewed_at: "2026-09-26T00:00:00.000Z".into(),
+        local_account_label: None,
+    };
+    let review_of = |record: &BatchAckRecord| {
+        fs::write(
+            DoubtKind::Masters.ack_path(imports.path(), BATCH),
+            serde_json::to_vec(record).unwrap(),
+        )
+        .unwrap();
+        operator_review(imports.path(), &line, &rows, None).unwrap()["masters"].clone()
+    };
+    // Control: the record as written is current.
+    let review = review_of(&current());
+    assert_eq!(review["state"], "current", "{review}");
+    type Edit = fn(&mut BatchAckRecord);
+    let cases: [(&str, Edit, bool, Value); 4] = [
+        (
+            "another batch",
+            |record| record.batch_id = "bridge-00000000-0000-4000-8000-000000000001".into(),
+            false,
+            json!([]),
+        ),
+        (
+            "another company",
+            |record| record.company_guid = "00000000-0000-4000-8000-000000000002".into(),
+            false,
+            json!([]),
+        ),
+        (
+            "a voucher under another GUID",
+            |record| record.vouchers[1].guid = "g-other".into(),
+            true,
+            json!(["T2"]),
+        ),
+        (
+            "another fingerprint field list",
+            |record| record.voucher_fingerprint_fields = "v0:guid".into(),
+            true,
+            json!(["T1", "T2"]),
+        ),
+    ];
+    for (name, edit, covers_doubt, changed_vouchers) in cases {
+        let mut record = current();
+        edit(&mut record);
+        let review = review_of(&record);
+        assert_eq!(review["state"], "stale", "{name}: {review}");
+        assert_eq!(review["covers_doubt"], covers_doubt, "{name}: {review}");
+        assert_eq!(
+            review["vouchers_unchanged"], !covers_doubt,
+            "{name}: {review}"
+        );
+        assert_eq!(
+            review["changed_vouchers"], changed_vouchers,
+            "{name}: {review}"
+        );
+    }
+}
+
+/// A step doubt file that says `unmatched` but holds no `target_voucher_step`
+/// reads `unreadable`, never as a doubt a review could bind to (#745).
+#[test]
+fn a_step_doubt_without_its_step_reads_unreadable() {
+    let imports = tempfile::tempdir().unwrap();
+    let line = posted_batch(2);
+    let rows = batch_rows(&line);
+    let step_doubt = super::batch_step_doubt_path(imports.path(), BATCH);
+    fs::write(&step_doubt, br#"{"state":"unmatched"}"#).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
+    assert_eq!(
+        review["batch_step"],
+        json!({"state":"unreadable"}),
+        "{review}"
+    );
+    // Control: with its step, the same file is a doubt with no review yet.
+    fs::write(&step_doubt, STEP_DOUBT).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
+    assert_eq!(review["batch_step"]["state"], "absent", "{review}");
 }
 
 /// A kind whose verdict is not yet recorded reads `pending`, not `null`: the
@@ -688,7 +949,7 @@ fn a_batch_kind_whose_verdict_is_pending_reads_pending() {
             serde_json::to_vec(&json!({"state":masters,"batch_step":{"state":step}})).unwrap(),
         )
         .unwrap();
-        operator_review(imports.path(), &line, &rows)
+        operator_review(imports.path(), &line, &rows, None)
     };
     let review = check("unchanged", MASTERS_CHECK_PENDING).unwrap();
     assert_eq!(review["batch_step"], json!({"state":"pending"}), "{review}");
@@ -712,7 +973,7 @@ fn a_doubt_whose_own_file_was_not_written_reads_doubt_record_unavailable() {
             serde_json::to_vec(&json!({"state":masters,"batch_step":{"state":step}})).unwrap(),
         )
         .unwrap();
-        operator_review(imports.path(), line, &batch_rows(line))
+        operator_review(imports.path(), line, &batch_rows(line), None)
     };
     let batch = posted_batch(2);
     let review = check(&batch, "posted_under_changed_masters", "matched").unwrap();
@@ -811,4 +1072,477 @@ fn a_second_doubt_after_the_read_refuses_an_unnamed_review() {
         let after = [(DoubtKind::Masters, masters), (DoubtKind::BatchStep, step)];
         assert_eq!(still_the_only_doubt(&after), expected, "{after:?}");
     }
+}
+
+/// Grow a preview one character at a time with `build(pad)`: it fits up to some
+/// size and is refused beyond it, never the other way round. The largest preview
+/// that fit, and the refusal that followed it (`None` if none did by `max_pad`).
+fn largest_fit(
+    build: impl Fn(usize) -> Result<String, String>,
+    max_pad: usize,
+) -> (String, Option<String>) {
+    let (mut fit, mut refusal) = (None, None);
+    for pad in 0..=max_pad {
+        match build(pad) {
+            Ok(preview) => {
+                assert!(refusal.is_none(), "a fit after a refusal, at pad {pad}");
+                fit = Some(preview);
+            }
+            Err(code) => {
+                refusal.get_or_insert(code);
+            }
+        }
+    }
+    (fit.expect("the smallest preview fits"), refusal)
+}
+
+/// The lengths of fields that grow together: `pad` more characters are dealt out
+/// round-robin from `start`, and each field stops at its own cap, so the total
+/// grows by one, or by nothing, per step.
+fn grown_lengths(pad: usize, start: usize, caps: &[usize]) -> Vec<usize> {
+    caps.iter()
+        .enumerate()
+        .map(|(field, cap)| {
+            (start + pad / caps.len() + usize::from(field < pad % caps.len())).min(*cap)
+        })
+        .collect()
+}
+
+/// The longest length, up to 200, at which `fits` still holds.
+fn widest(fits: impl Fn(usize) -> bool) -> usize {
+    (1..=200)
+        .take_while(|&length| fits(length))
+        .last()
+        .expect("fits at one character")
+}
+
+/// A name of `length` characters: a letter for `field`, so names differ, then
+/// `filler`.
+fn name_of(field: usize, length: usize, filler: &str) -> String {
+    format!(
+        "{}{}",
+        char::from_u32(0x0915 + field as u32).expect("a Devanagari letter"),
+        filler.repeat(length.saturating_sub(1))
+    )
+}
+
+/// A voucher as read back with one entry per name and this narration and number.
+fn row_named(names: &[String], narration: &str, number: &str) -> ReadVoucher {
+    let mut voucher = row_json(names.len(), narration);
+    voucher["voucher_number"] = json!(number);
+    for (index, name) in names.iter().enumerate() {
+        voucher["amounts"][index]["ledger"] = json!(name);
+    }
+    serde_json::from_value(voucher).unwrap()
+}
+
+/// A batch review of one voucher with `count` ledgers, in a company, whose names
+/// are `filler` letters of the lengths `lengths` gives: the company, then each
+/// ledger.
+fn batch_review_of(lengths: &[usize], filler: &str) -> Result<String, String> {
+    let line = posted_batch(2);
+    let step: Value = serde_json::from_slice(STEP_DOUBT).unwrap();
+    let names: Vec<String> = (0..lengths.len() - 1)
+        .map(|ledger| name_of(ledger, lengths[1 + ledger], filler))
+        .collect();
+    let rows = [row_named(&names, "Paid", "2")];
+    let rows = rows.iter().collect::<Vec<_>>();
+    batch_review_preview(
+        &line,
+        DoubtKind::BatchStep,
+        &name_of(30, lengths[0], filler),
+        &step,
+        &rows,
+    )
+}
+
+/// The caps of each of `fields` fields: the longest each can be, alone, with the
+/// rest at one character.
+fn field_caps(fields: usize, fits: impl Fn(&[usize]) -> bool) -> Vec<usize> {
+    (0..fields)
+        .map(|field| {
+            widest(|length| {
+                let mut lengths = vec![1; fields];
+                lengths[field] = length;
+                fits(&lengths)
+            })
+        })
+        .collect()
+}
+
+/// The batch review's 3,200-character cap is exact: the company and twenty-six
+/// ledger names (40 lines in all) grown to their own width, a character at a
+/// time, fit at exactly 3,200 characters and one more is refused. Branding added
+/// characters to this preview, so the boundary is pinned: what sits at it is
+/// refused loudly, never cut.
+#[test]
+fn a_batch_review_fits_at_exactly_3200_characters_and_not_one_more() {
+    let fits = |lengths: &[usize]| batch_review_of(lengths, "N");
+    let caps = field_caps(27, |lengths| fits(lengths).is_ok());
+    let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 27 * 100);
+    assert_eq!(fit.chars().count(), 3_200, "{fit}");
+    assert_eq!(fit.lines().count(), 40, "{fit}");
+    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+}
+
+/// The batch review's 7,000-byte cap binds before its character cap when the
+/// names are three-byte letters: grown the same way, the review fits up to the
+/// last size within 7,000 bytes (each step adds up to three) and the next is
+/// refused, at fewer than 3,200 characters. Branding added bytes to this preview
+/// too, so this boundary is pinned as well.
+#[test]
+fn a_batch_review_of_three_byte_names_is_refused_past_7000_bytes() {
+    let fits = |lengths: &[usize]| batch_review_of(lengths, "न");
+    let caps = field_caps(27, |lengths| fits(lengths).is_ok());
+    let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 27 * 100);
+    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+    let bytes = fit.len();
+    assert!(bytes <= 7_000 && bytes + 3 > 7_000, "{bytes} bytes");
+    assert!(
+        fit.chars().count() < 3_200,
+        "{} characters",
+        fit.chars().count()
+    );
+}
+
+/// One single review whose fields have the lengths `lengths` gives: the company,
+/// nine entry ledgers, the narration, the voucher number and the doubted ledger.
+fn single_review_of(lengths: &[usize]) -> Result<String, String> {
+    let names: Vec<String> = (0..9)
+        .map(|entry| name_of(entry, lengths[1 + entry], "N"))
+        .collect();
+    let doubt =
+        json!({"state":"posted_under_changed_masters","ledgers":[name_of(12, lengths[12], "N")]});
+    review_preview(
+        BATCH,
+        MARKER,
+        &name_of(30, lengths[0], "N"),
+        &doubt,
+        &row_named(
+            &names,
+            &name_of(10, lengths[10], "N"),
+            &name_of(11, lengths[11], "N"),
+        ),
+    )
+}
+
+/// The single review's 1,600-character cap is exact: the company, nine ledgers,
+/// the narration, the voucher number and the doubted ledger grown to their own
+/// width fit at exactly 1,600 characters and one more is refused. Branding added
+/// characters to this preview, so the boundary is pinned: what sits at it is
+/// refused loudly, never cut.
+#[test]
+fn a_single_review_fits_at_exactly_1600_characters_and_not_one_more() {
+    let caps = field_caps(13, |lengths| single_review_of(lengths).is_ok());
+    let (fit, refusal) = largest_fit(
+        |pad| single_review_of(&grown_lengths(pad, 1, &caps)),
+        13 * 100,
+    );
+    assert_eq!(fit.chars().count(), 1_600, "{fit}");
+    assert!(fit.lines().all(|line| line.chars().count() <= 100), "{fit}");
+    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+}
+
+/// A native post carries no tag: its reviewed row is the one with the GUID and
+/// MasterID its post was bound to, and without that binding nothing is found.
+/// A binding never falls back to a tag.
+#[test]
+fn a_bound_voucher_is_reviewed_by_its_guid_not_a_tag() {
+    let line = posted_line();
+    let untagged = row(2, "Paid by cheque");
+    let bound = vec![super::span_identity::PostedVoucherIdentity {
+        bridge_txn_id: "T1".into(),
+        guid: "g-1".into(),
+        master_id: 5,
+    }];
+    assert!(marked_row(&line, std::slice::from_ref(&untagged), None).is_none());
+    assert_eq!(
+        marked_row(&line, std::slice::from_ref(&untagged), Some(&bound)),
+        Some(&untagged)
+    );
+    // Another MasterID on the same GUID is not the bound voucher.
+    let other = vec![super::span_identity::PostedVoucherIdentity {
+        master_id: 6,
+        ..bound[0].clone()
+    }];
+    assert!(marked_row(&line, std::slice::from_ref(&untagged), Some(&other)).is_none());
+    // With a binding, a tagged row of the same batch is not taken instead.
+    let tag = line.attribution_tag(&line.vouchers[0]);
+    let mut tagged = row(2, &format!("Paid [BRIDGE:{tag}]"));
+    tagged.guid = Some("g-2".into());
+    assert!(marked_row(&line, std::slice::from_ref(&tagged), Some(&bound)).is_none());
+    assert_eq!(
+        marked_row(&line, std::slice::from_ref(&tagged), None),
+        Some(&tagged)
+    );
+}
+
+/// A masters record larger than `MAX_RECORD_BYTES` is unreadable, `Err(())`,
+/// never read as its content; one at the bound reads whole (#837).
+#[test]
+fn a_masters_record_past_the_record_bound_is_unreadable() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("masters.json");
+    let record = json!({"state": "verified"});
+    let padded = |size: usize| {
+        let mut bytes = record.to_string().into_bytes();
+        bytes.resize(size, b' ');
+        bytes
+    };
+    let at_bound = padded(ledger::MAX_RECORD_BYTES);
+    std::fs::write(&path, &at_bound).unwrap();
+    assert_eq!(
+        read_masters_record_raw(&path),
+        Ok(Some((at_bound, record.clone())))
+    );
+    std::fs::write(&path, padded(ledger::MAX_RECORD_BYTES + 1)).unwrap();
+    assert_eq!(read_masters_record_raw(&path), Err(()));
+}
+
+/// bridge#626: a ledger name that ends in one CR LF is shown in the review
+/// of one voucher quoted, with the break written out and the mark before it,
+/// whether the doubt or an entry names it, and the note stands once above
+/// the batch line. The same break at the end of the narration, the company
+/// name or the voucher number is refused.
+#[test]
+fn a_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
+    let mut voucher = row_json(2, "Paid");
+    voucher["amounts"][0]["ledger"] = json!("Ledger 0\r\n");
+    let voucher: ReadVoucher = serde_json::from_value(voucher).unwrap();
+    let named = json!({"state":"posted_under_changed_masters","ledgers":["Cash\r\n"]});
+    let note_lines = |preview: &str| {
+        preview
+            .lines()
+            .filter(|shown| *shown == post::LINE_BREAK_NOTE)
+            .count()
+    };
+    let preview = review_preview(BATCH, MARKER, "Books", &named, &voucher).unwrap();
+    let lines: Vec<&str> = preview.lines().collect();
+    assert_eq!(
+        preview,
+        [
+            "Record that you reviewed ONE \"Journal\" in \"Books\"",
+            "ComplyEaze Bridge posted it, but these ledgers no longer resolve",
+            "to the master you approved:",
+            r#"  Line break  "Cash\r\n""#,
+            "",
+            "As it is in Tally now:",
+            "Date: \"20260907\"  Voucher number: \"2\"  ALTERID: 10",
+            "Narration: below the dashes",
+            r#"Dr 1.00  Line break  "Ledger 0\r\n""#,
+            "Dr 1.00  \"Ledger 1\"",
+            r"Line break: a name that ends in a line break in Tally (shown as \r\n). No other name here has one.",
+            &format!("Batch: {BATCH}"),
+            "",
+            &format!("Choosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally."),
+            "It is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,",
+            "and the batch still reads reconciliation_required.",
+            post::VOUCHER_TEXT_HEADING,
+            "Narration: \"Paid\"",
+        ]
+        .join("\n")
+    );
+    assert_eq!(note_lines(&preview), 1);
+    assert!(
+        !preview
+            .chars()
+            .any(|shown| shown.is_control() && shown != '\n'),
+        "{preview:?}"
+    );
+    // The note costs one line, and only a text that shows such a name has it.
+    let plain = review_preview(BATCH, MARKER, "Books", &doubt(), &row(2, "Paid")).unwrap();
+    assert_eq!(note_lines(&plain), 0);
+    assert_eq!(lines.len(), plain.lines().count() + 1);
+    // The doubt alone, an entry alone, and one name in both.
+    let both = json!({"state":"posted_under_changed_masters","ledgers":["Ledger 0\r\n"]});
+    for (doubt, voucher) in [
+        (&named, &row(2, "Paid")),
+        (&doubt(), &voucher),
+        (&both, &voucher),
+    ] {
+        let preview = review_preview(BATCH, MARKER, "Books", doubt, voucher).unwrap();
+        assert_eq!(note_lines(&preview), 1, "{preview}");
+    }
+    let both = review_preview(BATCH, MARKER, "Books", &both, &voucher).unwrap();
+    assert_eq!(both.matches(r#"Line break  "Ledger 0\r\n""#).count(), 2);
+    // A voucher type is shown quoted, as every value read from Tally is, so
+    // its characters are escaped and the text carries no mark and no line
+    // about one.
+    let mut typed = row_json(2, "Paid");
+    typed["voucher_type"] = json!(r#"Journal\r\n""#);
+    let typed: ReadVoucher = serde_json::from_value(typed).unwrap();
+    let typed = review_preview(BATCH, MARKER, "Books", &doubt(), &typed).unwrap();
+    assert!(
+        typed.starts_with(r#"Record that you reviewed ONE "Journal\\r\\n\"" in "Books""#),
+        "{typed}"
+    );
+    assert!(!typed.contains("Line break"), "{typed}");
+    assert!(!typed.contains(post::LINE_BREAK_NOTE), "{typed}");
+    let mut numbered = row_json(2, "Paid");
+    numbered["voucher_number"] = json!("2\r\n");
+    let numbered: ReadVoucher = serde_json::from_value(numbered).unwrap();
+    for (source, preview) in [
+        (
+            "narration",
+            review_preview(BATCH, MARKER, "Books", &doubt(), &row(2, "Paid\r\n")),
+        ),
+        (
+            "company",
+            review_preview(BATCH, MARKER, "Books\r\n", &doubt(), &row(2, "Paid")),
+        ),
+        (
+            "voucher number",
+            review_preview(BATCH, MARKER, "Books", &doubt(), &numbered),
+        ),
+    ] {
+        assert_eq!(
+            preview,
+            Err("ack_review_layout_text".to_string()),
+            "{source}"
+        );
+    }
+}
+
+/// The review of a batch shows such a name the same way, marked in the
+/// doubt's list and on its per-ledger totals line, with the note once above
+/// the batch line. A line break in any other value it shows is refused.
+#[test]
+fn a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
+    let line = posted_batch(3);
+    let plain_rows = batch_rows(&line);
+    let mut rows = plain_rows.clone();
+    for row in &mut rows {
+        row.entries[0].ledger = "Ledger 0\r\n".into();
+    }
+    let rows = rows.iter().collect::<Vec<_>>();
+    let masters = json!({"state":"posted_under_changed_masters","ledgers":["Cash\r\n"]});
+    let preview =
+        batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &rows).unwrap();
+    let lines: Vec<&str> = preview.lines().collect();
+    assert_eq!(
+        preview,
+        [
+            "Record that you reviewed 3 vouchers in \"Books\"",
+            "ComplyEaze Bridge posted them, but these ledgers no longer resolve",
+            "to the master you approved:",
+            r#"  Line break  "Cash\r\n""#,
+            "",
+            "As they are in Tally now:",
+            "Not shown here: narrations, voucher numbers and types.",
+            "Dates: 20260907 to 20260907  ALTERIDs: 10 to 12",
+            r#"Dr 3  Cr 0  3 entries  Line break  "Ledger 0\r\n""#,
+            "Dr 3  Cr 0  3 entries  \"Ledger 1\"",
+            r"Line break: a name that ends in a line break in Tally (shown as \r\n). No other name here has one.",
+            &format!("Batch: {BATCH}"),
+            "",
+            &format!("Choosing \"{REVIEW_BUTTON}\" records: \"I reviewed these 3 vouchers in Tally."),
+            "They are correct as they stand.\" ComplyEaze Bridge changes nothing in Tally,",
+            "and the batch still reads reconciliation_required.",
+        ]
+        .join("\n")
+    );
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|shown| **shown == post::LINE_BREAK_NOTE)
+            .count(),
+        1
+    );
+    assert!(
+        !preview
+            .chars()
+            .any(|shown| shown.is_control() && shown != '\n'),
+        "{preview:?}"
+    );
+    let plain_rows = plain_rows.iter().collect::<Vec<_>>();
+    let plain: Value = serde_json::from_slice(MASTERS_DOUBT).unwrap();
+    let plain =
+        batch_review_preview(&line, DoubtKind::Masters, "Books", &plain, &plain_rows).unwrap();
+    assert!(!plain.contains(post::LINE_BREAK_NOTE));
+    assert_eq!(lines.len(), plain.lines().count() + 1);
+    // A doubted ledger alone brings the mark and its line.
+    let doubted =
+        batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &plain_rows).unwrap();
+    let doubted: Vec<&str> = doubted.lines().collect();
+    assert!(doubted.contains(&r#"  Line break  "Cash\r\n""#));
+    assert!(doubted.contains(&post::LINE_BREAK_NOTE));
+    // A step doubt lists no doubted ledger, so a name only its record holds
+    // is not shown and brings no line about a mark; an entry's name does.
+    let mut step: Value = serde_json::from_slice(STEP_DOUBT).unwrap();
+    step["ledgers"] = json!(["Cash\r\n"]);
+    let stepped =
+        batch_review_preview(&line, DoubtKind::BatchStep, "Books", &step, &plain_rows).unwrap();
+    assert!(!stepped.contains("Line break"), "{stepped}");
+    let stepped = batch_review_preview(&line, DoubtKind::BatchStep, "Books", &step, &rows).unwrap();
+    let stepped: Vec<&str> = stepped.lines().collect();
+    assert!(stepped.contains(&r#"Dr 3  Cr 0  3 entries  Line break  "Ledger 0\r\n""#));
+    assert!(stepped.contains(&post::LINE_BREAK_NOTE));
+    assert!(!stepped.iter().any(|shown| shown.contains("Cash")));
+    // A batch review shows no value of Tally's raw but the date, and a date
+    // is a validated TallyDate: no value it shows can carry the characters of
+    // a written-out break, so the check every dialog text passes is pinned on
+    // the one-voucher review above, which shows the voucher type raw.
+    let plain_masters: Value = serde_json::from_slice(MASTERS_DOUBT).unwrap();
+    // Only a ledger name is taken so: the company name, an amount or a
+    // voucher type with the same break is refused. A date cannot hold one:
+    // it is a validated TallyDate.
+    let masters = plain_masters;
+    assert_eq!(
+        batch_review_preview(
+            &line,
+            DoubtKind::Masters,
+            "Books\r\n",
+            &masters,
+            &plain_rows
+        ),
+        Err("ack_review_layout_text".to_string())
+    );
+    for (value, spoil) in [
+        (
+            "amount",
+            (|row: &mut ReadVoucher| row.entries[0].amount.push_str("\r\n"))
+                as fn(&mut ReadVoucher),
+        ),
+        ("voucher type", |row: &mut ReadVoucher| {
+            row.voucher_type.as_mut().unwrap().push_str("\r\n")
+        }),
+    ] {
+        let mut rows = batch_rows(&line);
+        spoil(&mut rows[0]);
+        let rows = rows.iter().collect::<Vec<_>>();
+        assert_eq!(
+            batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &rows),
+            Err("ack_review_layout_text".to_string()),
+            "{value}"
+        );
+    }
+}
+
+/// A finished masters verdict, in its own file beside the pending mark the
+/// post left, outranks that mark, for the review as for the verdict (#911).
+#[test]
+fn a_masters_verdict_file_outranks_the_pending_mark_beside_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let write = |name: &str, bytes: &[u8]| {
+        fs::write(imports.join(format!("{BATCH}.{name}")), bytes).unwrap()
+    };
+    write("masters_check.json", br#"{"state":"check_pending"}"#);
+    assert_eq!(read_masters_records(imports, BATCH), MastersRecord::Pending);
+    write("masters_verdict.json", br#"{"state":"unchanged"}"#);
+    assert_eq!(read_masters_records(imports, BATCH), MastersRecord::NoDoubt);
+    write(
+        "masters_verdict.json",
+        br#"{"state":"posted_under_changed_masters","ledgers":["Cash"],"doubt_record":"unavailable"}"#,
+    );
+    assert_eq!(
+        read_masters_records(imports, BATCH),
+        MastersRecord::DoubtRecordUnavailable
+    );
+    // A verdict file that cannot be read is unreadable, never the mark.
+    write("masters_verdict.json", b"{");
+    assert_eq!(
+        read_masters_records(imports, BATCH),
+        MastersRecord::Unreadable
+    );
 }

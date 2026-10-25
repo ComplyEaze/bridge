@@ -1,0 +1,13 @@
+docs/step-by-step-roadmap.md
+scripts/tally-company-selection.test.mjs
+scripts/tally-setup-safety.test.mjs
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs
+src-tauri/src/commands.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/mod.rs
+src-tauri/src/tally/runtime.rs
+src-tauri/src/tally/tdl_engine.rs
+src/main.tsx
+reviewer: lamemustafa

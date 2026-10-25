@@ -1,0 +1,36 @@
+# fixture: tests/fixtures/agent/batch-import-two-missing-ledgers-in-one-voucher.utf16le.xml
+# parser: parse_import_outcome
+# source: captured
+Ok(TallyImportOutcome {
+    application_status: NotReported,
+    counters: TallyImportResult {
+        created: 0,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 2,
+        line_error_count: 1,
+        counter_presence: TallyImportCounterPresence {
+            created: true,
+            altered: true,
+            deleted: true,
+            ignored: true,
+            errors: true,
+            cancelled: true,
+            exceptions: true,
+        },
+    },
+    exceptions_were_reported: true,
+    tally_line_errors: [
+        TallyLineError {
+            text: "Ledger 'Probe Absent Ledger 04' does not exist!",
+            truncated: false,
+        },
+    ],
+    tally_line_errors_omitted: 0,
+    last_vch_id: Some(
+        0,
+    ),
+})

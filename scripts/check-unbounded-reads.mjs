@@ -11,8 +11,8 @@
 // This repo already has the fix pattern in wide use — `reader.take(N +
 // 1).read_to_end(&mut buf)`, reading one byte past a declared limit so an
 // over-limit input is detectable rather than silently truncated (see
-// src-tauri/src/agent_bank_statement.rs, agent_desktop_journal.rs, source_draft/files.rs,
-// tools/bridge-tally-qualification). This gate checks that every such call
+// src-tauri/src/agent_bank_statement.rs, agent_desktop_journal.rs, source_draft/files.rs).
+// This gate checks that every such call
 // site actually uses it, so a new call site that forgets the `.take(...)` is
 // caught mechanically instead of depending on a reviewer noticing.
 //
@@ -36,69 +36,132 @@
 //      string or XML/JSON literal — of which this codebase's parser tests
 //      have many.
 //
-// Residual, stated rather than hidden: this only recognises the *direct*
-// `.take(...)` -> `.read_to_end`/`.read_to_string` chain, matched by scanning
-// backward from the read call to the start of its statement (a line ending
-// `;`, `{`, or `}` is a boundary). A reader that was capped further back —
-// wrapped in a limiting adapter and bound to a variable on an earlier
-// statement, then read from later — is not recognised and reports a false
-// positive; ALLOWED_UNBOUNDED below is the reviewed escape hatch for that.
+// Both call forms are read (#837): the method form, `reader.read_to_end(&mut
+// buf)`, and the fully qualified form, `std::io::Read::read_to_end(&mut
+// reader, &mut buf)` (or `AsyncReadExt::`, and `read_to_string` likewise). The
+// scan reads each call in the whole source with comments and string literals
+// blanked, never line by line, so formatting cannot split a call from its
+// argument and a commented-out call is not counted.
+//
+// A call is bounded only when the reader it reads IS a `take(...)`: the method
+// form's receiver ends in `.take(...)`, `Read::take(...)` or
+// `AsyncReadExt::take(...)`, or the qualified form's first argument does. A
+// `take` anywhere else, in the same statement or a neighbouring one, does not
+// count. Residual, stated rather than hidden: a reader capped on an earlier
+// statement and bound to a variable is reported; the allow-list below is the
+// reviewed escape hatch for that.
 
-import { readFileSync } from "node:fs";
+// Which files the scan reads is itself checked (#1148 item 12). Every tracked `.rs` file
+// (`git ls-files -z -- '*.rs'`) must be under a scanned root, excluded by the path rule below
+// (tests, by rule), or named in UNSCANNED_RS_FILES with its reason; any other file fails with an
+// UnscannedSourceFileError that names it, so a file outside the roots is never silently unread. A
+// name in the table that git no longer tracks fails too: the table cannot outlive the file it
+// excuses. The script exports its checks and runs the scan only when run directly, the shape of
+// check-surface-ack.mjs, so the tests can call them.
+
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { relative, resolve } from "node:path";
 
 const scriptRoot = fileURLToPath(new URL("../", import.meta.url));
-const rootArgument = process.argv.indexOf("--root");
-if (rootArgument !== -1 && !process.argv[rootArgument + 1]) {
-  throw new Error("--root requires a repository path");
-}
-const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(process.argv[rootArgument + 1]);
 
-const SOURCE_ROOTS = ["src-tauri/src", "src-tauri/crates", "tools"];
-const READ_CALL = /\.read_to_(?:end|string)\(\s*&mut\b/;
-const TAKE_CALL = /\.take\(/;
-const STATEMENT_BOUNDARY = /[;{}]\s*$/;
+export const SOURCE_ROOTS = ["src-tauri/src", "src-tauri/crates", "tools"];
+// The method form; its argument must start `&mut` (see 1. above).
+const METHOD_READ = /\.\s*read_to_(?:end|string)\s*\(/g;
+// The qualified form; quick_xml's `Reader::read_to_end` is not `Read::`.
+const QUALIFIED_READ = /\b(?:Read|AsyncReadExt)\s*::\s*read_to_(?:end|string)\s*\(/g;
+// What a capped reader's expression ends in, just before its argument list.
+const TAKE_CALLEE = /(?:\.\s*take|\b(?:Read|AsyncReadExt)\s*::\s*take)\s*$/;
 const TEST_ATTRIBUTE = /^#\[(?:test|tokio::test|async_std::test|wasm_bindgen_test)\]\s*$/;
 const CFG_TEST = /^#\[cfg\(test\)\]\s*$/;
 const FN_LINE = /^(\s*)(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s/;
 const MOD_LINE = /^(\s*)(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{?\s*$/;
-const MAX_LOOKBACK = 12;
 
-// Reviewed, named exceptions — never a bare count. Each entry documents why
-// the direct-chain heuristic above cannot see that this call site is already
-// bounded, so the exception is legible on its own without re-deriving it.
-const ALLOWED_UNBOUNDED = new Set([
-  // Zip entries read from a template XLSX/PDF bundled into the binary at
-  // build time (via `include_bytes!` / the packaged app resources), not from
-  // an untrusted or attacker-sized source. Tracked as a known gap rather than
-  // silently accepted: docs/proposed-ci-gates.md's REPORTING entry for this
-  // gate lists these as the concrete class-1 findings this scan actually
-  // surfaced.
-  "src-tauri/src/reports/outstandings_working_paper_xlsx.rs",
-  "src-tauri/src/reports/trial_balance_xlsx.rs",
-  "src-tauri/src/reports/party_statement_pdf.rs",
-]);
+// Reviewed, named exceptions — never a bare count. The scanned tree's
+// ALLOWED_FILE maps each excused file's path to why the gate cannot see that
+// its reads are bounded, so each exception is legible on its own; no file
+// means no exceptions. An entry must still excuse an unbounded read: one
+// whose file no longer holds any is stale and fails the gate (#837), so an
+// exception can never quietly cover a read added after its reason went away.
+const ALLOWED_FILE = "scripts/unbounded-reads-allowed.json";
 
-function listSourceFiles() {
-  const files = [];
-  for (const sourceRoot of SOURCE_ROOTS) {
-    const result = execFileSync(
-      "git",
-      ["ls-files", "-z", "--", sourceRoot],
-      { cwd: repositoryRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
-    );
-    for (const path of result.split("\0")) {
-      if (path && path.endsWith(".rs")) files.push(path);
+function loadAllowed(repositoryRoot) {
+  const path = resolve(repositoryRoot, ALLOWED_FILE);
+  if (!existsSync(path)) return new Map();
+  const entries = JSON.parse(readFileSync(path, "utf8"));
+  if (!entries || typeof entries !== "object" || Array.isArray(entries)) {
+    throw new Error(`${ALLOWED_FILE} must be an object of path: reason`);
+  }
+  for (const [file, reason] of Object.entries(entries)) {
+    if (typeof reason !== "string" || reason.trim() === "") {
+      throw new Error(`${ALLOWED_FILE}: ${file} has no reason; every exception says why`);
     }
   }
-  return files;
+  return new Map(Object.entries(entries));
 }
 
-function isExcludedByPath(path) {
+// Tracked `.rs` files the scan does not read, each with why. Tests are not listed here: the path
+// rule below excludes them wherever they are.
+export const UNSCANNED_RS_FILES = new Map([["src-tauri/build.rs", "build script, no external input"]]);
+export const TESTS_EXCLUDED_REASON = "tests are excluded by rule";
+
+export class UnscannedSourceFileError extends Error {
+  constructor(files) {
+    super(
+      `${files.length} tracked .rs file(s) are neither under a scanned root (${SOURCE_ROOTS.join(", ")}), ` +
+        `excluded by rule (${TESTS_EXCLUDED_REASON}), nor named with a reason in UNSCANNED_RS_FILES, ` +
+        "so the read-bound scan never reads them. Move the file under a scanned root, or name it with " +
+        "its reason:\n" +
+        files.map((file) => `  - ${file}`).join("\n"),
+    );
+    this.files = files;
+  }
+}
+// Set on the prototype so the uncaught error's first line already names the type.
+UnscannedSourceFileError.prototype.name = "UnscannedSourceFileError";
+
+export function isExcludedByPath(path) {
   return path.includes("/tests/") || /_tests?\.rs$/.test(path);
 }
+
+export function validateExclusions(exclusions) {
+  for (const [file, reason] of exclusions) {
+    if (typeof reason !== "string" || reason.trim() === "") {
+      throw new Error(`UNSCANNED_RS_FILES: ${file} has no reason; every exclusion says why`);
+    }
+  }
+}
+
+// The files to scan, in root order, from every tracked `.rs` file; throws if one is unaccounted for.
+export function checkSourceCoverage(tracked, { roots = SOURCE_ROOTS, exclusions = UNSCANNED_RS_FILES } = {}) {
+  validateExclusions(exclusions);
+  const under = (root) => (path) => path.startsWith(`${root}/`);
+  const unaccounted = tracked.filter(
+    (path) => !roots.some((root) => under(root)(path)) && !isExcludedByPath(path) && !exclusions.has(path),
+  );
+  if (unaccounted.length) throw new UnscannedSourceFileError(unaccounted);
+  const trackedSet = new Set(tracked);
+  const stale = [...exclusions.keys()].filter((file) => !trackedSet.has(file));
+  if (stale.length) {
+    throw new Error(
+      `${stale.length} stale exclusion(s) in UNSCANNED_RS_FILES: each names a file git does not ` +
+        "track, so the table would excuse a file added there later unreported. Remove the entry:\n" +
+        stale.map((file) => `  - ${file}`).join("\n"),
+    );
+  }
+  return roots.flatMap((root) => tracked.filter((path) => under(root)(path) && !isExcludedByPath(path)));
+}
+
+function trackedRustFiles(repositoryRoot) {
+  const result = execFileSync("git", ["ls-files", "-z", "--", "*.rs"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  return result.split("\0").filter(Boolean);
+}
+
 
 // Returns, for each line index, whether that line is inside a `#[cfg(test)]`
 // module or a `#[test]`-family-attributed function — tracked by indentation,
@@ -155,54 +218,181 @@ function testScopeMask(lines) {
   return inside;
 }
 
-function isBounded(lines, index) {
-  if (TAKE_CALL.test(lines[index])) return true;
-  let steps = 0;
-  for (let cursor = index - 1; cursor >= 0 && steps < MAX_LOOKBACK; cursor -= 1, steps += 1) {
-    const line = lines[cursor];
-    if (STATEMENT_BOUNDARY.test(line.trimEnd())) return false;
-    if (TAKE_CALL.test(line)) return true;
+// `text` with every comment and string or character literal blanked to spaces,
+// newlines kept, so offsets and line numbers still match the source.
+function maskRust(text) {
+  const out = text.split("");
+  const blank = (from, to) => {
+    for (let index = from; index < to; index += 1) if (out[index] !== "\n") out[index] = " ";
+  };
+  const isIdent = (char) => /[A-Za-z0-9_]/.test(char ?? "");
+  let index = 0;
+  while (index < text.length) {
+    const rest = text.slice(index, index + 2);
+    if (rest === "//") {
+      const end = text.indexOf("\n", index);
+      const stop = end === -1 ? text.length : end;
+      blank(index, stop);
+      index = stop;
+    } else if (rest === "/*") {
+      let depth = 0;
+      let cursor = index;
+      while (cursor < text.length) {
+        if (text.startsWith("/*", cursor)) {
+          depth += 1;
+          cursor += 2;
+        } else if (text.startsWith("*/", cursor)) {
+          depth -= 1;
+          cursor += 2;
+          if (depth === 0) break;
+        } else cursor += 1;
+      }
+      blank(index, cursor);
+      index = cursor;
+    } else if (!isIdent(text[index - 1]) && /^b?r#*"/.test(text.slice(index, index + 260))) {
+      const opening = /^b?r(#*)"/.exec(text.slice(index, index + 260));
+      const closing = `"${opening[1]}`;
+      const end = text.indexOf(closing, index + opening[0].length);
+      const stop = end === -1 ? text.length : end + closing.length;
+      blank(index, stop);
+      index = stop;
+    } else if (text[index] === '"') {
+      let cursor = index + 1;
+      while (cursor < text.length && text[cursor] !== '"') cursor += text[cursor] === "\\" ? 2 : 1;
+      blank(index, cursor + 1);
+      index = cursor + 1;
+    } else if (text[index] === "'") {
+      // A character literal, never a lifetime (`'a` has no closing quote).
+      const literal = /^'(?:[^'\\\n]|\\(?:x[0-9a-fA-F]{2}|u\{[0-9a-fA-F]{1,6}\}|.))'/.exec(
+        text.slice(index, index + 14),
+      );
+      const stop = index + (literal ? literal[0].length : 1);
+      if (literal) blank(index, stop);
+      index = stop;
+    } else index += 1;
+  }
+  return out.join("");
+}
+
+// The index of the parenthesis that closes the one opened at `open`, or -1.
+function closingParen(masked, open) {
+  let depth = 0;
+  for (let index = open; index < masked.length; index += 1) {
+    if (masked[index] === "(") depth += 1;
+    else if (masked[index] === ")" && (depth -= 1) === 0) return index;
+  }
+  return -1;
+}
+
+// Whether `expression` ends in a call to `take`: its last `(...)` is a
+// `take`'s argument list.
+function endsInTake(expression) {
+  const trimmed = expression.trimEnd();
+  if (!trimmed.endsWith(")")) return false;
+  let depth = 0;
+  for (let index = trimmed.length - 1; index >= 0; index -= 1) {
+    if (trimmed[index] === ")") depth += 1;
+    else if (trimmed[index] === "(" && (depth -= 1) === 0) {
+      return TAKE_CALLEE.test(trimmed.slice(0, index));
+    }
   }
   return false;
 }
 
-const failures = [];
-let scanned = 0;
-let boundedCount = 0;
-
-for (const path of listSourceFiles()) {
-  if (isExcludedByPath(path)) continue;
-  const absolute = resolve(repositoryRoot, path);
-  const text = readFileSync(absolute, "utf8");
-  const lines = text.split("\n");
-  const inTestScope = testScopeMask(lines);
-
-  lines.forEach((line, index) => {
-    if (!READ_CALL.test(line)) return;
-    scanned += 1;
-    if (inTestScope[index]) return;
-    if (isBounded(lines, index)) {
-      boundedCount += 1;
-      return;
+// Each read call in `masked`: its offset and whether its own reader is a take.
+function readCalls(masked) {
+  const calls = [];
+  for (const match of masked.matchAll(METHOD_READ)) {
+    const open = match.index + match[0].length - 1;
+    if (!/^\s*&\s*mut\b/.test(masked.slice(open + 1, open + 64))) continue;
+    calls.push({ offset: match.index, bounded: endsInTake(masked.slice(0, match.index)) });
+  }
+  for (const match of masked.matchAll(QUALIFIED_READ)) {
+    const open = match.index + match[0].length - 1;
+    const close = closingParen(masked, open);
+    const argumentsText = masked.slice(open + 1, close === -1 ? masked.length : close);
+    let depth = 0;
+    let comma = argumentsText.length;
+    for (let index = 0; index < argumentsText.length; index += 1) {
+      const char = argumentsText[index];
+      if ("([{".includes(char)) depth += 1;
+      else if (")]}".includes(char)) depth -= 1;
+      else if (char === "," && depth === 0) {
+        comma = index;
+        break;
+      }
     }
-    if (ALLOWED_UNBOUNDED.has(path)) return;
-    failures.push(`${path}:${index + 1}: ${line.trim()}`);
-  });
+    calls.push({ offset: match.index, bounded: endsInTake(argumentsText.slice(0, comma)) });
+  }
+  return calls.sort((left, right) => left.offset - right.offset);
 }
 
-if (failures.length) {
-  throw new Error(
-    `${failures.length} unbounded Read::read_to_end/read_to_string call(s) found — each ` +
-      "reads an unbounded amount of external data into memory with no `.take(N)` cap " +
-      "in the same statement. Wrap the reader in `.take(limit + 1)` first (see " +
-      "src-tauri/src/agent_bank_statement.rs for the pattern — the `+ 1` lets an " +
-      "over-limit input be detected rather than silently truncated), or add a " +
-      "reviewed entry to ALLOWED_UNBOUNDED in this script with the reason:\n" +
-      failures.map((line) => `  - ${line}`).join("\n"),
+function main(argv) {
+  const rootArgument = argv.indexOf("--root");
+  if (rootArgument !== -1 && !argv[rootArgument + 1]) {
+    throw new Error("--root requires a repository path");
+  }
+  const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(argv[rootArgument + 1]);
+
+  const allowedUnbounded = loadAllowed(repositoryRoot);
+  // How many unbounded reads each allowed file's entry excused in this scan.
+  const excused = new Map([...allowedUnbounded.keys()].map((file) => [file, 0]));
+  const failures = [];
+  let scanned = 0;
+  let boundedCount = 0;
+
+  for (const path of checkSourceCoverage(trackedRustFiles(repositoryRoot))) {
+    const absolute = resolve(repositoryRoot, path);
+    const text = readFileSync(absolute, "utf8");
+    const lines = text.split("\n");
+    const inTestScope = testScopeMask(lines);
+
+    for (const call of readCalls(maskRust(text))) {
+      const index = text.slice(0, call.offset).split("\n").length - 1;
+      scanned += 1;
+      if (inTestScope[index]) continue;
+      if (call.bounded) {
+        boundedCount += 1;
+        continue;
+      }
+      if (allowedUnbounded.has(path)) {
+        excused.set(path, excused.get(path) + 1);
+        continue;
+      }
+      failures.push(`${path}:${index + 1}: ${lines[index].trim()}`);
+    }
+  }
+
+  const stale = [...excused].filter(([, count]) => count === 0).map(([file]) => file);
+
+  if (failures.length) {
+    throw new Error(
+      `${failures.length} unbounded Read::read_to_end/read_to_string call(s) found ` +
+        `(${scanned} scanned, ${boundedCount} bounded) — each reads an unbounded amount of ` +
+        "external data into memory through a reader that is not a `take(N)`. Wrap the " +
+        "reader itself in `.take(limit + 1)` (see " +
+        "src-tauri/src/agent_bank_statement.rs for the pattern — the `+ 1` lets an " +
+        "over-limit input be detected rather than silently truncated), or add a " +
+        `reviewed entry to ${ALLOWED_FILE} with the reason:\n` +
+        failures.map((line) => `  - ${line}`).join("\n"),
+    );
+  }
+
+  if (stale.length) {
+    throw new Error(
+      `${stale.length} stale exception(s) in ${ALLOWED_FILE}: each names a file with no ` +
+        "unbounded read left to excuse, so a new one there would pass unreported. Remove " +
+        "the entry:\n" +
+        stale.map((file) => `  - ${file}`).join("\n"),
+    );
+  }
+
+  console.log(
+    `Read bound coverage holds: ${scanned} read_to_end/read_to_string call site(s) scanned, ` +
+      `${boundedCount} bounded, 0 unbounded (${allowedUnbounded.size} reviewed exception(s)).`,
   );
 }
 
-console.log(
-  `Read bound coverage holds: ${scanned} read_to_end/read_to_string call site(s) scanned, ` +
-    `${boundedCount} bounded, 0 unbounded (${ALLOWED_UNBOUNDED.size} reviewed exception(s)).`,
-);
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+  main(process.argv.slice(2));
+}

@@ -79,6 +79,9 @@ fn production_csp_has_no_remote_browser_egress_or_inline_code() {
             "beforeBuildCommand": "corepack pnpm run build",
             "beforeBundleCommand": "node scripts/check-no-test-seam.mjs --tauri-bundle-hook",
             "frontendDist": "../dist",
+            // tauri-build 2.7 links the Visual C++ runtime statically by default and writes an empty
+            // stand-in msvcrt.lib that breaks the Windows doctest link; false keeps the dynamic runtime.
+            "windows": { "staticVCRuntime": false },
         })
     );
 }

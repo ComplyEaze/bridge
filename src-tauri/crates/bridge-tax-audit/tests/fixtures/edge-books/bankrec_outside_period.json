@@ -1,0 +1,136 @@
+{
+ "comment": "bank_reconciliation on a statement its reader refuses: row 2 is dated the day before the statement's period begins and row 3 the day after it ends, and the reason names row 2's date and the period. The statement also lists a date that steps back with no balance to confirm it, and declares no opening balance: the period refusal is the one given.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_outside_period-000"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_outside_period-001"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-bankrec_outside_period-002"
+  },
+  {
+   "name": "Bank Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-bankrec_outside_period-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-bankrec_outside_period-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Edge Bank",
+   "opening": 500000,
+   "debit": 1000,
+   "credit": 0,
+   "closing": 501000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "w01",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     1000
+    ],
+    [
+     "Customer A",
+     -1000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "bank_reconciliation"
+ ],
+ "bank_reconciliation_ledger": "Edge Bank",
+ "bank_statement": {
+  "doc_id": "bank:edge:outside_period",
+  "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "account_ref": "XXXXXX0009",
+  "bank": "Invented Bank",
+  "period": {
+   "start": "2025-06-01",
+   "end": "2025-06-30"
+  },
+  "opening_balance_paise": null,
+  "closing_balance_paise": 501800,
+  "rows": [
+   {
+    "doc": "bank:edge:outside_period",
+    "row": 0,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-05",
+    "narration": "NEFT CUSTOMER A",
+    "debit_paise": 0,
+    "credit_paise": 1000,
+    "balance_paise": 501000
+   },
+   {
+    "doc": "bank:edge:outside_period",
+    "row": 1,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-03",
+    "narration": "NEFT BACK VALUED",
+    "debit_paise": 0,
+    "credit_paise": 500,
+    "balance_paise": null
+   },
+   {
+    "doc": "bank:edge:outside_period",
+    "row": 2,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-05-31",
+    "narration": "NEFT VALUE DATED MAY",
+    "debit_paise": 0,
+    "credit_paise": 200,
+    "balance_paise": null
+   },
+   {
+    "doc": "bank:edge:outside_period",
+    "row": 3,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-07-01",
+    "narration": "NEFT VALUE DATED JULY",
+    "debit_paise": 0,
+    "credit_paise": 100,
+    "balance_paise": null
+   }
+  ]
+ }
+}

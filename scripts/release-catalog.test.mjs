@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { assetName, combineReleaseSources, isInstallablePreview, mergeReleases, releaseAssets, releaseLabel, selectRelease } from "../site/release-catalog.mjs";
+import { assetName, combineReleaseSources, isInstallablePreview, mergeReleases, releaseAssets, releaseLabel, selectRelease, sha256Digest } from "../site/release-catalog.mjs";
 
 const preview = {
   draft: false,
@@ -15,13 +16,13 @@ const preview = {
   ],
 };
 
-test("release catalogue selects the newest usable unsigned preview, not an unrelated release", () => {
+test("release catalogue selects the newest usable release, not an unrelated one", () => {
   const unrelatedNewest = { ...preview, prerelease: false, tag_name: "v9.0.0", assets: [] };
   const incompleteNewestPreview = { ...preview, tag_name: "mcp-preview-0.3.0", assets: preview.assets.slice(0, 2) };
   assert.equal(isInstallablePreview(unrelatedNewest), false);
   assert.equal(isInstallablePreview(incompleteNewestPreview), false);
   assert.equal(selectRelease([unrelatedNewest, incompleteNewestPreview, preview]), preview);
-  assert.match(releaseLabel(preview), /unsigned preview/);
+  assert.match(releaseLabel(preview), /not yet code-signed/);
 });
 
 test("a preview marked Latest (pre-release flag cleared) stays installable", () => {
@@ -73,4 +74,32 @@ test("release catalogue requires immutable package and checksum names together",
     checksum: preview.assets[1],
   });
   assert.equal(releaseAssets({ ...preview, assets: preview.assets.slice(0, 2) }, "macos-arm64"), undefined);
+});
+
+test("user-facing site text does not call a release a preview or say it is for evaluation only", async () => {
+  const { readFile } = await import("node:fs/promises");
+  for (const file of ["index.html", "download.html", "releases.html", "changelog.template.html", "download.js", "releases.js", "release-source.mjs", "app.js"]) {
+    const text = await readFile(new URL(`../site/${file}`, import.meta.url), "utf8");
+    // The tag prefix is how a user finds the release; it is a name, not prose.
+    const prose = text.replaceAll("mcp-preview", "");
+    assert.doesNotMatch(prose, /\bpreviews?\b/i, `${file} calls a release a preview`);
+    assert.doesNotMatch(prose, /for evaluation/i, `${file} says a release is for evaluation only`);
+  }
+  assert.doesNotMatch(releaseLabel({ tag_name: "mcp-preview-9.9.9" }).replace("mcp-preview", ""), /\bpreview\b|for evaluation/i);
+});
+
+test("only a complete sha256 digest from GitHub is shown, in lower-case hex", () => {
+  const hex = "64d38de33323e801a9d88e221ba611ab4bdab0bbea9be44d44d4a4d73f77b243";
+  assert.equal(sha256Digest({ digest: `sha256:${hex}` }), hex);
+  for (const digest of [undefined, null, "", hex, `sha256:${hex.slice(1)}`, `sha256:${hex}0`, `sha256:${hex.toUpperCase()}`, `sha512:${hex}`, ` sha256:${hex}`]) {
+    assert.equal(sha256Digest({ digest }), undefined, `shown for ${JSON.stringify(digest)}`);
+  }
+  assert.equal(sha256Digest(undefined), undefined);
+});
+
+test("the Download page shows the digest only through sha256Digest, as text", async () => {
+  const js = await readFile(new URL("../site/download.js", import.meta.url), "utf8");
+  assert.match(js, /var digest = sha256Digest\(assets\.bundle\);/);
+  assert.match(js, /code\.textContent = digest;/);
+  assert.doesNotMatch(js, /\.digest\b/, "the page must not read a raw digest field");
 });

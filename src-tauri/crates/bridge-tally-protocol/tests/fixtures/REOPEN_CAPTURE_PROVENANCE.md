@@ -81,3 +81,15 @@ reopening, so a test can distinguish "closed stays closed" from "reopened balanc
   back is not covered.
 - No reopening of a bill whose original credit period was empty appears here; that case would
   correctly age from the bill date, but it is not measured.
+
+## Integrity digests
+
+Each row is the SHA-256 of the file's committed bytes, which
+`scripts/check-fixture-provenance.mjs` checks (#838). A digest pins the bytes as
+committed and claims nothing about where they came from: the Capture column
+repeats only what this note says above.
+
+| Fixture | Bytes | SHA-256 (integrity digest) | Capture |
+| --- | ---: | --- | --- |
+| `generators/build_reopen.py` | 2,955 | `6d6255037a25200d5f90ecf61ce31c5a72608650f5e6e1a5cb6fb49e81d2d983` | not a capture: the generator record, as above |
+| `generators/lib.py` | 3,793 | `9d5cd6f5827b113e95e803537425ff57e3a143a0f8cbbc29333999f597e807a4` | not a capture: the generator record, as above |

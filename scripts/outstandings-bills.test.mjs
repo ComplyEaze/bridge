@@ -17,7 +17,7 @@ function bill(party, reference, amount = "100") {
   };
 }
 
-test("statement rows absent entirely (voucher-scan path) grouped as null, not an empty map", () => {
+test("statement rows absent entirely grouped as null, not an empty map", () => {
   assert.equal(groupOpenBillsByParty(undefined, 2_000), null);
 });
 

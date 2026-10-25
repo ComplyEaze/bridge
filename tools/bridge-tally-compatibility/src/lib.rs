@@ -14,22 +14,36 @@ use thiserror::Error;
 pub mod bills_native_outstandings_probe_receipt;
 
 pub const LIVE_RECEIPT_SCHEMA_VERSION: u16 = 1;
-pub const SURFACE_SCHEMA_VERSION: u16 = 2;
+/// The surface file is an authored pin list (schema 3): paths and optional reasons, no stored
+/// hashes. The resolved in-memory manifest carries the same version.
+pub const SURFACE_SCHEMA_VERSION: u16 = 3;
+/// Longest `reason` a pin may carry.
+pub const MAX_PIN_REASON_CHARS: usize = 500;
 pub const SUPPORT_MANIFEST_SCHEMA_VERSION: u16 = 2;
 pub const TRUST_MANIFEST_SCHEMA_VERSION: u16 = 1;
 pub const ATTESTATION_SCHEMA_VERSION: u16 = 1;
+/// The review URL of an attestation must point at this repository: it is part of the signed bytes.
+/// The repository moved from the lamemustafa account to the ComplyEaze organization; GitHub keeps
+/// the old name as a permanent redirect, so a URL under either name is accepted.
+pub const REVIEW_URL_PREFIXES: [&str; 2] = [
+    "https://github.com/lamemustafa/bridge/",
+    "https://github.com/ComplyEaze/bridge/",
+];
 pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
-/// Capacity deliberately reserved for one small cohesive surface change.
-pub const RESERVED_SURFACE_FILES: usize = 15;
-/// Bounded high enough for the additive Tally safety-migration, Trial Balance, selected-ledger evidence, and endpoint-reconnect
-/// helper surfaces while still rejecting an unexpectedly
-/// broad attestation surface.
+/// A fixed parse bound on the compatibility surface's pin list: a list longer than this is
+/// refused as `surface_file_count_invalid`. It is a bound against a runaway or malformed list, **not
+/// a count to maintain**: it is deliberately not kept equal to the number of pins, and adding or
+/// removing a pin does not touch it. What decides whether a pin may be added or removed is the pin's
+/// own `reason` in `compatibility-surface.json` and the acknowledgement file the pull request adds
+/// (`docs/release-process.md`, "Acknowledging a change to a pinned file"), which CI enforces.
+///
 /// Every file under the Tally migration and report directories is required by a
 /// directory rule; `src/` and the protocol crates remain judgment-pinned
-/// because their mixed-purpose directories do not have that invariant. The
-/// reserved capacity covers a small cohesive feature (source, tests, docs
-/// and manifest) but makes further unreviewed additions an explicit
-/// compatibility-surface decision.
+/// because their mixed-purpose directories do not have that invariant.
+///
+/// The history below was written while this constant tracked the pin count exactly (it was raised
+/// by hand with each pin). It is kept as the record of why each early pin exists; where it speaks
+/// of a raise, read "a pin added".
 ///
 /// **Raised eleven times, the first three by branches that did not see each
 /// other.** 210 to 211 on master for `src-tauri/src/agent_ledgers.rs`, 211 to
@@ -119,10 +133,6 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 ///   pinned file.
 ///
 /// What leaves the machine, and the record of it:
-/// - `documents.rs` -- which storage URLs customer documents may be uploaded
-///   to, and the file checks made before an upload.
-/// - `axal.rs` -- which AXAL API origins may receive credentialed requests,
-///   and that its API client follows no redirects.
 /// - `agent_protocol.rs` -- the MCP response loop, which records an egress
 ///   receipt for a tool response before writing it and decides what is sent
 ///   when recording fails.
@@ -221,6 +231,10 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 /// ran a legacy schema no caller opened, the second named import actions no
 /// builder used.
 ///
+/// Lowered by three, to the pin count then in use, when `axal.rs`, `documents.rs` and `export_registry.rs` were
+/// deleted with the unfinished document-upload feature (bridge#912). The raise
+/// to 232 above names the first two, which no longer exist.
+///
 /// The raise to 262 binds thirteen test files because a directory rule requires
 /// it, not because of what they decide. Each `src-tauri/src/reports`
 /// file kept its tests in an inline `#[cfg(test)]` module, so editing a test
@@ -272,14 +286,10 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 /// drawer select. It is one file for one named reason -- not headroom.
 ///
 /// Not pinned, and deliberately: files feature-gated out of every shipped build
-/// (`agent_lab.rs`, `jsonex*.rs`, `india_tax_observation.rs`), operator filing
+/// (`agent_lab.rs`), operator filing
 /// labels (`client_groups.rs`, `client_group_label_migration.rs` and the
 /// `commands/all_clients.rs` commands over them, none of which reads Tally),
-/// dead or declaration-only modules, and `observability.rs`. Its count
-/// bucketing is a real privacy reduction, and the `tally_telemetry_preview`
-/// command returns what it builds, but nothing in the frontend calls that
-/// command and nothing sends its result off the machine. It becomes a candidate
-/// when something does. bridge#416 records the reasoning for the rest.
+/// and dead or declaration-only modules. bridge#416 records the reasoning for the rest.
 ///
 /// Also not pinned: the four frontend modules bridge#468 moved out of the pinned
 /// `src/main.tsx` and `src/MirrorProofScreen.tsx`, where they had been copied.
@@ -302,7 +312,7 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 /// `voucher_presence`, `ledger_movement` and the import-verification read.
 // The canonical protocol-reference index is retained for legacy links while
 // bridge#317 moves its content into six separately pinned parts. The cap grows
-// by those six pins; it remains an exact count after the coordinated reseal.
+// by those six pins; it remains an exact count after the coordinated pin-list change.
 // `src-tauri/src/agent_import_post_location.rs` (bridge#574) confirms which
 // loaded company a native post is aimed at, last before the POST, and reports
 // which companies' voucher marks moved after it.
@@ -339,15 +349,28 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // party is a cash withdrawal or deposit, which answers a person may give for
 // one, which need a ledger and which Bridge refuses; a defect there could post
 // a cash line to a ledger nobody chose.
-// `src-tauri/src/export_registry.rs` (bridge#833) records the files Bridge
-// exports from Tally data (bulk party statements so far), and the documents
-// uploader skips a file whose hash it holds; a defect there uploads a
-// client's exported statements from a folder the user syncs.
 // `bridge-tally-protocol/src/xml_text.rs` (bridge#832) is the one escaper every
 // request renderer uses, the voucher-import write path included; a defect there
 // changes which ledger or company a posted voucher names, or lets a value
 // break out of the element it belongs to.
-pub const MAX_SURFACE_FILES: usize = 291;
+// `bridge-tally-protocol/src/parent_partition.rs` (bridge#679) decides whether a
+// ledger read too large for one request may be split by parent group, and
+// whether the parts together returned every ledger the catalogue named, once;
+// a defect there returns a book with ledgers missing or repeated.
+// `bridge-tally-protocol/src/ledger_census.rs` (bridge#679) renders the request
+// that counts a book's ledgers by AlterID span, and decides whether the slices
+// added up to a count (order, duplicates, span, an empty census); a defect there
+// sizes the next ledger read for fewer ledgers than the book holds, and a
+// request past the response cap is cut off mid-read.
+// `src-tauri/src/request_trail.rs` (bridge#918) builds, field by field, the
+// record of a call's Tally sends that reaches the egress receipt; a defect
+// there puts request or response text, a company name or a row value into a
+// journal the user keeps.
+//
+// Since schema 3 the reason for a pin added from now on lives in that pin's own entry (`reason`
+// in compatibility-surface.json), not as another paragraph here, and the bound below is no longer
+// raised with each pin, so two pull requests that each add a pin do not collide.
+pub const MAX_SURFACE_FILES: usize = 1024;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;
@@ -362,10 +385,18 @@ const REQUIRED_SURFACE_DIRECTORIES: [&str; 2] =
 /// `agent_ledgers.rs` renders the agent ledger reads. It is here rather than left as a
 /// judgment pin because a judgment pin can be dropped during a conflict resolution and
 /// the gate still returns `compatibility_gate_passed` -- measured, by deleting this very
-/// entry and resealing. A required path cannot be dropped silently, and
+/// entry and acknowledging the change. A required path cannot be dropped silently, and
 /// `gate_rejects_each_omitted_required_lifecycle_path` iterates this list, so adding it
 /// here is what covers its omission.
-const REQUIRED_SURFACE_FILES: [&str; 14] = [
+///
+/// The voucher-presence contract's files follow (#840; until then a test in
+/// `book_presence_tests.rs` checked them by hand): `book_presence.rs` and
+/// `agent_presence.rs` are its production files; `agent_presence_tests.rs` holds the only
+/// independent statement of the admission contract, since the adapter reads its bounds from
+/// the published schema; and `agent_import_identity.rs` derives the narration marker both the
+/// presence reader and the import writer use, so an edit confined to it silently changes what
+/// is reported present.
+const REQUIRED_SURFACE_FILES: [&str; 18] = [
     "src-tauri/src/agent_catalog.rs",
     "src-tauri/src/agent_desktop_journal.rs",
     "src-tauri/src/agent_ledgers.rs",
@@ -380,6 +411,10 @@ const REQUIRED_SURFACE_FILES: [&str; 14] = [
     "docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md",
     "docs/tally/TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md",
     "docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md",
+    "src-tauri/crates/bridge-tally-core/src/book_presence.rs",
+    "src-tauri/src/agent_presence.rs",
+    "src-tauri/src/agent_presence_tests.rs",
+    "src-tauri/src/agent_import_identity.rs",
 ];
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -472,7 +507,6 @@ pub enum LoopbackFamily {
 #[serde(rename_all = "snake_case")]
 pub enum TransportProfile {
     XmlHttp,
-    JsonExShadow,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -481,10 +515,7 @@ pub enum ReadProfileId {
     XmlCompanyEnumerationV1,
     XmlSyntheticFixtureMarkerV1,
     XmlLedgerReadV1,
-    XmlVoucherEmptyRangeV1,
-    XmlVoucherPopulatedRangeV1,
     XmlEducationModeProbeV1,
-    JsonExSemanticShadowV1,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -749,12 +780,8 @@ impl LiveCompatibilityReceipt {
         }
         if !self.fixture_marker_verified {
             for operation in &self.operations {
-                if matches!(
-                    operation.profile,
-                    ReadProfileId::XmlLedgerReadV1
-                        | ReadProfileId::XmlVoucherEmptyRangeV1
-                        | ReadProfileId::XmlVoucherPopulatedRangeV1
-                ) && operation.outcome != OperationOutcome::NotAttempted
+                if matches!(operation.profile, ReadProfileId::XmlLedgerReadV1)
+                    && operation.outcome != OperationOutcome::NotAttempted
                 {
                     return Err(invalid("company_read_without_fixture_marker"));
                 }
@@ -921,9 +948,135 @@ pub struct SurfaceFile {
     pub sha256: String,
 }
 
-/// The surface stores only its pins. Its digest is computed, never stored, so
-/// two changes to different pins merge without touching a shared line
-/// (docs/proposed-order-independent-seal.md, bridge#760).
+/// One pin in the authored surface file: a repository path and, for a pin added after the cut-over
+/// to schema 3, the reason it is sealed (the per-pin rationale that used to be appended to one
+/// shared comment block).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SurfacePin {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// The authored surface file (schema 3): the pin list only. It stores no hashes, so two pull
+/// requests that edit one pinned file no longer collide on a stored value. The surface digest that
+/// receipts and attestations bind is computed from the live bytes of every pinned file by
+/// [`SurfacePins::resolve`]; a pinned change is acknowledged in review (an acknowledgement file per
+/// pull request, checked by `scripts/check-surface-ack.mjs`), not by rewriting a hash.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SurfacePins {
+    pub schema_version: u16,
+    pub files: Vec<SurfacePin>,
+}
+
+impl SurfacePins {
+    pub fn validate(&self) -> Result<(), CompatibilityError> {
+        if self.schema_version != SURFACE_SCHEMA_VERSION {
+            return Err(invalid("surface_schema_unsupported"));
+        }
+        if self.files.is_empty() || self.files.len() > MAX_SURFACE_FILES {
+            return Err(invalid("surface_file_count_invalid"));
+        }
+        let mut previous: Option<&str> = None;
+        for pin in &self.files {
+            validate_relative_path(&pin.path)?;
+            if let Some(reason) = &pin.reason {
+                if reason.trim().is_empty()
+                    || reason.chars().count() > MAX_PIN_REASON_CHARS
+                    || reason.chars().any(char::is_control)
+                {
+                    return Err(invalid("surface_pin_reason_invalid"));
+                }
+            }
+            if previous.is_some_and(|value| value >= pin.path.as_str()) {
+                return Err(invalid("surface_files_not_unique_sorted"));
+            }
+            previous = Some(&pin.path);
+        }
+        refuse_case_collisions(self.files.iter().map(|pin| pin.path.as_str()))
+    }
+
+    /// Reads every pinned file and returns the resolved manifest: each pinned path with the
+    /// SHA-256 of its bytes now. Also enforces the required files and directories.
+    pub fn resolve(
+        &self,
+        repository_root: &Path,
+    ) -> Result<CompatibilitySurfaceManifest, CompatibilityError> {
+        self.validate()?;
+        let mut files = Vec::with_capacity(self.files.len());
+        for pin in &self.files {
+            refuse_symlink_on_path(repository_root, &pin.path)?;
+            let bytes = fs::read(repository_root.join(&pin.path))
+                .map_err(|_| invalid("surface_file_unavailable"))?;
+            files.push(SurfaceFile {
+                path: pin.path.clone(),
+                sha256: sha256_bytes(&bytes),
+            });
+        }
+        let resolved = CompatibilitySurfaceManifest {
+            schema_version: SURFACE_SCHEMA_VERSION,
+            files,
+        };
+        resolved.validate_required_directory_coverage(repository_root)?;
+        Ok(resolved)
+    }
+
+    /// Reads the file. A file still in schema 1 or 2 (stored hashes) is refused with a code that
+    /// names the migration, before any shape check, so it is not reported as generic bad JSON.
+    pub fn from_json(bytes: &[u8]) -> Result<Self, CompatibilityError> {
+        if bytes.is_empty() || bytes.len() > MAX_ARTIFACT_BYTES {
+            return Err(invalid("artifact_size_invalid"));
+        }
+        // A hand-edited pin list with a trailing comma is bad JSON, not an unsupported schema.
+        let document: serde_json::Value =
+            serde_json::from_slice(bytes).map_err(|_| invalid("artifact_json_invalid"))?;
+        let version = document
+            .get("schema_version")
+            .and_then(serde_json::Value::as_u64);
+        match version {
+            Some(value) if value == u64::from(SURFACE_SCHEMA_VERSION) => {}
+            Some(1 | 2) => return Err(invalid("surface_schema_needs_migration")),
+            _ => return Err(invalid("surface_schema_unsupported")),
+        }
+        let value: Self = parse_bounded_json(bytes)?;
+        value.validate()?;
+        Ok(value)
+    }
+
+    pub fn to_pretty_json(&self) -> Result<Vec<u8>, CompatibilityError> {
+        self.validate()?;
+        let bytes = serde_json::to_vec_pretty(self).map_err(|_| invalid("serialization_failed"))?;
+        if bytes.len() > MAX_ARTIFACT_BYTES {
+            return Err(invalid("artifact_too_large"));
+        }
+        Ok(bytes)
+    }
+}
+
+/// Refuses a pinned path that is, or sits under, a symbolic link. Reading through one would make
+/// the digest follow an unpinned target, so an edit there would move the digest with no pinned
+/// path in any diff (the acknowledgement checks look only at pinned paths).
+fn refuse_symlink_on_path(
+    repository_root: &Path,
+    relative: &str,
+) -> Result<(), CompatibilityError> {
+    let mut current = repository_root.to_path_buf();
+    for component in relative.split('/') {
+        current.push(component);
+        let metadata =
+            fs::symlink_metadata(&current).map_err(|_| invalid("surface_file_unavailable"))?;
+        if metadata.file_type().is_symlink() {
+            return Err(invalid("surface_file_symlink"));
+        }
+    }
+    Ok(())
+}
+
+/// The RESOLVED surface: each pinned path with the SHA-256 of its live bytes, built by
+/// [`SurfacePins::resolve`]. It is what the digest is computed over. Its digest is computed, never
+/// stored (bridge#760); schema 3 also stopped storing the per-file hashes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompatibilitySurfaceManifest {
@@ -976,7 +1129,7 @@ impl CompatibilitySurfaceManifest {
             }
             previous = Some(&file.path);
         }
-        Ok(())
+        refuse_case_collisions(self.files.iter().map(|file| file.path.as_str()))
     }
 
     pub fn validate_files(&self, repository_root: &Path) -> Result<(), CompatibilityError> {
@@ -1028,41 +1181,6 @@ impl CompatibilitySurfaceManifest {
             return Err(invalid("surface_required_directory_file_unpinned"));
         }
         Ok(())
-    }
-
-    /// Refreshes every pinned file's digest from its bytes. With no stored manifest checksum,
-    /// this is the whole reseal, for a changed pin list too.
-    pub fn rehash_files(
-        &self,
-        repository_root: &Path,
-    ) -> Result<(Self, usize), CompatibilityError> {
-        self.validate()?;
-        let mut rehashed = self.clone();
-        let mut changed = 0;
-        for file in &mut rehashed.files {
-            let digest = sha256_file(&repository_root.join(&file.path))
-                .map_err(|_| invalid("surface_file_unavailable"))?;
-            if file.sha256 != digest {
-                file.sha256 = digest;
-                changed += 1;
-            }
-        }
-        Ok((rehashed, changed))
-    }
-
-    pub fn from_json(bytes: &[u8]) -> Result<Self, CompatibilityError> {
-        let value: Self = parse_bounded_json(bytes)?;
-        value.validate()?;
-        Ok(value)
-    }
-
-    pub fn to_pretty_json(&self) -> Result<Vec<u8>, CompatibilityError> {
-        self.validate()?;
-        let bytes = serde_json::to_vec_pretty(self).map_err(|_| invalid("serialization_failed"))?;
-        if bytes.len() > MAX_ARTIFACT_BYTES {
-            return Err(invalid("artifact_too_large"));
-        }
-        Ok(bytes)
     }
 }
 
@@ -1231,9 +1349,9 @@ impl ReviewedEvidenceAttestation {
         if self.reviewed_at_unix_ms <= 0 || self.expires_at_unix_ms <= self.reviewed_at_unix_ms {
             return Err(invalid("attestation_time_invalid"));
         }
-        if !self
-            .review_url
-            .starts_with("https://github.com/lamemustafa/bridge/")
+        if !REVIEW_URL_PREFIXES
+            .iter()
+            .any(|prefix| self.review_url.starts_with(prefix))
             || self.review_url.len() > 256
             || self.review_url.chars().any(char::is_control)
         {
@@ -1442,38 +1560,11 @@ fn validate_claim(claim: &SupportClaim) -> Result<(), CompatibilityError> {
         }
         _ => {}
     }
-    match claim.transport {
-        TransportProfile::XmlHttp => {
-            if claim
-                .required_profiles
-                .contains(&ReadProfileId::JsonExSemanticShadowV1)
-            {
-                return Err(invalid("xml_claim_contains_jsonex_profile"));
-            }
-        }
-        TransportProfile::JsonExShadow => {
-            if claim
-                .required_profiles
-                .iter()
-                .any(|profile| *profile != ReadProfileId::JsonExSemanticShadowV1)
-            {
-                return Err(invalid("jsonex_claim_contains_xml_profile"));
-            }
-            if claim.promotion_eligible || claim.level != ClaimLevel::Unknown {
-                return Err(invalid("jsonex_claim_not_qualifiable"));
-            }
-        }
-    }
     if claim.level == ClaimLevel::Supported {
-        if claim.transport != TransportProfile::XmlHttp {
-            return Err(invalid("supported_claim_transport_invalid"));
-        }
         let required: BTreeSet<_> = [
             ReadProfileId::XmlCompanyEnumerationV1,
             ReadProfileId::XmlSyntheticFixtureMarkerV1,
             ReadProfileId::XmlLedgerReadV1,
-            ReadProfileId::XmlVoucherEmptyRangeV1,
-            ReadProfileId::XmlVoucherPopulatedRangeV1,
         ]
         .into_iter()
         .collect();
@@ -1762,6 +1853,30 @@ fn validate_relative_path(value: &str) -> Result<(), CompatibilityError> {
             .any(|part| !matches!(part, Component::Normal(_)))
     {
         return Err(invalid("surface_path_invalid"));
+    }
+    // A path that only reads as normal (`a//b`, `a/b/`, `a/./b`) names the same file as its normal
+    // form but is not equal to it as text, so two spellings of one pin could both be listed (#840).
+    let normal = path
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/");
+    if normal != value {
+        return Err(invalid("surface_path_not_normalised"));
+    }
+    Ok(())
+}
+
+/// Two pins that differ only in ASCII letter case name one file on a case-insensitive file
+/// system, so one of them pins nothing a reader could tell apart (#840).
+fn refuse_case_collisions<'a>(
+    paths: impl IntoIterator<Item = &'a str>,
+) -> Result<(), CompatibilityError> {
+    let mut folded = BTreeSet::new();
+    for path in paths {
+        if !folded.insert(path.to_ascii_lowercase()) {
+            return Err(invalid("surface_path_case_collision"));
+        }
     }
     Ok(())
 }

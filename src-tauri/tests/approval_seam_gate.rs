@@ -70,13 +70,16 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
     // `ReviewAcknowledged`, and nothing converts one into the other.
     for call_site in [
         "approve(count, preview).await?;\n        Ok(Self {",
-        "approve_review(count, preview).await?;\n        Ok(Self(()))",
+        "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
     ] {
         if source.matches(call_site).count() != 1 {
             problems.push(format!("expected exactly one call site `{call_site}`"));
         }
     }
-    for call in ["approve(count, preview)", "approve_review(count, preview)"] {
+    for call in [
+        "approve(count, preview)",
+        "approve_review(kind, count, preview)",
+    ] {
         if source.matches(call).count() != 1 {
             problems.push(format!("`{call}` must be called exactly once"));
         }
@@ -103,9 +106,10 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         problems.push("outside tests, carry_approval_scope must carry nothing".into());
     }
     // Every other way to run code off the calling task, counted (#725): none
-    // but the one dialog task above. The two `.spawn(` are processes, the
-    // dialog's child and a unit test's stand-in, and the bare word is counted
-    // too, as the cfg census is, so a form nobody listed is caught.
+    // but the one dialog task above. The one `.spawn(` is a process, the
+    // dialog's child (#702 removed the unit tests' `sh` writer), and the bare
+    // word is counted too, as the cfg census is, so a form nobody listed is
+    // caught.
     for (form, expected) in [
         ("tokio::task::spawn(", 0),
         ("task::spawn(", 0),
@@ -113,8 +117,8 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         ("spawn_local(", 0),
         ("JoinSet", 0),
         ("Handle::current()", 0),
-        (".spawn(", 2),
-        ("spawn", 10),
+        (".spawn(", 1),
+        ("spawn", 9),
     ] {
         if source.matches(form).count() != expected {
             problems.push(format!("expected {expected} of `{form}`"));
@@ -280,22 +284,264 @@ fn seam_users_outside_tests(root: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// Lines that set `cfg(test)` for a build: a `--cfg test` flag or a build
-/// script's `rustc-cfg=test`.
-fn cfg_test_settings(text: &str) -> Vec<String> {
-    text.lines()
-        .filter(|line| {
-            let compact: String = line
-                .chars()
-                .filter(|character| !character.is_whitespace())
-                .collect();
-            compact.contains("--cfgtest")
-                || compact.contains("--cfg=test")
-                || compact.contains("\"--cfg\",\"test\"")
-                || compact.contains("rustc-cfg=test")
+/// The tracked files a build takes its configuration from (bridge#836): every workflow and
+/// composite action, every `.cargo/config` or `.cargo/config.toml` at any depth, every
+/// `build.rs`, the root `package.json`, and the scripts and Dockerfile that start cargo.
+fn build_configuration_files(tracked: &[String]) -> Vec<&str> {
+    const STARTS_CARGO: [&str; 4] = [
+        "package.json",
+        "scripts/check-no-test-seam.mjs",
+        "scripts/package-mcpb.mjs",
+        "glama/Dockerfile",
+    ];
+    tracked
+        .iter()
+        .map(String::as_str)
+        .filter(|path| {
+            let (directory, name) = path.rsplit_once('/').unwrap_or(("", path));
+            path.starts_with(".github/workflows/")
+                || path.starts_with(".github/actions/")
+                || name == "build.rs"
+                || (matches!(name, "config" | "config.toml")
+                    && (directory == ".cargo" || directory.ends_with("/.cargo")))
+                || STARTS_CARGO.contains(path)
         })
+        .collect()
+}
+
+/// The repository's tracked files: what a build can be given, unlike an untracked directory or
+/// a second checkout under the root.
+fn tracked_files() -> Vec<String> {
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the gate lists the repository's tracked files with git; no network is involved"
+    )]
+    let output = std::process::Command::new("git")
+        .args(["ls-files", "-z"])
+        .current_dir(repo())
+        .output()
+        .expect("git ls-files runs");
+    assert!(output.status.success(), "git ls-files must succeed");
+    String::from_utf8(output.stdout)
+        .expect("UTF-8 paths")
+        .split('\0')
+        .filter(|path| !path.is_empty())
         .map(str::to_string)
         .collect()
+}
+
+/// A file's text with every run of separators made one space: whitespace, U+001F (the separator
+/// of `CARGO_ENCODED_RUSTFLAGS`), quotes, brackets, commas and backslash escapes (`\t`, `\n`,
+/// `\r`, `\x1f`, `\u001f`, `\u{1f}`, or a lone backslash). A flag split over lines, quoted or
+/// escaped then reads as one phrase.
+fn normalised(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut separated = false;
+    let mut rest = text;
+    while let Some(character) = rest.chars().next() {
+        let mut taken = character.len_utf8();
+        let separator = if character == '\\' {
+            let escape = &rest[1..];
+            for spelled in [
+                "x1f", "x1F", "u001f", "u001F", "u{1f}", "u{1F}", "t", "n", "r",
+            ] {
+                if escape.starts_with(spelled) {
+                    taken += spelled.len();
+                    break;
+                }
+            }
+            true
+        } else {
+            character.is_whitespace()
+                || matches!(character, '\u{1f}' | '"' | '\'' | '`' | '[' | ']' | ',')
+        };
+        if separator {
+            separated = true;
+        } else {
+            if separated && !out.is_empty() {
+                out.push(' ');
+            }
+            separated = false;
+            out.push(character);
+        }
+        rest = &rest[taken..];
+    }
+    out
+}
+
+/// Whether `text` begins with the whole word `word`: what follows is not part of an identifier.
+fn starts_with_word(text: &str, word: &str) -> bool {
+    text.strip_prefix(word).is_some_and(|after| {
+        !after
+            .chars()
+            .next()
+            .is_some_and(|next| next.is_alphanumeric() || next == '_')
+    })
+}
+
+/// The same text as a shell joins it: quotes and backslashes removed rather than made
+/// separators, so `te"st"`, `te\\st` and `\\test` read as `test`, and every run of whitespace
+/// (or U+001F) made one space.
+fn joined(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut separated = false;
+    for character in text.chars() {
+        if matches!(character, '"' | '\'' | '`' | '\\') {
+            continue;
+        }
+        if character.is_whitespace() || character == '\u{1f}' {
+            separated = true;
+        } else {
+            if separated && !out.is_empty() {
+                out.push(' ');
+            }
+            separated = false;
+            out.push(character);
+        }
+    }
+    out
+}
+
+/// The `--cfg test` and `rustc-cfg=test` settings in one form of a text.
+fn settings_in(text: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    for (flag, separators) in [("--cfg", " = "), ("rustc-cfg=", " ")] {
+        for (at, _) in text.match_indices(flag) {
+            let value = text[at + flag.len()..].trim_start_matches(|c| separators.contains(c));
+            if starts_with_word(value, "test") {
+                let end = (at + 60).min(text.len());
+                let end = (end..=text.len())
+                    .find(|&i| text.is_char_boundary(i))
+                    .unwrap_or(end);
+                found.push(text[at..end].to_string());
+            }
+        }
+    }
+    found
+}
+
+/// Settings that give a build `cfg(test)`: a `--cfg` flag whose value is the word `test`, or a
+/// build script's `rustc-cfg=test`. They are read from the whole normalised text, where quotes,
+/// brackets and escapes separate words; when that finds none, from the text as a shell joins it,
+/// where a word written in pieces is one word. `--cfg testing` is not one.
+fn cfg_test_settings(text: &str) -> Vec<String> {
+    let found = settings_in(&normalised(text));
+    if found.is_empty() {
+        settings_in(&joined(text))
+    } else {
+        found
+    }
+}
+
+/// A build script's `rustc-cfg` emissions that are not a plain literal cfg name other than
+/// `test`: a value built by `format!` (`{}`, `{name}`), split from its key, or `test` itself
+/// cannot be judged from the text, so it is refused (bridge#836).
+fn build_script_cfg_problems(script: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (at, _) in script.match_indices("rustc-cfg") {
+        let after = &script[at + "rustc-cfg".len()..];
+        let value = after.strip_prefix('=').map(|value| {
+            let end = value.find('"').unwrap_or(value.len());
+            &value[..end]
+        });
+        let literal = value.is_some_and(|value| {
+            let mut characters = value.chars();
+            characters
+                .next()
+                .is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
+                && characters.all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && value != "test"
+        });
+        if !literal {
+            let shown: String = after.chars().take(40).collect();
+            problems.push(format!("rustc-cfg{shown}"));
+        }
+    }
+    problems
+}
+
+/// A manifest that names its build script: the gate reads only files named `build.rs`, so such
+/// a manifest is refused rather than its script left unread. The key is found as TOML spells it
+/// (bridge#1399 review): `build` under `[package]` (bare or quoted), the dotted `package.build`
+/// at the top of the file (parts bare or quoted), or `build` inside an inline `package = { .. }`.
+/// A string value names a script; `build = false` does not.
+fn named_build_script(manifest: &str) -> bool {
+    let key = |text: &str| -> String {
+        text.chars()
+            .filter(|c| !c.is_whitespace() && !matches!(c, '"' | '\''))
+            .collect()
+    };
+    let names_a_script = |value: &str| value.trim_start().starts_with(['"', '\'']);
+    let mut table = String::new();
+    for line in manifest.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(header) = line.strip_prefix('[') {
+            let header = header.trim_start_matches('[');
+            table = key(header.split(']').next().unwrap_or(""));
+            continue;
+        }
+        let Some((left, value)) = line.split_once('=') else {
+            continue;
+        };
+        let name = if table.is_empty() {
+            key(left)
+        } else {
+            format!("{table}.{}", key(left))
+        };
+        if name == "package.build" && names_a_script(value) {
+            return true;
+        }
+        if name == "package" {
+            let inner = value.trim().trim_start_matches('{').trim_end_matches('}');
+            let names = inner
+                .split(',')
+                .filter_map(|pair| pair.split_once('='))
+                .any(|(inner_key, inner_value)| {
+                    key(inner_key) == "build" && names_a_script(inner_value)
+                });
+            if names {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// The gate's whole verdict over a tree, given its tracked paths and a reader: the files it
+/// examined, and every problem found.
+fn build_configuration_verdict(
+    tracked: &[String],
+    read: impl Fn(&str) -> String,
+) -> (Vec<String>, Vec<String>) {
+    let mut examined = Vec::new();
+    let mut problems = Vec::new();
+    for path in build_configuration_files(tracked) {
+        let text = read(path);
+        for setting in cfg_test_settings(&text) {
+            problems.push(format!("{path} sets cfg(test): {setting}"));
+        }
+        if path.ends_with("build.rs") {
+            for emission in build_script_cfg_problems(&text) {
+                problems.push(format!(
+                    "{path} emits a cfg not a plain literal: {emission}"
+                ));
+            }
+        }
+        examined.push(path.to_string());
+    }
+    for manifest in tracked
+        .iter()
+        .filter(|path| path.rsplit('/').next() == Some("Cargo.toml"))
+    {
+        if named_build_script(&read(manifest)) {
+            problems.push(format!(
+                "{manifest} names its build script; name it build.rs"
+            ));
+        }
+    }
+    (examined, problems)
 }
 
 #[test]
@@ -317,7 +563,7 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "confirm(count, preview).await?;",
         ),
         source.replace(
-            "approve_review(count, preview).await?;",
+            "approve_review(kind, count, preview).await?;",
             "confirm_review(count, preview).await?;",
         ),
         source.replace(
@@ -330,7 +576,7 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
         ),
         // A review answer must never build a post approval.
         source.replace(
-            "approve_review(count, preview).await?;\n        Ok(Self(()))",
+            "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
             "approve(count, preview).await?;\n        Ok(Self(()))",
         ),
         format!(
@@ -395,7 +641,7 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "#[cfg(test)]\npub(crate) mod test_seam {",
             "#[cfg(test)]\n/// Scripted approvals.\npub(crate) mod test_seam {",
         ),
-        format!("{source}\n#[cfg(feature = \"voucher-scan\")]\nfn unrelated() {{}}\n"),
+        format!("{source}\n#[cfg(feature = \"lab-writes\")]\nfn unrelated() {{}}\n"),
         // A word inside a string is not a cfg predicate.
         format!("{source}\n#[cfg(feature = \"test-fixtures\")]\nfn unrelated() {{}}\n"),
     ] {
@@ -545,8 +791,8 @@ const REVIEW_ENTRY: &str = "pub fn run_review_confirmation() -> bool {
 /// own dialog, from the real stdin to the real stdout (#635, #687). The
 /// parent approves a post only on the post token, so pairing that token with
 /// the review dialog would let "I reviewed it" approve a post, and passing a
-/// dialog other than the real one would approve with nobody asked. No stub
-/// test could see either: a stub is a script, not this code. Each entry
+/// dialog other than the real one would approve with nobody asked. No
+/// stand-in test could see either: a stand-in is not this code. Each entry
 /// point's whole body is pinned, so a swapped body is caught too, and no
 /// other `answer_with_token(` call may appear in the file. A text gate cannot
 /// see a call that does not spell that out, such as one through a function
@@ -601,15 +847,16 @@ fn each_dialog_answers_with_its_own_token() {
 }
 
 /// Where a click becomes the answer (#687). No test can open a real window,
-/// and the parent's stub tests run only on unix. So the four native dialog
-/// functions, `confirm` and `confirm_review`, and the two functions that
-/// decide from the child's answer (`confirm_with`, `confirm_review_with`)
-/// are pinned here verbatim, with the button labels and the functions that
-/// word each title and the post button (#746). On Windows the post dialog's
-/// title is the only text that says what Yes does. The file's `cfg`
-/// attributes are counted as well: a platform or test split anywhere in it,
-/// such as a `#[cfg(windows)]` twin of a pinned function, must change this
-/// gate. This pins text, not the platform's behaviour.
+/// and the parent's tests replace the child with a stand-in (#702). So the
+/// four native dialog functions, `confirm` and `confirm_review`, and the two
+/// functions that decide from the child's answer (`confirm_with`,
+/// `confirm_review_with`) are pinned here verbatim, with the button labels
+/// and the functions that word each title and the post button (#746). On
+/// Windows the post dialog's title and its first line (#1780) are the only
+/// text that says what Yes does.
+/// The file's `cfg` attributes are counted as well: a platform or test split
+/// anywhere in it, such as a `#[cfg(windows)]` twin of a pinned function,
+/// must change this gate. This pins text, not the platform's behaviour.
 const REVIEW_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     rfd::MessageDialog::new()
@@ -627,7 +874,8 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
 const REVIEW_ACK_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
+        MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = review_question(count)
@@ -641,7 +889,14 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND,
+            // Topmost: a window the connector opens while Tally fills the
+            // screen is otherwise drawn behind it, since a background
+            // process may not take the foreground (#1589). With
+            // MB_SETFOREGROUND the box also takes the foreground, so a key
+            // typed for Tally answers it; the parent puts a first line on
+            // its text that says what Y and N do (#1780). No stays the
+            // default button.
+            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }
 }"#;
@@ -666,7 +921,8 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
 const POST_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
+        MB_YESNOCANCEL,
     };
     // rfd without common-controls-v6 discards custom labels. Use the existing
     // Win32 dependency so No is the default and Escape/close remain Cancel.
@@ -679,7 +935,14 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND,
+            // Topmost: a window the connector opens while Tally fills the
+            // screen is otherwise drawn behind it, since a background
+            // process may not take the foreground (#1589). With
+            // MB_SETFOREGROUND the box also takes the foreground, so a key
+            // typed for Tally answers it; the parent puts a first line on
+            // its text that says what Y and N do (#1780). No stays the
+            // default button.
+            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }
 }"#;
@@ -689,9 +952,12 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
 const POST_WORDS: &str = r#"#[cfg(not(windows))]
 fn post_words(count: VoucherCount) -> (String, String) {
     match count.batch() {
-        None => ("Bridge — approve one voucher".into(), POST_LABEL.into()),
+        None => (
+            "ComplyEaze Bridge — approve one voucher".into(),
+            POST_LABEL.into(),
+        ),
         Some(count) => (
-            format!("Bridge — approve {count} vouchers"),
+            format!("ComplyEaze Bridge — approve {count} vouchers"),
             format!("Post {count} vouchers"),
         ),
     }
@@ -702,25 +968,92 @@ fn post_words(count: VoucherCount) -> (String, String) {
 const REVIEW_TITLE: &str = r#"#[cfg(not(windows))]
 fn review_title(count: VoucherCount) -> String {
     match count.batch() {
-        None => "Bridge — record that you reviewed one voucher".into(),
-        Some(count) => format!("Bridge — record that you reviewed {count} vouchers"),
+        None => "ComplyEaze Bridge — record that you reviewed one voucher".into(),
+        Some(count) => format!("ComplyEaze Bridge — record that you reviewed {count} vouchers"),
     }
 }"#;
 
 const REVIEW_QUESTION: &str = r#"#[cfg(windows)]
 fn review_question(count: VoucherCount) -> String {
     match count.batch() {
-        None => "Bridge — record that you reviewed this voucher?".into(),
-        Some(count) => format!("Bridge — record that you reviewed these {count} vouchers?"),
+        None => "ComplyEaze Bridge — record that you reviewed this voucher?".into(),
+        Some(count) => {
+            format!("ComplyEaze Bridge — record that you reviewed these {count} vouchers?")
+        }
     }
 }"#;
 
 const POST_QUESTION: &str = r#"#[cfg(windows)]
 fn post_question(count: VoucherCount) -> String {
     match count.batch() {
-        None => "Bridge — post this voucher?".into(),
-        Some(count) => format!("Bridge — post {count} vouchers?"),
+        None => "ComplyEaze Bridge — post this voucher?".into(),
+        Some(count) => format!("ComplyEaze Bridge — post {count} vouchers?"),
     }
+}"#;
+
+/// What the parent writes above a dialog's text (#1780): the answer text, in
+/// the words of that platform's buttons, and the check that what the box will
+/// show is within its caps. The child shows what it is sent, so these decide
+/// what a person reads before the details.
+const ANSWER_EFFECT: &str = r#"fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
+    match shown {
+        Shown::Post => (
+            format!("post {} into Tally", these_vouchers(count)),
+            "Nothing is posted until you answer.",
+        ),
+        Shown::Review => (
+            format!("record that you reviewed {}", these_vouchers(count)),
+            "Nothing is recorded until you answer.",
+        ),
+        Shown::StopRelease => (
+            "release the invoice stop for this company, so that ComplyEaze Bridge builds and \
+             posts invoices for it again"
+                .into(),
+            "Nothing is released until you answer.",
+        ),
+    }
+}"#;
+
+const ANSWER_TEXT: &str = r#"#[cfg(not(windows))]
+fn answer_text(shown: Shown, count: VoucherCount) -> String {
+    let (yes, nothing) = answer_effect(shown, count);
+    let button = match shown {
+        Shown::Post => post_words(count).1,
+        Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
+    };
+    format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}")
+}"#;
+
+const ANSWER_TEXT_WINDOWS: &str = r#"#[cfg(windows)]
+fn answer_text(shown: Shown, count: VoucherCount) -> String {
+    let (yes, nothing) = answer_effect(shown, count);
+    format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}")
+}"#;
+
+const DISPLAYED_TEXT: &str = r#"fn displayed_text(shown: Shown, count: VoucherCount, preview: &str) -> String {
+    let answer = wrapped(&answer_text(shown, count));
+    match (shown, preview.split_once("\n\n")) {
+        (Shown::StopRelease, Some((statement, rest))) => {
+            format!("{statement}\n\n{answer}\n\n{rest}")
+        }
+        _ => format!("{answer}\n\n{preview}"),
+    }
+}"#;
+
+const FITS_THE_BOX: &str = r#"fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
+    if shown == Shown::StopRelease {
+        return true;
+    }
+    let (lines, chars) = match count.batch() {
+        None => (ONE_VOUCHER_LINES, ONE_VOUCHER_CHARS),
+        Some(_) => (BATCH_LINES, BATCH_CHARS),
+    };
+    let (extra_lines, extra_chars) = answer_reserve();
+    displayed.lines().count() <= lines + extra_lines
+        && displayed.chars().count() <= chars + extra_chars
+        && displayed
+            .lines()
+            .all(|line| line.chars().count() <= ANSWER_WIDTH)
 }"#;
 
 const CONFIRM_WITH: &str = r#"async fn confirm_with(
@@ -781,7 +1114,7 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 15] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 20] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -792,20 +1125,37 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 15] = [
     (POST_QUESTION, 1),
     (REVIEW_TITLE, 1),
     (REVIEW_QUESTION, 1),
+    (ANSWER_EFFECT, 1),
+    (ANSWER_TEXT, 1),
+    (ANSWER_TEXT_WINDOWS, 1),
+    (DISPLAYED_TEXT, 1),
+    (FITS_THE_BOX, 1),
     (POST_DIALOG_WINDOWS, 1),
     (REVIEW_ACK_DIALOG, 1),
     (REVIEW_ACK_DIALOG_WINDOWS, 1),
     (
         "async fn confirm(count: VoucherCount, preview: &str) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| \"import_approval_unavailable\")?;
-    confirm_with(&executable, count, preview).await
+    let shown = displayed_text(Shown::Post, count, preview);
+    if !fits_the_box(Shown::Post, count, &shown) {
+        return Err(\"import_review_too_large\".into());
+    }
+    confirm_with(&executable, count, &shown).await
 }",
         1,
     ),
     (
-        "async fn confirm_review(count: VoucherCount, preview: &str) -> Result<(), String> {
+        "async fn confirm_review(
+    kind: ReviewKind,
+    count: VoucherCount,
+    preview: &str,
+) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| \"ack_review_unavailable\")?;
-    confirm_review_with(&executable, count, preview).await
+    let shown = displayed_text(kind.shown(), count, preview);
+    if !fits_the_box(kind.shown(), count, &shown) {
+        return Err(\"ack_review_too_large\".into());
+    }
+    confirm_review_with(&executable, count, &shown).await
 }",
         1,
     ),
@@ -820,12 +1170,14 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 15] = [
 const CFG_CENSUS: [(&str, usize); 6] = [
     // #725 added one of each seam arm for the dialog task's scope, and the
     // non-test arm's identity function.
-    ("#[cfg(test)]", 6),
+    // #1780 added one more, the test-only accessor for what a review shows.
+    ("#[cfg(test)]", 7),
     ("#[cfg(not(test))]", 4),
-    ("#[cfg(unix)]", 7),
-    ("#[cfg(windows)]", 6),
-    ("#[cfg(not(windows))]", 7),
-    ("cfg", 31),
+    // #702 ran the parent's seven unix-only test items on every platform.
+    ("#[cfg(unix)]", 0),
+    ("#[cfg(windows)]", 7),
+    ("#[cfg(not(windows))]", 8),
+    ("cfg", 27),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -884,16 +1236,29 @@ fn each_dialog_answers_only_on_its_positive_button() {
             "MB_YESNOCANCEL | MB_DEFBUTTON1",
             1,
         ),
-        source.replacen("\"Post voucher\"", "\"Cancel\"", 1),
-        source.replacen("\"I reviewed it\"", "\"Cancel\"", 1),
+        // The parent shows the preview without the answer text, or shows the
+        // release with the review's words (#1780).
         source.replacen(
-            "confirm_with(&executable, count, preview).await\n}",
-            "let _ = (executable, count, preview);\n    Ok(())\n}",
+            "displayed_text(Shown::Post, count, preview)",
+            "preview.to_string()",
             1,
         ),
         source.replacen(
-            "confirm_review_with(&executable, count, preview).await\n}",
-            "let _ = (executable, count, preview);\n    Ok(())\n}",
+            "let shown = displayed_text(kind.shown(), count, preview);",
+            "let shown = displayed_text(Shown::Review, count, preview);",
+            1,
+        ),
+        source.replacen("let (extra_lines, extra_chars) = answer_reserve();", "let (extra_lines, extra_chars) = (0, 0);", 1),
+        source.replacen("\"Post voucher\"", "\"Cancel\"", 1),
+        source.replacen("\"I reviewed it\"", "\"Cancel\"", 1),
+        source.replacen(
+            "confirm_with(&executable, count, &shown).await\n}",
+            "let _ = (executable, count, shown);\n    Ok(())\n}",
+            1,
+        ),
+        source.replacen(
+            "confirm_review_with(&executable, count, &shown).await\n}",
+            "let _ = (executable, count, shown);\n    Ok(())\n}",
             1,
         ),
         source.replacen(
@@ -951,25 +1316,25 @@ fn each_dialog_answers_only_on_its_positive_button() {
         // The Windows post dialog asks the review's question, so Yes reads as
         // recording a review while it posts (#746).
         source.replacen(
-            "None => \"Bridge — post this voucher?\".into(),",
-            "None => \"Bridge — record that you reviewed this voucher?\".into(),",
+            "None => \"ComplyEaze Bridge — post this voucher?\".into(),",
+            "None => \"ComplyEaze Bridge — record that you reviewed this voucher?\".into(),",
             1,
         ),
         source.replacen(
-            "format!(\"Bridge — post {count} vouchers?\")",
-            "format!(\"Bridge — record that you reviewed these {count} vouchers?\")",
+            "format!(\"ComplyEaze Bridge — post {count} vouchers?\")",
+            "format!(\"ComplyEaze Bridge — record that you reviewed these {count} vouchers?\")",
             1,
         ),
         // A review dialog's title reads as approving a post (#746).
         source.replacen(
-            "format!(\"Bridge — record that you reviewed {count} vouchers\")",
-            "format!(\"Bridge — approve {count} vouchers\")",
+            "format!(\"ComplyEaze Bridge — record that you reviewed {count} vouchers\")",
+            "format!(\"ComplyEaze Bridge — approve {count} vouchers\")",
             1,
         ),
         // The Windows review dialog asks the post's question (#746).
         source.replacen(
-            "format!(\"Bridge — record that you reviewed these {count} vouchers?\")",
-            "format!(\"Bridge — post {count} vouchers?\")",
+            "format!(\"ComplyEaze Bridge — record that you reviewed these {count} vouchers?\")",
+            "format!(\"ComplyEaze Bridge — post {count} vouchers?\")",
             1,
         ),
         // rfd post dialog discards its answer: it still computes the comparison, then returns true.
@@ -1011,47 +1376,187 @@ fn only_test_files_name_the_seam() {
 
 #[test]
 fn nothing_sets_cfg_test_for_a_build() {
-    let mut candidates: Vec<PathBuf> = [
-        ".cargo/config.toml",
-        ".cargo/config",
-        "src-tauri/.cargo/config.toml",
-        "src-tauri/.cargo/config",
-    ]
-    .iter()
-    .map(|path| repo().join(path))
-    .collect();
-    candidates.extend(
-        fs::read_dir(repo().join(".github").join("workflows"))
-            .unwrap()
-            .map(|entry| entry.unwrap().path()),
-    );
-    candidates.push(repo().join("src-tauri").join("build.rs"));
-    for crate_dir in fs::read_dir(repo().join("src-tauri").join("crates")).unwrap() {
-        candidates.push(crate_dir.unwrap().path().join("build.rs"));
-    }
-    candidates.push(repo().join("package.json"));
-    let mut examined = 0;
-    for path in candidates.iter().filter(|path| path.is_file()) {
-        examined += 1;
-        let settings = cfg_test_settings(&fs::read_to_string(path).unwrap());
+    let tracked = tracked_files();
+    let (examined, problems) = build_configuration_verdict(&tracked, |path| read(path));
+    assert_eq!(problems, Vec::<String>::new());
+    // A gate that stops finding its files passes vacuously: these are read today.
+    for path in [
+        ".github/workflows/ci.yml",
+        ".github/actions/setup-windows-native/action.yml",
+        "src-tauri/build.rs",
+        "package.json",
+        "scripts/check-no-test-seam.mjs",
+        "scripts/package-mcpb.mjs",
+        "glama/Dockerfile",
+    ] {
         assert!(
-            settings.is_empty(),
-            "{} sets cfg(test): {settings:?}",
-            path.display()
+            examined.iter().any(|seen| seen == path),
+            "the gate must read {path}"
         );
     }
-    assert!(
-        examined >= 3,
-        "the gate must have looked at the workflows and build scripts"
-    );
-    for setting in [
-        "RUSTFLAGS: --cfg test",
-        "rustflags = [\"--cfg\", \"test\"]",
-        "println!(\"cargo:rustc-cfg=test\");",
-        "RUSTFLAGS=\"--cfg=test\" cargo build",
-    ] {
-        assert_eq!(cfg_test_settings(setting).len(), 1, "{setting}");
+    // ...and every tracked build script and Cargo config, whatever else the selection keeps.
+    for path in &tracked {
+        let (directory, name) = path.rsplit_once('/').unwrap_or(("", path));
+        let cargo_config = matches!(name, "config" | "config.toml")
+            && (directory == ".cargo" || directory.ends_with("/.cargo"));
+        if name == "build.rs" || cargo_config {
+            assert!(examined.contains(path), "the gate must read {path}");
+        }
     }
+}
+
+/// bridge#836: each way of setting `cfg(test)`, in each place a build reads, on a synthetic tree;
+/// the whole verdict is asserted, so a rule that stops matching, or starts over-matching, fails.
+#[test]
+fn every_spelling_and_place_that_sets_cfg_test_is_refused() {
+    let verdict = |files: &[(&str, &str)]| {
+        let tracked: Vec<String> = files.iter().map(|(path, _)| path.to_string()).collect();
+        build_configuration_verdict(&tracked, |path| {
+            files
+                .iter()
+                .find(|(listed, _)| *listed == path)
+                .map(|(_, text)| text.to_string())
+                .unwrap_or_default()
+        })
+        .1
+    };
+    let clean = "name: x\non: push\n";
+    for (path, text, setting) in [
+        (
+            ".github/workflows/x.yml",
+            "env:\n  RUSTFLAGS: --cfg test\n",
+            "--cfg test",
+        ),
+        (
+            ".github/workflows/x.yml",
+            "env:\n  RUSTFLAGS: \"--cfg 'test'\"\n",
+            "--cfg test",
+        ),
+        (
+            ".github/workflows/x.yml",
+            "env:\n  RUSTFLAGS: --cfg=\"test\"\n",
+            "--cfg= test",
+        ),
+        (
+            ".github/workflows/x.yml",
+            "env:\n  CARGO_ENCODED_RUSTFLAGS: \"--cfg\\x1ftest\"\n",
+            "--cfg test",
+        ),
+        (
+            ".github/workflows/x.yml",
+            "env:\n  CARGO_ENCODED_RUSTFLAGS: \"--cfg\u{1f}test\"\n",
+            "--cfg test",
+        ),
+        (
+            ".github/workflows/x.yml",
+            "run: cargo build --config \"build.rustflags=[\\\"--cfg\\\",\\\"test\\\"]\"\n",
+            "--cfg test",
+        ),
+        (
+            ".github/actions/other/action.yml",
+            "runs:\n  env:\n    RUSTFLAGS: --cfg test\n",
+            "--cfg test",
+        ),
+        (
+            ".cargo/config.toml",
+            "[build]\nrustflags = [\n  \"--cfg\",\n  \"test\",\n]\n",
+            "--cfg test",
+        ),
+        (
+            "tools/.cargo/config",
+            "[build]\nrustflags = [\"--cfg\", \"test\"]\n",
+            "--cfg test",
+        ),
+        (
+            "package.json",
+            "{\"scripts\": {\"b\": \"RUSTFLAGS='--cfg test' cargo build\"}}\n",
+            "--cfg test",
+        ),
+        (
+            "glama/Dockerfile",
+            "ENV RUSTFLAGS=\"--cfg test\"\n",
+            "--cfg test",
+        ),
+        (
+            "scripts/package-mcpb.mjs",
+            "spawn(\"cargo\", [\"build\"], { env: { RUSTFLAGS: \"--cfg test\" } });\n",
+            "--cfg test",
+        ),
+    ] {
+        let problems = verdict(&[(path, text), (".github/workflows/ci.yml", clean)]);
+        assert_eq!(problems.len(), 1, "{path}: {text:?} -> {problems:?}");
+        assert!(
+            problems[0].starts_with(&format!("{path} sets cfg(test): {setting}")),
+            "{path}: {text:?} -> {problems:?}"
+        );
+    }
+    // A literal `rustc-cfg=test` in a build script is refused twice: as a cfg(test) setting and
+    // as a cfg value other than a plain non-test name.
+    assert_eq!(
+        verdict(&[(
+            "tools/x/build.rs",
+            "fn main() { println!(\"cargo::rustc-cfg=test\"); }\n"
+        )]),
+        [
+            "tools/x/build.rs sets cfg(test): rustc-cfg=test ); }",
+            "tools/x/build.rs emits a cfg not a plain literal: rustc-cfg=test\"); }\n",
+        ]
+    );
+    // A build script's cfg judged by value, and a named build script refused.
+    for script in [
+        "fn main() { println!(\"cargo:rustc-cfg={}\", \"test\"); }\n",
+        "fn main() { let c = \"test\"; println!(\"cargo:rustc-cfg={c}\"); }\n",
+        "fn main() { println!(concat!(\"cargo:rustc-cfg\", \"=test\")); }\n",
+    ] {
+        let problems = verdict(&[("src-tauri/crates/x/build.rs", script)]);
+        assert_eq!(problems.len(), 1, "{script:?} -> {problems:?}");
+        assert!(problems[0]
+            .starts_with("src-tauri/crates/x/build.rs emits a cfg not a plain literal: "));
+    }
+    // Every TOML spelling of the build-script key (bridge#1399 review, P2 a).
+    for manifest in [
+        "[package]\nname = \"x\"\nbuild = \"setup.rs\"\n",
+        "[package]\nname = \"x\"\n\"build\" = \"setup.rs\"\n",
+        "[package]\nname = \"x\"\n'build' = 'setup.rs'\n",
+        "package.name = \"x\"\npackage.build = \"setup.rs\"\n",
+        "\"package\" . \"build\" = \"setup.rs\"\n",
+        "package = { name = \"x\", build = \"setup.rs\" }\n",
+        "[ \"package\" ]\nbuild=\"setup.rs\"\n",
+    ] {
+        assert_eq!(
+            verdict(&[("tools/x/Cargo.toml", manifest)]),
+            ["tools/x/Cargo.toml names its build script; name it build.rs"],
+            "{manifest:?}"
+        );
+    }
+    // A shell joins a word written in pieces (bridge#1399 review, P2 b): each is one setting.
+    for text in [
+        "run: RUSTFLAGS=\"--cfg te\"st cargo build\n",
+        "run: RUSTFLAGS='--cfg te'\"st\" cargo build\n",
+        "run: RUSTFLAGS=--cfg\\ te\\st cargo build\n",
+        "run: RUSTFLAGS=\"--cfg \\test\" cargo build\n",
+        "run: RUSTFLAGS=\"--c\"fg\" test\" cargo build\n",
+    ] {
+        let problems = verdict(&[(".github/workflows/x.yml", text)]);
+        assert_eq!(problems.len(), 1, "{text:?} -> {problems:?}");
+        assert!(
+            problems[0].starts_with(".github/workflows/x.yml sets cfg(test): --cfg test"),
+            "{text:?} -> {problems:?}"
+        );
+    }
+    // What is not a cfg(test) setting, or not a place a build reads, passes.
+    assert_eq!(
+        verdict(&[
+            (".github/workflows/x.yml", "env:\n  RUSTFLAGS: --cfg testing --cfg tests_x --cfg feature=\"test\"\n"),
+            ("src-tauri/build.rs", "fn main() { println!(\"cargo:rustc-cfg=shipping\"); println!(\"cargo:rustc-check-cfg=cfg(shipping)\"); }\n"),
+            ("tools/x/Cargo.toml", "[package]\nname = \"x\"\nbuild = false\n"),
+            ("tools/y/Cargo.toml", "[package]\nname = \"y\"\n[dependencies]\nbuild = \"1.0\"\n"),
+            ("tools/z/Cargo.toml", "[package.metadata.x]\nbuild = \"notes\"\n"),
+            ("docs/notes.md", "RUSTFLAGS=--cfg test\n"),
+            ("scripts/other.sh", "RUSTFLAGS=--cfg test cargo build\n"),
+        ]),
+        Vec::<String>::new()
+    );
 }
 
 #[test]

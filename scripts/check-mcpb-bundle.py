@@ -2,29 +2,67 @@
 # SPDX-License-Identifier: Apache-2.0
 """Verify and launch a trusted, locally built MCPB archive without contacting Tally."""
 import argparse
+import contextlib
 import platform
 import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import shutil
 import stat
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import zipfile
 
 RESOURCES = ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt", "THIRD_PARTY_LICENSES_RUST.txt")
 DEFAULT_TOOLS = {
-    "tally_status", "list_companies", "voucher_schema", "validate_masters", "outstandings",
-    "ledger_masters", "ledger_movement", "trial_balance", "profit_and_loss", "balance_sheet", "vouchers", "voucher_presence", "read_evidence", "egress_log", "verify_import",
+    "balance_sheet",
+    "cash_flow",
+    "company_features",
+    "egress_log",
+    "gst_status",
+    "gst_uncertain_vouchers",
+    "ledger_masters",
+    "ledger_movement",
+    "list_companies",
+    "local_data_report",
+    "masters",
+    "month_register",
+    "outstandings",
+    "profit_and_loss",
+    "purchase_register",
+    "read_evidence",
+    "sales_register",
+    "statement_tie_out",
+    "stock_summary",
+    "tally_status",
+    "trial_balance",
+    "validate_masters",
+    "verify_import",
+    "voucher_presence",
+    "voucher_read_cost",
+    "voucher_schema",
+    "vouchers",
 }
 # The bundle always enables file preparation and bank-statement parsing; they
 # write nothing to Tally. Posting, and recording a person's review of a doubted
 # post (bridge#239), are the tools behind the user's switch, and it is off by
 # default while the limits recorded on bridge#574 and bridge#579 remain.
-IMPORT_TOOLS = {"build_import_xml", "parse_bank_statement"}
-POSTING_TOOLS = {"post_import", "acknowledge_post_review"}
+IMPORT_TOOLS = {
+    "build_import_xml",
+    "parse_bank_statement",
+}
+POSTING_TOOLS = {
+    "acknowledge_post_review",
+    "post_import",
+}
+# The tax-audit tool is behind its own switch, off by default.
+AUDIT_TOOLS = {
+    "audit_test_run",
+}
 
 
 def expected_tools(environment):
@@ -34,14 +72,19 @@ def expected_tools(environment):
         tools |= IMPORT_TOOLS
     if environment.get("BRIDGE_AGENT_ENABLE_WRITES") == "true":
         tools |= POSTING_TOOLS
+    if environment.get("BRIDGE_AGENT_ENABLE_TAX_AUDIT") == "true":
+        tools |= AUDIT_TOOLS
     return tools
 # The bundled PDFium: beside the binary, where parse_bank_statement loads it,
-# with the licence notice scripts/fetch-pdfium.py generated at the root. Both are
+# with the licence notice scripts/fetch-pdfium.mjs generated at the root. Both are
 # checked against packaging/pdfium/pdfium.lock.json, not merely present.
 PDFIUM_NOTICE = "THIRD_PARTY_LICENSES_PDFIUM.txt"
 PDFIUM_LIBRARIES = {"darwin": "libpdfium.dylib", "win32": "pdfium.dll"}
 PDFIUM_PLATFORMS = {("darwin", "arm64"): "macos-arm64", ("win32", "amd64"): "windows-x64"}
-ARCHIVE_MEMBERS = len(RESOURCES) + 4  # manifest, binary, PDFium library, PDFium notice
+ICON = "icon.png"
+ICON_SOURCE = Path("packaging/mcpb") / ICON
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+ARCHIVE_MEMBERS = len(RESOURCES) + 5  # manifest, icon, binary, PDFium library, PDFium notice
 STATEMENT_FIXTURE = Path("src-tauri/crates/bridge-bank-statement/tests/fixtures/hdfc-synthetic.pdf")
 STATEMENT_PASSWORD = "synthetic-user-4321"
 MAX_BUNDLE_BYTES = 128 * 1024 * 1024
@@ -86,8 +129,13 @@ def unpack_bundle(archive, destination, repository):
         member_path(entry)
         require(entry.startswith("bin/"), "invalid_entry_point")
         library = str(PurePosixPath(entry).parent / PDFIUM_LIBRARIES.get(sys.platform, ""))
-        require(set(names) == set(RESOURCES) | {"manifest.json", entry, library, PDFIUM_NOTICE},
+        require(set(names) == set(RESOURCES) | {"manifest.json", ICON, entry, library, PDFIUM_NOTICE},
                 "unexpected_archive_members")
+        # The icon is the file committed in packaging/mcpb, unmodified, and the manifest names it.
+        require(manifest.get("icon") == ICON, "icon_declaration_mismatch")
+        icon = bundle.read(ICON)
+        require(icon.startswith(PNG_SIGNATURE), "icon_is_not_png")
+        require(icon == (repository / ICON_SOURCE).read_bytes(), "icon_bytes_differ")
         config = manifest["server"]["mcp_config"]
         require(manifest["server"]["type"] == "binary"
                 and config["command"] == "${__dirname}/" + entry
@@ -200,17 +248,38 @@ def run_bounded(command, payload, environment, timeout=15):
 
 def resolve_environment(manifest):
     mappings = manifest["server"]["mcp_config"]["env"]
-    require(set(mappings) == {"BRIDGE_TALLY_HOST", "BRIDGE_TALLY_PORT", "BRIDGE_AGENT_REDACTION",
-                              "BRIDGE_AGENT_ENABLE_IMPORT", "BRIDGE_AGENT_ENABLE_WRITES"},
+    require(set(mappings) == {"BRIDGE_TERMS_ACCEPTED", "BRIDGE_TALLY_HOST", "BRIDGE_TALLY_PORT",
+                              "BRIDGE_AGENT_REDACTION", "BRIDGE_AGENT_ENABLE_IMPORT",
+                              "BRIDGE_AGENT_ENABLE_WRITES", "BRIDGE_AGENT_ENABLE_TAX_AUDIT"},
             "unexpected_environment_mapping")
+    # No setting may be required. Claude Desktop builds no launch command while a required setting
+    # has no stored value, and an update that renames the Terms setting leaves it with none, so
+    # the server would never start to refuse (bridge#1413).
+    require(all(option.get("required") is not True for option in manifest["user_config"].values()),
+            "required_setting_blocks_launch")
+    # The Terms of Use are accepted by the user, never by default: the setting is off, and the
+    # server refuses every tool until it is on (see agent_terms.rs).
+    terms = manifest["user_config"].get("accept_terms_2026_10_1", {})
+    require(terms.get("type") == "boolean" and terms.get("default") is False,
+            "terms_setting_must_be_boolean_and_off")
+    require(mappings["BRIDGE_TERMS_ACCEPTED"] == "${user_config.accept_terms_2026_10_1}",
+            "terms_environment_mapping_mismatch")
     require(mappings["BRIDGE_AGENT_ENABLE_IMPORT"] == "true", "import_environment_mapping_mismatch")
-    writes = manifest["user_config"].get("enable_writes", {})
+    writes = manifest["user_config"].get("enable_posting_2026_10", {})
     require(writes.get("type") == "boolean" and isinstance(writes.get("default"), bool),
             "writes_default_must_be_boolean")
     # Posting stays off by default while the limits recorded on bridge#574 and bridge#579 remain.
     require(writes["default"] is False, "posting_must_default_off")
-    require(mappings["BRIDGE_AGENT_ENABLE_WRITES"] == "${user_config.enable_writes}",
+    # The key is versioned (bridge#1090): a value stored under the released enable_writes, whose
+    # text offered one voucher at a time, must not turn on batch posting, so it is mapped to nothing.
+    require(mappings["BRIDGE_AGENT_ENABLE_WRITES"] == "${user_config.enable_posting_2026_10}",
             "writes_environment_mapping_mismatch")
+    # The tax-audit tool ships off by default behind its own versioned switch.
+    audit = manifest["user_config"].get("enable_tax_audit_2026_10", {})
+    require(audit.get("type") == "boolean" and audit.get("default") is False,
+            "tax_audit_setting_must_be_boolean_and_off")
+    require(mappings["BRIDGE_AGENT_ENABLE_TAX_AUDIT"] == "${user_config.enable_tax_audit_2026_10}",
+            "tax_audit_environment_mapping_mismatch")
     # Supply isolated client settings through the manifest itself. Overwriting
     # the resulting environment would hide broken host/port substitutions.
     values = {name: option["default"] for name, option in manifest["user_config"].items()}
@@ -255,14 +324,75 @@ def validate_server_version(reply, manifest):
     return version
 
 
+REMOVE_ATTEMPTS = 8
+REMOVE_PAUSE_SECONDS = 0.5
+
+
+@contextlib.contextmanager
+def scratch_directory(prefix):
+    """A folder that is removed on exit, waiting a bounded time for the server binary inside it.
+
+    Windows can keep the binary of a process that has just exited locked for a moment. On Python 3.10
+    ``tempfile.TemporaryDirectory`` then fails its cleanup with a bare ``NotADirectoryError`` (its
+    handler recurses into the locked file), after the smoke run has finished and before its result
+    is written. The folder is retried; if it stays locked the run still reports what it verified
+    and says on stderr which folder was left behind and the last error, which names the locked file.
+    Which file is locked, and by what, is not established: the stderr line is how it will be.
+    """
+    path = tempfile.mkdtemp(prefix=prefix)
+    try:
+        yield path
+    finally:
+        for attempt in range(REMOVE_ATTEMPTS):
+            try:
+                shutil.rmtree(path)
+                break
+            except FileNotFoundError:
+                break
+            except OSError as error:
+                if attempt + 1 == REMOVE_ATTEMPTS:
+                    print("MCPB smoke could not remove its scratch folder %s after %d attempts (last error: %r); "
+                          "it was left in place" % (path, REMOVE_ATTEMPTS, error), file=sys.stderr)
+                else:
+                    time.sleep(REMOVE_PAUSE_SECONDS)
+
+
 def smoke(archive, repository):
-    with tempfile.TemporaryDirectory(prefix="bridge-mcpb-smoke-") as temporary:
+    with scratch_directory("bridge-mcpb-smoke-") as temporary:
         destination = Path(temporary) / "bundle"
         manifest, binary = unpack_bundle(archive, destination, repository)
         environment = {key: value for key, value in os.environ.items()
-                       if not key.startswith(("BRIDGE_AGENT_", "BRIDGE_TALLY_", "BRIDGE_PDFIUM_"))}
+                       if not key.startswith(("BRIDGE_AGENT_", "BRIDGE_TALLY_", "BRIDGE_PDFIUM_", "BRIDGE_TERMS_"))}
         environment.update(resolve_environment(manifest))
         environment["BRIDGE_AGENT_DATA_DIR"] = str(Path(temporary) / "data")
+        # With the manifest's defaults the Terms of Use are not accepted: the server must still
+        # answer initialize and tools/list, and refuse a tool call in band. Own data folder, so
+        # this run's receipts do not mix with the accepted run's below.
+        require(environment["BRIDGE_TERMS_ACCEPTED"] == "false", "terms_must_default_to_not_accepted")
+        refused_requests = [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-06-18", "capabilities": {},
+                "clientInfo": {"name": "bridge-mcpb-smoke", "version": "1.0.0"}}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+            {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
+                "name": "voucher_schema", "arguments": {}}},
+        ]
+        refused_command = manifest["server"]["mcp_config"]["command"].replace("${__dirname}", str(destination))
+        refused_output, _ = run_bounded(
+            [refused_command],
+            b"".join(json.dumps(request).encode() + b"\n" for request in refused_requests),
+            dict(environment, BRIDGE_AGENT_DATA_DIR=str(Path(temporary) / "data-refused")))
+        refused = [json.loads(line) for line in refused_output.splitlines()]
+        require([reply.get("id") for reply in refused] == [1, 2, 3], "terms_refusal_response_ids")
+        require(bool(refused[1]["result"]["tools"]), "terms_refusal_hid_the_tool_list")
+        refusal = refused[2]["result"]
+        require(refusal.get("isError") is True
+                and refusal.get("structuredContent", {}).get("result", {}).get("error", {}).get("code")
+                == "terms_not_accepted", "terms_refusal_missing")
+        require(not (Path(temporary) / "data-refused" / "terms-acceptance.jsonl").exists(),
+                "terms_recorded_without_acceptance")
+        environment["BRIDGE_TERMS_ACCEPTED"] = "true"
         requests = [
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
                 "protocolVersion": "2025-06-18", "capabilities": {},
@@ -286,6 +416,7 @@ def smoke(archive, repository):
         require(len(names) == len(expected) and set(names) == expected, "default_tools_mismatch")
         require(not POSTING_TOOLS & set(names) and IMPORT_TOOLS <= set(names),
                 "default_bundle_must_prepare_but_not_post")
+        require(not AUDIT_TOOLS & set(names), "default_bundle_must_not_list_the_tax_audit_tool")
         # The user's opt-in adds the posting tools and nothing else; verify_import stays
         # available either way for safe recovery of saved batches.
         enabled_environment = dict(environment, BRIDGE_AGENT_ENABLE_WRITES="true")
@@ -298,6 +429,16 @@ def smoke(archive, repository):
                 and set(enabled_names) == expected_tools(enabled_environment)
                 and set(enabled_names) - set(names) == POSTING_TOOLS,
                 "opt_in_tools_mismatch")
+        # The tax-audit switch, run on the packaged binary: it adds that one tool and nothing else.
+        audit_environment = dict(environment, BRIDGE_AGENT_ENABLE_TAX_AUDIT="true")
+        audit_output, _ = run_bounded([command], catalogue_payload, audit_environment)
+        audit_replies = [json.loads(line) for line in audit_output.splitlines()]
+        require([reply.get("id") for reply in audit_replies] == [1, 2], "audit_opt_in_response_ids")
+        audit_names = [tool["name"] for tool in audit_replies[1]["result"]["tools"]]
+        require(len(audit_names) == len(expected_tools(audit_environment))
+                and set(audit_names) == expected_tools(audit_environment)
+                and set(audit_names) - set(names) == AUDIT_TOOLS,
+                "audit_opt_in_tools_mismatch")
         schema = replies[2]["result"]
         require(schema.get("isError") is False
                 and schema["structuredContent"]["result"]["schema"]["type"] == "object"
@@ -307,6 +448,10 @@ def smoke(archive, repository):
             (Path(temporary) / "data" / "agent-egress.jsonl").read_bytes(),
             output.splitlines(keepends=True)[2],
         )
+        # Accepting the Terms is recorded once, next to the receipts, in the data folder.
+        acceptance = (Path(temporary) / "data" / "terms-acceptance.jsonl").read_bytes().splitlines()
+        require(len(acceptance) == 1 and json.loads(acceptance[0]).get("source") == "setting",
+                "terms_acceptance_not_recorded")
         statement_vouchers = statement_smoke(command, environment, temporary, repository)
         return {
             "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),

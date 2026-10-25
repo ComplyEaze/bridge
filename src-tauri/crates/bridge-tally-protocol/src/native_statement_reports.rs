@@ -139,9 +139,20 @@ pub fn render_native_statement_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
+    render_built_in_report_request(kind.report_id(), company, period)
+}
+
+/// The same envelope for any built-in report named by `id`. The Stock Summary
+/// (`native_stock_summary`) is requested through it, so its request is this
+/// shape by construction.
+pub(crate) fn render_built_in_report_request(
+    id: &str,
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+) -> String {
     format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
-        id = kind.report_id(),
+        id = xml_escape(id),
         company = xml_escape(company),
         from = period.from().as_str(),
         to = period.to().as_str(),
@@ -172,7 +183,7 @@ pub fn parse_native_statement(
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if !root_seen {
                     match name.as_slice() {
                         b"ENVELOPE" => root_seen = true,
@@ -216,7 +227,7 @@ pub fn parse_native_statement(
                 }
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if !root_seen {
                     return Err(invalid("statement_root_not_envelope"));
                 }
@@ -224,14 +235,14 @@ pub fn parse_native_statement(
                 return Err(invalid("statement_unexpected_empty_element"));
             }
             Event::End(element) => {
-                if element.name().as_ref().eq_ignore_ascii_case(b"ENVELOPE") && !envelope_closed {
+                if element.name().as_ref().eq_ignore_ascii_case("ENVELOPE") && !envelope_closed {
                     envelope_closed = true;
                 } else {
                     return Err(malformed());
                 }
             }
             Event::Text(text) => {
-                if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                if !text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("statement_stray_text"));
                 }
             }
@@ -272,18 +283,16 @@ fn read_wrapped_display_name(reader: &mut Reader<&[u8]>) -> Result<String, Nativ
     let mut found = None;
     loop {
         match reader.read_event().map_err(|_| malformed())? {
-            Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"DSPACCNAME") =>
-            {
+            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("DSPACCNAME") => {
                 if found.is_some() {
                     return Err(invalid("statement_duplicate_name_element"));
                 }
                 found = Some(read_display_name(reader, element.name())?);
             }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case(b"BSNAME") => {
+            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case("BSNAME") => {
                 return found.ok_or(invalid("statement_name_missing"));
             }
-            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {}
+            Event::Text(text) if text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) => {}
             _ => return Err(invalid("statement_name_shape")),
         }
     }
@@ -294,22 +303,22 @@ fn read_display_name(
     reader: &mut Reader<&[u8]>,
     outer: QName<'_>,
 ) -> Result<String, NativeStatementError> {
-    let outer = outer.as_ref().to_vec();
+    let outer = outer.as_ref().as_bytes().to_vec();
     let mut found = None;
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"DSPDISPNAME") =>
+                if element.name().as_ref().eq_ignore_ascii_case("DSPDISPNAME") =>
             {
                 if found.is_some() {
                     return Err(invalid("statement_duplicate_name_element"));
                 }
                 found = Some(read_text(reader, element.name())?);
             }
-            Event::End(element) if element.name().as_ref() == outer.as_slice() => {
+            Event::End(element) if element.name().as_ref().as_bytes() == outer.as_slice() => {
                 return found.ok_or(invalid("statement_name_missing"));
             }
-            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {}
+            Event::Text(text) if text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) => {}
             _ => return Err(invalid("statement_name_shape")),
         }
     }
@@ -322,28 +331,28 @@ fn read_amounts(
     block: &BytesStart<'_>,
     shape: Shape,
 ) -> Result<(NativeStatementAmount, NativeStatementAmount), NativeStatementError> {
-    let block = block.name().as_ref().to_vec();
+    let block = block.name().as_ref().as_bytes().to_vec();
     let mut sub = None;
     let mut main = None;
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 let slot = amount_slot(&name, shape, &mut sub, &mut main)?;
                 *slot = Some(amount(&read_text(reader, element.name())?)?);
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 let slot = amount_slot(&name, shape, &mut sub, &mut main)?;
                 *slot = Some(NativeStatementAmount::Empty);
             }
-            Event::End(element) if element.name().as_ref() == block.as_slice() => {
+            Event::End(element) if element.name().as_ref().as_bytes() == block.as_slice() => {
                 return match (sub, main) {
                     (Some(sub), Some(main)) => Ok((sub, main)),
                     _ => Err(invalid("statement_amount_missing")),
                 };
             }
-            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {}
+            Event::Text(text) if text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) => {}
             _ => return Err(invalid("statement_amounts_shape")),
         }
     }
@@ -369,7 +378,7 @@ fn amount_slot<'a>(
     Ok(slot)
 }
 
-fn amount(text: &str) -> Result<NativeStatementAmount, NativeStatementError> {
+pub(crate) fn amount(text: &str) -> Result<NativeStatementAmount, NativeStatementError> {
     if text.is_empty() {
         return Ok(NativeStatementAmount::Empty);
     }
@@ -381,33 +390,30 @@ fn amount(text: &str) -> Result<NativeStatementAmount, NativeStatementError> {
 }
 
 /// Text-only element content, with the five predefined entities decoded.
-fn read_text(reader: &mut Reader<&[u8]>, name: QName<'_>) -> Result<String, NativeStatementError> {
-    let end = name.as_ref().to_vec();
+pub(crate) fn read_text(
+    reader: &mut Reader<&[u8]>,
+    name: QName<'_>,
+) -> Result<String, NativeStatementError> {
+    let end = name.as_ref().as_bytes().to_vec();
     let mut value = String::new();
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Text(text) => {
-                let decoded = text
-                    .decode()
-                    .map_err(|_| invalid("statement_xml_invalid_encoding"))?;
-                let unescaped = quick_xml::escape::unescape(&decoded)
+                let unescaped = quick_xml::escape::unescape(&text)
                     .map_err(|_| invalid("statement_xml_invalid_escape"))?;
                 value.push_str(&unescaped);
             }
-            Event::GeneralRef(reference) => {
-                let decoded = reference
-                    .decode()
-                    .map_err(|_| invalid("statement_xml_invalid_encoding"))?;
-                match decoded.as_ref() {
-                    "amp" => value.push('&'),
-                    "lt" => value.push('<'),
-                    "gt" => value.push('>'),
-                    "quot" => value.push('"'),
-                    "apos" => value.push('\''),
-                    _ => return Err(invalid("statement_general_reference_invalid")),
-                }
+            Event::GeneralRef(reference) => match &*reference {
+                "amp" => value.push('&'),
+                "lt" => value.push('<'),
+                "gt" => value.push('>'),
+                "quot" => value.push('"'),
+                "apos" => value.push('\''),
+                _ => return Err(invalid("statement_general_reference_invalid")),
+            },
+            Event::End(element) if element.name().as_ref().as_bytes() == end.as_slice() => {
+                return Ok(value)
             }
-            Event::End(element) if element.name().as_ref() == end.as_slice() => return Ok(value),
             _ => return Err(invalid("statement_scalar_not_text_only")),
         }
     }

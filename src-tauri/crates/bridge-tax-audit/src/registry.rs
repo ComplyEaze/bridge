@@ -1,20 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Every ported test, one entry each, sorted by test id: how to run it on a book, and the
 //! least number of figures a parity comparison of it must see. Porting a test adds one entry
-//! here and one runner in `parity/python_golden.py`'s `RUNNERS`; `examples/local_parity.rs`,
+//! here and one runner in `parity/python_golden.py`'s `RUNNERS`; `examples/local_parity`,
 //! `compare::default_min_figures` and the registry-wide CI parity (`tests/registry.rs`) read
 //! this table instead of listing tests themselves.
 
+use std::collections::BTreeSet;
+
 use crate::applicability_44ab::{ComparisonTurnover, TurnoverInputs};
 use crate::book::Book;
+use crate::books_examined::{CallerNamedDocument, DocumentRead};
+use crate::documents::BankStatementLoad;
 use crate::error::{AuditError, Result};
 use crate::financial_statements::ReportTotals;
 use crate::rules::Rules;
 use crate::Engagement;
 
 /// Data a test takes from its caller rather than from the book: Tally's own Profit & Loss report
-/// totals (`financial_statements`) and the comparison turnover (`applicability_44ab`). Empty is
-/// "none supplied", which each of those tests handles itself.
+/// totals (`financial_statements`), the comparison turnover (`applicability_44ab`) and the documents
+/// loaded with the read (`books_examined`, through [`CallerData::documents_read`]). Empty is "none
+/// supplied", which each of those tests handles itself.
 #[derive(Debug, Clone, Default)]
 pub struct CallerData {
     pub report_totals: Option<ReportTotals>,
@@ -22,9 +27,36 @@ pub struct CallerData {
     /// The assessee's Form 26AS/AIS/TIS rows (`tds_tcs_26as`, `twentysixas_receipts`; the AIS rows
     /// also `high_value_register`).
     pub traces: crate::documents::TracesDocuments,
-    /// A bank statement (`bank_reconciliation`, which refuses without one; `high_value_register`,
-    /// whose s.194N section reports none supplied).
-    pub bank_statement: Option<crate::documents::BankStatementDoc>,
+    /// The bank statement: none supplied (`bank_reconciliation` refuses; `high_value_register`'s
+    /// s.194N section reports none supplied), read, or refused with the reader's plain-words reason
+    /// (`bank_reconciliation` gives its `refused` result; s.194N's coverage says so).
+    pub bank_statement: BankStatementLoad,
+    /// The documents loaded with the read whose data no field above holds (`books_examined`).
+    pub named_documents: BTreeSet<CallerNamedDocument>,
+}
+
+impl CallerData {
+    /// The documents loaded with the read, for `books_examined`, as the reference's pack lists them:
+    /// each document whose file was loaded, rows or none, in the pack's order (#1281). Form 26AS, AIS
+    /// and TIS when `traces` holds them, GSTR-1 when its comparison turnover is held (the pack takes
+    /// both from the one file), the bank statement when it was read (a refused one is not), and the
+    /// caller's `named_documents`.
+    pub fn documents_read(&self) -> BTreeSet<DocumentRead> {
+        let held = [
+            (DocumentRead::Gstr1, self.turnover_inputs.gstr1.is_some()),
+            (DocumentRead::Form26as, self.traces.form26as.is_some()),
+            (DocumentRead::Ais, self.traces.ais.is_some()),
+            (DocumentRead::Tis, self.traces.tis.is_some()),
+            (
+                DocumentRead::BankStatement,
+                matches!(self.bank_statement, BankStatementLoad::Read(_)),
+            ),
+        ];
+        held.into_iter()
+            .filter_map(|(d, loaded)| loaded.then_some(d))
+            .chain(self.named_documents.iter().map(|d| d.document()))
+            .collect()
+    }
 }
 
 /// One ported test.
@@ -45,12 +77,18 @@ pub const PORTED: &[PortedTest] = &[
     PortedTest {
         id: "bank_reconciliation",
         min_figures: 40,
-        run_on: |e, b, r, c| crate::bank_reconciliation_on(e, b, r, c.bank_statement.as_ref()),
+        run_on: |e, b, r, c| crate::bank_reconciliation_on(e, b, r, &c.bank_statement),
     },
     PortedTest {
         id: "book_keeping_quality",
         min_figures: 12,
         run_on: |e, b, r, _| crate::book_keeping_quality_on(e, b, r),
+    },
+    PortedTest {
+        id: "books_examined",
+        // `books_maintained` and `books_examined`, on any book.
+        min_figures: 2,
+        run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read()),
     },
     PortedTest {
         id: "cash_44ab",
@@ -68,6 +106,26 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::cash_payments_40a3_on(e, b, r),
     },
     PortedTest {
+        id: "clause21a_candidates",
+        // Nothing structural: two figures per item with a candidate.
+        min_figures: 2,
+        run_on: |e, b, r, _| crate::clause21a_candidates_on(e, b, r),
+    },
+    PortedTest {
+        id: "clause44",
+        // Every column's and reason's count and amount, the total, and the three overlays' pairs:
+        // 27 on any book.
+        min_figures: 27,
+        run_on: |e, b, r, _| crate::clause44_on(e, b, r),
+    },
+    PortedTest {
+        id: "counter_cheques_40a3",
+        // `configured_terms_count`, the six totals and counts, and one total per excluded role:
+        // twelve with no term configured, as the reference's own pack runs a client without one.
+        min_figures: 12,
+        run_on: |e, b, r, _| crate::counter_cheques_40a3_on(e, b, r),
+    },
+    PortedTest {
         id: "creditor_ageing_43bh",
         min_figures: 12,
         run_on: |e, b, r, _| crate::creditor_ageing_43bh_on(e, b, r),
@@ -78,8 +136,15 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::depreciation_on(e, b, r),
     },
     PortedTest {
+        id: "entity_269st_gap",
+        min_figures: 4,
+        run_on: |e, b, r, _| crate::entity_269st_gap_on(e, b, r),
+    },
+    PortedTest {
         id: "financial_statements",
-        min_figures: 18,
+        // 10 on any book: the six group totals, the tie status and the three voucher counts,
+        // which is all a book shows when neither stock term is known.
+        min_figures: 10,
         run_on: |e, b, r, c| crate::financial_statements_on(e, b, r, c.report_totals.as_ref()),
     },
     PortedTest {
@@ -87,8 +152,14 @@ pub const PORTED: &[PortedTest] = &[
         // 38 on any book: no row figures, no statement and an unknown recipient type.
         min_figures: 38,
         run_on: |e, b, r, c| {
-            crate::high_value_register_on(e, b, r, c.bank_statement.as_ref(), &c.traces.ais)
+            crate::high_value_register_on(e, b, r, &c.bank_statement, c.traces.ais_rows())
         },
+    },
+    PortedTest {
+        id: "knock_off_candidates",
+        // The seven fixed figures, on every book.
+        min_figures: 7,
+        run_on: |e, b, r, _| crate::knock_off_candidates_on(e, b, r),
     },
     PortedTest {
         id: "ledger_scrutiny",
@@ -102,6 +173,12 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::loans_interest_on(e, b, r),
     },
     PortedTest {
+        id: "narration_payees",
+        // The fifteen fixed figures, on every book.
+        min_figures: 15,
+        run_on: |e, b, r, _| crate::narration_payees_on(e, b, r),
+    },
+    PortedTest {
         id: "partners_40b_194t",
         // `applicable` alone, on any book that is not a firm's or an LLP's.
         min_figures: 1,
@@ -113,6 +190,29 @@ pub const PORTED: &[PortedTest] = &[
         // year and voucher count, and the Trial Balance movement and difference.
         min_figures: 16,
         run_on: |e, b, r, _| crate::party_monthly_on(e, b, r),
+    },
+    PortedTest {
+        id: "questionnaire_cl13",
+        // The accrual-journal count and the four answer figures, on every book.
+        min_figures: 5,
+        run_on: |e, b, r, _| crate::questionnaire_cl13_on(e, b, r),
+    },
+    PortedTest {
+        id: "read_scope",
+        min_figures: 1,
+        run_on: |_, b, r, _| crate::read_scope_on(b, r),
+    },
+    PortedTest {
+        id: "related_parties_cl23",
+        // `applicable` alone when no person is confirmed, as on the synthetic read.
+        min_figures: 1,
+        run_on: |e, b, r, _| crate::related_parties_cl23_on(e, b, r),
+    },
+    PortedTest {
+        id: "specified_persons_40a2b",
+        // `applicable` alone when no person is confirmed, as on the synthetic read.
+        min_figures: 1,
+        run_on: |e, b, r, _| crate::specified_persons_40a2b_on(e, b, r),
     },
     PortedTest {
         id: "stale_balances_41_1",
@@ -223,6 +323,30 @@ pub fn turnover_inputs_from_json(v: &serde_json::Value) -> Result<TurnoverInputs
     })
 }
 
+/// `books_examined`' documents from the JSON list `parity/python_golden.py --documents-read` reads:
+/// each a name the reference's pack gives, once, in the pack's order. Anything else is refused
+/// rather than read differently from the reference, which prints the names as given.
+pub fn documents_read_from_json(v: &serde_json::Value) -> Result<BTreeSet<DocumentRead>> {
+    let names = v
+        .as_array()
+        .ok_or_else(|| AuditError::Config("documents read: not a list".to_string()))?;
+    let mut out = BTreeSet::new();
+    for name in names {
+        let d = name.as_str().and_then(DocumentRead::parse).ok_or_else(|| {
+            AuditError::Config(format!(
+                "documents read: {name} is not a document the pack loads"
+            ))
+        })?;
+        if out.last().is_some_and(|last| *last >= d) {
+            return Err(AuditError::Config(format!(
+                "documents read: {name} is repeated or out of the pack's order"
+            )));
+        }
+        out.insert(d);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::PORTED;
@@ -270,6 +394,149 @@ mod tests {
             json!({"net_profit_paise": 3, "source": 9}),
         ] {
             assert!(report_totals_from_json(&bad).is_err(), "{bad}");
+        }
+    }
+
+    /// A bank statement whose contents `documents_read` never looks at.
+    fn statement() -> crate::documents::BankStatementDoc {
+        let day = bridge_tally_primitives::TallyDate::parse("20250401").unwrap();
+        crate::documents::BankStatementDoc {
+            doc_id: "bank:x".to_string(),
+            source_sha256: String::new(),
+            account_ref: "XXXX1".to_string(),
+            bank: "Invented Bank".to_string(),
+            start: day.clone(),
+            end: day,
+            opening_balance_paise: 0,
+            closing_balance_paise: 0,
+            rows: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_refused_bank_statement_is_never_listed() {
+        use super::CallerData;
+        use crate::books_examined::DocumentRead;
+        use crate::documents::BankStatementLoad;
+        let listed = |bank_statement| {
+            CallerData {
+                bank_statement,
+                ..Default::default()
+            }
+            .documents_read()
+            .into_iter()
+            .collect::<Vec<_>>()
+        };
+        assert!(listed(BankStatementLoad::NotSupplied).is_empty());
+        assert!(listed(BankStatementLoad::Refused("no closing balance".to_string())).is_empty());
+        assert_eq!(
+            listed(BankStatementLoad::Read(statement())),
+            [DocumentRead::BankStatement]
+        );
+    }
+
+    #[test]
+    fn each_document_is_listed_exactly_when_caller_data_holds_its_file() {
+        use super::CallerData;
+        use crate::applicability_44ab::ComparisonTurnover;
+        use crate::books_examined::{CallerNamedDocument as N, DocumentRead as D};
+        let turnover = || {
+            Some(ComparisonTurnover {
+                turnover_paise: 1,
+                coverage: "full".to_string(),
+            })
+        };
+        let listed = |c: &CallerData| c.documents_read().into_iter().collect::<Vec<_>>();
+        assert!(listed(&CallerData::default()).is_empty());
+        // Each derived document alone: a TRACES file loaded with no rows is listed.
+        let mut c = CallerData::default();
+        c.traces.form26as = Some(Vec::new());
+        assert_eq!(listed(&c), [D::Form26as]);
+        let mut c = CallerData::default();
+        c.traces.ais = Some(Vec::new());
+        assert_eq!(listed(&c), [D::Ais]);
+        let mut c = CallerData::default();
+        c.traces.tis = Some(Vec::new());
+        assert_eq!(listed(&c), [D::Tis]);
+        let mut c = CallerData::default();
+        c.turnover_inputs.gstr1 = turnover();
+        assert_eq!(listed(&c), [D::Gstr1]);
+        // Data that is not a loaded file lists nothing: the pack never fills the GSTR-3B or AIS
+        // turnover, and the report totals come from the read.
+        let mut c = CallerData::default();
+        c.turnover_inputs.gstr3b = turnover();
+        c.turnover_inputs.ais = turnover();
+        c.turnover_inputs.books_turnover_paise = Some(1);
+        c.report_totals = Some(crate::financial_statements::ReportTotals {
+            net_profit_paise: 1,
+            closing_stock_paise: None,
+            source: None,
+        });
+        assert!(listed(&c).is_empty());
+        // Everything at once, in the pack's order whatever the order of the fields.
+        let mut all = CallerData {
+            traces: crate::documents::TracesDocuments {
+                form26as: Some(Vec::new()),
+                ais: Some(Vec::new()),
+                tis: Some(Vec::new()),
+            },
+            bank_statement: crate::documents::BankStatementLoad::Read(statement()),
+            named_documents: [
+                N::DraftForm3cd,
+                N::Gstr3bVs2b,
+                N::Gstr3b,
+                N::ProfitAndLossReport,
+                N::Gstr2b,
+            ]
+            .into(),
+            ..c
+        };
+        all.turnover_inputs.gstr1 = turnover();
+        assert_eq!(
+            listed(&all),
+            [
+                D::Gstr2b,
+                D::Gstr1,
+                D::Form26as,
+                D::ProfitAndLossReport,
+                D::Ais,
+                D::Tis,
+                D::Gstr3b,
+                D::Gstr3bVs2b,
+                D::BankStatement,
+                D::DraftForm3cd,
+            ]
+        );
+    }
+
+    #[test]
+    fn documents_read_are_the_packs_names_once_in_its_order() {
+        use super::documents_read_from_json;
+        use crate::books_examined::DocumentRead;
+        use crate::error::AuditError;
+        use serde_json::json;
+        assert!(documents_read_from_json(&json!([])).unwrap().is_empty());
+        let read =
+            documents_read_from_json(&json!(["GSTR-2B", "Form 26AS", "Draft Form 3CD"])).unwrap();
+        assert_eq!(
+            read.into_iter().collect::<Vec<_>>(),
+            [
+                DocumentRead::Gstr2b,
+                DocumentRead::Form26as,
+                DocumentRead::DraftForm3cd
+            ]
+        );
+        for bad in [
+            json!("GSTR-2B"),
+            json!(["GSTR-2B", 3]),
+            json!(["GSTR-2B", "GSTR-9"]),
+            json!(["GSTR-2B", "GSTR-2B"]),
+            json!(["Form 26AS", "GSTR-1"]),
+        ] {
+            assert!(
+                matches!(documents_read_from_json(&bad), Err(AuditError::Config(_))),
+                "{bad}"
+            );
         }
     }
 

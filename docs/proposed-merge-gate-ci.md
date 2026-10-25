@@ -1,5 +1,12 @@
 # Proposed CI wiring for the shrunk merge gate
 
+> **Status note, 30 Sep 2026:** schema 3 removed the reseal and merge-driver scripts
+> and the stored per-file hashes. Where this proposal says "surface reseal", read
+> "the compatibility-surface acknowledgement": a pull request that changes a pinned
+> file now adds `docs/tally/compatibility/acks/pr-<N>.txt`, which
+> `scripts/merge-gate.sh` and `scripts/check-surface-ack.mjs` (enforcing in CI) check
+> (`docs/release-process.md`). The body below is kept as written.
+
 `scripts/merge-gate.sh` was cut from a 3977-line manual CLI tool that gated
 nothing automatically down to three checks that can run as real, required CI
 status contexts: compatibility-surface validation, the privacy/PII scan, and
@@ -59,9 +66,6 @@ on:
           byte/ownership/license/NOTICE content. Only needed when the PR adds
           or changes a binary (or Git-LFS-pointer) file; leave blank otherwise.
         required: false
-      independent_review_sha:
-        description: Full 40-hex commit SHA of the matching independent review attestation.
-        required: false
 
 concurrency:
   group: merge-gate-${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.pr_number }}
@@ -101,12 +105,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BINARY_REVIEW_SHA: ${{ github.event.inputs.binary_review_sha }}
-          INDEPENDENT_REVIEW_SHA: ${{ github.event.inputs.independent_review_sha }}
         run: |
           set -euo pipefail
           args=(scripts/merge-gate.sh "${{ steps.pr.outputs.number }}" --repo "${{ github.repository }}")
           [ -n "$BINARY_REVIEW_SHA" ] && args+=(--binary-review-sha "$BINARY_REVIEW_SHA")
-          [ -n "$INDEPENDENT_REVIEW_SHA" ] && args+=(--independent-review-sha "$INDEPENDENT_REVIEW_SHA")
           "${args[@]}"
 ```
 
@@ -121,12 +123,15 @@ Notes on this draft:
 - `pull-requests: read` and `issues: read` are enough: every `gh api`/`gh pr`
   call the shrunk script makes is a read against the same repository, so the
   default `GITHUB_TOKEN` (`github.token`) needs no elevated scope.
-- The `--binary-review-sha`/`--independent-review-sha` attestations are
-  inherently a human judgment call (someone read the actual binary bytes,
-  ownership, license, and NOTICE obligations) and cannot be automated. The
-  `workflow_dispatch` inputs above are the proposed escape hatch: a
-  maintainer who has done that review re-runs this workflow by hand with
-  both SHAs filled in. Until that happens, any PR that adds or changes a
+- The `--binary-review-sha` attestation is inherently the owner's own
+  judgment call (someone read the actual binary bytes, ownership, license,
+  and NOTICE obligations) and cannot be automated, and the gate must run from
+  origin/master's tree, so a workflow that checks out the pull request cannot
+  run it (docs/release-process.md, "The owner's merge verdict"). The
+  `workflow_dispatch` input above is the proposed escape hatch: the owner,
+  who has done that review, re-runs this workflow by hand with the SHA filled in
+  (the input can be supplied by anyone with write access, so a workflow like this
+  is not a substitute for the owner running the command himself). Until that happens, any PR that adds or changes a
   binary (including a Git LFS pointer, per the #360 fix) correctly stays
   blocked on the automatic `pull_request`/`pull_request_review`/
   `issue_comment` triggers.
@@ -174,11 +179,11 @@ safe; persisting state keyed to a SHA is not. This script reads by SHA
 throughout and persists nothing, so a force-push makes it refuse rather than
 strand:
 
-- the review-evidence check asks whether a review or comment names the
-  *current* head, so after a force-push it finds none and fails closed;
-- `--independent-review-sha` and `--binary-review-sha` are compared for
-  equality against the current `$head`, so a prior attestation stops matching
-  the moment the head moves.
+- the owner's two verdict lines name the *current* head and merge base, so
+  after a force-push or a merge of master into the branch it finds none and
+  fails closed;
+- `--binary-review-sha` is compared for equality against the current `$head`,
+  so a prior attestation stops matching the moment the head moves.
 
 Both are the behaviour you want. Neither would survive being cached.
 

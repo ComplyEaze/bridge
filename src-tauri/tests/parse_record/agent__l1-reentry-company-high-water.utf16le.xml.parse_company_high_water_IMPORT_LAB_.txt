@@ -1,0 +1,7 @@
+# fixture: agent/l1-reentry-company-high-water.utf16le.xml
+# parser: parse_company_high_water(IMPORT_LAB)
+# source: captured
+Ok(Object {
+    "altmstid": Number(234),
+    "altvchid": Number(1790),
+})

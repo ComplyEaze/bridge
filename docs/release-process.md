@@ -5,7 +5,7 @@ and macOS. A smoke bundle is not a production release.
 
 ## Supported build baseline
 
-- Source release line: `0.2.x` under Apache-2.0
+- Source release line: 0.2.0 and later under Apache-2.0 (`v0.1.0` was MIT)
 - Node.js: supported 24.x releases (>=24.15.0); CI uses `.node-version`
 - pnpm: the exact `packageManager` version in `package.json`
 - Rust: the exact channel and components in `rust-toolchain.toml`
@@ -16,16 +16,382 @@ and macOS. A smoke bundle is not a production release.
 
 ### Compatibility-surface reseal
 
-Any change to a pinned file requires a deliberate compatibility-surface reseal
-before the claim gate can pass. That includes `package.json`,
-`src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and either workflow — and it is
-not only dependency updates. **The canonical `docs/tally/TALLY_PROTOCOL_REFERENCE.md`
-index and each part it declares must be pinned sources, so a documentation-only edit to either
-stales its digest and fails the gate. Adding or removing a declared part also changes the pin
-list; see "Adding or removing a pin" below.** Nothing in a docs diff suggests a
-compatibility gate is involved, and PRs have failed CI for exactly this.
+The heading keeps its old name so existing links resolve. Since schema 3 there is
+**no reseal**: nothing is regenerated, no hash is stored, and no tool rewrites the
+surface. What replaces it is an acknowledgement filed with the pull request.
 
-Run this from `tools`, **with the pinned toolchain**. A Homebrew
+Any change to a pinned file needs a deliberate acknowledgement filed with the
+pull request. That includes `package.json`, `src-tauri/Cargo.toml`,
+`src-tauri/Cargo.lock` and either workflow, and it is not only dependency
+updates. **The canonical `docs/tally/TALLY_PROTOCOL_REFERENCE.md` index and each
+part it declares are pinned sources, so a documentation-only edit to either needs
+an acknowledgement. Adding or removing a declared part also changes the pin list;
+see "Adding or removing a pin" below.** Nothing in a docs diff suggests a
+compatibility gate is involved.
+
+**Enforcement.** The GitHub check enforces. On a pull request and in the merge
+queue, the `workflow-consistency` job fails with
+`surface ack check FAILED: <reason>` when a pinned path changed without its
+acknowledgement file, or the acknowledgement is wrong, edited or unneeded, and
+that job is part of `Required checks`. A push to master is enforced the same way
+(below). `scripts/merge-gate.sh`, run locally by whoever merges, is a second,
+independent check of the same rule. The step first ran with `--report-only`,
+which printed `WOULD FAIL: <reason>` and exited 0; the script
+still accepts that flag for local use, but the CI step must not carry it, and
+`scripts/check-ci-workflow-consistency.mjs` pins the step's exact text so that
+putting it back is a pinned change with its own acknowledgement.
+
+What this trades away, stated plainly. Under schema 2 the required
+`Tally portable core` job failed a pull request, and again the master push, when a
+pinned file's bytes differed from its stored hash. Nothing stored remains to
+compare, so nothing can fail on a byte difference; the acknowledgement replaces it.
+It is procedural assurance, not authentication: a missing or wrong file fails the
+check, but a hand-written file that names the right paths and a reviewer passes it,
+so the review is what stands behind it. The base race is still real: the pin list
+is read when the check runs but the merge binds only the head, so another pull
+request that pins a file after this one was checked lets an unacknowledged change
+land. A push to master is checked like a pull request and is never report-only.
+Every first-parent commit the push landed (`before..HEAD`, `before` from the event
+payload; each one a squashed pull request, attributed by the `(#N)` in its
+subject) must carry exactly the acknowledgement its pinned changes need, and the
+master run goes red if any does not. A push whose `before` is missing, new or not
+an ancestor of HEAD (a force-push) cannot be verified and fails. That red master
+needs an acknowledgement-only follow-up pull request to clear.
+
+#### What the surface is
+
+`docs/tally/compatibility/compatibility-surface.json` (schema 3) is an authored,
+sorted, unique list:
+
+```json
+{
+  "schema_version": 3,
+  "files": [
+    { "path": ".github/workflows/ci.yml" },
+    { "path": "src/NewScreen.tsx", "reason": "Decides what the client sees before a post." }
+  ]
+}
+```
+
+- `files` rows hold a repository-relative `path` and an optional `reason`
+  (at most 500 characters). There is no `sha256`, and no other key.
+- The top level has exactly `files` and `schema_version`. A schema 2 file, with
+  stored hashes, is refused with a message naming the migration.
+- The surface digest that receipts and attestations bind is **computed by the
+  gate from the live bytes of every pinned file**, never stored. Change one byte
+  of a pinned file and the digest moves, so evidence bound to the old digest goes
+  stale. The matrix carries no copy of the digest (bridge#760).
+- Because no per-file value is stored, two pull requests that change different
+  pinned files, or even the same pinned file, no longer conflict in the surface.
+  Each adds its own uniquely named acknowledgement.
+
+#### Acknowledging a change to a pinned file
+
+A pull request whose diff changes a pinned file (any status, under its old and its
+new name), adds a pin, or removes a pin adds exactly one file,
+`docs/tally/compatibility/acks/pr-<N>.txt`, where `<N>` is the pull request number.
+An edit to the pin list that adds or removes no pin (only a `reason` changed, or
+rows reordered) needs no acknowledgement, and adding one when nothing pinned
+changed is an error. Its lines are:
+
+```text
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+src/ClientSwitcher.tsx
+removed-pin: src/OldScreen.tsx
+reviewer: some-github-login
+```
+
+- One repository path per line, sorted and unique: every pinned path the diff
+  changes, and every pin the diff adds. "Changes" means any status: added,
+  modified, deleted, type or mode change, and both the old and the new name of a
+  rename. Pinned means pinned at the base or at the head.
+- One `removed-pin: <path>` line for each pin the diff removes from the list.
+  A removed pin is a decision, so it is named.
+- Exactly one `reviewer: <github login>` line.
+- No hashes, and no other content: a 64-hex token is refused, so that two pull
+  requests editing the same file never disagree over an acknowledgement.
+- `.gitattributes` (its end-of-line rules decide the bytes that are hashed) and
+  `scripts/check-surface-ack.mjs` are ordinary pins, each with its own `reason` in
+  the list; there is no special rule for them.
+- A pull request that touches no pinned path adds no acknowledgement. A pull
+  request that only deletes old acknowledgements (a cleanup) passes.
+- An acknowledgement is append-only for its own pull request: an existing one is
+  never modified. After merge it means nothing, and old files may be cleaned up.
+- The branch name is not the file name, so any branch name is fine.
+- The number is known only once the pull request is open, so the first run of a
+  pull request that touches a pinned path fails with `found 0` until
+  `pr-<N>.txt` is pushed to its branch. That is expected, not a breakage: open
+  the pull request, then push the file.
+- Dependency-update pull requests (Dependabot's npm, cargo and GitHub Actions
+  updates) change pinned files (`package.json`, `pnpm-lock.yaml`,
+  `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and pinned workflows), so each
+  one fails `Required checks` until a person pushes its `pr-<N>.txt`. The local
+  merge gate already asked for the same file; the difference is that CI now
+  reports it too.
+
+The `reviewer:` login is procedural assurance, not authentication: the file is
+written by hand and proves nothing by itself. What it records is that a named
+person read the pinned changes and stands behind them. Say which files you
+looked at in the review.
+
+**What checks it**
+
+- CI runs `scripts/check-surface-ack.mjs` in the `workflow-consistency` job. It
+  fails on a missing, wrong, edited or unneeded acknowledgement (see above).
+  Its modes:
+  - `pull_request`: diffs the merge commit against its first parent (`HEAD^1`),
+    after asserting that `HEAD^2` equals the pull request's head commit.
+  - `merge_group`: checks each first-parent commit in
+    `base_sha..head_sha` against its own acknowledgement, and fails closed when a
+    commit cannot be attributed to one pull request.
+  - `push` (master): every first-parent commit in `before..HEAD` is checked like a
+    pull request, each attributed by the `(#N)` in its subject, and `--report-only`
+    never softens a failure; a missing, all-zero or non-ancestor `before` fails closed. It also
+    validates that every file in the acknowledgements directory is well formed.
+  - `workflow_dispatch`: only the acknowledgements directory is validated.
+  The checker runs from the pull request's own tree, so a pull request could weaken
+  it; that is why the script and `ci.yml` are pinned, which makes the change
+  visible and acknowledged. A change that makes the checker skip itself shows no
+  failure in its own pull request run, so the pin alone does not make it red
+  in CI; `scripts/merge-gate.sh`, which is also pinned (with
+  `scripts/check-ci-workflow-consistency.mjs`, which enforces the step's shape), is
+  what sees it. Run the gate from a checkout of the base branch, not from the pull
+  request's own tree, or a weakened copy gates itself.
+- `scripts/merge-gate.sh` (run locally by whoever merges) reads the pin list at
+  the head and requires the same `pr-<N>.txt`. It measures removed and added pins
+  against the pull request's merge base (not the base tip), and reads the base tip
+  only to know which files are pinned there, so a branch that is behind a
+  master commit that added a pin is not reported as indeterminate. It no longer
+  matches a review to the acknowledgement's `reviewer:` line (the line is still read for
+  its shape); the owner's merge verdict, below, replaces the old review-naming checks.
+- **Branch history, in both checks.** The diff against the base cannot see a pin
+  the branch added and then lost, for example when a merge of master is resolved by
+  taking master's pin list: at the head the list equals the base's. So
+  `scripts/check-surface-ack.mjs` and `scripts/merge-gate.sh` also read the pin list at
+  every commit of the pull request and at each commit's parents (a merge is compared
+  with all of them, never the first only). A path that a commit pins and none of its
+  parents pinned, and that is in neither the base list nor the head list, counts as a
+  removed pin: the acknowledgement must declare it with a `removed-pin:` line, or the
+  pin must be restored. In an older commit only the paths matter, so both read them
+  leniently (valid JSON with a `files` array whose rows each have a path string); the
+  strict rules (sorted, unique, exact keys, schema) stay as they are for the list at
+  the head and at the base, so a branch is never stuck because an old commit had its
+  list out of order. Both fail closed on a shallow clone and on a commit whose list
+  cannot be read at all (the script fails, the gate is indeterminate). The CI step
+  blocks (it no longer runs with `--report-only`, so a finding fails the job), and the
+  merge gate blocks too. A pin that follows a rename inside the branch (one commit pins a new
+  file, a later one renames it and moves the pin) reports the old name as withdrawn:
+  declare it with one `removed-pin:` line for the old name. What these checks cannot
+  see: a pin lost in a rebase, a force-push, an amend or a squash before the push
+  leaves no history to read, and the merge group and the push to master each check one
+  squash commit, which has no branch history, so there the pull-request-time check
+  and the merge gate are the control. Only a review that compares the pin list with
+  the last reviewed head and a stay-pinned guard test (for the pins it names) can see
+  a rewritten history.
+- The `Tally portable core` job still runs the `gate` command, which checks
+  required-file coverage and that every pinned file exists, and computes the
+  digest from the files. It no longer compares a stored hash, so a changed
+  pinned file does not fail it by itself.
+
+The digest is the same one schema 2 produced for the same bytes, so an
+attestation or receipt made against the old surface stays valid exactly as long
+as no pinned byte changes and the pin list is unchanged (adding or removing a pin
+moves the digest too). Adding four pins (`.gitattributes`, the acknowledgement checker,
+`scripts/merge-gate.sh` and `scripts/check-ci-workflow-consistency.mjs`) in the
+cut-over itself moved the digest once. Print the current digest with
+`cargo run -p bridge-tally-compatibility -- surface-digest docs/tally/compatibility/compatibility-surface.json .`
+(the `surface-digest` subcommand resolves the surface the same way the gate does).
+
+Two byte changes have no pinned path in a diff, and are closed differently. A
+`.gitattributes` below the repository root (end-of-line, `ident` or
+`working-tree-encoding` rules) changes the bytes a pinned file is hashed as, so the
+acknowledgement checks refuse any nested `.gitattributes` outright. A pinned path
+that is, or sits under, a symbolic link would make the digest follow an unpinned
+target, so `resolve` refuses it (`surface_file_symlink`).
+
+The live-read collectors (`bridge-tally-live-read` and its native outstandings
+qualification) refuse to start unless every pinned file on disk is byte-identical
+to the blob committed at `HEAD` (`git hash-object --no-filters` against
+`git ls-tree`, so `assume-unchanged`, `skip-worktree`, clean filters, line-ending
+rules and a stale stat cache cannot hide an edit; an untracked or ignored pin, a
+symlink or a tree that is not the repository at the root refuses; git runs
+without `GIT_DIR` and the other redirecting variables). The reference is `HEAD`,
+not reviewed master: this refuses uncommitted edits only. A committed but not yet
+reviewed edit to a pinned request builder runs against live Tally, and is caught
+at `scripts/merge-gate.sh`, where the acknowledgement and the review name the file.
+Schema 2's reference was the stored hash, which a reseal in the same pull request
+moved too, so that case was not caught before either. A pull request stacked on another carries
+its own acknowledgement, so when the child merges into the parent branch and the
+parent then goes to master, it holds two. Fold them into the parent's `pr-<N>.txt`
+(the union of the two path lists) before the parent merges; both checkers require
+exactly one new acknowledgement.
+
+#### Adding or removing a pin
+
+Edit the sorted list by hand.
+
+1. Insert the entry in sorted path order with a `reason` (required for a pin added
+   by a pull request, at most 500 characters): why this file decides what Bridge
+   posts or lets leave the machine. Paths are relative, unique and sorted.
+2. Leave `MAX_SURFACE_FILES` in `tools/bridge-tally-compatibility/src/lib.rs`
+   alone. It is a fixed parse bound against a runaway list (1024), not a count to
+   maintain, so adding or removing a pin does not touch it and two pull requests
+   that each add a pin no longer collide on it. Only a list that approaches the
+   bound would justify raising it, which is a deliberate change to a pinned file
+   with its own reason and acknowledgement.
+3. Add the acknowledgement, listing the new pin's path (and a `removed-pin:` line for
+   each removal). Then run the tool's tests.
+
+Removing a pin is done the same way, with a `removed-pin:` line. A malformed list
+is refused by the tool and by CI.
+
+**What decides a pin now.** Until the bound replaced the exact count, adding a pin
+meant editing that constant in a pinned file, so the change could not go unnoticed
+in a diff of `lib.rs`. That no longer holds. A pin is now decided by its own
+`reason` (required on every pin a pull request adds), the sorted-and-unique and
+declared-removal rules the tool and the acknowledgement check enforce, and the
+acknowledgement file, which `workflow-consistency` enforces in CI on pull requests,
+in the merge queue and on the push to master. A pull request that adds or removes a
+pin without its acknowledgement fails, whatever else it edits.
+
+One narrower case remains. A branch adds a pin, and a later merge of master is
+resolved by taking master's pin list, which drops that pin. The branch-history check
+(see "What checks it") catches that, including when the acknowledgement is edited or
+deleted to match: the pin counts as withdrawn, so the acknowledgement must declare it
+with a `removed-pin:` line, or the pin must be restored. It is silent only when
+history is rewritten (a rebase, a force-push, an amend or a squash before the push)
+so that no commit records the pin. Before the bound replaced the exact count, a
+reviewer comparing the constant with the pin count could notice that mismatch too;
+that signal is gone. So a review of a pull request that touches the pin list compares
+the list with the last reviewed head as well as with the base, and names any pin that
+was present at the last reviewed head and is gone. That review comparison and a
+stay-pinned guard test (for the pins it names) are the only things that can see a
+rewritten history.
+
+What remains of the old collision: two pull requests that insert a pin at the same
+sorted position still conflict in the pin list itself. Resolve it by keeping both
+entries (see "When the surface conflicts in a merge"); the cap is no longer part of
+it.
+
+#### What the coverage report shows
+
+`scripts/surface_coverage_report.py` prints a surface coverage report. Run it by
+hand before opening a pull request that moves code. It never fails. Against the
+merge-base with `origin/master` (override with `--base`) it lists two things the
+gate cannot see: a pin that was dropped, and a module declared directly by a
+pinned module and newly left unpinned. Modules left unpinned before the branch
+are not reprinted, test-only modules are only counted, and feature-gated ones are
+labelled.
+
+**A clean report is not evidence that nothing left the pinned surface.** It does
+not see code moved between files that already existed; a new module declared by
+an *unpinned* module, even one carved out of a pinned file (a new file under an
+unpinned `db/mod.rs`, say); deeper descendants of a pinned module; a pinned
+file that stops being compiled; a test-only or feature-gated module becoming
+production; or a new crate root. The script's docstring keeps the full list.
+
+Read it, then pin each listed file that decides what Bridge posts or lets leave
+the machine, and leave the rest; see the comment on `MAX_SURFACE_FILES` for the
+rule and bridge#416 for the reasoning.
+
+#### When the surface conflicts in a merge or rebase
+
+The pin list is authored and no hash is stored, so a conflict in
+`compatibility-surface.json` means both sides edited the list (or both inserted
+at the same sorted position). Merge it by hand and be precise about the hazard:
+
+**A dropped entry can slip through.** The gate checks the pins that are
+still in the list. Lose one in the resolution and the gate does not fail. That is why the
+list must be *merged*, never resolved by taking one side wholesale. (A dropped pin
+that existed at the base is a removed pin, which `scripts/merge-gate.sh` blocks
+unless the acknowledgement has a `removed-pin:` line. A pin that only the branch
+itself added, dropped in a resolution, is not seen by anything.)
+
+**Where a pin matters enough that this is unacceptable, make it REQUIRED.**
+`REQUIRED_SURFACE_FILES` and `REQUIRED_SURFACE_DIRECTORIES` are checked for
+presence, so an entry in either cannot be dropped silently at all.
+`gate_rejects_each_omitted_required_lifecycle_path` iterates that list, so adding
+a path also tests it. A procedure a maintainer must follow is weaker than a
+constant they cannot circumvent. The matrix is worse: a dropped claim leaves no
+trace at all, so reconcile its claims the same way.
+
+1. Resolve every non-generated conflict and settle those files completely.
+2. Reconcile the pin list against the merge base. List the pins each side added and
+   removed and confirm the union of additions minus the union of removals is
+   present.
+
+   **Name the two sides explicitly; during a rebase `HEAD` is not your branch.**
+   When a rebase stops on a conflict, `HEAD` is the upstream plus whatever has
+   already been replayed, and the commit being applied is `REBASE_HEAD`. The
+   conflict stages say it without either name: stage 2 is the side you are
+   replaying onto, stage 3 the side being applied.
+
+   ```bash
+   surface=docs/tally/compatibility/compatibility-surface.json
+   pins() { python3 -c 'import json,sys; [print(f["path"]) for f in json.load(sys.stdin)["files"]]' | sort; }
+
+   git show ":1:$surface" | pins > /tmp/pins-base.txt   # merge base
+   git show ":2:$surface" | pins > /tmp/pins-ours.txt   # replayed onto / current
+   git show ":3:$surface" | pins > /tmp/pins-theirs.txt # being applied / incoming
+
+   comm -13 /tmp/pins-base.txt /tmp/pins-ours.txt   # added by one side
+   comm -13 /tmp/pins-base.txt /tmp/pins-theirs.txt # added by the other
+   comm -23 /tmp/pins-base.txt /tmp/pins-ours.txt   # removed by one side
+   comm -23 /tmp/pins-base.txt /tmp/pins-theirs.txt # removed by the other
+   ```
+
+   Removals need the same treatment as additions. A pin one side deliberately
+   retired is still present in the base, so it appears in neither `comm -13`
+   output; take the other side wholesale and it comes back. Where one side removed
+   an entry the other side *modified*, that is a genuine add/remove conflict and
+   wants a decision, not a default; say which way in the commit.
+
+   If the conflict is already resolved and the stages are gone, use `REBASE_HEAD`
+   (rebase) or `MERGE_HEAD` (merge) for the incoming side, never `origin/master`.
+3. Leave `MAX_SURFACE_FILES` alone: it is a fixed bound, not a count.
+4. Run the gate, and check the pin count against the union you computed; the gate
+   cannot do this for you. Add or update the acknowledgement so it lists every
+   changed pinned path and every added pin.
+
+A rebase carrying several commits that touch pinned files needs the acknowledgement
+on the pull request, not per commit; CI checks the merge result.
+
+#### Migrating an open branch across schema 3
+
+A branch cut before schema 3 still carries a schema 2 surface file (a `sha256` on
+every row). Merging master into it conflicts on that file. Once per branch:
+
+1. Merge master and resolve every source conflict:
+
+   ```sh
+   git fetch origin
+   git merge origin/master
+   ```
+
+2. Take master's surface file wholesale (schema 3):
+
+   ```sh
+   git checkout origin/master -- docs/tally/compatibility/compatibility-surface.json
+   ```
+
+3. Re-add the pins the branch itself added. `git diff <merge-base>..HEAD --
+   docs/tally/compatibility/compatibility-surface.json` shows them. Insert each as
+   `{ "path": "...", "reason": "..." }` in sorted order; do not touch
+   `MAX_SURFACE_FILES`. A branch that only changed the
+   contents of already-pinned files has nothing to re-add.
+4. Add `docs/tally/compatibility/acks/pr-<N>.txt` as above if the branch changes any
+   pinned path. Until the branch has merged master, its head still holds a schema 2
+   file, which the acknowledgement check and `scripts/merge-gate.sh` refuse to read
+   at the head (the merge gate reports the branch as indeterminate).
+5. Delete the leftover local merge-driver configuration, once per clone (harmless
+   if absent): `git config --remove-section merge.bridge-compat-reseal`.
+
+`scripts/reseal.sh`, `rehash-surface` and the merge driver no longer exist. Do not
+recreate them.
+
+#### Running the compatibility tool
+
+The tool's tests and the `gate` command need the pinned toolchain. A Homebrew
 `rustc` earlier on `PATH` shadows rustup, and this project pins the version in
 `rust-toolchain.toml`, so check `rustc --version` first. Setting `RUSTC` alone
 is **not** enough to escape the shadow: `cargo clippy` still resolves the wrong
@@ -43,379 +409,6 @@ rustc --version   # must match rust-toolchain.toml before you continue
 Quote `rustc_path` rather than piping it through `xargs dirname`: `xargs` splits
 on whitespace, so a home directory containing a space turns one path into
 several and the `PATH` entry it builds points nowhere.
-
-`--output` asks the
-compatibility tool to stage and replace the destination itself, and it is
-required — without it the command prints to stdout and changes nothing on
-disk, which looks like success:
-
-```bash
-cargo run --locked -p bridge-tally-compatibility -- rehash-surface \
-  ../docs/tally/compatibility/compatibility-surface.json .. \
-  --output ../docs/tally/compatibility/compatibility-surface.json
-```
-
-```powershell
-cargo run --locked -p bridge-tally-compatibility -- rehash-surface `
-  ../docs/tally/compatibility/compatibility-surface.json .. `
-  --output ../docs/tally/compatibility/compatibility-surface.json
-```
-
-`rehash-surface` reads the raw bytes of every existing pin, rewrites its
-`sha256`, and reports the changed-entry count; it neither adds nor removes
-pins. That is the whole reseal. The surface (schema 2) stores only the per-file
-hashes: the surface digest that receipts and attestations bind is computed by
-the gate from those hashes, never stored, and the matrix carries no copy of it
-(bridge#760). So a reseal never touches the matrix, and two changes that pin
-different files merge without conflict. CI intentionally checks the resulting
-surface but never reseals it. Without `--output`, the command retains its
-stdout contract. With `--output`,
-the tool writes raw UTF-8 without a BOM to a temporary file in the destination
-directory and replaces the destination only after successful serialization.
-This keeps failure fail-closed without relying on shell redirection or move
-semantics.
-On Unix, replacement preserves an existing destination's mode; a new
-destination uses the normal `0666` mode subject to the process umask. Windows
-uses its normal ACL semantics rather than POSIX mode bits.
-
-#### Adding or removing a pin
-
-Edit the file list by hand: add the entry in sorted path order with any
-64-hex placeholder `sha256`, or delete it. Then reseal as above.
-`rehash-surface` validates the list's shape (sorted, unique, relative paths,
-64-hex hashes, within `MAX_SURFACE_FILES`) and writes every entry's real hash,
-the new one included. A malformed list is refused and left unchanged.
-`scripts/reseal.sh --pins-changed` still works and is now the same as an
-ordinary reseal.
-
-#### What the reseal reports after it succeeds
-
-A successful `scripts/reseal.sh` (not `--verify`) prints a surface coverage
-report from `scripts/surface_coverage_report.py`. It never fails the reseal.
-Against the merge-base with `origin/master` (override with
-`SURFACE_REPORT_BASE`) it lists two things the gate cannot see: a pin that was
-dropped, and a module declared directly by a pinned module and newly left
-unpinned. Modules left unpinned before the branch are not reprinted, test-only
-modules are only counted, and feature-gated ones are labelled.
-
-**A clean report is not evidence that nothing left the seal.** It does not see
-code moved between files that already existed; a new module declared by an
-*unpinned* module, even one carved out of a pinned file (a new file under an
-unpinned `db/mod.rs`, say); deeper descendants of a pinned module; a pinned
-file that stops being compiled; a test-only or feature-gated module becoming
-production; or a new crate root. The script's docstring keeps the full list.
-The merge driver (`scripts/reseal-merge-driver.mjs`) writes the reconciled lists
-itself and does not print the report; run `scripts/reseal.sh` after resolving.
-
-Read it, then pin each listed file that decides what Bridge posts or lets leave
-the machine, and leave the rest; see the comment on `MAX_SURFACE_FILES` for the
-rule and bridge#416 for the reasoning.
-
-#### When the surface itself conflicts in a merge or rebase
-
-Every pin's `sha256` is generated: never hand-merge or hand-edit a hash. The pin
-*list* and the matrix's *claims* are authored, and a merge must reconcile them
-(below).
-
-Be precise about what the gate does and does not protect, because the two halves
-behave oppositely.
-
-**Stale bytes cannot slip through.** `validate_files` re-reads the raw bytes of
-every pinned file present and compares the SHA-256, so a surface pinning stale
-content fails with `surface_file_changed`. A reseal re-reads the bytes, so the
-only way to green is a hash that matches the merged file. For hashes the gate is byte-exact and
-fail-closed, so hand-merging them is futile rather than unsafe: every wrong
-resolution is loud, and regenerating is the only route to green.
-
-**A dropped entry slips through silently.** The gate can only check pins that are
-still in the list, and claims that are still in the matrix. Lose one in the
-resolution and the gate passes. That asymmetry is the whole hazard, and it is why
-the authored half below must be merged rather than regenerated.
-
-**When does this section apply at all?** With schema 2, two changes that touch
-different pinned files, even adjacent entries, merge without any conflict, on
-GitHub as well as locally, because each changes only its own `sha256` line. A
-conflict here now means both sides changed the same pinned file, or both
-inserted pins at the same sorted position, or one appended a pin after the last
-entry while the other edited the last pinned file, or one renamed a pin while
-the other edited that file, or both edited the claims. One case
-merges cleanly and is still caught: one side adds a pin for a file (its hash
-from that side's bytes) while the other edits that file. The merged hash line
-and the merged bytes then disagree, and `validate_files` fails with
-`surface_file_changed` on the merge result. That rests on CI running on the
-merge result, which `strict: true` branch protection (or a merge queue)
-ensures.
-
-**What does matter is the order.** Resolve every genuine *source* conflict first,
-and only then regenerate. `tools/bridge-tally-compatibility/src/lib.rs` is itself a
-pinned file: the tool pins its own source into the surface it produces. Regenerate
-before that file is final and you pin a half-merged copy -- the gate will catch it,
-but only after you have spent the cycle.
-
-**These two files are not wholly generated, and that is what makes the conflict
-dangerous.** Each carries two kinds of content:
-
-- **derived** -- every pinned file's `sha256`. Regenerating rewrites these, so
-  conflicts in them are noise. (Schema 1 also stored the aggregate digest in both
-  files; schema 2 stores none, bridge#760.)
-- **authored** -- the surface's *pin list*, and the matrix's *claims and promotion
-  constraints*. **Nothing regenerates these.** `rehash-surface` re-reads the bytes
-  of every entry that is present; it cannot restore an entry that is absent.
-
-So "take one side wholesale" is safe for the derived half and **silently lossy for
-the authored half**, and the gate will not catch it. Measured: delete one
-judgment-pinned entry from the surface, reseal, and the gate returns
-`compatibility_gate_passed`.
-
-**Where a pin matters enough that this is unacceptable, make it REQUIRED rather than
-relying on this procedure.** `REQUIRED_SURFACE_FILES` and `REQUIRED_SURFACE_DIRECTORIES`
-are checked for presence, not merely hashed, so an entry in either cannot be dropped
-silently at all. The same deletion that returned `compatibility_gate_passed` as a
-judgment pin returns `surface_required_directory_file_unpinned` once the path is
-required. `gate_rejects_each_omitted_required_lifecycle_path` iterates that list, so
-adding a path is also what tests it. A procedure a maintainer must follow is weaker
-than a constant they cannot circumvent; this section exists for the pins that are not
-worth promoting, not as a substitute for promoting the ones that are. `validate_files` enforces the required
-directories and `REQUIRED_SURFACE_FILES`; a judgment pin is in neither, so its
-absence is invisible. The matrix is worse: a dropped claim leaves no trace at all.
-
-1. Resolve every non-generated conflict and settle those files completely.
-2. Take **one side wholesale** for `compatibility-surface.json` and
-   `compatibility-matrix.json` -- but only as a starting point for the derived half.
-3. **Reconcile the authored half by hand, against the merge base.** This is the one
-   part of these files that must be *merged* rather than regenerated. List the pins
-   each side added and confirm the union is present:
-
-   **Name the two sides explicitly — during a rebase `HEAD` is not your branch.**
-   When a rebase stops on a conflict, `HEAD` is the upstream plus whatever has
-   already been replayed, and the commit being applied is `REBASE_HEAD`. Comparing
-   `HEAD` against `origin/master` there compares upstream with itself and never
-   reads the feature-side manifest at all — so it misses exactly the pin it is
-   meant to preserve. The conflict stages say it without either name: stage 2 is
-   the side you are replaying onto, stage 3 the side being applied.
-
-   ```bash
-   surface=docs/tally/compatibility/compatibility-surface.json
-   pins() { python3 -c 'import json,sys; [print(f["path"]) for f in json.load(sys.stdin)["files"]]' | sort; }
-
-   # during a rebase or merge conflict, read the stages -- they are unambiguous
-   git show ":1:$surface" | pins > /tmp/pins-base.txt   # merge base
-   git show ":2:$surface" | pins > /tmp/pins-ours.txt   # replayed onto / current
-   git show ":3:$surface" | pins > /tmp/pins-theirs.txt # being applied / incoming
-
-   # every pin either side ADDED since the base must survive the resolution
-   comm -13 /tmp/pins-base.txt /tmp/pins-ours.txt   # added by one side
-   comm -13 /tmp/pins-base.txt /tmp/pins-theirs.txt # added by the other
-
-   # and every pin either side REMOVED must stay removed -- additions alone are
-   # not enough, see below
-   comm -23 /tmp/pins-base.txt /tmp/pins-ours.txt   # removed by one side
-   comm -23 /tmp/pins-base.txt /tmp/pins-theirs.txt # removed by the other
-   ```
-
-   **Removals need the same treatment, and checking only additions hides them.**
-   A pin or claim that one side deliberately retired is still present in the base,
-   so it appears in neither `comm -13` output. Take the other side wholesale and it
-   comes back; reseal and the gate accepts it, because a resurrected pin hashes
-   fine. The retirement is silently undone, and which way it goes depends only on
-   which side step 2 happened to start from.
-
-   The union of additions minus the union of removals is the answer. Where one side
-   removed an entry the other side *modified*, that is a genuine add/remove conflict
-   and wants a decision, not a default -- resolve it explicitly and say which way in
-   the commit.
-
-   If the conflict is already resolved and the stages are gone, use `REBASE_HEAD`
-   (rebase) or `MERGE_HEAD` (merge) for the incoming side, never `origin/master`.
-
-   Do the same for the matrix's claims. A pin or claim that exists on one side and
-   not in your result is being deleted, and nothing downstream will say so.
-4. **Recompute `MAX_SURFACE_FILES` from the reconciled pin count, BEFORE regenerating.**
-   Do not carry a number derived from either side's cap. The ordering is not a
-   preference: `tools/bridge-tally-compatibility/src/lib.rs` is itself pinned, so
-   editing the constant after regenerating leaves its own digest stale and the gate
-   fails `surface_file_changed` until you reseal again. Every edit to a pinned file,
-   the cap included, belongs before the regeneration that hashes it, or the
-   regeneration has to be repeated.
-5. Regenerate: `scripts/reseal.sh` (or the one `rehash-surface` command above).
-6. Run the gate, and **check the pin count against the union you computed in step
-   3** -- the gate cannot do this for you.
-
-   `rehash-surface` also reports a changed-entry count, which is a check on your
-   reasoning **once you know what it counts**: only entries already in the list
-   whose digest on disk differs from the digest recorded. A newly added entry whose
-   digest you computed from disk is therefore **not** counted -- it already matches.
-   So adding one pin and raising the cap reports **one** (the tool's own pinned
-   source, changed by the cap edit) if you computed the new entry's digest from
-   disk, and **two** if you added it with a placeholder digest, as "Adding or
-   removing a pin" above suggests. Reconcile the number with how you added the pin; do not adjust a
-   digest to reach an expected count.
-
-A rebase carrying several commits that touch pinned files needs this at **each**
-commit that does, not once at the end. CI gates the final tree, but a history whose
-intermediate commits do not gate is not bisectable.
-
-**`MAX_SURFACE_FILES` is the line most likely to be silently wrong, and it is worse
-when it does NOT conflict.** The convention is to pin exactly the count in use, so
-any branch adding a pin must raise it. If two branches start from the same cap and
-each add one pin, both change it from N to N+1 -- an **identical edit**, which git
-merges automatically without ever showing you a conflict. The reconciled surface
-then holds N+2 pins against a cap of N+1, and step 4 fails with
-`surface_file_count_invalid`.
-
-That failure is loud, so it is not dangerous; what is misleading is expecting a
-conflict to prompt you. Recompute the cap from the reconciled pin count every time,
-whether or not git stopped to ask. The cap *test* derives its size from the constant
-precisely so that changing the cap does not also rewrite the test.
-
-Two further constraints apply:
-
-- `MAX_SURFACE_FILES` caps the pin count, and `RESERVED_SURFACE_FILES` bounds
-  how far the cap may exceed it. When the surface is at its cap, adding a pin
-  requires raising the constant, which the constant's own comment calls an
-  explicit compatibility-surface decision -- record the reason in the commit.
-- The tool pins its own source, so editing `tools/bridge-tally-compatibility`
-  to raise that cap stales its digest and needs another reseal after the edit.
-  Expect two passes, and run the tool's tests between them: a cap change can
-  invalidate a test that hard-codes the old bound.
-
-The PowerShell commands are intended for Windows PowerShell 5.1 and PowerShell
-7+. They deliberately do not use `>`: Windows PowerShell 5.1 redirection was
-measured to produce UTF-16LE. The output-path procedure is reasoned from the
-tool's byte writer, not host-verified; before relying on it on a Windows host,
-confirm the result with `Format-Hex` and require no UTF-8 BOM (`EF BB BF`).
-
-#### `scripts/reseal.sh` (wrapper)
-
-`scripts/reseal.sh` wraps the `rehash-surface` command above into one call, on
-Unix hosts. It resolves the pinned toolchain, prints the tool's own
-changed-entry count so a reseal that changed nothing (a no-op run) is visible as
-exactly that, and then prints the surface coverage report.
-
-```sh
-scripts/reseal.sh                  # reseal: rehash every pinned file
-scripts/reseal.sh --pins-changed   # the same; kept for existing instructions
-scripts/reseal.sh --verify         # reseals into a scratch copy and fails if
-                                    # it differs from the committed surface;
-                                    # never mutates the working tree. For CI --
-                                    # not wired into any workflow yet, since
-                                    # this repository's automation may not
-                                    # touch `.github/` here; see
-                                    # docs/proposed-dependency-policy.md for
-                                    # the proposed step.
-```
-
-It resolves the pinned toolchain itself (the same `rustc --version` shadowing
-hazard described above), and always runs from the repository root regardless
-of the caller's current directory. It has no PowerShell equivalent; run the
-`rehash-surface` command by hand on Windows.
-
-#### Merge driver (local only)
-
-Under schema 1, two PRs that each resealed after touching DIFFERENT
-already-pinned files always conflicted, on exactly two lines: the stored
-aggregate digests `manifest_sha256` (in the surface) and
-`compatibility_surface_sha256` (in the matrix). Schema 2 stores neither
-(bridge#760), so that case no longer conflicts anywhere, and
-`scripts/reseal-merge-driver.test.mjs` checks it with the driver overridden by
-git's built-in text merge (an `info/attributes` entry `merge=text`), as GitHub
-merges. What remains for the driver is the rarer case of both sides
-changing the pin list or the claims.
-
-A git merge driver at `scripts/reseal-merge-driver.mjs`, wired via
-`.gitattributes`, resolves the common case of that automatically: it
-reconciles the surface's pin list and the matrix's claim list with a real
-three-way merge (independent additions and removals from either side are
-both kept/honored automatically; the SAME entry changed on both sides to
-DIFFERENT content is refused, not guessed at, and falls back to git's
-ordinary conflict markers for manual resolution exactly as described above),
-then writes the reconciled lists. Every pinned file's post-merge hash is computed from git refs
-(`git diff --name-only`/`git show` against the merge base, "ours" and
-"theirs"), never from the working tree -- an earlier version of this driver
-read the working tree instead and a real merge experiment caught it sealing
-a wrong hash, because git does not guarantee every other path has already
-been checked out to its final post-merge content by the time this driver
-runs for the compatibility files specifically. It runs no tool, so it needs no
-Rust toolchain. See the extensive comments in
-`scripts/reseal-merge-driver.mjs` for the exact mechanics, including why
-`.git/MERGE_HEAD` -- the seemingly obvious way to learn "ours"/"theirs" from
-inside a running merge driver -- does not work (it is not written until
-*after* the whole tree-level merge finishes, i.e. after every driver
-invocation, and in a linked git worktree `.git` is a redirect file rather
-than a directory besides) and the gitattributes placeholders (`%S`/`%X`/`%Y`)
-used instead.
-
-**This is a LOCAL-ONLY convenience.** A `.gitattributes` `merge=` driver
-requires local git configuration to activate (below) and runs only when
-*your own* `git merge`/`git rebase` executes on *your* machine. **GitHub's
-server-side merge -- the "Merge pull request" button, and the mergeability
-check GitHub computes for an open PR -- does not run repository merge
-drivers at all; GitHub has no mechanism to execute arbitrary repository code
-as part of that merge.** So this reduces the pain of a maintainer juggling
-several compatibility-surface branches locally; it does **not** change what
-a PR shows as conflicting on GitHub, and does not touch anything under
-`.github/`. A PR that would conflict on GitHub still needs a rebase/merge
-performed locally (with this configured) to resolve automatically, then
-pushed.
-
-One-time setup per local checkout (not committed -- `.gitattributes` names
-the driver, but the driver's actual command has to come from local git
-config, by design: git will not execute arbitrary commands named in a
-version-controlled file without an explicit local opt-in):
-
-```sh
-git config merge.bridge-compat-reseal.name "Bridge compatibility-surface reseal driver"
-git config merge.bridge-compat-reseal.driver "node scripts/reseal-merge-driver.mjs %O %A %B %P %S %X %Y"
-```
-
-When it declines to resolve (a genuine conflict on the pin/claim list, or on
-a pinned file's own content, or an operation other than an ordinary `git
-merge`), it falls back to git's plain three-way text merge and prints why --
-resolve the conflict markers by hand following the procedure above, then run
-`scripts/reseal.sh` yourself.
-
-#### Migrating an open branch across bridge#760
-
-A branch cut before bridge#760 still carries schema-1 files and the old driver.
-During a local merge git runs the driver of the side that is **checked out**, so
-merging master into such a branch runs the *old* driver. It writes schema-1
-files, which the new tool, `scripts/reseal.sh` and the gate all refuse
-(`artifact_json_invalid`). That fails closed, but it has to be finished by hand,
-once per branch:
-
-1. Merge master without committing, and resolve every source conflict:
-
-   ```sh
-   git fetch origin
-   git merge --no-commit origin/master
-   ```
-
-2. Take master's two files, which have the schema-2 shape (`schema_version: 2`,
-   no `manifest_sha256`, no `compatibility_surface_sha256`):
-
-   ```sh
-   git checkout origin/master -- docs/tally/compatibility/compatibility-surface.json \
-     docs/tally/compatibility/compatibility-matrix.json
-   ```
-
-3. Re-apply the branch's own authored changes, if it had any: pins it added (in
-   sorted order, with any 64-hex placeholder `sha256`) or removed, and claims it
-   changed. Compare with the merge base as in "When the surface itself conflicts
-   in a merge or rebase" above. A branch that only changed the contents of
-   already-pinned files has nothing to re-apply.
-4. Reseal, verify and commit:
-
-   ```sh
-   scripts/reseal.sh
-   scripts/reseal.sh --verify
-   git add docs/tally/compatibility/compatibility-surface.json docs/tally/compatibility/compatibility-matrix.json
-   git commit
-   ```
-
-The merge commit then holds schema 2, and every later merge runs the new driver.
-Updating such a branch on GitHub ("Update branch") instead reports a conflict
-on the two files whenever the branch had resealed; resolve it locally the same
-way.
 
 Before cutting a candidate, regenerate and verify the Rust third-party notice
 with the pinned generator:
@@ -461,8 +454,7 @@ corepack pnpm run license:all
    unless release notes or product copy claim that scope.
    Live Education collection, when legitimately available, must follow the
    [read-only runbook](./tally/compatibility/live-education-runbook.md). Never
-   upload `.bridge-live/` automatically or substitute the parser-only CI
-   receipt for reviewed live evidence.
+   upload `.bridge-live/` automatically.
 7. Confirm the release commit and tag contain no PII, machine paths, secrets,
    or unsigned third-party assets. The MCPB's PDFium library is fetched at build
    time, never committed, and admitted only against the SHA-256 digests in
@@ -470,6 +462,189 @@ corepack pnpm run license:all
    archive, which the preview release notes state.
 8. Confirm the `Dependency security` workflow passes and GitHub reports no open
    Dependabot or secret-scanning alerts.
+
+## Merge gate: privacy scan and binary attestations
+
+`scripts/merge-gate.sh` scans the PR title, body, every commit message, the
+author and committer names, the changed file names and every added line for
+developer-home paths, PEM envelopes, credentials, customer email addresses,
+UUIDs without provenance, identifier shapes (PAN, GSTIN, mobile numbers) and long
+digit runs. The scan counts what it finds and never prints a value.
+
+**Finding the line.** When the scan blocks or is indeterminate the gate also
+prints `at <where>: <categories>` for up to 50 lines, where `<where>` is `pr-title:1`,
+`pr-body:<line>`, `commit-message-<n>:<line>`, `commit-identity-names:<line>`, a changed
+file name, or `<file>:<new-file line>` for an added line. It reports the location and
+the classifier's own counts and never the matched text or an excerpt, so the output
+is safe to paste. Open the file at that line to decide whether it is synthetic.
+"No single line reproduces the privacy finding" means the hit needs several lines
+together (a number split over lines) or comes from the PR text as a whole.
+Synthetic test data still trips the shapes: any ten digits starting 6 to 9 reads as an
+identifier and any run of eleven or more digits as a long digit run, however obviously
+fake. The gate has no allowlist by
+design; write the synthetic value in a form the shapes do not match (letters in it,
+a shorter run, grouped digits), or have the merger read the listed lines and merge on
+that reading.
+
+**Merge commits.** A merge made with conflicts carries git's own comment block
+(`# Conflicts:` and `#<TAB>path` lines) after the `Co-Authored-By` trailer. The gate
+treats that trailing block as outside the trailer footer, so the public agent address
+before it is still redacted; an address placed inside the block is still counted. Even
+so, strip the block from a merge commit message (or edit it with `git commit`) so it
+carries no noise.
+
+**The owner's merge verdict.** The gate no longer reads a reviewer's comment for its name or its
+head. Two machine lines count, each either the whole body of a pull request review or an issue
+comment (never an inline review comment) or the exact first line of a longer one (see "A
+verdict line that opens a longer comment" below), posted by the owner's account (a numeric user id
+the script holds, a real user, not an app; the gate fails closed if the id cannot be
+read), after CRLF becomes LF and at most one trailing newline, exactly one line of
+lowercase hex:
+
+    MERGE-VERDICT CLEAN head=<40 hex> base=<40 hex>
+    MERGE-ADVERSARY RECOMMEND head=<40 hex> base=<40 hex>
+
+The newest line of each kind by server time is the one that counts, and it must name the
+pull request's current head and the merge base the gate computes itself from a freshly
+fetched base tip, so merging master into the branch voids a verdict (except that a CLEAN
+line is carried across when the pull request's own change is byte-identical, see "Carrying a
+CLEAN line across a merge of master" below) while a master that
+moved under an unchanged branch does not (the merge queue's own run on the merged tree
+guards that case). Both lines are needed, except at review tier one, where MERGE-VERDICT CLEAN
+alone is enough (see "Review tiers" below). An edit or deletion of any review or issue
+comment the owner's account posted, by whoever made it, a dismissal of an owner review, and
+any later owner line that is not a positive one (`MERGE-VERDICT NOT-CLEAN`, `MERGE-VERDICT
+RETRACT`, `MERGE-ADVERSARY REJECT`, `MERGE-ADVERSARY RETRACT` or any malformed line that
+carries either token) void every verdict that is not strictly newer; an owner's inline
+review comment that carries a token voids every verdict whatever its time, because its edit
+history and deletion are not read (only deleting it lifts that). Edits, deletions and dismissals
+of items other accounts posted are ignored, except that an author the gate cannot read (a bot, a
+deleted account) is treated as possibly the owner and voids; the owner is matched by numeric id,
+not by login. The gate refuses a
+pull request whose title, body, branch name, changed file names, commit messages, added lines
+or commit comments carry either token, or on which anyone but the owner posted a review or
+comment (an inline review comment included) that does, so a stranger's comment that carries a
+token blocks the pull request until it is deleted; an owner's commit comment or inline comment
+that carries one voids every verdict instead (so those two places never refuse, they void). The tokens are read
+without case, with look-alike hyphens, hidden characters and character references folded away, and
+read three more ways: with HTML comments removed, with only the comment delimiters removed (a token
+hidden inside a comment is still a token), and as an HTML parser reads the text, with and without
+its comment text (tags and comment forms between the letters do not hide one). A pull request that
+quotes one in any of those places (this very section included) cannot pass the gate: its merge is the
+owner's own act. The commit comments are read once, from the repository's list of commit comments, and kept
+when they sit on one of the pull request's commits; the commit list must first be proven complete (250 commits
+at most). A list that is not proven, a page that cannot be read, or a comment that names no commit makes the
+gate `INDETERMINATE`. Other places a person can write in (labels, the milestone, author names, comments on
+commits no longer in the pull request) are not read. History it cannot read
+completely (more than one page of reviews, comments or timeline events included) is
+`INDETERMINATE`, never a pass.
+
+**Review tiers.** The gate asks `scripts/review-tier.mjs` for a tier before it judges the verdict
+lines, from the changed paths (a rename counts both names) and the committed list
+`scripts/review-tier-paths.json`, which the gate proves equal to master's like the rest of
+`scripts/`. The first rule of the list whose match holds decides a path. Documentation, plain
+tests and production code that does not touch the write path are tier **one**; a path on the write
+path, in credentials or security, in fixture data, or that no rule classifies is **full**, and so
+is a change with no paths, an unreadable input, an invalid list and any failure or malformed
+answer of the tool. A Rust test file is judged with the module it tests. Only the exact tier `one` lets the
+MERGE-ADVERSARY RECOMMEND line be absent: the pull request then stands on MERGE-VERDICT CLEAN
+alone. Every refusal and every void still applies at tier one, and an adversary line that voids
+(a rejection or a retraction) still voids the CLEAN line. The list is a judgement about names and
+directories, not about what a change does: an interface file edited to call a write path stays tier
+one unless its name or its neighbours say otherwise, which is what the reviewer's CLEAN is for.
+Prose (documents and site pages) is classified by the documentation rules before the name rules,
+so a document about a write-path subject is tier one. The gate prints the tier and what decided it
+("review tier: ..."). A change to the list or the tool is the owner's own act, like a change to
+the gate.
+
+**A verdict line that opens a longer comment.** An owner review or comment may open with the
+verdict line: its exact first line is the line, the rest of the body is non-blank prose, and that
+prose carries neither token (read the same way as everywhere else). A review that opens with the
+line is then the one thing the reviewer posts. Prose before the line, a line with spaces around
+it, a token anywhere else in the body, or a rest that is empty makes it a malformed owner line,
+which voids as before.
+
+**Carrying a CLEAN line across a merge of master.** When the newest MERGE-VERDICT CLEAN line is
+not voided and names an older head and merge base, the gate compares two GitHub compare diffs,
+one at that pair and one at the current merge base and head. The line is carried to the current
+pair only when they are byte-identical apart from the `index` lines and the text after the hunk
+numbers (context lines and hunk numbers are part of the comparison, so a change moved in a file is
+not the same change), neither is empty or holds a binary change, the new one lists no file twice
+and names exactly the pull request's current file list. Only CLEAN is carried, never MERGE-ADVERSARY
+RECOMMEND, which must name the current pair, and every void still applies to a carried line. What
+master changed in other files, or in the same file outside the pull request's hunks, is not looked
+at: the required checks at the head cover it, not the reviewer. When the pull request's own lines
+cannot be shown unchanged the gate says so and the reviewer looks again.
+
+**Merging as the gate judged.** `scripts/merge-gate-merge.sh <pr>` runs the gate, and merges only
+if it passed with exactly one MAY MERGE line, one merge command and one base-branch check for that
+pull request. It reads the pull request, marks a draft ready, reads it again, and runs
+`gh pr merge --squash --match-head-commit` with the head the gate printed, returning a draft it
+made ready to draft when the merge does not happen. It refuses any mismatch of state, base or head,
+and an interrupt while `gh` runs leaves the pull request as it is.
+
+The gate is run only from origin/master's tree, never from the pull request's checkout: it
+fetches the branch `master` of `origin` itself into a ref of its own and refuses to run (exit 2) unless
+the directory the script itself lives in is this tree's `scripts/` and everything under `scripts/`
+equals it, untracked files included, and its helpers run with an isolated Python interpreter
+so that a file placed beside them cannot replace a standard-library module. A pull request
+that changes or renames away `scripts/merge-gate*`, `scripts/merge_gate*.py`, `scripts/review-tier*` or anything
+under `.github/` is the owner's own act: a verdict about the gate cannot clear a change to
+the gate. For a pull request that the owner did not author, the two lines must
+come from separately run reviewers, and each reviewer records in its own log which line it posted;
+the gate cannot check that. The gate trusts the `origin` remote of the clone it runs in, and
+ignored files (caches, logs) are not part of the tree comparison, which is harmless because the
+helpers run isolated, and a path typed in a different letter case than the real one is refused. A root `.gitattributes` can change the bytes of the gate's files in a working
+tree; that can only break the gate (it then fails), not make it pass.
+
+Accepted residual risks, stated here so nobody reads the gate as stronger than it is: the lines bind
+the head and the merge base, not the name of the branch the pull request targets, so retargeting a
+pull request to another branch with the same merge base keeps the verdict; a
+reviewer session that has been tricked into obeying text it was asked to review can post
+both lines under the owner's account; a review posted by the owner's account through an
+application token cannot be told from one typed by the owner, because a review object carries
+no application field (an issue comment does, and one posted through an application is not
+accepted); the contributor's repository administration rights (deliberate) can bypass any
+gate.
+
+**Binary files.** Git shows a file it reads as binary (a NUL byte, so every UTF-16
+fixture, images, archives) as `Binary files differ` or a `GIT binary patch`, with no
+text to scan. The gate cannot read those bytes, so it holds the PR until the owner
+attests: `scripts/merge-gate.sh <PR> --binary-review-sha <head>` with the full 40-hex
+head SHA. This flag is the owner's own act, never read from the PR body or from a
+comment (the gate cannot tell who typed it: that it is the owner is kept by who runs the
+command), and no verdict line can stand in for it: a diff never shows binary bytes,
+licence or NOTICE obligations. It must equal the head the gate is running on, so a later
+push invalidates it. It states that the owner read every binary addition or change (the
+bytes, not the file name), its ownership and licence and its NOTICE obligation; for a
+captured fixture this means its `PROVENANCE` entry matches the bytes
+(`scripts/check-fixture-provenance.mjs`) and the capture is synthetic. The gate lists
+the first eight binary paths in its message so the merger knows what to read. The former
+`--independent-review-sha` flag is gone.
+
+**Lab-capture manifest.** `scripts/merge-gate-lab-captures.json` (schema 1, at most 1000
+entries) lists captures the owner has already read, one entry for each: `path`, `blob` (the git
+blob id), `size`, `sha256`, `capture_id`, `lab_ref` (a note, never resolved), `company` and
+`seed_basis` (how the lab company's books were built). The gate reads the file only from the
+master ref it fetched, as a regular-file blob, the way it reads the synthetic-UUID registry, so
+a pull request cannot list its own binaries. A binary addition or change is exempt from
+`--binary-review-sha` only if its path and the blob id GitHub reports for it both equal one
+entry, and the bytes of that blob, fetched through the API at merge time, have the entry's
+`size` and `sha256`. One different character in the blob, the same blob at another path, a
+missing blob id, a removed file or differing bytes is not exempt; a blob request that fails or
+answers malformed is reported as "could not check its bytes", apart from "bytes differ", and is
+not exempt either. The gate prints the exempt paths and the manifest's blob id, and anything
+unlisted still needs the attestation above. An invalid manifest, a link instead of a file, or a
+duplicate path means no exemptions, and the gate says why. Changing the manifest matches
+`scripts/merge-gate`, so that pull request is the owner's own merge. There the owner reads each
+sitting's decoded captures (a UTF-16LE file without a byte-order mark included, which a plain
+UTF-8 read shows as noise), their ownership and licence, states `seed_basis`, and confirms
+`sha256` on the file they read (for example `shasum -a 256`), since that is the value the gate
+checks. An entry stays valid for those bytes at that path until it is removed, so remove it
+when the capture is deleted or withdrawn. A lab branch is never read or trusted at gate time:
+lab branches are unprotected and are pushed with the owner's own account, so being on one
+proves nothing about where the bytes came from, and a branch can be moved or deleted later. A
+pointer to a lab branch or commit in a pull request body is ignored.
 
 ## Signing and publication
 
@@ -481,6 +656,13 @@ corepack pnpm run license:all
   reviewers; never place them in repository variables, logs, or artifacts.
 - Publish SHA-256 checksums and provenance/attestation evidence with every
   downloadable artifact.
+  Each preview archive gets a GitHub build attestation (`actions/attest`, in a
+  separate job that runs no repository code and is the only one that can mint
+  the identity token) that the publish job verifies with `gh attestation
+  verify`, requiring this workflow, this commit, the default branch and a
+  GitHub-hosted runner, before the release is created; the release notes tell
+  readers how to check a download. It records which workflow run and commit built the bytes. It is not
+  a code signature, and no client checks it yet.
 - Do not create or move a `v*` tag until signed artifacts from both supported
   platforms pass the candidate gates. Release tags must be immutable.
 
@@ -496,6 +678,16 @@ notarization or Gatekeeper approval. These artifacts remain previews without
 publisher signing. Production signing defaults and the MCPB publication lane
 are unchanged.
 
+## Pull-request type labels
+
+A release proposal reads the type label of each merged pull request. The
+`PR labels` workflow therefore fails a pull
+request that does not carry exactly one of `type:feature`, `type:bug`,
+`type:rectify` or `type:chore`, so a missing label is fixed on the pull request
+and does not block a release later. Dependabot pull requests are skipped; their
+`dependencies` label is already classified. Whether the check is required to
+merge is a repository setting, not something this file decides.
+
 ## MCPB previews and the install page
 
 `.github/workflows/release-mcpb-preview.yml` is a manually dispatched,
@@ -503,9 +695,12 @@ two-platform preview lane. It produces the actual Windows x64 and macOS arm64
 MCPB archives, validates and launches each archive without contacting Tally,
 then publishes a durable **GitHub prerelease** only when every archive, checksum,
 payload-free smoke result, and source-provenance record is present. Preview tags
-must start with `mcp-preview-`; they cannot reuse a production `v*` tag. A
-preview is unsigned and must never be described as signed, notarized, or ready
-for production use.
+must be `mcp-vX.Y.Z` (or the older `mcp-preview-X.Y.Z`, used by 0.2.0 and
+0.3.0); they cannot reuse a production `v*` tag. A
+build without publisher signing must never be described as signed, notarized,
+or ready for production use. The workflow titles the release
+`ComplyEaze Bridge MCP <version>` itself, with the version taken from the tag
+(`mcp-v0.5.0` gives `0.5.0`), so the title needs no edit after publication.
 
 This workflow intentionally has no production-signed channel. A raw MCPB
 archive is not a notarization-and-stapling carrier for the enclosed macOS
@@ -515,7 +710,8 @@ credentials, a timestamped Windows signing certificate, protected release
 environments, and host validation of the complete shipped carriers. Self-signed
 certificates and OS-warning bypass instructions are not acceptable substitutes.
 
-`site/` is a small static installer page. Its workflow runs when a maintainer
+`site/` is the static website (home, Download, Releases and Changelog). Its
+workflow runs when a maintainer
 dispatches it, and again when a maintainer-dispatched preview publication in
 this repository finishes successfully, so the page's release snapshot follows
 the release without a second step. The job requires the publication run's event
@@ -524,9 +720,27 @@ published with the workflow token starts no workflow of its own, which is why
 the follow-up is wired to the publication run. A successful publication also
 deploys any `site/` change already merged to the default branch but not yet
 deployed, so text on the default branch is text that goes live.
+Site text is a public claim, so it follows the same rule as release notes:
+say only what has been proven on the build a person can download.
+
+- A pull request that changes text under `site/` says so in its body, quoting
+  the changed sentence, and the reviewer reads it against the evidence for the
+  claim (the platforms tested, the not-yet-code-signed label, what the product
+  does not do). A claim the release notes could not make does not belong on the site.
+- Each deploy writes "Site text changed since the last deploy" to its run
+  summary: the files and the diff under `site/` between the last commit that
+  was deployed successfully and the one being deployed. The diff is cut at 300
+  lines of 400 characters, and files generated during the deploy (the release
+  list and the changelog page) are not compared. Read it after every deploy,
+  manual or publication-triggered; a wrong sentence is fixed by a new deploy.
+  It only informs. It reads the deployment history with the workflow token, and
+  if that read, the comparison or its two-minute limit fails, the step warns
+  and the deploy continues, so a missing summary is not a reason to stop a
+  release.
+
 Once GitHub Pages is configured for this repository, the page offers a
 preview by its tag name and complete asset set, whether or not GitHub marks the
-release a prerelease, and labels every download as an unsigned preview. It does
+release a prerelease, and labels every download as not yet code-signed. It does
 not proxy Tally, create an account, or run a cloud relay.
 
 ## Release rhythm and notes
@@ -536,9 +750,11 @@ every note for them first, and for maintainers second.
 
 **Rhythm**
 
-- Cut an `mcp-preview-*` build at most every two weeks, and only when both of
+- Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) only when both of
   these hold: at least one user-visible change has landed, and CI is green on
-  both hosts.
+  both hosts. A master push may show the native, bundle and seam jobs skipped
+  when the merge queue ran them on that same commit; its job summary names the
+  queue run, and the daily scheduled run runs everything.
 - The workflow publishes each preview as a prerelease. Once its checks are
   read, the maintainer marks the newest preview as the repository's latest
   release (`gh release edit <tag> --prerelease=false --latest`), so the
@@ -562,8 +778,8 @@ patch for a fix-only release:
 | Documentation only (`documentation`) | no release | no release |
 
 `node scripts/next-version.mjs` proposes the version:
-- It reads the pull requests squash-merged since the last `mcp-preview-*` or
-  `v*` tag, from `git log`, up to `origin/master` (`--to REF` changes that;
+- It reads the pull requests squash-merged since the last `mcp-v*`,
+  `mcp-preview-*` or `v*` tag, from `git log`, up to `origin/master` (`--to REF` changes that;
   `HEAD` would count an unmerged working branch's commits as direct pushes).
   It refuses when `origin/master` here is not origin's current master, or when
   the version files here differ from that commit's, so a stale branch cannot
@@ -587,10 +803,29 @@ patch for a fix-only release:
 `src-tauri/Cargo.lock`, and the README sentence naming the current version.
 It checks every file first and writes none if one fails. Then:
 
-1. Run `scripts/reseal.sh`, because three of those files are pinned.
+1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because three of those files are pinned (see "Compatibility-surface reseal").
 2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`.
 3. Commit, and open the version pull request.
 4. After it merges, dispatch the preview release with the matching tag.
+5. After the release is published, change the tag and date in the two managed
+   spans that name the newest published build (`managed:current-release` in
+   `README.md` and `managed:latest-preview` in `SECURITY.md`; search both files
+   for `managed:`), and check that the install page and the repository
+   description name the same build.
+   Also update the sentences that say a tool is "in source but not in the
+   0.3.0 release" in `docs/agent/README.md` (name the build that now has it),
+   and the `README.md` lines that describe the published package, so no line
+   describes the previous build as the newest. Add the new tag to the
+   "so far" list under `## [Unreleased]` in `CHANGELOG.md`, and the new version
+   to the version line of `docs/security-and-privacy.md` (change its tag line
+   only when the page is read again at the new tag).
+   The publish workflow creates the release as a pre-release and deploys the
+   site as soon as it ends, before `gh release edit` marks the release latest, so
+   the release snapshot deployed with the site still records it as a
+   pre-release. The site workflow has no push trigger: text merged under `site/`
+   and in `CHANGELOG.md` goes live only when a maintainer dispatches it or at
+   the next publication, so dispatch it once after the post-release pull request
+   merges.
 
 `scripts/check-license-metadata.mjs` fails CI when the five version files
 disagree.
@@ -606,18 +841,28 @@ disagree.
    labels through `.github/release.yml`. The publish workflow appends it; do
    not paste it by hand.
 
-   On the release page the written parts come first, then the standard
-   unsigned-preview text, then this generated list.
+   On the release page the install-and-check header
+   (`packaging/mcpb/INSTALL_AND_CHECK_RELEASE.md`) comes first, then the written
+   parts, then the standard release-notes footer, then this generated list.
+   If the notes cannot be composed at all, the release carries the footer and
+   the generated list without the header.
 
 **`CHANGELOG.md`**
 
 - Each release gets an "In plain words" section above the detailed entries,
-  written from the merged pull requests since the last build.
+  written from the merged pull requests since the last build. It opens with a
+  short "Should I upgrade?" block: who should, in one line why (name a published
+  advisory if the build fixes one), how to upgrade, and what to check afterwards
+  (the version the extension shows, and the posting setting).
+  It adds no claim the detailed entries or the published advisory do not support.
+- While the changes are unreleased, head the first part "What the next build
+  adds", so nothing unpublished reads as available. Rename it "What you can do
+  now" when the section becomes the release.
 - Keep the detailed entries as they are. They serve maintainers and
   integrators.
 - `CHANGELOG.md` is the one source for the notes. The publish workflow takes
-  the `## [X.Y.Z]` section that matches the tag (for `mcp-preview-X.Y.Z`),
-  puts it above the unsigned-preview text, and appends GitHub's list. The
+  the `## [X.Y.Z]` section that matches the tag (for `mcp-vX.Y.Z` or `mcp-preview-X.Y.Z`),
+  puts it above the release-notes footer, and appends GitHub's list. The
   install page's "What changed" page renders the same file when the install
   page is deployed, so a changelog edit reaches the site with the next
   deploy, not when the file changes.
@@ -631,13 +876,25 @@ disagree.
   published one. With no template, or one without the marker, the deploy uses
   a plain built-in page and never fails.
 - At cut time, in the pull request that bumps the version: rename the
-  plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, and
-  leave a fresh `## [Unreleased]` above it. If the section is missing, the
+  plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, change
+  its first part's heading from "What the next build adds" to "What you can do
+  now" and its "in source since" title to name the new build, and leave a fresh
+  `## [Unreleased]` above it. If the section is missing, the
   release carries the `[Unreleased]` text instead (with a warning), which may
   describe changes that build does not have, so read the release body; if that
   is empty too, only the standard text and GitHub's list. Headings must read
   `## [X.Y.Z] - date` (a dash or en dash also works); a fence that is never
   closed, or another level-two heading, is reported as a warning in the run.
+  In the same pull request, reread every answer on the Questions page (`site/faq.html`)
+  and every tool row on the capabilities page (`site/capabilities.html`) against the new
+  release and move each page's check stamp (the release and the day; on the Questions page
+  also in the structured data), and the release named by "release X offers" or "installs" in the
+  capabilities page and in `site/llms.txt`. The tools the catalog serves that no published build installs
+  are listed in `scripts/site-pages.test.mjs` under the release the page is stamped for;
+  once that release publishes them they belong on the page. `scripts/site-pages.test.mjs`
+  fails until each stamp names the version in `packaging/mcpb/manifest.json` and the page
+  names the tools the catalog serves, so a version bump cannot merge with answers nobody
+  has reread.
 - The install page shows this file's headings, paragraphs and bullets, so a
   claim added here is a claim on the public site. Fenced code is left out, and
   tables and quotes show as plain text. Escape nothing by hand: the renderer
@@ -651,8 +908,13 @@ disagree.
   the README and the repository description must agree with the newest
   published build.
 - Make no accuracy claim without a published method and result.
-- Never say "signed" or "production" about an unsigned preview (see *Signing
-  and publication*).
+- Never say "signed", "notarized" or "ready for production use" about a build
+  without publisher signing (see *Signing and publication*).
+- User-facing text does not call a release a "preview" or say it is "for
+  evaluation only". It says what is true: still being developed, may contain
+  errors, try it on test data with backups, not yet code-signed, and what has
+  and has not been tried. Internal names (the `mcp-preview-*` tag, the workflow
+  and file names) are not user-facing text.
 - Put no customer, company or client names, no local paths, and no
   private-repository references in any note.
 - Before publishing, check the text for AI-writing patterns and unclear
@@ -664,15 +926,79 @@ disagree.
 - If the MCP registry or another directory lists the build, update that
   listing's version and SHA-256 in the same release. A listing that points at
   an older package is a stale claim.
+- The official MCP registry listing is `io.github.ComplyEaze/bridge-tally`, published
+  from `registry/server.json` by the **Publish to the MCP registry** workflow
+  (`.github/workflows/publish-mcp-registry.yml`), dispatched by hand and never by a tag.
+  Create its `mcp-registry-publish` environment first. As set up on 2 October 2026 it
+  allows the default branch only and names one required reviewer, the owner, with
+  prevention of self-review off and administrator bypass off: a run waits for the
+  owner's own confirmation click, and there is no second person. For each release, after
+  it is published, update `registry/server.json` in the post-release pull request: the
+  version, the two asset addresses (they carry the version) and both `fileSha256`
+  values, copied from the release's `.sha256` files. Merge that pull request, and
+  dispatch the workflow from the default branch with the release tag, before any later
+  version pull request changes the manifest. The first job refuses to let the publishing
+  job run unless the file's version equals `packaging/mcpb/manifest.json`'s, the tag is
+  `mcp-v<version>`, the release is final, and each hash equals both the digest GitHub
+  records for the asset and its `.sha256` file. The registry accepts a token from any
+  job of any ComplyEaze repository that holds `id-token: write` and checks nothing else,
+  so the namespace is not protected by this workflow alone.
+
+  A published registry version's configuration cannot be edited or moved. A wrong
+  version can be withdrawn: the publish permission also lets a token mark a version
+  deprecated or deleted through the registry's status endpoint (`mcp-publisher status`),
+  which hides it without removing its metadata, and the next release's publication
+  supersedes it. Withdrawal needs its own `id-token` run, so it is an owner-only step
+  and is deliberately not part of the workflow. The test `scripts/check-registry-server-
+  json.test.mjs` (run by `pnpm test` in every pull request) checks the file's form and
+  that its version never runs ahead of the manifest; it cannot require equality in a
+  pull request, because the version pull request bumps the manifest before the release
+  (and so the hashes) exists.
 
 ## Rollback
 
 1. Mark the affected GitHub release as withdrawn and remove unsafe downloadable
-   artifacts without moving or reusing its tag.
-2. Publish a security advisory when coordinated disclosure is required.
-3. Revert or rectify the source change through a pull request with migration
+   artifacts without moving or reusing its tag. Remove every unsafe artifact: a
+   bundle left on the release stays downloadable from GitHub. Removing one
+   platform's bundle and its `.sha256` is enough for the live list to stop
+   offering the release on the install page (step 2 covers the snapshot),
+   because the page offers a release only while both platforms have a bundle
+   and a checksum. Delete the release or make it a draft only when the entry
+   itself must leave the list. Renaming it or changing its pre-release flag does
+   not change whether the page offers it: the page tells builds apart by tag
+   and assets.
+2. Redeploy the install page and read it back. The page is static and joins
+   two lists (`site/release-catalog.mjs`): the live GitHub list, and the
+   snapshot written by the last deploy (`site/releases.json`), with the live
+   entry winning for each tag. Until the redeploy, two things follow.
+   - A tag that is only in the snapshot stays. A deleted or drafted release
+     leaves the live list, so the Download button can still offer it, and
+     Releases shows it as Latest, with links to artifacts that no longer exist,
+     when it is the newest installable tag.
+   - A visitor whose browser gets no answer from GitHub (for example after its
+     unauthenticated rate limit) sees the snapshot only, with the page's notice,
+     so even a kept release whose artifacts were removed is still offered from
+     the old snapshot.
+
+   A new deploy writes a snapshot without the release, or without a complete
+   asset set. Dispatch "Deploy Bridge install page" from master (a run on another
+   ref skips both jobs without saying so) with the owner's yes. A
+   deploy also publishes any `site/` change already merged and renders the
+   changelog and legal pages again, so that text goes live too; read the run's
+   "Site text changed since the last deploy" summary afterwards, as under "MCPB
+   previews and the install page" (it does not compare the generated pages).
+   Then fetch `releases.json` from the deployed site, with a query string so a
+   cache does not answer, and check that the withdrawn tag is absent or present
+   with no complete asset set; open Download and Releases once to see the
+   merged list. If the withdrawn release was the only installable one, the
+   deploy stops at its check for at least one installable release and the old
+   page stays: cut the replacement first (step 5). Its publication redeploys the
+   page when its run succeeds; if it fails, dispatch the deploy by hand. Or say
+   plainly that the page cannot be updated.
+3. Publish a security advisory when coordinated disclosure is required.
+4. Revert or rectify the source change through a pull request with migration
    compatibility notes.
-4. Cut a new patch version; never replace an already published artifact under
+5. Cut a new patch version; never replace an already published artifact under
    the same version or checksum.
-5. Preserve release notes explaining impact, upgrade/rollback steps, and the
+6. Preserve release notes explaining impact, upgrade/rollback steps, and the
    last known-good version without including customer data.

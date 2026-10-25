@@ -47,10 +47,20 @@ pub enum PartyStatementDestinationApprovalError {
 /// Its field is private: only `PartyStatementDestinationApprovals::consume`
 /// can turn a renderer-provided token and destination into a value accepted by
 /// the bulk writer.
-#[cfg_attr(
-    not(feature = "live-calibration-harness"),
-    doc = "```compile_fail\nuse bridge_lib::reports::bulk_party_statement::ApprovedPartyStatementDestination;\nlet _ = ApprovedPartyStatementDestination(std::path::PathBuf::from(\"/tmp\"));\n```"
-)]
+///
+/// The two doctests are the compiler's own check of that. The first names the
+/// type through the root re-export and must compile, so the path the second
+/// relies on exists. The second tries to build the value through that path and
+/// must be refused. Stable rustdoc does not check the `E0451` code after
+/// `compile_fail`, so without the first an unreachable path would also pass.
+///
+/// ```
+/// fn _named(_: &bridge_lib::ApprovedPartyStatementDestination) {}
+/// ```
+///
+/// ```compile_fail,E0451
+/// let _ = bridge_lib::ApprovedPartyStatementDestination { 0: std::path::PathBuf::from("/tmp") };
+/// ```
 #[derive(Debug)]
 pub struct ApprovedPartyStatementDestination(PathBuf);
 
@@ -201,47 +211,14 @@ struct StatementManifest<'a> {
     failures: &'a [StatementFailure],
 }
 
-/// Produces a separate file for every party represented in the complete rows.
+/// Produces a separate file for every party represented in the complete rows,
+/// retaining the selected ageing basis in every file.
 ///
 /// Per-party failures are retained and reported after every remaining party is
 /// attempted. That makes a partially completed batch explicit, while still
 /// giving the operator usable files for parties whose statements rendered.
-pub fn write_bulk_party_statements(
-    destination: &ApprovedPartyStatementDestination,
-    company: &str,
-    as_of_yyyymmdd: &str,
-    format: &str,
-    open_bills: &[OpenBillRow],
-    unallocated_by_party: &[UnallocatedParty],
-    render: impl Fn(&PartyStatement) -> Result<Vec<u8>, String>,
-) -> Result<BulkPartyStatementResult, String> {
-    write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
-        destination,
-        company,
-        as_of_yyyymmdd,
-        format,
-        open_bills,
-        unallocated_by_party,
-        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
-        render,
-    })
-}
-
-/// Writes statements while retaining the selected ageing basis in every file.
 pub fn write_bulk_party_statements_with_ageing_anchor<Render>(
     request: BulkPartyStatementRequest<'_, Render>,
-) -> Result<BulkPartyStatementResult, String>
-where
-    Render: for<'statement> Fn(&'statement PartyStatement) -> Result<Vec<u8>, String>,
-{
-    write_recorded_bulk_party_statements(request, &crate::export_registry::record)
-}
-
-/// The batch writer, with the export registry's `record` passed in so that
-/// tests can watch when it is called (bridge#833).
-fn write_recorded_bulk_party_statements<Render>(
-    request: BulkPartyStatementRequest<'_, Render>,
-    record: &dyn Fn(&[u8]) -> Result<(), String>,
 ) -> Result<BulkPartyStatementResult, String>
 where
     Render: for<'statement> Fn(&'statement PartyStatement) -> Result<Vec<u8>, String>,
@@ -258,7 +235,9 @@ where
     } = request;
     let destination = destination.path();
     if !destination.is_dir() {
-        return Err("Bridge could not use that statement destination folder.".to_string());
+        return Err(
+            "ComplyEaze Bridge could not use that statement destination folder.".to_string(),
+        );
     }
 
     let parties = statement_parties(open_bills, unallocated_by_party);
@@ -309,16 +288,6 @@ where
             "statement-{}-{as_of_yyyymmdd}",
             safe_party_slug(&statement.party)
         );
-        // Recorded before it is written, so the documents uploader never finds
-        // a statement Bridge wrote that it does not know (bridge#833).
-        if record(&bytes).is_err() {
-            failures.push(StatementFailure {
-                party,
-                code: StatementFailureCode::Write,
-                reason: UNRECORDED_EXPORT.to_string(),
-            });
-            continue;
-        }
         match write_unique_file(destination, &stem, format, &bytes) {
             Ok(path) => written.push(WrittenStatement {
                 party,
@@ -342,9 +311,9 @@ where
         written: &written,
         failures: &failures,
     };
-    let manifest_bytes = serde_json::to_vec_pretty(&manifest)
-        .map_err(|error| format!("Bridge could not build the statement manifest: {error}"))?;
-    record(&manifest_bytes).map_err(|_| UNRECORDED_EXPORT.to_string())?;
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest).map_err(|error| {
+        format!("ComplyEaze Bridge could not build the statement manifest: {error}")
+    })?;
     let manifest_path = write_unique_file(
         destination,
         &format!("statement-manifest-{as_of_yyyymmdd}"),
@@ -368,21 +337,24 @@ fn statement_directional_totals(statement: &PartyStatement) -> Result<(String, S
             ExposureDirection::Receivable => &mut receivable,
             ExposureDirection::Payable => &mut payable,
         };
-        *total = total
-            .checked_add(&bill.amount)
-            .map_err(|_| "Bridge could not total a statement direction exactly.".to_string())?;
+        *total = total.checked_add(&bill.amount).map_err(|_| {
+            "ComplyEaze Bridge could not total a statement direction exactly.".to_string()
+        })?;
     }
     if !statement.unallocated.is_zero() {
         let total = match statement.unallocated_direction {
             Some(ExposureDirection::Receivable) => &mut receivable,
             Some(ExposureDirection::Payable) => &mut payable,
             None => {
-                return Err("Bridge found an unallocated amount without a direction.".to_string())
+                return Err(
+                    "ComplyEaze Bridge found an unallocated amount without a direction."
+                        .to_string(),
+                )
             }
         };
-        *total = total
-            .checked_add(&statement.unallocated)
-            .map_err(|_| "Bridge could not total a statement direction exactly.".to_string())?;
+        *total = total.checked_add(&statement.unallocated).map_err(|_| {
+            "ComplyEaze Bridge could not total a statement direction exactly.".to_string()
+        })?;
     }
     Ok((
         receivable.as_str().to_string(),
@@ -440,18 +412,12 @@ fn safe_party_slug(party: &str) -> String {
     }
 }
 
-/// Why a statement or manifest was not written: Bridge could not record it as
-/// its own export, and an unrecorded one could later be uploaded from a synced
-/// folder (bridge#833).
-const UNRECORDED_EXPORT: &str =
-    "Bridge could not record this file as its own export, so it did not write it.";
-
 /// Creates a previously unused filename. `create_new` closes the race between
 /// candidate selection and writing, so neither a same-run slug collision nor
 /// a pre-existing file can be silently overwritten. The name is reserved
 /// empty, and the bytes go to a hidden staging file beside it, synced, then
 /// renamed over the reservation: a crash leaves an empty file or a hidden
-/// one, and the documents scan uploads neither (bridge#833).
+/// one.
 fn write_unique_file(
     destination: &Path,
     stem: &str,
@@ -459,7 +425,7 @@ fn write_unique_file(
     bytes: &[u8],
 ) -> Result<PathBuf, String> {
     if Path::new(stem).components().count() != 1 {
-        return Err("Bridge could not build a safe statement filename.".to_string());
+        return Err("ComplyEaze Bridge could not build a safe statement filename.".to_string());
     }
     for sequence in 1..=10_000_u32 {
         let suffix = if sequence == 1 {
@@ -491,19 +457,21 @@ fn write_unique_file(
         }
         return Ok(path);
     }
-    Err("Bridge could not find an unused statement filename after 10,000 attempts.".to_string())
+    Err(
+        "ComplyEaze Bridge could not find an unused statement filename after 10,000 attempts."
+            .to_string(),
+    )
 }
 
 /// The hidden name a statement is written under before it is renamed into
-/// place. It starts with a dot, which the documents scan never lists
-/// (bridge#833).
-pub(crate) fn staging_name(name: &str) -> String {
+/// place. It starts with a dot, which hides it on macOS and Linux.
+fn staging_name(name: &str) -> String {
     format!(".{name}.{}.partial", Uuid::new_v4())
 }
 
 /// `fs::rename`, tried a few times: on Windows a virus scanner, the indexer
 /// or a sync client can hold a just-written file open for a moment, and the
-/// rename then fails although nothing is wrong (bridge#833).
+/// rename then fails although nothing is wrong.
 fn rename_with_retries(from: &Path, to: &Path) -> std::io::Result<()> {
     let mut attempt = 1;
     loop {
@@ -528,12 +496,14 @@ fn unwritable_destination_reason(path: &Path, error: &std::io::Error) -> String 
     tracing::warn!(path = %path.display(), %error, "statement file write failed");
     match error.kind() {
         std::io::ErrorKind::PermissionDenied => {
-            "Bridge does not have permission to write to the selected folder.".to_string()
+            "ComplyEaze Bridge does not have permission to write to the selected folder."
+                .to_string()
         }
         std::io::ErrorKind::NotFound => {
-            "Bridge could not find the selected folder any more.".to_string()
+            "ComplyEaze Bridge could not find the selected folder any more.".to_string()
         }
-        _ => "Bridge could not write the statement file to the selected folder.".to_string(),
+        _ => "ComplyEaze Bridge could not write the statement file to the selected folder."
+            .to_string(),
     }
 }
 
@@ -541,7 +511,7 @@ fn file_name(path: &Path) -> Result<String, String> {
     path.file_name()
         .and_then(|name| name.to_str())
         .map(str::to_owned)
-        .ok_or_else(|| "Bridge could not represent the statement filename.".to_string())
+        .ok_or_else(|| "ComplyEaze Bridge could not represent the statement filename.".to_string())
 }
 
 #[cfg(test)]

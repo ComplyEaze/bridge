@@ -3,7 +3,7 @@
 **Status: working conventions, written 2026-09-17. Improve them by PR.** This is the TypeScript and
 React sibling of [`rust-module-conventions.md`](./rust-module-conventions.md). Read that document's
 principles section first; they are not repeated here. [`module-decomposition.md`](./module-decomposition.md)
-covers pinning and resealing, and applies to `src/` unchanged.
+covers pinning and the acknowledgement of pinned changes, and applies to `src/` unchanged.
 
 ## The two constraints general advice does not know about
 
@@ -133,7 +133,6 @@ count once. The setup handlers come next:
 | runtime sessions | `runtimeSessions`, `runtimeError` | none | `refreshRuntime`, `cancelTallyRequest`; no source-text assertions. Smallest first hook. |
 | persisted company profiles | 5 + a load-version ref | none | writes `companies` (shared); `ux1-shell.test.mjs` asserts its `useState` and stale-load guard as text |
 | evidence drawer | 4 + 5 refs | none | focus lifecycle is covered by `evidence-drawer-focus.test.tsx` |
-| GST draft | `gstCompany`, `gstFinancialYear`, `draft`, `busy` | `draft` | shares `dashboardError` with `checkTally` |
 | mirror explorer | 2 | both | one loader |
 | write fixture | 5 | all 5 | attestation flags feed `enrollWriteFixture` |
 | sync evidence and proof preview | 4 + a request-version ref | all 4 | |

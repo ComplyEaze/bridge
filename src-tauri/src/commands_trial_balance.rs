@@ -92,7 +92,7 @@ fn parent_list_capture_error(
         | crate::reports::trial_balance_store::TrialBalanceExportStoreError::Unavailable => {
             local_error(
                 "trial_balance_capture_unavailable",
-                "Bridge could not access the retained Trial Balance safely.",
+                "ComplyEaze Bridge could not access the retained Trial Balance safely.",
                 "Refresh the report before selecting a parent again.",
             )
         }
@@ -120,7 +120,7 @@ fn read_error(error: anyhow::Error) -> TallyCommandError {
             return local_error(reason.safe_code(), "Native Trial Balance is not yet qualified for Education mode.",
                 "This report currently requires observed Licensed TallyPrime. Education support needs further qualification.");
         }
-        return local_error(reason.safe_code(), "Bridge could not admit this Trial Balance period or currency.",
+        return local_error(reason.safe_code(), "ComplyEaze Bridge could not admit this Trial Balance period or currency.",
             "Choose dates on or after book start. This report requires an INR base currency that Tally identifies.");
     }
     if let Some(reason) = error.chain().find_map(|cause| {
@@ -134,7 +134,7 @@ fn read_error(error: anyhow::Error) -> TallyCommandError {
             ),
             bridge_tally_protocol::native_trial_balance::NativeTrialBalanceError::InvalidAmount => local_error(
                 "trial_balance_amount_invalid",
-                "Tally returned a Trial Balance amount Bridge could not represent safely.",
+                "Tally returned a Trial Balance amount ComplyEaze Bridge could not represent safely.",
                 "Keep the selected company quiet and retry the report. If it persists, review the affected ledger amount in Tally.",
             ),
             bridge_tally_protocol::native_trial_balance::NativeTrialBalanceError::InvalidResponse(_) => local_error(
@@ -183,8 +183,8 @@ pub async fn fetch_tally_trial_balance(
     exports.clear().map_err(|_| {
         local_error(
             "trial_balance_export_unavailable",
-            "Bridge could not reset the previous export.",
-            "Restart Bridge, then refresh the report.",
+            "ComplyEaze Bridge could not reset the previous export.",
+            "Restart ComplyEaze Bridge, then refresh the report.",
         )
     })?;
     let identity =
@@ -226,12 +226,12 @@ pub async fn export_tally_trial_balance(
     slug.truncate(150);
     let filename = format!("trial-balance-{slug}-{}.xlsx", read.to.as_str());
     let bytes = tauri::async_runtime::spawn_blocking(move || render_trial_balance_xlsx(&read)).await
-        .map_err(|_| local_error("trial_balance_export_failed", "Bridge could not finish the workbook.", "Retry the export."))?
-        .map_err(|_| local_error("trial_balance_export_failed", "Bridge could not represent this workbook safely.", "Review the captured report; amounts that exceed Excel precision cannot be exported as numbers."))?;
+        .map_err(|_| local_error("trial_balance_export_failed", "ComplyEaze Bridge could not finish the workbook.", "Retry the export."))?
+        .map_err(|_| local_error("trial_balance_export_failed", "ComplyEaze Bridge could not represent this workbook safely.", "Review the captured report; amounts that exceed Excel precision cannot be exported as numbers."))?;
     save_report_download_bytes(&app, &filename, &bytes).map_err(|_| {
         local_error(
             "trial_balance_save_failed",
-            "Bridge could not save the workbook to Downloads.",
+            "ComplyEaze Bridge could not save the workbook to Downloads.",
             "Check Downloads-folder access and retry the export.",
         )
     })
@@ -259,7 +259,7 @@ pub async fn query_tally_trial_balance_capture_parent(
     .map_err(|_| {
         local_error(
             "trial_balance_capture_parent_query_failed",
-            "Bridge could not derive rows from the retained Trial Balance.",
+            "ComplyEaze Bridge could not derive rows from the retained Trial Balance.",
             "Select the parent again or refresh the report.",
         )
     })?
@@ -314,7 +314,7 @@ pub async fn list_tally_trial_balance_capture_parents(
     .map_err(|_| {
         local_error(
             "trial_balance_capture_parent_list_failed",
-            "Bridge could not scan the retained Trial Balance.",
+            "ComplyEaze Bridge could not scan the retained Trial Balance.",
             "Refresh the report before selecting a parent again.",
         )
     })?

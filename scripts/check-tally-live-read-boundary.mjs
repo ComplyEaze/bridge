@@ -41,7 +41,6 @@ const forbiddenNames = [
   "bridge-tally-core",
   "bridge-tally-incremental",
   "bridge-tally-observability",
-  "bridge-tally-qualification",
   "libsqlite3-sys",
   "rusqlite",
   "sqlx",
@@ -56,8 +55,8 @@ if (forbidden.length) {
 const firstParty = [...packages].filter((name) => name.startsWith("bridge-tally-")).sort();
 // `bridge-tally-primitives` was added 2026-07-31 to REMOVE `bridge-tally-core`
 // from this set, not to widen it. Unit A's outstandings work needs `ExactDecimal`
-// and `TallyDate`, which lived in `bridge-tally-core` alongside delivery
-// capability (`AxalTallyGateway`, `DestinationAdapter` -- begin/deliver/finalize).
+// and `TallyDate`, which lived in `bridge-tally-core` alongside a delivery
+// capability (a since-removed AXAL gateway and destination adapter).
 // Depending on core from the protocol dragged that write surface into this
 // read-only controller. The two value types now live in a capability-free crate
 // beneath both, so live-read reaches value types and no delivery surface at all.
@@ -194,7 +193,6 @@ function relativeCheckedPath(path) {
 const productionSurfaces = [
   "src-tauri/Cargo.toml",
   "src-tauri/src/sync/reconciliation.rs",
-  "src-tauri/src/tally/capability_packs.rs",
   "src-tauri/src/tally/connector.rs",
   "src-tauri/src/tally/runtime.rs",
   "src-tauri/src/tally/tdl_engine.rs",

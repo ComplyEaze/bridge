@@ -10,6 +10,7 @@ every mutation an author or a reviewer has written for this crate, with who wrot
     python3 parity/mutations.py M08 B12                 # by id
     python3 parity/mutations.py --changed-since origin/master --jobs 3
     python3 parity/mutations.py --changed-since origin/master --verify   # no build: the merge check
+    python3 parity/mutations.py --check-anchors        # no build: exit 2 on an anchor not exactly once at HEAD
     python3 parity/mutations.py --full --shard 2/8 --results shard.json  # nightly, one shard
     python3 parity/mutations.py --merge shard*.json --results all.json --report report.md
 
@@ -52,6 +53,18 @@ nightly run).
 SIGINT or SIGTERM stops the cargo runs in flight (their own process groups) and exits; records
 already written stay. A run killed outright (SIGKILL) can leave its cargo running and a mutation
 in its worker copy; the next run's copy refresh undoes the mutation.
+
+## A shard that cannot start
+
+Before any mutation the unmutated copy must build and pass. When it does not, the run exits 2 and
+prints the compiler's first lines. With `--shard` it also writes, in place of results, one document
+`{"refused": {"shard": "K/N", "problems": [...], "output": [...]}}` to `--results`, so `--merge`
+reports "Shards that refused to run" with the reason, and lists the ids that shard would have run
+apart from ids no shard ran. Both kinds of id still go on the nightly issue's failing line: a change
+must re-prove what no shard proved. Exit 1 is a mutation not killed; the nightly shard job fails on
+any other non-zero exit and leaves the judging of exit 1 to the merge. An uncaught exception is exit 2,
+never 1: before the first mutation of a shard it is written as a refusal ("crashed: <type>", with the
+exception and its innermost frame); after, the records already made stay and the shard still fails.
 
 ## The results file
 
@@ -126,6 +139,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
@@ -156,14 +170,22 @@ PASSING = {KILLED, TIMEOUT}  # a test-run timeout is a hang the suite would not 
 CRASHED = "<crashed>"  # the test name recorded when a test binary dies without naming a failure
 
 # Crate-relative files that never change what a test does: no crate source names them (a unit
-# test holds that), and a change to the list is judged entry by entry (see the docstring).
+# test holds that), and a change to the list is judged entry by entry (see the docstring). The
+# local parity example is built by `cargo test` and run by no test; a change that stops it
+# compiling fails the pull request's own test and clippy runs.
 INERT = ("parity/mutations.py", "parity/mutation-results.json", "parity/test_mutations.py",
-         "parity/mutations.json")
+         "parity/mutations.json", "examples/local_parity.rs")
 # The machine-readable line a failed report ends with, which the nightly puts in its issue.
 FAILING_MARK = "mutation-nightly-failing:"
 # The header ci.yml writes before each open issue's body in the --nightly-issues file.
 ISSUE_MARK = "mutation-nightly-issue"
 REPORT_ROWS = 100  # rows per report section; GitHub caps an issue body at 65,536 characters
+# A shard that could not start writes this instead of results: a typed reason and the first lines of
+# the compiler's output, so the merge can tell "refused to run" from "ran and found nothing".
+REFUSED_KEY = "refused"
+REFUSAL_LINES = 40  # compiler lines kept in a refusal
+REFUSAL_LINE_CHARS = 300  # characters kept of each
+_MADE_A_VERDICT = threading.Event()  # set once any mutation has a verdict: a crash then keeps the records
 
 
 class Stopped(Exception):
@@ -405,17 +427,49 @@ def shard(mutations: list[dict], k: int, n: int) -> list[dict]:
     return [m for m in mutations if owner[m["file"]] == k - 1]
 
 
+def refused_shard(refusal) -> None:
+    """Raise ValueError unless `refusal` is what a refusing shard writes: a "K/N" shard with 1 <= K <= N, a
+    list of problems and a list of compiler lines, all text. A corrupt document is then "not read", with the
+    rest of the merge intact, rather than a crash with no report."""
+    ok = isinstance(refusal, dict)
+    if ok:
+        m = re.fullmatch(r"(\d+)/(\d+)", refusal.get("shard") if isinstance(refusal.get("shard"), str) else "")
+        ok = bool(m) and 1 <= int(m.group(1)) <= int(m.group(2))
+        for key in ("problems", "output"):
+            lines = refusal.get(key)
+            ok = ok and isinstance(lines, list) and all(isinstance(x, str) for x in lines)
+    if not ok:
+        raise ValueError("not a shard refusal")
+
+
+def shard_results(doc) -> None:
+    """Raise ValueError unless `doc` is what a shard that ran writes: an object of records, each an
+    object. Valid JSON of any other shape (null, a number, a string, a list, a record that is not an
+    object) is then "not read", with the rest of the merge intact, rather than a crash or a file
+    merged as if it held nothing (#1041)."""
+    if not (isinstance(doc, dict) and all(isinstance(rec, dict) for rec in doc.values())):
+        raise ValueError("not shard results")
+
+
 def report(mutations: list[dict], merged: dict, committed: dict, unreadable: list[str] = (),
-           accepted: dict | None = None) -> tuple[str, bool]:
+           accepted: dict | None = None, refused: dict | None = None) -> tuple[str, bool]:
     """(Markdown, failed?) for a whole-list run. It fails when any mutation was not run or not
     killed, when a shard's results could not be read, or when the committed results file is stale
     (a record for a mutation not in the list, or none, or one made for a different definition).
     A failed report's first lines name every failing id, for the nightly issue; when a shard could
     not be read, every id in the list, since what it held is unknown. Each section lists at most
-    REPORT_ROWS rows, so the report fits an issue body."""
+    REPORT_ROWS rows, so the report fits an issue body. A shard that refused to run (`refused`, by
+    "k/n") fails the run and is named with its reason and compiler lines; the ids it would have run
+    are listed apart from ids no shard ran, and go on the failing line like every id not run."""
     order = [m["id"] for m in mutations]
     by_id = {m["id"]: m for m in mutations}
-    missing = [i for i in order if i not in merged]
+    refused = refused or {}
+    blocked: set[str] = set()
+    for key in refused:
+        k, n = (int(x) for x in key.split("/"))
+        blocked |= {m["id"] for m in shard(mutations, k, n)}
+    missing = [i for i in order if i not in merged and i not in blocked]
+    missing_refused = [i for i in order if i not in merged and i in blocked]
     bad = [(i, merged[i]["verdict"]) for i in order if i in merged and not passes(by_id[i], merged[i], accepted)]
     survivors = [i for i in order if i in merged and not proven(merged[i]) and passes(by_id[i], merged[i], accepted)]
     now_killed = [i for i in order if proven(merged.get(i)) and accepted_survivor(by_id[i], accepted)]
@@ -427,14 +481,19 @@ def report(mutations: list[dict], merged: dict, committed: dict, unreadable: lis
     timeouts = [i for i in order if merged.get(i, {}).get("verdict") == TIMEOUT]
     thin = [(i, merged[i]["killers"]) for i in order
             if i in merged and merged[i]["verdict"] == KILLED and len(merged[i]["killers"]) < 2]
-    failed = bool(missing or bad or stale or unreadable or stale_survivors)
+    failed = bool(missing or missing_refused or refused or bad or stale or unreadable or stale_survivors)
     out = [f"# Tax-audit mutations: {'FAILED' if failed else 'all killed'}", ""]
     if failed:
-        ids = order if unreadable else sorted(set(missing) | {i for i, _ in bad} | set(stale_ids), key=order.index)
+        ids = order if unreadable else sorted(set(missing) | set(missing_refused) | {i for i, _ in bad}
+                                              | set(stale_ids), key=order.index)
         out += [f"<!-- {FAILING_MARK} {' '.join(ids)} -->", ""]
     out += [f"{len(order)} in the list; {len(merged)} run; {sum(1 for i in order if proven(merged.get(i)))} killed.", ""]
+    refusals = [f"`{k}`: {'; '.join(r.get('problems', [])) or 'no reason recorded'}"
+                + (f" ({r['output'][0]})" if r.get("output") else "") for k, r in sorted(refused.items())]
     for title, rows in (("Shard results not read", [f"`{u}`" for u in unreadable]),
+                        ("Shards that refused to run", refusals),
                         ("Not killed", [f"`{i}` ({by_id[i]['file']}): {v}" for i, v in bad]),
+                        ("Not run, their shard refused", [f"`{i}`" for i in missing_refused]),
                         ("Not run", [f"`{i}`" for i in missing]),
                         ("Stale committed records", stale),
                         ("Stale accepted-survivor entries", stale_survivors),
@@ -482,6 +541,17 @@ def list_problems(mutations: list[dict], tracked: set[str]) -> list[str]:
     return out
 
 
+def load_refusal(mutations: list[dict], tracked: set[str]) -> str | None:
+    """Why the list cannot be judged at all (exit 2), or None: an id used more than once, or an
+    entry `list_problems` refuses."""
+    order = [m["id"] for m in mutations]
+    repeated = sorted({i for i in order if order.count(i) > 1})
+    if repeated:
+        return f"refusing: mutation ids used more than once: {repeated}"
+    malformed = list_problems(mutations, tracked)
+    return "refusing: mutation entries the runner cannot judge:\n  " + "\n  ".join(malformed) if malformed else None
+
+
 def tracked_files(repo: Path = REPO, crate: str = CRATE) -> set[str]:
     """Crate-relative paths of the files HEAD tracks under the crate, as git spells them."""
     out = subprocess.run(["git", "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", crate], cwd=repo,
@@ -494,12 +564,14 @@ def dirty(porcelain: str) -> list[str]:
     return [line for line in porcelain.splitlines() if line.strip() and not line.endswith(RESULTS_REL)]
 
 
-def apply_check(mutations: list[dict], crate: Path = ROOT) -> list[str]:
-    """Every mutation's `from` text appears exactly once in its file."""
+def apply_check(mutations: list[dict], crate: Path = ROOT, files: dict[str, bytes] | None = None) -> list[str]:
+    """Every mutation's `from` text appears exactly once in its file: in the working tree, or in
+    `files` ({crate-relative path: bytes}) when given."""
     bad = []
     for m in mutations:
         path = crate / m["file"]
-        n = path.read_bytes().count(m["from"].encode("utf-8")) if path.is_file() else 0
+        data = (path.read_bytes() if path.is_file() else None) if files is None else files.get(m["file"])
+        n = data.count(m["from"].encode("utf-8")) if data is not None else 0
         if n != 1:
             bad.append(f"{m['id']}: `from` found {n} times in {m['file']}")
     return bad
@@ -579,17 +651,30 @@ def _stop(_signum, _frame):
     raise KeyboardInterrupt
 
 
+def _signal_group(proc: subprocess.Popen, sig: int) -> bool:
+    """Send `sig` to the process group `proc` started; False when the group is already gone. Once its
+    leader is reaped, killpg answers ESRCH; on macOS, while the leader is an unreaped zombie and no
+    other member is left, it answers EPERM. EPERM from a leader still running is raised."""
+    try:
+        os.killpg(proc.pid, sig)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        if proc.poll() is None:
+            raise
+        return False
+
+
 def _kill_group(proc: subprocess.Popen) -> None:
     """End the process group `proc` started (its own session), and nothing else."""
+    if not _signal_group(proc, signal.SIGTERM):
+        return
     try:
-        os.killpg(proc.pid, signal.SIGTERM)
-        try:
-            proc.wait(timeout=KILL_GRACE)
-        except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait(timeout=KILL_GRACE)
+    except subprocess.TimeoutExpired:
+        if _signal_group(proc, signal.SIGKILL):
             proc.wait()
-    except ProcessLookupError:
-        pass
 
 
 def _kill_active() -> None:
@@ -719,15 +804,29 @@ def run_one(worker: Worker, m: dict, record: dict | None, full: bool, timeout: i
         path.write_bytes(original)
 
 
-def baseline(workers: list[Worker], timeout: int, build_timeout: int) -> list[str]:
+def compiler_lines(out: str) -> list[str]:
+    """The compiler's own lines from cargo's output, from the first `error` on: at most
+    REFUSAL_LINES of them, each cut to REFUSAL_LINE_CHARS, so a refusal says why without holding a log."""
+    lines = out.splitlines()
+    start = next((i for i, line in enumerate(lines) if line.startswith("error")), None)
+    if start is None:
+        return []
+    return [line[:REFUSAL_LINE_CHARS] for line in lines[start:start + REFUSAL_LINES]]
+
+
+def baseline(workers: list[Worker], timeout: int, build_timeout: int, details: list[str] | None = None
+             ) -> list[str]:
     """Problems with the unmutated copies: a build that fails or hangs, a test that does not pass,
     or a `timeout` under MARGIN times the unmutated suite's measured test time (a slow run would
-    then be counted as a hang). Every worker builds; the full suite runs once, on the first."""
+    then be counted as a hang). Every worker builds; the full suite runs once, on the first.
+    When `details` is given, the compiler's first lines of the first failed build go into it."""
     problems = []
     for w in workers:
         rc, out = w.run(["--no-run"], build_timeout)
         if rc is None or rc != 0 or parse_test_output(out)[1]:
             problems.append(f"{w.dir.name}: {BUILD_TIMEOUT if rc is None else COMPILE_ERROR}")
+            if details is not None and not details:
+                details.extend(compiler_lines(out))
     if problems:
         return problems
     w = workers[0]
@@ -739,6 +838,8 @@ def baseline(workers: list[Worker], timeout: int, build_timeout: int) -> list[st
         problems.append(f"{w.dir.name}: the unmutated suite exceeded --timeout {timeout}s")
     elif compile_error:
         problems.append(f"{w.dir.name}: {COMPILE_ERROR}")
+        if details is not None:
+            details.extend(compiler_lines(out))
     elif failed or rc != 0:
         problems.append(f"{w.dir.name}: fails unmutated: {', '.join(failed) or f'exit {rc}'}")
     elif timeout < MARGIN * took:
@@ -782,17 +883,64 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--workdir", type=Path, default=WORKERS, help="where the worker copies live")
     ap.add_argument("--merge", type=Path, nargs="+", metavar="FILE", help="merge shard results; run nothing")
     ap.add_argument("--report", type=Path, metavar="MD", help="with --merge: write a Markdown report")
+    ap.add_argument("--check-anchors", action="store_true",
+                    help="build nothing: exit 2 when an anchor is not exactly once in HEAD's committed bytes")
     args = ap.parse_args(argv)
+    _MADE_A_VERDICT.clear()
+    try:
+        return run(args)
+    except Exception as e:  # Python exits 1 on an uncaught one, which means "a mutation was not killed"
+        crash = f"crashed: {type(e).__name__}"
+        frame = traceback.extract_tb(e.__traceback__)[-1]
+        detail = [f"{type(e).__name__}: {e}"[:REFUSAL_LINE_CHARS],
+                  f"at {Path(frame.filename).name}:{frame.lineno} in {frame.name}"]
+        print(f"{crash}: {detail[0]}\n  {detail[1]}", file=sys.stderr)
+        if args.shard and args.results and not _MADE_A_VERDICT.is_set():  # nothing was run: a refusal
+            try:
+                write_atomic(args.results, json.dumps({REFUSED_KEY: {"shard": args.shard, "problems": [crash],
+                                                                     "output": detail}}, indent=1) + "\n")
+            except OSError as werr:  # the exit stays 2: the merge then lists the shard's ids as not run
+                print(f"the refusal could not be written: {type(werr).__name__}", file=sys.stderr)
+        return 2
+
+
+def check_anchors(args: argparse.Namespace) -> int:
+    """`--check-anchors`: the list, the tracked paths and the files all read from HEAD's committed
+    bytes, never the working tree, so the answer is about the head that will be run. Exit 2 when an
+    anchor is not exactly once (as for a list the runner cannot judge), else 0. No build, no copy."""
+    others = [name for name, value in (("ids", args.ids), ("--verify", args.verify), ("--list", args.list),
+                                       ("--merge", args.merge), ("--changed-since", args.changed_since),
+                                       ("--results", args.results), ("--nightly-issues", args.nightly_issues),
+                                       ("--report", args.report), ("--full", args.full), ("--shard", args.shard))
+              if value not in (None, False, [])]
+    if others:
+        print(f"refusing: --check-anchors takes no other mode or option: {others}", file=sys.stderr)
+        return 2
+    head = git("rev-parse", "HEAD").strip()
+    files = {p[len(CRATE) + 1:]: data for p, data in committed_files(head, REPO, (CRATE,)).items()}
+    mutations = json.loads(files[LIST.relative_to(ROOT).as_posix()].decode("utf-8"))
+    refusal = load_refusal(mutations, set(files))
+    if refusal:
+        print(refusal, file=sys.stderr)
+        return 2
+    stale = apply_check(mutations, ROOT, files)
+    for line in stale[:REPORT_ROWS]:
+        print(f"STALE {line}")
+    if len(stale) > REPORT_ROWS:
+        print(f"... and {len(stale) - REPORT_ROWS} more")
+    print(f"{len(stale)} of {len(mutations)} anchors are not exactly once in HEAD's bytes ({head})")
+    return 2 if stale else 0
+
+
+def run(args: argparse.Namespace) -> int:
+    if args.check_anchors:  # before the working-tree list is read
+        return check_anchors(args)
 
     mutations = json.loads(LIST.read_text(encoding="utf-8"))
     order = [m["id"] for m in mutations]
-    repeated = sorted({i for i in order if order.count(i) > 1})
-    if repeated:
-        print(f"refusing: mutation ids used more than once: {repeated}", file=sys.stderr)
-        return 2
-    malformed = list_problems(mutations, tracked_files(REPO, CRATE))
-    if malformed:
-        print("refusing: mutation entries the runner cannot judge:\n  " + "\n  ".join(malformed), file=sys.stderr)
+    refusal = load_refusal(mutations, tracked_files(REPO, CRATE))
+    if refusal:
+        print(refusal, file=sys.stderr)
         return 2
     unknown = sorted(set(args.ids) - set(order))
     if unknown:
@@ -812,12 +960,19 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         merged: dict = {}
         unreadable = []
+        refused: dict[str, dict] = {}
         for path in args.merge:
             try:
-                merged.update(json.loads(path.read_text(encoding="utf-8")))
+                doc = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(doc, dict) and REFUSED_KEY in doc:  # a shard that could not start: a reason,
+                    refused_shard(doc[REFUSED_KEY])                # never results
+                    refused[doc[REFUSED_KEY]["shard"]] = doc[REFUSED_KEY]
+                else:
+                    shard_results(doc)
+                    merged.update(doc)
             except (OSError, ValueError) as e:
                 unreadable.append(f"{path}: {type(e).__name__}")
-        text, failed = report(mutations, merged, load_results(RESULTS), unreadable, accepted)
+        text, failed = report(mutations, merged, load_results(RESULTS), unreadable, accepted, refused)
         write_atomic(args.results, render_results(merged, order))
         if args.report:
             write_atomic(args.report, text + "\n")
@@ -884,16 +1039,22 @@ def main(argv: list[str] | None = None) -> int:
     workers = [Worker(i, args.workdir) for i in range(jobs)]
     signal.signal(signal.SIGINT, _stop)
     signal.signal(signal.SIGTERM, _stop)
+    details: list[str] = []
     try:
         for w in workers:
             w.sync(files)
-        problems = baseline(workers, args.timeout, args.build_timeout)
+        problems = baseline(workers, args.timeout, args.build_timeout, details)
     except (Stopped, KeyboardInterrupt):
         print("stopped before any mutation", file=sys.stderr)
         return 130
     if problems:
         print("refusing: the unmutated copy does not pass; fix that first:\n  " + "\n  ".join(problems),
               file=sys.stderr)
+        if details:
+            print("the compiler said:\n  " + "\n  ".join(details), file=sys.stderr)
+        if args.shard and args.results:  # the merge reads this as a refusal, not as results: nothing was run
+            write_atomic(results_path, json.dumps({REFUSED_KEY: {"shard": args.shard, "problems": problems,
+                                                                 "output": details}}, indent=1) + "\n")
         return 2
     free = list(workers)
     pool_lock = threading.Lock()
@@ -914,6 +1075,7 @@ def main(argv: list[str] | None = None) -> int:
         rec.update(commit=head, crate_tree=tree)
         with pool_lock:
             done[m["id"]] = rec
+            _MADE_A_VERDICT.set()
             kill = f" by {len(rec['killers'])}: {', '.join(rec['killers'])}" if rec["killers"] else ""
             print(f"{m['id']} {rec['verdict']} ({rec['mode']}){kill}", flush=True)
             results[m["id"]] = rec

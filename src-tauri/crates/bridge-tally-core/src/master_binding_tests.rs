@@ -367,7 +367,7 @@ fn near_duplicate_masters_produce_candidates_and_choose_none() {
         [
             CandidateRule::CatalogPrefix,
             CandidateRule::CatalogPrefix,
-            CandidateRule::SharedToken
+            CandidateRule::SharedEveryDistinctiveToken
         ]
     );
     assert_eq!(unresolved.candidates.found(), 3);
@@ -1942,8 +1942,194 @@ fn candidate_order_is_rule_then_name_and_never_a_ranking() {
             ("ALPHA (5550000002)", CandidateRule::SharedIdentifier),
             ("ALPHA (5550000003)", CandidateRule::SharedIdentifier),
             ("ALPHA WHOLESALE", CandidateRule::CatalogPrefix),
-            ("ZETA ALPHA STORE", CandidateRule::SharedToken),
+            (
+                "ZETA ALPHA STORE",
+                CandidateRule::SharedEveryDistinctiveToken
+            ),
         ]
+    );
+}
+
+/// The rule of a listed candidate, by name.
+fn rule_of(binding: &EntityBinding, name: &str) -> CandidateRule {
+    binding
+        .unresolved()
+        .expect("binding did not resolve")
+        .candidates
+        .listed()
+        .iter()
+        .find(|candidate| candidate.catalog_name == name)
+        .unwrap_or_else(|| panic!("{name} is not listed"))
+        .rule
+}
+
+#[test]
+fn a_master_holding_every_typed_word_is_listed_before_one_holding_some_and_none_is_dropped() {
+    // #1076: "HDFC Cash Credit" must reach "Zed Cash Credit HDFC" (every word,
+    // not an extension of the typed name) ahead of a ledger that only shares
+    // "Cash" and "Credit". Name order alone would put "Cash Credit Interest"
+    // first. Nothing is hidden: all three are listed, so
+    // no near-miss becomes "missing".
+    let catalog = ledgers(&["Cash Credit Interest", "Zed Cash Credit HDFC", "HDFC Bank"]);
+    let binding = bind_one_name(&catalog, "HDFC Cash Credit");
+    assert_eq!(reason(&binding), UnboundReason::NearMiss);
+    assert_eq!(
+        candidate_names(&binding),
+        ["Zed Cash Credit HDFC", "Cash Credit Interest", "HDFC Bank"]
+    );
+    assert_eq!(
+        rule_of(&binding, "Zed Cash Credit HDFC"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(
+        rule_of(&binding, "Cash Credit Interest"),
+        CandidateRule::SharedToken
+    );
+    assert_eq!(rule_of(&binding, "HDFC Bank"), CandidateRule::SharedToken);
+    assert_eq!(binding.unresolved().unwrap().candidates.found(), 3);
+}
+
+#[test]
+fn a_typed_word_common_in_the_catalog_is_not_searched_on_but_vetoes_a_promotion() {
+    // In a catalog of 20 or more, a word held by more than a tenth of the
+    // masters does not discriminate, so it never creates a candidate. It is
+    // still a word the user typed: a master lacking it holds only some of the
+    // words, so it stays `shared_token`.
+    let mut names = vec![
+        "Sharma Brothers".to_string(),
+        "Zed Sharma Traders".to_string(),
+    ];
+    names.extend((0..18).map(|n| format!("Traders Unit{n:02}")));
+    let refs = names.iter().map(String::as_str).collect::<Vec<_>>();
+    let catalog = ledgers(&refs);
+    let binding = bind_one_name(&catalog, "Sharma Traders");
+    assert_eq!(
+        candidate_names(&binding),
+        ["Zed Sharma Traders", "Sharma Brothers"]
+    );
+    assert_eq!(
+        rule_of(&binding, "Zed Sharma Traders"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(
+        rule_of(&binding, "Sharma Brothers"),
+        CandidateRule::SharedToken
+    );
+}
+
+#[test]
+fn a_gst_head_word_that_is_common_in_the_book_still_separates_input_from_output() {
+    // `input` sits on 11 of 100 ledgers, so it is common and not searched on.
+    // Typed "Input CGST @9%", "Output CGST 9%" holds `cgst` and `9` but not
+    // `input`: it must not be listed ahead of the input ledger under the rule
+    // that says every typed word is held, although it sorts first by name.
+    let mut names = vec![
+        "Output CGST 9%".to_string(),
+        "Zed Input CGST 9%".to_string(),
+    ];
+    names.extend((0..10).map(|n| format!("Input Filler{n:02}")));
+    names.extend((0..88).map(|n| format!("Misc Q{n:03}")));
+    let refs = names.iter().map(String::as_str).collect::<Vec<_>>();
+    let catalog = ledgers(&refs);
+    let binding = bind_one_name(&catalog, "Input CGST @9%");
+    assert_eq!(
+        candidate_names(&binding),
+        ["Zed Input CGST 9%", "Output CGST 9%"]
+    );
+    assert_eq!(
+        rule_of(&binding, "Zed Input CGST 9%"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(
+        rule_of(&binding, "Output CGST 9%"),
+        CandidateRule::SharedToken
+    );
+}
+
+#[test]
+fn the_new_rule_is_named_on_the_wire_by_its_snake_case_name() {
+    let json = serde_json::to_string(&CandidateRule::SharedEveryDistinctiveToken).unwrap();
+    assert_eq!(json, "\"shared_every_distinctive_token\"");
+}
+
+#[test]
+fn the_stronger_rule_survives_the_candidate_cap_that_name_order_would_apply() {
+    // 26 masters share only "bravo" (under a tenth of 300) and sort before
+    // "Zulu Bravo Gamma", which holds every typed word. The cap is applied in
+    // the order the list is sorted into, so the full match must be inside it.
+    let mut names = (0..26)
+        .map(|n| format!("Bravo P{n:02}"))
+        .collect::<Vec<_>>();
+    names.push("Zulu Bravo Gamma".to_string());
+    names.extend((0..273).map(|n| format!("Filler Q{n:03}")));
+    let refs = names.iter().map(String::as_str).collect::<Vec<_>>();
+    let catalog = ledgers(&refs);
+    let binding = bind_one_name(&catalog, "Bravo Gamma");
+    let listed = candidate_names(&binding);
+    assert_eq!(listed.len(), MAX_CANDIDATES_PER_ENTITY);
+    assert_eq!(listed[0], "Zulu Bravo Gamma");
+    assert_eq!(
+        rule_of(&binding, "Zulu Bravo Gamma"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(binding.unresolved().unwrap().candidates.found(), 27);
+}
+
+#[test]
+fn a_short_word_typed_must_match_too_so_a_wrong_rate_ledger_is_not_lifted() {
+    // "5" is too short to be a token, but it is what tells these ledgers apart.
+    // "Input IGST 18%" holds both tokens and not the rate: it must not be
+    // promoted past the ledger that holds the rate. Both stay listed, in the
+    // order they had before this rule.
+    let catalog = ledgers(&["IGST 5%", "Input IGST 18%", "Zed Input IGST 5%"]);
+    let binding = bind_one_name(&catalog, "Input IGST 5%");
+    assert_eq!(
+        rule_of(&binding, "Zed Input IGST 5%"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(
+        rule_of(&binding, "Input IGST 18%"),
+        CandidateRule::SharedToken
+    );
+    assert_eq!(rule_of(&binding, "IGST 5%"), CandidateRule::SharedToken);
+    assert_eq!(
+        candidate_names(&binding),
+        ["Zed Input IGST 5%", "IGST 5%", "Input IGST 18%"]
+    );
+    assert_eq!(binding.unresolved().unwrap().candidates.found(), 3);
+}
+
+#[test]
+fn a_short_word_is_held_in_the_case_it_is_typed_in() {
+    // The catalogue holds `OD` in capitals and the request is typed `od`: the
+    // short words are kept from the lowercased key, as the typed ones are, so
+    // the ledger holding `OD` still counts as holding the word.
+    let catalog = ledgers(&["Zed Cash", "Zed Bank OD"]);
+    let binding = bind_one_name(&catalog, "Zed od");
+    assert_eq!(
+        rule_of(&binding, "Zed Bank OD"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(rule_of(&binding, "Zed Cash"), CandidateRule::SharedToken);
+}
+
+#[test]
+fn a_decimal_rate_is_one_word_so_five_does_not_match_inside_two_point_five() {
+    // `2.5` must not be read as `2` and `5`: typed "Input CGST 5%" would
+    // otherwise match the 2.5% ledger on its short words and lift it.
+    let catalog = ledgers(&["Input CGST 2.5%", "Zed Input CGST 5%"]);
+    let binding = bind_one_name(&catalog, "Input CGST 5%");
+    assert_eq!(
+        rule_of(&binding, "Zed Input CGST 5%"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(
+        rule_of(&binding, "Input CGST 2.5%"),
+        CandidateRule::SharedToken
+    );
+    assert_eq!(
+        candidate_names(&binding),
+        ["Zed Input CGST 5%", "Input CGST 2.5%"]
     );
 }
 
@@ -2080,7 +2266,7 @@ fn the_adr_quotes_the_thresholds_this_module_actually_uses() {
     // the wrong rule. "Remember to update the record" is the kind of rule this
     // project prefers to replace with something that fails.
     const ADR: &str = include_str!("../../../../docs/adr/0016-master-binding-authority.md");
-    for (constant, value) in [
+    let code = [
         (
             "MIN_NUMERIC_IDENTIFIER_DIGITS",
             MIN_NUMERIC_IDENTIFIER_DIGITS,
@@ -2089,14 +2275,52 @@ fn the_adr_quotes_the_thresholds_this_module_actually_uses() {
         ("MIN_CODE_IDENTIFIER_CHARS", MIN_CODE_IDENTIFIER_CHARS),
         ("MAX_CANDIDATES_PER_ENTITY", MAX_CANDIDATES_PER_ENTITY),
         ("COMMON_TOKEN_PERCENT", COMMON_TOKEN_PERCENT),
-    ] {
-        // A percentage reads naturally as `(10%)`; both spellings count, and
-        // neither lets a changed number pass.
-        let plain = format!("`{constant}` ({value})");
-        let percent = format!("`{constant}` ({value}%)");
+        ("COMMON_TOKEN_MIN_CATALOG", COMMON_TOKEN_MIN_CATALOG),
+    ]
+    .into_iter()
+    .collect::<std::collections::BTreeMap<_, _>>();
+
+    // Every quote of the form `` `NAME` (value) ``, with any whitespace between
+    // the name and the value: the ADR wraps its lines, so a quote can span a
+    // line break (#839). A percentage reads naturally as `(10%)`; both
+    // spellings count, and neither lets a changed number pass.
+    let mut quoted = std::collections::BTreeSet::new();
+    let mut rest = ADR;
+    while let Some(open) = rest.find('`') {
+        let Some(close) = rest[open + 1..].find('`').map(|offset| open + 1 + offset) else {
+            break;
+        };
+        let name = &rest[open + 1..close];
+        let after = rest[close + 1..].trim_start();
+        rest = &rest[close + 1..];
+        let is_constant = name.contains('_')
+            && name.chars().all(|character| {
+                character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
+            });
+        let Some(value) = after
+            .strip_prefix('(')
+            .and_then(|inner| inner.split_once(')'))
+            .map(|(value, _)| value.trim_end_matches('%'))
+        else {
+            continue;
+        };
+        if !is_constant || !value.chars().all(|character| character.is_ascii_digit()) {
+            continue;
+        }
+        let in_code = code.get(name).unwrap_or_else(|| {
+            panic!("ADR 0016 quotes {name} ({value}), which this test does not check")
+        });
+        assert_eq!(
+            value,
+            in_code.to_string(),
+            "ADR 0016 quotes {name} as {value}; the code says {in_code}"
+        );
+        quoted.insert(name);
+    }
+    for name in code.keys() {
         assert!(
-            ADR.contains(&plain) || ADR.contains(&percent),
-            "ADR 0016 does not quote {constant} as {value}; it must read {plain:?}"
+            quoted.contains(name),
+            "ADR 0016 does not quote {name} with its value"
         );
     }
 }
@@ -3128,4 +3352,267 @@ fn indic_orthography_is_not_treated_as_deception() {
             refused as u32
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// canonical_master_key -- the fold measured in §9.4d on licensed TallyPrime 7.1
+// ---------------------------------------------------------------------------
+
+#[test]
+fn canonical_master_key_folds_the_composed_9_4d_rules() {
+    let base = canonical_master_key("MB-PROBE-LEDGER-A");
+    assert_eq!(
+        canonical_master_key("MB PROBE LEDGER A"),
+        base,
+        "hyphen == space"
+    );
+    assert_eq!(
+        canonical_master_key("mb probe ledger a"),
+        base,
+        "case folds"
+    );
+    assert_eq!(
+        canonical_master_key("  mb probe  ledger a "),
+        base,
+        "surrounding + collapsed runs"
+    );
+    assert_eq!(
+        canonical_master_key("mb/probe/ledger/a"),
+        base,
+        "slash == space"
+    );
+}
+
+#[test]
+fn canonical_master_key_does_not_fold_unmeasured_separators() {
+    // §9.4d: an en dash and an underscore are ordinary characters to Tally,
+    // not separators -- a class-based fold would wrongly merge these.
+    assert_ne!(canonical_master_key("A_B"), canonical_master_key("A B"));
+    assert_ne!(
+        canonical_master_key("A\u{2013}B"),
+        canonical_master_key("A B")
+    );
+}
+
+#[test]
+fn canonical_master_key_does_not_normalise_unicode_forms() {
+    // §9.4d: "canonical equivalence is still refused" -- NFC vs NFD must stay
+    // distinguishable through this fold, unlike every other transformation.
+    let nfc = "\u{00e9}"; // é, single codepoint
+    let nfd = "e\u{0301}"; // e + combining acute accent
+    assert_ne!(canonical_master_key(nfc), canonical_master_key(nfd));
+}
+
+/// Characters biased to the folds' decisions: letters of both cases, ASCII and
+/// Unicode whitespace, the separators `-` and `/`, the Unicode dashes the wide
+/// fold unifies, an underscore and `&`, a few non-ASCII letters, and the
+/// letters and combining marks for which lowercasing and NFC do not commute
+/// (`J`/`T`/`H`/`W`/`Y` with a caron, macron below, diaeresis, Greek dialytika
+/// tonos or ring; `İ` and `i` with a dot above and a mark below it).
+const FOLD_ALPHABET: &[char] = &[
+    'a', 'B', 'c', 'Z', 'z', 'K', 'k', ' ', ' ', '\t', '\r', '\n', '\u{a0}', '\u{2003}', '-', '/',
+    '\u{2013}', '\u{2014}', '_', '&', '0', '9', '\u{e9}', '\u{c9}', '\u{3a3}', '\u{928}', 'J', 'j',
+    'T', 't', 'H', 'h', 'W', 'w', 'Y', 'y', 'I', 'i', '\u{130}', '\u{301}', '\u{30c}', '\u{331}',
+    '\u{308}', '\u{344}', '\u{30a}', '\u{307}', '\u{316}',
+];
+
+fn biased_string(max_len: usize) -> proptest::strategy::BoxedStrategy<String> {
+    use proptest::strategy::Strategy;
+    proptest::collection::vec(proptest::sample::select(FOLD_ALPHABET), 0..max_len)
+        .prop_map(|characters| characters.into_iter().collect::<String>())
+        .boxed()
+}
+
+/// `base` against a copy of itself changed character by character: kept,
+/// upper- or lower-cased, a space turned into `-` or `/` or doubled, then the
+/// whole copy left as is, decomposed (NFD) or composed (NFC). Pairs built this
+/// way share a fold key far more often than two independent strings do.
+fn related_pair(
+    base: proptest::strategy::BoxedStrategy<String>,
+) -> proptest::strategy::BoxedStrategy<(String, String)> {
+    use proptest::strategy::Strategy;
+    use unicode_normalization::UnicodeNormalization;
+    (base, proptest::collection::vec(0_u8..8, 0..16), 0_u8..3)
+        .prop_map(|(original, choices, form)| {
+            let mut changed = String::new();
+            for (position, character) in original.chars().enumerate() {
+                match choices.get(position).copied().unwrap_or(0) {
+                    2 => changed.extend(character.to_uppercase()),
+                    3 => changed.extend(character.to_lowercase()),
+                    4 if character == ' ' => changed.push('-'),
+                    5 if character == ' ' => changed.push('/'),
+                    6 if character.is_whitespace() => changed.extend([character, ' ']),
+                    _ => changed.push(character),
+                }
+            }
+            let changed = match form {
+                0 => changed,
+                1 => changed.nfd().collect(),
+                _ => changed.nfc().collect(),
+            };
+            (original, changed)
+        })
+        .boxed()
+}
+
+fn pair_generators() -> Vec<(
+    &'static str,
+    proptest::strategy::BoxedStrategy<(String, String)>,
+)> {
+    use proptest::strategy::Strategy;
+    vec![
+        (
+            "independent biased strings (up to 3 characters)",
+            (biased_string(4), biased_string(4)).boxed(),
+        ),
+        ("related biased strings", related_pair(biased_string(12))),
+        ("related arbitrary text", related_pair("\\PC{0,8}".boxed())),
+    ]
+}
+
+/// Runs `conclusion` on every generated pair satisfying `premise` (with a
+/// non-empty key, so an empty-equals-empty pair proves nothing), under a fixed
+/// seed, and returns how many pairs satisfied the premise in this very run.
+fn check_implication(
+    seed: u64,
+    strategy: &proptest::strategy::BoxedStrategy<(String, String)>,
+    premise_key: fn(&str) -> String,
+    conclusion_key: fn(&str) -> String,
+) -> usize {
+    let premises = std::cell::Cell::new(0_usize);
+    let mut runner = proptest::test_runner::TestRunner::new(proptest::test_runner::Config {
+        cases: 20_000,
+        rng_seed: proptest::test_runner::RngSeed::Fixed(seed),
+        failure_persistence: None,
+        ..proptest::test_runner::Config::default()
+    });
+    runner
+        .run(strategy, |(a, b)| {
+            let key = premise_key(&a);
+            if !key.is_empty() && key == premise_key(&b) {
+                premises.set(premises.get() + 1);
+                proptest::prop_assert_eq!(
+                    conclusion_key(&a),
+                    conclusion_key(&b),
+                    "premise key {:?} equal for {:?} / {:?}",
+                    key,
+                    a,
+                    b
+                );
+            }
+            Ok(())
+        })
+        .unwrap_or_else(|failure| panic!("{failure}"));
+    premises.get()
+}
+
+fn twin_key_0(value: &str) -> String {
+    let [wide, _, _] = twin_fold_keys(value);
+    wide
+}
+
+fn twin_key_1(value: &str) -> String {
+    let [_, narrow, _] = twin_fold_keys(value);
+    narrow
+}
+
+#[test]
+fn absence_key_is_the_third_twin_fold_key() {
+    for name in [
+        "Alpha Traders",
+        "Rent/Office\r\n",
+        "Cafe\u{301}/X",
+        "",
+        " - ",
+    ] {
+        assert_eq!(absence_key(name), twin_fold_keys(name)[2], "{name:?}");
+    }
+}
+
+/// Twin key 0 equal implies `absence_key` equal. `absence_key` is a function
+/// of key 0, so this is structural; the property pins it against a refactor.
+#[test]
+fn equality_on_twin_key_0_implies_equality_on_the_absence_key() {
+    for (index, (name, strategy)) in pair_generators().iter().enumerate() {
+        let premises = check_implication(
+            0x6162_7365_6E63_6500 + index as u64,
+            strategy,
+            twin_key_0,
+            absence_key,
+        );
+        eprintln!("key0 => absence_key, {name}: {premises} premise pairs of 20000");
+        assert!(premises >= 30, "{name}: only {premises} premise pairs");
+    }
+}
+
+/// Twin key 1 equal means equal up to ASCII case, `-`, `/` and ASCII-space
+/// runs, all of which `canonical_master_key` folds too.
+#[test]
+fn equality_on_twin_key_1_implies_equality_on_the_canonical_key() {
+    for (index, (name, strategy)) in pair_generators().iter().enumerate() {
+        let premises = check_implication(
+            0x6361_6E6F_6E00 + index as u64,
+            strategy,
+            twin_key_1,
+            canonical_master_key,
+        );
+        eprintln!("key1 => canonical, {name}: {premises} premise pairs of 20000");
+        assert!(premises >= 30, "{name}: only {premises} premise pairs");
+    }
+}
+
+/// The two keys the index matches on each catch pairs the other misses, so
+/// neither can be dropped: lowercasing and NFC do not commute.
+#[test]
+fn neither_the_canonical_key_nor_the_absence_key_subsumes_the_other() {
+    // Canonical only.
+    assert_eq!(
+        canonical_master_key("j\u{30c}"),
+        canonical_master_key("J\u{30c}")
+    );
+    assert_ne!(absence_key("j\u{30c}"), absence_key("J\u{30c}"));
+    // Absence key only: NFC against NFD, and an en dash against a space.
+    assert_ne!(
+        canonical_master_key("\u{e9}"),
+        canonical_master_key("e\u{301}")
+    );
+    assert_eq!(absence_key("\u{e9}"), absence_key("e\u{301}"));
+    assert_ne!(
+        canonical_master_key("A\u{2013}B"),
+        canonical_master_key("A B")
+    );
+    assert_eq!(absence_key("A\u{2013}B"), absence_key("A B"));
+}
+
+/// Search both ways over the generators for pairs one key accepts and the
+/// other does not, so the test above is not the only witness.
+#[test]
+fn each_key_catches_pairs_the_other_misses_in_generated_text() {
+    use proptest::strategy::{Strategy, ValueTree};
+    let mut runner = proptest::test_runner::TestRunner::deterministic();
+    let strategy = related_pair(biased_string(12));
+    let (mut canonical_only, mut absence_only) = (0_usize, 0_usize);
+    for _ in 0..20_000 {
+        let (a, b) = strategy.new_tree(&mut runner).expect("tree").current();
+        let canonical = canonical_master_key(&a) == canonical_master_key(&b);
+        let absence = absence_key(&a) == absence_key(&b);
+        canonical_only += usize::from(canonical && !absence);
+        absence_only += usize::from(absence && !canonical);
+    }
+    eprintln!("canonical only: {canonical_only}, absence key only: {absence_only} of 20000");
+    assert!(canonical_only > 0 && absence_only > 0);
+}
+
+/// An earlier version of the fold tests claimed that an equal canonical key
+/// always comes with an agreeing twin key. It does not: `İ` plus a mark of
+/// combining class below 230 lowercases to `i`, a dot above and the mark, a
+/// spelling NFC orders differently.
+#[test]
+fn an_equal_canonical_key_does_not_imply_an_agreeing_twin_key() {
+    let (a, b) = ("\u{130}\u{316}", "i\u{307}\u{316}");
+    assert_eq!(canonical_master_key(a), canonical_master_key(b));
+    assert!(twin_fold_keys(a)
+        .iter()
+        .zip(twin_fold_keys(b).iter())
+        .all(|(left, right)| left != right));
 }

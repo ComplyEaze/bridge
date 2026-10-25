@@ -16,8 +16,8 @@
 //! purpose nobody knows is visible rather than held back.
 //!
 //! Recognition is by the party name the parser gives a row: SBI's `ATM WDL`
-//! and Union Bank's `BY CASH` rules, each from a captured statement, name the
-//! two cash parties ([`crate::bank`]). A parser that extracts one of those two
+//! and the `BY CASH` rules of Union Bank and Bank of Baroda, each from a measured
+//! statement, name the two cash parties ([`crate::bank`]). A parser that extracts one of those two
 //! names from other text makes that row a cash line too, which fails safe: it
 //! is asked, never defaulted.
 
@@ -28,7 +28,7 @@ use std::collections::BTreeMap;
 
 /// The party the SBI parser names an `ATM WDL` row.
 pub const CASH_WITHDRAWAL: &str = "ATM CASH WITHDRAWAL";
-/// The party the Union Bank parser names a `BY CASH` row.
+/// The party the Union Bank and Bank of Baroda parsers name a `BY CASH` row.
 pub const CASH_DEPOSIT: &str = "CASH DEPOSIT";
 
 /// The narration tag of a line posted to suspense because a person answered
@@ -175,13 +175,13 @@ impl CashAnswer {
     pub fn not_built(self) -> Option<&'static str> {
         match self {
             Self::PaidToSomeone => Some(
-                "cash paid straight to someone needs a cash Payment to that person as well, which Bridge does not build yet; record it by hand, or answer dont_know so it posts to suspense for the CA",
+                "cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; record it by hand, or answer dont_know so it posts to suspense for the CA",
             ),
             Self::OwnCashBox => Some(
-                "a deposit from the cash box is a Contra that can drive the cash book negative, and Bridge cannot yet check the cash book's balance first; record it by hand, or answer dont_know so it posts to suspense for the CA",
+                "a deposit from the cash box is a Contra that can drive the cash book negative, and ComplyEaze Bridge cannot yet check the cash book's balance first; record it by hand, or answer dont_know so it posts to suspense for the CA",
             ),
             Self::UnbookedCashSales => Some(
-                "record those cash sales or collections in Tally first; the deposit itself is then a Contra from the cash box, which Bridge does not build yet",
+                "record those cash sales or collections in Tally first; the deposit itself is then a Contra from the cash box, which ComplyEaze Bridge does not build yet",
             ),
             _ => None,
         }

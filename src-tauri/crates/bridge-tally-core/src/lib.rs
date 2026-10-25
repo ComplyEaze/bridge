@@ -4,20 +4,19 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) use bridge_tally_primitives::exact_arithmetic;
 pub use bridge_tally_primitives::{
-    ExactDecimal, ReadResponseScope, TallyDate, TallyError, MAX_EXACT_DECIMAL_BYTES,
+    company_guid, text, DateSpan, ExactDecimal, ReadResponseScope, TallyDate, TallyError,
+    MAX_EXACT_DECIMAL_BYTES,
 };
 
-pub mod bills_reconciliation;
 pub mod book_presence;
 pub mod master_binding;
+pub mod master_name_index;
 mod pack_models;
 pub mod reconciliation;
 pub mod report_tie_out;
-pub mod transport_qualification;
+pub mod text_search;
 
 pub use pack_models::*;
-
-pub mod destination;
 
 pub const PROOF_CONTRACT_VERSION: u16 = 3;
 pub const CORE_ACCOUNTING_SCHEMA_VERSION: PackSchemaVersion =
@@ -224,19 +223,13 @@ pub struct CoreAccountingBatch {
     /// Operator-facing diagnostics about master text that would render badly
     /// in a document. Deliberately excluded from serialization: `PackBatch`
     /// is the wire payload whose shape is pinned to `CORE_ACCOUNTING_SCHEMA_VERSION`
-    /// and covered by a destination's negotiated-version content hash (see
-    /// `AxalDestinationAdapter::deliver_batch`). A diagnostic is not
+    /// and covered by a content hash of the batch. A diagnostic is not
     /// accounting data, so it must never silently change that hash or shape
     /// under an unchanged schema version; it stays an in-process field that
     /// travels alongside the batch rather than inside it.
     #[serde(skip)]
     pub foreign_master_text_diagnostics: Vec<ForeignMasterTextDiagnostic>,
 }
-
-/// Safe operator warning for a committed Core Accounting window that retains
-/// master text which may render badly in a document.
-pub const FOREIGN_MASTER_TEXT_RENDERING_WARNING_CODE: &str =
-    "foreign_master_text_rendering_degraded";
 
 impl CoreAccountingBatch {
     /// The diagnostic details intentionally remain in-process so source names
@@ -388,21 +381,6 @@ pub struct ProbeResult {
     pub profile: CapabilityProfile,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct DeliverySession {
-    pub delivery_id: String,
-    pub accepted_pack_versions: BTreeMap<CapabilityPackId, PackSchemaVersion>,
-    pub max_batch_bytes: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct DeliveryReceipt {
-    pub delivery_id: String,
-    pub receipt_id: String,
-    pub content_sha256: String,
-    pub committed: bool,
-}
-
 #[async_trait]
 pub trait TallyConnector: Send + Sync {
     async fn probe(&self) -> Result<ProbeResult, TallyError>;
@@ -419,34 +397,6 @@ pub trait TallyConnector: Send + Sync {
         &self,
         context: &RequestContext,
     ) -> Result<CanonicalPackWindow, TallyError>;
-    async fn read_core_period_balance_report(
-        &self,
-        _context: &RequestContext,
-    ) -> Result<report_tie_out::LedgerPeriodBalanceReport, TallyError> {
-        Err(TallyError::Unsupported {
-            code: "core_period_balance_report_not_supported".to_string(),
-        })
-    }
-}
-
-#[async_trait]
-pub trait DestinationAdapter: Send + Sync {
-    async fn supported_packs(
-        &self,
-    ) -> Result<BTreeMap<CapabilityPackId, PackSchemaVersion>, TallyError>;
-    async fn begin_delivery(&self, proof: &ProofManifest) -> Result<DeliverySession, TallyError>;
-    async fn deliver_batch(
-        &self,
-        session: &DeliverySession,
-        batch: &PackBatch,
-        content_sha256: &str,
-        idempotency_key: &str,
-    ) -> Result<DeliveryReceipt, TallyError>;
-    async fn finalize_delivery(
-        &self,
-        session: &DeliverySession,
-        proof: &ProofManifest,
-    ) -> Result<DeliveryReceipt, TallyError>;
 }
 
 #[cfg(test)]

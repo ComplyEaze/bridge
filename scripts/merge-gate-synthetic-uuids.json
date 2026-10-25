@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "uuid": "00000000-0000-4000-8000-000000000002",
+      "note": "hand-made sentinel: zero prefix with the version-4 and variant bits set, the company identifier of the Rust import-post tests' own synthetic company; already in many tracked test files"
+    },
+    {
+      "uuid": "d64eda55-da7c-4106-a171-3e3cb6cdd331",
+      "note": "company identifier of the synthetic lab company BRIDGE TIEOUT B, as Tally returned it in read-only captures on 21 October 2026 (lab branch lab/692-tieout-b-answers at 20ef79c46c87d4b10571b2fd21f6a76375ccfc4e and 8af487be217086536a863a60d5912a73089b08b3); the group identifiers in the same captures are this value with a suffix"
+    },
+    {
+      "uuid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+      "note": "company identifier of the synthetic lab company BRIDGE SHAPE LAB: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-company-extent.utf16le.xml on master (added in f68c43e4b81ff87766cce0373470337497fe3830, #1185) names it BRIDGE SHAPE LAB beside this GUID; the master identifiers of that company's groups, vouchers and other rows in its captures are this value with a suffix"
+    }
+  ]
+}

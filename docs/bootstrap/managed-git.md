@@ -34,7 +34,11 @@ personal information.
 - Require linear history and these exact status contexts: `Frontend build`,
   `Rust format`, `Required checks`, `Dependency security`, and
   `GitGuardian Security Checks`. The `Required checks` aggregate gate
-  transitively covers `Native checks (*)` and `Bundle smoke (*)`; require the
+  transitively covers `Native checks (*)`
+  and `Bundle smoke (*)` (on a master
+  push, for a commit the merge queue already ran those jobs on, through that
+  queue run: `scripts/master-push-reuse.mjs`; a pull request runs the bundle and
+  seam jobs on Windows only, and the queue and a push run both systems); require the
   gate rather than those individual matrix contexts, because they are
   path-filtered and report `skipped` on docs-only changes — requiring them
   directly makes documentation pull requests permanently unmergeable.
@@ -47,7 +51,7 @@ personal information.
 
 ## Governance labels
 
-- Area: `area:tally`, `area:documents`, `area:infra`,
+- Area: `area:tally`, `area:tax-audit`, `area:infra`,
   `area:security`
 - Severity: `severity:p1`, `severity:p2`, `severity:p3`, `severity:p4`
 - Type: `type:bug`, `type:feature`, `type:chore`, `type:rectify`

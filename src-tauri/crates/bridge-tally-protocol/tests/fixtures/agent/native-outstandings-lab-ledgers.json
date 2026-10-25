@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE OUTSTANDINGS LAB, seeded for #945 and read back through Bridge",
+  "observed_date": "2026-09-30",
+  "requested_as_of": "20260630",
+  "source_response_bytes": 24576,
+  "source_response_sha256": "2cb06919d200ac5aaf06cc0a6c3d66931b7cc1b5344992af028ad460ec922013",
+  "source_request_bytes": 1298,
+  "source_request_sha256": "aaa049d5a2e223d1bd583ef00078d4d8a0879d33a41f9c4526d6805c30053392",
+  "request_rendered_by": "render_native_ledger_snapshot_request(company, period 20250401..20260630, ModeAgnostic)",
+  "fixture_bytes": 24576,
+  "fixture_sha256": "2cb06919d200ac5aaf06cc0a6c3d66931b7cc1b5344992af028ad460ec922013",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "17 ledgers: 15 seeded plus Cash and Profit & Loss A/c; ISBILLWISEON false only for P03 and the support ledgers.",
+  "provenance_limit": "One synthetic book on one build. The data is seeded by this project (15 ledgers, 19 vouchers over raw import), so the capture shows how Tally stores and reports those shapes; it is not evidence about any client's book. The request was sent once through a capped harness; the response is unmodified.",
+  "sensitivity_review": "Synthetic company name, synthetic ledger names (prefix OL), synthetic GUID; no party, person, GSTIN, address or credential."
+}

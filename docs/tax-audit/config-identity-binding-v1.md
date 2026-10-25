@@ -63,7 +63,7 @@ person reading the drift can judge.
 `roles.bank_groups`, `roles.round_off_ledgers`, `loans.loan_ledgers`'s keys,
 `depreciation.block_by_ledger`'s keys and `depreciation.dep_expense_ledgers`. This is a strict
 subset of the reference implementation's own registry, which also binds names inside `tds`,
-`gst_outward`, `related_parties`, `statutory_dues`, a legacy trade-creditor source and more.
+`gst_outward`, `statutory_dues`, a legacy trade-creditor source and more.
 
 `BIND-ID-UNUSED` is therefore checked only against the locations this port reads. A production
 client config's `[ledger_ids]`/`[group_ids]` are written for the reference implementation's full

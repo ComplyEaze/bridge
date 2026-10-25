@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Download ComplyEaze Bridge, the local TallyPrime MCP server for Claude</title>
+<meta name="description" content="Download the ComplyEaze Bridge extension for Claude Desktop, for Windows x64 and Apple Silicon Macs. Not yet code-signed; your computer may warn you." />
+<link rel="canonical" href="https://bridge.complyeaze.com/download.html" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="ComplyEaze Bridge" />
+<meta property="og:locale" content="en_IN" />
+<meta property="og:title" content="Download ComplyEaze Bridge, the local TallyPrime MCP server for Claude" />
+<meta property="og:description" content="Download the ComplyEaze Bridge extension for Claude Desktop, for Windows x64 and Apple Silicon Macs. Not yet code-signed; your computer may warn you." />
+<meta property="og:url" content="https://bridge.complyeaze.com/download.html" />
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
+<script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
+<link rel="preload" href="fonts/bricolage-wght-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="chrome.css" />
+<link rel="stylesheet" href="pages.css" />
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body class="ce-page">
+<a class="ce-skip-link" href="#main">Skip to content</a>
+<div class="ce-header__sentinel" id="ceHeaderSentinel" aria-hidden="true"></div>
+<header class="ce-header" id="ceHeader">
+  <div class="ce-header__inner">
+    <a class="ce-brand" href="./" aria-label="ComplyEaze Bridge, home">
+      <svg class="ce-logo" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg>
+    </a>
+    <div class="ce-header__right">
+      <nav class="ce-nav" id="ceNav" aria-label="Primary">
+        <a class="ce-nav__download" href="./download.html" aria-current="page">Download</a>
+        <a href="./faq.html">Questions</a>
+        <a href="./releases.html">Releases</a>
+        <a href="./changelog.html">Changelog</a>
+        <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <div class="ce-header__actions">
+        <a class="ce-star" id="ceStar" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer" aria-label="ComplyEaze Bridge on GitHub">
+          <svg class="ce-star__icon" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 .8l2.1 4.4 4.8.6-3.5 3.4.9 4.8L8 11.6l-4.3 2.4.9-4.8L1.1 5.8l4.8-.6z" /></svg>
+          <span class="ce-star__count" id="ceStarCount" aria-hidden="true"></span>
+        </a>
+        <a class="btn btn-primary ce-cta" href="./download.html" aria-current="page">Download</a>
+        <button class="ce-menu-toggle" id="ceMenuToggle" type="button" aria-expanded="false" aria-controls="ceNav">
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="visually-hidden">Menu</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page-hero">
+    <div class="page-hero__inner">
+      <h1>Download ComplyEaze Bridge</h1>
+      <p>
+        A Claude&nbsp;Desktop extension that connects Claude to TallyPrime on your computer.
+        For Windows&nbsp;x64 and Apple&nbsp;Silicon Macs. Not yet code-signed; your computer may warn you.
+      </p>
+    </div>
+  </section>
+
+  <div class="page-body">
+    <section class="page-section">
+      <h2>Choose your build</h2>
+      <div class="dl-panel">
+        <p class="dl-state" id="dlLoading" role="status">Checking the latest release&hellip;</p>
+        <noscript><p class="dl-state">The download buttons need JavaScript. Without it, open the <a href="https://github.com/ComplyEaze/bridge/releases">releases page on GitHub</a>, take the newest release whose tag starts with <code>mcp-</code> and that lists a <code>.mcpb</code> file for your computer, and compare it with the matching <code>.sha256</code> file.</p></noscript>
+        <div class="dl-state" id="dlError" hidden>
+          <p>We could not reach GitHub for the latest build.</p>
+          <a class="btn btn-primary" href="https://github.com/ComplyEaze/bridge/releases/latest">See releases on GitHub</a>
+        </div>
+        <div class="dl-buttons" id="dlReady" hidden></div>
+      </div>
+    </section>
+
+    <section class="page-section" id="at-a-glance">
+      <h2>At a glance, release 0.6.0</h2>
+      <ul class="before-list">
+        <li><strong>You can ask:</strong> outstanding receivables and payables, with ageing of the open bills; the trial balance for a period; the vouchers in a date range, found by number, reference, narration or amount and added up by ledger, month, voucher type, group or primary group (checked on one synthetic book, not a large one); Tally&rsquo;s own Cash Flow for whole months, shown only when its net total ties to the trial balance (not a cash flow statement under AS&nbsp;3; tried on two synthetic books); one ledger&rsquo;s opening, debits, credits and closing; and Tally&rsquo;s own month-wise Sales or Purchase Register for whole months (not tied to the vouchers; read on one synthetic book).</li>
+        <li><strong>Partly, with limits:</strong> profit and loss and the balance sheet, which a book with stock items is expected to refuse (none has been tried yet) and a book with several currencies does refuse; closing stock value per item at 31&nbsp;March and its closing quantity where Tally&rsquo;s own Stock Summary shows the item on a line of its own, on small books only, and only the year to 31&nbsp;March 2026 has been checked; and a password-protected SBI, HDFC or Union Bank of India PDF statement, read into a file of Payment, Receipt and Contra vouchers that you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, a line it cannot place goes to a suspense ledger you name, and it has not yet been run on a real bank statement.</li>
+        <li><strong>Not in release 0.6.0:</strong> GST returns or GSTR-2B matching; making sales or purchase invoices or GST entries; tax-audit flags; Tally&rsquo;s Funds Flow, Ratio Analysis and negative-balance reports.</li>
+        <li>&ldquo;You can ask&rdquo; means it answered on the books and builds we ran it on, which the <a href="https://github.com/ComplyEaze/bridge#what-has-been-run-against-a-real-tallyprime">README</a> lists (not every read has its own recorded run); we have not yet run the published 0.6.0 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The <a href="./faq.html#what-can-i-ask">Questions page</a> has the full table.</li>
+      </ul>
+    </section>
+
+    <section class="page-section">
+      <h2>Before you install</h2>
+      <ul class="before-list">
+        <li>ComplyEaze Bridge is still being developed and may contain errors. Try it first on a test company, and take a backup before you turn posting on.</li>
+        <li>Posting is off by default in a new install. If you already have an older release installed, it may keep its own settings, posting included: read <a href="#older-release">If you already have an older release</a> below before you install. There is no tool to undo or delete a posted voucher; you correct it in Tally. A post can still land in a company renamed after the last check, and a replaced ledger is not always noticed. The approval window for a post covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it. The <a href="https://github.com/ComplyEaze/bridge#readme">README</a> gives these limits in full.</li>
+        <li>Each download has a matching <code>.sha256</code> file on the same release, linked under its button. Compare it with your download before opening the package: on Windows, in Command Prompt, type <code>cd Downloads</code> and then run <code>certutil -hashfile &lt;file&gt; SHA256</code>; on a Mac, in Terminal, type <code>cd Downloads</code> and then run <code>shasum -a 256 &lt;file&gt;</code> (put your downloaded file&rsquo;s name in place of <code>&lt;file&gt;</code>). Check that the 64-character code it prints matches the code at the start of the <code>.sha256</code> file (open that file in Notepad or TextEdit).</li>
+        <li>ComplyEaze&nbsp;Bridge does not update itself. Look for a newer version on the <a href="https://github.com/ComplyEaze/bridge/releases">releases page</a> on GitHub: its name starts with &ldquo;ComplyEaze Bridge MCP&rdquo;.</li>
+        <li>Tally must be running on the same computer as Claude&nbsp;Desktop.</li>
+        <li>You bring TallyPrime and Claude&nbsp;Desktop, and what Claude reads goes to Anthropic. ComplyEaze Bridge has no account and no price set today.</li>
+        <li>On a Mac, run Tally in a Windows virtual machine on that same Mac with its gateway port forwarded to the Mac's localhost, or reach it through local port forwarding your organisation has approved. ComplyEaze Bridge talks to Tally only on localhost, so a separate PC, or a Tally elsewhere on your network, cannot be reached.</li>
+      </ul>
+    </section>
+
+    <section class="page-section">
+      <h2>Install, once</h2>
+      <p class="dl-note">Already have ComplyEaze&nbsp;Bridge installed? Read <a href="#older-release">If you already have an older release</a> first.</p>
+      <ol class="steps-list">
+        <li>In TallyPrime, press F1, then Settings, then Connectivity, then Client/Server configuration. Set &ldquo;TallyPrime acts as&rdquo; to Both, note the Port number (usually <code>9000</code>), save, then close and reopen TallyPrime.</li>
+        <li>In Claude&nbsp;Desktop, open Settings, then Extensions, then Advanced settings, and click Install Extension. Choose the downloaded .mcpb file. In our test, Claude&nbsp;Desktop showed its own notice that the extension is not verified by Anthropic, then asked us to confirm.</li>
+        <li>Read the Terms of Use linked in the settings that open (if none open, open Settings, then Extensions, then ComplyEaze&nbsp;Bridge), then tick &ldquo;I accept the ComplyEaze Bridge Terms of Use&rdquo;. Until you do, ComplyEaze&nbsp;Bridge does not read from Tally, and from release 0.5.1 every tool answers that the Terms of Use are not accepted and names this setting (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). (In 0.5.0, after an update from 0.4.2, Claude&nbsp;Desktop may not start it: on a Mac with an error that does not mention the Terms, on one Windows computer with no error.)</li>
+        <li>Type your Tally port (usually <code>9000</code>). Leave the Tally host as <code>localhost</code> and leave posting off.</li>
+        <li>Click Save, check &ldquo;Allow voucher posting, one voucher or a batch of up to 50&rdquo; is as you want it (it is a new setting: if you turned posting on in an earlier version, turn it on again), then quit Claude&nbsp;Desktop completely and open it again. Ask &ldquo;Which company is open in Tally?&rdquo; Claude&nbsp;Desktop may ask your permission before it uses a tool; in our test we chose Allow once.</li>
+      </ol>
+      <p class="dl-note">First time, or on a Mac? Start with a test company. The <a href="https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md">installation guide</a> has every click, what each screen shows, and what to do when yours differs.</p>
+      <p class="dl-note">ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Questions and problems: <a href="https://github.com/ComplyEaze/bridge/issues">open an issue on GitHub</a>.</p>
+    </section>
+
+    <section class="page-section" id="older-release">
+      <h2>If you already have an older release</h2>
+      <ul class="before-list">
+        <li>A ComplyEaze Bridge older than 0.4.2 left installed keeps its own settings, and one from before 0.3.0 may have posting on, so remove such a release first. Release 0.4.2 installed as a new extension. A build of 0.5.0 made by our checks (not the published file), installed over 0.4.2 on one Mac, replaced it and kept its Tally port, Response redaction and posting setting (a posting setting that was on stayed on), so after you install it, tick the Terms of Use setting (version 2026-10.1) again and check the posting setting.</li>
+        <li>If ComplyEaze&nbsp;Bridge 0.4.2 is already installed, install the new file over it and keep its data folder, which both versions use. A build of 0.5.0 made by our checks (not the published file) replaced 0.4.2 on one Mac and kept its Tally port, Response redaction and posting setting; the old Terms setting was gone and the new one had no value. Installing over a release older than 0.4.2 was not tried: remove such a release first, keep its data folder, and enter your settings in the new one, including Response redaction, which starts at none. If Settings &rarr; Extensions lists two ComplyEaze&nbsp;Bridge entries (as happened when 0.4.2 was installed beside an older release), remove the older entry before you use either, enter your settings in the new one, including Response redaction, which starts at none, tick the Terms setting, and quit and reopen Claude&nbsp;Desktop (steps 3 to 5 of &ldquo;Install, once&rdquo; above).</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer class="ce-footer">
+  <div class="ce-footer__inner">
+    <div class="ce-footer__grid">
+      <div>
+        <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
+        <dl class="ce-footer__facts">
+          <div><dt>Tally connection</dt><dd>ComplyEaze Bridge&rsquo;s own code connects to Tally on this computer only.</dd></div>
+          <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
+          <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
+          <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>
+        </dl>
+        <p class="ce-footer__synthetic">Every book, party and amount shown on this site is from a synthetic demo book.</p>
+      </div>
+      <nav class="ce-footer__col" aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="./download.html" aria-current="page">Download</a></li>
+          <li><a href="./faq.html">Questions</a></li>
+          <li><a href="./capabilities.html">Capabilities</a></li>
+          <li><a href="./releases.html">Releases</a></li>
+          <li><a href="./changelog.html">Changelog</a></li>
+          <li><a href="./blog.html">Blog</a></li>
+          <li><a href="./security.html">Security</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Project">
+        <h3>Project</h3>
+        <ul>
+          <li><a href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/issues" target="_blank" rel="noopener noreferrer">Report an issue</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="./privacy.html">Privacy Policy</a></li>
+          <li><a href="./terms.html">Terms of Use</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">Security policy</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="ce-footer__base">
+      <span>ComplyEaze Bridge is open source under the Apache License, Version 2.0.</span>
+      <span>Published by SPMS Comply Eaze Solutions LLP, a limited liability partnership registered with limited liability under the Limited Liability Partnership Act, 2008, LLP identification number ACI-9231. Registered office: S-137, 1st Floor, Sunsquare Shopping Plaza, Plot No. SPL-1/J, RIICO Chowk, Bhiwadi Ind. Area, Alwar, Bhiwadi, Tijara, Alwar 301019, Rajasthan, India.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="chrome.js" defer></script>
+<script type="module" src="download.js"></script>
+</body>
+</html>

@@ -4,9 +4,9 @@ use tally_protocol_simulator::{
     encode, Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
 
-const GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
+pub(super) const GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
 
-fn decode(bytes: &[u8]) -> String {
+pub(super) fn decode(bytes: &[u8]) -> String {
     String::from_utf16(
         &bytes
             .chunks_exact(2)
@@ -16,13 +16,13 @@ fn decode(bytes: &[u8]) -> String {
     .unwrap()
 }
 
-fn companies() -> String {
+pub(super) fn companies() -> String {
     decode(include_bytes!(
         "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
     ))
 }
 
-fn extents() -> String {
+pub(super) fn extents() -> String {
     include_str!(
         "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
     )
@@ -36,7 +36,7 @@ fn trial_balance() -> String {
     .to_string()
 }
 
-fn identity() -> VerifiedCompanyIdentity {
+pub(super) fn identity() -> VerifiedCompanyIdentity {
     let companies = parse_companies_from_collection(&companies()).unwrap();
     let row = companies
         .iter()
@@ -44,7 +44,7 @@ fn identity() -> VerifiedCompanyIdentity {
         .unwrap();
     VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        GUID.into(),
+        crate::tally::test_company_guid(GUID),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &companies,
@@ -52,24 +52,24 @@ fn identity() -> VerifiedCompanyIdentity {
     .unwrap()
 }
 
-fn xml(text: String) -> ScenarioPlan {
+pub(super) fn xml(text: String) -> ScenarioPlan {
     ScenarioPlan::new(Fixture::SyntheticXml(text))
         .with_encoding(WireEncoding::Utf16Le)
         .with_framing(ResponseFraming::ContentLength)
 }
 
-fn status() -> ScenarioPlan {
+pub(super) fn status() -> ScenarioPlan {
     ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime))
 }
 
-fn education(text: &str) -> String {
+pub(super) fn education(text: &str) -> String {
     text.replace(
         "<EDUMODE TYPE=\"Logical\">No</EDUMODE>",
         "<EDUMODE TYPE=\"Logical\">Yes</EDUMODE>",
     )
 }
 
-fn pair(plans: &mut Vec<ScenarioPlan>, response: ScenarioPlan) {
+pub(super) fn pair(plans: &mut Vec<ScenarioPlan>, response: ScenarioPlan) {
     plans.extend([response.clone(), status(), response, status()]);
 }
 
@@ -91,7 +91,7 @@ fn complete_plans(currency: String, report: String) -> Vec<ScenarioPlan> {
     plans
 }
 
-fn config(simulator: &SequenceSimulator) -> TallyConfig {
+pub(super) fn config(simulator: &SequenceSimulator) -> TallyConfig {
     TallyConfig {
         host: simulator.address().ip().to_string(),
         port: simulator.address().port(),
@@ -107,7 +107,7 @@ async fn trial_balance_refuses_education_before_identity_or_report_dispatch() {
     let simulator = SequenceSimulator::spawn(vec![status(), xml(education(&companies()))]).unwrap();
 
     let error = TallyRuntime::default()
-        .fetch_trial_balance(
+        .fetch_trial_balance_with_extent(
             config(&simulator),
             &identity(),
             TrialBalancePeriod::new(
@@ -115,6 +115,7 @@ async fn trial_balance_refuses_education_before_identity_or_report_dispatch() {
                 TallyDate::parse("20260902").unwrap(),
             )
             .unwrap(),
+            TrialBalanceCurrencyScope::SingleCurrency,
         )
         .await
         .unwrap_err();
@@ -136,7 +137,7 @@ async fn trial_balance_refuses_before_books_before_currency_or_report_dispatch()
     let simulator = SequenceSimulator::spawn(plans).unwrap();
 
     let error = TallyRuntime::default()
-        .fetch_trial_balance(
+        .fetch_trial_balance_with_extent(
             config(&simulator),
             &identity(),
             TrialBalancePeriod::new(
@@ -144,6 +145,7 @@ async fn trial_balance_refuses_before_books_before_currency_or_report_dispatch()
                 TallyDate::parse("20260902").unwrap(),
             )
             .unwrap(),
+            TrialBalanceCurrencyScope::SingleCurrency,
         )
         .await
         .unwrap_err();
@@ -174,7 +176,7 @@ async fn trial_balance_rejects_non_inr_before_trial_balance_dispatch() {
     let simulator = SequenceSimulator::spawn(opening_plans(foreign)).unwrap();
 
     let error = TallyRuntime::default()
-        .fetch_trial_balance(
+        .fetch_trial_balance_with_extent(
             config(&simulator),
             &identity(),
             TrialBalancePeriod::new(
@@ -182,6 +184,7 @@ async fn trial_balance_rejects_non_inr_before_trial_balance_dispatch() {
                 TallyDate::parse("20260902").unwrap(),
             )
             .unwrap(),
+            TrialBalanceCurrencyScope::SingleCurrency,
         )
         .await
         .unwrap_err();
@@ -231,8 +234,8 @@ async fn trial_balance_replays_captured_native_report_through_all_runtime_bracke
     ));
     let simulator = SequenceSimulator::spawn(complete_plans(currency, trial_balance())).unwrap();
 
-    let read = TallyRuntime::default()
-        .fetch_trial_balance(
+    let (read, _) = TallyRuntime::default()
+        .fetch_trial_balance_with_extent(
             config(&simulator),
             &identity(),
             TrialBalancePeriod::new(
@@ -240,6 +243,7 @@ async fn trial_balance_replays_captured_native_report_through_all_runtime_bracke
                 TallyDate::parse("20260902").unwrap(),
             )
             .unwrap(),
+            TrialBalanceCurrencyScope::SingleCurrency,
         )
         .await
         .unwrap();
@@ -283,7 +287,7 @@ async fn trial_balance_rejects_report_or_book_drift_and_retains_completed_source
             .collect::<Vec<_>>();
         let simulator = SequenceSimulator::spawn(plans).unwrap();
         let error = TallyRuntime::default()
-            .fetch_trial_balance(
+            .fetch_trial_balance_with_extent(
                 config(&simulator),
                 &identity(),
                 TrialBalancePeriod::new(
@@ -291,6 +295,7 @@ async fn trial_balance_rejects_report_or_book_drift_and_retains_completed_source
                     TallyDate::parse("20260902").unwrap(),
                 )
                 .unwrap(),
+                TrialBalanceCurrencyScope::SingleCurrency,
             )
             .await
             .unwrap_err();
@@ -444,7 +449,7 @@ async fn the_desktop_trial_balance_reads_a_several_currency_books_base_ledgers()
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        FOREX.into(),
+        crate::tally::test_company_guid(FOREX),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &observed,
@@ -501,7 +506,7 @@ async fn the_default_trial_balance_read_still_refuses_a_several_currency_book() 
     let total = plans.len();
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let error = TallyRuntime::default()
-        .fetch_trial_balance(
+        .fetch_trial_balance_with_extent(
             config(&simulator),
             &identity(),
             TrialBalancePeriod::new(
@@ -509,6 +514,7 @@ async fn the_default_trial_balance_read_still_refuses_a_several_currency_book() 
                 TallyDate::parse("20260902").unwrap(),
             )
             .unwrap(),
+            TrialBalanceCurrencyScope::SingleCurrency,
         )
         .await
         .unwrap_err();
@@ -533,7 +539,7 @@ fn forex_identity() -> VerifiedCompanyIdentity {
         .unwrap();
     VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        FOREX.into(),
+        crate::tally::test_company_guid(FOREX),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &companies,

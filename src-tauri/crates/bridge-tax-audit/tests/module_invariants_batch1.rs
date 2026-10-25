@@ -26,6 +26,8 @@ fn ledger(name: &str, chain: &[&str]) -> Ledger {
         chain: chain.iter().map(|g| (*g).to_string()).collect(),
         chain_complete: true,
         master_opening_paise: 0,
+        pan: String::new(),
+        gstin: String::new(),
         guid: String::new(),
         masterid: None,
     }

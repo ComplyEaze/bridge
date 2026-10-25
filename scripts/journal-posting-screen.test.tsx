@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, test, vi } from "vitest";
@@ -100,7 +101,7 @@ test("renders the review flow and keeps safe recovery actions after each backend
   await act(async () => {
     button(host, "Reconcile original batch").click();
   });
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   expect(button(host, "Choose another file")).toBeTruthy();
   expect([...host.querySelectorAll("button")].some((item) => item.textContent?.includes("Post Journal"))).toBe(false);
 
@@ -108,7 +109,7 @@ test("renders the review flow and keeps safe recovery actions after each backend
   await act(async () => {
     button(host, "Choose another file").click();
   });
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   expect([...host.querySelectorAll("button")].some((item) => item.textContent?.includes("Post Journal"))).toBe(false);
 
   root.unmount();
@@ -148,7 +149,7 @@ test("reports a busy Journal action until the native post result is rendered", a
     await pendingPost;
   });
   expect(busyStates.at(-1)).toBe(false);
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   expect([...host.querySelectorAll("button")].some((item) => item.textContent?.includes("Post Journal"))).toBe(false);
   root.unmount();
 });
@@ -198,7 +199,7 @@ test("retains an attempted Journal and response evidence through failed reconcil
   });
 
   const details = host.querySelector("details");
-  expect(details?.textContent).toContain("Tally's response is retained for reconciliation; Bridge only confirms posting after a matching Journal readback.");
+  expect(details?.textContent).toContain("Tally's response is retained for reconciliation; ComplyEaze Bridge only confirms posting after a matching Journal readback.");
   expect(details?.textContent).toContain("success");
   expect(details?.textContent).toContain("Created 1");
   expect(details?.textContent).toContain("Line errors 0");
@@ -231,14 +232,14 @@ test("retains an attempted Journal and response evidence through failed reconcil
     result: { result: { dispatch: { state: "previous_attempt_reconciled", resent: false } } },
   });
   await act(async () => { button(host, "Reconcile original batch").click(); });
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   expect(button(host, "Choose another file")).toBeTruthy();
   expect(host.textContent).not.toContain("Post Journal");
   root.unmount();
 });
 
 for (const [code, expected] of [
-  ["import_approval_timed_out", "The approval dialog expired before Bridge could post this Journal."],
+  ["import_approval_timed_out", "The approval dialog expired before ComplyEaze Bridge could post this Journal."],
   ["import_approval_declined", "The Journal was not posted because approval was declined."],
 ] as const) {
   test(`explains ${code} while keeping Post Journal available`, async () => {
@@ -359,7 +360,7 @@ test("an active or unresolved snapshot blocks posting from an already-open revie
   });
   await act(async () => { button(host, "Post Journal").click(); });
   expect(mocks.invoke.mock.calls[1][0]).toBe("desktop_post_reviewed_journal");
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   root.unmount();
 });
 
@@ -368,10 +369,39 @@ test("does not admit Journal actions before native lifecycle protection is ready
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
-  await act(async () => { root.render(<JournalPostingScreen config={config} lifecycleAdmissionReady={false} lifecycleAdmissionError="Bridge could not install native close protection." />); });
+  await act(async () => { root.render(<JournalPostingScreen config={config} lifecycleAdmissionReady={false} lifecycleAdmissionError="ComplyEaze Bridge could not install native close protection." />); });
   expect(host.textContent).toContain("Native close protection unavailable");
   expect(button(host, "Choose Journal file").disabled).toBe(true);
   await act(async () => { button(host, "Choose Journal file").click(); });
   expect(mocks.invoke).not.toHaveBeenCalled();
   root.unmount();
+});
+
+test("marks an entry sent as On Account and shows its note only when sent (#1234)", async () => {
+  const note = "On Account: a bill-wise ledger when this batch was built. Its entries carry no bill allocation.";
+  const cells = async (details: typeof review.details & { onAccountNote?: string }) => {
+    mocks.invoke.mockResolvedValueOnce({ ...review, details });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => { root.render(<JournalPostingScreen config={config} />); });
+    await act(async () => { button(host, "Choose Journal file").click(); });
+    const shown = {
+      marks: [...host.querySelectorAll("tbody td:first-child")].map((cell) => cell.querySelector("strong")?.textContent ?? null),
+      note: host.textContent?.includes(note) ?? false,
+    };
+    root.unmount();
+    return shown;
+  };
+  expect(await cells(review.details)).toEqual({ marks: [null, null], note: false });
+  const [expense, cash] = review.details.entries;
+  expect(await cells({ ...review.details, entries: [{ ...expense, onAccount: true }, { ...cash, onAccount: false }], onAccountNote: note }))
+    .toEqual({ marks: ["On Account", null], note: true });
+  // The details of a marked review as the backend serialises them: the text its Rust test
+  // (review_marks_each_entry_on_a_ledger_approved_on_account) compares with its own output.
+  const rust = readFileSync("src-tauri/src/agent_desktop_journal_tests.rs", "utf8");
+  const pinned = /const MARKED_REVIEW_DETAILS_SENT: &str =\s*r#"(.+)"#;/.exec(rust);
+  expect(pinned, "MARKED_REVIEW_DETAILS_SENT was not found in the Rust test file").not.toBeNull();
+  const sent = JSON.parse(pinned![1]);
+  expect(await cells(sent)).toEqual({ marks: ["On Account", null], note: true });
 });

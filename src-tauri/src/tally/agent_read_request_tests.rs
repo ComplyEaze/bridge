@@ -69,6 +69,41 @@ fn the_company_object_constructor_renders_the_pinned_profile_for_the_verified_na
     );
 }
 
+/// The invoice build's company read is its own pinned profile, from the
+/// verified name only, and is no Collection export `parse` would admit.
+#[test]
+fn the_invoice_company_constructor_renders_its_own_pinned_profile() {
+    let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(
+        "BRIDGE & <SYNTHETIC> \"BOOK\"",
+        "00000000-0000-4000-8000-000000000001",
+    );
+    let company = bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(
+        "BRIDGE & <SYNTHETIC> \"BOOK\"",
+    )
+    .unwrap();
+    let expected = bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::InvoiceCompanyHsnV1 {
+        company: &company,
+    };
+    assert_eq!(expected.id().as_str(), "invoice_company_hsn_v1");
+    let rendered = AgentReadRequest::invoice_company_hsn(&identity)
+        .unwrap()
+        .into_xml();
+    assert_eq!(rendered, expected.render());
+    assert!(rendered.contains("<FETCHLIST><FETCH>*</FETCH></FETCHLIST>"));
+    assert_eq!(
+        AgentReadRequest::parse(rendered).unwrap_err(),
+        AgentReadRequestError
+    );
+    let invalid = crate::tally::VerifiedCompanyIdentity::test_fixture(
+        "line\nbreak",
+        "00000000-0000-4000-8000-000000000001",
+    );
+    assert_eq!(
+        AgentReadRequest::invoice_company_hsn(&invalid).unwrap_err(),
+        AgentReadRequestError
+    );
+}
+
 #[test]
 fn parse_refuses_every_object_export_including_the_company_part() {
     let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(

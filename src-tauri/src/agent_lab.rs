@@ -12,7 +12,7 @@
 //! path exists anywhere in this file.
 //!
 //! No signed compatibility evidence exists for any inventory field read here
-//! on any Tally release/mode (the plan-research note's §4.2/§4.5 findings):
+//! on any Tally release/mode:
 //! every value this tool returns is exploratory, not a qualified claim.
 
 use super::*;
@@ -65,8 +65,9 @@ impl LabGuardConfig {
     fn from_env() -> Result<Self, String> {
         let target = env::var("BRIDGE_LAB_TARGET_GUID")
             .map_err(|_| "lab_target_guid_required".to_string())?;
-        let deny_raw =
-            env::var("BRIDGE_LAB_DENY_GUIDS").map_err(|_| "lab_deny_guids_required".to_string())?;
+        // The deny list may be absent: a write is then admitted only while the target is the
+        // only company loaded (#972, see `admit_lab_target`).
+        let deny_raw = env::var("BRIDGE_LAB_DENY_GUIDS").unwrap_or_default();
         Self::from_values(&target, &deny_raw)
     }
 
@@ -77,8 +78,8 @@ impl LabGuardConfig {
     fn from_values(target: &str, deny_raw: &str) -> Result<Self, String> {
         let target_guid = parse_native_company_guid(target.trim())
             .map_err(|_| "lab_target_guid_invalid".to_string())?
-            .hyphenated()
-            .to_string();
+            .as_str()
+            .to_owned();
         let mut deny_guids = Vec::new();
         for candidate in deny_raw.split(',') {
             let candidate = candidate.trim();
@@ -87,12 +88,9 @@ impl LabGuardConfig {
             }
             let guid = parse_native_company_guid(candidate)
                 .map_err(|_| "lab_deny_guids_invalid".to_string())?
-                .hyphenated()
-                .to_string();
+                .as_str()
+                .to_owned();
             deny_guids.push(guid);
-        }
-        if deny_guids.is_empty() {
-            return Err("lab_deny_guids_required".to_string());
         }
         if deny_guids
             .iter()
@@ -112,8 +110,8 @@ impl LabGuardConfig {
 // ---------------------------------------------------------------------------
 
 /// The always-on lab preconditions: `BRIDGE_LAB_WRITES=1`, the Tally endpoint
-/// pinned to port 9001, and `BRIDGE_LAB_TARGET_GUID`/`BRIDGE_LAB_DENY_GUIDS`
-/// both present and well-formed. Every lab tool call requires these,
+/// pinned to port 9001, `BRIDGE_LAB_TARGET_GUID` present and well-formed, and
+/// `BRIDGE_LAB_DENY_GUIDS` well-formed when present. Every lab tool call requires these,
 /// `lab_read_inventory` included -- but a *read* does not require the target
 /// to be the company being read, or to be the company currently loaded (that
 /// stronger requirement, [`admit_lab_target`], is scoped to a write batch:
@@ -140,37 +138,23 @@ fn require_lab_read_guards(server: &Server) -> Result<LabGuardConfig, ToolFailur
 /// of any request built from this identity, not a separate check that could
 /// drift out of sync with it.
 ///
-/// Reserved for the Phase 3.5 lab writer (not yet built); `lab_read_inventory`
-/// (Phase 3.2, read-only) intentionally does not call this -- see
+/// With no deny list, the batch is admitted only while the target is the only
+/// company Tally has loaded: a write that lands in the wrong company then lands
+/// in the target (#972). With a deny list, the existing rule stands: no denied
+/// company loaded, and the target loaded. The lab write tools call this;
+/// `lab_read_inventory` (read-only) intentionally does not -- see
 /// [`require_lab_read_guards`].
-#[allow(dead_code)]
 pub(super) async fn admit_lab_target(
     server: &Server,
 ) -> Result<(TallyCompany, VerifiedCompanyIdentity, Evidence), ToolFailure> {
     let config = require_lab_read_guards(server)?;
     let (companies, evidence) = server.companies().await?;
-    let denied = companies.iter().any(|company| {
-        company.guid.as_deref().is_some_and(|guid| {
-            config
-                .deny_guids
-                .iter()
-                .any(|deny| deny.eq_ignore_ascii_case(guid))
-        })
-    });
-    if denied {
-        return Err(ToolFailure::from("lab_source_company_loaded".to_string())
-            .with_prior_evidence(evidence));
-    }
-    let loaded = companies.iter().any(|company| {
-        company
-            .guid
-            .as_deref()
-            .is_some_and(|guid| guid.eq_ignore_ascii_case(&config.target_guid))
-    });
-    if !loaded {
-        return Err(
-            ToolFailure::from("lab_target_not_loaded".to_string()).with_prior_evidence(evidence)
-        );
+    let loaded = companies
+        .iter()
+        .map(|company| company.guid.as_deref())
+        .collect::<Vec<_>>();
+    if let Some(code) = loaded_set_refusal(&config, &loaded) {
+        return Err(ToolFailure::from(code.to_string()).with_prior_evidence(evidence));
     }
     let (company, identity, verify_evidence) =
         server
@@ -182,6 +166,47 @@ pub(super) async fn admit_lab_target(
         identity,
         combine_evidence(evidence, verify_evidence),
     ))
+}
+
+/// Why a write batch is refused for the set of companies Tally has loaded, if it is (#972), in
+/// the order the checks run. With no deny list, the target must be the only company loaded.
+/// With one, no denied company may be loaded; either way the target must be.
+fn loaded_set_refusal(config: &LabGuardConfig, loaded: &[Option<&str>]) -> Option<&'static str> {
+    if config.deny_guids.is_empty()
+        && !loaded_set_is_exactly_target(loaded.iter().copied(), &config.target_guid)
+    {
+        return Some("lab_deny_guids_required");
+    }
+    let denied = loaded.iter().flatten().any(|guid| {
+        config
+            .deny_guids
+            .iter()
+            .any(|deny| deny.eq_ignore_ascii_case(guid))
+    });
+    if denied {
+        return Some("lab_source_company_loaded");
+    }
+    let target_loaded = loaded
+        .iter()
+        .flatten()
+        .any(|guid| guid.eq_ignore_ascii_case(&config.target_guid));
+    (!target_loaded).then_some("lab_target_not_loaded")
+}
+
+/// Whether the loaded companies are one company, the target: at least one is loaded, and every
+/// one has a GUID equal to the target's. A company without a GUID is another company.
+fn loaded_set_is_exactly_target<'a>(
+    loaded: impl IntoIterator<Item = Option<&'a str>>,
+    target_guid: &str,
+) -> bool {
+    let mut any = false;
+    for guid in loaded {
+        any = true;
+        if !guid.is_some_and(|guid| guid.eq_ignore_ascii_case(target_guid)) {
+            return false;
+        }
+    }
+    any
 }
 
 // ---------------------------------------------------------------------------
@@ -480,7 +505,7 @@ fn parse_lab_master_rows(
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let tag = event.name().as_ref().to_ascii_uppercase();
                 let at_collection = path == ["ENVELOPE", "BODY", "DATA", "COLLECTION"];
                 if at_collection {
                     if tag != row_tag {
@@ -490,13 +515,10 @@ fn parse_lab_master_rows(
                     for attribute in event.attributes() {
                         let attribute =
                             attribute.map_err(|_| "agent_read_protocol_invalid".to_string())?;
-                        if attribute.key.as_ref().eq_ignore_ascii_case(b"NAME") {
+                        if attribute.key.as_ref().eq_ignore_ascii_case("NAME") {
                             attribute_name = Some(
                                 attribute
-                                    .decoded_and_normalized_value(
-                                        quick_xml::XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )
+                                    .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                                     .map_err(|_| "agent_read_protocol_invalid".to_string())?
                                     .into_owned(),
                             );
@@ -528,15 +550,11 @@ fn parse_lab_master_rows(
             // wrong number that still looks like one. Same buffer, so a value
             // split across Text, GeneralRef and CDATA rejoins in order.
             Ok(quick_xml::events::Event::CData(text)) => {
-                buffer.push(
-                    &text
-                        .decode()
-                        .map_err(|_| "agent_read_protocol_invalid".to_string())?,
-                );
+                buffer.push(&text);
             }
             Ok(quick_xml::events::Event::Empty(_)) => buffer.abandon(),
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 // A field belongs to the row when its parent chain is exactly
                 // COLLECTION_PREFIX + [row_tag]; `path` still holds the closing
                 // element, so the parent chain is everything before it.
@@ -601,7 +619,7 @@ fn lab_master_json(kind: LabMasterKind, row: &BTreeMap<String, String>) -> Value
             // GST/HSN fields as returned, unclassified -- no signed
             // compatibility evidence exists for these on any Tally
             // release/mode yet (unlike the ledger GST duty-head vocabulary,
-            // which §4.3 confirms is live-capture backed).
+            // which protocol reference §8.3 confirms is live-capture backed).
             "gst_applicable": optional_field(row, "GSTAPPLICABLE"),
             "gst_type_of_supply": optional_field(row, "GSTTYPEOFSUPPLY"),
             "hsn_code": optional_field(row, "HSNCODE"),
@@ -662,7 +680,7 @@ fn parse_lab_inventory_vouchers(xml: &str) -> Result<Vec<Value>, String> {
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let tag = event.name().as_ref().to_ascii_uppercase();
                 // `path` is the parent chain of the element about to open.
                 if path_is(&path, &COLLECTION_PREFIX) {
                     if tag != "VOUCHER" {
@@ -695,15 +713,11 @@ fn parse_lab_inventory_vouchers(xml: &str) -> Result<Vec<Value>, String> {
             // wrong number that still looks like one. Same buffer, so a value
             // split across Text, GeneralRef and CDATA rejoins in order.
             Ok(quick_xml::events::Event::CData(text)) => {
-                buffer.push(
-                    &text
-                        .decode()
-                        .map_err(|_| "agent_read_protocol_invalid".to_string())?,
-                );
+                buffer.push(&text);
             }
             Ok(quick_xml::events::Event::Empty(_)) => buffer.abandon(),
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 // `path` still holds the closing element, so its parent chain
                 // names the container the field belongs to. Resolving this at
                 // `End` rather than at each text event is what keeps a
@@ -791,8 +805,10 @@ pub(super) async fn lab_read_inventory(
     args: &Value,
 ) -> Result<ToolOutcome, ToolFailure> {
     let guid = required_string(args, "company_guid")?;
-    let from = normalized_date(required_string(args, "from")?)?;
-    let to = normalized_date(required_string(args, "to")?)?;
+    let date = |key| -> Result<bridge_tally_core::TallyDate, ToolFailure> {
+        Ok(normalized_date(required_string(args, key)?)?)
+    };
+    let (from, to) = (date("from")?, date("to")?);
     if from > to {
         return Err("invalid_date_range".to_string().into());
     }
@@ -833,7 +849,7 @@ pub(super) async fn lab_read_inventory(
         evidence = combine_evidence(evidence.clone(), voucher_evidence);
         let rows = parse_lab_inventory_vouchers(&voucher_xml)
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
-        if !window_honoured(&rows, &from, &to) {
+        if !window_honoured(&rows, from.as_str(), to.as_str()) {
             return Err(ToolFailure::from("window_not_honoured".to_string())
                 .with_prior_evidence(evidence.clone()));
         }
@@ -953,7 +969,7 @@ mod tests {
     }
 
     #[test]
-    fn lab_guard_config_requires_all_env_vars() {
+    fn lab_guard_config_requires_the_target_env_var_and_not_the_deny_list() {
         let _guard = lock_env();
         std::env::remove_var("BRIDGE_LAB_TARGET_GUID");
         std::env::remove_var("BRIDGE_LAB_DENY_GUIDS");
@@ -961,6 +977,14 @@ mod tests {
             LabGuardConfig::from_env(),
             Err("lab_target_guid_required".to_string())
         );
+        // #972: with the target alone, the config reads, with an empty deny list.
+        std::env::set_var("BRIDGE_LAB_TARGET_GUID", TARGET_GUID);
+        let config = LabGuardConfig::from_env();
+        std::env::remove_var("BRIDGE_LAB_TARGET_GUID");
+        assert!(config
+            .expect("the target alone parses")
+            .deny_guids
+            .is_empty());
     }
 
     #[test]
@@ -970,6 +994,100 @@ mod tests {
         let result =
             LabGuardConfig::from_values(TARGET_GUID, &format!("{DENY_GUID_1},{TARGET_GUID}"));
         assert_eq!(result, Err("lab_deny_guids_invalid".to_string()));
+    }
+
+    #[test]
+    fn lab_guard_config_accepts_no_deny_list_and_still_checks_the_ones_it_gets() {
+        // #972: the deny list may be absent. `admit_lab_target` then requires the loaded set to
+        // be exactly the target.
+        for absent in ["", " ", ",", " , "] {
+            let config = LabGuardConfig::from_values(TARGET_GUID, absent)
+                .unwrap_or_else(|code| panic!("{absent:?}: {code}"));
+            assert!(config.deny_guids.is_empty(), "{absent:?}");
+        }
+        // A deny list that is given is still parsed strictly.
+        assert_eq!(
+            LabGuardConfig::from_values(TARGET_GUID, "not-a-guid"),
+            Err("lab_deny_guids_invalid".to_string())
+        );
+        assert_eq!(
+            LabGuardConfig::from_values("not-a-guid", ""),
+            Err("lab_target_guid_invalid".to_string())
+        );
+    }
+
+    #[test]
+    fn the_loaded_set_equals_the_target_only_when_every_loaded_company_is_it() {
+        let target = TARGET_GUID.to_ascii_lowercase();
+        let upper = TARGET_GUID.to_ascii_uppercase();
+        // Exactly the target: one company, or the same company listed twice, in any case.
+        assert!(loaded_set_is_exactly_target(
+            [Some(upper.as_str())],
+            &target
+        ));
+        assert!(loaded_set_is_exactly_target(
+            [Some(target.as_str()), Some(upper.as_str())],
+            &target
+        ));
+        // Nothing loaded is not the target.
+        assert!(!loaded_set_is_exactly_target(
+            std::iter::empty::<Option<&str>>(),
+            &target
+        ));
+        // Any other company, a company without a GUID, or another company beside the target.
+        assert!(!loaded_set_is_exactly_target([Some(DENY_GUID_1)], &target));
+        assert!(!loaded_set_is_exactly_target([None], &target));
+        assert!(!loaded_set_is_exactly_target(
+            [Some(target.as_str()), Some(DENY_GUID_1)],
+            &target
+        ));
+        assert!(!loaded_set_is_exactly_target(
+            [Some(target.as_str()), None],
+            &target
+        ));
+    }
+
+    #[test]
+    fn a_write_batch_is_admitted_by_the_loaded_set_as_the_issue_says() {
+        let target = TARGET_GUID.to_ascii_lowercase();
+        let with_deny = LabGuardConfig::from_values(TARGET_GUID, DENY_GUID_1).unwrap();
+        let without_deny = LabGuardConfig::from_values(TARGET_GUID, "").unwrap();
+        // A company that is in neither list: DENY_GUID_2 is not in `with_deny` here.
+        let other = DENY_GUID_2;
+        let t = Some(target.as_str());
+        // No deny list: admitted only while the target is the only company loaded.
+        assert_eq!(loaded_set_refusal(&without_deny, &[t]), None);
+        assert_eq!(
+            loaded_set_refusal(&without_deny, &[t, Some(other)]),
+            Some("lab_deny_guids_required")
+        );
+        assert_eq!(
+            loaded_set_refusal(&without_deny, &[t, None]),
+            Some("lab_deny_guids_required")
+        );
+        assert_eq!(
+            loaded_set_refusal(&without_deny, &[Some(other)]),
+            Some("lab_deny_guids_required")
+        );
+        assert_eq!(
+            loaded_set_refusal(&without_deny, &[]),
+            Some("lab_deny_guids_required")
+        );
+        // A deny list keeps the earlier rule: others may be loaded, a denied one may not.
+        assert_eq!(loaded_set_refusal(&with_deny, &[t, Some(other)]), None);
+        assert_eq!(loaded_set_refusal(&with_deny, &[t]), None);
+        assert_eq!(
+            loaded_set_refusal(&with_deny, &[t, Some(DENY_GUID_1)]),
+            Some("lab_source_company_loaded")
+        );
+        assert_eq!(
+            loaded_set_refusal(&with_deny, &[Some(other)]),
+            Some("lab_target_not_loaded")
+        );
+        assert_eq!(
+            loaded_set_refusal(&with_deny, &[]),
+            Some("lab_target_not_loaded")
+        );
     }
 
     #[test]
@@ -997,13 +1115,52 @@ mod tests {
     #[test]
     fn env_lab_writes_enabled_requires_exact_truthy_value() {
         let _guard = lock_env();
+        // Put the variable back as it was: removing it decided another test's
+        // result whenever this one ran first (#1435).
+        let previous = std::env::var_os("BRIDGE_LAB_WRITES");
         std::env::remove_var("BRIDGE_LAB_WRITES");
         assert!(!env_lab_writes_enabled());
         std::env::set_var("BRIDGE_LAB_WRITES", "1");
         assert!(env_lab_writes_enabled());
         std::env::set_var("BRIDGE_LAB_WRITES", "yes");
         assert!(!env_lab_writes_enabled());
-        std::env::remove_var("BRIDGE_LAB_WRITES");
+        match previous {
+            Some(value) => std::env::set_var("BRIDGE_LAB_WRITES", value),
+            None => std::env::remove_var("BRIDGE_LAB_WRITES"),
+        }
+    }
+
+    /// With the variable set, the catalogue registers each lab tool once. The
+    /// mask_parties test exempts only what registered (#1435), so this is the
+    /// one test that fails if they stop registering.
+    #[test]
+    fn the_lab_tools_register_when_lab_writes_is_set() {
+        let _guard = lock_env();
+        let previous = std::env::var_os("BRIDGE_LAB_WRITES");
+        std::env::set_var("BRIDGE_LAB_WRITES", "1");
+        let definitions = super::super::catalog::registered_tool_definitions(true, true);
+        // Restored before asserting, so a failure leaves the variable as found.
+        match previous {
+            Some(value) => std::env::set_var("BRIDGE_LAB_WRITES", value),
+            None => std::env::remove_var("BRIDGE_LAB_WRITES"),
+        }
+        let names = definitions
+            .as_array()
+            .expect("tools")
+            .iter()
+            .map(|tool| tool["name"].as_str().expect("tool name"))
+            .collect::<Vec<_>>();
+        for lab in [
+            "lab_import_masters",
+            "lab_import_vouchers",
+            "lab_read_inventory",
+        ] {
+            assert_eq!(
+                names.iter().filter(|name| **name == lab).count(),
+                1,
+                "{lab} is registered once when BRIDGE_LAB_WRITES=1"
+            );
+        }
     }
 
     #[test]
@@ -1020,6 +1177,8 @@ mod tests {
         let rows = parse_lab_master_rows(&synthetic_stock_item_collection(), "StockItem").unwrap();
         assert_eq!(rows.len(), 1);
         let json = lab_master_json(LabMasterKind::StockItem, &rows[0]);
+        // The item's own name is marked as a party name, so masking reaches it (#999).
+        assert_eq!(json["name"], json!(party_name("Sodium Bicarbonate")));
         assert_eq!(json["parent"], "Chemicals");
         assert_eq!(json["base_unit"], "Kgs");
         assert_eq!(json["opening_qty"], "100");
@@ -1476,7 +1635,7 @@ mod tests {
             .unwrap();
         let identity = VerifiedCompanyIdentity::from_observed_companies(
             observed.name.clone(),
-            observed.guid.clone().unwrap(),
+            crate::tally::test_company_guid(&observed.guid.clone().unwrap()),
             observed.company_number.clone().unwrap(),
             observed.books_from.clone().unwrap(),
             &companies,
@@ -1513,8 +1672,8 @@ mod tests {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         });
         let expected = render_lab_master_collection(
             identity.display_name(),

@@ -1,0 +1,13 @@
+# fixture: tests/fixtures/agent/register-e2e/native-register-e2e-currencies.utf16le.xml
+# parser: parse_company_currency
+# source: captured
+Ok(CompanyCurrency {
+    symbol: "I₹",
+    mailing_name: "INR",
+    currency_count: 1,
+    decimal_places: 2,
+    is_inr: true,
+    names: [
+        "I₹",
+    ],
+})

@@ -35,28 +35,32 @@ fn a_paired_report_response_marker_does_not_change_the_command_code() {
     }
 }
 
-use super::all_clients::{
+use super::all_clients::migration::{
     load_client_group_labels_for_migration, prepare_client_group_label_migration_from_labels,
     ClientGroupLabelMigrationPreparationError,
 };
 use super::{
-    company_sweep_result, first_calendar_day_canary_window,
+    company_sweep_result, first_calendar_day_canary_window, mirror_unavailable_command_error,
+    mirror_unavailable_string_error, party_ledger_master_balance_basis,
     party_ledger_master_currency_admission_error, party_ledger_master_foreign_currency_error,
     party_ledger_master_mixed_currency_error, party_ledger_master_runtime_command_error,
     party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
-    reviewed_probe_commitment_sha256, tally_command_error, tally_runtime_command_error,
-    verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
-    OutstandingsRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
-    VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
+    reviewed_probe_commitment_sha256, sweep_failure_naming_identity, tally_command_error,
+    tally_runtime_command_error, verify_observed_company_tuple_from_companies,
+    write_unique_download, CompanySweepFailure, OutstandingsRequest, PartyLedgerMasterExport,
+    PartyLedgerMasterRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
+    VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED, MIRROR_KEY_INVALID_MESSAGE,
+    MIRROR_KEY_MISSING_MESSAGE,
 };
+use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
 // path cannot be constructed portably. The import must carry the same gate as
 // the test, or Windows fails on an unused import under `-D warnings`.
 #[cfg(unix)]
 use super::require_utf8_destination;
+use crate::tally::connection::TallyProduct;
 use crate::tally::{
     ConnectionStatus, OutstandingsLoadResult, TallyCompany, TallyLedger, TallyProbeResult,
-    TallyProduct,
 };
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::PartyLedgerMasterFieldObservation;
@@ -91,10 +95,13 @@ async fn empty_label_migration_plan_never_opens_the_mirror() {
 
 #[test]
 fn same_guid_case_or_whitespace_sibling_is_not_a_safe_scope() {
-    let identity = VerifiedCompanyIdentity::test_fixture("Client Book", "same-guid");
+    let identity = VerifiedCompanyIdentity::test_fixture(
+        "Client Book",
+        "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94",
+    );
     let sibling = TallyCompany {
         name: " client book ".to_string(),
-        guid: Some("SAME-GUID".to_string()),
+        guid: Some("5A3E1C70-9B2D-4F48-8A6C-0D7E2F1B3C94".to_string()),
         company_number: Some("2".to_string()),
         books_from: Some("20270401".to_string()),
     };
@@ -107,7 +114,7 @@ fn same_guid_case_or_whitespace_sibling_is_not_a_safe_scope() {
 fn setup_rejects_presentation_equivalent_guid_siblings() {
     let selected = SelectedCompanyIdentity {
         display_name: "Client Book".to_string(),
-        company_guid: "same-guid".to_string(),
+        company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
         company_number: "1".to_string(),
         books_from_yyyymmdd: "20260401".to_string(),
     };
@@ -116,13 +123,13 @@ fn setup_rejects_presentation_equivalent_guid_siblings() {
         vec![
             TallyCompany {
                 name: "Client Book".to_string(),
-                guid: Some("same-guid".to_string()),
+                guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
                 company_number: Some("1".to_string()),
                 books_from: Some("20260401".to_string()),
             },
             TallyCompany {
                 name: " client book ".to_string(),
-                guid: Some("SAME-GUID".to_string()),
+                guid: Some("5A3E1C70-9B2D-4F48-8A6C-0D7E2F1B3C94".to_string()),
                 company_number: Some("2".to_string()),
                 books_from: Some("20270401".to_string()),
             },
@@ -137,7 +144,7 @@ fn setup_rejects_presentation_equivalent_guid_siblings() {
 fn setup_rejects_identical_name_same_guid_different_book() {
     let selected = SelectedCompanyIdentity {
         display_name: "Client Book".to_string(),
-        company_guid: "same-guid".to_string(),
+        company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
         company_number: "1".to_string(),
         books_from_yyyymmdd: "20260401".to_string(),
     };
@@ -146,13 +153,13 @@ fn setup_rejects_identical_name_same_guid_different_book() {
         vec![
             TallyCompany {
                 name: "Client Book".to_string(),
-                guid: Some("same-guid".to_string()),
+                guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
                 company_number: Some("1".to_string()),
                 books_from: Some("20260401".to_string()),
             },
             TallyCompany {
                 name: "Client Book".to_string(),
-                guid: Some("same-guid".to_string()),
+                guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
                 company_number: Some("2".to_string()),
                 books_from: Some("20270401".to_string()),
             },
@@ -164,16 +171,60 @@ fn setup_rejects_identical_name_same_guid_different_book() {
 }
 
 #[test]
+fn setup_refuses_a_company_guid_that_is_not_strict_shaped_and_does_not_say_probe_again() {
+    for guid in [
+        "not-a-company-guid".to_string(),
+        "5a3e1c709b2d4f488a6c0d7e2f1b3c94".to_string(),
+        "{5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94}".to_string(),
+        "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c9".to_string(),
+    ] {
+        let selected = SelectedCompanyIdentity {
+            display_name: "Client Book".to_string(),
+            company_guid: guid.clone(),
+            company_number: "1".to_string(),
+            books_from_yyyymmdd: "20260401".to_string(),
+        };
+        // The company list holds exactly the selected tuple, so only the
+        // GUID's own shape can refuse it.
+        let listed = TallyCompany {
+            name: "Client Book".to_string(),
+            guid: Some(guid.clone()),
+            company_number: Some("1".to_string()),
+            books_from: Some("20260401".to_string()),
+        };
+        let error = verify_observed_company_tuple_from_companies(&selected, vec![listed])
+            .expect_err("a GUID not in Tally's form must not become an identity");
+
+        assert_eq!(error.code, "company_selection_invalid", "{guid:?}");
+        assert!(
+            error.message.contains("not in the expected form"),
+            "{guid:?}: {}",
+            error.message
+        );
+        assert_eq!(error.retry, "not_recommended", "{guid:?}");
+        assert_eq!(
+            error.remediation,
+            "Do not use this company here. Write to contact@complyeaze.com with this company's name.",
+            "{guid:?}"
+        );
+        assert!(
+            !error.message.contains("Probe again") && !error.remediation.contains("Probe again"),
+            "probing again returns the same company: {error:?}"
+        );
+    }
+}
+
+#[test]
 fn setup_reports_duplicate_complete_tuple_separately() {
     let selected = SelectedCompanyIdentity {
         display_name: "Client Book".to_string(),
-        company_guid: "same-guid".to_string(),
+        company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
         company_number: "1".to_string(),
         books_from_yyyymmdd: "20260401".to_string(),
     };
     let duplicate = TallyCompany {
         name: "Client Book".to_string(),
-        guid: Some("same-guid".to_string()),
+        guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
         company_number: Some("1".to_string()),
         books_from: Some("20260401".to_string()),
     };
@@ -239,6 +290,59 @@ fn an_outstandings_request_carries_no_currency_assertion() {
             "{assertion:?}"
         );
     }
+}
+
+#[test]
+fn company_sweep_names_a_company_identity_refusal_and_keeps_other_failures() {
+    use crate::tally::runtime::CompanyIdentityBracketError;
+    use bridge_tally_protocol::outstandings_shared::OutstandingsError;
+
+    let reason = |failure: CompanySweepFailure| match failure {
+        CompanySweepFailure::ReasonCode(code) => code,
+        CompanySweepFailure::OutstandingsRead => "company_outstandings_read_failed",
+        CompanySweepFailure::CompanyVerification(error) => error.code,
+    };
+    let cases: [(anyhow::Error, &str); 3] = [
+        (
+            CompanyIdentityBracketError::AbsentOrAmbiguous.into(),
+            "company_identity_absent_or_ambiguous",
+        ),
+        (
+            CompanyIdentityBracketError::PresentationCollision.into(),
+            "company_identity_presentation_collision",
+        ),
+        (
+            OutstandingsError::CompanyIdentityMismatch.into(),
+            "company_identity_not_matched",
+        ),
+    ];
+    for (error, expected) in cases {
+        let error = error.context("the sweep's read of one company");
+        for otherwise in [
+            CompanySweepFailure::ReasonCode("company_currency_probe_failed"),
+            CompanySweepFailure::OutstandingsRead,
+        ] {
+            let failure = sweep_failure_naming_identity(&error, otherwise);
+            assert_eq!(reason(failure), expected);
+        }
+    }
+
+    // Any other fault keeps the failure the sweep would have reported.
+    let other = anyhow::Error::new(OutstandingsError::InvalidResponse("synthetic_parse_fault"));
+    assert_eq!(
+        reason(sweep_failure_naming_identity(
+            &other,
+            CompanySweepFailure::ReasonCode("company_currency_probe_failed")
+        )),
+        "company_currency_probe_failed"
+    );
+    assert_eq!(
+        reason(sweep_failure_naming_identity(
+            &other,
+            CompanySweepFailure::OutstandingsRead
+        )),
+        "company_outstandings_read_failed"
+    );
 }
 
 #[test]
@@ -384,10 +488,19 @@ fn tally_runtime_error_serialization_is_stable_and_redacted() {
     assert_eq!(invalid_config.code, "endpoint_configuration_invalid");
     assert!(!invalid_config.local_state_changed);
 
-    let queue_deadline =
+    // Nothing emits this text (#1299): the queue deadline is classified only by its type (see
+    // `retained_wire_evidence_does_not_hide_typed_command_refusals`), so a string that merely
+    // reads like one gets the generic code.
+    let queue_deadline_text =
         tally_runtime_command_error(anyhow::anyhow!("endpoint queue deadline exceeded"));
-    assert_eq!(queue_deadline.code, "tally_runtime_temporarily_unavailable");
-    assert!(queue_deadline.local_state_changed);
+    assert_eq!(
+        (
+            queue_deadline_text.code,
+            queue_deadline_text.retry,
+            queue_deadline_text.local_state_changed
+        ),
+        ("endpoint_unreachable", "after_change", true)
+    );
 
     let deadline = tally_runtime_command_error(
         anyhow::Error::new(bridge_tally_transport::TallyTransportError::RequestTimedOut)
@@ -459,6 +572,19 @@ fn retained_wire_evidence_does_not_hide_typed_command_refusals() {
         assert_eq!(mapped.code, code);
         assert!(!mapped.message.contains("opening balances disagreed"));
     }
+    // The live queue deadline is the typed error, found through any context on top (#1299).
+    let queue_deadline = tally_runtime_command_error(
+        anyhow::Error::new(crate::tally::runtime::TallyRuntimeControlError::QueueDeadline)
+            .context("outstandings read failed"),
+    );
+    assert_eq!(
+        (
+            queue_deadline.code,
+            queue_deadline.retry,
+            queue_deadline.local_state_changed
+        ),
+        ("tally_runtime_temporarily_unavailable", "safe", true)
+    );
 }
 
 #[test]
@@ -473,6 +599,171 @@ fn drifted_party_master_read_is_response_validation_not_endpoint_failure() {
 }
 
 #[test]
+fn a_chosen_date_before_the_books_is_named_in_band_through_retained_evidence() {
+    use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
+    let refusal = anyhow::Error::new(
+        crate::tally::connection::PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom,
+    );
+    for error in [
+        refusal,
+        with_read_evidence(
+            anyhow::Error::new(
+                crate::tally::connection::PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom,
+            ),
+            RuntimeReadEvidence::empty(),
+        ),
+    ] {
+        let mapped = party_ledger_master_runtime_command_error(error);
+        assert_eq!(mapped.code, "as_of_precedes_books_from");
+        assert_eq!(mapped.retry, "after_change");
+        assert!(!mapped.local_state_changed);
+    }
+}
+
+#[test]
+fn the_export_request_reads_a_chosen_date_and_refuses_a_malformed_one_at_the_boundary() {
+    let request = |as_of: Option<&str>| {
+        let mut value = serde_json::json!({
+            "config": { "host": "127.0.0.1", "port": 9000 },
+            "selected_company": {
+                "display_name": "Synthetic Accounts",
+                "company_guid": "00000000-0000-0000-0000-000000000000",
+                "company_number": "100001",
+                "books_from_yyyymmdd": "20260401",
+            },
+        });
+        if let Some(as_of) = as_of {
+            value["as_of_yyyymmdd"] = serde_json::json!(as_of);
+        }
+        serde_json::from_value::<PartyLedgerMasterRequest>(value)
+    };
+    assert_eq!(request(None).unwrap().as_of_yyyymmdd, None);
+    assert_eq!(
+        request(Some("20260731")).unwrap().as_of_yyyymmdd,
+        Some(TallyDate::parse("20260731").unwrap())
+    );
+    for malformed in ["2026-07-31", "20260230", "", "2026073"] {
+        assert!(request(Some(malformed)).is_err(), "{malformed}");
+    }
+}
+
+#[test]
+fn the_two_key_states_have_their_own_codes_and_a_credential_failure_does_not() {
+    use crate::db::MirrorKeyError;
+    let code = |error: MirrorKeyError| mirror_unavailable_command_error(anyhow::Error::new(error));
+    let missing = code(MirrorKeyError::MissingForExistingMirror);
+    assert_eq!(missing.code, "tally_mirror_key_missing");
+    assert_eq!(missing.retry, "not_recommended");
+    let invalid = code(MirrorKeyError::StoredKeyInvalid);
+    assert_eq!(invalid.code, "tally_mirror_key_invalid");
+    assert_eq!(invalid.retry, "not_recommended");
+    // Anything else keeps the old code, and a retry is safe: a denied prompt or a locked
+    // credential store must never read as a missing key.
+    for other in [
+        code(MirrorKeyError::Store(anyhow::anyhow!("denied"))),
+        code(MirrorKeyError::DatabaseStateUnreadable),
+        mirror_unavailable_command_error(anyhow::anyhow!("a disk error")),
+    ] {
+        assert_eq!(other.code, "tally_mirror_unavailable");
+        assert_eq!(other.retry, "safe");
+    }
+}
+
+#[test]
+fn a_key_state_still_reads_as_its_own_after_context_is_added() {
+    use crate::db::MirrorKeyError;
+    // The caller may add context on the way up; the typed state must survive it.
+    let wrapped = anyhow::Error::new(MirrorKeyError::StoredKeyInvalid)
+        .context("opening the mirror")
+        .context("starting the sync");
+    assert_eq!(
+        mirror_unavailable_command_error(wrapped).code,
+        "tally_mirror_key_invalid"
+    );
+}
+
+#[test]
+fn a_string_error_tells_the_two_key_states_from_the_rest() {
+    use crate::db::MirrorKeyError;
+    let text = |error: anyhow::Error| mirror_unavailable_string_error(error);
+    let missing = text(anyhow::Error::new(MirrorKeyError::MissingForExistingMirror));
+    let invalid = text(anyhow::Error::new(MirrorKeyError::StoredKeyInvalid));
+    let other = text(anyhow::anyhow!("a disk error"));
+    // A string carries no code field, so the text leads with it: the app's banner reads it there.
+    assert!(missing.starts_with("tally_mirror_key_missing: "));
+    assert!(invalid.starts_with("tally_mirror_key_invalid: "));
+    assert!(missing.contains(MIRROR_KEY_MISSING_MESSAGE));
+    assert!(invalid.contains(MIRROR_KEY_INVALID_MESSAGE));
+    assert_ne!(missing, invalid);
+    assert_ne!(missing, other);
+    assert_ne!(invalid, other);
+    assert_eq!(
+        text(anyhow::Error::new(MirrorKeyError::Store(anyhow::anyhow!(
+            "denied"
+        )))),
+        other,
+        "a credential-store failure reads as the retryable one"
+    );
+}
+
+#[test]
+fn a_chosen_date_becomes_the_requested_basis_and_none_asks_for_the_host_date() {
+    use crate::reports::party_ledger_master::BalanceDateBasis;
+    let chosen = TallyDate::parse("20260731").unwrap();
+    let host = TallyDate::parse("20261012").unwrap();
+    // A chosen date is the basis, and the clock is not read for it.
+    let basis = party_ledger_master_balance_basis(Some(chosen.clone()), || {
+        panic!("a chosen date must not read the host's date")
+    })
+    .unwrap();
+    assert_eq!(basis, BalanceDateBasis::Requested(chosen));
+    // With none chosen the basis is the host's date, as the export has always used.
+    let basis = party_ledger_master_balance_basis(None, || Ok(host.clone())).unwrap();
+    assert_eq!(basis, BalanceDateBasis::HostToday(host));
+    // A clock that cannot be read is the host-date error, not a made-up date.
+    let refused = party_ledger_master_balance_basis(None, || {
+        Err(tally_command_error(
+            "current_date_invalid",
+            "ComplyEaze Bridge application",
+            "synthetic",
+            "after_change",
+            false,
+            "synthetic",
+        ))
+    })
+    .unwrap_err();
+    assert_eq!(refused.code, "current_date_invalid");
+}
+
+#[test]
+fn the_export_response_is_the_path_and_the_typed_notes_the_app_reads() {
+    use crate::reports::party_ledger_master::{SourceNote, SourceNoteKind};
+    let response = PartyLedgerMasterExport {
+        path: "/exports/party-ledger-master-synthetic-20260831.xlsx".to_string(),
+        notes: vec![
+            SourceNote {
+                kind: SourceNoteKind::DateMoved,
+                text: "moved".to_string(),
+            },
+            SourceNote {
+                kind: SourceNoteKind::LaterDatedVoucher,
+                text: "later".to_string(),
+            },
+        ],
+    };
+    assert_eq!(
+        serde_json::to_value(&response).unwrap(),
+        serde_json::json!({
+            "path": "/exports/party-ledger-master-synthetic-20260831.xlsx",
+            "notes": [
+                { "kind": "date_moved", "text": "moved" },
+                { "kind": "later_dated_voucher", "text": "later" },
+            ],
+        })
+    );
+}
+
+#[test]
 fn party_master_export_keeps_runtime_control_error_code_and_hides_runtime_detail() {
     let error = party_ledger_master_runtime_command_error(anyhow::Error::new(
         crate::tally::runtime::TallyRuntimeControlError::QueueDeadline,
@@ -483,7 +774,7 @@ fn party_master_export_keeps_runtime_control_error_code_and_hides_runtime_detail
     assert!(error.local_state_changed);
     assert!(error
         .message
-        .starts_with("Bridge withheld the party/ledger master:"));
+        .starts_with("ComplyEaze Bridge withheld the party/ledger master:"));
     assert!(!error.message.contains("QueueDeadline"));
 }
 
@@ -648,7 +939,6 @@ fn reviewed_probe_commitment_binds_time_company_name_and_full_company_list() {
             features: BTreeMap::new(),
             packs: BTreeMap::new(),
         },
-        selected_read_scope: None,
         passport_snapshot_id: None,
     };
     let first = reviewed_probe_commitment_sha256(
@@ -701,15 +991,15 @@ fn a_size_refused_party_master_export_names_the_size_not_a_validation_failure() 
     use crate::tally::connection::PartyLedgerMasterSourceValidationError as Validation;
     use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
     let too_large = party_ledger_master_runtime_command_error(with_read_evidence(
-        anyhow::Error::new(Validation::TooLarge {
-            master_alter_id: 9_500,
-            counted_ledgers: Some(9_400),
-            estimated_bytes: 35_250_000,
-            budget_bytes: 16_000_000,
+        anyhow::Error::new(Validation::CatalogueTooLarge {
+            master_alter_id: 30_000,
+            estimated_bytes: 42_000_000,
+            limit_bytes: 32_000_000,
+            mark_limit: 400_000,
         }),
         RuntimeReadEvidence::empty(),
     ));
-    assert_eq!(too_large.code, "ledger_masters_too_large");
+    assert_eq!(too_large.code, "ledger_catalogue_too_large");
     assert_eq!(too_large.category, "Response size");
     assert_eq!(too_large.retry, "after_change");
     assert!(!too_large.local_state_changed);
@@ -719,6 +1009,78 @@ fn a_size_refused_party_master_export_names_the_size_not_a_validation_failure() 
         RuntimeReadEvidence::empty(),
     ));
     assert_eq!(other.code, "response_validation_failed");
+
+    // The census's refusals (#679) keep their own codes, not an endpoint failure.
+    for (error, code) in [
+        (
+            Validation::LedgerCountDiffers {
+                expected: 8,
+                observed: 9,
+            },
+            "ledger_count_differs",
+        ),
+        (
+            Validation::LedgerSpan {
+                source: bridge_tally_protocol::ledger_census::LedgerCensusError::CensusEmpty,
+            },
+            "ledger_span_census_empty",
+        ),
+        (
+            Validation::LedgerCountCompanyDiffers {
+                company: 9,
+                census: 5,
+            },
+            "ledger_count_company_differs",
+        ),
+        (
+            Validation::LedgerCountCompanyInvalid {
+                source:
+                    bridge_tally_protocol::outstandings_shared::OutstandingsError::InvalidResponse(
+                        "company_ledger_count_invalid",
+                    ),
+            },
+            "ledger_count_company_invalid",
+        ),
+        (
+            Validation::LedgerCountCompanyResponseTooLarge {
+                source: anyhow::anyhow!("past the cap"),
+            },
+            "ledger_count_company_response_too_large",
+        ),
+        (
+            Validation::CountedCatalogueTooLarge {
+                ledgers: 23_000,
+                estimated_bytes: 32_200_000,
+                limit_bytes: 32_000_000,
+            },
+            "ledger_count_catalogue_too_large",
+        ),
+        (
+            Validation::LedgerSpanSliceResponseTooLarge {
+                source: anyhow::anyhow!("past the cap"),
+            },
+            "ledger_span_slice_response_too_large",
+        ),
+    ] {
+        let mapped = party_ledger_master_runtime_command_error(with_read_evidence(
+            anyhow::Error::new(error),
+            RuntimeReadEvidence::empty(),
+        ));
+        assert_eq!(mapped.code, code);
+        let size_refusal = matches!(
+            code,
+            "ledger_count_catalogue_too_large" | "ledger_span_slice_response_too_large"
+        );
+        assert_eq!(
+            mapped.category,
+            if size_refusal {
+                "Response size"
+            } else {
+                "Response validation"
+            }
+        );
+        assert!(!mapped.local_state_changed);
+    }
 }
 
 /// bridge#551: the desktop party/ledger export withholds a workbook that would
@@ -770,4 +1132,60 @@ fn party_master_export_withholds_and_names_the_ledgers_it_would_leave_out() {
             .code,
         "party_ledger_master_foreign_currency_ledgers"
     );
+}
+
+/// The desktop messages these files show name the product in full, never by its
+/// bare short name (#962). A line that is not a comment and holds the word
+/// "Bridge" must have it as "ComplyEaze Bridge", so a new message in one of
+/// these files cannot bring the short name back.
+#[test]
+fn desktop_messages_name_the_product_in_full() {
+    const SOURCES: [(&str, &str); 7] = [
+        ("commands.rs", include_str!("commands.rs")),
+        (
+            "commands/all_clients.rs",
+            include_str!("commands/all_clients.rs"),
+        ),
+        (
+            "commands/all_clients/migration.rs",
+            include_str!("commands/all_clients/migration.rs"),
+        ),
+        (
+            "commands_trial_balance.rs",
+            include_str!("commands_trial_balance.rs"),
+        ),
+        (
+            "reports/bulk_party_statement.rs",
+            include_str!("reports/bulk_party_statement.rs"),
+        ),
+        (
+            "source_draft/types.rs",
+            include_str!("source_draft/types.rs"),
+        ),
+        ("sync/coordinator.rs", include_str!("sync/coordinator.rs")),
+    ];
+    let is_word = |character: Option<char>| {
+        character.is_some_and(|character| character.is_alphanumeric() || character == '_')
+    };
+    for (file, source) in SOURCES {
+        for (number, line) in source.lines().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("//") {
+                continue;
+            }
+            for (at, word) in line.match_indices("Bridge") {
+                let before = line[..at].chars().next_back();
+                let after = line[at + word.len()..].chars().next();
+                if is_word(before) || is_word(after) {
+                    continue;
+                }
+                assert!(
+                    line[..at].ends_with("ComplyEaze "),
+                    "{file}:{}: a bare Bridge: {}",
+                    number + 1,
+                    trimmed
+                );
+            }
+        }
+    }
 }

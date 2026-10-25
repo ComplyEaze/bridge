@@ -17,18 +17,28 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 use bridge_tax_audit::book::{
-    Book, InventoryLine, Ledger, LedgerLine, TbRow, Voucher, VoucherStatus,
+    Book, ClosingStock, InventoryLine, Ledger, LedgerLine, OpeningStock, TbRow, Voucher,
+    VoucherStatus,
 };
 use bridge_tax_audit::canonical::canonical_test_result;
 use bridge_tax_audit::compare::compare;
-use bridge_tax_audit::documents::{bank_statement_from_json, traces_documents_from_json};
+use bridge_tax_audit::documents::{
+    bank_statement_from_json, traces_documents_from_json, BankStatementLoad,
+};
+use bridge_tax_audit::error::{AuditError, Result};
+use bridge_tax_audit::findings::{EvidenceRef, TestResult};
 use bridge_tax_audit::read::Window;
 use bridge_tax_audit::rules::Rules;
+use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
-    bank_reconciliation, book_keeping_quality, cash_book_integrity, creditor_ageing_43bh,
-    high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly,
-    stale_balances_41_1, statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as,
-    trial_balance, twentysixas_receipts, PartnersConfig, Tds26asConfig, TdsConfig,
+    applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
+    cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
+    creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements,
+    high_value_register, knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees,
+    partners_40b_194t, party_identity, party_monthly, questionnaire_cl13, read_scope,
+    related_parties_cl23, specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock,
+    stock_read, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
+    RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -37,10 +47,96 @@ fn spec(name: &str) -> Value {
     serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
 }
 
+/// `knock_off_candidates`' extra party groups: the book's `party_identity.party_groups`, `[]` when
+/// the table or the key is absent. Anything but a table there, or a list of text, is refused (the
+/// pack's README section 10), as the real pipeline's binding refuses it; `strs()` would not.
+fn party_groups(s: &Value) -> Vec<String> {
+    let table = typed(s, "party_identity", false, "a table", |v| {
+        v.is_object().then(|| v.clone())
+    });
+    table
+        .and_then(|t| {
+            typed(&t, "party_groups", false, "a list of text", |v| {
+                v.as_array()?
+                    .iter()
+                    .map(|g| g.as_str().map(str::to_string))
+                    .collect()
+            })
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+#[should_panic(expected = "party_groups must be a list of text, got \"Sundry Debtors\"")]
+fn a_party_groups_value_that_is_not_a_list_is_refused() {
+    party_groups(&serde_json::json!({"party_identity": {"party_groups": "Sundry Debtors"}}));
+}
+
+#[test]
+#[should_panic(expected = "party_groups must be a list of text, got [\"Sundry Debtors\",1]")]
+fn a_party_groups_item_that_is_not_text_is_refused() {
+    party_groups(&serde_json::json!({"party_identity": {"party_groups": ["Sundry Debtors", 1]}}));
+}
+
+/// The `party_identity` table of an edge book, as the engagement's TOML table would give it.
+fn party_config(v: &Value) -> party_identity::PartyConfig {
+    let text = |o: &Value, k: &str| o[k].as_str().unwrap_or_default().to_string();
+    party_identity::PartyConfig {
+        derive_pan_from_gstin: v["derive_pan_from_gstin"].as_bool().unwrap_or(false),
+        party_groups: strs(&v["party_groups"]),
+        additional_party_ledgers: strs(&v["additional_party_ledgers"]).into_iter().collect(),
+        excluded_ledgers: strs(&v["excluded_ledgers"]).into_iter().collect(),
+        round_off_ledgers: strs(&v["round_off_ledgers"]).into_iter().collect(),
+        overrides: v["overrides"]
+            .as_object()
+            .map(|o| {
+                o.iter()
+                    .map(|(k, x)| {
+                        (
+                            k.clone(),
+                            party_identity::PartyOverride {
+                                name: text(x, "name"),
+                                pan: text(x, "pan"),
+                                gstin: text(x, "gstin"),
+                                address: text(x, "address"),
+                            },
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+    }
+}
+
 fn strs(v: &Value) -> Vec<String> {
     v.as_array()
         .map(|a| a.iter().map(|s| s.as_str().unwrap().to_string()).collect())
         .unwrap_or_default()
+}
+
+/// `narration_payees`' listed ledgers: the book's `narration_payee_ledgers`, `[]` when absent.
+/// Anything but a list of text is refused (the pack's README section 15), as the real pipeline's
+/// binding refuses it; `strs()` would not.
+fn narration_payee_ledgers(s: &Value) -> BTreeSet<String> {
+    typed(s, "narration_payee_ledgers", false, "a list of text", |v| {
+        v.as_array()?
+            .iter()
+            .map(|t| t.as_str().map(str::to_string))
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
+#[test]
+#[should_panic(expected = "narration_payee_ledgers must be a list of text, got \"Wages\"")]
+fn a_narration_payee_ledgers_value_that_is_not_a_list_is_refused() {
+    narration_payee_ledgers(&serde_json::json!({"narration_payee_ledgers": "Wages"}));
+}
+
+#[test]
+#[should_panic(expected = "narration_payee_ledgers must be a list of text, got [\"Wages\",1]")]
+fn a_narration_payee_ledgers_item_that_is_not_text_is_refused() {
+    narration_payee_ledgers(&serde_json::json!({"narration_payee_ledgers": ["Wages", 1]}));
 }
 
 fn date(iso: &str) -> TallyDate {
@@ -98,6 +194,52 @@ fn inventory_line(i: &Value) -> InventoryLine {
 }
 
 /// The book `parity/edge_golden.py` builds from the same spec.
+/// `opening_stock`: integer paise, or one of the reasons it is unknown; absent means none applies.
+fn opening_stock(s: &Value) -> OpeningStock {
+    use bridge_tax_audit::book::OpeningStockUnknown as U;
+    typed(
+        s,
+        "opening_stock",
+        false,
+        "integer paise or a reason",
+        |v| {
+            v.as_i64().map(OpeningStock::Valued).or_else(|| {
+                [U::NotRead, U::NotAtBooksStart, U::Unreadable]
+                    .into_iter()
+                    .find(|u| v.as_str() == Some(u.as_str()))
+                    .map(OpeningStock::Unknown)
+            })
+        },
+    )
+    .unwrap_or_default()
+}
+
+/// `closing_stock`: integer paise, or one of the reasons it is unknown; absent means none applies.
+fn closing_stock(s: &Value) -> ClosingStock {
+    use bridge_tax_audit::book::ClosingStockUnknown as U;
+    typed(
+        s,
+        "closing_stock",
+        false,
+        "integer paise or a reason",
+        |v| {
+            v.as_i64().map(ClosingStock::Valued).or_else(|| {
+                [
+                    U::NotRead,
+                    U::NoSummaryAtPeriodEnd,
+                    U::Unreadable,
+                    U::NoStockItems,
+                    U::SeveralSummariesAtPeriodEnd,
+                ]
+                .into_iter()
+                .find(|u| v.as_str() == Some(u.as_str()))
+                .map(ClosingStock::Unknown)
+            })
+        },
+    )
+    .unwrap_or_default()
+}
+
 fn build(s: &Value) -> Book {
     let groups = s["groups"]
         .as_object()
@@ -119,6 +261,12 @@ fn build(s: &Value) -> Book {
                 chain_complete: typed(l, "chain_complete", false, "true or false", Value::as_bool)
                     .unwrap_or(true),
                 master_opening_paise: 0,
+                pan: typed(l, "pan", false, "text", |p| p.as_str().map(str::to_string))
+                    .unwrap_or_default(),
+                gstin: typed(l, "gstin", false, "text", |p| {
+                    p.as_str().map(str::to_string)
+                })
+                .unwrap_or_default(),
                 guid: l["guid"].as_str().unwrap().to_string(),
                 masterid: None,
             };
@@ -155,6 +303,10 @@ fn build(s: &Value) -> Book {
                     .collect(),
                 narration: text("narration", ""),
                 party_field: text("party", ""),
+                party_gstin: typed(v, "party_gstin", false, "text", |p| {
+                    p.as_str().map(str::to_string)
+                })
+                .unwrap_or_default(),
                 reference: typed(v, "reference", false, "text", |r| {
                     r.as_str().map(str::to_string)
                 })
@@ -194,6 +346,10 @@ fn build(s: &Value) -> Book {
         ledgers,
         vouchers,
         tb,
+        currency_read: typed(s, "currency_read", false, "true or false", Value::as_bool)
+            .unwrap_or(false),
+        opening_stock: opening_stock(s),
+        closing_stock: closing_stock(s),
         ..Default::default()
     }
 }
@@ -257,6 +413,43 @@ fn creditor_ageing_params(c: &Value) -> creditor_ageing_43bh::Params {
             })
             .unwrap_or_default(),
         mse_interest_ledgers: strs(&c["mse_interest_ledgers"]).into_iter().collect(),
+    }
+}
+
+/// `creditor_ageing_43bh` on an edge book, as `parity/edge_golden.py` runs it.
+fn creditor_ageing_result(s: &Value, book: &Book, rules: &Rules) -> Result<TestResult> {
+    let creditors: BTreeSet<String> = strs(&s["creditors"]).into_iter().collect();
+    creditor_ageing_43bh::run(
+        book,
+        rules,
+        &period(s),
+        &creditors,
+        &creditor_ageing_params(&s["creditor_ageing"]),
+    )
+}
+
+/// `statutory_dues_43b` on an edge book, as `parity/edge_golden.py` runs it.
+fn statutory_dues_result(s: &Value, book: &Book, rules: &Rules) -> Result<TestResult> {
+    let sd = &s["statutory_dues"];
+    let nature_by_ledger: BTreeMap<String, String> = sd["nature_by_ledger"]
+        .as_object()
+        .map(|m| {
+            m.iter()
+                .map(|(k, v)| (k.clone(), v.as_str().unwrap().to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let salary: BTreeSet<String> = strs(&sd["salary_expense_ledgers"]).into_iter().collect();
+    statutory_dues_43b::run(book, rules, &period(s), &nature_by_ledger, &salary)
+}
+
+/// The result of the one test a statutory-dues or creditor-ageing book names.
+fn dues_or_ageing_result(s: &Value) -> Result<TestResult> {
+    let (book, rules) = (build(s), rules(s));
+    match strs(&s["tests"]).as_slice() {
+        [test] if test == "creditor_ageing_43bh" => creditor_ageing_result(s, &book, &rules),
+        [test] if test == "statutory_dues_43b" => statutory_dues_result(s, &book, &rules),
+        other => panic!("{other:?}: not a statutory-dues or creditor-ageing book"),
     }
 }
 
@@ -373,6 +566,17 @@ fn toml_of(v: &Value) -> toml::Value {
     }
 }
 
+/// The `related_parties` table of an edge book (absent meaning `{}`), as the engagement's TOML
+/// `[related_parties]` table would give it, before binding (the edge books are not bound).
+fn related_parties(s: &Value) -> RelatedPartiesConfig {
+    RelatedPartiesConfig {
+        persons: s["related_parties"]
+            .as_object()
+            .map(|m| m.iter().map(|(k, v)| (k.clone(), toml_of(v))).collect())
+            .unwrap_or_default(),
+    }
+}
+
 /// The `partners` and `deed` `parity/edge_golden.py` passes `partners_40b_194t`, as a bound
 /// `[partners]` table.
 fn partners(s: &Value) -> PartnersConfig {
@@ -410,6 +614,33 @@ fn tds_26as_config(s: &Value) -> Tds26asConfig {
                     .collect()
             })
             .unwrap_or_default(),
+    }
+}
+
+/// `clause44`'s inputs from the spec's `clause44` table, as `parity/edge_golden.py` passes them:
+/// every key optional and empty when absent, `tax_ledgers` every head's ledgers, and the two maps
+/// typed by the crate's own reader.
+fn clause44_inputs(s: &Value) -> clause44::Inputs {
+    let c = &s["clause44"];
+    let set = |k: &str| strs(&c[k]).into_iter().collect();
+    let map = |k: &str| -> BTreeMap<String, toml::Value> {
+        c[k].as_object()
+            .map(|m| m.iter().map(|(l, v)| (l.clone(), toml_of(v))).collect())
+            .unwrap_or_default()
+    };
+    clause44::Inputs {
+        dep_expense_ledgers: set("dep_expense_ledgers"),
+        tax_ledgers: c["tax_ledgers"]
+            .as_object()
+            .map(|heads| heads.values().flat_map(strs).collect())
+            .unwrap_or_default(),
+        no_supplier_expense_ledgers: set("no_supplier_expense_ledgers"),
+        round_off_ledgers: set("round_off_ledgers"),
+        ..clause44::Inputs::new(
+            &map("registration_type_by_ledger"),
+            &map("money_category_by_ledger"),
+        )
+        .unwrap()
     }
 }
 
@@ -501,6 +732,69 @@ fn stock_inputs(s: &Value) -> stock_read::StockInputs {
     }
 }
 
+/// `applicability_44ab`'s inputs from an edge book: `a44_turnover` (the reference's `turnover_inputs`), `a44_cash_share`,
+/// `presumptive_history` and `deductor_activity`, each typed strictly as `parity/edge_golden.py` reads it.
+fn applicability_inputs(
+    s: &Value,
+) -> (
+    applicability_44ab::TurnoverInputs,
+    applicability_44ab::CashShare,
+    Option<toml::Table>,
+    Option<DeductorActivity>,
+) {
+    let t = &s["a44_turnover"];
+    let optional_int = |v: &Value| -> Option<i64> {
+        if v.is_null() {
+            None
+        } else {
+            Some(v.as_i64().expect("an integer or null"))
+        }
+    };
+    let source = |name: &str| {
+        optional_int(&t[format!("{name}_turnover_paise")]).map(|turnover_paise| {
+            applicability_44ab::ComparisonTurnover {
+                turnover_paise,
+                coverage: t[format!("{name}_coverage")]
+                    .as_str()
+                    .unwrap_or("full")
+                    .to_string(),
+            }
+        })
+    };
+    let inputs = applicability_44ab::TurnoverInputs {
+        books_turnover_paise: optional_int(&t["books_turnover_paise"]),
+        gstr1: source("gstr1"),
+        gstr3b: source("gstr3b"),
+        ais: source("ais"),
+    };
+    let c = &s["a44_cash_share"];
+    let cash = applicability_44ab::CashShare {
+        receipts_bp: optional_int(&c["receipts_bp"]),
+        payments_bp: optional_int(&c["payments_bp"]),
+        limits: strs(&c["limits"]),
+    };
+    let history = s["presumptive_history"].as_object().map(|m| {
+        m.iter()
+            .map(|(k, v)| {
+                let value = match v {
+                    Value::String(x) => toml::Value::String(x.clone()),
+                    Value::Bool(b) => toml::Value::Boolean(*b),
+                    Value::Number(n) => toml::Value::Integer(n.as_i64().expect("an integer")),
+                    other => {
+                        panic!("presumptive_history holds text, integers and booleans, not {other}")
+                    }
+                };
+                (k.clone(), value)
+            })
+            .collect::<toml::Table>()
+    });
+    let activity = s["deductor_activity"].as_str().map(|a| {
+        DeductorActivity::parse(a)
+            .unwrap_or_else(|| panic!("deductor_activity {a:?} is not recognised"))
+    });
+    (inputs, cash, history, activity)
+}
+
 /// Build the book, run every test the spec names, and compare each whole dump with the reference's.
 fn check(name: &str) {
     let s = spec(name);
@@ -526,6 +820,32 @@ fn check(name: &str) {
                 let c = trial_balance::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
+            "clause44" => {
+                let r = clause44::run(&book, &rules, &clause44_inputs(&s)).unwrap();
+                let c = clause44::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "related_parties_cl23" => {
+                let r = related_parties_cl23::run(&book, &rules, &related_parties(&s)).unwrap();
+                let c = related_parties_cl23::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "specified_persons_40a2b" => {
+                let entity_type = s["entity_type"].as_str().unwrap_or("individual");
+                let table = related_parties(&s);
+                let related = related_parties_cl23::run(&book, &rules, &table).unwrap();
+                let r =
+                    specified_persons_40a2b::run(&rules, entity_type, &table, &related).unwrap();
+                let c = specified_persons_40a2b::check_invariants(
+                    &rules,
+                    entity_type,
+                    &table,
+                    &related,
+                    &r,
+                )
+                .unwrap();
+                (r, c)
+            }
             "stale_balances_41_1" => {
                 let r = stale_balances_41_1::run(&book, &rules).unwrap();
                 let c = stale_balances_41_1::check_invariants(&book, &r).unwrap();
@@ -536,40 +856,147 @@ fn check(name: &str) {
                 let c = ledger_scrutiny::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
+            "counter_cheques_40a3" => {
+                let terms: BTreeSet<String> =
+                    strs(&s["counter_cheque_terms"]).into_iter().collect();
+                let r = counter_cheques_40a3::run(&book, &rules, &cash, &bank, &terms).unwrap();
+                let c = counter_cheques_40a3::check_invariants(&r, None);
+                (r, c)
+            }
             "cash_book_integrity" => {
                 let terms = strs(&s["own_account_terms"]);
                 let r = cash_book_integrity::run(&book, &rules, &cash, &bank, &terms).unwrap();
                 let c = cash_book_integrity::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
-            "creditor_ageing_43bh" => {
-                let creditors: BTreeSet<String> = strs(&s["creditors"]).into_iter().collect();
-                let r = creditor_ageing_43bh::run(
+            "financial_statements" => {
+                // As `parity/edge_golden.py` runs it: no partners' interest ledgers and no report
+                // totals.
+                let r = financial_statements::run(&book, &rules, &BTreeSet::new(), None).unwrap();
+                let c = financial_statements::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "cash_payments_40a3" => {
+                // As `parity/edge_golden.py` runs it: the configured loan ledgers and the
+                // round-off ledgers as given. The reference module has no `check_invariants`.
+                let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
+                let r = cash_payments_40a3::run(
+                    &book,
+                    &rules,
+                    &cash,
+                    &bank,
+                    &set("loan_ledgers"),
+                    &set("round_off_ledgers"),
+                )
+                .unwrap();
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
+            }
+            "depreciation" => {
+                // As `parity/edge_golden.py` runs it: the spec's `depreciation` table is the
+                // client config's, each of its three tables required, with the put-to-use dates
+                // `run` takes (absent meaning none).
+                let d = &s["depreciation"];
+                let table = |k: &str| {
+                    d[k].as_object()
+                        .unwrap_or_else(|| panic!("{name}: depreciation.{k} must be a table"))
+                };
+                assert!(
+                    d["dep_expense_ledgers"].is_array(),
+                    "{name}: depreciation.dep_expense_ledgers must be a list"
+                );
+                let r = depreciation::run(
                     &book,
                     &rules,
                     &period(&s),
-                    &creditors,
-                    &creditor_ageing_params(&s["creditor_ageing"]),
+                    &table("block_by_ledger")
+                        .iter()
+                        .map(|(l, b)| (l.clone(), b.as_str().unwrap().to_string()))
+                        .collect(),
+                    &table("opening_wdv_paise")
+                        .iter()
+                        .map(|(b, p)| (b.clone(), int(p)))
+                        .collect(),
+                    &strs(&d["dep_expense_ledgers"]).into_iter().collect(),
+                    &d["put_to_use_by_voucher"]
+                        .as_object()
+                        .into_iter()
+                        .flatten()
+                        .map(|(g, day)| (g.clone(), date(day.as_str().unwrap())))
+                        .collect(),
                 )
                 .unwrap();
+                let c = depreciation::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "entity_269st_gap" => {
+                // As `parity/edge_golden.py` runs it: the party index from the book's own
+                // `party_identity` table (the engagement's), the round-off ledgers as given.
+                let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
+                let config = party_config(&s["party_identity"]);
+                let index = party_identity::build_party_index(&book, &config).unwrap();
+                let r = entity_269st_gap::run(
+                    &book,
+                    &rules,
+                    &cash,
+                    &bank,
+                    &index,
+                    &set("round_off_ledgers"),
+                )
+                .unwrap();
+                let c = entity_269st_gap::check_invariants(&r);
+                (r, c)
+            }
+            "books_examined" => {
+                // As `parity/edge_golden.py` runs it: the documents loaded, in the pack's order.
+                let documents_read = typed(&s, "documents_read", false, "a list of text", |d| {
+                    bridge_tax_audit::registry::documents_read_from_json(d).ok()
+                })
+                .unwrap_or_default();
+                let r = books_examined::run(&book, &rules, &documents_read).unwrap();
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
+            }
+            "clause21a_candidates" => {
+                // As `parity/edge_golden.py` runs it: the client's extra terms through the crate's
+                // own reader of `[clause21a]`, and the partners' interest and remuneration ledgers.
+                let clause21a = s.get("clause21a_extra_terms").map(|x| {
+                    toml::Value::Table(toml::Table::from_iter([(
+                        "extra_terms".to_string(),
+                        toml_of(x),
+                    )]))
+                });
+                let extra = clause21a_candidates::extra_terms(clause21a.as_ref()).unwrap();
+                let partner_ledgers = clause21a_candidates::partner_ledgers(&partners(&s)).unwrap();
+                let r = clause21a_candidates::run(&book, &rules, &extra, &partner_ledgers).unwrap();
+                // The reference module has no check_invariants: an empty evaluated list.
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
+            }
+            "read_scope" => {
+                let r = read_scope::run(&book, &rules).unwrap();
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
+            }
+            "creditor_ageing_43bh" => {
+                let r = creditor_ageing_result(&s, &book, &rules).unwrap();
                 let c = creditor_ageing_43bh::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
             "statutory_dues_43b" => {
-                let sd = &s["statutory_dues"];
-                let nature_by_ledger: BTreeMap<String, String> = sd["nature_by_ledger"]
-                    .as_object()
-                    .map(|m| {
-                        m.iter()
-                            .map(|(k, v)| (k.clone(), v.as_str().unwrap().to_string()))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let salary: BTreeSet<String> =
-                    strs(&sd["salary_expense_ledgers"]).into_iter().collect();
-                let r =
-                    statutory_dues_43b::run(&book, &rules, &period(&s), &nature_by_ledger, &salary)
-                        .unwrap();
+                let r = statutory_dues_result(&s, &book, &rules).unwrap();
                 let c = statutory_dues_43b::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
@@ -589,6 +1016,25 @@ fn check(name: &str) {
                 let diffs = compare(&golden, &rust, None).unwrap();
                 assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
                 continue;
+            }
+            "narration_payees" => {
+                // As `parity/edge_golden.py` runs it: the TDS payee test first, as its arm above
+                // runs it, and the 194C ledgers it could not name a payee for read too.
+                let entity_type = s["entity_type"].as_str().unwrap_or("individual");
+                let tds = tds_config(&s);
+                let tds_result =
+                    tds_payees::run(&book, &rules, entity_type, &tds, &tds_inputs(&s)).unwrap();
+                let added = narration_payees::unnamed_194c_ledgers(
+                    &book,
+                    &tds_result,
+                    &tds.nature_by_ledger,
+                )
+                .unwrap();
+                let listed = narration_payee_ledgers(&s);
+                let r = narration_payees::run(&book, &rules, &bank, &listed, &added).unwrap();
+                let read: BTreeSet<String> = listed.union(&added).cloned().collect();
+                let c = narration_payees::check_invariants(&book, &r, &bank, &read).unwrap();
+                (r, c)
             }
             "loans_interest" => {
                 let entity_type = s["entity_type"].as_str().unwrap_or("individual");
@@ -651,32 +1097,98 @@ fn check(name: &str) {
                 assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
                 continue;
             }
-            "bank_reconciliation" => {
-                // The statement is caller data; its rows feed BANK-1, as the reference's pack sets
-                // `eng.bank` to them.
-                let statement = bank_statement_from_json(&s["bank_statement"]).unwrap();
-                let terms: BTreeSet<String> = strs(&s["bank_charge_terms"]).into_iter().collect();
-                let ledger = s["bank_reconciliation_ledger"].as_str().unwrap();
-                let r = bank_reconciliation::run(
-                    &book,
+            "applicability_44ab" => {
+                let (inputs, cash_share, history, activity) = applicability_inputs(&s);
+                let entity_type = s["entity_type"].as_str().unwrap_or("individual");
+                let r = applicability_44ab::run(
                     &rules,
-                    &period(&s),
-                    &statement,
-                    ledger,
-                    &terms,
-                    bank_reconciliation::MATCH_MAX_DAYS,
+                    entity_type,
+                    &inputs,
+                    &cash_share,
+                    history.as_ref(),
+                    activity,
                 )
                 .unwrap();
-                let c = bank_reconciliation::check_invariants(&statement.rows, &r).unwrap();
-                (r, c)
+                // The reference module has no check_invariants: an empty evaluated list.
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
+            }
+            "bank_reconciliation" => {
+                // The statement is caller data; its rows feed BANK-1, as the reference's pack sets
+                // `eng.bank` to them. A statement the reader refuses gives the module's refused
+                // result, with the reader's reason, and BANK-1 no rows, as the pack does.
+                match bank_statement_from_json(&s["bank_statement"]) {
+                    Ok(statement) => {
+                        let terms: BTreeSet<String> =
+                            strs(&s["bank_charge_terms"]).into_iter().collect();
+                        let ledger = s["bank_reconciliation_ledger"].as_str().unwrap();
+                        let r = bank_reconciliation::run(
+                            &book,
+                            &rules,
+                            &period(&s),
+                            &statement,
+                            ledger,
+                            &terms,
+                            bank_reconciliation::MATCH_MAX_DAYS,
+                        )
+                        .unwrap();
+                        let c = bank_reconciliation::check_invariants(&statement.rows, &r).unwrap();
+                        (r, c)
+                    }
+                    Err(AuditError::StatementRefused(refusal)) => {
+                        let r = bank_reconciliation::refused(&rules, &refusal.reason()).unwrap();
+                        let c = bank_reconciliation::check_invariants(&[], &r).unwrap();
+                        // The refused result's one figure is the reason: the registry's floor is
+                        // for a reconciliation that ran.
+                        let rust = canonical_test_result(&book, &r, Some(c)).unwrap();
+                        let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                        let diffs = compare(&golden, &rust, Some(1)).unwrap();
+                        assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                        continue;
+                    }
+                    Err(e) => panic!("{name}: the statement is malformed: {e}"),
+                }
+            }
+            "knock_off_candidates" => {
+                // No module check: the dump lists none (the pack's README section 6).
+                let r = knock_off_candidates::run(&book, &rules, &party_groups(&s)).unwrap();
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
             }
             "high_value_register" => {
                 // As `parity/edge_golden.py` runs it: the statement and the AIS rows optional, the
                 // counterparty types already merged, the recipient type from `entity_type` unless
-                // the spec names one ("unknown" meaning none).
+                // the spec names one ("unknown" meaning none). A statement the reader refuses is not
+                // supplied, and its reason is passed, as the pack passes it. A statement read and also
+                // refused is not a state `BankStatementLoad` can hold, so a spec giving both panics.
                 let statement = match &s["bank_statement"] {
-                    Value::Null => None,
-                    v => Some(bank_statement_from_json(v).unwrap()),
+                    Value::Null => match s["bank_statement_refused"].as_str() {
+                        Some(reason) => BankStatementLoad::Refused(reason.to_string()),
+                        None => BankStatementLoad::NotSupplied,
+                    },
+                    v => match bank_statement_from_json(v) {
+                        Ok(statement) => {
+                            assert!(
+                                s["bank_statement_refused"].is_null(),
+                                "{name}: bank_statement_refused is given and the statement is read"
+                            );
+                            BankStatementLoad::Read(statement)
+                        }
+                        Err(AuditError::StatementRefused(refusal)) => {
+                            assert!(
+                                s["bank_statement_refused"].is_null(),
+                                "{name}: bank_statement_refused is given and the reader refuses"
+                            );
+                            BankStatementLoad::Refused(refusal.reason())
+                        }
+                        Err(e) => panic!("{name}: the statement is malformed: {e}"),
+                    },
                 };
                 let docs = traces_documents_from_json(&s).unwrap();
                 let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
@@ -706,9 +1218,9 @@ fn check(name: &str) {
                     cash: &cash,
                     bank: &bank,
                     threshold_paise: None,
-                    bank_statement: statement.as_ref(),
+                    bank_statement: &statement,
                     s194n_narration_terms: &terms,
-                    ais_rows: &docs.ais,
+                    ais_rows: docs.ais_rows(),
                     s194n_recipient_type: recipient,
                     round_off_ledgers: &round_off,
                     counterparty_type_by_ledger: &types,
@@ -729,7 +1241,26 @@ fn check(name: &str) {
                 .unwrap_or(party_monthly::PARTY_TOP_N);
                 let r =
                     party_monthly::run(&book, &rules, &period(&s), &cash, &bank, top_n).unwrap();
-                let c = party_monthly::check_invariants(&book, &period(&s), &r).unwrap();
+                // PWM-2 takes the cash and bank ledgers run() takes, as the reference's pack passes them.
+                let c =
+                    party_monthly::check_invariants(&book, &period(&s), &r, &cash, &bank).unwrap();
+                (r, c)
+            }
+            "questionnaire_cl13" => {
+                // The stock port's result on a book carrying both Stock Summaries, none on a book
+                // carrying neither; one alone is refused, as `parity/edge_golden.py` refuses it.
+                let has = (
+                    s.get("stock_opening").is_some(),
+                    s.get("stock_closing").is_some(),
+                );
+                let stock_result = match has {
+                    (true, true) => Some(stock::run(&book, &rules, &stock_inputs(&s)).unwrap()),
+                    (false, false) => None,
+                    _ => panic!("{name}: stock_opening and stock_closing go together"),
+                };
+                let r = questionnaire_cl13::run(&book, &rules, &period(&s), stock_result.as_ref())
+                    .unwrap();
+                let c = questionnaire_cl13::check_invariants(&book, &period(&s), &r).unwrap();
                 (r, c)
             }
             "stock" => {
@@ -741,8 +1272,10 @@ fn check(name: &str) {
             "twentysixas_receipts" => {
                 let docs = traces_documents_from_json(&s).unwrap();
                 let aliases = tds_26as_config(&s).deductor_aliases;
-                let r = twentysixas_receipts::run(&book, &rules, &docs.form26as, &aliases).unwrap();
-                let c = twentysixas_receipts::check_invariants(&book, &docs.form26as, &r).unwrap();
+                let r = twentysixas_receipts::run(&book, &rules, docs.form26as_rows(), &aliases)
+                    .unwrap();
+                let c = twentysixas_receipts::check_invariants(&book, docs.form26as_rows(), &r)
+                    .unwrap();
                 (r, c)
             }
             "tds_tcs_26as" => {
@@ -751,13 +1284,13 @@ fn check(name: &str) {
                     &book,
                     &rules,
                     &period(&s),
-                    &docs.form26as,
-                    &docs.ais,
-                    &docs.tis,
+                    docs.form26as_rows(),
+                    docs.ais_rows(),
+                    docs.tis_rows(),
                     &tds_26as_config(&s),
                 )
                 .unwrap();
-                let c = tds_tcs_26as::check_invariants(&book, &docs.form26as, &r).unwrap();
+                let c = tds_tcs_26as::check_invariants(&book, docs.form26as_rows(), &r).unwrap();
                 (r, c)
             }
             other => panic!("{name}: no edge dispatch for {other} (EDGE_TESTS: {EDGE_TESTS:?})"),
@@ -771,16 +1304,31 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 16] = [
+const EDGE_TESTS: [&str; 31] = [
+    "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
+    "books_examined",
     "cash_book_integrity",
+    "cash_payments_40a3",
+    "clause21a_candidates",
+    "clause44",
+    "counter_cheques_40a3",
     "creditor_ageing_43bh",
+    "depreciation",
+    "entity_269st_gap",
+    "financial_statements",
     "high_value_register",
+    "knock_off_candidates",
     "ledger_scrutiny",
     "loans_interest",
+    "narration_payees",
     "partners_40b_194t",
     "party_monthly",
+    "questionnaire_cl13",
+    "read_scope",
+    "related_parties_cl23",
+    "specified_persons_40a2b",
     "stale_balances_41_1",
     "statutory_dues_43b",
     "stock",
@@ -987,8 +1535,12 @@ fn the_26as_invariants_catch_a_row_of_the_wrong_part() {
     let (book, rules) = (build(&s), crate::rules(&s));
     let docs = traces_documents_from_json(&s).unwrap();
     let aliases = tds_26as_config(&s).deductor_aliases;
-    let mut r = twentysixas_receipts::run(&book, &rules, &docs.form26as, &aliases).unwrap();
-    let part_vi = docs.form26as.iter().find(|a| a.part == "VI").unwrap();
+    let mut r = twentysixas_receipts::run(&book, &rules, docs.form26as_rows(), &aliases).unwrap();
+    let part_vi = docs
+        .form26as_rows()
+        .iter()
+        .find(|a| a.part == "VI")
+        .unwrap();
     let vi_id = format!("{}#{}", part_vi.doc, part_vi.row);
     let supply = r
         .figures
@@ -1001,7 +1553,7 @@ fn the_26as_invariants_catch_a_row_of_the_wrong_part() {
         .find(|e| e.kind == "document_row")
         .unwrap();
     doc.id = vi_id.clone();
-    let v = twentysixas_receipts::check_invariants(&book, &docs.form26as, &r).unwrap();
+    let v = twentysixas_receipts::check_invariants(&book, docs.form26as_rows(), &r).unwrap();
     assert!(
         v.iter()
             .any(|m| m.starts_with("TR-2:") && m.contains("Part VI row")),
@@ -1016,16 +1568,22 @@ fn the_26as_invariants_catch_a_row_of_the_wrong_part() {
         &book,
         &rules,
         &period(&s),
-        &docs.form26as,
-        &docs.ais,
-        &docs.tis,
+        docs.form26as_rows(),
+        docs.ais_rows(),
+        docs.tis_rows(),
         &cfg,
     )
     .unwrap();
-    assert!(tds_tcs_26as::check_invariants(&book, &docs.form26as, &r)
-        .unwrap()
-        .is_empty());
-    let part_vi = docs.form26as.iter().find(|a| a.part == "VI").unwrap();
+    assert!(
+        tds_tcs_26as::check_invariants(&book, docs.form26as_rows(), &r)
+            .unwrap()
+            .is_empty()
+    );
+    let part_vi = docs
+        .form26as_rows()
+        .iter()
+        .find(|a| a.part == "VI")
+        .unwrap();
     let pair = r
         .figures
         .iter_mut()
@@ -1037,7 +1595,7 @@ fn the_26as_invariants_catch_a_row_of_the_wrong_part() {
         .find(|e| e.kind == "document_row")
         .unwrap();
     doc.id = format!("{}#{}", part_vi.doc, part_vi.row);
-    let v = tds_tcs_26as::check_invariants(&book, &docs.form26as, &r).unwrap();
+    let v = tds_tcs_26as::check_invariants(&book, docs.form26as_rows(), &r).unwrap();
     assert!(
         v.iter()
             .any(|m| m.starts_with("TT-4:") && m.contains("(kind tds) matches a 26AS part-VI row")),
@@ -1072,9 +1630,10 @@ fn each_26as_invariant_fires_on_its_own_tampering() {
     let (book, rules) = (build(&s), crate::rules(&s));
     let docs = traces_documents_from_json(&s).unwrap();
     let aliases = tds_26as_config(&s).deductor_aliases;
-    let clean = twentysixas_receipts::run(&book, &rules, &docs.form26as, &aliases).unwrap();
-    let check =
-        |r: &TestResult| twentysixas_receipts::check_invariants(&book, &docs.form26as, r).unwrap();
+    let clean = twentysixas_receipts::run(&book, &rules, docs.form26as_rows(), &aliases).unwrap();
+    let check = |r: &TestResult| {
+        twentysixas_receipts::check_invariants(&book, docs.form26as_rows(), r).unwrap()
+    };
     let base = check(&clean);
     assert!(
         !base.is_empty()
@@ -1158,13 +1717,14 @@ fn each_26as_invariant_fires_on_its_own_tampering() {
         &book,
         &rules,
         &period(&s),
-        &docs.form26as,
-        &docs.ais,
-        &docs.tis,
+        docs.form26as_rows(),
+        docs.ais_rows(),
+        docs.tis_rows(),
         &tds_26as_config(&s),
     )
     .unwrap();
-    let check = |r: &TestResult| tds_tcs_26as::check_invariants(&book, &docs.form26as, r).unwrap();
+    let check =
+        |r: &TestResult| tds_tcs_26as::check_invariants(&book, docs.form26as_rows(), r).unwrap();
     assert!(check(&clean).is_empty());
     for (name, needle) in [
         ("twentysixas_agg_count", "!= twentysixas_agg_count"),
@@ -1200,29 +1760,33 @@ fn a_repeated_tis_category_is_refused() {
     let s = spec("tds26as_matching");
     let (book, rules) = (build(&s), crate::rules(&s));
     let mut docs = traces_documents_from_json(&s).unwrap();
-    let mut again = docs.tis[0].clone();
+    let mut again = docs.tis_rows()[0].clone();
     again.row = 99;
-    docs.tis.push(again);
+    docs.tis.as_mut().unwrap().push(again);
     let Err(err) = tds_tcs_26as::run(
         &book,
         &rules,
         &period(&s),
-        &docs.form26as,
-        &docs.ais,
-        &docs.tis,
+        docs.form26as_rows(),
+        docs.ais_rows(),
+        docs.tis_rows(),
         &tds_26as_config(&s),
     ) else {
         panic!("a repeated TIS category is refused");
     };
-    assert!(format!("{err}").contains("would repeat"), "{err}");
+    assert!(
+        matches!(&err, AuditError::DuplicateFigureId(id) if id.starts_with("tds_tcs_26as.")),
+        "{err}"
+    );
 }
 
 /// Two matched books rows sharing a GUID would repeat `match_pair_<hash>`: the reference's `fig`
 /// raises ("duplicate figure id bank_reconciliation.match_pair_093394bf", checked on this same
-/// change to `bankrec_paths`), and the port refuses with an error rather than panicking.
+/// change to `bankrec_adds_up` at reference `da9e2d3d`), and the port refuses with an error rather
+/// than panicking.
 #[test]
 fn a_repeated_books_guid_is_refused_not_panicked() {
-    let mut s = spec("bankrec_paths");
+    let mut s = spec("bankrec_adds_up");
     for v in s["vouchers"].as_array_mut().unwrap() {
         if v["guid"] == "p07" {
             v["guid"] = Value::from("p01");
@@ -1244,29 +1808,168 @@ fn a_repeated_books_guid_is_refused_not_panicked() {
     })
     .expect("refused, not panicked");
     let err = result.expect_err("a repeated figure id is refused");
-    assert!(format!("{err}").contains("match_pair_093394bf"), "{err}");
+    assert!(
+        matches!(&err, AuditError::DuplicateFigureId(id) if id == "bank_reconciliation.match_pair_093394bf"),
+        "{err}"
+    );
 }
 
-/// A two-line journal whose lines are both on one party ledger gives two figures one id; the
-/// reference raises `duplicate figure id ...journal_transfer_amount_0bce8b28_0431f39b` on this
-/// book, and the port refuses with an error, never a panic.
+/// A row's refs as (kind, id, label), in the order the module emitted them.
+fn emitted(evidence: &[EvidenceRef]) -> Vec<(&str, &str, &str)> {
+    evidence
+        .iter()
+        .map(|e| (e.kind.as_str(), e.id.as_str(), e.label.as_str()))
+        .collect()
+}
+
+/// The canonical dump sorts a row's refs, so no golden shows the order a module emits them in.
+/// The reference emits a row's voucher refs sorted by GUID and then label, by code point: measured
+/// at `ee17d80f`, through `parity/edge_golden.py` with its serialiser wrapped, on the six books
+/// below (78 runs of voucher refs, each ascending). The two lists are what it emitted there for
+/// those rows: upper case before lower, a decomposed accent before `z` and the composed one after
+/// it, a full-width letter before a character beyond U+FFFF, and a creditor's ledger first.
 #[test]
-fn a_journal_on_one_ledger_is_refused_not_panicked() {
-    let mut s = spec("hvr_bare");
-    for v in s["vouchers"].as_array_mut().unwrap() {
-        if v["guid"] == "b02" {
-            v["lines"] =
-                serde_json::json!([["Customer A", 20_000_000], ["Customer A", -20_000_000]]);
+fn dues_and_ageing_emit_voucher_refs_by_guid_then_label() {
+    let mut results = BTreeMap::new();
+    for name in [
+        "creditor_ageing_shared_guid",
+        "creditor_ageing_short",
+        "statutory_dues_more",
+        "statutory_dues_ref_order",
+        "statutory_dues_shared_guid",
+        "statutory_dues_shared_guid_employee",
+    ] {
+        let r = dues_or_ageing_result(&spec(name)).unwrap();
+        let rows = (r.figures.iter().map(|f| (&f.id, &f.evidence)))
+            .chain(r.findings.iter().map(|f| (&f.id, &f.evidence)));
+        let mut pairs = 0;
+        for (id, evidence) in rows {
+            for run in evidence.split(|e| e.kind != "voucher") {
+                pairs += run.len().saturating_sub(1);
+                assert!(
+                    run.windows(2)
+                        .all(|w| (&w[0].id, &w[0].label) < (&w[1].id, &w[1].label)),
+                    "{name} {id}: {:?}",
+                    emitted(run)
+                );
+            }
+        }
+        assert!(pairs > 0, "{name}: no row cites two vouchers");
+        results.insert(name, r);
+    }
+    let dues = &results["statutory_dues_ref_order"];
+    let charged = (dues.figures.iter())
+        .find(|f| f.id == "statutory_dues_43b.charged_gst_payable")
+        .unwrap();
+    assert_eq!(
+        emitted(&charged.evidence),
+        [
+            ("voucher", "", "Payment PAY-B on 2025-12-01"),
+            ("voucher", "", "Payment pay-b on 2025-12-01"),
+            ("voucher", "edge-so-G", "Payment G1 on 2025-12-02"),
+            ("voucher", "edge-so-case", "Journal INV-A on 2025-10-01"),
+            ("voucher", "edge-so-case", "Journal Inv-a on 2025-10-01"),
+            ("voucher", "edge-so-case", "Journal inv-a on 2025-10-01"),
+            ("voucher", "edge-so-g", "Payment G0 on 2025-12-03"),
+            ("voucher", "edge-so-g", "Payment G1 on 2025-12-02"),
+            ("voucher", "edge-so-uni", "Journal e\u{301}1 on 2025-11-01"),
+            ("voucher", "edge-so-uni", "Journal z1 on 2025-10-31"),
+            ("voucher", "edge-so-uni", "Journal z1 on 2025-11-01"),
+            ("voucher", "edge-so-uni", "Journal \u{e9}1 on 2025-11-01"),
+            ("voucher", "edge-so-uni", "Journal \u{ff21}1 on 2025-11-01"),
+            ("voucher", "edge-so-uni", "Journal \u{1f4d1}1 on 2025-11-01"),
+            ("voucher", "edge-so-uni", "journal z1 on 2025-11-01"),
+        ]
+    );
+    let ageing = &results["creditor_ageing_shared_guid"];
+    let unclassified = (ageing.findings.iter())
+        .find(|f| f.id == "creditor_ageing_43bh/unknown_classification/729e41a8")
+        .unwrap();
+    assert_eq!(
+        emitted(&unclassified.evidence),
+        [
+            ("ledger", "Cedar Unclassified", ""),
+            ("voucher", "", "Purchase C-B1 on 2025-11-01"),
+            ("voucher", "", "Purchase c-b1 on 2025-11-01"),
+            ("voucher", "edge-cg-uni", "Purchase e\u{301}1 on 2025-11-02"),
+            ("voucher", "edge-cg-uni", "Purchase z1 on 2025-11-02"),
+            ("voucher", "edge-cg-uni", "Purchase \u{e9}1 on 2025-11-02"),
+            ("voucher", "edge-cg-uni", "Purchase \u{ff21}1 on 2025-11-02"),
+            (
+                "voucher",
+                "edge-cg-uni",
+                "Purchase \u{1f4d1}1 on 2025-11-02"
+            ),
+        ]
+    );
+}
+
+/// A GUID that is the text of another voucher's key (a NUL and a place) makes two keys equal. The
+/// reference's `voucher_keys` raises on each of these two books so edited, and for
+/// `creditor_ageing_43bh` with no creditor in scope too; `statutory_dues_43b` makes keys only for
+/// a mapped nature, so with none it returns its empty result, and with one it makes them over the
+/// whole population, so it raises too when the edited voucher touches no mapped ledger (all
+/// measured at `ee17d80f`). Each port refuses with the typed error where the reference raises, and
+/// only there.
+#[test]
+fn a_guid_that_makes_two_voucher_keys_equal_is_refused_by_dues_and_ageing() {
+    for (name, field, value) in [
+        ("statutory_dues_shared_guid", "guid", "EDGE-SG-A"),
+        // A voucher on no mapped ledger.
+        ("statutory_dues_shared_guid", "number", "X-OTHER"),
+        ("creditor_ageing_shared_guid", "guid", "edge-cg-d"),
+    ] {
+        let mut s = spec(name);
+        let voucher = (s["vouchers"].as_array_mut().unwrap().iter_mut())
+            .find(|v| v[field] == value)
+            .unwrap();
+        // The key of the book's first blank-GUID voucher.
+        voucher["guid"] = Value::from("\u{0}00000001");
+        let refused = |s: &Value| {
+            matches!(
+                dues_or_ageing_result(s),
+                Err(AuditError::VoucherKeysNotUnique)
+            )
+        };
+        assert!(refused(&s), "{name} {value}");
+        s["creditors"] = serde_json::json!([]);
+        s["statutory_dues"] = serde_json::json!({});
+        if name == "creditor_ageing_shared_guid" {
+            assert!(refused(&s), "{name} with no creditor");
+        } else {
+            let r = dues_or_ageing_result(&s).unwrap();
+            assert!(r.figures.is_empty() && r.findings.is_empty(), "{name}");
         }
     }
+}
+
+/// Two party ledgers whose tags are equal (blank-GUID ledgers named `Debtor 6631` and `Debtor
+/// 69926` share the first eight hex digits of their name's hash), each with a cash receipt on one
+/// day, repeat the figure id of that day's row: the reference raises "duplicate figure id
+/// high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-05-10_5745a08c" on this
+/// book (run at reference `ee17d80f`), and the port refuses with the typed error, not a panic.
+#[test]
+fn two_party_ledgers_with_one_tag_are_refused_in_the_high_value_register() {
+    let mut s = spec("hvr_bare");
+    s["ledgers"].as_array_mut().unwrap().extend([
+        serde_json::json!({"name": "Debtor 6631", "chain": ["Sundry Debtors", "Current Assets"], "guid": ""}),
+        serde_json::json!({"name": "Debtor 69926", "chain": ["Sundry Debtors", "Current Assets"], "guid": ""}),
+    ]);
+    s["vouchers"] = serde_json::json!([
+        {"guid": "r1", "date": "2025-05-10", "base_type": "Receipt",
+         "lines": [["Cash", 21000310], ["Debtor 6631", -21000310]]},
+        {"guid": "r2", "date": "2025-05-10", "base_type": "Receipt",
+         "lines": [["Cash", 22000310], ["Debtor 69926", -22000310]]}
+    ]);
     let (book, rules) = (build(&s), rules(&s));
     let cash: BTreeSet<String> = strs(&s["cash"]).into_iter().collect();
-    let (none, no_types) = (BTreeSet::new(), BTreeMap::new());
+    let none = BTreeSet::new();
+    let no_types = BTreeMap::new();
     let inputs = high_value_register::Inputs {
         cash: &cash,
         bank: &none,
         threshold_paise: None,
-        bank_statement: None,
+        bank_statement: &BankStatementLoad::NotSupplied,
         s194n_narration_terms: &none,
         ais_rows: &[],
         s194n_recipient_type: None,
@@ -1277,7 +1980,7 @@ fn a_journal_on_one_ledger_is_refused_not_panicked() {
         .expect("refused, not panicked");
     let err = result.expect_err("a repeated figure id is refused");
     assert!(
-        format!("{err}").contains("journal_transfer_amount_0bce8b28_0431f39b"),
+        matches!(&err, AuditError::DuplicateFigureId(id) if id == "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-05-10_5745a08c"),
         "{err}"
     );
 }
@@ -1382,23 +2085,58 @@ fn a_party_tag_equal_to_a_fixed_row_is_refused_not_panicked() {
     .expect("refused, not panicked");
     let err = result.expect_err("a repeated figure id is refused");
     assert!(
-        format!("{err}").contains("party_monthly.sales_jun_a64cfcd9"),
+        matches!(&err, AuditError::DuplicateFigureId(id) if id == "party_monthly.sales_jun_a64cfcd9"),
         "{err}"
     );
 }
 
-/// The pm_paths result, and a way to change one published figure: the PWM checks read figures
-/// back, so a changed figure is what an engine fault would look like to them.
-fn pm_paths_result() -> (Book, Window, bridge_tax_audit::findings::TestResult) {
-    let s = spec("pm_paths");
-    let (book, rules) = (build(&s), rules(&s));
-    let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
-    let r = party_monthly::run(&book, &rules, &period(&s), &set("cash"), &set("bank"), 2).unwrap();
-    let window = period(&s);
-    assert!(party_monthly::check_invariants(&book, &window, &r)
-        .unwrap()
-        .is_empty());
-    (book, window, r)
+/// A `party_monthly` result on an edge book, with what its module check takes: the PWM checks
+/// read figures and findings back, so a changed one is what an engine fault would look like to
+/// them.
+struct Pm {
+    book: Book,
+    window: Window,
+    cash: BTreeSet<String>,
+    bank: BTreeSet<String>,
+    r: bridge_tax_audit::findings::TestResult,
+}
+
+impl Pm {
+    fn on(name: &str, top_n: usize) -> Pm {
+        let s = spec(name);
+        let (book, rules) = (build(&s), rules(&s));
+        let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
+        let (window, cash, bank) = (period(&s), set("cash"), set("bank"));
+        let r = party_monthly::run(&book, &rules, &window, &cash, &bank, top_n).unwrap();
+        let pm = Pm {
+            book,
+            window,
+            cash,
+            bank,
+            r,
+        };
+        assert_eq!(pm.check(), Vec::<String>::new(), "{name} untouched");
+        pm
+    }
+
+    fn check(&self) -> Vec<String> {
+        party_monthly::check_invariants(&self.book, &self.window, &self.r, &self.cash, &self.bank)
+            .unwrap()
+    }
+
+    fn finding(&mut self, id: &str) -> &mut bridge_tax_audit::findings::Finding {
+        let id = format!("party_monthly/{id}");
+        self.r
+            .findings
+            .iter_mut()
+            .find(|f| f.id == id)
+            .unwrap_or_else(|| panic!("no finding {id}"))
+    }
+}
+
+/// The pm_paths result, at the `top_n` its book names.
+fn pm_paths_result() -> Pm {
+    Pm::on("pm_paths", 2)
 }
 
 fn nudge(r: &mut bridge_tax_audit::findings::TestResult, prefix: &str, label: &str) {
@@ -1418,9 +2156,9 @@ fn nudge(r: &mut bridge_tax_audit::findings::TestResult, prefix: &str, label: &s
 /// Both are silent on the untouched result.
 #[test]
 fn pwm_1_fires_on_a_total_or_movement_that_does_not_tie() {
-    let (book, window, mut r) = pm_paths_result();
-    nudge(&mut r, "party_monthly.sales_year_", "Total");
-    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    let mut pm = pm_paths_result();
+    nudge(&mut pm.r, "party_monthly.sales_year_", "Total");
+    let out = pm.check();
     assert!(
         out.iter()
             .any(|v| v.starts_with("PWM-1: the sales rows sum to")),
@@ -1433,14 +2171,14 @@ fn pwm_1_fires_on_a_total_or_movement_that_does_not_tie() {
         "{out:?}"
     );
 
-    let (book, window, mut r) = pm_paths_result();
-    let f = r
-        .figures
-        .iter_mut()
-        .find(|f| f.id == "party_monthly.purchases_tb_movement")
-        .unwrap();
+    let mut pm = pm_paths_result();
+    let f =
+        pm.r.figures
+            .iter_mut()
+            .find(|f| f.id == "party_monthly.purchases_tb_movement")
+            .unwrap();
     f.value = bridge_tax_audit::findings::Value::Int(0);
-    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    let out = pm.check();
     assert_eq!(
         out,
         vec!["PWM-1: purchases_tb_movement is 0p but the Trial Balance's period columns give 675000p"]
@@ -1451,32 +2189,18 @@ fn pwm_1_fires_on_a_total_or_movement_that_does_not_tie() {
 /// reported against that row, not folded into the rows with no party.
 #[test]
 fn pwm_2_checks_the_not_attributed_row_on_its_own() {
-    let s = spec("pm_attribution");
-    let (book, rules) = (build(&s), rules(&s));
-    let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
-    let window = period(&s);
-    let mut r = party_monthly::run(
-        &book,
-        &rules,
-        &window,
-        &set("cash"),
-        &set("bank"),
-        party_monthly::PARTY_TOP_N,
-    )
-    .unwrap();
-    assert!(party_monthly::check_invariants(&book, &window, &r)
-        .unwrap()
-        .is_empty());
+    let mut pm = Pm::on("pm_attribution", party_monthly::PARTY_TOP_N);
     nudge(
-        &mut r,
+        &mut pm.r,
         "party_monthly.indirect_expenses_vouchers_",
-        "Not attributed: no party on the other side",
+        "Not attributed to a party",
     );
-    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
-    assert!(
-        out.iter().any(|v| v
-            == "PWM-2: the indirect_expenses not-attributed row has 4p in vouchers but the vouchers give 3p"),
-        "{out:?}"
+    assert_eq!(
+        pm.check(),
+        vec![
+            "PWM-1: the indirect_expenses rows sum to 10p in vouchers but the total row has 9p",
+            "PWM-2: the indirect_expenses not-attributed row has 5p in vouchers but the vouchers give 4p",
+        ]
     );
 }
 
@@ -1484,17 +2208,17 @@ fn pwm_2_checks_the_not_attributed_row_on_its_own() {
 /// label does not count the parties it holds.
 #[test]
 fn pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong() {
-    let (book, window, mut r) = pm_paths_result();
-    nudge(&mut r, "party_monthly.sales_vouchers_", "Cust A");
-    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    let mut pm = pm_paths_result();
+    nudge(&mut pm.r, "party_monthly.sales_vouchers_", "Cust A");
+    let out = pm.check();
     assert!(
         out.iter().any(|v| v
             == "PWM-2: the sales row for 'Cust A' has 4p in vouchers but the vouchers give 3p"),
         "{out:?}"
     );
 
-    let (book, window, mut r) = pm_paths_result();
-    for f in &mut r.figures {
+    let mut pm = pm_paths_result();
+    for f in &mut pm.r.figures {
         if let Some(e) = f
             .evidence
             .first_mut()
@@ -1503,9 +2227,203 @@ fn pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong() {
             e.label = "Others (9 parties)".to_string();
         }
     }
-    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    let out = pm.check();
     assert_eq!(
         out,
         vec!["PWM-2: the sales Others row is labelled 'Others (9 parties)' but 2 parties are not shown by name"]
+    );
+}
+
+/// Set one published figure's value.
+fn set_figure(r: &mut bridge_tax_audit::findings::TestResult, id: &str, value: i64) {
+    let f = r
+        .figures
+        .iter_mut()
+        .find(|f| f.id == id)
+        .unwrap_or_else(|| panic!("no figure {id}"));
+    f.value = bridge_tax_audit::findings::Value::Int(value);
+}
+
+/// PWM-2 checks each not-attributed reason's count, and its finding: present exactly when the
+/// reason has vouchers, citing exactly those vouchers and nothing else, its facts pointing at that
+/// count. pm_attribution's indirect expenses carry all three reasons (nil a08, other side a01 and
+/// a04, money a06).
+#[test]
+fn pwm_2_checks_each_not_attributed_reasons_count_and_finding() {
+    let base = || Pm::on("pm_attribution", party_monthly::PARTY_TOP_N);
+
+    let mut pm = base();
+    set_figure(
+        &mut pm.r,
+        "party_monthly.indirect_expenses_not_attributed_money_vouchers",
+        2,
+    );
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: indirect_expenses_not_attributed_money_vouchers is 2 but the vouchers give 1"]
+    );
+
+    // The other-side and money findings' evidence swapped.
+    let mut pm = base();
+    let other = pm
+        .finding("not_attributed/indirect_expenses")
+        .evidence
+        .clone();
+    let money = std::mem::replace(
+        &mut pm
+            .finding("not_attributed_money/indirect_expenses")
+            .evidence,
+        other,
+    );
+    pm.finding("not_attributed/indirect_expenses").evidence = money;
+    assert_eq!(
+        pm.check(),
+        vec![
+            "PWM-2: the indirect_expenses other_side not-attributed finding cites 1 item(s) that are not the 2 voucher(s) with that reason",
+            "PWM-2: the indirect_expenses money not-attributed finding cites 2 item(s) that are not the 1 voucher(s) with that reason",
+        ]
+    );
+
+    // A cited item that is not a voucher.
+    let mut pm = base();
+    pm.finding("not_attributed_money/indirect_expenses")
+        .evidence
+        .push(bridge_tax_audit::findings::EvidenceRef::with_label(
+            "ledger", "Bank", "Bank",
+        ));
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: the indirect_expenses money not-attributed finding cites 2 item(s) that are not the 1 voucher(s) with that reason"]
+    );
+
+    // The money finding dropped, then repeated.
+    let mut pm = base();
+    pm.r.findings
+        .retain(|f| f.id != "party_monthly/not_attributed_money/indirect_expenses");
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: the indirect_expenses money not-attributed reason has 1 voucher(s) but no finding"]
+    );
+    let mut pm = base();
+    let again = pm.finding("not_attributed_money/indirect_expenses").clone();
+    pm.r.findings.push(again);
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: the indirect_expenses money not-attributed reason has 1 voucher(s) but 2 findings"]
+    );
+
+    // The nil finding's facts pointed at another reason's count instead of its own.
+    let mut pm = base();
+    let row = pm.finding("not_attributed/sales").facts.clone();
+    pm.finding("not_attributed_nil/indirect_expenses").facts = row;
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: the indirect_expenses nil not-attributed finding's facts do not point at its count"]
+    );
+
+    // A nil finding for sales, where no voucher has that reason.
+    let mut pm = base();
+    let mut extra = pm.finding("not_attributed_nil/indirect_expenses").clone();
+    extra.id = "party_monthly/not_attributed_nil/sales".to_string();
+    pm.r.findings.push(extra);
+    assert_eq!(
+        pm.check(),
+        vec![
+            "PWM-2: the sales nil not-attributed finding is present but no voucher has that reason"
+        ]
+    );
+}
+
+/// PWM-2 compares a finding's citations as a multiset of GUID and label: pm_money's direct
+/// expenses cite two identical receipts (one GUID, number and date), and a receipt and a payment
+/// with no GUID.
+#[test]
+fn pwm_2_compares_citations_by_guid_and_label_as_a_multiset() {
+    // One of the two identical receipts cited as the receipt with no GUID instead: the same set of
+    // citations, and as many of them.
+    let mut pm = Pm::on("pm_money", party_monthly::PARTY_TOP_N);
+    let f = pm.finding("not_attributed_money/direct_expenses");
+    let ids: Vec<&str> = f.evidence.iter().map(|e| e.id.as_str()).collect();
+    assert_eq!(ids, ["dup", "dup", ""]);
+    f.evidence[1] = f.evidence[2].clone();
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: the direct_expenses money not-attributed finding cites 3 item(s) that are not the 3 voucher(s) with that reason"]
+    );
+
+    // The two vouchers with no GUID swapped between the money and other-side findings: their GUIDs
+    // agree, so only the labels tell them apart.
+    let mut pm = Pm::on("pm_money", party_monthly::PARTY_TOP_N);
+    let blank = |f: &bridge_tax_audit::findings::Finding| {
+        f.evidence.iter().position(|e| e.id.is_empty()).unwrap()
+    };
+    let (i, j) = (
+        blank(pm.finding("not_attributed_money/direct_expenses")),
+        blank(pm.finding("not_attributed/direct_expenses")),
+    );
+    let receipt = pm.finding("not_attributed_money/direct_expenses").evidence[i].clone();
+    let payment = std::mem::replace(
+        &mut pm.finding("not_attributed/direct_expenses").evidence[j],
+        receipt,
+    );
+    pm.finding("not_attributed_money/direct_expenses").evidence[i] = payment;
+    assert_eq!(
+        pm.check(),
+        vec![
+            "PWM-2: the direct_expenses other_side not-attributed finding cites 1 item(s) that are not the 1 voucher(s) with that reason",
+            "PWM-2: the direct_expenses money not-attributed finding cites 3 item(s) that are not the 3 voucher(s) with that reason",
+        ]
+    );
+}
+
+/// A not-attributed finding naming a block the book does not carry is reported: pm_not_fy has no
+/// Direct Expenses group.
+#[test]
+fn pwm_2_reports_a_not_attributed_finding_for_a_block_the_book_does_not_carry() {
+    let mut pm = Pm::on("pm_not_fy", party_monthly::PARTY_TOP_N);
+    let mut stray = pm.r.findings[0].clone();
+    stray.id = "party_monthly/not_attributed/direct_expenses".to_string();
+    pm.r.findings.push(stray);
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: a not-attributed finding names direct_expenses, a block the book does not carry: ['party_monthly/not_attributed/direct_expenses']"]
+    );
+}
+
+/// PWM-2 compares the cash-or-bank row and the no-party row each on its own: a voucher moved from
+/// one to the other keeps their sum and the total, and is still reported.
+#[test]
+fn pwm_2_checks_the_cash_or_bank_and_no_party_rows_each_on_its_own() {
+    let mut pm = pm_paths_result();
+    let count_of = |pm: &Pm, label: &str| -> (String, i64) {
+        let f = pm
+            .r
+            .figures
+            .iter()
+            .find(|f| {
+                f.id.starts_with("party_monthly.sales_vouchers_") && f.evidence[0].label == label
+            })
+            .unwrap();
+        match f.value {
+            bridge_tax_audit::findings::Value::Int(v) => (f.id.clone(), v),
+            ref other => panic!("{other:?}"),
+        }
+    };
+    let (cb_id, cb) = count_of(&pm, "Cash or bank (no party)");
+    let (np_id, np) = count_of(&pm, "No party");
+    set_figure(&mut pm.r, &cb_id, cb + 1);
+    set_figure(&mut pm.r, &np_id, np - 1);
+    assert_eq!(
+        pm.check(),
+        vec![
+            format!(
+                "PWM-2: the sales cash-or-bank row has {}p in vouchers but the vouchers give {cb}p",
+                cb + 1
+            ),
+            format!(
+                "PWM-2: the sales no-party row has {}p in vouchers but the vouchers give {np}p",
+                np - 1
+            ),
+        ]
     );
 }

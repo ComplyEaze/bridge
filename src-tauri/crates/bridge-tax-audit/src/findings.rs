@@ -2,6 +2,8 @@
 //! a number a CA may see with its unit and one-line definition, and findings that cite figures
 //! by id.
 
+use crate::error::{AuditError, Result};
+
 /// A figure's value. Money is paise and ratios are basis points, both integers; a ratio with
 /// a zero denominator is `Undefined`, which is not zero. There is no float variant.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,9 +131,11 @@ impl TestResult {
 
     /// Add a figure named `<test_id>.<name>` and return its id.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// On a duplicate figure id: that is a bug in the test, and the reference engine raises.
+    /// `DuplicateFigureId` when the id is already present, as the reference engine's `fig` raises.
+    /// Some names are built from configuration (a configured ledger's tag), so a configuration
+    /// shape can repeat one without any bug in the test (#644).
     pub fn fig(
         &mut self,
         name: &str,
@@ -139,12 +143,11 @@ impl TestResult {
         unit: Unit,
         definition: &str,
         evidence: Vec<EvidenceRef>,
-    ) -> String {
+    ) -> Result<String> {
         let id = format!("{}.{name}", self.test_id);
-        assert!(
-            self.figures.iter().all(|f| f.id != id),
-            "duplicate figure id {id}"
-        );
+        if self.figures.iter().any(|f| f.id == id) {
+            return Err(AuditError::DuplicateFigureId(id));
+        }
         self.figures.push(Figure {
             id: id.clone(),
             value,
@@ -152,7 +155,7 @@ impl TestResult {
             definition: definition.to_string(),
             evidence,
         });
-        id
+        Ok(id)
     }
 }
 
@@ -173,4 +176,31 @@ pub fn pct_bp(num_paise: i64, den_paise: i64) -> Option<Value> {
         q
     };
     i64::try_from(floored).ok().map(Value::Int)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_repeated_figure_id_is_refused_with_its_typed_error() {
+        let mut r = TestResult::new("t", "1", "r");
+        let add = |r: &mut TestResult, name: &str, v: i64| {
+            r.fig(name, Value::Int(v), Unit::Count, "d", Vec::new())
+        };
+        assert_eq!(add(&mut r, "a", 1).unwrap(), "t.a");
+        assert_eq!(add(&mut r, "b", 2).unwrap(), "t.b");
+        let err = add(&mut r, "a", 3).unwrap_err();
+        assert!(
+            matches!(&err, AuditError::DuplicateFigureId(id) if id == "t.a"),
+            "{err}"
+        );
+        // The refused figure is not kept: the first `a` stands, and nothing was appended.
+        let kept: Vec<_> = r
+            .figures
+            .iter()
+            .map(|f| (f.id.as_str(), &f.value))
+            .collect();
+        assert_eq!(kept, [("t.a", &Value::Int(1)), ("t.b", &Value::Int(2))]);
+    }
 }

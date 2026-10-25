@@ -1,5 +1,4 @@
-//! Geometry, profiles and account binding, ported from
-//! `scripts/bank_statement_import.test.py`.
+//! Geometry, profiles and account binding.
 
 mod common;
 
@@ -38,7 +37,7 @@ fn parse_real_hdfc_capture() {
         .map(|row| row.get("narr"))
         .collect();
     assert!(unresolved.is_empty(), "{unresolved:?}");
-    // digests pinned by the Python suite over the same capture
+    // digests recorded once by the removed Python tool over the same capture
     assert_eq!(
         digest(parties(&rows, bank)),
         "f079dbf8cc126ee0",
@@ -342,7 +341,7 @@ fn hyphenated_counterparties_survive_every_narration_shape() {
         ("IMPS-1-WEIRD", "UNRESOLVED"),
         ("NEFT DR-ONLY-TWO", "UNRESOLVED"),
     ] {
-        // the Python test passes only `narr`; HDFC reads `narr_spaced` when set
+        // pass only `narr`; HDFC reads `narr_spaced` when set
         let only_narr = Bank::Hdfc.party(&row(&[("narr", narration)]));
         assert_eq!(only_narr, expected, "{narration}");
     }

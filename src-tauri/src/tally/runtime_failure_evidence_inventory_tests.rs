@@ -164,6 +164,8 @@ async fn party_master_drift_retains_prior_reports_and_exact_typed_cause() {
                 &identity,
                 DateBoundaryProfile::ModeAgnostic,
                 assertion(&extents(), &identity),
+                &BalanceDateBasis::HostToday(TallyDate::parse("20990101").unwrap()),
+                crate::tally::connection::ComplianceRead::Standard,
             )
             .await
             .unwrap_err();
@@ -199,6 +201,16 @@ async fn currency_and_basic_ledger_drift_retain_completed_sources() {
             vec![xml(companies())]
         };
         pair(&mut plans, xml(extents()));
+        // The ledger export checks the book's single INR master first; that read completes.
+        let currency_at = plans.len();
+        if basic {
+            pair(
+                &mut plans,
+                xml(decode(include_bytes!(
+                    "../../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+                ))),
+            );
+        }
         let report: &[u8] = if basic {
             include_bytes!("../../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters.utf16le.xml")
         } else {
@@ -212,7 +224,7 @@ async fn currency_and_basic_ledger_drift_retain_completed_sources() {
         let runtime = TallyRuntime::default();
         let error = if basic {
             runtime
-                .fetch_ledgers_with_evidence(config(&simulator), &identity)
+                .fetch_ledgers_with_opening_as_of_evidence(config(&simulator), &identity)
                 .await
                 .unwrap_err()
         } else {
@@ -234,7 +246,9 @@ async fn currency_and_basic_ledger_drift_retain_completed_sources() {
         assert_eq!(requests.len(), i + 4);
         let drift = expected_source(&requests, &bodies, &[i, i + 2], false);
         let expected = if basic {
-            expected_source(&requests, &bodies, &[0, 1], false).combine(drift)
+            expected_source(&requests, &bodies, &[0, 1], false)
+                .combine(expected_source(&requests, &bodies, &[currency_at], true))
+                .combine(drift)
         } else {
             drift
         };

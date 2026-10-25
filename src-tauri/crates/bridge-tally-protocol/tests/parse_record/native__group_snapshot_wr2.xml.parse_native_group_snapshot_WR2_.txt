@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/native/group_snapshot_wr2.xml
+# parser: parse_native_group_snapshot(WR2)
+# source: captured
+Err(InvalidResponse("group_response_company_guid_missing"))

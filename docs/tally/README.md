@@ -28,49 +28,26 @@ capability from assumption, and a completed request from a verified snapshot.
 
 ## Operator tools
 
-- [`scripts/bank_statement_import.py`](../../scripts/bank_statement_import.py) turns a
-  password-protected bank-statement PDF into TallyPrime import XML (Payment / Receipt /
-  Contra), for hand-import through Gateway of Tally > Import > Vouchers. Offline; it never
-  contacts Tally. SBI and HDFC statement layouts are supported.
+- A standalone command-line tool that turned a statement PDF into import XML without Tally running
+  was removed; `parse_bank_statement` and `build_import_xml` do its work inside Bridge. What is
+  lost with it: the standalone command line, its dry run and CSV manifest, overwrite-with-rollback of
+  a named output, the password prompt and environment variable, `--confirm-open-company` (Bridge checks
+  the company by GUID against Tally), and re-import by REMOTEID. It also had no group gate, so a book whose
+  bank ledger sits under a money group the writer has not observed (for example `Bank OCC A/c`), or whose
+  group ancestry cannot be resolved, could be imported through it and is refused by Bridge; such a book has
+  no Payment, Receipt or Contra route until the group is captured and admitted in Rust.
 
-  What it proves before it writes anything: every row reproduces its printed running
-  balance; the chain lands on the closing balance the statement prints **and** reproduces
-  its printed debit and credit totals (the closing balance alone is the net, so a dropped
-  tail whose two sides cancel would still pass); and the account's own digits appear in the
-  statement header, so the wrong statement cannot be posted to the ledger you named. It then
-  re-parses its own output.
-
-  What it *cannot* prove is which company Tally has open — see §9.11d — so
-  `--confirm-open-company` makes that an explicit operator step rather than a silent one.
-  Contract tests run in CI: `python3 scripts/bank_statement_import.test.py`.
-
-  It was written because Bridge's own writer could not express a bank statement at all: it
-  qualified **Journal only** (`LIVE_QUALIFIED_VOUCHER_TYPES` in `src-tauri/src/agent_import.rs`),
-  while money out is a Payment, money in a Receipt, and an own-account or ATM movement a
-  Contra. **That is still the case on master**; qualifying the three types is in flight and
-  not landed, so nothing here should be read as a plan of record.
-
-  Even once it lands, this tool covers a part Bridge does not: it reads the **statement
-  PDF**, whereas `build_import_xml` takes an already-structured payload. It also covers books
-  the writer refuses, such as one whose bank ledger sits under a money group Bridge has not
-  yet observed a captured ledger beneath.
-
-  No statement, password, ledger name or account number lives in this repository — all are
-  supplied at run time.
-
-  > **Scoped update, 2026-09-16.** The "still the case on master" paragraph above is stale:
-  > `LIVE_QUALIFIED_VOUCHER_TYPES` now carries Journal, Payment, Receipt and Contra, and a
-  > Bridge-built batch is corrected through `build_import_xml(..., amends_batch_id)`
-  > (`agent_import_amend.rs`), never by a rebuild.
+  > **Scoped update, 2026-09-16.** A Bridge-built batch is corrected through
+  > `build_import_xml(..., amends_batch_id)` (`agent_import_amend.rs`), never by a
+  > rebuild.
 
 - `parse_bank_statement` (MCP tool, [`src-tauri/crates/bridge-bank-statement`](../../src-tauri/crates/bridge-bank-statement))
-  is the parsing half of the script above, ported to Rust. It reads the PDF through a bundled
-  PDFium rather than `pdftotext`, runs the same geometry, SBI/HDFC profiles, account binding,
-  balance replay and control totals, and proposes Payment / Receipt / Contra vouchers in
-  `build_import_xml`'s input shape. It mints no REMOTEID and writes no XML: Bridge's writer owns
+  reads a bank-statement PDF through a bundled PDFium, applies the SBI and HDFC geometry profiles,
+  account binding, balance replay and control totals, and proposes Payment / Receipt / Contra
+  vouchers in `build_import_xml`'s input shape. It mints no REMOTEID and writes no XML: Bridge's writer owns
   identity and rendering. Listed only when imports are enabled.
 
-  It also reads **Union Bank of India** statements (`bank: "ubi"`), which the script does not.
+  It also reads **Union Bank of India** statements (`bank: "ubi"`).
   That layout prints one line per row with `(Cr)`/`(Dr)`-suffixed figures, so the profile reads
   rows as text rather than by column bounds. It prints no debit or credit totals, so for `ubi`
   both may be omitted. The proof is then weaker, and stated as such: the balance replay from the
@@ -84,16 +61,47 @@ capability from assumption, and a completed request from a verified snapshot.
   real run should be compared row by row against `pdftotext`. `MOBFT` transfers go to suspense,
   because the observed shape does not say which field names the counterparty.
 
+  It also reads **Bank of Baroda** statements in one measured layout (`bank: "bob"`; in source, not in a published build). A statement is read as Bank of Baroda only if page 1's `IFSC Code:` line carries the bank's prefix (the statements print the bank's name only in an image); otherwise it is refused as `statement_bank_not_recognised`. That layout is a column table like
+  HDFC's, with these differences, each measured on two real statements, held privately
+  (read through PDFium; the rules are described by shape and geometry only): the column header is printed on page 1 only; a row's amount sits on
+  its own visual line, up to 12 points below its date; the newest row is printed first, so the
+  rows are reversed before the balance replay and numbered oldest first; the balance carries a
+  glued `Cr` or `Dr` marker (`Dr` is overdrawn, read as negative); and the statement prints no
+  totals, no opening or closing balance and a masked account number (`ddd` + `XXXXXXXX` + `ddd`),
+  so the operator supplies both balances (a `Dr` balance as a negative number), every page must
+  print `<date> <time> <word> Page N of M`, and `account_label` must carry the whole number: it
+  must begin and end with the clear digits, and only those six are compared (the masked middle
+  cannot be, and whether the mask keeps the number's real length is unverified, so its length is
+  not checked). With no printed totals, the two balances and the page footers are the only checks
+  on which rows were read, and missing rows whose amounts net to zero would not be seen. A later page must start with a row (the table continues at the top of each later page);
+  a page that opens with anything else is refused as `unexpected_line_in_table`. The measured statements cut
+  a narration at about 50 characters; a name can end mid-word, the same payer is cut at the
+  same place, and two payers whose names agree up to the cut are one party here. A party is named for `UPI/<ref>/<time>/UPI/<VPA>/...` (the VPA, when a slash
+  follows it), `NEFT-<UTR>-<name>` and `RTGS-<UTR>-<name>` (everything after the UTR), and
+  `BY CASH` is a cash deposit (a NEFT or RTGS name is not taken when a line was broken at the
+  cell edge anywhere in the narration, because the name's spelling is then uncertain); `Loan Recovery For<digits>` is named as printed, loan number included (one party per loan),
+  and `CHARGES FOR :IMPS/`, `Charges for PORD Customer Payment` and `SMS Charges for` are
+  labelled `BANK CHARGES`. The account number returned, and hashed into every transaction id, is
+  the masked number as printed, so the same statement gives the same ids whatever label digits
+  were typed. IMPS, `MBK`,
+  `EBANK`, interest, disbursement, `BY <name>`, cheque-clearing rows and every other wording
+  go to suspense. Such a row names no party, so no mapping row can match it and the mapping can neither book it
+  as a Contra nor skip it: its proposal is a Payment or Receipt on the suspense ledger, also when it
+  is a transfer between the firm's own accounts. Not measured: other account types and branches, a statement printed
+  oldest first (refused as `rows_not_newest_first` when the dates show it; a statement whose
+  rows all share one date is caught by the balance replay instead), other wordings, and statements fetched another
+  way.
+
   Full proposals stay in a private file under the agent data directory; the tool result is a
-  counterparty summary (names marked for `mask_parties`), and the PDF password is read from an
-  owner-only local file named by `password_file`, never from an argument. `build_import_xml`
+  counterparty summary (names marked for `mask_parties`), and the PDF password is read from a
+  local file named by `password_file` (on a Mac it must be owned by the user with no group or other permission bits; on Windows it must be owned by the user or Administrators, with an access list that lets no one but the user, SYSTEM and Administrators read or change it), never from an argument. `build_import_xml`
   builds from that file when given `proposals_id` and the `proposals_sha256` the parse returned,
   refusing a file changed since; its vouchers pass the same admission as inline ones. Correct an
   imported batch by re-parsing with the fixed mapping and building with `amends_batch_id`. The MCPB carries the pinned PDFium beside
   `bridge_mcp` (see [`packaging/mcpb/README.md`](../../packaging/mcpb/README.md)).
 
   Its PDF tests need the PDFium library and are ignored by default: fetch the pinned build with
-  `python3 scripts/fetch-pdfium.py --platform macos-arm64 --dest <dir>` (it verifies the SHA-256
+  `node scripts/fetch-pdfium.mjs --platform macos-arm64 --dest <dir>` (it verifies the SHA-256
   in `packaging/pdfium/pdfium.lock.json` before extracting), then run
   `BRIDGE_PDFIUM_LIBRARY=<dir>/libpdfium.dylib cargo test -p bridge-bank-statement -- --ignored`.
 
@@ -212,8 +220,6 @@ mode is tested as Education mode; Bridge does not bypass its restrictions.
 
 The simulator and fixture rules live in
 [`src-tauri/crates/tally-protocol-simulator`](../../src-tauri/crates/tally-protocol-simulator/README.md).
-The parser-only evidence contract lives in
-[`tools/bridge-tally-qualification`](../../tools/bridge-tally-qualification/README.md).
 The separate live-observation DTO and release gate live in
 [`tools/bridge-tally-compatibility`](../../tools/bridge-tally-compatibility/README.md).
 That crate performs no network requests. The separate

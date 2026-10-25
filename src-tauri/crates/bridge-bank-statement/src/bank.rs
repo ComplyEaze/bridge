@@ -1,20 +1,32 @@
 //! Column geometry and row rules for the supported statement layouts.
 //!
-//! `Sbi` and `Hdfc` are a direct port of the `SBI` and `HDFC` classes in
-//! `scripts/bank_statement_import.py`. The reasoning behind each rule — why a
+//! `Sbi` and `Hdfc` were first written as a port of a Python tool that has been
+//! removed; the Rust items are now the only statement of their rules. The reasoning behind each rule — why a
 //! boundary is the shape it is, and which real statement it was measured
-//! against — is written there at length and is not repeated here; where a rule
-//! looks arbitrary, read that docstring before changing it.
+//! against — is written on the item that implements it where it was recorded. An
+//! item with no such comment (the reference extractors, the SBI party patterns, the
+//! `TPT` pattern of the HDFC party) is specified by its tests, which hold each shape;
+//! read both before changing one.
 //!
-//! `Ubi` (Union Bank of India) has no Python reference. Its rules come from the
+//! `Ubi` (Union Bank of India): its rules come from the
 //! text layer of one real statement, described by shape only (68 single-line
 //! rows): see [`Layout::SingleLine`] and `ubi_party`.
+//!
+//! `Bob` (Bank of Baroda): its rules come from two
+//! real statements read through PDFium (held privately), described by shape and
+//! geometry only: see
+//! [`Bank::bob_rows`] for what is peculiar to it (newest row first, a
+//! `Cr`/`Dr` marker glued to the balance, no printed totals, and a column header
+//! on the first page only).
 
 use crate::date::{self, Date};
 use crate::geometry::Word;
 use crate::parse::{Cells, Row};
+use crate::refusal::Refusal;
 use crate::text::{is_alnum, is_upper, remove_space, squash, strip};
 use regex::Regex;
+use serde::Serialize;
+use std::fmt;
 use std::sync::LazyLock;
 
 /// A statement layout.
@@ -23,6 +35,7 @@ pub enum Bank {
     Sbi,
     Hdfc,
     Ubi,
+    Bob,
 }
 
 /// How a layout's rows are read off the page.
@@ -47,13 +60,36 @@ pub const BALANCE: &str = "bal";
 
 /// The words a party extractor returns when it could not identify a
 /// counterparty. Output, not input: a mapping row naming one is refused.
+///
+/// Every unrecognised narration shape reports the same word, so a mapping row for it
+/// would gather transactions that have nothing to do with each other under one ledger,
+/// or, with `skip`, silently drop them all. They must reach the suspense ledger, where a
+/// person sees them. A [`crate::mapping::Mapping`] can only be built by validating its
+/// rows, and that refuses a sentinel key, so a sentinel is looked up and never found.
 pub const UNRESOLVED: &str = "UNRESOLVED";
 pub const UNNAMED: &str = "UNNAMED";
 pub const PARSER_SENTINELS: [&str; 2] = [UNRESOLVED, UNNAMED];
 
+/// The labels a parser returns for a line it recognises by its wording (a loan
+/// instalment, a card fee, bank charges) rather than by a name the statement
+/// printed. They can be mapped like a party, but they are not a counterparty.
+pub const PARSER_CATEGORIES: [&str; 4] = [EMI, DEBIT_CARD_FEE, BANK_CHARGES, CARD_ANNUAL_FEE];
+const EMI: &str = "EMI";
+const DEBIT_CARD_FEE: &str = "DEBIT CARD FEE";
+const BANK_CHARGES: &str = "BANK CHARGES";
+const CARD_ANNUAL_FEE: &str = "CARD ANNUAL FEE";
+
 /// The digit count of an ACH bank reference — **exactly** the observed length,
 /// not a minimum. A six-digit PIN code printed with a space made a reasoned
 /// lower bound misattribute `ACME-400 001` to `ACME`.
+///
+/// The count is the only thing that separates a reference from a number inside the
+/// counterparty's own name, so it is observed, not reasoned: every ACH reference seen in
+/// a real narration is ten digits. Anything else (longer, shorter, or wrapped into
+/// another length) is `UNRESOLVED` and reaches suspense, where a person sees it. An
+/// unrecognised narration costs a look; a misattributed one announces nothing. When a
+/// reference of another length is genuinely observed, widen this and record the
+/// observation (finding S2 in `docs/tally/README.md`).
 pub const ACH_REFERENCE_DIGITS: usize = 10;
 
 macro_rules! pattern {
@@ -68,6 +104,7 @@ impl Bank {
             "sbi" => Some(Self::Sbi),
             "hdfc" => Some(Self::Hdfc),
             "ubi" => Some(Self::Ubi),
+            "bob" => Some(Self::Bob),
             _ => None,
         }
     }
@@ -77,23 +114,24 @@ impl Bank {
             Self::Sbi => "sbi",
             Self::Hdfc => "hdfc",
             Self::Ubi => "ubi",
+            Self::Bob => "bob",
         }
     }
 
     pub fn layout(self) -> Layout {
         match self {
-            Self::Sbi | Self::Hdfc => Layout::Columns,
+            Self::Sbi | Self::Hdfc | Self::Bob => Layout::Columns,
             Self::Ubi => Layout::SingleLine,
         }
     }
 
     /// Whether the statement prints debit and credit totals an operator can
-    /// supply as controls. Union Bank prints neither totals nor an opening or
-    /// closing line.
+    /// supply as controls. Union Bank and the measured Bank of Baroda statements print neither totals nor an
+    /// opening or closing line.
     pub fn prints_totals(self) -> bool {
         match self {
             Self::Sbi | Self::Hdfc => true,
-            Self::Ubi => false,
+            Self::Ubi | Self::Bob => false,
         }
     }
 
@@ -123,6 +161,19 @@ impl Bank {
             ],
             // not read by columns; one catch-all so `column_of` stays total
             Self::Ubi => &[(0.0, 9999.0, "narr")],
+            // Measured on two statements: the transaction date spans x 15-65 and the value
+            // date 87-137 on every row; narration words start at 148 and end by 360;
+            // cheque-zone words lie in 362-469; withdrawals end at 543, deposits at 662
+            // and the balance at 787 (it starts no earlier than 718).
+            Self::Bob => &[
+                (0.0, 75.0, "date"),
+                (75.0, 145.0, "vdt"),
+                (145.0, 361.0, "narr"),
+                (361.0, 470.0, "chq"),
+                (470.0, 575.0, "dr"),
+                (575.0, 700.0, "cr"),
+                (700.0, 9999.0, "bal"),
+            ],
         }
     }
 
@@ -132,6 +183,8 @@ impl Bank {
             (Self::Sbi, "narr") => Some(220.0),
             (Self::Sbi, "ref") => Some(299.0),
             (Self::Hdfc, "narr") => Some(240.0),
+            // the right edge of the narration cell: narration words end at 359.5, none past 360
+            (Self::Bob, "narr") => Some(360.0),
             _ => None,
         }
     }
@@ -139,7 +192,8 @@ impl Bank {
     /// Columns only ever populated on the row carrying the date.
     pub fn row_scoped(self) -> &'static [&'static str] {
         match self {
-            Self::Sbi | Self::Ubi => &[],
+            // On the measured statements a row's amount sits on its own visual line, up to 12pt below the date
+            Self::Sbi | Self::Ubi | Self::Bob => &[],
             Self::Hdfc => &["ref", "vdt", "dr", "cr", "bal"],
         }
     }
@@ -147,7 +201,8 @@ impl Bank {
     /// A line carrying every token of any group ends the current page's table.
     pub fn bottom_anchors(self) -> Anchors {
         match self {
-            Self::Sbi | Self::Ubi => &[],
+            // On the measured statements the table ends at its footer line: see [`Bank::column_footer`]
+            Self::Sbi | Self::Ubi | Self::Bob => &[],
             Self::Hdfc => &[&["HDFC", "BANK", "LIMITED"], &["STATEMENT", "SUMMARY"]],
         }
     }
@@ -155,7 +210,7 @@ impl Bank {
     /// ... and these end the statement entirely; later pages are not read.
     pub fn end_anchors(self) -> Anchors {
         match self {
-            Self::Sbi | Self::Ubi => &[],
+            Self::Sbi | Self::Ubi | Self::Bob => &[],
             Self::Hdfc => &[&["STATEMENT", "SUMMARY"]],
         }
     }
@@ -165,11 +220,23 @@ impl Bank {
     pub fn top_anchors(self) -> Anchors {
         match self {
             Self::Sbi => &[&["Txn"]],
-            // page 1 repeats the column header; later pages only the period line
-            Self::Hdfc => &[&["Narration"], &["Statement", "account"]],
+            // page 1 repeats the column header; later pages only the period line, which
+            // prints "Statement of account" and, a hair below it in a smaller font,
+            // "From : <date> To : <date>". A reader that groups those into two lines would
+            // leave the second one below the anchor, so it anchors too.
+            Self::Hdfc => &[&["Narration"], &["From", "To"], &["Statement", "account"]],
             // the column header is repeated on every page
             Self::Ubi => &[UBI_HEADER],
+            // the column header is printed on page 1 only: see [`Bank::header_once`]
+            Self::Bob => &[&["TRAN", "VALUE", "NARRATION"]],
         }
+    }
+
+    /// Whether the column header is printed on the first page only. The table
+    /// then starts at the top of every later page, once an earlier page has
+    /// shown the header.
+    pub fn header_once(self) -> bool {
+        matches!(self, Self::Bob)
     }
 
     /// The label printed beside the account number. Only that line binds.
@@ -180,10 +247,15 @@ impl Bank {
             Self::Hdfc => &[&["Account", "No"]],
             // a masked "<label> No" line and a CIF ID line also print digits
             Self::Ubi => &[&["Account", "Number"]],
+            // The measured statements print the account number masked: see [`crate::parse::require_account_match`]
+            Self::Bob => &[],
         }
     }
 
     /// A line whose every word is one of these is column furniture.
+    ///
+    /// SBI's header wraps onto three lines and repeats on every page, so its later lines
+    /// sit below the table anchor and would otherwise be appended to the row in progress.
     pub fn header_words(self) -> &'static [&'static str] {
         match self {
             Self::Sbi => &[
@@ -200,7 +272,7 @@ impl Bank {
                 "Credit",
                 "Balance",
             ],
-            Self::Hdfc | Self::Ubi => &[],
+            Self::Hdfc | Self::Ubi | Self::Bob => &[],
         }
     }
 
@@ -219,6 +291,7 @@ impl Bank {
             r"^\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$"
         );
         pattern!(HDFC_DATE, r"^\d{2}/\d{2}/\d{2}$");
+        pattern!(BOB_DATE, r"^\d{2}/\d{2}/\d{4}$");
         let cell: &[Word] = cells.get(DATE).map_or(&[], Vec::as_slice);
         match self {
             // SBI prints "1 Aug" then "2026" beneath it: the date cell is two words
@@ -232,6 +305,14 @@ impl Bank {
             }
             Self::Hdfc => cell.len() == 1 && HDFC_DATE.is_match(&cell[0].text),
             Self::Ubi => false,
+            // a row opens with its transaction date and its value date, one word each
+            Self::Bob => {
+                let one_date = |column: &str| {
+                    let cell: &[Word] = cells.get(column).map_or(&[], Vec::as_slice);
+                    cell.len() == 1 && BOB_DATE.is_match(&cell[0].text)
+                };
+                one_date(DATE) && one_date("vdt")
+            }
         }
     }
 
@@ -241,6 +322,7 @@ impl Bank {
             Self::Sbi => date::parse_day_month_name_year(&remove_space(text)),
             Self::Hdfc => date::parse_day_month_short_year(text),
             Self::Ubi => date::parse_day_month_year_hyphenated(text),
+            Self::Bob => date::parse_day_month_year_slashed(text),
         }
     }
 
@@ -250,14 +332,16 @@ impl Bank {
             Self::Sbi => "%d%b%Y",
             Self::Hdfc => "%d/%m/%y",
             Self::Ubi => "%d-%m-%Y",
+            Self::Bob => "%d/%m/%Y",
         }
     }
 
     pub fn party(self, row: &Row) -> String {
         match self {
-            Self::Sbi => sbi_party(row),
+            Self::Sbi => named_or_unnamed(sbi_party(row)),
             Self::Hdfc => hdfc_party(row),
             Self::Ubi => ubi_party(row),
+            Self::Bob => bob_party(row),
         }
     }
 
@@ -266,7 +350,87 @@ impl Bank {
             Self::Sbi => sbi_reference(row),
             Self::Hdfc => hdfc_reference(row),
             Self::Ubi => ubi_reference(row),
+            Self::Bob => bob_reference(row),
         }
+    }
+}
+
+/// The reference a network transfer carries on both banks' statements: a UPI or
+/// IMPS reference of twelve digits, or a NEFT or RTGS UTR. It can be built only
+/// by [`Bank::transfer_reference`], which never takes a cheque number, a bank's
+/// own transaction id or an all-zero placeholder for one. Which banks print the
+/// same value on both statements of one transfer is not yet measured.
+///
+/// Upper case and without whitespace by construction: a UPI or IMPS value is
+/// ASCII digits, and a NEFT or RTGS one passed [`looks_like_utr`], which
+/// requires alphanumeric upper case.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
+pub struct BankReference(String);
+
+impl fmt::Display for BankReference {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl BankReference {
+    /// A reference read back from a record: admitted only in a shape
+    /// [`Bank::transfer_reference`] can produce (twelve ASCII digits, or a
+    /// value that [`looks_like_utr`]) and never all zeros. Anything else is not
+    /// a value this build wrote.
+    pub fn from_recorded(text: &str) -> Option<Self> {
+        let admitted = (text.len() == 12 && text.bytes().all(|byte| byte.is_ascii_digit()))
+            || looks_like_utr(text);
+        (admitted && !text.chars().all(|character| character == '0'))
+            .then(|| Self(text.to_string()))
+    }
+}
+
+impl Bank {
+    /// The row's network-transfer reference, when it carries one, read from
+    /// what [`Bank::reference`] names. Every other mode (cheque, internal
+    /// transfer, net banking, ATM, ACH, clearing, cash, mobile banking) and any
+    /// empty or all-zero value gives `None`.
+    pub fn transfer_reference(self, row: &Row) -> Option<BankReference> {
+        let (mode, value) = self.reference(row);
+        // SBI prints a UPI reference as `<digits> (<vpa>)`
+        let value = match (self, mode.as_str()) {
+            (Self::Sbi, "UPI") => value
+                .split_once(" (")
+                .map_or(value.as_str(), |(head, _)| head),
+            _ => value.as_str(),
+        };
+        let admitted = match (self, mode.as_str()) {
+            (_, "UPI" | "IMPS") => {
+                value.len() == 12 && value.bytes().all(|byte| byte.is_ascii_digit())
+            }
+            // HDFC's NEFT value is the narration's last field, which can be a
+            // remark, or its reference column, too short for a long UTR: not
+            // admitted until a real statement shows where the UTR is printed.
+            (Self::Hdfc, "NEFT") => false,
+            (_, "NEFT" | "RTGS") => looks_like_utr(value),
+            _ => false,
+        };
+        (admitted && !value.chars().all(|character| character == '0'))
+            .then(|| BankReference(value.to_string()))
+    }
+
+    /// The cheque or transaction number the statement prints in its own column,
+    /// trimmed: `ref` for HDFC Bank and Union Bank, `chq` for Bank of Baroda.
+    /// State Bank of India's `ref` column is narrative (an account number and a
+    /// name), so only the cheque number [`Bank::reference`] reads from its end
+    /// is taken. `None` when it is empty or all zeros. Recorded only.
+    pub fn instrument(self, row: &Row) -> Option<String> {
+        let value = match self {
+            Self::Sbi => match self.reference(row) {
+                (mode, number) if mode == "CHQ" => number,
+                _ => return None,
+            },
+            Self::Hdfc | Self::Ubi => strip(row.get("ref")).to_string(),
+            Self::Bob => strip(row.get("chq")).to_string(),
+        };
+        (!value.chars().all(|character| character == '0')).then_some(value)
     }
 }
 
@@ -362,6 +526,20 @@ fn rstrip_hyphens(text: &str) -> &str {
     text.trim_end_matches('-')
 }
 
+/// A name field that was found but printed empty (or blank, or only hyphens)
+/// is `UNNAMED`, never an empty party: an empty party matches no mapping row
+/// and would leave the line's narration with no one named. Applied once, at
+/// the exit of the SBI reader, so no branch can return an empty party.
+fn named_or_unnamed(party: String) -> String {
+    if party.is_empty() {
+        UNNAMED.to_string()
+    } else {
+        party
+    }
+}
+
+/// Kept apart on purpose from the narration reader of `bridge-tax-audit`'s `narration_payees`,
+/// which reads a Tally voucher's narration by its spec pack's README section 3 (#1428).
 fn sbi_party(row: &Row) -> String {
     pattern!(TRANSFER_TO, r"^TRANSFER TO \d+\s+(.+?)\s*/\s*\d+$");
     pattern!(
@@ -418,12 +596,7 @@ fn sbi_party(row: &Row) -> String {
             let inner = MASKED
                 .captures(parts[1])
                 .map_or(parts[1], |inner| inner.get(1).map_or("", |m| m.as_str()));
-            let name = squash(rstrip_hyphens(inner));
-            return if name.is_empty() {
-                UNNAMED.to_string()
-            } else {
-                name
-            };
+            return squash(rstrip_hyphens(inner));
         }
     }
     UNRESOLVED.to_string()
@@ -486,6 +659,10 @@ fn sbi_reference(row: &Row) -> (String, String) {
 /// A bank reference: long, upper-case alphanumeric, and mostly digits
 /// (`_looks_like_utr`). The digit requirement stops `INTERNATIONAL` from
 /// terminating its own name.
+///
+/// A reference always carries digits and a company name may carry none. A shape of
+/// capitals and digits without a digit count would also match a name with one long
+/// all-capitals word, which would end its own name early and leave the party empty.
 pub fn looks_like_utr(text: &str) -> bool {
     text.chars().count() >= 10
         && is_alnum(text)
@@ -502,6 +679,22 @@ fn is_python_digit(character: char) -> bool {
 /// The name field of a hyphen-delimited narration, which may itself contain
 /// hyphens (`_bounded_party`). An empty result means the narration is not the
 /// shape the rule was written for, and the caller sends it to suspense.
+///
+/// HDFC delimits every field with `-`, so a counterparty called `ACME-INDUSTRIES`
+/// occupies two fields, and a non-greedy match stops at the first of them. That either
+/// misses a correct mapping or, worse, hits an unrelated ledger that happens to be named
+/// `ACME`. So the name runs from field `skip` up to the next structured field that
+/// `is_boundary` recognises, less `back` fields for anything that sits between the name
+/// and that marker.
+///
+/// `skip` matters as much as the boundary: an IFSC ahead of the name looks exactly like
+/// the UTR that terminates it, so scanning from field 0 finds the wrong marker and
+/// returns nothing. `is_boundary` should be a shape a name does not take (a masked
+/// account, a VPA, a 12-digit reference, a UTR), never a bare four-letter code, which is
+/// also a plausible company name. The test sees the part with its spaces removed, so a
+/// name that is mostly digits and capitals can come to satisfy a loose shape; the first
+/// part that does ends the name, and a name that is cut short that way is a wrong party,
+/// not a refusal.
 fn bounded_party(
     narration: &str,
     prefix_len: usize,
@@ -514,7 +707,10 @@ fn bounded_party(
         if index < skip {
             continue;
         }
-        // the test strips whitespace: a cell wrap also lands inside a reference
+        // the test strips whitespace: HDFC narrations are read space-joined, so a cell wrap
+        // that lands inside a reference leaves a space in it (`HDF CH12345678`), and a
+        // marker that is only recognisable when unbroken is not a marker. Names keep their
+        // spaces; only the test strips.
         if is_boundary(&remove_space(part)) {
             let end = index.saturating_sub(back).max(skip);
             return strip(&parts[skip..end].join("-")).to_string();
@@ -523,6 +719,15 @@ fn bounded_party(
     String::new()
 }
 
+/// The name field of an HDFC UPI narration:
+/// `UPI-<name>-<vpa>-<bank code>-<12-digit ref>-<remark>`.
+///
+/// The name may itself contain hyphens, so it is bounded by the next structured field,
+/// never by the first hyphen (which would turn `ACME-INDUSTRIES` into `ACME`). Two
+/// boundaries are recognised, in order of reliability: the VPA (the field holding `@`),
+/// then the reference (twelve or more digits), with the bank code sitting between it and
+/// the name. Neither found means the shape is not the one this rule was written for; the
+/// empty result sends the line to suspense rather than guessing.
 fn upi_party(narration: &str) -> String {
     pattern!(LONG_DIGITS, r"^\d{12,}$");
     let by_vpa = bounded_party(narration, "UPI-".len(), |part| part.contains('@'), 0, 0);
@@ -548,6 +753,8 @@ fn prefix_through_hyphen(narration: &str) -> Option<usize> {
         .map(|(offset, _)| offset + 1)
 }
 
+/// Kept apart on purpose from the narration reader of `bridge-tax-audit`'s `narration_payees`,
+/// which reads a Tally voucher's narration by its spec pack's README section 3 (#1428).
 fn hdfc_party(row: &Row) -> String {
     pattern!(IMPS, r"^IMPS-\d+-");
     pattern!(MASKED_ACCOUNT, r"^[Xx]{4,}\d*$");
@@ -561,7 +768,9 @@ fn hdfc_party(row: &Row) -> String {
         .unwrap()
     });
 
-    // the space-preserving reading: de-wrapping welds `ACME INDUSTRIES`
+    // the space-preserving reading: de-wrapping welds `ACME INDUSTRIES` into one word, and
+    // on a real statement it also lost the correct spelling of a counterparty that appeared
+    // twice
     let spaced = row.get("narr_spaced");
     let narration = if spaced.is_empty() {
         row.get("narr")
@@ -576,6 +785,10 @@ fn hdfc_party(row: &Row) -> String {
         }
     };
     if IMPS.is_match(narration) {
+        // IMPS-<ref>-<name...>-<bank code>-<masked account>-...: the name ends at the bank
+        // code. The masked account after it is the marker (`back` drops the bank code
+        // itself): a name can be four capitals and so can the bank code, but neither can
+        // be `XXXXXXXX1234`.
         let Some(prefix) = prefix_through_hyphen(narration) else {
             return UNRESOLVED.to_string();
         };
@@ -588,6 +801,9 @@ fn hdfc_party(row: &Row) -> String {
         ));
     }
     if NEFT.is_match(narration) {
+        // NEFT DR-<IFSC>-<name...>-<branch>-<UTR>-...: the UTR is the marker and the
+        // branch sits between it and the name (`back`). The IFSC ahead of the name has
+        // the same shape as the UTR, so the scan starts after it (`skip`).
         let Some(prefix) = prefix_through_hyphen(narration) else {
             return UNRESOLVED.to_string();
         };
@@ -601,23 +817,37 @@ fn hdfc_party(row: &Row) -> String {
         if candidate.is_empty() {
             return UNRESOLVED.to_string();
         }
+        // `UPI-XXXXXX4230-...` is a masked account, not a payee name
         return if MASKED_UPI.is_match(&candidate) {
             UNNAMED.to_string()
         } else {
             candidate
         };
     }
+    // ACH D- TP ACH <name>-<reference> (findings S1 and S2 in `docs/tally/README.md`).
+    // Spaces may sit inside the reference and directly after the hyphen, because the cell
+    // wraps wherever the column edge falls. The whole function reads the space-joined
+    // narration, which keeps those spaces visible to the pattern.
+    //
+    // Greedy `(.+)` binds the name to the LAST qualifying reference. The digit count is
+    // part of the shape, and has to be, because "hyphen then digits" alone does not tell a
+    // bank reference from an ordinary name: `ACH D- TP ACH ACME-54` resolved to `ACME`, and
+    // so did `ACME-5 4` (a name whose number wrapped at the column edge), so a mapping for
+    // `ACME` silently posted an `ACME-54` transaction to the wrong ledger. Requiring a
+    // reference-length run leaves both `UNRESOLVED`, which routes them to suspense where a
+    // person sees them. That is the direction to fail in: an unrecognised narration costs a
+    // look, a misattributed one does not announce itself at all.
     if let Some(found) = ACH_PARTY.captures(narration) {
         return squash(&found[1]);
     }
     if narration.starts_with("EMI ") {
-        return "EMI".to_string();
+        return EMI.to_string();
     }
     if narration.starts_with("DEBIT CARD") {
-        return "DEBIT CARD FEE".to_string();
+        return DEBIT_CARD_FEE.to_string();
     }
     if narration.contains("INSTAALERTCHG") {
-        return "BANK CHARGES".to_string();
+        return BANK_CHARGES.to_string();
     }
     UNRESOLVED.to_string()
 }
@@ -684,7 +914,7 @@ fn ubi_party(row: &Row) -> String {
         return crate::cash::CASH_DEPOSIT.to_string();
     }
     if CARD_FEE.is_match(narration) {
-        return "CARD ANNUAL FEE".to_string();
+        return CARD_ANNUAL_FEE.to_string();
     }
     UNRESOLVED.to_string()
 }
@@ -714,4 +944,177 @@ fn ubi_reference(row: &Row) -> (String, String) {
         "TXN"
     };
     pair(mode, strip(row.get("ref")))
+}
+
+impl Bank {
+    /// `(N, M)` from the footer line of a column layout that prints one: the measured Bank of Baroda statements' is
+    /// `<dd/mm/yyyy> <hh:mm> <word> Page N of M`, on every page, below the table. `None`
+    /// for any other line and for every other layout, so a transaction's narration cannot
+    /// pass for a footer (it would have to open with a date and a time).
+    pub fn column_footer(self, words: &[&str]) -> Option<(usize, usize)> {
+        pattern!(
+            BOB_FOOTER,
+            r"^[0-9]{2}/[0-9]{2}/[0-9]{4} [0-9]{2}:[0-9]{2} \S+ Page ([0-9]+) of ([0-9]+)$"
+        );
+        match self {
+            Self::Bob => {
+                let text = words.join(" ");
+                let found = BOB_FOOTER.captures(&text)?;
+                Some((found[1].parse().ok()?, found[2].parse().ok()?))
+            }
+            _ => None,
+        }
+    }
+
+    /// The Bank of Baroda rows as the replay needs them: oldest first, each balance a signed number.
+    ///
+    /// The statement prints its newest row first, each balance followed by a glued `Cr`
+    /// or `Dr` marker (a `Dr` balance is overdrawn), and no
+    /// opening balance, closing balance or totals. A statement whose dates run the other
+    /// way is refused, not reversed twice: the replay would break on it anyway, and a
+    /// loud refusal that names the cause is kinder than a chain failure. Numbers in any
+    /// refusal are positions in the reversed (oldest first) order.
+    pub fn bob_rows(rows: Vec<Row>) -> Result<Vec<Row>, Refusal> {
+        pattern!(MARKED_BALANCE, r"^([0-9]+(?:\.[0-9]{1,2})?)(Cr|Dr)$");
+        let mut rows = rows;
+        rows.reverse();
+        let mut previous: Option<Date> = None;
+        for (index, row) in rows.iter_mut().enumerate() {
+            let number = index + 1;
+            let Some(printed) = Self::Bob.parse_date(strip(row.get(DATE))) else {
+                return Err(Refusal::at_row(
+                    "unparseable_date",
+                    number,
+                    format!(
+                        "row {number}: the date cell is not a date this layout can produce ({}); the columns have shifted or the extraction is corrupt",
+                        Self::Bob.date_format()
+                    ),
+                ));
+            };
+            if Self::Bob.parse_date(strip(row.get("vdt"))).is_none() {
+                return Err(Refusal::at_row(
+                    "unparseable_value_date",
+                    number,
+                    format!("row {number}: the value date cell is not a date this layout can produce; the columns have shifted or a line does not belong to the table"),
+                ));
+            }
+            if previous.is_some_and(|earlier| printed < earlier) {
+                return Err(Refusal::at_row(
+                    "rows_not_newest_first",
+                    number,
+                    format!(
+                        "row {number} is dated before the row printed after it; this layout prints its newest row first"
+                    ),
+                ));
+            }
+            previous = Some(printed);
+            let Some(found) = MARKED_BALANCE.captures(strip(row.get(BALANCE))) else {
+                return Err(Refusal::at_row(
+                    "malformed_balance",
+                    number,
+                    format!("row {number}: the balance cell is not an amount followed by Cr or Dr"),
+                ));
+            };
+            let magnitude = found[1].to_string();
+            let overdrawn =
+                &found[2] == "Dr" && magnitude.chars().any(|c| c.is_ascii_digit() && c != '0');
+            row.set(
+                BALANCE,
+                if overdrawn {
+                    format!("-{magnitude}")
+                } else {
+                    magnitude
+                },
+            );
+        }
+        Ok(rows)
+    }
+}
+
+/// Bank of Baroda narrations, by prefix, as observed on the two measured statements. They print at most
+/// about 50 characters of a narration, so a name can end mid-word (the same payer is cut at
+/// the same place every time, since the prefix before it has a fixed width). A rule names a
+/// counterparty only where the shape settles it:
+///
+/// * `UPI/<12 digits>/<hh:mm:ss>/UPI/<VPA>/...` names the VPA, and only when a `/` follows
+///   it: a VPA that ends the text may have lost its handle to the cut;
+/// * `NEFT-<UTR>-<name>` and `RTGS-<UTR>-<name>` name everything after the UTR (a name can
+///   hold hyphens), without trailing hyphens, unless a line was broken at the cell edge
+///   somewhere in the narration (the de-wrapped and the space-joined readings then differ);
+/// * `BY CASH` is a cash deposit; `Loan Recovery For<digits>` is named as printed, loan
+///   number included, so that two loans are two parties; the three charge wordings
+///   (`CHARGES FOR :IMPS/`, `Charges for PORD Customer Payment`, `SMS Charges for`) are
+///   `BANK CHARGES`.
+///
+/// Not named, so they reach suspense: `IMPS` (no counterparty field is settled), `MBK` (the
+/// last field may be the payer's own remark), `EBANK`, `BY <name>`, interest, disbursement
+/// and every other wording.
+fn bob_party(row: &Row) -> String {
+    pattern!(
+        UPI,
+        r"^UPI/[0-9]{12}/[0-9]{2}:[0-9]{2}:[0-9]{2}/UPI/([A-Za-z0-9._-]+@[A-Za-z0-9]+)/"
+    );
+    pattern!(TRANSFER, r"^(?:NEFT|RTGS)-([^-\s]+)-\s*(\S.*)$");
+    // the digits follow "For" with no space, as printed
+    pattern!(LOAN, r"^Loan Recovery For[0-9]+$");
+    pattern!(
+        CHARGES,
+        r"^(?:CHARGES FOR :IMPS/|Charges for PORD Customer Payment|SMS Charges for )"
+    );
+
+    // a VPA is one token: read it from the de-wrapped narration, where a token broken
+    // at the cell edge is whole again
+    if let Some(found) = UPI.captures(strip(row.get(NARRATION))) {
+        return found[1].to_string();
+    }
+    let narration = strip(row.get("narr_spaced"));
+    if let Some(found) = TRANSFER.captures(narration) {
+        // a line broken at the cell edge may have been broken inside a word, or at a space
+        // that happened to fall there: the two readings differ and the name is not settled
+        if strip(row.get(NARRATION)) != narration {
+            return UNRESOLVED.to_string();
+        }
+        let name = squash(rstrip_hyphens(found[2].trim_end()));
+        if looks_like_utr(&found[1]) && !name.is_empty() {
+            return name;
+        }
+        return UNRESOLVED.to_string();
+    }
+    if narration == "BY CASH" {
+        return crate::cash::CASH_DEPOSIT.to_string();
+    }
+    // the narration carries the loan's own number: named as printed, one party per loan,
+    // so two loans are never one
+    if LOAN.is_match(narration) {
+        return narration.to_string();
+    }
+    if CHARGES.is_match(narration) {
+        return BANK_CHARGES.to_string();
+    }
+    UNRESOLVED.to_string()
+}
+
+fn bob_reference(row: &Row) -> (String, String) {
+    pattern!(UPI, r"^UPI/([0-9]{12})/");
+    pattern!(IMPS, r"^IMPS/[A-Z0-9]{3}/([0-9]{12})/");
+    pattern!(MBK, r"^MBK/([0-9]{12})/");
+    pattern!(TRANSFER, r"^(NEFT|RTGS)-([^-]+)-");
+    let narration = strip(row.get(NARRATION));
+    let pair = |mode: &str, value: &str| (mode.to_string(), value.to_string());
+    for (mode, pattern) in [("UPI", &*UPI), ("IMPS", &*IMPS), ("MBK", &*MBK)] {
+        if let Some(found) = pattern.captures(narration) {
+            return pair(mode, &found[1]);
+        }
+    }
+    if let Some(found) = TRANSFER.captures(narration) {
+        if looks_like_utr(&found[2]) {
+            return pair(&found[1], &found[2]);
+        }
+    }
+    let mode = if narration == "BY CASH" {
+        "CASH"
+    } else {
+        "TXN"
+    };
+    pair(mode, strip(row.get("chq")))
 }

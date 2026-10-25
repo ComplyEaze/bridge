@@ -151,25 +151,6 @@ fn canonical_pack_models_round_trip_with_exact_values_and_references() {
 }
 
 #[test]
-fn derived_bill_ids_bind_parent_scope_and_ordinal_not_mutable_values() {
-    let company = text(&"c".repeat(64));
-    let party = id("ledger:party");
-    let parent = id("voucher:1");
-    let first = derive_bill_allocation_source_id(&company, &party, &parent, 1).unwrap();
-    let same = derive_bill_allocation_source_id(&company, &party, &parent, 1).unwrap();
-    let next = derive_bill_allocation_source_id(&company, &party, &parent, 2).unwrap();
-    assert_eq!(first, same, "amount and due date are not identity inputs");
-    assert_ne!(first, next);
-    assert!(derive_bill_allocation_source_id(&company, &party, &parent, 0).is_err());
-
-    let scope = text(&"a".repeat(64));
-    assert_ne!(
-        derive_bill_outstanding_source_id(&scope, 1).unwrap(),
-        derive_bill_outstanding_source_id(&scope, 2).unwrap()
-    );
-}
-
-#[test]
 fn missing_fields_unknown_fields_and_invalid_exact_decimals_fail_deserialization() {
     assert!(serde_json::from_str::<InventoryEntryRecord>(
         r#"{

@@ -1,5 +1,6 @@
-//! Stable tags for figure/finding/evidence ids, keyed by Tally identity (GUID) rather than
-//! ledger display name. A byte-for-byte port of the reference engine's implementation; the rule
+//! Stable tags for figure and finding ids, keyed by Tally identity (GUID) rather than
+//! ledger display name. (An evidence ref's id is the identifier of what it cites, not a tag: a
+//! `ledger` ref carries the name, §11.) A byte-for-byte port of the reference engine's implementation; the rule
 //! is written down in full in `docs/tax-audit/parity-spec-v1.md` §11 -- this module's own
 //! comments summarise it, that section is the contract.
 //!
@@ -17,8 +18,6 @@
 //! `docs/tax-audit/parity-spec-v1.md` §11), or parity breaks silently.
 
 use std::collections::BTreeMap;
-
-use sha1::{Digest, Sha1};
 
 use crate::book::{Book, Ledger};
 use crate::error::{AuditError, Result};
@@ -38,7 +37,7 @@ fn normalize_guid(guid: &str) -> String {
     crate::support::py_lower(crate::support::py_strip(guid))
 }
 
-/// Short, stable, non-reversible-in-practice tag for a figure/finding/evidence id, from a Tally
+/// Short, stable, non-reversible-in-practice tag for a figure or finding id, from a Tally
 /// GUID: the first 8 hex characters of the sha1 of the normalised (`normalize_guid`) GUID. Errs
 /// when the normalised GUID is blank -- refuse, never fall back to a name hash (mirrors the
 /// reference implementation's `MissingGuid`).
@@ -47,7 +46,7 @@ pub fn guid_tag(guid: &str, what: &str) -> Result<String> {
     if normalized.is_empty() {
         return Err(missing_guid(what));
     }
-    Ok(crate::canonical::hex(&Sha1::digest(normalized.as_bytes()))[..8].to_string())
+    Ok(crate::support::hash8(&normalized))
 }
 
 /// See [`guid_tag`]. A ledger with a blank (post-normalisation) GUID falls back to hashing the
@@ -58,7 +57,7 @@ pub fn guid_tag(guid: &str, what: &str) -> Result<String> {
 /// because there is no Tally identity left to anchor it to.
 pub fn ledger_tag(ledger: &Ledger) -> Result<String> {
     if normalize_guid(&ledger.guid).is_empty() {
-        return Ok(crate::canonical::hex(&Sha1::digest(ledger.name.as_bytes()))[..8].to_string());
+        return Ok(crate::support::hash8(&ledger.name));
     }
     guid_tag(&ledger.guid, &format!("ledger {:?}", ledger.name))
 }
@@ -66,7 +65,7 @@ pub fn ledger_tag(ledger: &Ledger) -> Result<String> {
 /// A guid-based tag when `name` names a real ledger in `book.ledgers` (the case at risk of the
 /// read-shape rename churn this module exists to fix); the plain sha1 hash of `name` itself
 /// otherwise -- for a `name` that is NOT a Book ledger: a client-config alias, a synthetic
-/// sentinel bucket (e.g. `cash_payments_40a3::UNIDENTIFIED_PARTY`), or a Trial Balance row with no
+/// sentinel bucket (e.g. `high_value_register::UNIDENTIFIED_PARTY`), or a Trial Balance row with no
 /// matching ledger master. None of those is itself read fresh from Tally's ledger export on every
 /// capture, so none of them carries this module's rename-churn risk; hashing the string itself is
 /// already stable for them, and refusing would drop a real row for no benefit. When `name` DOES
@@ -75,7 +74,7 @@ pub fn ledger_tag(ledger: &Ledger) -> Result<String> {
 pub fn stable_ledger_tag(book: &Book, name: &str) -> Result<String> {
     match book.ledgers.get(name) {
         Some(ledger) => ledger_tag(ledger),
-        None => Ok(crate::canonical::hex(&Sha1::digest(name.as_bytes()))[..8].to_string()),
+        None => Ok(crate::support::hash8(name)),
     }
 }
 
@@ -196,6 +195,8 @@ mod tests {
             chain: vec!["Indirect Expenses".to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: guid.to_string(),
             masterid: None,
         }

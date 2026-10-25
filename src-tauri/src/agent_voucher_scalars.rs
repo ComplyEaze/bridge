@@ -17,6 +17,7 @@ pub(in crate::agent) fn is_voucher_scalar(field: &str) -> bool {
             | "ISOPTIONAL"
             | "ISPOSTDATED"
             | "REFERENCE"
+            | "REFERENCEDATE"
             | "ISINVOICE"
             | "PARTYGSTIN"
     )
@@ -27,7 +28,10 @@ pub(in crate::agent) fn is_voucher_entry_scalar(field: &str) -> bool {
 }
 
 pub(in crate::agent) fn is_voucher_bill_allocation_scalar(field: &str) -> bool {
-    matches!(field, "NAME" | "BILLTYPE" | "AMOUNT")
+    matches!(
+        field,
+        "NAME" | "BILLTYPE" | "AMOUNT" | "BILLDATE" | "BILLCREDITPERIOD"
+    )
 }
 
 /// Reserve one XML element, independently of text/entity event fragmentation.

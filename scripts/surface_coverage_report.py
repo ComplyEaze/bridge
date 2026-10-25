@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Report two ways code leaves the sealed compatibility surface. Never fails.
+"""Report two ways code leaves the pinned compatibility surface. Never fails.
 
 Checked (bridge#416), comparing the working tree with the merge-base against a
 base ref (default `origin/master`):
 
-1. A dropped pin. `rehash-surface` never adds paths, so a conflict resolved by
-   taking the base side of `compatibility-surface.json` loses entries a branch
-   added, and the gate still passes.
+1. A dropped pin. Nothing regenerates the pin list (schema 3 has no stored
+   hashes), so a conflict resolved by taking the base side of
+   `compatibility-surface.json` loses entries a branch added, and the gate
+   still passes. Only the `path` of each row is read, so schema 3 rows
+   (`path`, optional `reason`) and schema 2 rows (`path`, `sha256`) both work.
 2. A module declared *directly* by a pinned module and left unpinned, where it
    is a new file, a file newly attached to that pinned module, or a file that
    was pinned at the base.
@@ -22,7 +24,7 @@ Not checked -- a clean report is not evidence that nothing left the seal:
 - a new crate root.
 
 Only what is new on the branch is printed, so modules left unpinned before it
-are not reprinted on every reseal. It decides nothing: a person reads it and
+are not reprinted on every run. It decides nothing: a person reads it and
 either pins the file or leaves it.
 
 The module graph follows rustc's rules for out-of-line modules, walked from
@@ -431,7 +433,7 @@ def main(argv: list[str]) -> int:
             print("surface coverage: surface is outside the repository; nothing compared")
         else:
             print("\n".join(report(args.root, surface, args.base)))
-    except Exception as error:  # a report must never block a reseal
+    except Exception as error:  # a report must never block a merge
         print(f"surface coverage: report unavailable ({type(error).__name__}: {error})")
     return 0
 

@@ -1,0 +1,4 @@
+scripts/merge_gate_diff.py
+scripts/merge_gate_privacy.py
+tools/bridge-tally-compatibility/src/lib.rs
+reviewer: lamemustafa

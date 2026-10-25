@@ -65,19 +65,25 @@
 //!
 //! Every amount is carried in i128 (a year of capital-paise-days times a rate exceeds i64) and
 //! each figure is checked back into i64.
+//!
+//! Every per-voucher map, and the TDS seen, is keyed by the voucher's own [`VoucherKey`] (#1243):
+//! two vouchers sharing a GUID (blank, or repeated) are two credits to the s.194T base and two
+//! vouchers in a count. A citation names a voucher by its GUID and label, and cites the distinct
+//! pairs: two vouchers sharing a GUID are two citations unless their number, type and day are the
+//! same too, when they are one. The keys are formed only when a partner is configured, as the
+//! reference forms them inside its per-partner walk: a firm with none reads a population whose
+//! keys would collide (a GUID holding a NUL) without refusing it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use sha1::{Digest, Sha1};
-
-use crate::book::{Book, Voucher};
+use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::depreciation::civil_day_number;
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::Window;
 use crate::rules::Rules;
-use crate::support::{overflow, py_repr_str, rupees, voucher_label};
+use crate::support::{hash8, overflow, py_repr_str, rupees, voucher_label};
 use crate::tds_payees::py_format_g;
 use crate::PartnersConfig;
 
@@ -270,12 +276,6 @@ ledger",
     Ok(())
 }
 
-/// The reference's `_hash`: the first 8 hex characters of the key's SHA-1.
-fn hash8(key: &str) -> String {
-    let digest = Sha1::digest(key.as_bytes());
-    crate::canonical::hex(&digest)[..8].to_string()
-}
-
 /// `numerator / denominator` rounded half-up; 0 when either is not positive.
 fn round_half_up(numerator: i128, denominator: i128) -> i128 {
     if numerator <= 0 || denominator <= 0 {
@@ -284,7 +284,7 @@ fn round_half_up(numerator: i128, denominator: i128) -> i128 {
     (numerator + denominator / 2) / denominator
 }
 
-type Vouchers<'a> = BTreeMap<String, &'a Voucher>;
+type Vouchers<'a> = BTreeMap<VoucherKey, &'a Voucher>;
 
 /// One partner's pass over the population (the reference's `compute_partner_walk`).
 ///
@@ -304,6 +304,8 @@ type Vouchers<'a> = BTreeMap<String, &'a Voucher>;
 /// partner's ledger). An interest or remuneration voucher that also credits a ledger this test
 /// does not read (no partner's capital, no TDS-payable ledger, neither of this partner's own
 /// ledgers) is `unread_credit_vouchers`, with those ledgers.
+///
+/// Every map is keyed by the voucher's own [`VoucherKey`], never its GUID.
 struct Walk<'a> {
     opening_paise: i128,
     /// (day number, delta paise), sorted by day.
@@ -312,8 +314,8 @@ struct Walk<'a> {
     interest_vouchers: Vouchers<'a>,
     remuneration_credited_paise: i128,
     remuneration_vouchers: Vouchers<'a>,
-    interest_by_voucher: BTreeMap<String, i128>,
-    remuneration_by_voucher: BTreeMap<String, i128>,
+    interest_by_voucher: BTreeMap<VoucherKey, i128>,
+    remuneration_by_voucher: BTreeMap<VoucherKey, i128>,
     shared_tds_vouchers: Vouchers<'a>,
     shared_tds_interest_vouchers: Vouchers<'a>,
     shared_tds_remuneration_vouchers: Vouchers<'a>,
@@ -322,14 +324,14 @@ struct Walk<'a> {
     off_capital_vouchers: Vouchers<'a>,
     off_capital_interest_vouchers: Vouchers<'a>,
     capital_set_off_vouchers: Vouchers<'a>,
-    unread_credit_vouchers: BTreeMap<String, (&'a Voucher, BTreeSet<String>)>,
+    unread_credit_vouchers: BTreeMap<VoucherKey, (&'a Voucher, BTreeSet<String>)>,
     unread_credit_interest_vouchers: Vouchers<'a>,
     nonplain_vouchers: Vouchers<'a>,
     nonplain_interest_vouchers: Vouchers<'a>,
 }
 
 fn walk<'a>(
-    pop: &[&'a Voucher],
+    keyed: &[(VoucherKey, &'a Voucher)],
     book: &Book,
     p: &Partner,
     tds_ledgers: &BTreeSet<String>,
@@ -369,8 +371,9 @@ fn walk<'a>(
     let interest = p.interest_ledger.as_deref();
     let remuneration = p.remuneration_ledger.as_deref();
     let own_ledgers: BTreeSet<&str> = [interest, remuneration].into_iter().flatten().collect();
-    for &v in pop {
-        let guid = || v.guid.clone();
+    for (vk, v) in keyed {
+        let v: &'a Voucher = v;
+        let key = || vk.clone();
         // The capital lines' amounts, and the TDS added back as one more line where it applies.
         // Only a non-zero line touches a ledger (a zero capital line let TDS be added back to it).
         let mut lines_here: Vec<i128> = v
@@ -400,7 +403,8 @@ fn walk<'a>(
                 .lines
                 .iter()
                 .filter(|l| {
-                    i128::from(l.amount_paise) * own_net < 0 && !tds_ledgers.contains(&l.ledger)
+                    i128::from(l.amount_paise).signum() * own_net.signum() < 0
+                        && !tds_ledgers.contains(&l.ledger)
                 })
                 .map(|l| l.ledger.as_str())
                 .collect();
@@ -414,10 +418,10 @@ fn walk<'a>(
                 };
                 let (on_int, on_rem) = (on(interest), on(remuneration));
                 if on_int || on_rem {
-                    w.off_capital_vouchers.insert(guid(), v);
+                    w.off_capital_vouchers.insert(key(), v);
                 }
                 if on_int {
-                    w.off_capital_interest_vouchers.insert(guid(), v);
+                    w.off_capital_interest_vouchers.insert(key(), v);
                 }
             }
             continue;
@@ -443,9 +447,9 @@ fn walk<'a>(
                             && l.amount_paise < 0)
                 });
             if !plain {
-                w.nonplain_vouchers.insert(guid(), v);
+                w.nonplain_vouchers.insert(key(), v);
                 if is_interest || other_touch {
-                    w.nonplain_interest_vouchers.insert(guid(), v);
+                    w.nonplain_interest_vouchers.insert(key(), v);
                 }
             }
         }
@@ -468,12 +472,12 @@ fn walk<'a>(
             if opposite_alone {
                 lines_here.push(-tds);
             } else {
-                w.shared_tds_vouchers.insert(guid(), v);
+                w.shared_tds_vouchers.insert(key(), v);
                 if is_interest {
-                    w.shared_tds_interest_vouchers.insert(guid(), v);
+                    w.shared_tds_interest_vouchers.insert(key(), v);
                 }
                 if is_remuneration {
-                    w.shared_tds_remuneration_vouchers.insert(guid(), v);
+                    w.shared_tds_remuneration_vouchers.insert(key(), v);
                 }
             }
         }
@@ -501,9 +505,9 @@ fn walk<'a>(
             let i_part = if int_debit > 0 && exact {
                 c.min(int_debit)
             } else {
-                w.mixed_unsplit_vouchers.insert(guid(), v);
+                w.mixed_unsplit_vouchers.insert(key(), v);
                 if capital_debited && c > 0 {
-                    w.mixed_set_off_vouchers.insert(guid(), v);
+                    w.mixed_set_off_vouchers.insert(key(), v);
                 }
                 c
             };
@@ -514,8 +518,8 @@ fn walk<'a>(
                     } else {
                         (&mut w.remuneration_by_voucher, &mut w.remuneration_vouchers)
                     };
-                    *by_v.entry(guid()).or_insert(0) += part;
-                    vs.insert(guid(), v);
+                    *by_v.entry(key()).or_insert(0) += part;
+                    vs.insert(key(), v);
                 }
             }
             w.interest_credited_paise += i_part;
@@ -539,9 +543,9 @@ fn walk<'a>(
             .collect();
         if !unread.is_empty() && (is_interest || is_remuneration) {
             if is_interest {
-                w.unread_credit_interest_vouchers.insert(guid(), v);
+                w.unread_credit_interest_vouchers.insert(key(), v);
             }
-            w.unread_credit_vouchers.insert(guid(), (v, unread));
+            w.unread_credit_vouchers.insert(key(), (v, unread));
         }
         // A voucher on one of the two ledgers that both credits and debits the capital is read net
         // and named.
@@ -554,17 +558,17 @@ fn walk<'a>(
             && capital_lines().any(|l| l.amount_paise < 0)
             && capital_lines().any(|l| l.amount_paise > 0)
         {
-            w.capital_set_off_vouchers.insert(guid(), v);
+            w.capital_set_off_vouchers.insert(key(), v);
         }
         for amount in lines_here {
             if is_interest {
                 w.interest_credited_paise -= amount;
-                w.interest_vouchers.insert(guid(), v);
-                *w.interest_by_voucher.entry(guid()).or_insert(0) -= amount;
+                w.interest_vouchers.insert(key(), v);
+                *w.interest_by_voucher.entry(key()).or_insert(0) -= amount;
             } else if is_remuneration {
                 w.remuneration_credited_paise -= amount;
-                w.remuneration_vouchers.insert(guid(), v);
-                *w.remuneration_by_voucher.entry(guid()).or_insert(0) -= amount;
+                w.remuneration_vouchers.insert(key(), v);
+                *w.remuneration_by_voucher.entry(key()).or_insert(0) -= amount;
             } else {
                 w.events.push((civil_day_number(&v.date), amount));
             }
@@ -575,19 +579,19 @@ fn walk<'a>(
 }
 
 /// The reference's `s194t_credits`: each voucher's net interest plus remuneration to the partner,
-/// with its date (the remuneration voucher wins a GUID both maps hold, as `{**a, **b}` does).
-fn s194t_credits<'a>(w: &Walk<'a>) -> Vec<(&'a Voucher, String, i128)> {
+/// by its key (a voucher split into both is one credit).
+fn s194t_credits<'a>(w: &Walk<'a>) -> Vec<(&'a Voucher, VoucherKey, i128)> {
     let mut vouchers = w.interest_vouchers.clone();
     vouchers.extend(w.remuneration_vouchers.clone());
-    let mut amounts: BTreeMap<&String, i128> = BTreeMap::new();
+    let mut amounts: BTreeMap<&VoucherKey, i128> = BTreeMap::new();
     for by_voucher in [&w.interest_by_voucher, &w.remuneration_by_voucher] {
-        for (g, paise) in by_voucher {
-            *amounts.entry(g).or_insert(0) += paise;
+        for (k, paise) in by_voucher {
+            *amounts.entry(k).or_insert(0) += paise;
         }
     }
     amounts
         .into_iter()
-        .map(|(g, paise)| (vouchers[g], g.clone(), paise))
+        .map(|(k, paise)| (vouchers[k], k.clone(), paise))
         .collect()
 }
 
@@ -619,14 +623,19 @@ fn interest_from_capital_days(days_paise: i128, rate_bp: i64, denom_days: i128) 
     round_half_up(days_paise * i128::from(rate_bp), denom_days * 10_000)
 }
 
-/// Voucher refs sorted by GUID, labelled.
-fn voucher_refs(vs: &BTreeMap<String, &Voucher>) -> Vec<EvidenceRef> {
-    vs.iter()
-        .map(|(g, v)| EvidenceRef::with_label("voucher", g, &voucher_label(v)))
+/// The reference's `_refs`: the distinct refs of some vouchers, by GUID and label, sorted by (GUID,
+/// label). Vouchers sharing a GUID are each cited, unless their labels are identical too.
+fn voucher_refs<'v>(vs: impl IntoIterator<Item = &'v Voucher>) -> Vec<EvidenceRef> {
+    let refs: BTreeSet<(&str, String)> = vs
+        .into_iter()
+        .map(|v| (v.guid.as_str(), voucher_label(v)))
+        .collect();
+    refs.into_iter()
+        .map(|(g, label)| EvidenceRef::with_label("voucher", g, &label))
         .collect()
 }
 
-fn labels(vs: &BTreeMap<String, &Voucher>) -> String {
+fn labels(vs: &Vouchers) -> String {
     vs.values()
         .map(|v| voucher_label(v))
         .collect::<Vec<_>>()
@@ -634,7 +643,7 @@ fn labels(vs: &BTreeMap<String, &Voucher>) -> String {
 }
 
 /// [`labels`] for a map whose values carry their voucher first.
-fn labels_of<T>(vs: &BTreeMap<String, (&Voucher, T)>) -> String {
+fn labels_of<T>(vs: &BTreeMap<VoucherKey, (&Voucher, T)>) -> String {
     vs.values()
         .map(|(v, _)| voucher_label(v))
         .collect::<Vec<_>>()
@@ -758,7 +767,7 @@ pub fn run_with(
 s40b_interest_rate_bp and rules.entity(...).s194t for this engagement's entity_type -- never from \
 the entity_type string itself. 'no' when both are absent/zero/false.",
         Vec::new(),
-    );
+    )?;
     if !applicable {
         return Ok(r);
     }
@@ -767,6 +776,13 @@ the entity_type string itself. 'no' when both are absent/zero/false.",
     let (partners, deed) = partners_config(cfg)?;
     check_partners_config(&partners, book, tds_ledgers)?;
     let pop = book.population()?;
+    // The reference forms the keys inside its per-partner walk, so with no partner configured it
+    // never forms them: a population whose keys collide is read there, not refused.
+    let keyed = if partners.is_empty() {
+        Vec::new()
+    } else {
+        voucher_keys(&pop)?
+    };
     r.population_note = "Books population (optional, cancelled and post-dated vouchers excluded). \
 A capital-ledger line is excluded from the daily-balance walk, and counted as interest/remuneration \
 credited instead, iff that SAME voucher also carries a line on the partner's own interest or \
@@ -776,7 +792,8 @@ narration."
 
     // Each partner's figures are tagged `hash8(key)`, as the reference tags them, so two keys whose
     // tags coincide would name one figure twice. The reference raises there (its `fig` refuses a
-    // duplicate id); refuse the same way before any partner figure is built, never panic in `fig`.
+    // duplicate id); refuse before any partner figure is built, naming both keys, rather than
+    // leave `fig` to refuse the first repeated id.
     let mut tags: BTreeMap<String, &str> = BTreeMap::new();
     for key in partners.keys() {
         let tag = hash8(key);
@@ -822,7 +839,7 @@ bound ({s40b_rate} bp), not a confirmed authorised rate."
             ),
         },
         Vec::new(),
-    );
+    )?;
     if rate_not_recorded {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/deed_rate_missing"),
@@ -875,7 +892,7 @@ during the year) showing the authorised interest rate and remuneration clause."
     };
     let mut remuneration_facts: Vec<(String, String)> = Vec::new();
     let mut remuneration_notes: Vec<String> = Vec::new();
-    let mut remuneration_evidence: BTreeMap<String, &Voucher> = BTreeMap::new();
+    let mut remuneration_evidence: Vouchers = BTreeMap::new();
     let mut excess_total: i128 = 0;
     let mut credited_total: i128 = 0;
     let mut not_computed_count = 0_usize;
@@ -945,7 +962,7 @@ is listed in clause 21(c)."
 
     for (key, p) in &partners {
         let h = hash8(key);
-        let w = walk(&pop, book, p, tds_ledgers, &all_capitals, &all_int_rem);
+        let w = walk(&keyed, book, p, tds_ledgers, &all_capitals, &all_int_rem);
         let days_primary = capital_paise_days(w.opening_paise, &w.events, period);
         let days_opening_only = capital_paise_days(w.opening_paise, &[], period);
         let reductions_skipped: Vec<(i64, i128)> =
@@ -959,7 +976,7 @@ is listed in clause 21(c)."
         let excess = (credited - allowable_365).max(0);
         // A partner whose interest cannot be read exactly has s.40(b) NOT COMPUTED, and said so;
         // under the closing rule every partner is not computed.
-        let mut unknown: BTreeMap<String, &Voucher> = w.mixed_unsplit_vouchers.clone();
+        let mut unknown: Vouchers = w.mixed_unsplit_vouchers.clone();
         unknown.extend(w.shared_tds_interest_vouchers.clone());
         unknown.extend(w.off_capital_interest_vouchers.clone());
         unknown.extend(w.capital_set_off_vouchers.clone());
@@ -989,7 +1006,7 @@ that says so)."
             Unit::Paise,
             &format!("Opening (1-4) balance of partner (tag {h})'s capital ledger(s), Dr+/Cr-."),
             ev_capital.clone(),
-        );
+        )?;
         let no_remuneration_note = if p.remuneration_ledger.is_none() {
             " No remuneration ledger is configured for this partner: remuneration credits, if any, \
 are read as capital; configure the remuneration ledger."
@@ -1008,7 +1025,7 @@ date), actual days / 365, a debit (negative) capital day contributing zero.{unus
 {no_remuneration_note}"
             ),
             ev_capital.clone(),
-        );
+        )?;
         r.fig(
             &format!("allowable_interest_sensitivity_360day_{h}"),
             int(allowable_360)?,
@@ -1017,7 +1034,7 @@ date), actual days / 365, a debit (negative) capital day contributing zero.{unus
                 "Same daily-balance walk for partner (tag {h}), but actual days / 360.{unusable}"
             ),
             ev_capital.clone(),
-        );
+        )?;
         r.fig(
             &format!("allowable_interest_sensitivity_opening_only_{h}"),
             int(allowable_opening_only)?,
@@ -1027,7 +1044,7 @@ date), actual days / 365, a debit (negative) capital day contributing zero.{unus
 opening value for the whole year (no intra-year voucher line applied at all).{unusable}"
             ),
             ev_capital.clone(),
-        );
+        )?;
         r.fig(
             &format!("allowable_interest_sensitivity_no_reduction_{h}"),
             int(allowable_no_reduction)?,
@@ -1038,9 +1055,9 @@ withdrawal or transfer (every debit line on the capital ledger(s) skipped; a cre
 e.g. capital introduced, still applied).{unusable}"
             ),
             ev_capital,
-        );
+        )?;
 
-        let ev_interest_v = voucher_refs(&w.interest_vouchers);
+        let ev_interest_v = voucher_refs(w.interest_vouchers.values().copied());
         let f_credited = r.fig(
             &format!("interest_credited_{h}"),
             int(credited)?,
@@ -1050,7 +1067,7 @@ e.g. capital introduced, still applied).{unusable}"
 also carrying a line on their interest_ledger.{unusable}"
             ),
             ev_interest_v.clone(),
-        );
+        )?;
         credited_total += credited;
         let off = &w.off_capital_vouchers;
         // The listed vouchers on a ledger shared by partners, never the shared ledgers alone.
@@ -1094,7 +1111,7 @@ is is not judged either.",
 partners' capitals alone: not counted for this partner"
                     .to_string(),
                 facts: Vec::new(),
-                evidence: voucher_refs(off),
+                evidence: voucher_refs(off.values().copied()),
                 confidence: Confidence::JudgementRequired,
                 limits,
                 ask_client: vec![
@@ -1106,10 +1123,10 @@ which."
         }
         // The interest vouchers that also credit a ledger this test does not read, and those
         // ledgers, sorted (both named by the not-computed finding).
-        let unread: BTreeMap<&String, &(&Voucher, BTreeSet<String>)> = w
+        let unread: BTreeMap<&VoucherKey, &(&Voucher, BTreeSet<String>)> = w
             .unread_credit_vouchers
             .iter()
-            .filter(|(g, _)| w.unread_credit_interest_vouchers.contains_key(*g))
+            .filter(|(k, _)| w.unread_credit_interest_vouchers.contains_key(*k))
             .collect();
         let unread_ledgers: BTreeSet<&String> =
             unread.values().flat_map(|(_, ls)| ls.iter()).collect();
@@ -1151,15 +1168,15 @@ counted. If the deed authorises no interest on capital, the configuration can re
                         .to_string(),
                 );
             }
-            let other_shape: BTreeMap<String, &Voucher> = w
+            let other_shape: Vouchers = w
                 .nonplain_vouchers
                 .iter()
-                .filter(|(g, _)| {
-                    !w.capital_set_off_vouchers.contains_key(*g)
-                        && !w.unread_credit_interest_vouchers.contains_key(*g)
-                        && !w.shared_tds_interest_vouchers.contains_key(*g)
+                .filter(|(k, _)| {
+                    !w.capital_set_off_vouchers.contains_key(*k)
+                        && !w.unread_credit_interest_vouchers.contains_key(*k)
+                        && !w.shared_tds_interest_vouchers.contains_key(*k)
                 })
-                .map(|(g, v)| (g.clone(), *v))
+                .map(|(k, v)| (k.clone(), *v))
                 .collect();
             if !other_shape.is_empty() {
                 reasons.push(format!(
@@ -1261,7 +1278,7 @@ read exactly; the CA computes it"
 no partner; the CA computes it"
                 )
                 };
-            let mut evidence = voucher_refs(&unknown);
+            let mut evidence = voucher_refs(unknown.values().copied());
             evidence.extend(unread_ledgers.iter().map(|x| EvidenceRef::new("ledger", x)));
             if no_interest_ledger {
                 evidence.extend(
@@ -1323,7 +1340,7 @@ your statutory dues; otherwise, what it is.",
                 Unit::Paise,
                 &format!("interest_credited_{h} minus allowable_interest_{h}, floor 0."),
                 Vec::new(),
-            );
+            )?;
             excess_total += excess;
             if excess > 0 {
                 let mut limits = vec![if rate_not_recorded {
@@ -1389,8 +1406,8 @@ their remuneration_ledger. The s.40(b)(v) book-profit limit is NOT computed here
 split is counted as interest, not here."
                 }
             ),
-            voucher_refs(&w.remuneration_vouchers),
-        );
+            voucher_refs(w.remuneration_vouchers.values().copied()),
+        )?;
         remuneration_facts.push((key.clone(), f_rem));
         let mixed_here = &w.mixed_unsplit_vouchers;
         // A voucher is mixed only when it carries a remuneration ledger, so one is configured.
@@ -1405,21 +1422,21 @@ out the remuneration in them.",
                 labels(mixed_here)
             ));
         }
-        let unread_rem: BTreeMap<String, &Voucher> = w
+        let unread_rem: Vouchers = w
             .unread_credit_vouchers
             .iter()
-            .filter(|(g, _)| !w.unread_credit_interest_vouchers.contains_key(*g))
-            .map(|(g, (v, _))| (g.clone(), *v))
+            .filter(|(k, _)| !w.unread_credit_interest_vouchers.contains_key(*k))
+            .map(|(k, (v, _))| (k.clone(), *v))
             .collect();
-        let other_rem: BTreeMap<String, &Voucher> = w
+        let other_rem: Vouchers = w
             .nonplain_vouchers
             .iter()
-            .filter(|(g, _)| {
-                !w.nonplain_interest_vouchers.contains_key(*g)
-                    && !unread_rem.contains_key(*g)
-                    && !w.shared_tds_remuneration_vouchers.contains_key(*g)
+            .filter(|(k, _)| {
+                !w.nonplain_interest_vouchers.contains_key(*k)
+                    && !unread_rem.contains_key(*k)
+                    && !w.shared_tds_remuneration_vouchers.contains_key(*k)
             })
-            .map(|(g, v)| (g.clone(), *v))
+            .map(|(k, v)| (k.clone(), *v))
             .collect();
         if !other_rem.is_empty() {
             remuneration_evidence.extend(other_rem.clone());
@@ -1476,7 +1493,7 @@ remuneration, commission, bonus and interest to a partner).{}",
                 }
             ),
             Vec::new(),
-        );
+        )?;
         let tds_expected = round_half_up(subject_paise * i128::from(tds_rate_bp), 10_000);
         let f_tds = r.fig(
             &format!("s194t_tds_expected_{h}"),
@@ -1484,10 +1501,7 @@ remuneration, commission, bonus and interest to a partner).{}",
             Unit::Paise,
             &format!("TDS @ {tds_rate_bp} bp on s194t_amount_credited_{h}."),
             Vec::new(),
-        );
-        // The remuneration voucher wins a GUID both maps hold, as `{**interest, **remuneration}`.
-        let mut touched = w.interest_vouchers.clone();
-        touched.extend(w.remuneration_vouchers.clone());
+        )?;
         // The TDS seen is on ANY voucher touching the partner (its capital, or its own interest or
         // remuneration ledger not shared by partners) with a line on a TDS-payable ledger.
         let ledgers: BTreeSet<&str> = [
@@ -1534,30 +1548,31 @@ remuneration, commission, bonus and interest to a partner).{}",
                 .lines
                 .iter()
                 .filter(|l| {
-                    i128::from(l.amount_paise) * tds < 0 && !tds_ledgers.contains(&l.ledger)
+                    i128::from(l.amount_paise).signum() * tds.signum() < 0
+                        && !tds_ledgers.contains(&l.ledger)
                 })
                 .map(|l| l.ledger.as_str())
                 .collect();
             !side.is_empty() && side.iter().all(|l| all_capitals.contains(*l))
         };
-        let mut seen: BTreeMap<String, &Voucher> = BTreeMap::new();
-        let mut unattributed: BTreeMap<String, &Voucher> = BTreeMap::new();
+        let mut seen: Vouchers = BTreeMap::new();
+        let mut unattributed: Vouchers = BTreeMap::new();
         if !tds_ledgers.is_empty() {
             // Only a non-zero line touches a ledger, as the walk reads it: a zero capital line
             // never makes a shared ledger's TDS that partner's.
-            for &v in &pop {
+            for (vk, v) in &keyed {
                 if v.lines
                     .iter()
                     .any(|l| own.contains(l.ledger.as_str()) && l.amount_paise != 0)
                     && has_tds(v)
                 {
-                    seen.insert(v.guid.clone(), v);
+                    seen.insert(vk.clone(), v);
                 }
             }
             // On a shared ledger, TDS booked against partners' capitals alone is theirs, never
             // "whose is not judged" for another.
-            for &v in &pop {
-                if !seen.contains_key(&v.guid)
+            for (vk, v) in &keyed {
+                if !seen.contains_key(vk)
                     && has_tds(v)
                     && v.lines.iter().any(|l| {
                         ledgers.contains(l.ledger.as_str())
@@ -1566,7 +1581,7 @@ remuneration, commission, bonus and interest to a partner).{}",
                     })
                     && !partners_tds(v)
                 {
-                    unattributed.insert(v.guid.clone(), v);
+                    unattributed.insert(vk.clone(), v);
                 }
             }
         }
@@ -1595,7 +1610,7 @@ judged\" when none is classified, or when the only such lines are on a ledger sh
 on a voucher whose TDS is not booked against partners' capitals alone)."
             ),
             Vec::new(),
-        );
+        )?;
 
         let over = subject_paise > i128::from(tds_limit_paise);
         if over || base_uncertain {
@@ -1630,7 +1645,7 @@ be wrong in either direction.",
                     rupees(i128::from(tds_limit_paise))
                 ));
             }
-            let mut reversals: Vec<(&Voucher, &String)> = credits
+            let mut reversals: Vec<(&Voucher, &VoucherKey)> = credits
                 .iter()
                 .filter(|c| c.2 < 0)
                 .map(|c| (c.0, &c.1))
@@ -1640,7 +1655,7 @@ be wrong in either direction.",
                 let net_paise = w.interest_credited_paise + w.remuneration_credited_paise;
                 limits.push(format!(
                     "{} voucher(s) carry a negative net credit of interest and remuneration to this \
-partner ({}): under the gross reading (owner, 25-Sep) they lower nothing, so this base ({}) \
+partner ({}): under the gross reading they lower nothing, so this base ({}) \
 exceeds the interest and remuneration credited net of them ({}).",
                     reversals.len(),
                     reversals
@@ -1670,8 +1685,8 @@ exceeds the interest and remuneration credited net of them ({}).",
 the rules table -- not yet a verified rule."
                 ));
             }
-            let by_date = |vs: &BTreeMap<String, &Voucher>| -> Vec<String> {
-                let mut ordered: Vec<(&String, &&Voucher)> = vs.iter().collect();
+            let by_date = |vs: &Vouchers| -> Vec<String> {
+                let mut ordered: Vec<(&VoucherKey, &&Voucher)> = vs.iter().collect();
                 ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));
                 ordered.into_iter().map(|(_, v)| voucher_label(v)).collect()
             };
@@ -1746,9 +1761,15 @@ touched_vouchers)."
 returned the income, tax paid)."
                     .to_string(),
             );
-            let mut evidence = touched.clone();
-            evidence.extend(seen.clone());
-            evidence.extend(unattributed.clone());
+            // Its vouchers, and those carrying the TDS seen or attributed to no one.
+            let evidence = voucher_refs(
+                w.interest_vouchers
+                    .values()
+                    .chain(w.remuneration_vouchers.values())
+                    .chain(seen.values())
+                    .chain(unattributed.values())
+                    .copied(),
+            );
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/s194t/{h}"),
                 clauses: vec![
@@ -1761,7 +1782,7 @@ returned the income, tax paid)."
                     ("credited".to_string(), f_subject),
                     ("tds_expected".to_string(), f_tds),
                 ],
-                evidence: voucher_refs(&evidence),
+                evidence,
                 confidence: if seen.is_empty() {
                     Confidence::NeedsDocument
                 } else {
@@ -1782,7 +1803,7 @@ returned the income, tax paid)."
             Unit::Paise,
             "Sum of s40b_excess_<partner> across all partners.",
             Vec::new(),
-        );
+        )?;
     } else {
         r.fig(
             "s40b_excess_total_not_computed",
@@ -1797,7 +1818,7 @@ out the partners whose excess is not computed (their s40b_not_computed findings)
 configured (see that question). Where a partner's excess is computed, it is that partner's own \
 figure.",
             Vec::new(),
-        );
+        )?;
     }
     r.fig(
         "s194t_interest_credited_total",
@@ -1806,7 +1827,7 @@ figure.",
         "Sum of interest_credited_<partner> across all partners -- cross-check this against a \
 shared interest_ledger's own TB movement when every partner uses the same ledger name.",
         Vec::new(),
-    );
+    )?;
 
     if !remuneration_facts.is_empty() {
         let mut limits = vec![
@@ -1825,7 +1846,7 @@ reading, not a books fact."
 profit, not computed here"
                 .to_string(),
             facts: remuneration_facts,
-            evidence: voucher_refs(&remuneration_evidence),
+            evidence: voucher_refs(remuneration_evidence.values().copied()),
             confidence: Confidence::JudgementRequired,
             limits,
             ask_client: vec![
@@ -1899,6 +1920,8 @@ mod tests {
             chain: vec!["Capital Account".to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: String::new(),
             masterid: None,
         }
@@ -2103,6 +2126,26 @@ remuneration in each voucher named here and the TDS on each.";
         // Either key alone runs.
         let one = "[p30395]\ncapital_ledgers = [\"A Capital\"]\n";
         assert!(run(&book, &rules, &year(), "firm", &cfg(one), &BTreeSet::new()).is_ok());
+    }
+
+    /// A partner's figures carry the first eight hex digits of the sha1 of its key as written
+    /// (`hashlib.sha1(b"PartnerA").hexdigest()[:8]`, measured in Python; mixed case on purpose, so
+    /// a tag that folds case is caught).
+    #[test]
+    fn a_partners_figure_id_carries_the_sha1_tag_of_its_key_as_written() {
+        let mut book = Book {
+            vouchers: Vec::new(),
+            ..unreadable_book()
+        };
+        book.ledgers
+            .insert("A Capital".to_string(), ledger("A Capital"));
+        let rules = Rules::vendored().unwrap();
+        let one = "[PartnerA]\ncapital_ledgers = [\"A Capital\"]\n";
+        let r = run(&book, &rules, &year(), "firm", &cfg(one), &BTreeSet::new()).unwrap();
+        assert!(r
+            .figures
+            .iter()
+            .any(|f| f.id == "partners_40b_194t.capital_opening_8a0577f9"));
     }
 
     #[test]
@@ -2343,6 +2386,47 @@ names; got {got}"
             let m = config_refusal(go_with(Vec::new(), &config, &["TDS Payable"], false));
             assert_eq!(m, format!("{TEST_ID}: {why}"), "{config}");
         }
+    }
+
+    /// No partner configured, and a population whose keys would collide (a GUID holding a NUL beside
+    /// two vouchers that share the bare GUID): the reference forms its keys inside its per-partner
+    /// walk, so it reads the book and prints its figures (measured at reference `ee17d80f` on this
+    /// input: four figures and one finding), where the keys alone are refused. The port forms them
+    /// only for a configured partner; with one it refuses, as the reference raises.
+    #[test]
+    fn a_firm_with_no_partner_reads_a_population_whose_keys_collide() {
+        let colliding = || {
+            let line = |ledger: &'static str, p: i64| [(ledger, p), ("Cash", -p)];
+            vec![
+                voucher("g\u{0}00000001", &line("Interest to Partners", 1000)),
+                voucher("g", &line("Interest to Partners", 1000)),
+                voucher("g", &line("Interest to Partners", 1000)),
+            ]
+        };
+        let r = go_with(colliding(), DEED, &["TDS Payable"], S40B_EXCESS_COMPUTED)
+            .expect("no partner: no keys are formed");
+        assert_eq!(r.figures.len(), 4);
+        assert_eq!(r.findings.len(), 1);
+        assert_eq!(fig(&r, "applicable").value, Value::Text("yes".to_string()));
+        assert_eq!(fig(&r, "interest_rate_bp_used").value, Value::Int(1000));
+        assert_eq!(
+            fig(&r, "s194t_interest_credited_total").value,
+            Value::Int(0)
+        );
+        assert_eq!(
+            fig(&r, "s40b_excess_total_not_computed").value,
+            Value::Text("not computed: no partner is configured for this firm".to_string())
+        );
+        let with_partner = format!("{ONE}{DEED}");
+        assert!(matches!(
+            go_with(
+                colliding(),
+                &with_partner,
+                &["TDS Payable"],
+                S40B_EXCESS_COMPUTED
+            ),
+            Err(AuditError::VoucherKeysNotUnique)
+        ));
     }
 
     // ---- the closing rule: the excess is computed for no partner ----
@@ -2962,7 +3046,7 @@ ledger shared by partners, on a voucher whose TDS is not booked against partners
 
     #[test]
     fn shared_tds_seen_on_a_partners_own_capital_is_not_also_listed_as_unattributed() {
-        // Kills PR-09 (`!seen.contains_key(&v.guid)` -> `true`): s1 touches A's capital and
+        // Kills PR-09 (`!seen.contains_key(vk)` -> `true`): s1 touches A's capital and
         // carries TDS, so it is in A's `seen`; it is also on the shared interest ledger with a bank
         // on the TDS's side (not partners' TDS), so only the `seen` guard keeps it out of A's
         // `unattributed`. The reference lists it for A as seen, never as "not judged".
@@ -3835,5 +3919,43 @@ supplied and that interest was authorised for the whole year; confirm both again
         // Implied by the Python: A's own capital never appears off-capital here, since p2's side
         // opposite A's interest ledger is B's capital alone.
         assert!(found(&r, &format!("off_capital/{ha}")).is_empty());
+    }
+
+    #[test]
+    fn a_side_test_on_lines_of_extreme_amounts_does_not_overflow() {
+        // Only the sign of a line and of the net it is compared with decides the side; their
+        // product must never be formed. Four lines of i64::MAX net to 2^65 - 4, and a line of
+        // that size times it exceeds i128::MAX. The overflow shows as a panic in a debug build (the
+        // test profile), which is how this test fails without the fix.
+        let big = i64::MAX;
+        let own_side = voucher(
+            "x1",
+            &[
+                ("Interest to Partners", big),
+                ("Interest to Partners", big),
+                ("Interest to Partners", big),
+                ("Interest to Partners", big),
+                ("Partner B", i64::MIN),
+            ],
+        );
+        let tds_side = voucher(
+            "x2",
+            &[
+                ("TDS Payable", big),
+                ("TDS Payable", big),
+                ("TDS Payable", big),
+                ("TDS Payable", big),
+                ("Interest to Partners", big),
+            ],
+        );
+        // Partner A's walk (both sites) finishes; partner B's pass then meets a credit of 2^63
+        // (the negated i64::MIN), which no longer fits i64, and refuses it with a typed error.
+        let refusal = config_refusal(go_with(
+            vec![own_side, tds_side],
+            &format!("{TWO}{DEED}"),
+            &["TDS Payable"],
+            S40B_EXCESS_COMPUTED,
+        ));
+        assert!(refusal.contains("overflowed i64 paise"), "{refusal}");
     }
 }

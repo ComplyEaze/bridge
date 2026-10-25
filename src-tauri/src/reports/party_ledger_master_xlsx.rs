@@ -82,6 +82,9 @@ pub(crate) fn render_party_ledger_master_xlsx(
         worksheet.write_string_with_format(row, 0, label, &bold)?;
         worksheet.write_string(row, 1, value)?;
     }
+    if let Some(note) = source.notes_text() {
+        worksheet.write_string(2, 2, note)?;
+    }
     worksheet.write_string_with_format(7, 0, "Repeated read agreement", &bold)?;
     worksheet.write_string(
         7,
@@ -248,9 +251,13 @@ fn write_schedule_iii(
         3,
         1,
         format!(
-            "Read period: {} to {}. No prior-year values were requested or inferred.",
+            "Read period: {} to {}. No prior-year values were requested or inferred.{}",
             source.from.as_str(),
-            source.to.as_str()
+            source.to.as_str(),
+            source
+                .notes_text()
+                .map(|note| format!(" {note}"))
+                .unwrap_or_default()
         ),
     )?;
     for (row, label, value) in [

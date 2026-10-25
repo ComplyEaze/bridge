@@ -1,0 +1,4 @@
+# fixture: ../tally-protocol-simulator/fixtures/record_count_mismatch.xml
+# parser: parse_ledgers_with_evidence
+# source: synthetic: not evidence of what Tally sends
+Err(Tally source record count did not match parsed primary rows)

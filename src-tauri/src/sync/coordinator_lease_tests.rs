@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use crate::endpoint_coordination::acquire as acquire_endpoint_dispatch_lease;
 use crate::tally::{TallyConfig, TallyRuntime};
@@ -43,11 +47,11 @@ async fn snapshot_worker_holds_posting_lease_until_cancellation_settles() {
             .start(plan.clone(), connector(&plan, config.clone()), mirror.clone())
             .await
             .unwrap_err(),
-        "Another Bridge snapshot or Journal posting is using this Tally endpoint. Wait for it to finish."
+        "Another ComplyEaze Bridge snapshot or Journal posting is using this Tally endpoint. Wait for it to finish."
     );
     assert!(coordinator.jobs.lock().unwrap().is_empty());
     assert!(store.load(&plan.resume_key).await.unwrap().is_none());
-    assert!(timeout(Duration::from_millis(50), listener.accept())
+    assert!(timeout(Duration::from_millis(1000), listener.accept())
         .await
         .is_err());
     drop(posting_lease);

@@ -1,0 +1,189 @@
+{
+ "comment": "loans_interest, bridge#803, a firm: a journal moving a loan to another lender's loan with TDS on it is a repayment of one loan and a loan taken on the other, not a TDS journal (From Loan, To Loan); a TDS journal on one loan stays neither taken nor repaid (Journal Loan), also beside a nil line on another loan.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_loan_transfer_tds-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_loan_transfer_tds-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_loan_transfer_tds-002"
+  },
+  {
+   "name": "From Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_loan_transfer_tds-003"
+  },
+  {
+   "name": "To Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_loan_transfer_tds-004"
+  },
+  {
+   "name": "Journal Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_loan_transfer_tds-005"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "From Loan",
+   "opening": -5000000,
+   "debit": 4120000,
+   "credit": 0,
+   "closing": -880000
+  },
+  {
+   "ledger": "Journal Loan",
+   "opening": -5000000,
+   "debit": 240000,
+   "credit": 0,
+   "closing": -4760000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 360000,
+   "closing": -360000
+  },
+  {
+   "ledger": "To Loan",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4000000,
+   "closing": -4000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "t01",
+   "date": "2025-09-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "From Loan",
+     4120000
+    ],
+    [
+     "To Loan",
+     -4000000
+    ],
+    [
+     "TDS Payable",
+     -120000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2025-09-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Journal Loan",
+     120000
+    ],
+    [
+     "TDS Payable",
+     -120000
+    ]
+   ]
+  },
+  {
+   "guid": "j02",
+   "date": "2025-09-02",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Journal Loan",
+     120000
+    ],
+    [
+     "TDS Payable",
+     -120000
+    ],
+    [
+     "From Loan",
+     0
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "From Loan": {
+   "lender": "Invented Transfer Lender",
+   "lender_type": "person"
+  },
+  "To Loan": {
+   "lender": "Invented Receiving Lender",
+   "lender_type": "person"
+  },
+  "Journal Loan": {
+   "lender": "Invented Journal Lender",
+   "lender_type": "person"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

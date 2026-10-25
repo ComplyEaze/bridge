@@ -113,7 +113,7 @@ company lookups to produce a value that is constant for the entire request.
 > **Rule: never use `<COMPUTE>` to carry a per-request constant.** Company name, company GUID,
 > schema identifiers and record counts are all obtainable from a separate, cheap request — or
 > from the client that built the request in the first place. Bridge's existing
-> `company_book_extent_v1` profile already returns the verified company GUID in milliseconds.
+> `company_book_extent_v2` profile already returns the verified company GUID in milliseconds.
 
 This is the same category of error as the self-referential `$$NumItems` in §5.3b: a TDL
 construct that looks like free metadata and is actually per-row work. Both were inherited from
@@ -284,6 +284,10 @@ requires a restart.
 
 **OWNER-RULED 2026-07-30.** The wildcard outstandings profile has one narrow response-bound
 exception because a live 1,632-voucher boundary produced approximately 33.6 MiB:
+
+(October 2026: the voucher-scan outstandings read, its `VoucherOutstandingsV1` request and its
+40 MiB cap were deleted from the code; every read now has the 32 MiB cap. This section stays as
+the rule a future scan must meet.)
 
 - the general XML response cap remains **32 MiB**;
 - only the closed `VoucherOutstandingsV1` request type may use a **40 MiB** response cap;
@@ -532,7 +536,7 @@ failure:
 | Numbering method | Your `<VOUCHERNUMBER>` | A failed Alter |
 | --- | --- | --- |
 | Automatic | **discarded** — Tally assigns its own | **silently duplicates** |
-| **Manual + `PREVENTDUPLICATES=Yes`** | **preserved verbatim** | **cleanly rejected** |
+| **Manual + `PREVENTDUPLICATES=Yes`** | **preserved verbatim**, except a space at its end, which did not read back (§9.8) | **cleanly rejected** |
 
 Under automatic numbering a client-supplied key is thrown away while the create still reports
 `CREATED=1, ERRORS=0`. Any dedupe built on it is silently ineffective.
@@ -599,8 +603,9 @@ neither is:
 - **An independent attribution marker stays.** The returned *attribute* does not echo the client
   key — but the key itself survives in any field Tally does not own. The committed capture
   `src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml` returns it inside `NARRATION` as
-  `[BRIDGE:9c8d8de4-…]`, which is why Bridge's verifier reaches `posted_verified` only through a
-  narration-tagged match. A date/ledger/amount fingerprint is **not** a substitute: a recurring or
+  `[BRIDGE:9c8d8de4-…]`, which is why, for a file a person imports, Bridge's verifier reaches
+  `posted_verified` only through a narration-tagged match. A native post writes no marker and
+  reaches it through its post-span binding instead (protocol reference §9.15). A date/ledger/amount fingerprint is **not** a substitute: a recurring or
   duplicate same-day payment already gives that tuple, so a pre-existing voucher stands in for a
   write that never happened.
 
@@ -617,6 +622,14 @@ licensed or standard TallyPrime.
 > set in place (`CREATED=0 ALTERED=1`, same GUID) for Journal, Payment, Receipt and Contra; date and
 > voucher-type replacement were observed on a Payment only. See TALLY_PROTOCOL_REFERENCE §9.3 for
 > the row-by-row table and what remains unmeasured.
+
+> **Scoped addition, 2026-10-09 (PARTIAL):** an unchanged re-import was seen again, on TallyPrime
+> Release 7.1 Silver on Windows 10, for a file Bridge built (two Receipts and four Payments) and a
+> person imported through Tally's Import screen. The six vouchers were altered in place: same GUIDs,
+> MasterIDs and numbers, AlterIDs advanced, six vouchers afterwards. On the re-import Tally's screen
+> showed only "Import successful", with no counters. The export's `REMOTEID` attribute is the voucher's own GUID
+> there too, and the file's id survives only in the narration tag. Which field Tally matched on is not
+> established. See TALLY_PROTOCOL_REFERENCE §9.3.
 
 ### 3.3b Master-name matching: directional alternatives, otherwise exact
 
@@ -852,8 +865,17 @@ subject to a foreign-writer cross-check. It also accepts non-numeric text withou
 ### 3.6 Master re-create is a silent Alter
 
 Re-sending an identical ledger `ACTION="Create"` returned `CREATED=0, ALTERED=1` — the
-existing master was **overwritten** with the retry payload. Persist `CREATED` and `ALTERED` as
-distinct outbox outcomes. A pre-read alone does not authorize creation: use the complete-catalogue
+existing master was **overwritten** with the retry payload.
+A `Create` with the same name and a changed parent, bill-wise flag and opening ended,
+in one run on licensed 7.1 Silver, with all three at the supplied values, the opening
+balance included, still reporting only `ALTERED=1` (protocol reference §9.4g, PARTIAL).
+In two follow-up runs, a supplied opening alone replaced the existing one and an
+omitted opening was kept (§9.4g, one run each).
+Read any opening at a stated date (I11): a date-less read showed the new opening as
+0.00 once, after a move to a nominal group; on a balance-sheet ledger it agreed with
+the dated read.
+Persist `CREATED` and `ALTERED` as distinct outbox outcomes.
+A pre-read alone does not authorize creation: use the complete-catalogue
 and mutation-time prerequisites in `PROMPT_PLAYBOOK.md` Phase 4 step 3a; an unqualified case stays
 unresolved without dispatch.
 
@@ -1037,8 +1059,8 @@ the same asymmetry as the `$$` crash (§I1) and the current-period edit block (�
 Each wrong guess costs a hung gateway and an operator interruption. Object and report names
 must come from documentation or from Tally's own UI, never from experimentation.
 
-**This rule was violated during the investigation** — six unknown types were sent in a loop
-after the first had already hung for 300 s, taking the instance down. That is exactly the
+**This rule has been broken before** — several unknown types were sent in a loop after the
+first had already hung the gateway, taking the instance down. That is exactly the
 "never auto-retry a request that caused a hang" rule in §5.4. Recorded because the failure was
 procedural, not technical.
 
@@ -1087,6 +1109,18 @@ model — start, act, exit — not a long-running server.
 logged-in user. Its documentation does not mention the XML gateway or port 9000, so it is not
 established as a solution for headless XML integration. Worth investigating only if the hosted
 topology is revived.
+
+### 5.5 A real statement's layout is never committed as a capture
+
+A bank statement's text layer places every word, and the width or position of a word that has
+been masked can still identify the word. Do not commit a sanitised capture of a new statement
+or layout; measure the layout on the statement where it lives and commit only what describes its
+shape (see `src-tauri/crates/bridge-bank-statement/examples/layout_probe.rs`, which prints no
+position of a masked word on its line). The two captures in `scripts/fixtures/` are the last ones, and
+`scripts/fixtures/README.md` says so. `tests/committed_captures_tests.rs` in the bank crate is a
+tripwire for non-ASCII text in them, not a gate.
+
+---
 
 ## 6. Parsing
 
@@ -1239,8 +1273,8 @@ does not try — see `SECTION-REGISTER.md` for why three attempts each produced 
 false positive on legitimate edits, and for the other residuals.
 
 **2. The reference is pinned in the compatibility surface**, so even a
-documentation-only edit stales its digest and fails the `Tally portable core`
-job. The reseal procedure is in
+documentation-only edit changes a pinned file and needs a compatibility-surface
+acknowledgement file with the pull request. The procedure is in
 [`docs/release-process.md`](../release-process.md#compatibility-surface-reseal).
 
 Run before pushing:
@@ -1295,7 +1329,7 @@ through the existing `package-mcpb.mjs --binary` path immediately after the Taur
 build and installer checks. A failed Tauri build stops staging. The standalone
 packaging command still builds its own release binary when `--binary` is absent.
 
-The prior [successful source run](https://github.com/lamemustafa/bridge/actions/runs/34199125671)
+The prior [successful source run](https://github.com/ComplyEaze/bridge/actions/runs/34199125671)
 spent 6m37s in macOS MCP staging after the Tauri build, recompiling native
 libraries and Tauri in a different feature/environment configuration. Reusing
 the same job's output removes that second build invocation. Preserve the
@@ -1314,11 +1348,11 @@ runs can publish caches in their own scopes. A cache miss still runs the
 complete build and gates. Keep the 50-minute job bound.
 
 The earlier multi-GB cache-save overrun is why this policy requires a measured
-cold/warm comparison. The [cache-only cold run](https://github.com/lamemustafa/bridge/actions/runs/34221535786)
+cold/warm comparison. The [cache-only cold run](https://github.com/ComplyEaze/bridge/actions/runs/34221535786)
 at `97a8d0b` passed Windows native
 in 28m32s, including a 67-second save of 825,712,308 compressed bytes. Its main
 compilation took 12m40s, including a 547.32-second OpenSSL build step; 778 library
-tests took 462.69s. The [same-commit warm run](https://github.com/lamemustafa/bridge/actions/runs/34224173710)
+tests took 462.69s. The [same-commit warm run](https://github.com/ComplyEaze/bridge/actions/runs/34224173710)
 passed in 9m55s, with a 33-second exact-cache restore and no OpenSSL/AWS-LC
 build-script execution. All 778 library tests still ran (328.08s). Hosted test
 time also varied, so do not attribute the entire elapsed difference to caching.
@@ -1392,7 +1426,7 @@ must not be summed as user wait time. Retain raw timings, report sample counts,
 and avoid a percentile claim from a handful of runs.
 
 The retained baseline had a 39m13s Windows native job and 75 summed job minutes.
-The [first profile experiment](https://github.com/lamemustafa/bridge/actions/runs/34207728015)
+The [first profile experiment](https://github.com/ComplyEaze/bridge/actions/runs/34207728015)
 passed the same 778 Windows / 786 macOS library tests and all remaining checks.
 Windows took 29m00s, including a 21m23s main test step and 2m03s main Clippy step
 (the baseline Clippy step took 10m33s). Total summed job time was 72m46s. This is
@@ -1401,7 +1435,7 @@ costs differed across the runs. The macOS profile cache was cold and saved
 693,838,529 compressed bytes in a 37-second post-cache step. Windows retained
 only registry/tool caching (167,987,643 compressed bytes; 44-second post-cache
 step), not its target tree.
-The [current dependency candidate](https://github.com/lamemustafa/bridge/actions/runs/34208820274),
+The [current dependency candidate](https://github.com/ComplyEaze/bridge/actions/runs/34208820274),
 with the same application sources and lockfile as the profile experiment, took
 10m49s in Windows main Clippy with line tables. This second baseline supports the
 observed compilation saving; it does not make unrelated cache states comparable.
@@ -1417,7 +1451,7 @@ linking also limit what a Rust compiler cache can save.
 
 Run licence and compatibility checks before an expensive validation cycle.
 When pinned bytes legitimately change, use the existing deliberate
-[compatibility reseal procedure](../release-process.md#compatibility-surface-reseal);
+[compatibility-surface acknowledgement procedure](../release-process.md#compatibility-surface-reseal);
 never remove pins or promote unknown claims to repair a dependency PR. Review
 related findings together, fix supported defects, and verify one final candidate.
 Do not restart unchanged native checks merely to chase an empty review queue.

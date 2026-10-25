@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use std::ffi::OsString;
 use std::fs;
@@ -28,8 +32,8 @@ fn loopback_aliases_share_a_port_lease_and_ports_remain_independent() {
     }
     let other_port = lease_path(root, &endpoint("127.0.0.1", 9002)).unwrap();
     assert_ne!(local, other_port);
-    let _first = acquire_at(root, &endpoint("localhost", 9001)).unwrap();
-    let _second = acquire_at(root, &endpoint("::1", 9002)).unwrap();
+    let _first = acquire_at(&[root], &endpoint("localhost", 9001)).unwrap();
+    let _second = acquire_at(&[root], &endpoint("::1", 9002)).unwrap();
 }
 
 #[test]
@@ -37,30 +41,66 @@ fn snapshots_share_observation_lane_but_exclude_writers_and_each_other() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
     let endpoint = endpoint("127.0.0.1", 9001);
-    let snapshot = acquire_snapshot_at(root, &endpoint).unwrap();
-    let observation = acquire_observation_at(root, &endpoint).unwrap();
+    let snapshot = acquire_snapshot_at(&[root], &endpoint).unwrap();
+    let observation = acquire_observation_at(&[root], &endpoint).unwrap();
     assert_eq!(
-        acquire_at(root, &endpoint).err().as_deref(),
+        acquire_at(&[root], &endpoint).err().as_deref(),
         Some("import_admission_busy")
     );
     assert_eq!(
-        acquire_snapshot_at(root, &endpoint).err().as_deref(),
+        acquire_snapshot_at(&[root], &endpoint).err().as_deref(),
         Some("import_admission_busy")
     );
     drop(observation);
     drop(snapshot);
 
-    let writer = acquire_at(root, &endpoint).unwrap();
+    let writer = acquire_at(&[root], &endpoint).unwrap();
     assert_eq!(
-        acquire_observation_at(root, &endpoint).err().as_deref(),
+        acquire_observation_at(&[root], &endpoint).err().as_deref(),
         Some("import_admission_busy")
     );
     assert_eq!(
-        acquire_snapshot_at(root, &endpoint).err().as_deref(),
+        acquire_snapshot_at(&[root], &endpoint).err().as_deref(),
         Some("import_admission_busy")
     );
     drop(writer);
-    let _reacquired = acquire_snapshot_at(root, &endpoint).unwrap();
+    let _reacquired = acquire_snapshot_at(&[root], &endpoint).unwrap();
+}
+
+/// A lease is taken under every root, so a build holding it under any one
+/// root (an earlier build under the first, a packaged one under the second)
+/// excludes a build that takes both, in every mode.
+#[test]
+fn a_lease_held_under_any_one_root_excludes_a_build_that_takes_every_root() {
+    let directory = tempfile::tempdir().unwrap();
+    let old = directory.path().join("old");
+    let new = directory.path().join("new");
+    let both = [old.as_path(), new.as_path()];
+    let endpoint = endpoint("127.0.0.1", 9001);
+    for one in [&both[..1], &both[1..]] {
+        let writer = acquire_at(one, &endpoint).unwrap();
+        assert_eq!(
+            acquire_observation_at(&both, &endpoint).err().as_deref(),
+            Some("import_admission_busy")
+        );
+        assert_eq!(
+            acquire_snapshot_at(&both, &endpoint).err().as_deref(),
+            Some("import_admission_busy")
+        );
+        drop(writer);
+        let snapshot = acquire_snapshot_at(one, &endpoint).unwrap();
+        assert_eq!(
+            acquire_at(&both, &endpoint).err().as_deref(),
+            Some("import_admission_busy")
+        );
+        assert_eq!(
+            acquire_snapshot_at(&both, &endpoint).err().as_deref(),
+            Some("import_admission_busy")
+        );
+        let _observing = acquire_observation_at(&both, &endpoint).unwrap();
+        drop(snapshot);
+    }
+    drop(acquire_at(&both, &endpoint).unwrap());
 }
 
 #[test]
@@ -70,7 +110,7 @@ fn unsafe_lease_leaf_is_refused() {
     let path = lease_path(directory.path(), &endpoint).unwrap();
     fs::create_dir(&path).unwrap();
     assert_eq!(
-        acquire_at(directory.path(), &endpoint).err().as_deref(),
+        acquire_at(&[directory.path()], &endpoint).err().as_deref(),
         Some("import_admission_lock_unavailable")
     );
 }
@@ -100,23 +140,25 @@ fn separate_processes_with_distinct_data_roots_contend_then_reacquire() {
         );
         wait_for(&ready).unwrap();
         assert_eq!(
-            acquire_at(&coordination_root, &endpoint).err().as_deref(),
-            Some("import_admission_busy")
-        );
-        assert_eq!(
-            acquire_snapshot_at(&coordination_root, &endpoint)
+            acquire_at(&[coordination_root.as_path()], &endpoint)
                 .err()
                 .as_deref(),
             Some("import_admission_busy")
         );
-        let observation = acquire_observation_at(&coordination_root, &endpoint);
+        assert_eq!(
+            acquire_snapshot_at(&[coordination_root.as_path()], &endpoint)
+                .err()
+                .as_deref(),
+            Some("import_admission_busy")
+        );
+        let observation = acquire_observation_at(&[coordination_root.as_path()], &endpoint);
         if mode == "snapshot" {
             drop(observation.expect("snapshot permits durable observation"));
         } else {
             assert_eq!(observation.err().as_deref(), Some("import_admission_busy"));
         }
         assert!(child.release().unwrap().success());
-        drop(acquire_at(&coordination_root, &endpoint).unwrap());
+        drop(acquire_at(&[coordination_root.as_path()], &endpoint).unwrap());
     }
     assert!(first_data_root.is_dir());
 }
@@ -136,10 +178,10 @@ fn dispatch_lease_child() {
     assert!(matches!(mode.as_str(), "dispatch" | "snapshot"));
     let root = PathBuf::from(root);
     let endpoint = endpoint("::1", port);
-    let _dispatch =
-        (mode == "dispatch").then(|| acquire_at(&root, &endpoint).expect("child dispatch lease"));
+    let _dispatch = (mode == "dispatch")
+        .then(|| acquire_at(&[root.as_path()], &endpoint).expect("child dispatch lease"));
     let _snapshot = (mode == "snapshot")
-        .then(|| acquire_snapshot_at(&root, &endpoint).expect("child snapshot lease"));
+        .then(|| acquire_snapshot_at(&[root.as_path()], &endpoint).expect("child snapshot lease"));
     fs::write(ready, b"ready").expect("child ready");
     let deadline = Instant::now() + Duration::from_secs(15);
     while !release.exists() {

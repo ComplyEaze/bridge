@@ -1,14 +1,10 @@
 use crate::tally::canonical_window::build_core_window;
-use bridge_tally_core::report_tie_out::{LedgerPeriodBalance, LedgerPeriodBalanceReport};
 use bridge_tally_core::{
     CanonicalPackWindow, CapabilityEvidence, CapabilityPackId, CapabilityProfile, CapabilityState,
-    CompanyRef, EvidenceConfidence, ExactDecimal, PackBatch, ProbeResult, ReadResponseScope,
-    ReadWindow, RequestContext, SourceIdentity, TallyConnector, TallyDate, TallyError,
-    CORE_ACCOUNTING_SCHEMA_VERSION,
+    CompanyRef, EvidenceConfidence, PackBatch, ProbeResult, ReadResponseScope, RequestContext,
+    SourceIdentity, TallyConnector, TallyDate, TallyError, CORE_ACCOUNTING_SCHEMA_VERSION,
 };
-use bridge_tally_protocol::xml_read_profiles::{
-    ReadOnlyProfile, ValidatedCompanyName, EDUCATION_REPORT_FAMILY_UNSUPPORTED,
-};
+use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
 use bridge_tally_protocol::{
     native_outstandings::{
         render_native_group_snapshot_request, render_native_ledger_export_request,
@@ -17,10 +13,9 @@ use bridge_tally_protocol::{
     },
     outstandings_shared::{
         parse_company_book_extent_v2, require_master_witness, CompanyBookExtent,
-        DateBoundaryProfile,
+        CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
     },
-    parse_companies_from_collection, parse_ledger_period_balance_report,
-    parse_native_group_source_records_with_evidence,
+    parse_companies_from_collection, parse_native_group_source_records_with_evidence,
     parse_native_ledger_source_records_with_evidence,
     parse_native_voucher_source_records_with_evidence,
     parse_native_voucher_type_source_records_with_evidence, ParsedExport, ParsedSourceRecord,
@@ -33,22 +28,43 @@ use tokio_util::sync::CancellationToken;
 
 use super::connection::DirectCompanyBootstrapError;
 use super::runtime::{TallyRuntimeControlError, TallyRuntimeReadError};
+use super::runtime_control::ReadRetryPolicy;
 use super::{
-    tdl_engine, TallyCompany, TallyConfig, TallyRuntime, VerifiedCompanyIdentity,
-    VerifiedCompanyIdentityError,
+    TallyCompany, TallyConfig, TallyRuntime, VerifiedCompanyIdentity, VerifiedCompanyIdentityError,
 };
 
 const CORE_QUERY_PROFILE: &str = "core_accounting_v3";
 
-pub(super) struct SealedReadRequest(String);
+/// One connector read, sealed with whether it may be sent again. There is no
+/// default: each call site names which of the two it sends.
+pub(super) struct SealedReadRequest {
+    xml: String,
+    retry: ReadRetryPolicy,
+}
 
 impl SealedReadRequest {
-    fn from_connector_profile(xml: String) -> Self {
-        Self(xml)
+    /// A small read: the book-extent pair or the company list. It is cheap to
+    /// send again, and a snapshot run that fails on one cannot be resumed, so
+    /// it keeps the retry.
+    fn small_read(xml: String) -> Self {
+        Self {
+            xml,
+            retry: ReadRetryPolicy::transient_default(),
+        }
     }
 
-    pub(super) fn into_xml(self) -> String {
-        self.0
+    /// A collection export, whose answer grows with the book. It is sent once:
+    /// the gateway serialises, and a second copy would ask it while it may
+    /// still be building the first (IMPLEMENTATION_GUIDE rule I7).
+    fn export(xml: String) -> Self {
+        Self {
+            xml,
+            retry: ReadRetryPolicy::SINGLE_ATTEMPT,
+        }
+    }
+
+    pub(super) fn into_parts(self) -> (String, ReadRetryPolicy) {
+        (self.xml, self.retry)
     }
 }
 
@@ -117,7 +133,7 @@ impl RuntimeTallyConnector {
 
     async fn post_xml_validated<P>(
         &self,
-        request_xml: String,
+        request: SealedReadRequest,
         validate_application_response: P,
     ) -> Result<String, TallyError>
     where
@@ -126,7 +142,7 @@ impl RuntimeTallyConnector {
         self.runtime
             .post_xml_cancellable_validated(
                 self.config.clone(),
-                SealedReadRequest::from_connector_profile(request_xml),
+                request,
                 self.cancellation.clone(),
                 validate_application_response,
             )
@@ -174,7 +190,7 @@ impl RuntimeTallyConnector {
         let opening_extent = self.read_pinned_company_book_extent(identity).await?;
         let native_group_request = render_native_group_snapshot_request(&company_name);
         let first_group_xml = self
-            .post_xml_validated(native_group_request.clone(), {
+            .post_xml_validated(SealedReadRequest::export(native_group_request.clone()), {
                 let validation_guid = expected_guid.clone();
                 move |xml| {
                     parse_native_group_source_records_with_evidence(xml, &validation_guid).is_ok()
@@ -182,7 +198,7 @@ impl RuntimeTallyConnector {
             })
             .await?;
         let second_group_xml = self
-            .post_xml_validated(native_group_request, {
+            .post_xml_validated(SealedReadRequest::export(native_group_request), {
                 let validation_guid = expected_guid.clone();
                 move |xml| {
                     parse_native_group_source_records_with_evidence(xml, &validation_guid).is_ok()
@@ -214,15 +230,21 @@ impl RuntimeTallyConnector {
             render_native_ledger_export_request(&company_name, &ledger_period);
         let validation_guid = expected_guid.clone();
         let first_ledger_xml = self
-            .post_xml_validated(native_ledger_request.clone(), move |xml| {
-                parse_native_ledger_source_records_with_evidence(xml, &validation_guid).is_ok()
-            })
+            .post_xml_validated(
+                SealedReadRequest::export(native_ledger_request.clone()),
+                move |xml| {
+                    parse_native_ledger_source_records_with_evidence(xml, &validation_guid).is_ok()
+                },
+            )
             .await?;
         let validation_guid = expected_guid.clone();
         let second_ledger_xml = self
-            .post_xml_validated(native_ledger_request, move |xml| {
-                parse_native_ledger_source_records_with_evidence(xml, &validation_guid).is_ok()
-            })
+            .post_xml_validated(
+                SealedReadRequest::export(native_ledger_request),
+                move |xml| {
+                    parse_native_ledger_source_records_with_evidence(xml, &validation_guid).is_ok()
+                },
+            )
             .await?;
         if first_ledger_xml != second_ledger_xml {
             return Err(invalid_data("native_ledger_snapshot_drifted"));
@@ -238,7 +260,7 @@ impl RuntimeTallyConnector {
         let validation_guid = expected_guid.clone();
         let voucher_type_xml = self
             .post_xml_validated(
-                render_native_voucher_type_export_request(&company_name),
+                SealedReadRequest::export(render_native_voucher_type_export_request(&company_name)),
                 move |xml| {
                     parse_native_voucher_type_source_records_with_evidence(xml, &validation_guid)
                         .is_ok()
@@ -266,11 +288,11 @@ impl RuntimeTallyConnector {
         let validation_guid = expected_guid.clone();
         let voucher_xml = self
             .post_xml_validated(
-                render_native_voucher_export_request(
+                SealedReadRequest::export(render_native_voucher_export_request(
                     &company_name,
                     &voucher_window_from,
                     &voucher_window_to,
-                ),
+                )),
                 move |xml| {
                     parse_native_voucher_source_records_with_evidence(xml, &validation_guid).is_ok()
                 },
@@ -298,18 +320,22 @@ impl RuntimeTallyConnector {
             .company_book_extent_expectation()
             .map_err(|_| invalid_data("company_identity_invalid"))?;
         let request = ReadOnlyProfile::CompanyBookExtentV2 { company: &company }.render();
+        // The transport seam admits only a well-formed response, so the one
+        // refusal left for these parses is a response for another company.
+        // Parse the first before asking again: a wrong company ends the read
+        // without a second request.
         let first_xml = self
-            .post_xml_validated(request.clone(), |xml| {
-                parse_company_book_extent_v2(xml, &expectation).is_ok()
-            })
-            .await?;
-        let second_xml = self
-            .post_xml_validated(request, |xml| {
-                parse_company_book_extent_v2(xml, &expectation).is_ok()
+            .post_xml_validated(SealedReadRequest::small_read(request.clone()), |xml| {
+                extent_response_is_well_formed(xml, &expectation)
             })
             .await?;
         let first = parse_company_book_extent_v2(&first_xml, &expectation)
             .map_err(|_| invalid_data("company_identity_mismatch"))?;
+        let second_xml = self
+            .post_xml_validated(SealedReadRequest::small_read(request), |xml| {
+                extent_response_is_well_formed(xml, &expectation)
+            })
+            .await?;
         let second = parse_company_book_extent_v2(&second_xml, &expectation)
             .map_err(|_| invalid_data("company_identity_mismatch"))?;
         if first != second {
@@ -391,9 +417,11 @@ impl RuntimeTallyConnector {
         ) else {
             return Err(protocol_error("company_identity_not_found"));
         };
+        let guid = bridge_tally_core::company_guid::CompanyGuid::parse(guid)
+            .map_err(|_| protocol_error("company_identity_invalid"))?;
         VerifiedCompanyIdentity::from_observed_companies(
             company.name.clone(),
-            guid.to_string(),
+            guid,
             company_number.to_string(),
             books_from.to_string(),
             companies,
@@ -422,22 +450,6 @@ impl RuntimeTallyConnector {
             .await
             .map_err(map_transport_error)?;
         self.verify_snapshot_identity_from_companies(&companies)
-    }
-
-    /// As [`Self::verify_snapshot_identity`], also returning whether the same
-    /// company-list response reports Education mode. No further request.
-    async fn verify_snapshot_identity_observing_mode(
-        &self,
-    ) -> Result<(VerifiedCompanyIdentity, bool), TallyError> {
-        let (companies, education) = self
-            .runtime
-            .fetch_companies_observing_education_mode(self.config.clone())
-            .await
-            .map_err(map_transport_error)?;
-        Ok((
-            self.verify_snapshot_identity_from_companies(&companies)?,
-            education,
-        ))
     }
 
     async fn verify_closing_snapshot_identity(
@@ -491,9 +503,10 @@ impl TallyConnector for RuntimeTallyConnector {
         let lineage = source_lineage(&self.config)?;
         let companies = parse_companies_from_collection(
             &self
-                .post_xml_validated(ReadOnlyProfile::CompanyListV2.render(), |xml| {
-                    parse_companies_from_collection(xml).is_ok()
-                })
+                .post_xml_validated(
+                    SealedReadRequest::small_read(ReadOnlyProfile::CompanyListV2.render()),
+                    |xml| parse_companies_from_collection(xml).is_ok(),
+                )
                 .await?,
         )
         .map_err(|_| protocol_error("company_export_invalid"))?;
@@ -543,106 +556,6 @@ impl TallyConnector for RuntimeTallyConnector {
             .extract_core_window(context, boundary_profile, &identity)
             .await;
         self.finish_snapshot_source_read(window, &identity).await
-    }
-
-    async fn read_core_period_balance_report(
-        &self,
-        context: &RequestContext,
-    ) -> Result<LedgerPeriodBalanceReport, TallyError> {
-        if context.company.identity != self.company.identity
-            || context.pack != CapabilityPackId::CoreAccounting
-            || context.schema_version != CORE_ACCOUNTING_SCHEMA_VERSION
-            || context.query_profile.as_str() != CORE_QUERY_PROFILE
-        {
-            return Err(invalid_data("period_report_scope_mismatch"));
-        }
-        let expected_company_guid = self.company.identity.company_guid.clone();
-        let expected_from = context.window.from_yyyymmdd.clone();
-        let expected_to = context.window.to_yyyymmdd.clone();
-        let validation_company_guid = expected_company_guid.clone();
-        let validation_from = expected_from.clone();
-        let validation_to = expected_to.clone();
-        // Fail closed: `from`/`to` feed a quoted `<SET>"..."</SET>` TDL
-        // literal in `ledger_period_balances_request`, where XML escaping
-        // cannot protect the argument (Tally decodes `&quot;` back to a
-        // literal `"` before the formula runs). Requiring a validated
-        // `TallyDate` here -- exactly 8 ASCII digits -- closes that off at
-        // the boundary instead of relying on every caller of this connector
-        // having validated the window already (bridge#832).
-        let request_from = TallyDate::parse(expected_from)?;
-        let request_to = TallyDate::parse(expected_to)?;
-        let (identity, education) = self.verify_snapshot_identity_observing_mode().await?;
-        // The period report is a custom report whose TDL Education answers with
-        // a blocking dialog on the Tally screen (bridge#45). Either this
-        // identity read or the run's own probe reporting Education refuses it
-        // before it is sent; the run records the tie-out as unavailable.
-        let probed_education = *self
-            .snapshot_boundary_profile
-            .read()
-            .map_err(|_| invalid_data("snapshot_boundary_profile_unavailable"))?
-            == Some(DateBoundaryProfile::EducationRestricted);
-        if education || probed_education {
-            return Err(TallyError::Unsupported {
-                code: EDUCATION_REPORT_FAMILY_UNSUPPORTED.to_string(),
-            });
-        }
-        let xml = self
-            .post_xml_validated(
-                tdl_engine::ledger_period_balances_request(
-                    &self.company.display_name,
-                    &request_from,
-                    &request_to,
-                ),
-                move |xml| {
-                    parse_ledger_period_balance_report(xml).is_ok_and(|parsed| {
-                        company_guids_equal(&parsed.context.company_guid, &validation_company_guid)
-                            && parsed.context.from_yyyymmdd == validation_from
-                            && parsed.context.to_yyyymmdd == validation_to
-                            && parsed.context.ordinary_books_requested
-                    })
-                },
-            )
-            .await;
-        let xml = self.finish_snapshot_source_read(xml, &identity).await?;
-        let parsed = parse_ledger_period_balance_report(&xml)
-            .map_err(|_| protocol_error("period_report_invalid"))?;
-        if !company_guids_equal(
-            &parsed.context.company_guid,
-            &self.company.identity.company_guid,
-        ) || parsed.context.from_yyyymmdd != context.window.from_yyyymmdd
-            || parsed.context.to_yyyymmdd != context.window.to_yyyymmdd
-            || !parsed.context.ordinary_books_requested
-        {
-            return Err(invalid_data("period_report_scope_mismatch"));
-        }
-        let balances = parsed
-            .records
-            .into_iter()
-            .map(|row| {
-                Ok(LedgerPeriodBalance {
-                    ledger_source_id: row
-                        .source_id
-                        .ok_or_else(|| invalid_data("period_report_identity_missing"))?,
-                    opening_balance: ExactDecimal::parse(row.record.opening_balance)?,
-                    closing_balance: ExactDecimal::parse(row.record.closing_balance)?,
-                })
-            })
-            .collect::<Result<Vec<_>, TallyError>>()?;
-        let report = LedgerPeriodBalanceReport {
-            source_identity: self.company.identity.clone(),
-            window: ReadWindow {
-                from_yyyymmdd: parsed.context.from_yyyymmdd,
-                to_yyyymmdd: parsed.context.to_yyyymmdd,
-            },
-            // The report echoes Bridge's requested profile, but Tally does not
-            // attest that TBalOpening/TBalClosing exclude every scenario,
-            // optional, post-dated, or tracking-note effect. A live,
-            // release-specific capability receipt must opt this in later.
-            ordinary_books_scope_observed: false,
-            source_reported_count: parsed.context.source_record_count,
-            balances,
-        };
-        Ok(report)
     }
 }
 
@@ -753,10 +666,6 @@ fn native_groups_for_core_window(
         .map_err(|_| protocol_error("group_export_invalid"))
 }
 
-fn company_guids_equal(left: &str, right: &str) -> bool {
-    left.eq_ignore_ascii_case(right)
-}
-
 fn map_transport_error(error: anyhow::Error) -> TallyError {
     if error
         .downcast_ref::<DirectCompanyBootstrapError>()
@@ -785,7 +694,9 @@ fn map_transport_error(error: anyhow::Error) -> TallyError {
             // A wire-gate refusal (#697) sent nothing; its code says why.
             TallyTransportError::PolicyInvalid { .. }
             | TallyTransportError::ClientInitializationFailed
-            | TallyTransportError::WireRefused { .. } => TallyError::Unsupported {
+            | TallyTransportError::WireRefused { .. }
+            // A withdrawn send (#778) sent nothing either.
+            | TallyTransportError::SendWithdrawn => TallyError::Unsupported {
                 code: transport.safe_code().to_string(),
             },
             TallyTransportError::RequestTooLarge { .. } => {
@@ -797,9 +708,10 @@ fn map_transport_error(error: anyhow::Error) -> TallyError {
             | TallyTransportError::UnsupportedContentEncoding
             | TallyTransportError::InvalidEncoding { .. }
             | TallyTransportError::HttpStatus { .. } => protocol_error(transport.safe_code()),
-            TallyTransportError::ConnectionFailed
-            | TallyTransportError::RequestTimedOut
-            | TallyTransportError::RequestFailed => TallyError::Unreachable,
+            TallyTransportError::RequestTimedOut => TallyError::RequestDeadlineExceeded,
+            TallyTransportError::ConnectionFailed | TallyTransportError::RequestFailed => {
+                TallyError::Unreachable
+            }
         };
     }
     if let Some(read) = error.downcast_ref::<TallyRuntimeReadError>() {
@@ -810,6 +722,20 @@ fn map_transport_error(error: anyhow::Error) -> TallyError {
         };
     }
     protocol_error("unclassified_tally_error")
+}
+
+/// Whether an extent response is well formed enough to be read by the
+/// connector: it parses for the selected company, or it is a complete, valid
+/// response that names no such company. Anything malformed (truncated, not
+/// XML, not a success status, an ambiguous or incomplete company row) is
+/// rejected at the transport seam. A response for another company is left to
+/// the connector's own parse, which refuses it as `company_identity_mismatch`
+/// rather than as a generic protocol rejection.
+fn extent_response_is_well_formed(xml: &str, expectation: &CompanyBookExtentExpectation) -> bool {
+    matches!(
+        parse_company_book_extent_v2(xml, expectation),
+        Ok(_) | Err(OutstandingsError::CompanyIdentityMismatch)
+    )
 }
 
 fn classify_voucher_window_error(error: TallyError) -> TallyError {
@@ -841,6 +767,7 @@ fn capability_failure_code(error: &TallyError) -> String {
         | TallyError::InvalidData { code }
         | TallyError::Unsupported { code } => code.clone(),
         TallyError::Unreachable => "tally_unreachable".to_string(),
+        TallyError::RequestDeadlineExceeded => "request_deadline_exceeded".to_string(),
         TallyError::ReadResponseTooLarge { .. } => {
             "voucher_response_size_limit_exceeded".to_string()
         }

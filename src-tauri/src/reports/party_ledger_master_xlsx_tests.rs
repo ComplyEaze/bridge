@@ -5,7 +5,8 @@ use zip::ZipArchive;
 
 use super::*;
 use crate::reports::party_ledger_master::{
-    build_party_ledger_master_workbook, PartyLedgerMasterRow, PartyLedgerMasterSource,
+    build_party_ledger_master_workbook, BalanceDateBasis, PartyLedgerMasterRow,
+    PartyLedgerMasterSource,
 };
 use bridge_tally_protocol::{PartyLedgerMasterFieldObservation, PartyLedgerMasterFields};
 
@@ -17,6 +18,8 @@ fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
         currency_decimal_places: decimal_places,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Three decimal customer".to_string(),
             parent: PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".to_string()),
@@ -38,6 +41,7 @@ fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     }
 }
 
@@ -79,6 +83,8 @@ fn renders_evidence_currency_and_returned_fields_in_the_workbook() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Customer".to_string(),
             parent: PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".to_string()),
@@ -105,6 +111,7 @@ fn renders_evidence_currency_and_returned_fields_in_the_workbook() {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     })
     .unwrap();
     let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
@@ -145,6 +152,8 @@ fn normally_signed_sundry_debtor_renders_as_a_group_subtotal_not_trade_receivabl
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Customer balance".to_string(),
             parent: PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".to_string()),
@@ -170,6 +179,7 @@ fn normally_signed_sundry_debtor_renders_as_a_group_subtotal_not_trade_receivabl
         }],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     })
     .unwrap();
 
@@ -222,6 +232,8 @@ fn gstin_not_observed_is_labeled_while_an_explicit_empty_gstin_is_not() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows,
         request_sha256: "0".repeat(64),
         master_response_sha256: "a".repeat(64),
@@ -233,6 +245,7 @@ fn gstin_not_observed_is_labeled_while_an_explicit_empty_gstin_is_not() {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     })
     .unwrap();
     let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
@@ -275,6 +288,8 @@ fn worksheet_with_parent(parent: PartyLedgerMasterFieldObservation) -> (String, 
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Parent observation".to_string(),
             parent,
@@ -296,6 +311,7 @@ fn worksheet_with_parent(parent: PartyLedgerMasterFieldObservation) -> (String, 
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     })
     .unwrap();
     let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
@@ -482,4 +498,139 @@ fn a_decision_whose_ledger_moved_between_subgroups_reports_the_change_on_the_row
     assert!(strings.contains("CA grouping decision. Ancestry changed since the decision"));
     assert!(strings.contains("Applied. Ancestry changed since the decision"));
     assert!(strings.contains("Nothing needs attention."));
+}
+
+fn workbook_text(source: PartyLedgerMasterSource) -> String {
+    let workbook = build_party_ledger_master_workbook(source).unwrap();
+    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut text = String::new();
+    for name in [
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/sharedStrings.xml",
+    ] {
+        std::io::Read::read_to_string(&mut archive.by_name(name).unwrap(), &mut text).unwrap();
+    }
+    text
+}
+
+#[test]
+fn a_later_dated_voucher_is_said_beside_the_balance_date_and_in_the_read_period() {
+    let mut source = source_with_precision(2);
+    source.to = TallyDate::parse("20261001").unwrap();
+    source.last_voucher_date = TallyDate::parse("50261231").unwrap();
+    let text = workbook_text(source);
+    let note = "Vouchers dated after 20261001 (the book's last voucher date is 50261231) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first month boundary (the 1st, 2nd or 31st of a month) on or after this computer's date, or on or after the start of the books if that is later; if this computer's date is wrong, correct it and export again.";
+    // Once on the ledger sheet (beside the date), once in the Schedule III read period.
+    assert_eq!(text.matches(note).count(), 2, "{text}");
+    assert!(text.contains(&format!(
+        "Read period: 20260401 to 20261001. No prior-year values were requested or inferred. {note}"
+    )));
+}
+
+#[test]
+fn no_later_dated_voucher_adds_nothing_to_the_workbook() {
+    for last in ["20260731", "20260630"] {
+        let mut source = source_with_precision(2);
+        source.last_voucher_date = TallyDate::parse(last).unwrap();
+        let text = workbook_text(source);
+        assert!(!text.contains("Vouchers dated after"), "{last}");
+        assert!(text.contains(
+            "Read period: 20260401 to 20260731. No prior-year values were requested or inferred."
+        ));
+        assert!(
+            !text.contains("No prior-year values were requested or inferred. "),
+            "{last}"
+        );
+    }
+}
+
+/// A fingerprint of every part of the package except `docProps/core.xml`,
+/// which Excel's writer stamps with the creation time: each part's name,
+/// length and decompressed bytes, in name order.
+fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
+    use sha2::{Digest, Sha256};
+    let workbook = build_party_ledger_master_workbook(source).unwrap();
+    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut parts = Vec::new();
+    for index in 0..archive.len() {
+        let mut part = archive.by_index(index).unwrap();
+        let name = part
+            .name()
+            .expect("package part names are UTF-8")
+            .into_owned();
+        if name == "docProps/core.xml" {
+            continue;
+        }
+        let mut contents = Vec::new();
+        std::io::Read::read_to_end(&mut part, &mut contents).unwrap();
+        parts.push((name, contents));
+    }
+    parts.sort();
+    let mut hasher = Sha256::new();
+    for (name, contents) in &parts {
+        hasher.update(name.as_bytes());
+        hasher.update((contents.len() as u64).to_le_bytes());
+        hasher.update(contents);
+    }
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// The package of the host-date workbook: with no date typed, the bytes must not
+/// change. The first digest was taken from master before #903 changed anything
+/// (96744b54...); the Schedule III sheet then gained its decisions row, its basis
+/// column and its decisions section (#737), which moves the baseline once, so both
+/// digests are taken again from the tree that has them. The two stay what they were
+/// to each other: the later-dated variant differs from the plain one only by its note.
+const HOST_DATE_PACKAGE_WITHOUT_NOTE: &str =
+    "bd101415a54ac8ccad3725d365000837e8ff4814691663646e9fdd1aa44587e0";
+const HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE: &str =
+    "6096cac89f18c50505a2ab3a0bee5a99f89b004d703ab1a058098dc73dbf59b7";
+
+#[test]
+fn the_host_date_workbook_is_byte_for_byte_what_it_was_before_a_date_could_be_typed() {
+    assert_eq!(
+        package_fingerprint(source_with_precision(2)),
+        HOST_DATE_PACKAGE_WITHOUT_NOTE
+    );
+    let mut later = source_with_precision(2);
+    later.to = TallyDate::parse("20261001").unwrap();
+    later.last_voucher_date = TallyDate::parse("50261231").unwrap();
+    assert_eq!(
+        package_fingerprint(later),
+        HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE
+    );
+}
+
+#[test]
+fn a_moved_chosen_date_is_said_beside_the_balance_date_and_in_the_read_period() {
+    let mut source = source_with_precision(2);
+    source.to = TallyDate::parse("20260831").unwrap();
+    source.last_voucher_date = TallyDate::parse("20260831").unwrap();
+    source.balance_date_basis = BalanceDateBasis::Requested(TallyDate::parse("20260815").unwrap());
+    let moved = source.date_moved_note().expect("a moved date is noted");
+    let text = workbook_text(source);
+    // Once on the ledger sheet (beside the date), once in the Schedule III read period.
+    assert_eq!(text.matches(&moved).count(), 2, "{text}");
+    assert!(text.contains(&format!(
+        "Read period: 20260401 to 20260831. No prior-year values were requested or inferred. {moved}"
+    )));
+}
+
+#[test]
+fn a_chosen_date_that_is_a_boundary_adds_no_moved_note_to_the_workbook() {
+    let mut source = source_with_precision(2);
+    source.balance_date_basis = BalanceDateBasis::Requested(TallyDate::parse("20260731").unwrap());
+    assert_eq!(source.date_moved_note(), None);
+    let text = workbook_text(source);
+    assert!(!text.contains("is not a date Tally accepts"), "{text}");
+    assert!(text.contains(
+        "Read period: 20260401 to 20260731. No prior-year values were requested or inferred."
+    ));
 }

@@ -307,3 +307,230 @@ fn native_voucher_export_request_is_bounded_by_a_date_filter() {
     assert!(!voucher_xml.contains("<REPORT>"));
     assert!(!voucher_xml.contains("<REPORT "));
 }
+
+fn one_part(parents: &[&str]) -> crate::parent_partition::ParentPart {
+    let rows = parents
+        .iter()
+        .enumerate()
+        .map(|(index, parent)| {
+            (
+                format!("l{index}"),
+                format!("g{index}"),
+                (*parent).to_owned(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let partition = crate::parent_partition::ParentPartition::plan(
+        rows.iter().map(|(name, guid, parent)| {
+            (
+                name.as_str(),
+                guid.as_str(),
+                crate::parent_partition::ParentObservation::from(Some(parent.as_str())),
+            )
+        }),
+        crate::parent_partition::PartitionLimits {
+            max_ledgers_per_part: 100,
+            max_parents_per_part: 100,
+            max_parts: 1,
+            max_complement_formula_bytes: 10_000,
+        },
+    )
+    .unwrap();
+    partition.parts()[0].clone()
+}
+
+fn strip_parent_filter(xml: &str) -> String {
+    let start = xml.find("<SYSTEM ").expect("formula present");
+    let end = xml.find("</SYSTEM>").unwrap() + "</SYSTEM>".len();
+    format!("{}{}", &xml[..start], &xml[end..]).replace("<FILTERS>BridgeParentPart</FILTERS>", "")
+}
+
+/// bridge#679: a parent part adds one formula and one filter reference to the
+/// otherwise unchanged request, and an unfiltered request carries neither.
+#[test]
+fn parent_part_requests_differ_from_the_whole_read_only_by_the_filter() {
+    let from = TallyDate::parse("20250401").unwrap();
+    let to = TallyDate::parse("20260401").unwrap();
+    let export =
+        NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from.clone(), to.clone())
+            .unwrap();
+    let snapshot =
+        NativeLedgerSnapshotPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
+    let part = one_part(&["Sundry Debtors", "Duties & Taxes"]);
+
+    let whole_master = render_party_ledger_master_request("Co", &export);
+    let whole_balance = render_native_ledger_snapshot_request("Co", &snapshot);
+    for whole in [&whole_master, &whole_balance] {
+        assert!(!whole.contains("<SYSTEM"));
+        assert!(!whole.contains("<FILTERS>"));
+    }
+
+    let master = render_party_ledger_master_request_for_parents("Co", &export, &part);
+    let balance = render_native_ledger_snapshot_request_for_parents("Co", &snapshot, &part);
+    for (filtered, whole) in [(&master, &whole_master), (&balance, &whole_balance)] {
+        assert_eq!(strip_parent_filter(filtered), *whole);
+        assert_eq!(filtered.matches("<SYSTEM ").count(), 1);
+        assert_eq!(filtered.matches("<FILTERS>").count(), 1);
+        assert!(filtered.contains(
+            r#"<TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeParentPart">$Parent = "Duties &amp; Taxes" OR $Parent = "Sundry Debtors"</SYSTEM><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">"#
+        ));
+        assert!(filtered
+            .contains("</COMPUTE><FILTERS>BridgeParentPart</FILTERS></COLLECTION></TDLMESSAGE>"));
+    }
+}
+
+#[test]
+fn the_reserved_root_part_carries_tallys_own_root_literal() {
+    let from = TallyDate::parse("20250401").unwrap();
+    let to = TallyDate::parse("20260401").unwrap();
+    let export =
+        NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
+    let root = format!("{} Primary", crate::TALLY_SANITIZED_ROOT_MARKER);
+    let xml = render_party_ledger_master_request_for_parents("Co", &export, &one_part(&[&root]));
+    assert!(xml.contains(r#"NAME="BridgeParentPart">$Parent = "&#4; Primary"</SYSTEM>"#));
+    assert!(!xml.contains('\u{fffd}'));
+}
+
+/// bridge#679: the complement part lists every `NOT` formula in one `FILTERS`
+/// element, so the filters apply together.
+#[test]
+fn the_complement_part_request_lists_each_not_formula_in_one_filters_element() {
+    use crate::parent_partition::{ParentObservation, ParentPartition, PartitionLimits};
+    let from = TallyDate::parse("20250401").unwrap();
+    let to = TallyDate::parse("20260401").unwrap();
+    let export =
+        NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
+    let rows = [
+        ("l0", "g0", ParentObservation::Named("A")),
+        ("l1", "g1", ParentObservation::Named("B & C")),
+        ("l2", "g2", ParentObservation::Named("D")),
+        ("l3", "g3", ParentObservation::Unsupported),
+    ];
+    let partition = ParentPartition::plan(
+        rows,
+        PartitionLimits {
+            max_ledgers_per_part: 100,
+            max_parents_per_part: 2,
+            max_parts: 4,
+            max_complement_formula_bytes: 10_000,
+        },
+    )
+    .unwrap();
+    let complement = partition.parts().last().unwrap();
+    assert!(complement.is_complement());
+    let xml = render_party_ledger_master_request_for_parents("Co", &export, complement);
+    assert_eq!(xml.matches("<SYSTEM ").count(), 2);
+    assert!(xml.contains(
+        r#"<TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeNot0">NOT ($Parent = "A" OR $Parent = "B &amp; C")</SYSTEM><SYSTEM TYPE="Formulae" NAME="BridgeNot1">NOT ($Parent = "D")</SYSTEM><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">"#
+    ));
+    assert_eq!(xml.matches("<FILTERS>").count(), 1);
+    assert!(xml.contains("<FILTERS>BridgeNot0,BridgeNot1</FILTERS></COLLECTION></TDLMESSAGE>"));
+}
+
+const GST_DETAILS_REQUEST: &[u8] =
+    include_bytes!("../../tests/fixtures/ledger_gst_details_request.utf16le.xml");
+
+fn gst_details_period() -> NativeLedgerExportPeriod {
+    NativeLedgerExportPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20260401").unwrap(),
+        TallyDate::parse("20260801").unwrap(),
+    )
+    .expect("mode-agnostic profile accepts valid calendar dates")
+}
+
+#[test]
+fn the_gst_details_request_is_byte_for_byte_the_one_sent_live() {
+    assert_eq!(
+        render_party_ledger_master_request_with_gst_details(
+            "BRIDGE PILOT LAB",
+            &gst_details_period()
+        ),
+        crate::text_encoding::decode_xml_bytes(GST_DETAILS_REQUEST).unwrap()
+    );
+}
+
+#[test]
+fn the_gst_details_request_differs_from_the_production_compliance_request_only_by_its_fetch_suffix()
+{
+    let period = gst_details_period();
+    let production = render_party_ledger_master_request("BRIDGE PILOT LAB", &period);
+    let with_details =
+        render_party_ledger_master_request_with_gst_details("BRIDGE PILOT LAB", &period);
+    let suffix = ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
+    assert_eq!(
+        production.replacen(
+            "LEDGSTREGDETAILS.LIST</FETCH>",
+            &format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>"),
+            1
+        ),
+        with_details
+    );
+    // The production request is pinned by its own bytes: the fetch it has always sent.
+    assert!(production.contains("<FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST</FETCH>"));
+    assert!(!production.contains("GSTDETAILS.LIST,"));
+}
+
+/// The parent-part variant of the GST details read adds the same `FETCH`
+/// suffix as the whole-book variant and changes nothing else: the parent
+/// filter, its formula and the collection are the production part request's.
+#[test]
+fn the_gst_details_parent_part_request_differs_from_the_production_part_request_only_by_the_suffix()
+{
+    use crate::parent_partition::{ParentObservation, ParentPartition, PartitionLimits};
+    let period = gst_details_period();
+    // The complement part is a part kind the read sends too (ledgers under a
+    // parent whose name a formula cannot carry): two named parents in chunks
+    // of one, so it holds two `NOT` formulas.
+    let complement = ParentPartition::plan(
+        [
+            ("l0", "g0", ParentObservation::Named("A")),
+            ("l1", "g1", ParentObservation::Named("B & C")),
+            ("l2", "g2", ParentObservation::Unsupported),
+        ],
+        PartitionLimits {
+            max_ledgers_per_part: 100,
+            max_parents_per_part: 1,
+            max_parts: 4,
+            max_complement_formula_bytes: 10_000,
+        },
+    )
+    .unwrap()
+    .parts()
+    .last()
+    .unwrap()
+    .clone();
+    assert!(complement.is_complement());
+    assert_eq!(complement.formulas().len(), 2);
+    for part in [
+        one_part(&["Sundry Debtors"]),
+        one_part(&["Sundry Debtors", "Duties & Taxes"]),
+        complement,
+    ] {
+        let production = render_party_ledger_master_request_for_parents("Co", &period, &part);
+        let with_details =
+            render_party_ledger_master_request_for_parents_with_gst_details("Co", &period, &part);
+        let suffix = ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
+        let marker = "LEDGSTREGDETAILS.LIST</FETCH>";
+        assert_eq!(production.matches(marker).count(), 1);
+        assert_eq!(
+            production.replacen(marker, &format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>"), 1),
+            with_details
+        );
+        assert_ne!(production, with_details);
+        // The suffix is the whole-book variant's, byte for byte.
+        let whole = render_party_ledger_master_request_with_gst_details("Co", &period);
+        assert!(whole.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
+        assert!(with_details.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
+        assert_eq!(with_details.matches("<FILTERS>").count(), 1);
+        assert_eq!(
+            with_details.matches("<SYSTEM ").count(),
+            part.formulas().len(),
+            "one formula per part formula, as in the production request"
+        );
+        assert_eq!(
+            production.matches("<SYSTEM ").count(),
+            with_details.matches("<SYSTEM ").count()
+        );
+    }
+}

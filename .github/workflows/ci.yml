@@ -13,7 +13,17 @@ on:
     # A stack then accumulated unchecked changes until its root merged, so the
     # first real run faced several pull requests' worth of change at once.
     types: [opened, reopened, synchronize, ready_for_review]
+  # The merge queue's temporary branch (gh-readonly-queue/master/...) is the exact
+  # tree that will land; a required check must be reported on it under the same name.
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
+  # A daily full run on master. A push skips a family of heavy jobs when the merge queue already
+  # ran that family on the same commit (scripts/master-push-reuse.mjs), so this run keeps the
+  # Rust caches warm (saved only by push, manual and scheduled runs) and exercises the tip even
+  # when no change triggers a run.
+  schedule:
+    - cron: '17 3 * * *'
 
 concurrency:
   # A pull request's newer push supersedes its older run. Every other run (a
@@ -29,6 +39,8 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      # Only to read this workflow's own merge-queue runs and their jobs (scripts/master-push-reuse.mjs).
+      actions: read
     outputs:
       bundle: ${{ steps.scope.outputs.bundle }}
       native: ${{ steps.scope.outputs.native }}
@@ -44,12 +56,43 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
         run: |
           set -euo pipefail
 
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+          # The unscoped run: every heavy job runs, whatever changed.
+          full_run() {
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
             echo 'native=true' >> "$GITHUB_OUTPUT"
+            echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$EVENT_NAME" == "schedule" ]]; then
+            full_run
+          fi
+
+          # A push to master runs a family of heavy jobs unless the merge queue already RAN that family
+          # on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped
+          # the family by scope is no evidence, so it is run here as it always was. Any error or doubt
+          # in the lookup runs both: a non-zero exit discards whatever was printed (its status goes to the job
+          # summary), and only an exact
+          # `reuse_<family>=true` line among the first two skips anything. tax_audit is cheap and always runs on a push.
+          # To turn the reuse off, delete this block: every push is then a full run again.
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            lookup_status=0
+            decision="$(node scripts/master-push-reuse.mjs)" || lookup_status=$?
+            if [[ "$lookup_status" -ne 0 ]]; then decision=''; fi
+            printf '%s\n' "$decision"
+            { echo '### Master push reuse'; echo '```'; printf '%s\n' "$decision"; echo '```'; echo "Lookup exit status: $lookup_status"; } >> "$GITHUB_STEP_SUMMARY"
+            for family in native bundle; do
+              if printf '%s\n' "$decision" | head -n 2 | grep -qx "reuse_${family}=true"; then
+                echo "${family}=false" >> "$GITHUB_OUTPUT"
+              else
+                echo "${family}=true" >> "$GITHUB_OUTPUT"
+              fi
+            done
             echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -57,35 +100,32 @@ jobs:
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             base="$PR_BASE_SHA"
           else
-            base="$BEFORE_SHA"
+            base="$MERGE_GROUP_BASE_SHA"
           fi
 
-          # A new branch has no useful predecessor. Keep the conservative path.
+          # A missing base has no useful predecessor. Keep the conservative path.
           if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
-            echo 'bundle=true' >> "$GITHUB_OUTPUT"
-            echo 'native=true' >> "$GITHUB_OUTPUT"
-            echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
-            exit 0
+            full_run
           fi
 
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/|\.github/actions/setup-windows-native/|rust-toolchain\.toml|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs)'; then
+          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.mjs$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes(\.test)?\.mjs$|retain-macos-test-binaries(\.test)?\.mjs$))' <<< "$changed_files"; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
           fi
 
           # The mutation records check runs when the crate it guards changes, or this workflow does.
-          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/ci\.yml|src-tauri/crates/bridge-tax-audit/)'; then
+          if grep -Eq '^(\.github/workflows/ci\.yml|src-tauri/crates/bridge-tax-audit/)' <<< "$changed_files"; then
             echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
           else
             echo 'tax_audit=false' >> "$GITHUB_OUTPUT"
           fi
 
           # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.
-          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.py|capture-package-log(\.test)?\.py|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)'; then
+          if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
           else
             echo 'bundle=false' >> "$GITHUB_OUTPUT"
@@ -94,7 +134,11 @@ jobs:
   frontend:
     name: Frontend build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The Playwright system packages are about 125 MB from the runner's apt mirror. Normally that takes about 30 s,
+    # but on 2 Oct 2026 one runner fetched at a steady 77 kB/s, which needs about 27 minutes, and the old 15-minute
+    # limit cancelled the job (and, in the merge queue, dropped the entry). The install step limits each apt attempt
+    # to 600 s and ends itself in most cases; this limit bounds the rest (see the install step for the worst case).
+    timeout-minutes: 40
     permissions:
       contents: read
     steps:
@@ -108,7 +152,71 @@ jobs:
           cache: pnpm
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run license:check
-      - run: corepack pnpm exec playwright install --with-deps chromium webkit
+      # The browser download hung until the job's time limit about eight times in two days
+      # (bridge#998). The browsers are cached by Playwright version and runner OS. A hit
+      # installs only the system packages; a miss downloads, with a short timeout per
+      # attempt and a bounded number of attempts, so a hung download fails fast and is
+      # tried again instead of burning the job. Only this download is retried, never a test.
+      - name: Read the Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      # Restored here and saved by the "Save Playwright browsers" step after the install, not by the combined cache action,
+      # so that only a push, manual or scheduled run writes the cache: a pull-request ref's copy is readable by that ref
+      # alone (15 Oct 2026: five such copies, 1.8 GiB of a 10 GiB cap).
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - name: Install Playwright browsers and system dependencies
+        env:
+          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+        run: |
+          # The system packages are installed by apt, as root, so the `timeout` that limits them runs as root too. On
+          # 2 Oct 2026 a `timeout` run as the runner user stopped Playwright but could not signal the root apt-get that
+          # Playwright had started through sudo; it kept the dpkg lock, and attempts 2 and 3 failed at once with "Could
+          # not get lock /var/lib/dpkg/lock-frontend". Here `node` itself runs as root, on an ephemeral runner image:
+          # Playwright then sees uid 0 and starts apt without sudo, so apt and its download processes stay in
+          # `timeout`'s process group and the limit kills all of them. `Dpkg::Use-Pty "0"` keeps dpkg in that group too
+          # (with a pty, apt starts dpkg in its own session). The limit is needed because apt's own timeout restarts on
+          # every byte: on 7 Oct 2026 its package-list update wrote nothing for 39 minutes, on an image that sets that
+          # timeout to 15 s (bridge#1426). 600 s covers update, download and unpack, normally under a minute. apt keeps
+          # finished packages between attempts and resumes a partial one, so three attempts still fit the 77 kB/s mirror
+          # of 2 Oct, with no margin. apt also waits for the dpkg lock, within reason, rather than failing.
+          # Worst case: three attempts that reach the limit end with the `exit 1` below about 31 minutes into the job.
+          # Two of them, a slow third that succeeds, a browser cache miss and three timed-out downloads take about
+          # 44 minutes; the job's own time limit (40 minutes, see its header) then ends it, as loudly as `exit 1`.
+          printf '%s\n' 'DPkg::Lock::Timeout "150";' 'Dpkg::Use-Pty "0";' | sudo tee /etc/apt/apt.conf.d/99-bridge-lock-timeout > /dev/null
+          for attempt in 1 2 3; do
+            if sudo timeout --kill-after=10 600 "$(command -v node)" node_modules/@playwright/test/cli.js install-deps chromium webkit; then
+              break
+            fi
+            echo "Playwright system dependencies attempt $attempt of 3 failed or timed out after 600 s"
+            [ "$attempt" = 3 ] && exit 1
+            # an apt that died mid-unpack leaves dpkg interrupted, and every retry would then fail; finish it first.
+            # dpkg does not read apt's DPkg::Lock::Timeout, so if something holds the lock this fails at once and
+            # `|| true` hides that; it is harmless, because the next apt attempt waits for the lock (up to 150 s).
+            sudo dpkg --configure -a || true
+          done
+          # The browser download is what hung until the job's time limit about eight times in two days, so it is the
+          # part that keeps a short limit and a bounded number of attempts. It runs no apt and holds no lock.
+          # This block ends the step (exit 0 or exit 1 inside it): add nothing after it without checking that.
+          if [ "$CACHE_HIT" != "true" ]; then
+            for attempt in 1 2 3; do
+              if timeout --kill-after=10 240 corepack pnpm exec playwright install chromium webkit; then
+                exit 0
+              fi
+              echo "Playwright browser download attempt $attempt of 3 failed or timed out after 240 s"
+            done
+            exit 1
+          fi
+      - name: Save Playwright browsers
+        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - run: corepack pnpm test
       - run: corepack pnpm run build
 
@@ -154,23 +262,30 @@ jobs:
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: 1.96.0
-      - name: Require pinned Rust for reseal regressions
-        run: rustup which --toolchain 1.96.0 rustc
       - run: node scripts/check-ci-workflow-consistency.mjs
-      - name: Test reseal and merge-driver regressions
-        run: node --test scripts/reseal.test.mjs scripts/reseal-merge-driver.test.mjs
+      # A pull request that changes a pinned file, or the pin list, adds its own
+      # acknowledgement file (docs/release-process.md). The step enforces: a missing,
+      # wrong, edited or unneeded acknowledgement fails the job. A push to master checks
+      # every landed commit the same way.
+      - name: Check the surface acknowledgement
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || github.event_name == 'push' && 'push' || 'workflow_dispatch' }}
+        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE"
       - run: node scripts/check-protocol-section-numbers.mjs
       - run: node scripts/check-protocol-section-numbers.test.mjs
       - run: node scripts/check-unbounded-reads.mjs
       - run: node scripts/check-gh-api-pagination.mjs
       - run: node --test scripts/prune-package-compiler-cache.test.mjs
-      - run: python3 scripts/collect-macos-test-crashes.test.py
-      - run: python3 scripts/retain-macos-test-binaries.test.py
-      - run: python3 scripts/bank_statement_import.test.py
-      - run: python3 scripts/fetch-pdfium.test.py
-      # the committed statement PDFs are this generator's output, byte for byte
-      - run: python3 scripts/generate-bank-statement-fixtures.py src-tauri/crates/bridge-bank-statement/tests/fixtures --check
-      - run: python3 scripts/sanitise-bbox-capture.test.py
+      - run: node --test scripts/master-push-reuse.test.mjs scripts/master-push-scope.test.mjs
+      - run: node --test scripts/check-ci-workflow-consistency.mutation.mjs
+      # A committed merge-conflict marker passes every other check and ships as text.
+      - run: node scripts/check-conflict-markers.mjs
+      - run: node --test scripts/check-conflict-markers.test.mjs
+      - run: node --test scripts/collect-macos-test-crashes.test.mjs scripts/retain-macos-test-binaries.test.mjs
+      - run: node --test scripts/fetch-pdfium.test.mjs
       - run: python3 scripts/merge-gate.test.py
       - run: python3 scripts/surface_coverage_report.test.py
 
@@ -194,7 +309,7 @@ jobs:
             src-tauri -> target
             tools -> target
           # bridge#669: a PR-scoped cache only serves that PR; PRs restore master's.
-          save-if: ${{ github.event_name != 'pull_request' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
       - name: Test portable Tally truth layer
         working-directory: src-tauri
         run: >-
@@ -210,14 +325,7 @@ jobs:
         working-directory: src-tauri
         run: >-
           cargo test --locked -p bridge-tally-protocol --no-fail-fast
-          --features jsonex-parser,jsonex-request-builder,india-tax-observation-parser,bills-payments-observation-parser,bills-native-outstandings-probe
-      # The legacy voucher-scan outstandings path is compiled out of shipped
-      # builds. Its tests exist only under the feature, so run them here.
-      - name: Test legacy voucher-scan outstandings path
-        working-directory: src-tauri
-        run: |
-          cargo test --locked -p bridge-tally-protocol --features voucher-scan --no-fail-fast
-          cargo test --locked -p bridge-tally-transport --features voucher-scan --no-fail-fast
+          --features bills-native-outstandings-probe
       - name: Test isolated native outstandings qualification path
         working-directory: tools
         run: |
@@ -240,24 +348,14 @@ jobs:
         working-directory: src-tauri
         run: >-
           cargo clippy --locked -p bridge-tally-protocol
-          --features jsonex-parser,jsonex-request-builder,india-tax-observation-parser,bills-payments-observation-parser,bills-native-outstandings-probe
+          --features bills-native-outstandings-probe
           --all-targets -- -D warnings -A clippy::pedantic
-      - name: Lint legacy voucher-scan outstandings path
-        working-directory: src-tauri
-        run: |
-          cargo clippy --locked -p bridge-tally-protocol --features voucher-scan --all-targets -- -D warnings -A clippy::pedantic
-          cargo clippy --locked -p bridge-tally-transport --features voucher-scan --all-targets -- -D warnings -A clippy::pedantic
       - name: Lint isolated native outstandings qualification path
         working-directory: tools
         run: |
           cargo clippy --locked -p bridge-tally-compatibility --features bills-native-outstandings-probe-receipt --all-targets -- -D warnings -A clippy::pedantic
           cargo clippy --locked -p bridge-tally-read-transport --features bills-native-outstandings-probe-transport --all-targets -- -D warnings -A clippy::pedantic
           cargo clippy --locked -p bridge-tally-live-read --features bills-native-outstandings-probe-runner --all-targets -- -D warnings -A clippy::pedantic
-      - name: Produce parser-only synthetic qualification smoke receipt
-        working-directory: tools
-        run: >-
-          cargo run --locked --release -p bridge-tally-qualification --
-          run ci-smoke target/tally-qualification-smoke.json 7 3
       - name: Enforce exact Tally compatibility claims
         working-directory: tools
         run: >-
@@ -285,19 +383,14 @@ jobs:
         run: node scripts/check-fixture-provenance.mjs
       - name: Enforce Tally request-builder hazard allowlist
         run: node scripts/check-tally-request-builder-hazards.mjs
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: tally-parser-qualification-smoke
-          path: tools/target/tally-qualification-smoke.json
-          if-no-files-found: error
-          retention-days: 7
 
   native:
-    name: Native checks (${{ matrix.os }})
+    name: Native checks (${{ matrix.os }}, shard ${{ matrix.shard }} of 2)
     needs: changes
     # Rust/Tauri changes always receive Windows and macOS coverage on PRs. The
-    # check is deliberately skipped only for frontend- and documentation-only PRs.
-    if: github.event_name != 'pull_request' || needs.changes.outputs.native == 'true'
+    # check is deliberately skipped only for frontend- and documentation-only PRs, and on a master
+    # push whose commit the merge queue already ran this job on (scripts/master-push-reuse.mjs).
+    if: needs.changes.outputs.native == 'true'
     runs-on: ${{ matrix.os }}
     # CI does not debug native test executables. Keep local line tables and
     # release profiles unchanged; assertions and overflow checks stay enabled.
@@ -314,6 +407,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
+        # The workspace tests are split in two halves by nextest's own partitioning (the test step below), each half on
+        # its own runner. Each shard compiles the whole workspace for itself and the two share one Rust cache key, which
+        # shard 1 alone saves (so a freshly saved cache holds no clippy-only dependency builds, and shard 2 may check those
+        # once from cold). Shard 1 also runs the PDFium tests, the doctests and the tools tests; shard 2 also runs clippy,
+        # the egress census and the tools lints. The matrix takes no include: or exclude: entries.
+        # scripts/check-ci-workflow-consistency.mjs pins the list, the partition flag and each step's shard.
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -323,7 +423,7 @@ jobs:
           toolchain: 1.96.0
           components: clippy
       - name: Install pinned nextest
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
         with:
           tool: cargo-nextest@0.9.143
           fallback: none
@@ -332,7 +432,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: ./.github/actions/setup-windows-native
         with:
-          save-cache: true
+          save-cache: ${{ matrix.shard == 1 }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         id: native-cache
         with:
@@ -342,11 +442,11 @@ jobs:
           # Separate the Windows dependency artifacts from the former registry-only
           # cache. Keep Cargo/toolchain/profile fingerprints and cleanup defaults;
           # workspace binaries and incremental artifacts are not persisted.
-          key: ${{ runner.os == 'Windows' && format('native-deps-v1-{0}', hashFiles('.github/actions/setup-windows-native/action.yml')) || '' }}
+          shared-key: ${{ runner.os == 'Windows' && format('native-deps-v1-{0}', hashFiles('.github/actions/setup-windows-native/action.yml')) || '' }}
           env-vars: ${{ runner.os == 'Windows' && 'ImageOS ImageVersion OPENSSL LIBCLANG' || '' }}
           # PRs consume trusted base caches. Manual branch runs can measure cold
           # and warm reuse in their own scope before a change reaches master.
-          save-if: ${{ github.event_name != 'pull_request' }}
+          save-if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && matrix.shard == 1 }}
       - name: Record Windows prerequisite cache state
         if: runner.os == 'Windows'
         shell: pwsh
@@ -364,18 +464,33 @@ jobs:
         run: >-
           cargo nextest run --locked --manifest-path src-tauri/Cargo.toml
           --workspace --no-fail-fast --retries 0 --test-threads num-cpus --timings
+          --partition count:${{ matrix.shard }}/2
+      # Test names, binaries, times and outcomes from nextest's JUnit report (src-tauri/.config/nextest.toml),
+      # for choosing which tests to trim or split. The report carries a failing test's panic text whatever
+      # the store-*-output settings say, so it is uploaded only when the test step passed. It sits right after
+      # that step because the PDFium step below runs nextest again and rewrites the same file.
+      - name: Retain macOS per-test timings
+        if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-test-timings-macos-shard-${{ matrix.shard }}
+          path: src-tauri/target/nextest/default/junit.xml
+          if-no-files-found: warn
+          retention-days: 7
       - name: Collect minimized macOS test crash stacks
         if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}
         run: >-
-          python3 scripts/collect-macos-test-crashes.py
+          node scripts/collect-macos-test-crashes.mjs
           --since-file "$RUNNER_TEMP/bridge-native-start"
           --output "$RUNNER_TEMP/bridge-native-crashes.json"
           --wait-seconds ${{ steps.native-tests.outcome == 'failure' && '30' || '0' }}
       - name: Retain minimized macOS test crash stacks
         if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-crash-stacks-macos
+          name: native-crash-stacks-macos-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/bridge-native-crashes.json
           if-no-files-found: error
           retention-days: 7
@@ -384,7 +499,7 @@ jobs:
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: >-
-          python3 scripts/retain-macos-test-binaries.py
+          node scripts/retain-macos-test-binaries.mjs
           --crash-json "$RUNNER_TEMP/bridge-native-crashes.json"
           --target src-tauri/target/debug/deps
           --output "$RUNNER_TEMP/bridge-native-binaries"
@@ -392,7 +507,7 @@ jobs:
         if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'failure' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-crash-binaries-macos
+          name: native-crash-binaries-macos-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/bridge-native-binaries
           if-no-files-found: error
           retention-days: 7
@@ -402,15 +517,33 @@ jobs:
       # in packaging/pdfium/pdfium.lock.json before extraction, and the ignored
       # tests are run on their own. Without the variable they fail, not skip.
       - name: Fetch pinned PDFium
+        if: matrix.shard == 1
         shell: bash
         run: >-
-          "$(command -v python3 || command -v python)" scripts/fetch-pdfium.py
+          node scripts/fetch-pdfium.mjs
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/pdfium" --github-env "$GITHUB_ENV"
+      # Nine tests, selected on the workspace build above and run on both systems: in
+      # bridge-bank-statement's pdf_tests, a_union_bank_statement_reads_one_row_per_line,
+      # an_owner_password_only_statement_opens_with_its_owner_password,
+      # malformed_input_is_refused_not_parsed and
+      # pdfium_reproduces_poppler_rows_on_the_synthetic_hdfc_statement; in the bridge lib,
+      # a_parsed_statement_builds_an_import_file_by_proposals_id and four agent::bank_statement
+      # tests (a_union_bank_statement_parses_without_printed_totals,
+      # mask_parties_masks_every_name_in_the_summary,
+      # only_the_summary_leaves_and_the_password_appears_nowhere,
+      # refusals_name_a_category_and_a_row_never_the_statement). `--no-tests fail` makes a
+      # filter that selects nothing fail the step, so a rename cannot silently turn the step
+      # into a pass. A `-p` build resolves features differently from `--workspace`, so the
+      # earlier `cargo test -p` pair recompiled six workspace crates (about 55 s on macOS)
+      # to run them. One command also means a failure is the step's exit code: on Windows the
+      # old pair ran under pwsh, which reports only the last command's status.
       - name: Test PDF extraction through PDFium
-        run: |
-          cargo test --locked --manifest-path src-tauri/Cargo.toml -p bridge-bank-statement --no-fail-fast -- --ignored
-          cargo test --locked --manifest-path src-tauri/Cargo.toml -p bridge --lib --no-fail-fast -- --ignored bank_statement a_parsed_statement_builds_an_import_file_by_proposals_id
+        if: matrix.shard == 1
+        run: >-
+          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml
+          --workspace --no-fail-fast --retries 0 --test-threads num-cpus --no-tests fail --run-ignored ignored-only
+          -E 'package(=bridge-bank-statement) | (package(=bridge) & kind(lib) & (test(~bank_statement) | test(~a_parsed_statement_builds_an_import_file_by_proposals_id)))'
       # Nextest does not execute doctests. Keep these as a separate required step.
       # bridge#583: the test-only approval seam must be visible to the scan
       # that proves shipped binaries lack it. This reuses the unit-test build
@@ -419,51 +552,43 @@ jobs:
         shell: bash
         run: node scripts/check-no-test-seam.mjs --test-harness
       - name: Test native workspace doctests
+        if: matrix.shard == 1
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --workspace --doc --no-fail-fast
       - name: Test Tally qualification tools workspace
+        if: matrix.shard == 1
         working-directory: tools
         run: cargo test --locked --workspace --no-fail-fast
       - name: Test isolated native outstandings qualification feature
+        if: matrix.shard == 1
         working-directory: tools
         run: >-
           cargo test --locked -p bridge-tally-live-read
           --features bills-native-outstandings-probe-runner
           --all-targets -- --test-threads=1
-      - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --all-targets --timings -- -D warnings -A clippy::pedantic
-      # The legacy voucher-scan runtime and the manual Unit A calibration harness
-      # are non-default features, so the workspace steps above never compile
-      # them. Each feature set carries tests the other lacks: the default-width
-      # invariant exists only without the harness, and the harness constructor
-      # tests only with it. The code is platform-neutral, so macOS alone runs it.
-      # The test step runs only tally:: and unit_a_live, where every gated test
-      # lives; the rest of the suite already ran above. The guard fails if a cfg
-      # on either feature appears anywhere else, so a gated test added outside
-      # the filter cannot pass unrun. bulk_party_statement.rs only gates a
-      # compile_fail doctest, which nextest never runs.
-      - name: Guard legacy feature test filter scope
-        if: runner.os == 'macOS'
+      - name: Lint the native workspace
+        if: matrix.shard == 2
+        run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --all-targets --timings -- -D warnings -A clippy::pedantic
+      # The Tally-path egress census (scripts/check-tally-egress-boundary.mjs, check 2). The
+      # two egress lints are forced to warn, which no group allow, -A or lint table (measured)
+      # can silence, over the shipped targets. The messages go to a file first, so a failed run
+      # cannot read as "nothing found", and the census requires that what fired match the
+      # reviewed call sites for this OS exactly, so a run that silences the lints (RUSTFLAGS
+      # --cap-lints allow does) fails too. Measured with clippy 1.96.0 on macOS, on a two-file crate
+      # and on this workspace: after a passing `-D warnings` step this run re-lints and reports the
+      # firings. If it ever did not, the firings would be zero and the census would fail loudly. To
+      # roll back, delete this step; the static half of the gate still runs in the portable job.
+      - name: Census the Tally-path egress lints
+        if: matrix.shard == 2
+        shell: bash
         run: |
-          outside=$(git grep -l -E 'feature *= *"(voucher-scan|live-calibration-harness)"' -- src-tauri/src src-tauri/tests \
-            | grep -v -x -E 'src-tauri/src/tally/.*|src-tauri/tests/unit_a_live\.rs|src-tauri/src/reports/bulk_party_statement\.rs' || true)
-          if [ -n "$outside" ]; then
-            echo "Feature-gated code outside the nextest filter; widen the filter below:"
-            echo "$outside"
-            exit 1
-          fi
-      - name: Test legacy voucher-scan and calibration harness features
-        if: runner.os == 'macOS'
-        run: |
-          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml -p bridge --features voucher-scan --no-fail-fast --retries 0 --test-threads num-cpus -E 'test(/^tally::/) | binary(unit_a_live)'
-          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml -p bridge --features live-calibration-harness --no-fail-fast --retries 0 --test-threads num-cpus -E 'test(/^tally::/) | binary(unit_a_live)'
-      - name: Lint legacy voucher-scan and calibration harness features
-        if: runner.os == 'macOS'
-        run: |
-          cargo clippy --locked --manifest-path src-tauri/Cargo.toml -p bridge --features voucher-scan --all-targets -- -D warnings -A clippy::pedantic
-          cargo clippy --locked --manifest-path src-tauri/Cargo.toml -p bridge --features live-calibration-harness --all-targets -- -D warnings -A clippy::pedantic
+          cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --lib --bins --message-format=json -- -A clippy::pedantic --force-warn clippy::disallowed_methods --force-warn clippy::disallowed_types > "$RUNNER_TEMP/egress-census.jsonl"
+          node scripts/check-tally-egress-boundary.mjs --census "$RUNNER_TEMP/egress-census.jsonl" "$RUNNER_OS"
       - name: Lint Tally qualification tools workspace
+        if: matrix.shard == 2
         working-directory: tools
         run: cargo clippy --locked --workspace --all-targets -- -D warnings -A clippy::pedantic
       - name: Lint isolated native outstandings qualification feature
+        if: matrix.shard == 2
         working-directory: tools
         run: >-
           cargo clippy --locked -p bridge-tally-live-read
@@ -472,9 +597,10 @@ jobs:
 
       - name: Retain native compiler timings
         if: ${{ always() }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-compiler-timings-${{ matrix.os }}
+          name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}
           path: src-tauri/target/cargo-timings/*.html
           if-no-files-found: warn
           retention-days: 7
@@ -482,9 +608,13 @@ jobs:
   bundle-smoke:
     name: Bundle smoke (${{ matrix.os }})
     needs: changes
-    # Bundle output is validated for packaging-relevant pull requests and every
-    # master/manual run. Rust/Tauri PRs retain the native platform matrix above.
-    if: github.event_name != 'pull_request' || needs.changes.outputs.bundle == 'true'
+    # Bundle output is validated for packaging-relevant pull requests and for every
+    # manual or scheduled run, and on a master push unless the merge queue already ran it
+    # on that commit. Rust/Tauri PRs retain the native platform matrix above. A pull request
+    # runs Windows only: the macOS bundle and seam jobs run in the merge queue and on a master
+    # push, so a macOS-only packaging failure is found at the queue (it ejects that entry)
+    # rather than costing every pull request about 12 macOS runner minutes.
+    if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
@@ -492,7 +622,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["windows-latest", "macos-latest"]') }}
     env:
       SCCACHE_DIR: ${{ github.workspace }}/.cache/bridge-package-sccache
       SCCACHE_CACHE_SIZE: 64M
@@ -534,7 +664,7 @@ jobs:
           # Tauri sets this inside its process; include it before cache lookup so
           # artifacts from a plain Cargo build cannot masquerade as a warm bundle.
           env-vars: ${{ runner.os == 'macOS' && 'MACOSX_DEPLOYMENT_TARGET' || '' }}
-          save-if: ${{ github.event_name != 'pull_request' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
       - name: Set up Windows native prerequisites
         id: windows-bundle-prerequisites
         if: runner.os == 'Windows'
@@ -549,7 +679,7 @@ jobs:
       - run: corepack pnpm run license:all
       - name: Install pinned package compiler cache
         id: package-sccache
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
         with:
           tool: sccache@0.17.0
           fallback: none
@@ -581,9 +711,9 @@ jobs:
           # Pinned Tauri CLI logs bundle_dmg.sh stdout/stderr only at debug.
           TAURI_CLI_VERBOSITY: '1'
         run: |
-          python3 scripts/capture-package-log.test.py
+          node --test scripts/capture-package-log.test.mjs
           set -o pipefail
-          corepack pnpm run tauri:build -- --timings 2>&1 | python3 scripts/capture-package-log.py
+          corepack pnpm run tauri:build -- --timings 2>&1 | node scripts/capture-package-log.mjs
       - name: Collect failed macOS bundle context
         if: ${{ failure() && runner.os == 'macOS' && steps.macos-bundle.outcome == 'failure' }}
         run: |
@@ -592,6 +722,7 @@ jobs:
           df -h . > package-diagnostics/disk-space.txt 2>&1
       - name: Retain macOS package diagnostics
         if: ${{ always() && runner.os == 'macOS' && (steps.macos-bundle.outcome == 'success' || steps.macos-bundle.outcome == 'failure') }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: macos-package-diagnostics
@@ -611,12 +742,12 @@ jobs:
           node scripts/check-macos-bundle-resources.mjs
           node scripts/check-macos-bundle-resources.mutation.mjs
       # parse_bank_statement loads PDFium from beside bridge_mcp, so the bundle
-      # carries the pinned build. fetch-pdfium.py verifies the archive, the
+      # carries the pinned build. fetch-pdfium.mjs verifies the archive, the
       # library and the licence notice it writes against the lock before use.
       - name: Fetch pinned PDFium for the MCPB
         shell: bash
         run: >-
-          "$(command -v python3 || command -v python)" scripts/fetch-pdfium.py
+          node scripts/fetch-pdfium.mjs
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/mcpb-pdfium"
       # tauri build uses --bins, including the auto-discovered bridge_mcp.
@@ -679,6 +810,7 @@ jobs:
           JS
       - name: Upload package compiler cache statistics
         if: ${{ always() && steps.package-sccache-start.outcome == 'success' }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-compiler-cache-${{ matrix.os }}
@@ -699,8 +831,8 @@ jobs:
     # rather than after it: it builds the bridge lib unit-test executable in
     # release and requires the marker there, so a clean scan of the shipped
     # executables means the scan could have seen the seam. Same scope and
-    # platforms as bundle-smoke, whose runs it guards.
-    if: github.event_name != 'pull_request' || needs.changes.outputs.bundle == 'true'
+    # platforms as bundle-smoke, whose runs it guards (on a pull request, Windows only).
+    if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     permissions:
@@ -708,7 +840,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["windows-latest", "macos-latest"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -751,7 +883,8 @@ jobs:
     name: Retain current compiler caches
     # Every job that saves a Rust cache has finished, so no save races the listing.
     needs: [bundle-smoke, native, tally-portable, workflow-consistency]
-    if: ${{ always() && github.ref == 'refs/heads/master' && needs.workflow-consistency.result == 'success' }}
+    # Not on the scheduled run: the pruner admits only a master push or a manual run.
+    if: ${{ always() && github.ref == 'refs/heads/master' && github.event_name != 'schedule' && needs.workflow-consistency.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -785,7 +918,7 @@ jobs:
     # master left inconsistent by a merge that bypassed it then reds crate PRs and
     # the nightly run, not every unrelated PR.
     needs: [changes]
-    if: github.event_name != 'pull_request' || needs.changes.outputs.tax_audit == 'true'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.tax_audit == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -800,7 +933,7 @@ jobs:
         run: python3 -m unittest discover -s src-tauri/crates/bridge-tax-audit/parity -p 'test_mutations.py'
       # The nightly run writes the ids it found failing into its open tracking issue.
       - name: Read any open nightly mutation issue
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -813,9 +946,9 @@ jobs:
       # crate tree. While a nightly issue is open, a crate change must also re-prove
       # every mutation it lists as failing, so the fix merges and nothing else does.
       - name: Check the change's mutations are proven on this tree
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: >-
           python3 src-tauri/crates/bridge-tax-audit/parity/mutations.py --verify
           --changed-since "$BASE_SHA" --nightly-issues "$RUNNER_TEMP/nightly-issues.txt"
@@ -848,7 +981,7 @@ jobs:
           printf '%s\n' "$NEEDS_JSON"
           failed="$(
             printf '%s' "$NEEDS_JSON" \
-              | python3 -c "import json,sys; d=json.load(sys.stdin); failed=[k for k,v in d.items() if v.get('result') in ('failure','cancelled')]; failed += [] if d.get('workflow-consistency', {}).get('result') == 'success' else ['workflow-consistency']; print(' '.join(dict.fromkeys(failed)))"
+              | node -e 'const d = JSON.parse(require("fs").readFileSync(0, "utf8")); const failed = Object.keys(d).filter((k) => ["failure", "cancelled"].includes(d[k].result)); if (d["workflow-consistency"]?.result !== "success") failed.push("workflow-consistency"); console.log([...new Set(failed)].join(" "))'
           )"
           if [[ -n "$failed" ]]; then
             echo "Required jobs did not pass: $failed"

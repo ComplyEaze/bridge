@@ -285,6 +285,120 @@ fn live_capture_backs_the_recognised_duty_head_vocabulary() {
     );
 }
 
+fn captured_live_ledger_masters_with_sgst_utgst() -> String {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-masters-sgst-utgst.utf16le.xml"
+    );
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_live_capture_backs_sgst_utgst_as_a_recognised_head() {
+    // Bytes TallyPrime 7.1 Silver sent for ledger_masters fields=compliance (see the
+    // fixture's JSON sidecar for the binary, relay and times): ledgers created with the
+    // literal head `SGST/UTGST` come back with exactly that string, and TAXTYPE GST.
+    // Before this head was recognised the same bytes classified as `unrecognized`,
+    // and a caller could not tell those ledgers from a misspelt head.
+    let period = NativeLedgerExportPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20250401").unwrap(),
+        TallyDate::parse("20250804").unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        sha256_hex(render_party_ledger_master_request("BRIDGE GST RECON LAB", &period).as_bytes()),
+        "f700339d10d4bdc845f7ab4af482e407fc03d9901a7eaebdf34feb86f8d7ea68",
+        "the fixture answers exactly the request ledger_masters sends"
+    );
+    let parsed = parse_native_party_ledger_master_records_with_evidence(
+        &captured_live_ledger_masters_with_sgst_utgst(),
+        COMPANY_GUID,
+    )
+    .expect("the live SGST/UTGST capture parses");
+    assert_eq!(parsed.records.len(), 36);
+
+    let mut heads: Vec<(String, GstDutyHead)> = parsed
+        .records
+        .iter()
+        .filter_map(|row| match &row.record.fields.gst_duty_head {
+            GstDutyHeadObservation::Recognized { raw, head } => Some((raw.clone(), *head)),
+            _ => None,
+        })
+        .collect();
+    heads.sort_by(|left, right| left.0.cmp(&right.0));
+    heads.dedup();
+    assert_eq!(
+        heads,
+        vec![
+            ("CGST".to_string(), GstDutyHead::Cgst),
+            ("Cess".to_string(), GstDutyHead::Cess),
+            ("IGST".to_string(), GstDutyHead::Igst),
+            ("SGST/UTGST".to_string(), GstDutyHead::SgstUtgst),
+            ("State Tax".to_string(), GstDutyHead::StateTax),
+            ("UT Tax".to_string(), GstDutyHead::UtTax),
+        ],
+        "every recognised spelling is backed by bytes Tally sent"
+    );
+
+    let sgst_utgst_rows: Vec<_> = parsed
+        .records
+        .iter()
+        .filter(|row| {
+            matches!(
+                &row.record.fields.gst_duty_head,
+                GstDutyHeadObservation::Recognized {
+                    head: GstDutyHead::SgstUtgst,
+                    ..
+                }
+            )
+        })
+        .collect();
+    assert_eq!(
+        sgst_utgst_rows.len(),
+        2,
+        "the probe ledger and the batch ledger"
+    );
+    for row in sgst_utgst_rows {
+        assert_eq!(
+            row.record.ledger.parent.returned_text(),
+            Some("Duties & Taxes")
+        );
+        assert_eq!(row.record.fields.tax_type.returned_text(), Some("GST"));
+    }
+    assert!(captured_live_ledger_masters_with_sgst_utgst().contains(">SGST/UTGST</GSTDUTYHEAD>"));
+
+    // The serialised wire shape a caller of ledger_masters sees.
+    let wire = serde_json::to_value(&GstDutyHeadObservation::Recognized {
+        raw: "SGST/UTGST".to_string(),
+        head: GstDutyHead::SgstUtgst,
+    })
+    .unwrap();
+    assert_eq!(
+        wire,
+        json!({"observation": "recognized", "raw": "SGST/UTGST", "head": "sgst_utgst"})
+    );
+}
+
+#[test]
+fn sgst_utgst_on_a_non_gst_ledger_is_contradictory_not_recognised() {
+    assert_eq!(
+        GstDutyHeadObservation::from_observations(
+            &PartyLedgerMasterFieldObservation::Returned("Others".to_string()),
+            &PartyLedgerMasterFieldObservation::Returned("SGST/UTGST".to_string()),
+        ),
+        GstDutyHeadObservation::Contradictory {
+            tax_type: "Others".to_string(),
+            raw: "SGST/UTGST".to_string(),
+        }
+    );
+}
+
 #[test]
 fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
     // bridge#624, over a live TallyPrime 7.1 Silver capture of the request this
@@ -375,6 +489,54 @@ fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
         answer("G1 Party D Two GSTINs", "20251001"),
         (text("29ZZZZZ0000Z1Z5"), "in_force", text("Regular"), None),
         "the later registration applies from its own date"
+    );
+}
+
+/// bridge#1520, over populated values: the live registration-history capture,
+/// whose rows hold dated registrations, serialised through the helper equals
+/// the golden that the expression the row used before `gst_details` existed
+/// produced on the same parse (see the provenance note). The golden holds the
+/// existing `mark_party_field` behaviour too: a key whose value is not a
+/// string is dropped, not re-inserted.
+#[test]
+fn populated_compliance_objects_are_byte_for_byte_the_ones_built_before_gst_details() {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-gst-registrations.utf16le.xml"
+    );
+    let capture = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let parsed = parse_native_party_ledger_master_records_with_evidence(
+        &capture,
+        "de2e15f2-6d42-4715-b6e7-b7a95a68abe8",
+    )
+    .expect("the live registration-history capture parses");
+    let compliance = parsed
+        .records
+        .into_iter()
+        .map(|row| compliance_json(row.record.fields, false))
+        .collect::<Vec<_>>();
+    assert!(!compliance.is_empty());
+    assert!(compliance.iter().all(|value| value.is_object()));
+    let actual = serde_json::to_string(&compliance).unwrap();
+    let golden = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/ledger_masters_compliance_objects_registrations_before_gst_details.json"
+    );
+    let first_difference = actual
+        .bytes()
+        .zip(golden.bytes())
+        .position(|(left, right)| left != right)
+        .unwrap_or(actual.len().min(golden.len()));
+    assert!(
+        actual == golden,
+        "{} objects differ from the golden ({} bytes, golden {}) from byte {first_difference}",
+        compliance.len(),
+        actual.len(),
+        golden.len()
     );
 }
 
@@ -505,6 +667,7 @@ fn gst_duty_head_vocabulary_is_explicit_and_irregular() {
         ("CGST", GstDutyHead::Cgst),
         ("IGST", GstDutyHead::Igst),
         ("State Tax", GstDutyHead::StateTax),
+        ("SGST/UTGST", GstDutyHead::SgstUtgst),
         ("UT Tax", GstDutyHead::UtTax),
         ("Cess", GstDutyHead::Cess),
     ] {
@@ -527,6 +690,10 @@ fn gst_duty_head_vocabulary_is_explicit_and_irregular() {
         "State",
         "Integrated",
         "Union Territory Tax",
+        "sgst/utgst",
+        "SGST / UTGST",
+        "SGST/UTGST ",
+        "UTGST",
     ] {
         assert_eq!(
             GstDutyHeadObservation::from_observations(
@@ -777,7 +944,7 @@ fn a_filter_report_names_at_most_twenty_sub_groups_and_counts_them_all() {
 mod through_the_tool {
     use super::*;
     use tally_protocol_simulator::{
-        Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
+        Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
     };
 
     const GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
@@ -869,6 +1036,13 @@ mod through_the_tool {
     /// changed. The same text serves every extent read of the call, so the
     /// brackets stay equal unless a test changes the closing one.
     fn extent_with_master_mark(mark: u64) -> String {
+        extent_with_marks(mark, Some(None))
+    }
+
+    /// `extent_with_master_mark` with the captured company's voucher
+    /// high-water (`ALTVCHID`) kept (`Some(None)`), moved to another value
+    /// (`Some(Some(value))`) or removed (`None`).
+    fn extent_with_marks(mark: u64, voucher: Option<Option<u64>>) -> String {
         let extent = include_str!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
         );
@@ -877,15 +1051,32 @@ mod through_the_tool {
         let end = at + extent[at..].find("</COMPANY>").unwrap();
         let from = "<ALTMSTID TYPE=\"Number\"> 219</ALTMSTID>";
         assert_eq!(extent[start..end].matches(from).count(), 1);
-        format!(
-            "{}{}{}",
-            &extent[..start],
-            extent[start..end].replace(
-                from,
-                &format!("<ALTMSTID TYPE=\"Number\"> {mark}</ALTMSTID>")
-            ),
-            &extent[end..]
-        )
+        let mut company = extent[start..end].replace(
+            from,
+            &format!("<ALTMSTID TYPE=\"Number\"> {mark}</ALTMSTID>"),
+        );
+        let voucher_line = company
+            .lines()
+            .find(|line| line.contains("<ALTVCHID "))
+            .expect("the captured company has a voucher high-water")
+            .to_owned();
+        match voucher {
+            Some(None) => {}
+            Some(Some(value)) => {
+                company = company.replace(
+                    &voucher_line,
+                    &format!("     <ALTVCHID TYPE=\"Number\"> {value}</ALTVCHID>"),
+                );
+            }
+            None => {
+                company = company
+                    .split_inclusive('\n')
+                    .filter(|line| !line.contains("<ALTVCHID "))
+                    .collect();
+            }
+        }
+        assert_eq!(voucher.is_none(), !company.contains("<ALTVCHID "));
+        format!("{}{}{}", &extent[..start], company, &extent[end..])
     }
 
     /// The compliance sequence on a book whose master mark is `mark`, with the
@@ -897,8 +1088,18 @@ mod through_the_tool {
         reads: Vec<String>,
         closing: Option<String>,
     ) -> Vec<ScenarioPlan> {
+        marked_plans_over(extent_with_master_mark(mark), reads, closing)
+    }
+
+    /// `marked_compliance_plans` over an extent text of the caller's making,
+    /// used for every extent read before the source's closing one.
+    fn marked_plans_over(
+        extent: String,
+        reads: Vec<String>,
+        closing: Option<String>,
+    ) -> Vec<ScenarioPlan> {
         let company = xml(companies());
-        let extent = xml(extent_with_master_mark(mark));
+        let extent = xml(extent);
         let currency = xml(captured(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
         )));
@@ -920,54 +1121,113 @@ mod through_the_tool {
         plans
     }
 
-    /// A master mark past what a catalogue read can bound within the budget
-    /// (10,000) refuses right after the source's opening extent, as before
-    /// #668: no catalogue, ledger, balance or group request is sent, and the
-    /// refusal names the mark as an upper bound and says no ledgers were
-    /// counted.
+    /// A master mark past what the census covers (400,000) refuses right after
+    /// the source's opening extent: no census, catalogue, ledger, balance or
+    /// group request is sent, because a response past the transport's cap is
+    /// cut off mid-read (#679). The refusal names the mark as an upper bound.
     #[tokio::test]
-    async fn a_book_whose_master_mark_is_over_the_bound_is_refused_before_any_ledger_read() {
-        let plans = marked_compliance_plans(10_001, Vec::new(), None);
-        let total = plans.len();
-        let (response, requests) =
-            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
-        assert_eq!(requests, total, "nothing is sent after the opening extent");
-        let error = refusal(&response);
-        assert_eq!(error["code"], "party_ledger_master_read_failed");
-        assert_eq!(error["cause"], "ledger_masters_too_large");
-        assert_eq!(
-            error["size"],
-            json!({"master_alter_id": 10_001, "counted_ledgers": null, "estimated_bytes": 37_503_750, "budget_bytes": 16_000_000})
-        );
-        let remediation = error["remediation"].as_str().unwrap();
-        assert!(remediation.contains("UPPER BOUND"), "{error}");
-        assert!(remediation.contains("fields=basic"), "{error}");
+    async fn a_book_whose_mark_is_past_the_census_is_refused_before_any_ledger_read() {
+        for mark in [400_001_u64, 1_000_000] {
+            let plans = marked_compliance_plans(mark, Vec::new(), None);
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "nothing is sent after the opening extent");
+            let error = refusal(&response);
+            assert_eq!(error["code"], "party_ledger_master_read_failed");
+            assert_eq!(error["cause"], "ledger_catalogue_too_large");
+            assert_eq!(
+                error["size"],
+                json!({"master_alter_id": mark, "estimated_bytes": mark * 1_400, "limit_bytes": 32_000_000, "limit_master_alter_id": 400_000})
+            );
+            let remediation = error["remediation"].as_str().unwrap();
+            assert!(remediation.contains("UPPER BOUND"), "{error}");
+            assert!(remediation.contains("fields=basic"), "{error}");
+        }
     }
 
-    /// The captured catalogue widened to `rows` ledgers: the nine captured
-    /// rows first, then copies of the first with a distinct name and GUID.
-    fn catalogue(rows: usize) -> String {
-        let captured = captured(include_bytes!(
+    /// The captured nine-ledger catalogue.
+    fn catalogue() -> String {
+        captured(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
-        ));
-        if rows <= 9 {
-            return captured;
+        ))
+    }
+
+    /// One generated ledger: a distinct name and GUID under a named parent.
+    struct Generated {
+        index: usize,
+        name: String,
+        parent: &'static str,
+    }
+
+    /// `spec` parents with that many ledgers each, in spec order.
+    fn generated(spec: &[(&'static str, usize)]) -> Vec<Generated> {
+        let mut rows = Vec::new();
+        for (parent, count) in spec {
+            for _ in 0..*count {
+                let index = rows.len();
+                rows.push(Generated {
+                    index,
+                    name: format!("Generated Ledger {index:05}"),
+                    parent,
+                });
+            }
         }
-        let first = captured.find("    <LEDGER ").unwrap();
-        let end = captured.find("</COLLECTION>").unwrap();
-        let template_end =
-            first + captured[first..].find("</LEDGER>").unwrap() + "</LEDGER>\n".len();
-        let template = &captured[first..template_end];
-        let mut widened = captured[..end].to_owned();
-        for i in 9..rows {
-            widened.push_str(
+        rows
+    }
+
+    /// The rows whose parent is one of `parents`.
+    fn under<'a>(rows: &'a [Generated], parents: &[&str]) -> Vec<&'a Generated> {
+        rows.iter()
+            .filter(|row| parents.contains(&row.parent))
+            .collect()
+    }
+
+    /// A captured party-master response with its ledgers replaced by
+    /// `rows`, each cut from the captured first ledger. The catalogue, master
+    /// and balance reads all use it; the opening balance is the row's index, so
+    /// the master and the balance agree.
+    fn with_ledgers(captured_response: String, rows: &[&Generated]) -> String {
+        const MARK: &str = "</LEDGER>";
+        let first = captured_response.find("    <LEDGER ").unwrap();
+        let first_end = first + captured_response[first..].find(MARK).unwrap() + MARK.len();
+        let last_end = captured_response.rfind(MARK).unwrap() + MARK.len();
+        let template = captured_response[first..first_end].trim_start();
+        let mut out = captured_response[..first].to_owned();
+        for (position, row) in rows.iter().enumerate() {
+            if position > 0 {
+                out.push_str("\n    ");
+            }
+            out.push_str(
                 &template
-                    .replace("Bridge Nested Debtor WR4", &format!("Filler Ledger {i}"))
-                    .replace("-000000d5", &format!("-f{i:07x}")),
+                    .replace("Bridge Nested Debtors WR4", row.parent)
+                    .replace("Bridge Nested Debtor WR4", &row.name)
+                    .replace("-000000d5", &format!("-{:08x}", 0x1000 + row.index))
+                    .replace(
+                        "<ALTERID TYPE=\"Number\"> 215<",
+                        &format!("<ALTERID TYPE=\"Number\"> {}<", 1_000 + row.index),
+                    )
+                    .replace(
+                        "<MASTERID TYPE=\"Number\"> 213<",
+                        &format!("<MASTERID TYPE=\"Number\"> {}<", 10 + row.index),
+                    )
+                    .replace(">-50000.00<", &format!(">-{}.00<", 1 + row.index)),
             );
         }
-        widened.push_str(&captured[end..]);
-        widened
+        out.push_str(&captured_response[last_end..]);
+        out
+    }
+
+    fn generated_catalogue(rows: &[&Generated]) -> String {
+        with_ledgers(catalogue(), rows)
+    }
+
+    fn generated_masters(rows: &[&Generated]) -> String {
+        with_ledgers(masters(), rows)
+    }
+
+    fn generated_balances(rows: &[&Generated]) -> String {
+        with_ledgers(balances(), rows)
     }
 
     /// A mark past the master bound but within the catalogue's reach is
@@ -978,7 +1238,7 @@ mod through_the_tool {
     async fn a_book_whose_counted_ledgers_fit_is_read_though_its_mark_does_not() {
         let plans = marked_compliance_plans(
             5_000,
-            vec![catalogue(9), masters(), balances(), groups()],
+            vec![catalogue(), masters(), balances(), groups()],
             Some(extent_with_master_mark(5_000)),
         );
         let total = plans.len();
@@ -993,30 +1253,499 @@ mod through_the_tool {
         assert_eq!(items(&response), items(&unsized_response));
     }
 
-    /// The same mark with a catalogue of 4,267 ledgers, one more than fit,
-    /// refuses right after the catalogue: no master request is sent, and the
-    /// refusal carries the count.
+    /// A book counted at 4,267 ledgers under one parent, one more than a
+    /// read holds, cannot be split by parent: it refuses right after the
+    /// catalogue, and no master request is sent (#679).
     #[tokio::test]
-    async fn a_book_whose_counted_ledgers_are_over_the_bound_is_refused_before_the_master_read() {
-        let plans = marked_compliance_plans(5_000, vec![catalogue(4_267)], None);
+    async fn a_parent_holding_more_ledgers_than_one_read_is_refused_before_the_master_read() {
+        let rows = generated(&[("Sundry Debtors", 4_267)]);
+        let plans = marked_compliance_plans(
+            6_000,
+            vec![generated_catalogue(&under(&rows, &["Sundry Debtors"]))],
+            None,
+        );
         let total = plans.len();
         let (response, requests) =
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
         assert_eq!(requests, total, "nothing is sent after the catalogue pair");
         let error = refusal(&response);
         assert_eq!(error["code"], "party_ledger_master_read_failed");
-        assert_eq!(error["cause"], "ledger_masters_too_large");
-        assert_eq!(
-            error["size"],
-            json!({"master_alter_id": 5_000, "counted_ledgers": 4_267, "estimated_bytes": 16_001_250, "budget_bytes": 16_000_000})
+        assert_eq!(error["cause"], "parent_over_budget");
+    }
+
+    const BIG: &str = "Sundry Debtors";
+    const NESTED: &str = "Bridge Nested Debtors WR4";
+    const OTHER: &str = "Sundry Creditors";
+
+    /// 4,300 ledgers under three parents. Largest first, the debtors and the
+    /// nested group fill the first read (3,300) and the creditors the second.
+    fn split_book() -> Vec<Generated> {
+        generated(&[(BIG, 2_200), (OTHER, 1_000), (NESTED, 1_100)])
+    }
+
+    /// The whole sequence for the split book: the catalogue, then one master
+    /// and one balance read per part, then the groups.
+    fn split_plans(
+        mark: u64,
+        first: (String, String),
+        second: (String, String),
+    ) -> Vec<ScenarioPlan> {
+        split_plans_closing(mark, first, second, extent_with_master_mark(mark))
+    }
+
+    /// `split_plans` whose source ends on the given closing extent.
+    fn split_plans_closing(
+        mark: u64,
+        first: (String, String),
+        second: (String, String),
+        closing: String,
+    ) -> Vec<ScenarioPlan> {
+        let rows = split_book();
+        let mut plans = marked_compliance_plans(
+            mark,
+            vec![
+                generated_catalogue(&rows.iter().collect::<Vec<_>>()),
+                first.0,
+                first.1,
+                second.0,
+                second.1,
+                groups(),
+            ],
+            None,
         );
+        pair(&mut plans, xml(closing));
+        plans
+    }
+
+    fn part_reads(rows: &[&Generated]) -> (String, String) {
+        (generated_masters(rows), generated_balances(rows))
+    }
+
+    /// A book too large for one read but with no parent too large is read in
+    /// parts, one filtered master and balance pair per part, and every ledger
+    /// comes back once, whatever its mark: 6,000 is within the old mark cap,
+    /// 10,001 and 20,000 were refused on the mark alone before #679 (#679).
+    #[tokio::test]
+    async fn a_book_too_large_for_one_read_is_read_in_parts_by_parent() {
+        for mark in [6_000_u64, 10_001, 20_000] {
+            let rows = split_book();
+            let mut plans = split_plans(
+                mark,
+                part_reads(&under(&rows, &[BIG, NESTED])),
+                part_reads(&under(&rows, &[OTHER])),
+            );
+            plans.extend([xml(companies()), status(), xml(companies())]);
+            let total = plans.len();
+            let (response, requests) = call_with_max_bytes(
+                plans,
+                json!({"company_guid":GUID,"fields":"compliance"}),
+                2_000_000,
+            )
+            .await;
+            assert_eq!(requests, total, "mark {mark}");
+            assert_ne!(response["isError"], true, "mark {mark}: {response}");
+            assert_eq!(response["structuredContent"]["result"]["total"], 4_300);
+            let names = items(&response)
+                .iter()
+                .map(|item| item["name"].as_str().unwrap())
+                .collect::<Vec<_>>();
+            assert!(
+                names.windows(2).all(|pair| pair[0] <= pair[1]),
+                "sorted by name"
+            );
+        }
+    }
+
+    async fn split_refusal(first: (String, String), second: (String, String)) -> String {
+        let plans = split_plans(6_000, first, second);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "the whole bracket is read before coverage");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        error["cause"].as_str().unwrap().to_owned()
+    }
+
+    /// The reads of a split book that end where Bridge must stop: the
+    /// catalogue, then each read in `reads`, and nothing after it. Fails if
+    /// Bridge sent a request past the refusal, and returns the cause.
+    async fn stops_after(rows: &[Generated], reads: Vec<String>) -> String {
+        let mut sequence = vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())];
+        sequence.extend(reads);
+        let plans = marked_compliance_plans(6_000, sequence, None);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "a request was sent past the refusal");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        error["cause"].as_str().unwrap().to_owned()
+    }
+
+    /// A part that omits one of its parent's ledgers, as when a ledger was
+    /// deleted, or a filter was ignored in the wrong direction, stops the read
+    /// right after its master: its balance and every later part are never
+    /// requested (#679).
+    #[tokio::test]
+    async fn a_part_that_omits_a_ledger_of_its_parents_stops_the_read_after_its_master() {
+        let rows = split_book();
+        let mut short = under(&rows, &[BIG, NESTED]);
+        short.pop();
+        let cause = stops_after(&rows, vec![part_reads(&short).0]).await;
+        assert_eq!(cause, "parent_part_row_count_differs");
+    }
+
+    /// A part that carries another part's ledger, as when Tally ignored the
+    /// filter, stops the read the same way rather than being deduplicated.
+    #[tokio::test]
+    async fn a_part_that_carries_another_parts_ledger_stops_the_read_after_its_master() {
+        let rows = split_book();
+        let mut wide = under(&rows, &[BIG, NESTED]);
+        wide.push(under(&rows, &[OTHER])[0]);
+        let cause = stops_after(&rows, vec![part_reads(&wide).0]).await;
+        assert_eq!(cause, "parent_part_row_count_differs");
+    }
+
+    /// A part whose answer passes the response cap, as when Tally ignored its
+    /// filter and returned the whole book, is refused under its own cause, not
+    /// as a bare read failure, and nothing is sent after it (#679).
+    #[tokio::test]
+    async fn a_part_past_the_response_cap_is_refused_under_its_own_cause() {
+        let rows = split_book();
+        let mut plans = marked_compliance_plans(
+            6_000,
+            vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
+            None,
+        );
+        plans.push(
+            xml(part_reads(&under(&rows, &[BIG, NESTED])).0).with_framing(
+                ResponseFraming::DeclaredContentLength {
+                    bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+                },
+            ),
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(
+            requests, total,
+            "a request was sent past the oversized answer"
+        );
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "parent_part_response_too_large");
+        assert_eq!(
+            error["remediation"],
+            crate::agent::refusal_remediation("parent_part_response_too_large").unwrap()
+        );
+    }
+
+    /// A part with the right number of ledgers, one of them another part's,
+    /// passes the count and is refused by coverage after the whole bracket.
+    #[tokio::test]
+    async fn a_part_that_swaps_in_another_parts_ledger_is_refused_by_coverage() {
+        let rows = split_book();
+        let mut swapped = under(&rows, &[BIG, NESTED]);
+        swapped.pop();
+        swapped.push(under(&rows, &[OTHER])[0]);
+        let cause = split_refusal(part_reads(&swapped), part_reads(&under(&rows, &[OTHER]))).await;
+        assert_eq!(cause, "parent_part_row_outside_parents");
+    }
+
+    /// A ledger renamed between the catalogue and its part is refused.
+    #[tokio::test]
+    async fn a_part_whose_ledger_differs_from_the_catalogue_is_refused() {
+        let rows = split_book();
+        let (masters_0, balances_0) = part_reads(&under(&rows, &[BIG, NESTED]));
+        let renamed = |text: String| text.replace("Generated Ledger 00005", "Renamed Ledger");
+        let cause = split_refusal(
+            (renamed(masters_0), renamed(balances_0)),
+            part_reads(&under(&rows, &[OTHER])),
+        )
+        .await;
+        assert_eq!(cause, "parent_part_row_differs_from_catalogue");
+    }
+
+    /// The voucher high-water moving between the parts of a split read, as when
+    /// a voucher is posted after the first part's balances were read, refuses the
+    /// whole read on its closing extent: no rows are released (#679).
+    #[tokio::test]
+    async fn a_split_read_whose_book_changes_between_parts_is_refused() {
+        let rows = split_book();
+        let plans = split_plans_closing(
+            6_000,
+            part_reads(&under(&rows, &[BIG, NESTED])),
+            part_reads(&under(&rows, &[OTHER])),
+            extent_with_marks(6_000, Some(Some(999_999))),
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(
+            requests, total,
+            "every part was read before the closing extent"
+        );
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "party_ledger_extent_changed");
+    }
+
+    /// A book too large for one read whose Tally reports no voucher high-water
+    /// cannot be proved unchanged across parts, so it is refused after the
+    /// catalogue and before any part is requested (#679).
+    #[tokio::test]
+    async fn a_split_read_needs_the_voucher_high_water_before_any_part_is_read() {
+        let rows = split_book();
+        let plans = marked_plans_over(
+            extent_with_marks(6_000, None),
+            vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "parent_partition_voucher_witness_absent");
+        assert!(error["remediation"]
+            .as_str()
+            .unwrap()
+            .contains("fields=basic"));
+    }
+
+    const ODD: &str = "Odd\tParent";
+
+    /// The split book plus `odd` ledgers under a parent name no filter can
+    /// carry (a control character), and the whole sequence for reading it:
+    /// the catalogue, the two named parts, then the complement part, then the
+    /// groups.
+    fn complement_book(
+        odd: usize,
+        reads: impl FnOnce(&[Generated]) -> [(String, String); 3],
+    ) -> (Vec<Generated>, Vec<ScenarioPlan>) {
+        let mut rows = split_book();
+        for _ in 0..odd {
+            let index = rows.len();
+            rows.push(Generated {
+                index,
+                name: format!("Generated Ledger {index:05}"),
+                parent: ODD,
+            });
+        }
+        let [first, second, third] = reads(&rows);
+        let mut plans = marked_compliance_plans(
+            6_000,
+            vec![
+                generated_catalogue(&rows.iter().collect::<Vec<_>>()),
+                first.0,
+                first.1,
+                second.0,
+                second.1,
+                third.0,
+                third.1,
+                groups(),
+            ],
+            None,
+        );
+        pair(&mut plans, xml(extent_with_master_mark(6_000)));
+        (rows, plans)
+    }
+
+    fn complement_reads(rows: &[Generated]) -> [(String, String); 3] {
+        [
+            part_reads(&under(rows, &[BIG, NESTED])),
+            part_reads(&under(rows, &[OTHER])),
+            part_reads(&under(rows, &[ODD])),
+        ]
+    }
+
+    /// Ledgers under a parent name with a control character cannot be named by
+    /// any filter, so they are read as one extra part that excludes every
+    /// named parent, and every ledger comes back once (#679).
+    #[tokio::test]
+    async fn ledgers_under_an_unnameable_parent_are_read_as_a_complement_part() {
+        let (_, mut plans) = complement_book(3, complement_reads);
+        plans.extend([xml(companies()), status(), xml(companies())]);
+        let total = plans.len();
+        let (response, requests) = call_with_max_bytes(
+            plans,
+            json!({"company_guid":GUID,"fields":"compliance"}),
+            2_000_000,
+        )
+        .await;
+        assert_eq!(requests, total);
+        assert_ne!(response["isError"], true, "{response}");
+        assert_eq!(response["structuredContent"]["result"]["total"], 4_303);
+    }
+
+    /// A named part that comes back short stops the read before the
+    /// complement is requested: the complement's filter is built on the same
+    /// assumption, so nothing more is sent to Tally (#679).
+    #[tokio::test]
+    async fn a_short_named_part_stops_the_read_before_the_complement_is_sent() {
+        let (rows, _) = complement_book(3, complement_reads);
+        let mut short = under(&rows, &[OTHER]);
+        short.pop();
+        let first = part_reads(&under(&rows, &[BIG, NESTED]));
+        let second = part_reads(&short);
+        let cause = stops_after(&rows, vec![first.0, first.1, second.0]).await;
+        assert_eq!(cause, "parent_part_row_count_differs");
+    }
+
+    /// A complement part that returns a ledger of a named part, as when the
+    /// exclusion was ignored, stops the read after its master.
+    #[tokio::test]
+    async fn a_complement_part_that_carries_a_named_ledger_stops_the_read() {
+        let (rows, _) = complement_book(3, complement_reads);
+        let mut wide = under(&rows, &[ODD]);
+        wide.push(under(&rows, &[OTHER])[0]);
+        let first = part_reads(&under(&rows, &[BIG, NESTED]));
+        let second = part_reads(&under(&rows, &[OTHER]));
+        let cause = stops_after(
+            &rows,
+            vec![first.0, first.1, second.0, second.1, part_reads(&wide).0],
+        )
+        .await;
+        assert_eq!(cause, "parent_part_row_count_differs");
+    }
+
+    /// A complement part that swaps one unnameable ledger for a named one has
+    /// the right count, so coverage refuses it as a repeat once the bracket is
+    /// read.
+    #[tokio::test]
+    async fn a_complement_part_that_swaps_in_a_named_ledger_is_refused_as_a_repeat() {
+        let (_, plans) = complement_book(3, |rows| {
+            let mut swapped = under(rows, &[ODD]);
+            swapped.pop();
+            swapped.push(under(rows, &[OTHER])[0]);
+            [
+                part_reads(&under(rows, &[BIG, NESTED])),
+                part_reads(&under(rows, &[OTHER])),
+                part_reads(&swapped),
+            ]
+        });
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "the whole bracket is read before coverage");
+        assert_eq!(refusal(&response)["cause"], "parent_part_row_repeated");
+    }
+
+    /// A complement part that omits one of the unnameable ledgers stops the
+    /// read after its master.
+    #[tokio::test]
+    async fn a_complement_part_that_omits_a_ledger_stops_the_read() {
+        let (rows, _) = complement_book(3, complement_reads);
+        let mut short = under(&rows, &[ODD]);
+        short.pop();
+        let first = part_reads(&under(&rows, &[BIG, NESTED]));
+        let second = part_reads(&under(&rows, &[OTHER]));
+        let cause = stops_after(
+            &rows,
+            vec![first.0, first.1, second.0, second.1, part_reads(&short).0],
+        )
+        .await;
+        assert_eq!(cause, "parent_part_row_count_differs");
+    }
+
+    /// More unnameable ledgers than one read holds are refused right after
+    /// the catalogue, with the parent name not echoed (#679).
+    #[tokio::test]
+    async fn more_unnameable_ledgers_than_one_read_holds_are_refused_after_the_catalogue() {
+        let rows = generated(&[(BIG, 1), (ODD, 4_267)]);
+        let plans = marked_compliance_plans(
+            6_000,
+            vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        assert_eq!(refusal(&response)["cause"], "parent_over_budget");
+        assert!(!response.to_string().contains("Odd"));
+    }
+
+    /// A book whose every ledger sits under an unnameable parent has no named
+    /// part to exclude, so it is refused with the count of them, the cause
+    /// that says so, and no name echoed (#679).
+    #[tokio::test]
+    async fn a_book_with_no_nameable_parent_is_refused_with_its_ledger_count() {
+        let rows = generated(&[(ODD, 4_300)]);
+        let plans = marked_compliance_plans(
+            6_000,
+            vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "parent_name_unsupported");
+        assert_eq!(error["unsupported_parent_ledgers"], 4_300);
+        assert!(!response.to_string().contains("Odd"), "{error}");
+        assert!(error["remediation"]
+            .as_str()
+            .unwrap()
+            .contains("fields=basic"));
+    }
+
+    /// One part needs no witness: a counted book that fits one read is read
+    /// whole with or without a voucher high-water, as before.
+    #[tokio::test]
+    async fn a_counted_read_of_one_part_does_not_need_the_voucher_high_water() {
+        let extent = extent_with_marks(5_000, None);
+        let plans = marked_plans_over(
+            extent.clone(),
+            vec![catalogue(), masters(), balances(), groups()],
+            Some(extent),
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total);
+        assert_ne!(response["isError"], true, "{response}");
+    }
+
+    /// A part that returns one of its ledgers twice is refused on that read,
+    /// before its balances are read: the master parser's own duplicate-identity
+    /// refusal comes first, so the coverage check's repeat (`parent_part_row_repeated`,
+    /// covered in the protocol crate) is a second line of defence, not a path
+    /// the tool reaches.
+    #[tokio::test]
+    async fn a_part_that_repeats_a_ledger_is_refused_at_its_master_read() {
+        let rows = split_book();
+        let mut doubled = under(&rows, &[BIG, NESTED]);
+        doubled.push(doubled[0]);
+        let plans = marked_compliance_plans(
+            6_000,
+            vec![
+                generated_catalogue(&rows.iter().collect::<Vec<_>>()),
+                generated_masters(&doubled),
+            ],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(
+            requests, total,
+            "nothing is sent after the doubled master pair"
+        );
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "duplicate_master_identity");
     }
 
     /// A catalogue that names another company does not size this one: it is
     /// refused on identity before any master request is sent.
     #[tokio::test]
     async fn a_count_from_another_company_is_refused_before_the_master_read() {
-        let other = catalogue(9).replace(GUID, "00000000-0000-0000-0000-000000000000");
+        let other = catalogue().replace(GUID, "00000000-0000-0000-0000-000000000000");
         let plans = marked_compliance_plans(5_000, vec![other], None);
         let total = plans.len();
         let (response, requests) =
@@ -1032,7 +1761,13 @@ mod through_the_tool {
     #[tokio::test]
     async fn a_catalogue_that_changes_between_its_two_reads_is_refused_before_the_master_read() {
         let mut plans = marked_compliance_plans(5_000, Vec::new(), None);
-        plans.extend([xml(catalogue(9)), status(), xml(catalogue(10)), status()]);
+        let changed = generated(&[(BIG, 10)]);
+        plans.extend([
+            xml(catalogue()),
+            status(),
+            xml(generated_catalogue(&under(&changed, &[BIG]))),
+            status(),
+        ]);
         let total = plans.len();
         let (response, requests) =
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
@@ -1054,7 +1789,7 @@ mod through_the_tool {
         };
         let counted_plans = marked_compliance_plans(
             5_000,
-            vec![catalogue(9), masters(), balances(), groups()],
+            vec![catalogue(), masters(), balances(), groups()],
             Some(extent_with_master_mark(5_000)),
         );
         let (counted, _) = call(
@@ -1073,7 +1808,7 @@ mod through_the_tool {
         )
         .await;
         // UTF-16LE on the wire, with its two-byte byte-order mark.
-        let catalogue_wire = 2 + 2 * catalogue(9).encode_utf16().count() as u64;
+        let catalogue_wire = 2 + 2 * catalogue().encode_utf16().count() as u64;
         assert_eq!(
             bytes(&counted) - bytes(&admitted),
             2 * catalogue_wire,
@@ -1082,6 +1817,841 @@ mod through_the_tool {
         assert_ne!(
             counted["structuredContent"]["evidence"]["request_sha256"],
             admitted["structuredContent"]["evidence"]["request_sha256"]
+        );
+    }
+
+    // -- #679: the census counts a book whose mark is past its catalogue ------
+
+    /// The synthetic lab company the census slices were captured from.
+    const LAB_COMPANY_GUID: &str = "f8dab51e-a5d9-49d5-9232-54a16c8b95bb";
+
+    /// The captured eight-ledger census slice.
+    fn census_capture() -> String {
+        captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/ledger-census-slice-eight-rows.utf16le.xml"
+        ))
+    }
+
+    /// The captured answer to a slice holding no ledger.
+    fn census_empty() -> String {
+        captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/ledger-census-slice-empty.utf16le.xml"
+        ))
+    }
+
+    /// A census slice answer holding one ledger per id in `ids`, each cut from
+    /// the captured slice's first row, under `company_guid`.
+    fn census_slice(company_guid: &str, ids: std::ops::Range<u32>) -> String {
+        const MARK: &str = "</LEDGER>";
+        assert!(
+            !ids.is_empty(),
+            "an empty slice is the captured empty answer"
+        );
+        let capture = census_capture().replace(LAB_COMPANY_GUID, company_guid);
+        let first = capture.find("    <LEDGER ").unwrap();
+        let first_end = first + capture[first..].find(MARK).unwrap() + MARK.len();
+        let last_end = capture.rfind(MARK).unwrap() + MARK.len();
+        let template = capture[first..first_end].trim_start().to_owned();
+        // The name sits twice in a row: as the row's attribute and as its `NAME`.
+        assert_eq!(template.matches("SZ Debtor 0284").count(), 2);
+        assert_eq!(template.matches("-000001f3").count(), 1);
+        let mut out = capture[..first].to_owned();
+        for (position, id) in ids.enumerate() {
+            if position > 0 {
+                out.push_str("\n    ");
+            }
+            out.push_str(
+                &template
+                    .replace("SZ Debtor 0284", &format!("Census Ledger {id}"))
+                    .replace("-000001f3", &format!("-{:08x}", 0x2000_0000 + id)),
+            );
+        }
+        out.push_str(&capture[last_end..]);
+        out
+    }
+
+    /// The slices of a census of a book whose master mark is `mark`, one answer
+    /// per slice of 4,000, empty except where `filled` puts ledgers.
+    fn census_bodies(
+        mark: u64,
+        company_guid: &str,
+        filled: &[(usize, std::ops::Range<u32>)],
+    ) -> Vec<String> {
+        let slices = mark.div_ceil(4_000) as usize;
+        (0..slices)
+            .map(
+                |index| match filled.iter().find(|(slice, _)| *slice == index) {
+                    Some((_, ids)) => census_slice(company_guid, ids.clone()),
+                    None => census_empty(),
+                },
+            )
+            .collect()
+    }
+
+    /// `marked_compliance_plans` for a census: the slices are single reads, one
+    /// request each with no health check, then `reads` are paired as usual.
+    fn census_plans(
+        mark: u64,
+        slices: Vec<String>,
+        reads: Vec<String>,
+        closing: Option<String>,
+    ) -> Vec<ScenarioPlan> {
+        let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+        plans.extend(slices.into_iter().map(xml));
+        for source in reads {
+            pair(&mut plans, xml(source));
+        }
+        if let Some(closing) = closing {
+            pair(&mut plans, xml(closing));
+            plans.extend([xml(companies()), status(), xml(companies())]);
+        }
+        plans
+    }
+
+    /// The company-count answer for the test company: the captured company-extent
+    /// answer reduced to this company's row holding `NUMLEDGERS` (`None`: the field
+    /// absent). The row's shape (name attribute, NAME, GUID, NUMLEDGERS with a
+    /// leading space) is the live capture's (`company-ledger-count`, bridge#938);
+    /// only the company it names is the test company's.
+    fn company_count_body(numledgers: Option<&str>) -> String {
+        let capture = include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+        );
+        let at = capture.find(GUID).expect("the captured company");
+        let start = capture[..at].rfind("<COMPANY ").unwrap();
+        let end = at + capture[at..].find("</COMPANY>").unwrap() + "</COMPANY>".len();
+        let row = &capture[start..end];
+        let name = row[row.find("NAME=\"").unwrap() + 6..]
+            .split('"')
+            .next()
+            .unwrap();
+        let field = numledgers
+            .map(|value| format!("     <NUMLEDGERS TYPE=\"Number\"> {value}</NUMLEDGERS>\n"))
+            .unwrap_or_default();
+        let new_row = format!(
+            "<COMPANY NAME=\"{name}\" RESERVEDNAME=\"\">\n     <NAME TYPE=\"String\">{name}</NAME>\n     <GUID TYPE=\"String\">{GUID}</GUID>\n{field}    </COMPANY>"
+        );
+        let first = capture.find("<COMPANY ").unwrap();
+        let last_end = capture.rfind("</COMPANY>").unwrap() + "</COMPANY>".len();
+        format!("{}{}{}", &capture[..first], new_row, &capture[last_end..])
+    }
+
+    /// `census_plans` for a census that completes: the book's extent is read
+    /// again after the last slice, before any read is admitted by the count
+    /// (#679). `after` is that extent's text.
+    fn census_plans_after(
+        mark: u64,
+        slices: Vec<String>,
+        after: String,
+        reads: Vec<String>,
+        closing: Option<String>,
+    ) -> Vec<ScenarioPlan> {
+        // Tally's own count of the ledgers agrees with the census's: the distinct
+        // GUIDs the census's own parser reads from the slices, so text that merely
+        // looks like a ledger row cannot skew it.
+        let counted = slices
+            .iter()
+            .flat_map(|body| {
+                bridge_tally_protocol::parse_ledger_census_slice(body, GUID, u64::MAX)
+                    .expect("a census slice given to the helper parses")
+            })
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
+        census_plans_counted(
+            mark,
+            slices,
+            company_count_body(Some(&counted.to_string())),
+            after,
+            reads,
+            closing,
+        )
+    }
+
+    /// [`census_plans_after`] with the company's own ledger-count answer given.
+    fn census_plans_counted(
+        mark: u64,
+        slices: Vec<String>,
+        company_count: String,
+        after: String,
+        reads: Vec<String>,
+        closing: Option<String>,
+    ) -> Vec<ScenarioPlan> {
+        let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+        plans.extend(slices.into_iter().map(xml));
+        // One read, not a pair, before the extent is read again.
+        plans.push(xml(company_count));
+        pair(&mut plans, xml(after));
+        for source in reads {
+            pair(&mut plans, xml(source));
+        }
+        if let Some(closing) = closing {
+            pair(&mut plans, xml(closing));
+            plans.extend([xml(companies()), status(), xml(companies())]);
+        }
+        plans
+    }
+
+    /// [`census_plans_after`] with the extent unchanged.
+    fn census_plans_checked(
+        mark: u64,
+        slices: Vec<String>,
+        reads: Vec<String>,
+        closing: Option<String>,
+    ) -> Vec<ScenarioPlan> {
+        census_plans_after(mark, slices, extent_with_master_mark(mark), reads, closing)
+    }
+
+    /// A book whose mark (102,161: the shape of a real book of 864 ledgers) is
+    /// past what its catalogue can be read for is counted by AlterID span, one
+    /// single read per slice of 4,000, and the count admits the whole read: the
+    /// same rows as the unsized read (#679).
+    #[tokio::test]
+    async fn a_book_whose_mark_is_past_its_catalogue_is_counted_by_span_and_read_whole() {
+        let mark = 102_161_u64;
+        let slices = census_bodies(mark, GUID, &[(24, 0..9)]);
+        assert_eq!(slices.len(), 26);
+        let plans = census_plans_checked(
+            mark,
+            slices,
+            vec![masters(), balances(), groups()],
+            Some(extent_with_master_mark(mark)),
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total);
+        assert_ne!(response["isError"], true, "{response}");
+        let (unsized_response, _) = call(
+            compliance_plans(masters(), balances()),
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        assert_eq!(items(&response), items(&unsized_response));
+    }
+
+    /// Each slice's answer is accounted in the evidence once (a slice is one
+    /// read, not a pair). The same nine ledgers counted as one filled slice or
+    /// as two differ in evidence bytes by exactly the difference of the slices'
+    /// wire sizes, so a slice counted twice would double that difference.
+    #[tokio::test]
+    async fn a_census_slice_is_accounted_once_in_the_evidence() {
+        let mark = 102_161_u64;
+        let wire = |bodies: &[String]| -> u64 {
+            bodies
+                .iter()
+                .map(|body| 2 + 2 * body.encode_utf16().count() as u64)
+                .sum()
+        };
+        let one_slice = census_bodies(mark, GUID, &[(24, 0..9)]);
+        let two_slices = census_bodies(mark, GUID, &[(24, 0..5), (25, 5..9)]);
+        assert_ne!(wire(&one_slice), wire(&two_slices));
+        let mut bytes = Vec::new();
+        for slices in [&one_slice, &two_slices] {
+            let plans = census_plans_checked(
+                mark,
+                slices.clone(),
+                vec![masters(), balances(), groups()],
+                Some(extent_with_master_mark(mark)),
+            );
+            let (response, _) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_ne!(response["isError"], true, "{response}");
+            bytes.push(
+                response["structuredContent"]["evidence"]["bytes"]
+                    .as_u64()
+                    .unwrap(),
+            );
+        }
+        assert_eq!(
+            bytes[0] as i64 - bytes[1] as i64,
+            wire(&one_slice) as i64 - wire(&two_slices) as i64
+        );
+    }
+
+    /// The census's count is compared with the ledgers the whole read returns:
+    /// a count of eight against nine master rows is refused right after the
+    /// master pair, and no balance or group request is sent.
+    #[tokio::test]
+    async fn a_census_count_that_differs_from_the_master_read_stops_the_read_after_its_master() {
+        let mark = 102_161_u64;
+        let plans = census_plans_checked(
+            mark,
+            census_bodies(mark, GUID, &[(24, 0..8)]),
+            vec![masters()],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "a request was sent past the master pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "ledger_count_differs");
+        assert_eq!(
+            error["remediation"],
+            crate::agent::refusal_remediation("ledger_count_differs").unwrap()
+        );
+    }
+
+    /// A census that found no ledger is refused, not counted as an empty book:
+    /// an empty slice is the answer a closed or absent company gives too.
+    #[tokio::test]
+    async fn a_census_that_finds_no_ledger_is_refused_after_its_last_slice() {
+        let mark = 102_161_u64;
+        let plans = census_plans(mark, census_bodies(mark, GUID, &[]), Vec::new(), None);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the census");
+        assert_eq!(refusal(&response)["cause"], "ledger_span_census_empty");
+    }
+
+    /// Every refusal inside the census stops it at the slice that caused it:
+    /// the plans end there, and a request past them fails the count.
+    async fn census_stops_at(slices: Vec<String>) -> String {
+        let plans = census_plans(102_161, slices, Vec::new(), None);
+        let total = plans.len();
+        let (response, requests) = call_with_max_bytes(
+            plans,
+            json!({"company_guid":GUID,"fields":"compliance"}),
+            20_000_000,
+        )
+        .await;
+        assert_eq!(requests, total, "a request was sent past the refusal");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        error["cause"].as_str().unwrap().to_owned()
+    }
+
+    #[tokio::test]
+    async fn a_slice_holding_more_ledgers_than_its_span_stops_the_census_there() {
+        // 4,001 ledgers in a slice of 4,000 AlterIDs: the filter was ignored.
+        let cause = census_stops_at(vec![census_slice(GUID, 0..4_001)]).await;
+        assert_eq!(cause, "ledger_span_slice_over_bound");
+    }
+
+    #[tokio::test]
+    async fn a_ledger_seen_in_two_slices_stops_the_census_at_the_second() {
+        let cause = census_stops_at(vec![census_slice(GUID, 0..5), census_slice(GUID, 3..8)]).await;
+        assert_eq!(cause, "ledger_span_duplicate_identity");
+    }
+
+    /// The whole read after a catalogue count compares the count with the
+    /// master rows too (#679): nine ledgers counted, eight returned, and the
+    /// read ends right after the master pair, before any balance is requested.
+    #[tokio::test]
+    async fn a_catalogue_count_that_differs_from_the_master_read_stops_the_read_after_its_master() {
+        let nine = generated(&[(BIG, 9)]);
+        let eight = generated(&[(BIG, 8)]);
+        let plans = marked_compliance_plans(
+            5_000,
+            vec![
+                generated_catalogue(&nine.iter().collect::<Vec<_>>()),
+                generated_masters(&eight.iter().collect::<Vec<_>>()),
+            ],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "a request was sent past the master pair");
+        assert_eq!(refusal(&response)["cause"], "ledger_count_differs");
+    }
+
+    /// The plans of a census that stops at the company's own ledger count: the
+    /// slices and that one answer, and nothing after it.
+    fn census_plans_to_the_count(
+        mark: u64,
+        slices: Vec<String>,
+        company_count: String,
+    ) -> Vec<ScenarioPlan> {
+        let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+        plans.extend(slices.into_iter().map(xml));
+        plans.push(xml(company_count));
+        plans
+    }
+
+    /// Tally's own count of the company's ledgers is higher than the census
+    /// counted (as would follow if a company closed and reopened during the
+    /// census with equal marks answered the slices after that with the empty
+    /// body, which is reasoned, not reproduced; or a ledger added during the
+    /// read): the call is refused
+    /// right after that one read, before the extent is read again and before any
+    /// master or catalogue read could be sized from the low count (#938).
+    #[tokio::test]
+    async fn a_census_below_the_companys_own_ledger_count_is_refused_before_anything_is_sized() {
+        let mark = 102_161_u64;
+        // The census holds nine ledgers: ten is the smallest higher count.
+        for company in ["10", "20"] {
+            let plans = census_plans_to_the_count(
+                mark,
+                census_bodies(mark, GUID, &[(24, 0..9)]),
+                company_count_body(Some(company)),
+            );
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "a request was sent after the count read");
+            let error = refusal(&response);
+            assert_eq!(error["code"], "party_ledger_master_read_failed");
+            assert_eq!(error["cause"], "ledger_count_company_differs");
+            assert_eq!(
+                error["remediation"],
+                crate::agent::refusal_remediation("ledger_count_company_differs").unwrap()
+            );
+        }
+    }
+
+    /// The company-count read is accounted in the evidence even when it refuses
+    /// the call: two refusals that differ only in the size of that answer differ
+    /// in evidence bytes by exactly that difference.
+    #[tokio::test]
+    async fn a_refused_company_count_read_is_accounted_in_the_evidence() {
+        let mark = 102_161_u64;
+        let wire = |body: &str| 2 + 2 * body.encode_utf16().count() as u64;
+        let mut bytes = Vec::new();
+        let mut sizes = Vec::new();
+        for answer in ["20", "2000000"] {
+            let body = company_count_body(Some(answer));
+            sizes.push(wire(&body));
+            let plans =
+                census_plans_to_the_count(mark, census_bodies(mark, GUID, &[(24, 0..9)]), body);
+            let (response, _) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(refusal(&response)["cause"], "ledger_count_company_differs");
+            bytes.push(
+                response["structuredContent"]["evidence"]["bytes"]
+                    .as_u64()
+                    .unwrap(),
+            );
+        }
+        assert_ne!(sizes[0], sizes[1]);
+        assert_eq!(bytes[1] - bytes[0], sizes[1] - sizes[0]);
+    }
+
+    /// The same in a read that goes on: the company-count answer is in the
+    /// successful read's evidence, so two reads that differ only in its size
+    /// differ in evidence bytes by exactly that difference.
+    #[tokio::test]
+    async fn the_company_count_read_is_accounted_in_a_successful_reads_evidence() {
+        let mark = 102_161_u64;
+        let wire = |body: &str| 2 + 2 * body.encode_utf16().count() as u64;
+        let mut bytes = Vec::new();
+        let mut sizes = Vec::new();
+        for answer in ["8", "000000000008"] {
+            let body = company_count_body(Some(answer));
+            sizes.push(wire(&body));
+            let plans = census_plans_counted(
+                mark,
+                census_bodies(mark, GUID, &[(24, 0..9)]),
+                body,
+                extent_with_master_mark(mark),
+                vec![masters(), balances(), groups()],
+                Some(extent_with_master_mark(mark)),
+            );
+            let (response, _) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_ne!(response["isError"], true, "{response}");
+            bytes.push(
+                response["structuredContent"]["evidence"]["bytes"]
+                    .as_u64()
+                    .unwrap(),
+            );
+        }
+        assert_ne!(sizes[0], sizes[1]);
+        assert_eq!(bytes[1] - bytes[0], sizes[1] - sizes[0]);
+    }
+
+    /// A company-count answer past the response cap is not a damaged answer: it
+    /// is refused under the read's own code with its own `cause` and remediation
+    /// (#1033), never as `ledger_count_company_invalid` or
+    /// `ledger_count_company_differs`, and nothing is sent after it.
+    #[tokio::test]
+    async fn a_transport_failure_on_the_company_count_read_is_not_an_invalid_answer() {
+        let mark = 102_161_u64;
+        let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+        plans.extend(
+            census_bodies(mark, GUID, &[(24, 0..9)])
+                .into_iter()
+                .map(xml),
+        );
+        plans.push(xml(company_count_body(Some("9"))).with_framing(
+            ResponseFraming::DeclaredContentLength {
+                bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+            },
+        ));
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "a request was sent after the count read");
+        assert_eq!(response["isError"], true, "{response}");
+        let error = refusal(&response);
+        assert_eq!(
+            error["code"], "party_ledger_master_read_failed",
+            "{response}"
+        );
+        assert_eq!(
+            error["cause"], "ledger_count_company_response_too_large",
+            "{response}"
+        );
+        assert_eq!(
+            error["remediation"],
+            crate::agent::refusal_remediation("ledger_count_company_response_too_large").unwrap()
+        );
+    }
+
+    /// Any other failure of the company-count read keeps what it had (#1144
+    /// review): a reset connection still carries no `cause`, and an HTTP error
+    /// keeps the transport's own. Only an answer past the cap is renamed, so
+    /// neither reads as `ledger_count_company_response_too_large`, and nothing
+    /// is sent after either.
+    #[tokio::test]
+    async fn a_count_read_failure_short_of_the_cap_keeps_its_own_cause() {
+        for (failed, cause) in [
+            (
+                xml(company_count_body(Some("9")))
+                    .with_delivery(tally_protocol_simulator::Delivery::ResetBeforeBody),
+                None,
+            ),
+            (
+                xml(company_count_body(Some("9"))).with_http_status(500),
+                Some("http_status_failure"),
+            ),
+        ] {
+            let mark = 102_161_u64;
+            let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+            plans.extend(
+                census_bodies(mark, GUID, &[(24, 0..9)])
+                    .into_iter()
+                    .map(xml),
+            );
+            plans.push(failed);
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "a request was sent after the count read");
+            let error = refusal(&response);
+            assert_eq!(
+                error["code"], "party_ledger_master_read_failed",
+                "{response}"
+            );
+            assert_eq!(
+                error.get("cause").and_then(Value::as_str),
+                cause,
+                "{response}"
+            );
+        }
+    }
+
+    /// The cross-check flag is added to a result whatever the frame was, and a
+    /// read with no census leaves the frame as it was.
+    #[test]
+    fn the_cross_check_flag_joins_an_object_frame_and_replaces_any_other() {
+        use crate::tally::connection::CountCrossCheck;
+        let flag = json!({"status": "matched"});
+        let joined = count_cross_check_frame(json!({"rows": 3}), Some(CountCrossCheck::Matched));
+        assert_eq!(joined["rows"], 3);
+        assert_eq!(joined["ledger_count_cross_check"], flag);
+        for other in [json!(null), json!([1, 2]), json!("text")] {
+            let framed = count_cross_check_frame(other, Some(CountCrossCheck::Matched));
+            assert_eq!(framed, json!({"ledger_count_cross_check": flag}));
+        }
+        let untouched = json!({"rows": 3});
+        assert_eq!(count_cross_check_frame(untouched.clone(), None), untouched);
+    }
+
+    /// A count the company does not give, or gives in a form that is not a plain
+    /// integer, or gives for another company, is refused or unavailable, never
+    /// read as agreement.
+    #[tokio::test]
+    async fn an_unusable_company_count_answer_refuses_the_call_after_that_read() {
+        let mark = 102_161_u64;
+        let other = company_count_body(Some("9")).replace(GUID, LAB_COMPANY_GUID);
+        assert_ne!(other, company_count_body(Some("9")));
+        for bad in [
+            company_count_body(Some("9,000")),
+            company_count_body(Some("-1")),
+            company_count_body(Some("")),
+            other,
+            company_count_body(Some("9")).replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>"),
+        ] {
+            let plans =
+                census_plans_to_the_count(mark, census_bodies(mark, GUID, &[(24, 0..9)]), bad);
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "a request was sent after the count read");
+            assert_eq!(response["isError"], true, "{response}");
+            assert_eq!(refusal(&response)["cause"], "ledger_count_company_invalid");
+        }
+    }
+
+    /// Whether the check ran is in the result: `matched` when Tally's count equals
+    /// the census's, `company_count_lower` when it is below (the read goes on),
+    /// `unavailable` when the answer carries no count; and nothing at all when no
+    /// census ran.
+    #[tokio::test]
+    async fn the_result_says_whether_the_census_count_was_cross_checked() {
+        let mark = 102_161_u64;
+        for (answer, status) in [
+            (Some("9"), "matched"),
+            (Some("8"), "company_count_lower"),
+            (None, "unavailable"),
+        ] {
+            let plans = census_plans_counted(
+                mark,
+                census_bodies(mark, GUID, &[(24, 0..9)]),
+                company_count_body(answer),
+                extent_with_master_mark(mark),
+                vec![masters(), balances(), groups()],
+                Some(extent_with_master_mark(mark)),
+            );
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "{status}");
+            assert_ne!(response["isError"], true, "{status}: {response}");
+            assert_eq!(
+                response["structuredContent"]["result"]["ledger_count_cross_check"]["status"],
+                status
+            );
+        }
+        // No census (a whole read by the mark alone): no such field.
+        let (unsized_response, _) = call(
+            compliance_plans(masters(), balances()),
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        assert!(
+            unsized_response["structuredContent"]["result"]
+                .get("ledger_count_cross_check")
+                .is_none(),
+            "{unsized_response}"
+        );
+    }
+
+    /// A company closed, reopened or switched during the census answers the
+    /// slices after that moment with the same empty body as a slice past every
+    /// ledger, so the count can be low, and the count sizes the next read. The
+    /// book's extent is read again after the census and before that read is
+    /// admitted (#679): the company switching after the first, a middle or the
+    /// last slice that held ledgers refuses the call, and nothing is sent after
+    /// that extent (the plans end there; a request past them fails the count).
+    /// The refusal comes from the extent alone whatever the slices held; the
+    /// three positions keep a partial count (5, 10 and 15 ledgers against the
+    /// nine master rows) from being read as a match. A company closed and
+    /// reopened with equal marks is not caught by the extent. Tally's own count
+    /// of the ledgers (#938) is meant to catch it (by reasoning, no live
+    /// reproduction), before the extent is read again.
+    #[tokio::test]
+    async fn a_book_that_changes_during_the_census_is_refused_before_the_next_read_is_sized() {
+        let mark = 102_161_u64;
+        // Ledgers up to the slice of the switch, empty answers after it.
+        for switched_after in [0_usize, 12, 24] {
+            let filled: Vec<(usize, std::ops::Range<u32>)> = (0..=switched_after)
+                .step_by(12)
+                .enumerate()
+                .map(|(position, slice)| {
+                    let start = position as u32 * 5;
+                    (slice, start..start + 5)
+                })
+                .collect();
+            let slices = census_bodies(mark, GUID, &filled);
+            // The master mark moved: the book was edited, or another was opened.
+            let plans = census_plans_after(
+                mark,
+                slices.clone(),
+                extent_with_master_mark(mark + 1),
+                Vec::new(),
+                None,
+            );
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(
+                requests, total,
+                "a read was sent after the switch at slice {switched_after}"
+            );
+            assert_eq!(
+                refusal(&response)["cause"],
+                "party_ledger_extent_changed",
+                "switch at slice {switched_after}"
+            );
+            // Another company's extent answers the same request: still nothing more.
+            let other = extent_with_master_mark(mark).replace(GUID, LAB_COMPANY_GUID);
+            assert_ne!(other, extent_with_master_mark(mark));
+            let plans = census_plans_after(mark, slices, other, Vec::new(), None);
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(
+                requests, total,
+                "a read was sent after the company switched at slice {switched_after}"
+            );
+            assert_eq!(response["isError"], true, "{response}");
+        }
+    }
+
+    /// A census that refuses still accounts for every slice it sent, the
+    /// refused one included: two refusals that differ only in the size of the
+    /// last slice differ in evidence bytes by exactly that difference.
+    #[tokio::test]
+    async fn a_refused_census_accounts_the_slices_it_sent() {
+        let wire = |body: &str| 2 + 2 * body.encode_utf16().count() as u64;
+        let mut bytes = Vec::new();
+        let mut sizes = Vec::new();
+        for last in [3..8_u32, 3..9] {
+            let slices = vec![census_slice(GUID, 0..5), census_slice(GUID, last)];
+            sizes.push(slices.iter().map(|body| wire(body)).sum::<u64>());
+            let plans = census_plans(102_161, slices, Vec::new(), None);
+            let (response, _) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(
+                refusal(&response)["cause"],
+                "ledger_span_duplicate_identity"
+            );
+            bytes.push(
+                response["structuredContent"]["evidence"]["bytes"]
+                    .as_u64()
+                    .unwrap(),
+            );
+        }
+        assert_ne!(sizes[0], sizes[1]);
+        assert_eq!(bytes[1] - bytes[0], sizes[1] - sizes[0]);
+        assert!(bytes[0] >= sizes[0], "both slices are accounted");
+    }
+
+    #[tokio::test]
+    async fn a_ledger_seen_twice_within_one_slice_stops_the_census_there() {
+        let twice = census_slice(GUID, 0..3);
+        let second = format!("-{:08x}", 0x2000_0000 + 1);
+        let first = format!("-{:08x}", 0x2000_0000);
+        assert_eq!(twice.matches(&second).count(), 1);
+        let cause = census_stops_at(vec![twice.replace(&second, &first)]).await;
+        assert_eq!(cause, "ledger_span_duplicate_identity");
+    }
+
+    #[tokio::test]
+    async fn a_failed_slice_is_refused_as_malformed_not_counted_as_empty() {
+        let failed = census_empty().replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>");
+        assert_ne!(failed, census_empty());
+        let cause = census_stops_at(vec![failed]).await;
+        assert_eq!(cause, "ledger_span_slice_malformed");
+    }
+
+    #[tokio::test]
+    async fn a_slice_of_another_company_stops_the_census_there() {
+        let other = "00000000-0000-0000-0000-000000000000";
+        let cause = census_stops_at(vec![census_empty(), census_slice(other, 0..3)]).await;
+        assert_eq!(cause, "ledger_span_identity_mismatch");
+    }
+
+    #[tokio::test]
+    async fn a_slice_past_the_response_cap_is_refused_under_its_own_cause() {
+        let mark = 102_161_u64;
+        let mut plans = census_plans(mark, Vec::new(), Vec::new(), None);
+        plans.push(
+            xml(census_empty()).with_framing(ResponseFraming::DeclaredContentLength {
+                bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+            }),
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(
+            requests, total,
+            "a request was sent past the oversized answer"
+        );
+        let error = refusal(&response);
+        assert_eq!(error["cause"], "ledger_span_slice_response_too_large");
+        assert_eq!(
+            error["remediation"],
+            crate::agent::refusal_remediation("ledger_span_slice_response_too_large").unwrap()
+        );
+    }
+
+    /// A count past one read is read in parts, the parents named by the
+    /// catalogue: the census's slices, then the catalogue pair, then the parts,
+    /// and the two counts agree (#679).
+    #[tokio::test]
+    async fn a_census_count_past_one_read_is_read_in_parts_after_the_catalogue() {
+        let mark = 30_000_u64;
+        let rows = split_book();
+        let mut plans = census_plans_checked(
+            mark,
+            census_bodies(mark, GUID, &[(0, 0..4_000), (1, 4_000..4_300)]),
+            vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
+            None,
+        );
+        for source in [
+            part_reads(&under(&rows, &[BIG, NESTED])).0,
+            part_reads(&under(&rows, &[BIG, NESTED])).1,
+            part_reads(&under(&rows, &[OTHER])).0,
+            part_reads(&under(&rows, &[OTHER])).1,
+            groups(),
+            extent_with_master_mark(mark),
+        ] {
+            pair(&mut plans, xml(source));
+        }
+        plans.extend([xml(companies()), status(), xml(companies())]);
+        let total = plans.len();
+        let (response, requests) = call_with_max_bytes(
+            plans,
+            json!({"company_guid":GUID,"fields":"compliance"}),
+            2_000_000,
+        )
+        .await;
+        assert_eq!(requests, total);
+        assert_ne!(response["isError"], true, "{response}");
+        assert_eq!(response["structuredContent"]["result"]["total"], 4_300);
+    }
+
+    /// The census and the catalogue count one book twice; a difference stops
+    /// the read right after the catalogue, before any master is requested.
+    #[tokio::test]
+    async fn a_census_and_a_catalogue_that_count_differently_stop_the_read_after_the_catalogue() {
+        let mark = 30_000_u64;
+        let rows = split_book();
+        let plans = census_plans_checked(
+            mark,
+            census_bodies(mark, GUID, &[(0, 0..4_000), (1, 4_000..4_299)]),
+            vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        assert_eq!(refusal(&response)["cause"], "ledger_count_differs");
+    }
+
+    /// A count whose catalogue would not fit the response limit is refused
+    /// right after the census, before the catalogue is requested.
+    #[tokio::test]
+    async fn a_census_count_whose_catalogue_cannot_fit_is_refused_before_the_catalogue() {
+        let mark = 30_000_u64;
+        // 22,858 ledgers, one more than the catalogue limit admits.
+        let filled = [
+            (0, 0..4_000),
+            (1, 4_000..8_000),
+            (2, 8_000..12_000),
+            (3, 12_000..16_000),
+            (4, 16_000..20_000),
+            (5, 20_000..22_858),
+        ];
+        let plans =
+            census_plans_checked(mark, census_bodies(mark, GUID, &filled), Vec::new(), None);
+        let total = plans.len();
+        let (response, requests) = call_with_max_bytes(
+            plans,
+            json!({"company_guid":GUID,"fields":"compliance"}),
+            20_000_000,
+        )
+        .await;
+        assert_eq!(requests, total, "nothing is sent after the census");
+        assert_eq!(
+            refusal(&response)["cause"],
+            "ledger_count_catalogue_too_large"
         );
     }
 
@@ -1231,6 +2801,153 @@ mod through_the_tool {
         assert_eq!(error["cause"], "company_base_currency_not_inr");
     }
 
+    /// A ledger export refused as a whole names why (#718): Tally's failure
+    /// answer, no answer, a response cut off before its root closed, and one
+    /// whose ledgers belong to another company each carry their own cause
+    /// beside `ledger_export_invalid`. Each is the captured basic export with
+    /// one change made here; before #718 all four carried no cause.
+    #[tokio::test]
+    async fn a_ledger_export_refused_as_a_whole_names_its_cause() {
+        let captured = period_opening();
+        let company_prefix = format!("{GUID}-");
+        assert!(captured.contains(&company_prefix));
+        for (body, cause) in [
+            (
+                captured.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1),
+                "native_collection_not_success",
+            ),
+            (
+                captured.replacen("<STATUS>1</STATUS>", "<STATUS></STATUS>", 1),
+                "native_collection_status_absent",
+            ),
+            (
+                captured.replacen("</ENVELOPE>", "", 1),
+                "native_collection_malformed_response",
+            ),
+            (
+                captured.replace(&company_prefix, "00000000-0000-4000-8000-0000000000aa-"),
+                "native_collection_identity_mismatch",
+            ),
+        ] {
+            assert_ne!(body, captured, "{cause}");
+            let (response, _) = call(
+                basic_plans_reading(body, None),
+                json!({"company_guid":GUID}),
+            )
+            .await;
+            let error = refusal(&response);
+            assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+            assert_eq!(error["cause"], cause, "{response}");
+        }
+    }
+
+    /// A ledger export refused for one row names whose fault it was (#718,
+    /// slice 2): a row repeating a field is `native_collection_row_unusable`, and
+    /// a response that ends inside a row is `native_collection_malformed_response`.
+    /// Each is the captured basic export with one change made here; before
+    /// slice 2 both carried no cause.
+    #[tokio::test]
+    async fn a_ledger_export_refused_for_one_row_names_its_cause() {
+        let captured = period_opening();
+        let parent = r#"<PARENT TYPE="String">Bridge Nested Debtors WR4</PARENT>"#;
+        assert_eq!(captured.matches(parent).count(), 1);
+        let opening = captured.find("<OPENINGBALANCE").expect("a row's opening");
+        for (body, cause) in [
+            (
+                captured.replacen(parent, &format!("{parent}{parent}"), 1),
+                "native_collection_row_unusable",
+            ),
+            (
+                captured[..opening].to_owned(),
+                "native_collection_malformed_response",
+            ),
+        ] {
+            assert_ne!(body, captured, "{cause}");
+            let (response, _) = call(
+                basic_plans_reading(body, None),
+                json!({"company_guid":GUID}),
+            )
+            .await;
+            let error = refusal(&response);
+            assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+            assert_eq!(error["cause"], cause, "{response}");
+        }
+    }
+
+    /// A `ledger_masters` catalogue export that outlives its deadline is sent
+    /// once, as the movement catalogue is (#937): a 2 s deadline, a 5 s stall,
+    /// and a wait past both. A whole second read is held behind the stalled
+    /// export, so a retry would find plans to answer it and `received` would
+    /// count them. Returns the response and how many requests were received.
+    async fn ledger_masters_with_a_stalled_export(
+        args: Value,
+        groups: Option<String>,
+    ) -> (Value, usize) {
+        const EXPORT: usize = 15;
+        let busy = std::time::Duration::from_millis(5_000);
+        let captured = period_opening();
+        let mut plans = basic_plans_reading(captured.clone(), groups.clone());
+        plans[EXPORT] = plans[EXPORT]
+            .clone()
+            .with_delivery(tally_protocol_simulator::Delivery::SlowHeaders(busy));
+        let stalled = EXPORT + 1;
+        plans.truncate(stalled);
+        // Everything after the identity read: what a retried read sends next.
+        plans.extend(basic_plans_reading(captured, groups).into_iter().skip(4));
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let mut server = Server::new(Settings {
+            endpoint: TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().into(),
+            max_rows: 500,
+            max_bytes: 200_000,
+            redaction: Redaction::None,
+            import_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
+        });
+        server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
+            bridge_tally_transport::TransportPolicy {
+                request_timeout: std::time::Duration::from_millis(2_000),
+                ..Default::default()
+            },
+        );
+        let response = server.call_tool("ledger_masters", args).await;
+        // Past the stalled response and any retry that would have queued behind it.
+        tokio::time::sleep(busy + std::time::Duration::from_millis(3_000)).await;
+        let received = simulator.received();
+        simulator.cancel();
+        assert_eq!(
+            received, stalled,
+            "nothing was sent after the export that timed out: {response}"
+        );
+        (response, received)
+    }
+
+    #[tokio::test]
+    async fn a_basic_ledger_masters_catalogue_that_times_out_is_sent_once() {
+        let (response, _) =
+            ledger_masters_with_a_stalled_export(json!({"company_guid":GUID}), None).await;
+        let error = refusal(&response);
+        assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+        assert_eq!(error["cause"], "request_deadline_exceeded", "{response}");
+    }
+
+    #[tokio::test]
+    async fn a_group_filtered_ledger_masters_catalogue_that_times_out_is_sent_once() {
+        let (response, _) = ledger_masters_with_a_stalled_export(
+            json!({"company_guid":GUID, "group":"Sundry Debtors"}),
+            Some(groups()),
+        )
+        .await;
+        let error = refusal(&response);
+        assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+        assert_eq!(error["cause"], "request_deadline_exceeded", "{response}");
+    }
+
     /// As `basic_plans`, with the ledger export given and, when `groups` is
     /// supplied, the paired group collection a `group` filter adds inside the
     /// same extent and identity bracket.
@@ -1332,6 +3049,64 @@ mod through_the_tool {
         }
     }
 
+    /// bridge#1520: the `compliance` object of every row is the bytes it was
+    /// before `gst_details` existed (#1518). The golden is the tool's own rows
+    /// on this capture, produced by the tree at `90bcaa67^`; its provenance
+    /// note gives the command.
+    #[tokio::test]
+    async fn compliance_rows_are_byte_for_byte_the_ones_read_before_gst_details() {
+        let (response, _) = call(
+            compliance_plans(masters(), balances()),
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        let compliance = items(&response)
+            .iter()
+            .map(|row| &row["compliance"])
+            .collect::<Vec<_>>();
+        assert!(!compliance.is_empty());
+        assert!(compliance.iter().all(|value| value.is_object()));
+        let actual = serde_json::to_string(&compliance).unwrap();
+        let golden = include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/ledger_masters_compliance_rows_before_gst_details.json"
+        );
+        let first_difference = actual
+            .bytes()
+            .zip(golden.bytes())
+            .position(|(left, right)| left != right)
+            .unwrap_or(actual.len().min(golden.len()));
+        assert!(
+            actual == golden,
+            "{} rows differ from the golden ({} bytes, golden {}) from byte {first_difference}",
+            compliance.len(),
+            actual.len(),
+            golden.len()
+        );
+    }
+
+    /// bridge#1520: no `fields=compliance` row names `gst_details`, anywhere,
+    /// until a caller asks for the GST details read.
+    #[tokio::test]
+    async fn compliance_rows_carry_no_gst_details_key() {
+        let (response, _) = call(
+            compliance_plans(masters(), balances()),
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        let rows = items(&response);
+        assert!(!rows.is_empty());
+        for row in rows {
+            assert!(
+                !row["compliance"]
+                    .as_object()
+                    .unwrap()
+                    .contains_key("gst_details"),
+                "{row}"
+            );
+        }
+        assert!(!response.to_string().contains("gst_details"));
+    }
+
     /// bridge#653: `as_of` sets the date every row's `party_gstin` is read as
     /// of, in either spelling. Which entry is in force on a date is pinned over
     /// the live registration-history capture by
@@ -1361,7 +3136,7 @@ mod through_the_tool {
             json!({"company_guid":GUID,"as_of":"20260331"}),
             json!({"company_guid":GUID,"fields":"basic","as_of":"20260331"}),
         ] {
-            let (response, requests) = call_refused_before_any_request(args.clone()).await;
+            let (response, requests) = call(Vec::new(), args.clone()).await;
             assert_eq!(requests, 0, "{args}");
             let error = refusal(&response);
             assert_eq!(
@@ -1376,7 +3151,8 @@ mod through_the_tool {
 
     #[tokio::test]
     async fn an_impossible_as_of_date_is_refused_before_any_request() {
-        let (response, requests) = call_refused_before_any_request(
+        let (response, requests) = call(
+            Vec::new(),
             json!({"company_guid":GUID,"fields":"compliance","as_of":"20260231"}),
         )
         .await;
@@ -1437,8 +3213,8 @@ mod through_the_tool {
                 max_bytes: 200_000,
                 redaction: Redaction::None,
                 import_enabled: false,
-                writes_enabled: false,
-                batch_post_enabled: false,
+                posting: Posting::Off,
+                audit_enabled: false,
             });
             Self {
                 simulator,
@@ -1925,42 +3701,18 @@ mod through_the_tool {
         call_with_max_bytes(plans, args, 200_000).await
     }
 
-    /// A call that should be refused before it sends anything. The simulator
-    /// needs at least one plan, so it holds one it serves only if a request is
-    /// sent; the requests Bridge actually sent are counted after a cancel,
-    /// whose wake-up connection carries no method.
-    async fn call_refused_before_any_request(args: Value) -> (Value, usize) {
-        let simulator = SequenceSimulator::spawn(vec![status()]).unwrap();
-        let directory = tempfile::tempdir().unwrap();
-        let server = Server::new(Settings {
-            endpoint: TallyEndpointConfig {
-                host: "127.0.0.1".into(),
-                port: simulator.address().port(),
-            },
-            data_dir: directory.path().into(),
-            max_rows: 500,
-            max_bytes: 200_000,
-            redaction: Redaction::None,
-            import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
-        });
-        let response = server.call_tool("ledger_masters", args).await;
-        simulator.cancel();
-        let requests = simulator
-            .finish()
-            .unwrap()
-            .into_iter()
-            .filter(|request| !request.method.is_empty())
-            .count();
-        (response, requests)
-    }
-
     async fn call_with_max_bytes(
         plans: Vec<ScenarioPlan>,
         args: Value,
         max_bytes: usize,
     ) -> (Value, usize) {
+        // The simulator stops serving when its plans run out, so a request
+        // past them would reach a closed port and never be counted. A last
+        // plan that is served only if such a request is sent lets the count
+        // go over `plans.len()`; the cancel's wake-up connection carries no
+        // method and is not counted.
+        let mut plans = plans;
+        plans.push(status());
         let simulator = SequenceSimulator::spawn(plans).unwrap();
         let directory = tempfile::tempdir().unwrap();
         let server = Server::new(Settings {
@@ -1973,11 +3725,17 @@ mod through_the_tool {
             max_bytes,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         });
         let response = server.call_tool("ledger_masters", args).await;
-        let requests = simulator.finish().unwrap().len();
+        simulator.cancel();
+        let requests = simulator
+            .finish()
+            .unwrap()
+            .into_iter()
+            .filter(|request| !request.method.is_empty())
+            .count();
         (response, requests)
     }
 
@@ -2586,8 +4344,8 @@ mod through_the_tool {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         });
         let (client, source) = tokio::io::duplex(1 << 20);
         let (client_read, mut client_write) = tokio::io::split(client);
@@ -2767,8 +4525,8 @@ mod through_the_tool {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         });
         let frames = format!(
             "{}\n{}\n",
@@ -2880,5 +4638,968 @@ mod through_the_tool {
         .await;
         assert_eq!(response["result"]["isError"], false, "{response}");
         assert_eq!(requests, basic_plans().len());
+    }
+
+    // -- include_gst_details: the opt-in dated GST rate details ---------------
+
+    /// The GST details read, through the tool's own path. The request on the
+    /// wire is what each test pins, by the hash the simulator keeps of every
+    /// request body; the answers are the real capture or the harness's own
+    /// generated books.
+    mod gst_details {
+        use super::*;
+        use crate::tally::connection::{
+            compliance_master_ledgers_per_read, parent_partition_limits, ComplianceRead,
+        };
+        use bridge_tally_protocol::native_outstandings::{
+            render_party_ledger_master_request_for_parents,
+            render_party_ledger_master_request_for_parents_with_gst_details,
+            render_party_ledger_master_request_with_gst_details,
+        };
+        use bridge_tally_protocol::parent_partition::{
+            ParentObservation, ParentPart, ParentPartition,
+        };
+        use tally_protocol_simulator::ObservedRequest;
+
+        /// The company the shared harness answers for.
+        const HARNESS_COMPANY: &str = "WR2 Unicode Lab";
+        /// The capture's own company GUID, which the harness company's
+        /// replaces so that the real bytes are served as its answer.
+        const CAPTURE_COMPANY_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+
+        fn capture() -> String {
+            captured(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/ledger_gst_details_live.utf16le.xml"
+            ))
+        }
+
+        /// The capture as the harness company's master answer: its company
+        /// GUID, in every ledger's GUID and `BRIDGECOMPANYGUID`, is the only
+        /// thing changed.
+        fn capture_for_the_harness_company() -> String {
+            let capture = capture();
+            assert_eq!(capture.matches(CAPTURE_COMPANY_GUID).count(), 28);
+            capture.replace(CAPTURE_COMPANY_GUID, GUID)
+        }
+
+        /// Each ledger of the capture: its (escaped) name and parent text.
+        fn capture_ledgers(capture: &str) -> Vec<(String, String)> {
+            capture
+                .split("<LEDGER NAME=\"")
+                .skip(1)
+                .map(|block| {
+                    let name = block[..block.find('"').unwrap()].to_owned();
+                    let from = block.find("<PARENT TYPE=\"String\">").unwrap()
+                        + "<PARENT TYPE=\"String\">".len();
+                    let parent =
+                        block[from..from + block[from..].find("</PARENT>").unwrap()].to_owned();
+                    (name, parent)
+                })
+                .collect()
+        }
+
+        /// The ledger names whose `GSTDETAILS.LIST` holds a dated entry,
+        /// counted from the bytes.
+        fn ledgers_with_entries(capture: &str) -> Vec<String> {
+            capture
+                .split("<LEDGER NAME=\"")
+                .skip(1)
+                .filter(|block| {
+                    block
+                        .split("<GSTDETAILS.LIST>")
+                        .skip(1)
+                        .any(|list| list.trim_start().starts_with("<APPLICABLEFROM"))
+                })
+                .map(|block| block[..block.find('"').unwrap()].replace("&amp;", "&"))
+                .collect()
+        }
+
+        /// A balance snapshot for the capture's ledgers: the harness's real
+        /// balance row, once per ledger, at the capture's own zero opening.
+        fn balances_for(ledgers: &[(String, String)]) -> String {
+            const MARK: &str = "</LEDGER>";
+            let source = balances();
+            let first = source.find("    <LEDGER ").unwrap();
+            let first_end = first + source[first..].find(MARK).unwrap() + MARK.len();
+            let last_end = source.rfind(MARK).unwrap() + MARK.len();
+            let template = source[first..first_end].trim_start();
+            let mut out = source[..first].to_owned();
+            for (position, (name, parent)) in ledgers.iter().enumerate() {
+                if position > 0 {
+                    out.push_str("\n    ");
+                }
+                out.push_str(
+                    &template
+                        .replace("Bridge Nested Debtors WR4", parent)
+                        .replace("Bridge Nested Debtor WR4", name)
+                        .replace("-50000.00", "0.00"),
+                );
+            }
+            out.push_str(&source[last_end..]);
+            out
+        }
+
+        fn capture_plans() -> Vec<ScenarioPlan> {
+            let master = capture_for_the_harness_company();
+            let balances = balances_for(&capture_ledgers(&master));
+            compliance_plans(master, balances)
+        }
+
+        /// What the production code asks Tally for the harness company: the
+        /// period is the captured extent's books-from and last voucher date.
+        fn harness_period() -> bridge_tally_protocol::native_outstandings::NativeLedgerExportPeriod
+        {
+            NativeLedgerExportPeriod::new(
+                DateBoundaryProfile::ModeAgnostic,
+                TallyDate::parse("20260401").unwrap(),
+                TallyDate::parse("20260907").unwrap(),
+            )
+            .unwrap()
+        }
+
+        fn wire_sha(request: &str) -> String {
+            sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
+                request,
+            ))
+        }
+
+        /// How many of the requests sent were exactly `request`.
+        fn sent(observed: &[ObservedRequest], request: &str) -> usize {
+            let sha = wire_sha(request);
+            observed
+                .iter()
+                .filter(|observed| observed.request_body_sha256 == sha)
+                .count()
+        }
+
+        /// How many of the requests sent were a master read, of any variant:
+        /// the production request or its details variant, whole or by parents.
+        fn master_reads_sent(observed: &[ObservedRequest], parts: &[ParentPart]) -> usize {
+            let period = harness_period();
+            let mut requests = vec![
+                render_party_ledger_master_request(HARNESS_COMPANY, &period),
+                render_party_ledger_master_request_with_gst_details(HARNESS_COMPANY, &period),
+            ];
+            for part in parts {
+                requests.push(render_party_ledger_master_request_for_parents(
+                    HARNESS_COMPANY,
+                    &period,
+                    part,
+                ));
+                requests.push(
+                    render_party_ledger_master_request_for_parents_with_gst_details(
+                        HARNESS_COMPANY,
+                        &period,
+                        part,
+                    ),
+                );
+            }
+            requests.iter().map(|request| sent(observed, request)).sum()
+        }
+
+        async fn call_observed(
+            plans: Vec<ScenarioPlan>,
+            args: Value,
+            redaction: Redaction,
+            max_bytes: usize,
+        ) -> (Value, Vec<ObservedRequest>) {
+            // A last plan served only if a request is sent past the others.
+            let mut plans = plans;
+            plans.push(status());
+            let simulator = SequenceSimulator::spawn(plans).unwrap();
+            let directory = tempfile::tempdir().unwrap();
+            let server = Server::new(Settings {
+                endpoint: TallyEndpointConfig {
+                    host: "127.0.0.1".into(),
+                    port: simulator.address().port(),
+                },
+                data_dir: directory.path().into(),
+                max_rows: 500,
+                max_bytes,
+                redaction,
+                import_enabled: false,
+                posting: crate::agent::Posting::Off,
+                audit_enabled: false,
+            });
+            let response = server.call_tool("ledger_masters", args).await;
+            simulator.cancel();
+            let observed = simulator
+                .finish()
+                .unwrap()
+                .into_iter()
+                .filter(|request| !request.method.is_empty())
+                .collect();
+            (response, observed)
+        }
+
+        fn compliance_args(flag: Option<bool>) -> Value {
+            match flag {
+                None => json!({"company_guid":GUID,"fields":"compliance"}),
+                Some(flag) => {
+                    json!({"company_guid":GUID,"fields":"compliance","include_gst_details":flag})
+                }
+            }
+        }
+
+        /// Without the flag (absent or false) the master read is the
+        /// production request, byte for byte, and no row carries a
+        /// `gst_details` key, not even a null one.
+        #[tokio::test]
+        async fn without_the_flag_the_request_is_the_production_one_and_no_row_carries_gst_details()
+        {
+            for flag in [None, Some(false)] {
+                let plans = compliance_plans(masters(), balances());
+                let total = plans.len();
+                let (response, observed) =
+                    call_observed(plans, compliance_args(flag), Redaction::None, 200_000).await;
+                assert_eq!(observed.len(), total, "{flag:?}");
+                let period = harness_period();
+                assert_eq!(
+                    sent(
+                        &observed,
+                        &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                    ),
+                    2,
+                    "the production compliance request, read as a pair: {flag:?}"
+                );
+                assert_eq!(
+                    sent(
+                        &observed,
+                        &render_party_ledger_master_request_with_gst_details(
+                            HARNESS_COMPANY,
+                            &period
+                        )
+                    ),
+                    0,
+                    "{flag:?}"
+                );
+                for row in items(&response) {
+                    let compliance = row["compliance"].as_object().unwrap();
+                    assert!(!compliance.contains_key("gst_details"), "{flag:?}: {row}");
+                    assert!(row.get("gst_details").is_none(), "{flag:?}: {row}");
+                    // The registration history is untouched beside it.
+                    assert!(compliance.contains_key("gst_registrations"), "{row}");
+                }
+                assert!(
+                    response["structuredContent"]["result"]
+                        .get("limitations")
+                        .is_none(),
+                    "{flag:?}: {response}"
+                );
+            }
+        }
+
+        /// With the flag, the request sent is the production one with the
+        /// pinned FETCH suffix, and the answer is the live capture: the five
+        /// ledgers that carry entries show them, the nine that carry an empty
+        /// placeholder show an empty list, and the Cess rows are `absent`.
+        #[tokio::test]
+        async fn with_the_flag_the_extended_request_is_sent_and_the_captured_rates_are_returned() {
+            let capture = capture();
+            let with_entries = ledgers_with_entries(&capture);
+            assert_eq!(with_entries.len(), 5, "counted from the capture's bytes");
+            let ledgers = capture_ledgers(&capture);
+            assert_eq!(ledgers.len(), 14);
+
+            let plans = capture_plans();
+            let total = plans.len();
+            let (response, observed) =
+                call_observed(plans, compliance_args(Some(true)), Redaction::None, 200_000).await;
+            assert_eq!(observed.len(), total);
+            let period = harness_period();
+            assert_eq!(
+                sent(
+                    &observed,
+                    &render_party_ledger_master_request_with_gst_details(HARNESS_COMPANY, &period)
+                ),
+                2,
+                "the extended compliance request, read as a pair"
+            );
+            assert_eq!(
+                sent(
+                    &observed,
+                    &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                ),
+                0,
+                "the production request is not also sent"
+            );
+
+            let rows = items(&response);
+            assert_eq!(rows.len(), 14);
+            let mut with_rows = Vec::new();
+            for row in rows {
+                let details = &row["compliance"]["gst_details"];
+                assert_eq!(details["observation"], "entries", "{row}");
+                let entries = details["entries"].as_array().unwrap();
+                if !entries.is_empty() {
+                    with_rows.push(row["name"].as_str().unwrap().to_owned());
+                }
+                for entry in entries {
+                    assert_eq!(entry["applicable_from"], "20260401");
+                    assert_eq!(entry["other_content_skipped"], false);
+                    // Tally's GSTINELIGIBLEITC goes out under the name of its element (#1741),
+                    // and never under the earlier eligibility key.
+                    assert!(entry.get("itc_eligible").is_none(), "{entry}");
+                    assert!(
+                        entry.as_object().unwrap().contains_key("ineligible_itc"),
+                        "{entry}"
+                    );
+                    for state in entry["states"].as_array().unwrap() {
+                        assert_eq!(
+                            state["state_name"],
+                            format!("{} Any", bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER),
+                            "the reserved state value keeps its marker"
+                        );
+                        assert_eq!(state["slab_rates_present"], false);
+                        let rates = state["rates"].as_array().unwrap();
+                        assert_eq!(rates.len(), 5);
+                        for rate in rates {
+                            if rate["duty_head"] == "Cess" {
+                                assert_eq!(rate["rate"], json!({"kind":"absent"}), "{rate}");
+                            }
+                        }
+                    }
+                }
+            }
+            with_rows.sort();
+            let mut expected = with_entries;
+            expected.sort();
+            assert_eq!(with_rows, expected);
+            // The captured values, as sent: Yes on the Goods ledger's entry, no element on the
+            // Purchase ledger's (null, never defaulted).
+            let flag = |name: &str| {
+                row(rows, name)["compliance"]["gst_details"]["entries"][0]["ineligible_itc"].clone()
+            };
+            assert_eq!(flag("BRIDGE Goods 18%"), json!(true));
+            assert_eq!(flag("BRIDGE Purchase Svc 5%"), Value::Null);
+
+            let rates_of = |name: &str, head: &str| -> Value {
+                let rates = &row(rows, name)["compliance"]["gst_details"]["entries"][0]["states"]
+                    [0]["rates"];
+                rates
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|rate| rate["duty_head"] == head)
+                    .unwrap_or_else(|| panic!("{head} missing from {rates}"))["rate"]
+                    .clone()
+            };
+            // Raw rates keep their leading spaces; a missing GSTRATE is absent.
+            assert_eq!(
+                rates_of("BRIDGE Purchase Svc 5%", "CGST"),
+                json!({"kind":"value","raw":" 2.50","decimal":"2.50"})
+            );
+            assert_eq!(
+                rates_of("BRIDGE Goods 18%", "IGST"),
+                json!({"kind":"value","raw":" 18","decimal":"18"})
+            );
+            assert_eq!(
+                rates_of("BRIDGE CGST 2.5%", "CGST"),
+                json!({"kind":"absent"}),
+                "this ledger's entry carries no rate at all"
+            );
+            // The limitations ship with the rows.
+            let limitations = response["structuredContent"]["result"]["limitations"]
+                .as_array()
+                .unwrap_or_else(|| panic!("no limitations: {response}"))
+                .iter()
+                .map(|line| line.as_str().unwrap())
+                .collect::<Vec<_>>()
+                .join(" ");
+            for words in [
+                "never merged",
+                "HSN/SAC and type of supply are not returned",
+                "place of supply is in the registration history",
+                "slab rates are only flagged",
+                "Do not read true as eligible",
+                "says nothing either way",
+                "14-ledger lab book of TallyPrime 7.1 Silver",
+                "not yet run through this tool on a live Tally",
+                "admitted at 8,000 bytes a ledger instead of 3,750",
+                "not a measured ratio",
+            ] {
+                assert!(limitations.contains(words), "{words}: {limitations}");
+            }
+        }
+
+        /// A rate `absent` in the response is `absent` in the output, and a
+        /// rate that is zero is `zero`: the output keeps the parser's four
+        /// states apart.
+        #[tokio::test]
+        async fn an_absent_rate_is_not_rendered_as_zero() {
+            let capture = capture_for_the_harness_company();
+            // The real bytes with one GSTRATE edited: ` 9` on the Goods
+            // ledger's CGST row becomes `0.00`.
+            let from = "<GSTRATE TYPE=\"Number\"> 9</GSTRATE>";
+            assert!(capture.matches(from).count() >= 1);
+            let edited = capture.replacen(from, "<GSTRATE TYPE=\"Number\">0.00</GSTRATE>", 1);
+            let balances = balances_for(&capture_ledgers(&edited));
+            let (response, _) = call_observed(
+                compliance_plans(edited, balances),
+                compliance_args(Some(true)),
+                Redaction::None,
+                200_000,
+            )
+            .await;
+            let rows = items(&response);
+            let rate = |name: &str, head: &str| -> Value {
+                row(rows, name)["compliance"]["gst_details"]["entries"][0]["states"][0]["rates"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|rate| rate["duty_head"] == head)
+                    .unwrap()["rate"]
+                    .clone()
+            };
+            assert_eq!(rate("BRIDGE Goods 18%", "CGST"), json!({"kind":"zero"}));
+            assert_eq!(rate("BRIDGE Goods 18%", "Cess"), json!({"kind":"absent"}));
+            assert_eq!(
+                rate("BRIDGE Goods 18%", "SGST/UTGST"),
+                json!({"kind":"value","raw":" 9","decimal":"9"})
+            );
+        }
+
+        /// The flag is for fields=compliance only. Any other `fields` (the
+        /// default included) refuses it before any request, with the code and
+        /// a remediation that names the fix.
+        #[tokio::test]
+        async fn the_flag_with_basic_fields_is_refused_before_any_request() {
+            for args in [
+                json!({"company_guid":GUID,"include_gst_details":true}),
+                json!({"company_guid":GUID,"fields":"basic","include_gst_details":true}),
+            ] {
+                let (response, requests) = call(Vec::new(), args.clone()).await;
+                assert_eq!(requests, 0, "{args}");
+                let error = refusal(&response);
+                assert_eq!(
+                    error["code"], "ledger_masters_gst_details_requires_compliance",
+                    "{args}"
+                );
+                assert!(error["remediation"]
+                    .as_str()
+                    .is_some_and(|text| text.contains("fields=compliance")));
+            }
+            // False is not a request for the details, so basic accepts it.
+            let (response, _) = call(
+                basic_plans(),
+                json!({"company_guid":GUID,"fields":"basic","include_gst_details":false}),
+            )
+            .await;
+            assert!(!items(&response).is_empty());
+        }
+
+        /// Only a JSON boolean is a flag.
+        #[tokio::test]
+        async fn a_flag_that_is_not_a_boolean_is_refused_before_any_request() {
+            for flag in [
+                json!("true"),
+                json!("false"),
+                json!(1),
+                json!(0),
+                json!(null),
+                json!([]),
+                json!({}),
+            ] {
+                for fields in ["compliance", "basic"] {
+                    let args =
+                        json!({"company_guid":GUID,"fields":fields,"include_gst_details":flag});
+                    let (response, requests) = call(Vec::new(), args.clone()).await;
+                    assert_eq!(requests, 0, "{args}");
+                    assert_eq!(
+                        refusal(&response)["code"],
+                        "argument_invalid:include_gst_details",
+                        "{args}"
+                    );
+                }
+            }
+        }
+
+        /// The flag changes what is asked, so it changes what the call's
+        /// evidence commits to: the same book read with and without it
+        /// commits to different request sets.
+        #[tokio::test]
+        async fn the_request_commitment_differs_between_the_two_modes() {
+            let evidence = |flag: bool| {
+                let args = compliance_args(Some(flag));
+                async move {
+                    let (response, _) = call_observed(
+                        compliance_plans(masters(), balances()),
+                        args,
+                        Redaction::None,
+                        200_000,
+                    )
+                    .await;
+                    assert_ne!(response["isError"], true, "{response}");
+                    response["structuredContent"]["evidence"]["request_sha256"]
+                        .as_str()
+                        .unwrap()
+                        .to_owned()
+                }
+            };
+            let without = evidence(false).await;
+            let with = evidence(true).await;
+            assert_eq!(without, evidence(false).await, "the commitment is stable");
+            assert_eq!(with, evidence(true).await, "the commitment is stable");
+            assert_ne!(without, with);
+        }
+
+        /// A listing held for one mode is not served to a page asking for the
+        /// other: the rows differ in whether they carry the details.
+        #[tokio::test]
+        async fn a_snapshot_of_one_mode_is_not_served_to_a_page_of_the_other() {
+            let mut plans = compliance_plans(masters(), balances());
+            plans.extend(continuation_plans(extent_with_master_mark(219)));
+            plans.extend(
+                compliance_plans(masters(), balances())
+                    .into_iter()
+                    .skip(identity_plans().len()),
+            );
+            let total = plans.len();
+            let one = OneServer::spawn(plans);
+            let first = one
+                .call(json!({"company_guid":GUID,"fields":"compliance","include_gst_details":true,"limit":1}))
+                .await;
+            assert!(items(&first)[0]["compliance"]["gst_details"].is_object());
+            let id = snapshot_id(&first);
+            let other = one
+                .call(json!({"company_guid":GUID,"fields":"compliance","offset":1,"limit":1}))
+                .await;
+            assert_eq!(snapshot_of(&other)["reused"], false);
+            assert_ne!(snapshot_of(&other)["id"], id.as_str());
+            for row in items(&other) {
+                assert!(row["compliance"].get("gst_details").is_none(), "{row}");
+            }
+            assert_eq!(one.requests(), total);
+        }
+
+        /// The other direction: a listing held for a read without the flag is
+        /// not served to a later page that asks for the details, which reads
+        /// afresh and carries `gst_details` and the limitations.
+        #[tokio::test]
+        async fn a_snapshot_without_the_details_is_not_served_to_a_page_that_asks_for_them() {
+            let mut plans = compliance_plans(masters(), balances());
+            plans.extend(continuation_plans(extent_with_master_mark(219)));
+            plans.extend(
+                compliance_plans(masters(), balances())
+                    .into_iter()
+                    .skip(identity_plans().len()),
+            );
+            let total = plans.len();
+            let one = OneServer::spawn(plans);
+            let first = one
+                .call(json!({"company_guid":GUID,"fields":"compliance","limit":1}))
+                .await;
+            assert!(!items(&first).is_empty());
+            for row in items(&first) {
+                assert!(row["compliance"].get("gst_details").is_none(), "{row}");
+            }
+            let id = snapshot_id(&first);
+            let other = one
+                .call(json!({"company_guid":GUID,"fields":"compliance","include_gst_details":true,"offset":1,"limit":1}))
+                .await;
+            assert_eq!(snapshot_of(&other)["reused"], false);
+            assert_ne!(snapshot_of(&other)["id"], id.as_str());
+            assert!(!items(&other).is_empty());
+            for row in items(&other) {
+                assert!(row["compliance"]["gst_details"].is_object(), "{row}");
+            }
+            assert!(
+                other["structuredContent"]["result"]["limitations"].is_array(),
+                "{other}"
+            );
+            assert_eq!(one.requests(), total);
+        }
+
+        /// A second page of the same mode, naming its snapshot, is served from
+        /// the held read, and its rows carry `gst_details` and the result
+        /// carries the limitations, as the first page's do.
+        #[tokio::test]
+        async fn a_second_page_of_the_same_details_mode_is_served_from_the_held_listing() {
+            let mut plans = compliance_plans(masters(), balances());
+            plans.extend(continuation_plans(extent_with_master_mark(219)));
+            let total = plans.len();
+            let one = OneServer::spawn(plans);
+            let args = |offset: usize, snapshot: Option<&str>| {
+                let mut args = json!({"company_guid":GUID,"fields":"compliance","include_gst_details":true,"offset":offset,"limit":1});
+                if let Some(snapshot) = snapshot {
+                    args["snapshot_id"] = json!(snapshot);
+                }
+                args
+            };
+            let first = one.call(args(0, None)).await;
+            let id = snapshot_id(&first);
+            assert_eq!(snapshot_of(&first)["reused"], false);
+            let second = one.call(args(1, Some(&id))).await;
+            assert_eq!(snapshot_of(&second)["reused"], true);
+            assert_eq!(snapshot_of(&second)["id"], id.as_str());
+            for page in [&first, &second] {
+                assert!(!items(page).is_empty());
+                for row in items(page) {
+                    assert!(row["compliance"]["gst_details"].is_object(), "{row}");
+                }
+                let limitations = page["structuredContent"]["result"]["limitations"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("no limitations: {page}"));
+                assert_eq!(limitations.len(), 6, "{page}");
+            }
+            assert_ne!(items(&first)[0]["name"], items(&second)[0]["name"]);
+            assert_eq!(one.requests(), total, "the second page reads no ledger");
+        }
+
+        /// A masking redaction marks the ledger names, and nothing else in the
+        /// details changes: they hold rates, dates, heads and a state name, no
+        /// party text, so `mask_parties` leaves them exactly as they are.
+        #[tokio::test]
+        async fn masking_parties_leaves_the_gst_details_as_they_are() {
+            let read = |redaction| async move {
+                call_observed(
+                    capture_plans(),
+                    compliance_args(Some(true)),
+                    redaction,
+                    200_000,
+                )
+                .await
+                .0
+            };
+            let plain = read(Redaction::None).await;
+            let masked = read(Redaction::MaskParties).await;
+            let plain_rows = items(&plain);
+            let masked_rows = items(&masked);
+            assert_eq!(plain_rows.len(), masked_rows.len());
+            let mut ledger_names_masked = 0;
+            for (plain, masked) in plain_rows.iter().zip(masked_rows) {
+                if plain["name"] != masked["name"] {
+                    ledger_names_masked += 1;
+                }
+                assert!(plain["compliance"]["gst_details"].is_object(), "{plain}");
+                assert_eq!(
+                    plain["compliance"]["gst_details"], masked["compliance"]["gst_details"],
+                    "{plain}"
+                );
+            }
+            assert!(ledger_names_masked > 0, "the control: names are masked");
+        }
+
+        // -- admission: the details read is sized by its own estimate --------
+
+        const BIG: &str = "Sundry Debtors";
+        const OTHER: &str = "Sundry Creditors";
+
+        /// A master mark that every count here is taken under: past what one
+        /// standard read admits by the mark, within what the catalogue counts.
+        const MARK: u64 = 6_000;
+
+        /// `count` ledgers under two parents, `BIG` first. `BIG` holds the
+        /// larger share, so a part packed largest-first never joins them when
+        /// together they exceed a part.
+        fn book(count: u64) -> Vec<Generated> {
+            let big = count / 2 + 1;
+            generated(&[(BIG, big as usize), (OTHER, (count - big) as usize)])
+        }
+
+        /// The parts the details read plans for `rows`, under the limits the
+        /// production read uses for it.
+        fn planned_parts(rows: &[Generated]) -> Vec<ParentPart> {
+            let guids = rows
+                .iter()
+                .map(|row| format!("guid-{}", row.index))
+                .collect::<Vec<_>>();
+            ParentPartition::plan(
+                rows.iter().zip(&guids).map(|(row, guid)| {
+                    (
+                        row.name.as_str(),
+                        guid.as_str(),
+                        ParentObservation::Named(row.parent),
+                    )
+                }),
+                parent_partition_limits(ComplianceRead::WithGstDetails),
+            )
+            .unwrap()
+            .parts()
+            .to_vec()
+        }
+
+        fn whole_read_plans(rows: &[Generated]) -> Vec<ScenarioPlan> {
+            let all = rows.iter().collect::<Vec<_>>();
+            marked_compliance_plans(
+                MARK,
+                vec![
+                    generated_catalogue(&all),
+                    generated_masters(&all),
+                    generated_balances(&all),
+                    groups(),
+                ],
+                Some(extent_with_master_mark(MARK)),
+            )
+        }
+
+        fn parts_read_plans(rows: &[Generated], parents_per_part: &[&[&str]]) -> Vec<ScenarioPlan> {
+            let all = rows.iter().collect::<Vec<_>>();
+            let mut reads = vec![generated_catalogue(&all)];
+            for parents in parents_per_part {
+                let part = under(rows, parents);
+                reads.push(generated_masters(&part));
+                reads.push(generated_balances(&part));
+            }
+            reads.push(groups());
+            marked_compliance_plans(MARK, reads, Some(extent_with_master_mark(MARK)))
+        }
+
+        /// The books below sit between the two limits: they fit one standard
+        /// read and not one details read, and their mark is past both so that
+        /// either read counts the book first.
+        #[test]
+        fn the_books_chosen_for_the_boundary_tests_sit_between_the_two_limits() {
+            let standard = compliance_master_ledgers_per_read(ComplianceRead::Standard);
+            let with = compliance_master_ledgers_per_read(ComplianceRead::WithGstDetails);
+            assert!(with < standard);
+            assert!(std::hint::black_box(MARK) > standard);
+        }
+
+        /// A book one ledger over what a details read holds is one whole read
+        /// without the flag and a read in parts with it, each part requested
+        /// with the details; a book of exactly what it holds is one whole
+        /// details read.
+        #[tokio::test]
+        async fn a_book_that_fits_a_standard_read_but_not_a_details_read_is_read_in_parts_with_the_flag(
+        ) {
+            let with = compliance_master_ledgers_per_read(ComplianceRead::WithGstDetails);
+            let period = harness_period();
+
+            // Without the flag: one whole standard read.
+            let rows = book(with + 1);
+            let plans = whole_read_plans(&rows);
+            let total = plans.len();
+            let (response, observed) =
+                call_observed(plans, compliance_args(None), Redaction::None, 2_000_000).await;
+            assert_ne!(response["isError"], true, "{response}");
+            assert_eq!(observed.len(), total);
+            assert_eq!(response["structuredContent"]["result"]["total"], with + 1);
+            assert_eq!(
+                sent(
+                    &observed,
+                    &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                ),
+                2
+            );
+
+            // With the flag: parts, each by its parents, each with the details.
+            let parts = planned_parts(&rows);
+            assert_eq!(parts.len(), 2, "the book does not fit one details read");
+            let plans = parts_read_plans(&rows, &[&[BIG], &[OTHER]]);
+            let total = plans.len();
+            let (response, observed) = call_observed(
+                plans,
+                compliance_args(Some(true)),
+                Redaction::None,
+                2_000_000,
+            )
+            .await;
+            assert_ne!(response["isError"], true, "{response}");
+            assert_eq!(observed.len(), total, "{response}");
+            assert_eq!(response["structuredContent"]["result"]["total"], with + 1);
+            for part in &parts {
+                assert_eq!(
+                    sent(
+                        &observed,
+                        &render_party_ledger_master_request_for_parents_with_gst_details(
+                            HARNESS_COMPANY,
+                            &period,
+                            part
+                        )
+                    ),
+                    2,
+                    "each part is requested with the details, as a pair"
+                );
+                assert_eq!(
+                    sent(
+                        &observed,
+                        &render_party_ledger_master_request_for_parents(
+                            HARNESS_COMPANY,
+                            &period,
+                            part
+                        )
+                    ),
+                    0,
+                    "no part is requested without them"
+                );
+            }
+            assert_eq!(
+                master_reads_sent(&observed, &parts),
+                2 * parts.len(),
+                "no other master read was sent"
+            );
+
+            // Exactly what a details read holds: one whole details read.
+            let rows = book(with);
+            let plans = whole_read_plans(&rows);
+            let total = plans.len();
+            let (response, observed) = call_observed(
+                plans,
+                compliance_args(Some(true)),
+                Redaction::None,
+                2_000_000,
+            )
+            .await;
+            assert_ne!(response["isError"], true, "{response}");
+            assert_eq!(observed.len(), total);
+            assert_eq!(response["structuredContent"]["result"]["total"], with);
+            assert_eq!(
+                sent(
+                    &observed,
+                    &render_party_ledger_master_request_with_gst_details(HARNESS_COMPANY, &period)
+                ),
+                2
+            );
+            assert_eq!(master_reads_sent(&observed, &[]), 2);
+        }
+
+        /// A mark one standard read holds and a details read does not is
+        /// counted first when the details are asked for (the catalogue pair is
+        /// sent), and admitted by the mark alone when they are not.
+        #[tokio::test]
+        async fn a_mark_that_a_standard_read_admits_is_counted_first_when_the_details_are_asked_for(
+        ) {
+            let with = compliance_master_ledgers_per_read(ComplianceRead::WithGstDetails);
+            let mark = with + 1;
+            let rows = generated(&[(BIG, 10)]);
+            let all = rows.iter().collect::<Vec<_>>();
+            let period = harness_period();
+
+            let plans = marked_compliance_plans(
+                mark,
+                vec![generated_masters(&all), generated_balances(&all), groups()],
+                Some(extent_with_master_mark(mark)),
+            );
+            let total = plans.len();
+            let (response, observed) =
+                call_observed(plans, compliance_args(None), Redaction::None, 200_000).await;
+            assert_ne!(response["isError"], true, "{response}");
+            assert_eq!(observed.len(), total, "no catalogue is read");
+
+            let plans = marked_compliance_plans(
+                mark,
+                vec![
+                    generated_catalogue(&all),
+                    generated_masters(&all),
+                    generated_balances(&all),
+                    groups(),
+                ],
+                Some(extent_with_master_mark(mark)),
+            );
+            let total = plans.len();
+            let (response, observed) =
+                call_observed(plans, compliance_args(Some(true)), Redaction::None, 200_000).await;
+            assert_ne!(response["isError"], true, "{response}");
+            assert_eq!(observed.len(), total, "the catalogue pair is read first");
+            assert_eq!(
+                sent(
+                    &observed,
+                    &render_party_ledger_master_request_with_gst_details(HARNESS_COMPANY, &period)
+                ),
+                2
+            );
+        }
+
+        /// A count taken by AlterID span is sized by the read kind too: the
+        /// same census count is one whole read without the flag and parts with
+        /// it, after the catalogue that names the parents.
+        #[tokio::test]
+        async fn a_census_count_that_a_standard_read_holds_is_read_in_parts_when_the_details_are_asked_for(
+        ) {
+            let with = compliance_master_ledgers_per_read(ComplianceRead::WithGstDetails);
+            let mark = 30_000_u64;
+            let count = (with + 1) as u32;
+            let rows = book(u64::from(count));
+            let all = rows.iter().collect::<Vec<_>>();
+            let period = harness_period();
+
+            let plans = census_plans_checked(
+                mark,
+                census_bodies(mark, GUID, &[(0, 0..count)]),
+                vec![generated_masters(&all), generated_balances(&all), groups()],
+                Some(extent_with_master_mark(mark)),
+            );
+            let total = plans.len();
+            let (response, observed) =
+                call_observed(plans, compliance_args(None), Redaction::None, 2_000_000).await;
+            assert_ne!(response["isError"], true, "{response}");
+            assert_eq!(
+                observed.len(),
+                total,
+                "one whole standard read, no catalogue"
+            );
+
+            let mut plans = census_plans_checked(
+                mark,
+                census_bodies(mark, GUID, &[(0, 0..count)]),
+                vec![generated_catalogue(&all)],
+                None,
+            );
+            for parents in [[BIG], [OTHER]] {
+                let part = under(&rows, &parents);
+                pair(&mut plans, xml(generated_masters(&part)));
+                pair(&mut plans, xml(generated_balances(&part)));
+            }
+            pair(&mut plans, xml(groups()));
+            pair(&mut plans, xml(extent_with_master_mark(mark)));
+            plans.extend([xml(companies()), status(), xml(companies())]);
+            let total = plans.len();
+            let (response, observed) = call_observed(
+                plans,
+                compliance_args(Some(true)),
+                Redaction::None,
+                2_000_000,
+            )
+            .await;
+            assert_ne!(response["isError"], true, "{response}");
+            assert_eq!(observed.len(), total);
+            let parts = planned_parts(&rows);
+            assert_eq!(parts.len(), 2);
+            for part in &parts {
+                assert_eq!(
+                    sent(
+                        &observed,
+                        &render_party_ledger_master_request_for_parents_with_gst_details(
+                            HARNESS_COMPANY,
+                            &period,
+                            part
+                        )
+                    ),
+                    2
+                );
+            }
+        }
+
+        /// A parent holding more ledgers than a details part holds cannot be
+        /// split, so it is refused as the existing over-budget refusal, before
+        /// any master request. The same parent is read whole without the flag.
+        #[tokio::test]
+        async fn a_parent_too_large_for_a_details_part_is_refused_not_truncated() {
+            let with = compliance_master_ledgers_per_read(ComplianceRead::WithGstDetails);
+            let rows = generated(&[(BIG, (with + 1) as usize)]);
+            let all = rows.iter().collect::<Vec<_>>();
+            let plans = marked_compliance_plans(MARK, vec![generated_catalogue(&all)], None);
+            let total = plans.len();
+            let (response, observed) = call_observed(
+                plans,
+                compliance_args(Some(true)),
+                Redaction::None,
+                2_000_000,
+            )
+            .await;
+            assert_eq!(observed.len(), total, "nothing is sent after the catalogue");
+            let error = refusal(&response);
+            assert_eq!(error["code"], "party_ledger_master_read_failed");
+            assert_eq!(error["cause"], "parent_over_budget");
+            assert_eq!(master_reads_sent(&observed, &[]), 0);
+
+            let plans = whole_read_plans(&rows);
+            let total = plans.len();
+            let (response, observed) =
+                call_observed(plans, compliance_args(None), Redaction::None, 2_000_000).await;
+            assert_ne!(response["isError"], true, "{response}");
+            assert_eq!(observed.len(), total);
+        }
     }
 }

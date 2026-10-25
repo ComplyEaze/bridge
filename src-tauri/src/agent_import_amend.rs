@@ -14,9 +14,9 @@
 //!
 //! Tally does not echo a client REMOTEID on readback (TALLY_PROTOCOL_REFERENCE
 //! §9.3), so the voucher is located by its narration marker, which carries the
-//! same batch-derived UUID. A natively posted batch carried that marker beside a
-//! random private REMOTEID, so an amendment of it would create a duplicate; any
-//! dispatch in the lineage refuses the amendment.
+//! same batch-derived UUID. A natively posted batch carries a random private
+//! REMOTEID and, since #864, no marker at all, so an amendment of it would create
+//! a duplicate; any dispatch in the lineage refuses the amendment.
 //!
 //! The comparison covers the date, a bank voucher's effective date when read,
 //! the voucher type, the voucher number when the batch set one, each entry's
@@ -63,8 +63,9 @@ pub(super) fn admit_lineage(
         if batch.endpoint_origin.as_deref() != Some(endpoint_origin) {
             return Err("import_amend_endpoint_mismatch".into());
         }
-        // A native post carried the marker beside a random private REMOTEID.
-        // Re-importing under the batch identity would create, not alter.
+        // A native post was sent under a fresh private REMOTEID, not the batch
+        // identity, and since #864 without the narration marker. Re-importing
+        // under the batch identity would create, not alter.
         if build.dispatched {
             return Err("import_amend_natively_posted".into());
         }
@@ -120,20 +121,14 @@ impl Lineage {
 
     /// The read window that holds both where each voucher is now and where the
     /// amendment will put it: an amendment may move a voucher's date.
-    pub(super) fn window(&self, vouchers: &[ImportVoucher]) -> (String, String) {
-        let dates = vouchers
-            .iter()
-            .flat_map(|voucher| {
-                std::iter::once(voucher.date.clone()).chain(
-                    self.versions(&voucher.bridge_txn_id)
-                        .map(|(_, recorded)| recorded.date.clone()),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        (
-            dates.first().cloned().unwrap_or_default(),
-            dates.last().cloned().unwrap_or_default(),
-        )
+    /// `None` only for no vouchers.
+    pub(super) fn window(&self, vouchers: &[ImportVoucher]) -> Option<(TallyDate, TallyDate)> {
+        super::date_window(vouchers.iter().flat_map(|voucher| {
+            std::iter::once(&voucher.date).chain(
+                self.versions(&voucher.bridge_txn_id)
+                    .map(|(_, recorded)| &recorded.date),
+            )
+        }))
     }
 
     /// The compare-and-swap. Returns per-voucher evidence when every amended
@@ -189,14 +184,15 @@ impl Lineage {
                 let recorded = canonical_import_voucher(recorded)?;
                 let entries_match =
                     expected_entry_fingerprint(&recorded) == actual_entry_fingerprint(&row);
-                let mut diffs = voucher_diffs(&recorded, &row, entries_match);
-                // The import rewrites the narration too, so an edit to it in
-                // Tally is a change the amendment would overwrite.
-                if row.narration.as_deref().map(str::trim)
-                    != Some(expected_narration(&recorded, &tag).as_str())
-                {
-                    diffs.push(json!("narration"));
-                }
+                // The narration is compared too (#1608): the import rewrites it,
+                // so an edit to it in Tally is a change the amendment would
+                // overwrite.
+                let diffs = voucher_diffs(
+                    &recorded,
+                    &row,
+                    entries_match,
+                    WrittenNarration::Tagged(&tag),
+                );
                 if diffs.is_empty() {
                     matching.push(batch_id);
                 }
@@ -261,16 +257,6 @@ impl Lineage {
             Err(refused)
         })
     }
-}
-
-/// The narration `render_voucher_xml` writes for this voucher under `tag`.
-fn expected_narration(voucher: &ImportVoucher, tag: &str) -> String {
-    format!(
-        "{} [BRIDGE:{tag}]",
-        voucher.narration.as_deref().unwrap_or("").trim()
-    )
-    .trim()
-    .to_string()
 }
 
 fn canonical_import_voucher(voucher: &ImportVoucher) -> Result<ImportVoucher, String> {

@@ -1,0 +1,365 @@
+{
+ "comment": "Firm entity, so the s.40(b) rule is open. Partner A (\"partner\"): salary and interest are governed by s.40(b) (s40b_governs); rent and purchases still ask for a comparable; the remuneration ledger is also listed under other, which asks for a comparable on the same amount, so the nature decides, not the ledger. Partner B (\"working partner\") has a negative interest amount (a reversal larger than the credit), still governed. Person G (\"wife of Partner A\") shares the interest ledger Family Loan Interest and voucher p02 with Partner A, but each has their own amount (Partner A's also includes j01): it is governed for the partner and asks for a comparable for Person G. Person G's salary asks for a comparable although the rule is open.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_firm-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-sp_firm-001"
+  },
+  {
+   "name": "Family Loan Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_firm-002"
+  },
+  {
+   "name": "Partner A Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_firm-003"
+  },
+  {
+   "name": "Partner A Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-sp_firm-004"
+  },
+  {
+   "name": "Partner A Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_firm-005"
+  },
+  {
+   "name": "Partner A Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_firm-006"
+  },
+  {
+   "name": "Partner B Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_firm-007"
+  },
+  {
+   "name": "Person G Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_firm-008"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_firm-009"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-sp_firm-010"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 9000000,
+   "credit": 5300000,
+   "closing": 53700000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50010000,
+   "debit": 500000,
+   "credit": 1400000,
+   "closing": -50910000
+  },
+  {
+   "ledger": "Family Loan Interest",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 0,
+   "closing": 300000
+  },
+  {
+   "ledger": "Partner A Interest",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 0,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Partner A Purchases",
+   "opening": 0,
+   "debit": 1100000,
+   "credit": 0,
+   "closing": 1100000
+  },
+  {
+   "ledger": "Partner A Remuneration",
+   "opening": 0,
+   "debit": 2400000,
+   "credit": 0,
+   "closing": 2400000
+  },
+  {
+   "ledger": "Partner A Rent",
+   "opening": 0,
+   "debit": 600000,
+   "credit": 0,
+   "closing": 600000
+  },
+  {
+   "ledger": "Partner B Interest",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 500000,
+   "closing": -300000
+  },
+  {
+   "ledger": "Person G Salary",
+   "opening": 0,
+   "debit": 900000,
+   "credit": 0,
+   "closing": 900000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 10000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 10000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 9000000,
+   "closing": -9000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Sales",
+     -9000000
+    ],
+    [
+     "Bank A",
+     9000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-06-30",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Partner A Remuneration",
+     2400000
+    ],
+    [
+     "Bank A",
+     -2400000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Partner A Interest",
+     1200000
+    ],
+    [
+     "Capital",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-07-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Family Loan Interest",
+     300000
+    ],
+    [
+     "Bank A",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2025-08-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Partner A Rent",
+     600000
+    ],
+    [
+     "Bank A",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2025-09-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Partner A Purchases",
+     1100000
+    ],
+    [
+     "Bank A",
+     -1100000
+    ]
+   ]
+  },
+  {
+   "guid": "j02",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Partner B Interest",
+     200000
+    ],
+    [
+     "Capital",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "j03",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Capital",
+     500000
+    ],
+    [
+     "Partner B Interest",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "p05",
+   "date": "2025-10-31",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person G Salary",
+     900000
+    ],
+    [
+     "Bank A",
+     -900000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23",
+  "specified_persons_40a2b"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "related_parties": {
+  "Partner A": {
+   "relationship": "partner",
+   "ledgers_by_nature": {
+    "salary": [
+     "Partner A Remuneration"
+    ],
+    "interest": [
+     "Partner A Interest",
+     "Family Loan Interest"
+    ],
+    "rent": [
+     "Partner A Rent"
+    ],
+    "purchases": [
+     "Partner A Purchases"
+    ],
+    "other": [
+     "Partner A Remuneration"
+    ]
+   }
+  },
+  "Partner B": {
+   "relationship": "working partner",
+   "ledgers_by_nature": {
+    "interest": [
+     "Partner B Interest"
+    ]
+   }
+  },
+  "Person G": {
+   "relationship": "wife of Partner A",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person G Salary"
+    ],
+    "interest": [
+     "Family Loan Interest"
+    ]
+   }
+  }
+ }
+}

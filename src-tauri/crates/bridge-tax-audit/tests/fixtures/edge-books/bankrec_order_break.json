@@ -1,0 +1,146 @@
+{
+ "comment": "bank_reconciliation on a statement its reader refuses: row 2 is dated before row 1 and every row carries a balance; the back-valued pair chains, a later step is exactly Re 1 off (allowed), and the chain first breaks at the 17 June row, which the reason names. The statement also declares no closing balance: the order refusal is the one given.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_order_break-000"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_order_break-001"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-bankrec_order_break-002"
+  },
+  {
+   "name": "Bank Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-bankrec_order_break-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-bankrec_order_break-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Edge Bank",
+   "opening": 500000,
+   "debit": 1000,
+   "credit": 0,
+   "closing": 501000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "o01",
+   "date": "2025-06-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     1000
+    ],
+    [
+     "Customer A",
+     -1000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "bank_reconciliation"
+ ],
+ "bank_reconciliation_ledger": "Edge Bank",
+ "bank_statement": {
+  "doc_id": "bank:edge:order_break",
+  "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "account_ref": "XXXXXX0009",
+  "bank": "Invented Bank",
+  "period": {
+   "start": "2025-06-01",
+   "end": "2025-06-30"
+  },
+  "opening_balance_paise": 500000,
+  "closing_balance_paise": null,
+  "rows": [
+   {
+    "doc": "bank:edge:order_break",
+    "row": 0,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-10",
+    "narration": "NEFT CUSTOMER A",
+    "debit_paise": 0,
+    "credit_paise": 1000,
+    "balance_paise": 501000
+   },
+   {
+    "doc": "bank:edge:order_break",
+    "row": 1,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-12",
+    "narration": "CHQ 401",
+    "debit_paise": 500,
+    "credit_paise": 0,
+    "balance_paise": 500500
+   },
+   {
+    "doc": "bank:edge:order_break",
+    "row": 2,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-11",
+    "narration": "NEFT BACK VALUED",
+    "debit_paise": 0,
+    "credit_paise": 200,
+    "balance_paise": 500700
+   },
+   {
+    "doc": "bank:edge:order_break",
+    "row": 3,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-14",
+    "narration": "NEFT CUSTOMER B",
+    "debit_paise": 0,
+    "credit_paise": 300,
+    "balance_paise": 501100
+   },
+   {
+    "doc": "bank:edge:order_break",
+    "row": 4,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-17",
+    "narration": "CHQ 402",
+    "debit_paise": 400,
+    "credit_paise": 0,
+    "balance_paise": 500900
+   }
+  ]
+ }
+}

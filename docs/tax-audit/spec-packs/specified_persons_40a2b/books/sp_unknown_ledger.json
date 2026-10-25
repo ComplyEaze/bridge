@@ -1,0 +1,148 @@
+{
+ "comment": "Individual entity. Person U's rent set names Alpha Rent, which moves, and Ghost Rent, which has no ledger master and no Trial Balance row: the finding carries the amount figure's evidence, Ghost Rent included, so EVID-1 fires once for it in this test's dump. Person U's interest set names only Ghost Interest, which has no master: its amount is 0, so no finding and no EVID-1 here (the related_parties_cl23 dump reports it).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_unknown_ledger-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_unknown_ledger-001"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-sp_unknown_ledger-002"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_unknown_ledger-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-sp_unknown_ledger-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Rent",
+   "opening": 0,
+   "debit": 2400000,
+   "credit": 0,
+   "closing": 2400000
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 9000000,
+   "credit": 2400000,
+   "closing": 56600000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50010000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50010000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 10000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 10000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 9000000,
+   "closing": -9000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Sales",
+     -9000000
+    ],
+    [
+     "Bank A",
+     9000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Alpha Rent",
+     2400000
+    ],
+    [
+     "Bank A",
+     -2400000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23",
+  "specified_persons_40a2b"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "individual",
+ "related_parties": {
+  "Person U": {
+   "relationship": "uncle of the proprietor",
+   "ledgers_by_nature": {
+    "rent": [
+     "Alpha Rent",
+     "Ghost Rent"
+    ],
+    "interest": [
+     "Ghost Interest"
+    ]
+   }
+  }
+ }
+}

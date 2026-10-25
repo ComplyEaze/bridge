@@ -10,14 +10,15 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
         .remove(0);
     template.voucher_type = Some("Journal".into());
     template.voucher_number = None;
-    let date = template.date.as_deref().unwrap();
+    let date = template.date.as_str();
     let expected = ImportVoucher {
         bridge_txn_id: String::new(),
-        date: format!("{}-{}-{}", &date[..4], &date[4..6], &date[6..]),
+        date: stored_date(date),
         voucher_type: VoucherType::Journal,
         narration: None,
         reference: None,
         voucher_number: None,
+        invoice: None,
         entries: template
             .entries
             .iter()
@@ -41,6 +42,10 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
         .collect::<Vec<_>>();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -51,8 +56,8 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
             .iter()
             .map(|row| row.bridge_txn_id.clone())
             .collect(),
-        date_from: date.into(),
-        date_to: date.into(),
+        date_from: stored_date(date),
+        date_to: stored_date(date),
         sha256: "synthetic".into(),
         built_at: now(),
         status: "built".into(),
@@ -128,9 +133,15 @@ fn delimiter_bearing_ledger_names_do_not_create_accounting_duplicates() {
         is_deemed_positive: "No".into(),
     }];
     let rows = vec![first, second];
-    let fingerprints = rows.iter().map(observed_fingerprint).collect::<Vec<_>>();
+    let fingerprints = rows
+        .iter()
+        .map(|row| observed_fingerprint(row, None))
+        .collect::<Vec<_>>();
     assert_ne!(fingerprints[0], fingerprints[1]);
-    assert_eq!(fingerprints[0].2.join(","), fingerprints[1].2.join(","));
+    assert_eq!(
+        actual_entry_fingerprint(&rows[0]).join(","),
+        actual_entry_fingerprint(&rows[1]).join(",")
+    );
     let identities = rows
         .iter()
         .map(observed_voucher_identity)
@@ -283,9 +294,12 @@ fn cancelled_vouchers_pair_neither_in_the_batch_nor_in_the_window() {
         .map(observed_voucher_identity)
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
-    let fingerprints = pair.iter().map(observed_fingerprint).collect::<Vec<_>>();
+    let fingerprints = pair
+        .iter()
+        .map(|row| observed_fingerprint(row, None))
+        .collect::<Vec<_>>();
     assert_eq!(fingerprints[0], fingerprints[1]);
-    let batch_fingerprint = observed_fingerprint(&effective);
+    let batch_fingerprint = observed_fingerprint(&effective, None);
     let expected = BTreeMap::from([(&batch_fingerprint, 1)]);
     for (tags, expected_tags) in [
         (
@@ -306,4 +320,57 @@ fn cancelled_vouchers_pair_neither_in_the_batch_nor_in_the_window() {
         assert!(batch.is_empty(), "{tags:?}: {batch:?}");
         assert!(unrelated.is_empty(), "{tags:?}: {unrelated:?}");
     }
+}
+
+/// Bridge's own fingerprint of voucher 353, the hand re-entry in the L1
+/// capture, equals the fingerprint L1A-050 was built with (#806): the field
+/// comparison in `L1_REENTRY_CAPTURE_PROVENANCE.md`, now made by the function
+/// verification matches with. The cancelled 352 carries no entries, so its
+/// fingerprint does not.
+#[test]
+fn the_hand_re_entry_carries_the_cancelled_vouchers_fingerprint() {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-import-verification.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let canonical = |mut row: ReadVoucher| {
+        for entry in &mut row.entries {
+            entry.amount = canonical_verification_amount(&entry.amount).unwrap();
+        }
+        row
+    };
+    let rows = parse_import_vouchers(&xml, "17a10910-773c-42c6-bd66-7bba9a392536")
+        .unwrap()
+        .rows;
+    let row_at = |alter_id: u64| {
+        canonical(
+            rows.iter()
+                .find(|row| row.alter_id == Some(alter_id))
+                .expect("the captured row")
+                .clone(),
+        )
+    };
+    let journal = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-journal.jsonl"
+    );
+    let line: ImportLedgerLine =
+        serde_json::from_str(journal.lines().next().expect("the built batch")).unwrap();
+    let mut built = line
+        .vouchers
+        .iter()
+        .find(|voucher| voucher.bridge_txn_id == "L1A-050")
+        .expect("L1A-050")
+        .clone();
+    for entry in &mut built.entries {
+        entry.amount = canonical_verification_amount(&entry.amount).unwrap();
+    }
+    let expected = expected_fingerprint(&built);
+    assert_eq!(observed_fingerprint(&row_at(1790), None), expected);
+    assert_ne!(observed_fingerprint(&row_at(1789), None), expected);
 }

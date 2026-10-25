@@ -397,7 +397,11 @@ fn the_selectors_are_exclusive_and_the_schema_offers_only_measured_classes() {
     );
 
     // The class read is the plain read plus exactly the class COMPUTEs.
-    let (company, from, to) = ("Synthetic Book", "20250701", "20250731");
+    let (company, from, to) = (
+        "Synthetic Book",
+        &tally_date("20250701"),
+        &tally_date("20250731"),
+    );
     let plain = VoucherReadShape::EntryWildcard
         .render(company, from, to, None)
         .unwrap();
@@ -485,10 +489,18 @@ fn captured_window() -> String {
 fn the_live_capture_classes_a_renamed_type_and_its_child_from_the_request_sent() {
     // The fixture answers exactly the request this read sends.
     let request = VoucherReadShape::ClassEntryWildcard
-        .render("BRIDGE READS LAB", "20250701", "20250731", None)
+        .render(
+            "BRIDGE READS LAB",
+            &tally_date("20250701"),
+            &tally_date("20250731"),
+            None,
+        )
         .unwrap();
+    // The capture predates the word REFERENCEDATE in the field list: the request carries the word and is
+    // the captured one once that word is removed.
+    assert!(request.contains("PARTYGSTIN,REFERENCEDATE</FETCH>"));
     assert_eq!(
-        sha256_hex(request.as_bytes()),
+        sha256_hex(request.replacen(",REFERENCEDATE", "", 1).as_bytes()),
         "913a6a68694dd09c2955dbc0e694e40072435b69fe7788e180f1df1bafe39279"
     );
     let rows = parse_agent_rows(&captured_window(), COMPANY).expect("the live capture parses");
@@ -555,19 +567,21 @@ mod through_the_tool {
         ]
     }
 
-    /// Identity, then the high-water pre-flight and the window, each read in
-    /// its company bracket. The window is the live capture; the rest frames it.
+    /// Identity, then the high-water pre-flight, the window's census (#1029)
+    /// and the window, each read in its company bracket. The window is the
+    /// live capture, and the census counts the same rows; the rest frames it.
     fn plans() -> Vec<ScenarioPlan> {
         let high_water = format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{COMPANY}</GUID><ALTVCHID>3</ALTVCHID><ALTMSTID>224</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>");
         let mut plans = vec![company(), status(), company(), status()];
-        for payload in [high_water, captured_window()] {
+        for payload in [high_water, captured_window(), captured_window()] {
             plans.extend(bracketed(payload));
         }
         plans
     }
 
-    /// The requests [`plans`] answers: identity, then two bracketed reads.
-    const WINDOW_REQUESTS: usize = 4 + 2 * 6;
+    /// The requests [`plans`] answers: identity, then three bracketed reads
+    /// (marks, census, window).
+    const WINDOW_REQUESTS: usize = 4 + 3 * 6;
 
     async fn call(filter: Value) -> Value {
         call_with(filter, false).await.0
@@ -608,8 +622,8 @@ mod through_the_tool {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
+            audit_enabled: false,
         });
         let mut args = json!({"company_guid": COMPANY, "from": "20250701", "to": "20250731"});
         for (key, value) in filter.as_object().unwrap() {
@@ -721,7 +735,12 @@ mod through_the_tool {
         // The class request itself went to Tally, as the transport encodes
         // it: a UTF-16LE body behind a byte-order mark.
         let class_request = VoucherReadShape::ClassEntryWildcard
-            .render("BRIDGE READS LAB", "20250701", "20250731", None)
+            .render(
+                "BRIDGE READS LAB",
+                &tally_date("20250701"),
+                &tally_date("20250731"),
+                None,
+            )
             .unwrap();
         let wire = [0xFF_u8, 0xFE]
             .into_iter()
@@ -812,7 +831,8 @@ mod through_the_tool {
         window.replace_range(start..end, &voucher);
         let high_water = format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{COMPANY}</GUID><ALTVCHID>3</ALTVCHID><ALTMSTID>224</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>");
         let mut plans = vec![company(), status(), company(), status()];
-        for payload in [high_water, window] {
+        // Marks, then the census and the window, both of the same rows.
+        for payload in [high_water, window.clone(), window] {
             plans.extend(bracketed(payload));
         }
         let (response, _simulator) = call_on(plans, json!({"voucher_class": "Purchase"})).await;

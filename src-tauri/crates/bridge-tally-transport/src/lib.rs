@@ -6,8 +6,6 @@
 
 use std::{net::IpAddr, sync::Arc, time::Duration};
 
-#[cfg(feature = "voucher-scan")]
-use bridge_tally_protocol::outstandings::VoucherOutstandingsRequestXml;
 use bridge_tally_protocol::{
     decode_tally_xml_response_bytes_limited, encode_tally_xml_request_utf16le,
     validate_tally_xml_response_content_type, ExpectedTallyTextEncoding, TallyTextDecodeError,
@@ -28,19 +26,70 @@ pub use wire_gate::{
     WireWaitBudget, WIRE_BUSY_RETRY_AFTER, WIRE_WAIT_MAX,
 };
 
+/// What one Tally send was, for a caller that keeps a record of its sends
+/// (#918): a kind, sizes, an outcome code and a time. Never text, and no hash
+/// of a request or response: a request names the company, and a hash of it
+/// would let a reader who holds a guessed name confirm it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SendRecord {
+    pub kind: SendKind,
+    /// The encoded request entity's length (a POST; `None` for a status GET).
+    /// A request that cannot be built (over the size cap, or no endpoint URL)
+    /// is refused before any send and leaves no record.
+    pub request_bytes: Option<usize>,
+    /// `answered`, `send_abandoned`, or the error's `safe_code()`: a closed set
+    /// of codes.
+    pub outcome: &'static str,
+    /// The HTTP entity the send received (answered only).
+    pub response_bytes: Option<usize>,
+    /// Milliseconds from the send starting to it ending, while the wire lock
+    /// was held (0 when the gate refused it). Work a caller does between
+    /// taking the lock with `acquire_wire_lock` and sending is not counted.
+    pub held_ms: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SendKind {
+    Post,
+    Status,
+}
+
+impl SendKind {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Post => "post",
+            Self::Status => "status",
+        }
+    }
+}
+
+/// Told about every send a transport makes, however it ends (a send whose
+/// future is dropped mid-flight is told as `send_abandoned`). A transport built
+/// without one records nothing.
+///
+/// Called while the send still holds the wire lock, so it must be quick and
+/// must not wait on anything.
+pub trait SendObserver: Send + Sync {
+    fn observe(&self, record: SendRecord);
+}
+
+/// Whether a send may still start (#778): asked before a send takes the wire
+/// lock and again once it holds it, so a send whose caller has withdrawn
+/// starts no request, while one already sent always runs to its end. A
+/// transport built without one admits every send.
+///
+/// Not the wire gate: a gate's refusal is `WireRefused`, which callers read as
+/// a busy port with a retry time, never as a withdrawal.
+pub trait SendAdmission: Send + Sync {
+    fn admits(&self) -> bool;
+}
+
 pub const STATUS_RESPONSE_MAX_BYTES: usize = 1024 * 1024;
 /// Maximum UTF-8 byte length of an XML source string accepted before UTF-16LE
 /// wire encoding. This preserves the pre-U1 request-cap contract; the encoded
 /// HTTP entity is mathematically bounded to at most twice this size plus its BOM.
 pub const XML_REQUEST_MAX_BYTES: usize = 32 * 1024 * 1024;
 pub const XML_RESPONSE_MAX_BYTES: usize = 32 * 1024 * 1024;
-/// Sealed exception for the voucher-scan wildcard outstandings request only
-/// -- see `post_outstandings_xml_decoded`. Gated with the request type that
-/// is the only thing admitted through it: with `voucher-scan` off, nothing
-/// can construct that request, so a raised cap nothing can reach would be a
-/// widened attack surface for no reason.
-#[cfg(feature = "voucher-scan")]
-pub const OUTSTANDINGS_XML_RESPONSE_MAX_BYTES: usize = 40 * 1024 * 1024;
 pub const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
 // `/status` is a bodyless ASCII-only liveness probe. Keep its pre-U1 UTF-8
@@ -272,6 +321,9 @@ pub enum TallyTransportError {
     /// The endpoint's wire gate refused the send; nothing was sent.
     #[error("Tally send was held back by the endpoint wire lock ({refusal:?})")]
     WireRefused { refusal: WireRefusal },
+    /// The send's caller withdrew before it started; nothing was sent (#778).
+    #[error("Tally send was not started: its caller withdrew")]
+    SendWithdrawn,
 }
 
 impl TallyTransportError {
@@ -291,6 +343,7 @@ impl TallyTransportError {
             Self::UnsupportedContentEncoding => "response_content_encoding_unsupported",
             Self::InvalidEncoding { .. } => "response_encoding_invalid",
             Self::WireRefused { refusal } => refusal.safe_code(),
+            Self::SendWithdrawn => "request_cancelled",
         }
     }
 }
@@ -345,6 +398,10 @@ pub struct TallyHttpTransport {
     /// The operation's shared wait budget, when this transport is scoped to
     /// one ([`Self::for_operation`]); otherwise each send has its own.
     wire_budget: Option<WireWaitBudget>,
+    /// Told about every send, when the application keeps a record of them.
+    observer: Option<Arc<dyn SendObserver>>,
+    /// Asked before each send starts, when its caller can withdraw (#778).
+    admission: Option<Arc<dyn SendAdmission>>,
 }
 
 /// A transport holding its endpoint's wire lock for exactly one send, from
@@ -416,7 +473,86 @@ impl TallyHttpTransport {
             wire: Arc::new(UngatedWire),
             wire_retry: WireRetryPolicy::DEFAULT,
             wire_budget: None,
+            observer: None,
+            admission: None,
         })
+    }
+
+    /// Tell `observer` about every send of this transport and its clones, however
+    /// each ends (#918).
+    #[must_use]
+    pub fn with_send_observer(mut self, observer: Arc<dyn SendObserver>) -> Self {
+        self.observer = Some(observer);
+        self
+    }
+
+    /// A clone whose sends, and those of its clones, start only while
+    /// `admission` admits them (#778). A refused send fails with
+    /// [`TallyTransportError::SendWithdrawn`] and sends nothing; the observer
+    /// is told, as for a wire refusal. [`Self::acquire_wire_lock`] does not
+    /// ask it: a send whose lock was taken for it is always sent.
+    #[must_use]
+    pub fn with_send_admission(&self, admission: Arc<dyn SendAdmission>) -> Self {
+        let mut admitted = self.clone();
+        admitted.admission = Some(admission);
+        admitted
+    }
+
+    /// Refuse a send its caller has withdrawn, telling the observer.
+    fn refuse_unless_admitted(
+        &self,
+        kind: SendKind,
+        request: Option<usize>,
+    ) -> Result<(), TallyTransportError> {
+        if self
+            .admission
+            .as_ref()
+            .is_some_and(|admission| !admission.admits())
+        {
+            let error = TallyTransportError::SendWithdrawn;
+            self.observe(kind, request, None, error.safe_code(), None);
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    fn observe(
+        &self,
+        kind: SendKind,
+        request_bytes: Option<usize>,
+        started: Option<std::time::Instant>,
+        outcome: &'static str,
+        response_bytes: Option<usize>,
+    ) {
+        let Some(observer) = &self.observer else {
+            return;
+        };
+        observer.observe(SendRecord {
+            kind,
+            request_bytes,
+            outcome,
+            response_bytes,
+            held_ms: started.map_or(0, |started| {
+                u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
+            }),
+        });
+    }
+
+    /// `wire_lock`, telling the observer about a refusal: nothing was sent.
+    /// A withdrawn send is refused before the lock is taken and again once it
+    /// is held, so a withdrawal during the lock wait starts nothing (#778).
+    async fn wire_lock_observed(
+        &self,
+        kind: SendKind,
+        request: Option<usize>,
+    ) -> Result<Box<dyn WireLockHeld>, TallyTransportError> {
+        self.refuse_unless_admitted(kind, request)?;
+        let held = self.wire_lock().await.inspect_err(|error| {
+            self.observe(kind, request, None, error.safe_code(), None);
+        })?;
+        // Dropping `held` on a refusal releases the lock unused.
+        self.refuse_unless_admitted(kind, request)?;
+        Ok(held)
     }
 
     /// Gate every send of this transport, and of its clones, on `gate`, trying
@@ -460,7 +596,10 @@ impl TallyHttpTransport {
     /// run while it is held.
     pub async fn acquire_wire_lock(&self) -> Result<WireHeldTransport<'_>, TallyTransportError> {
         let refused = |refusal| TallyTransportError::WireRefused { refusal };
-        let held = self.wire.try_acquire().map_err(refused)?;
+        let held = self.wire.try_acquire().map_err(|refusal| {
+            self.observe(SendKind::Post, None, None, refusal.safe_code(), None);
+            refused(refusal)
+        })?;
         Ok(WireHeldTransport {
             transport: self,
             held,
@@ -477,35 +616,27 @@ impl TallyHttpTransport {
             .map_err(|refusal| TallyTransportError::WireRefused { refusal })
     }
 
-    pub fn canonical_origin(&self) -> Result<String, TallyTransportError> {
-        canonical_loopback_origin(&self.config)
-    }
-
-    pub async fn get_status(&self) -> Result<TallyHttpResponse, TallyTransportError> {
-        let url = endpoint_url(&self.config, "/status")?;
-        // Held until this function returns: the response read to its end, or
-        // the send failed.
-        let _wire = self.wire_lock().await?;
-        let response = self
-            .client
-            .get(url)
-            .header(CONTENT_TYPE, TALLY_STATUS_CONTENT_TYPE)
-            .send()
-            .await
-            .map_err(classify_request_error)?;
-        read_response(
-            response,
-            self.policy.status_response_max_bytes,
-            TALLY_STATUS_RESPONSE_ENCODING,
-        )
-        .await
-    }
-
     pub async fn get_status_decoded(
         &self,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
         let url = endpoint_url(&self.config, "/status")?;
-        let _wire = self.wire_lock().await?;
+        let _wire = self.wire_lock_observed(SendKind::Status, None).await?;
+        let started = std::time::Instant::now();
+        let flight = InFlight::begin(self, SendKind::Status, None, started);
+        let result = self.get_status_decoded_locked(url).await;
+        flight.finish();
+        self.observe_result(SendKind::Status, None, started, &result, answered_decoded);
+        result
+    }
+
+    async fn get_status_decoded_locked(
+        &self,
+        url: Url,
+    ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
+        )]
         let response = self
             .client
             .get(url)
@@ -526,7 +657,28 @@ impl TallyHttpTransport {
             prepare_tally_xml_request(&xml, self.policy.xml_request_max_bytes)?;
         let content_length = body.len();
         let url = endpoint_url(&self.config, "/")?;
-        let _wire = self.wire_lock().await?;
+        let request = Some(content_length);
+        let _wire = self.wire_lock_observed(SendKind::Post, request).await?;
+        let started = std::time::Instant::now();
+        let flight = InFlight::begin(self, SendKind::Post, request, started);
+        let result = self.post_xml_locked(url, body, content_length).await;
+        flight.finish();
+        self.observe_result(SendKind::Post, request, started, &result, answered_raw);
+        let mut response = result?;
+        response.request_body_sha256 = Some(body_sha256);
+        Ok(response)
+    }
+
+    async fn post_xml_locked(
+        &self,
+        url: Url,
+        body: Vec<u8>,
+        content_length: usize,
+    ) -> Result<TallyHttpResponse, TallyTransportError> {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
+        )]
         let response = self
             .client
             .post(url)
@@ -536,50 +688,25 @@ impl TallyHttpTransport {
             .send()
             .await
             .map_err(classify_request_error)?;
-        let mut response = read_response(
+        read_response(
             response,
             self.policy.xml_response_max_bytes,
             TALLY_XML_POST_RESPONSE_ENCODING,
         )
-        .await?;
-        response.request_body_sha256 = Some(body_sha256);
-        Ok(response)
+        .await
     }
 
     pub async fn post_xml_decoded(
         &self,
         xml: String,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
-        self.post_xml_decoded_with_response_limit(xml, self.policy.xml_response_max_bytes)
-            .await
-    }
-
-    /// Closed exception for the live-verified wildcard outstandings profile.
-    /// The general policy remains capped at 32 MiB and the same client keeps
-    /// the immutable 20-second request deadline.
-    #[cfg(feature = "voucher-scan")]
-    pub async fn post_outstandings_xml_decoded(
-        &self,
-        request: VoucherOutstandingsRequestXml,
-    ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
-        self.post_xml_decoded_with_response_limit(
-            request.into_xml(),
-            OUTSTANDINGS_XML_RESPONSE_MAX_BYTES,
-        )
-        .await
-    }
-
-    async fn post_xml_decoded_with_response_limit(
-        &self,
-        xml: String,
-        response_max_bytes: usize,
-    ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
         // The request is prepared before the lock is taken, so a request that
         // cannot be sent never holds it.
         let prepared = prepare_tally_xml_request(&xml, self.policy.xml_request_max_bytes)?;
         let url = endpoint_url(&self.config, "/")?;
-        let _wire = self.wire_lock().await?;
-        self.send_prepared_decoded(prepared, url, response_max_bytes)
+        let request = Some(prepared.body.len());
+        let _wire = self.wire_lock_observed(SendKind::Post, request).await?;
+        self.send_prepared_decoded(prepared, url, self.policy.xml_response_max_bytes)
             .await
     }
 
@@ -593,6 +720,35 @@ impl TallyHttpTransport {
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
         let PreparedTallyXmlRequest { body, body_sha256 } = prepared;
         let content_length = body.len();
+        let started = std::time::Instant::now();
+        let flight = InFlight::begin(self, SendKind::Post, Some(content_length), started);
+        let result = self
+            .send_prepared_decoded_locked(url, body, content_length, response_max_bytes)
+            .await;
+        flight.finish();
+        self.observe_result(
+            SendKind::Post,
+            Some(content_length),
+            started,
+            &result,
+            answered_decoded,
+        );
+        let mut response = result?;
+        response.request_body_sha256 = Some(body_sha256);
+        Ok(response)
+    }
+
+    async fn send_prepared_decoded_locked(
+        &self,
+        url: Url,
+        body: Vec<u8>,
+        content_length: usize,
+        response_max_bytes: usize,
+    ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
+        )]
         let response = self
             .client
             .post(url)
@@ -602,15 +758,92 @@ impl TallyHttpTransport {
             .send()
             .await
             .map_err(classify_request_error)?;
-        let mut response = read_decoded_response(
+        read_decoded_response(
             response,
             response_max_bytes,
             TALLY_XML_POST_RESPONSE_ENCODING,
         )
-        .await?;
-        response.request_body_sha256 = Some(body_sha256);
-        Ok(response)
+        .await
     }
+
+    /// Tell the observer how a send ended, whichever way it did.
+    fn observe_result<T>(
+        &self,
+        kind: SendKind,
+        request: Option<usize>,
+        started: std::time::Instant,
+        result: &Result<T, TallyTransportError>,
+        answered: fn(&T) -> usize,
+    ) {
+        if self.observer.is_none() {
+            return;
+        }
+        match result {
+            Ok(response) => self.observe(
+                kind,
+                request,
+                Some(started),
+                "answered",
+                Some(answered(response)),
+            ),
+            Err(error) => self.observe(kind, request, Some(started), error.safe_code(), None),
+        }
+    }
+}
+
+/// Tells the observer a send was abandoned, if its future is dropped before it
+/// ends (a cancelled call): the in-flight request is the one a trail most needs
+/// to name.
+struct InFlight<'a> {
+    transport: &'a TallyHttpTransport,
+    kind: SendKind,
+    request: Option<usize>,
+    started: std::time::Instant,
+    finished: bool,
+}
+
+impl<'a> InFlight<'a> {
+    fn begin(
+        transport: &'a TallyHttpTransport,
+        kind: SendKind,
+        request: Option<usize>,
+        started: std::time::Instant,
+    ) -> Self {
+        Self {
+            transport,
+            kind,
+            request,
+            started,
+            finished: false,
+        }
+    }
+
+    /// The send ended: the caller records how.
+    fn finish(mut self) {
+        self.finished = true;
+    }
+}
+
+impl Drop for InFlight<'_> {
+    fn drop(&mut self) {
+        if !self.finished {
+            self.transport.observe(
+                self.kind,
+                self.request,
+                Some(self.started),
+                "send_abandoned",
+                None,
+            );
+        }
+    }
+}
+
+fn answered_raw(response: &TallyHttpResponse) -> usize {
+    response.encoded_bytes()
+}
+
+fn answered_decoded(response: &TallyDecodedHttpResponse) -> usize {
+    response.encoded_bytes()
 }
 
 pub fn canonical_loopback_origin(

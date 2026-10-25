@@ -39,7 +39,6 @@ async fn same_endpoint_serializes_while_distinct_endpoints_are_independent() {
         runtime
             .execute_read(
                 endpoint,
-                ReadOperation::CompanyList,
                 ReadRetryPolicy::SINGLE_ATTEMPT,
                 CancellationToken::new(),
                 |_| {
@@ -50,10 +49,7 @@ async fn same_endpoint_serializes_while_distinct_endpoints_are_independent() {
                         maximum.fetch_max(active, Ordering::SeqCst);
                         tokio::time::sleep(Duration::from_millis(20)).await;
                         in_flight.fetch_sub(1, Ordering::SeqCst);
-                        ReadAttempt::<_, ()>::Success {
-                            value: (),
-                            observed_body_bytes: BodyBytesObservation::Observed(10),
-                        }
+                        ReadAttempt::<_, ()>::Success { value: () }
                     }
                 },
             )
@@ -105,7 +101,6 @@ async fn transient_reads_retry_exactly_but_validation_never_retries() {
     let result = runtime
         .execute_read(
             endpoint("retry-endpoint"),
-            ReadOperation::VoucherExport,
             ReadRetryPolicy::new(3, Duration::ZERO, Duration::ZERO, 0).unwrap(),
             CancellationToken::new(),
             move |_| {
@@ -115,14 +110,10 @@ async fn transient_reads_retry_exactly_but_validation_never_retries() {
                     if attempt < 3 {
                         ReadAttempt::Failure {
                             error: "transient",
-                            class: ReadFailureClass::RequestTimeout,
-                            observed_body_bytes: BodyBytesObservation::Unavailable,
+                            class: ReadFailureClass::Connection,
                         }
                     } else {
-                        ReadAttempt::Success {
-                            value: "ok",
-                            observed_body_bytes: BodyBytesObservation::Observed(12),
-                        }
+                        ReadAttempt::Success { value: "ok" }
                     }
                 }
             },
@@ -137,7 +128,6 @@ async fn transient_reads_retry_exactly_but_validation_never_retries() {
     let error = runtime
         .execute_read(
             endpoint("validation-endpoint"),
-            ReadOperation::MasterExport,
             ReadRetryPolicy::new(3, Duration::ZERO, Duration::ZERO, 0).unwrap(),
             CancellationToken::new(),
             move |_| {
@@ -147,7 +137,6 @@ async fn transient_reads_retry_exactly_but_validation_never_retries() {
                     ReadAttempt::<(), _>::Failure {
                         error: "validation_failed",
                         class: ReadFailureClass::Validation,
-                        observed_body_bytes: BodyBytesObservation::Observed(100),
                     }
                 }
             },
@@ -161,9 +150,42 @@ async fn transient_reads_retry_exactly_but_validation_never_retries() {
     assert_eq!(attempts.load(Ordering::SeqCst), 1);
 }
 
+// A client timeout does not cancel the work Tally is still doing, and the gateway serialises,
+// so a second send queues behind the first (IMPLEMENTATION_GUIDE rule I7).
+#[tokio::test]
+async fn a_timed_out_read_is_sent_once() {
+    let runtime = test_runtime(Duration::ZERO, 100);
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let observed = Arc::clone(&attempts);
+    let error = runtime
+        .execute_read(
+            endpoint("timeout-endpoint"),
+            ReadRetryPolicy::new(3, Duration::ZERO, Duration::ZERO, 0).unwrap(),
+            CancellationToken::new(),
+            move |_| {
+                let observed = Arc::clone(&observed);
+                async move {
+                    observed.fetch_add(1, Ordering::SeqCst);
+                    ReadAttempt::<(), _>::Failure {
+                        error: "timed_out",
+                        class: ReadFailureClass::RequestTimeout,
+                    }
+                }
+            },
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(error, ReadExecutionError::Attempt("timed_out")));
+    assert_eq!(attempts.load(Ordering::SeqCst), 1);
+}
+
 #[tokio::test]
 async fn cancellation_is_terminal_and_preserves_follow_up_spacing() {
-    let spacing = Duration::from_millis(60);
+    // A spacing a stall cannot eat: the follow-up is checked against a clock started
+    // before the cancel, so no slack is needed (the quarantine starts after it), and a
+    // follow-up that skips the wait would need a stall as long as the spacing to pass
+    // (#1255).
+    let spacing = Duration::from_millis(400);
     let runtime = test_runtime(spacing, 3);
     let cancellation = CancellationToken::new();
     let cancel = cancellation.clone();
@@ -173,7 +195,6 @@ async fn cancellation_is_terminal_and_preserves_follow_up_spacing() {
             runtime
                 .execute_read(
                     endpoint("cancel-endpoint"),
-                    ReadOperation::ReportExport,
                     ReadRetryPolicy::SINGLE_ATTEMPT,
                     cancellation,
                     |_| async { std::future::pending::<ReadAttempt<(), ()>>().await },
@@ -182,28 +203,22 @@ async fn cancellation_is_terminal_and_preserves_follow_up_spacing() {
         })
     };
     tokio::time::sleep(Duration::from_millis(10)).await;
+    let started = Instant::now();
     cancel.cancel();
     assert!(matches!(
         running.await.unwrap(),
         Err(ReadExecutionError::Cancelled)
     ));
-    let started = Instant::now();
     runtime
         .execute_read(
             endpoint("cancel-endpoint"),
-            ReadOperation::ReportExport,
             ReadRetryPolicy::SINGLE_ATTEMPT,
             CancellationToken::new(),
-            |_| async {
-                ReadAttempt::<_, ()>::Success {
-                    value: (),
-                    observed_body_bytes: BodyBytesObservation::Observed(0),
-                }
-            },
+            |_| async { ReadAttempt::<_, ()>::Success { value: () } },
         )
         .await
         .unwrap();
-    assert!(started.elapsed() >= spacing.saturating_sub(Duration::from_millis(10)));
+    assert!(started.elapsed() >= spacing);
 }
 
 #[tokio::test]
@@ -213,13 +228,11 @@ async fn circuit_cooldown_and_single_half_open_probe_are_enforced() {
         ReadAttempt::<(), _>::Failure {
             error: "offline",
             class: ReadFailureClass::Connection,
-            observed_body_bytes: BodyBytesObservation::Unavailable,
         }
     };
     let _ = runtime
         .execute_read(
             endpoint("circuit-endpoint"),
-            ReadOperation::CompanyList,
             ReadRetryPolicy::SINGLE_ATTEMPT,
             CancellationToken::new(),
             |_| fail(),
@@ -228,7 +241,6 @@ async fn circuit_cooldown_and_single_half_open_probe_are_enforced() {
     let rejected = runtime
         .execute_read(
             endpoint("circuit-endpoint"),
-            ReadOperation::CompanyList,
             ReadRetryPolicy::SINGLE_ATTEMPT,
             CancellationToken::new(),
             |_| fail(),
@@ -253,7 +265,6 @@ async fn circuit_cooldown_and_single_half_open_probe_are_enforced() {
             runtime
                 .execute_read(
                     endpoint("circuit-endpoint"),
-                    ReadOperation::CompanyList,
                     ReadRetryPolicy::SINGLE_ATTEMPT,
                     CancellationToken::new(),
                     |_| {
@@ -262,10 +273,7 @@ async fn circuit_cooldown_and_single_half_open_probe_are_enforced() {
                         async move {
                             entered.notify_one();
                             release.notified().await;
-                            ReadAttempt::<_, ()>::Success {
-                                value: (),
-                                observed_body_bytes: BodyBytesObservation::Observed(1),
-                            }
+                            ReadAttempt::<_, ()>::Success { value: () }
                         }
                     },
                 )
@@ -279,15 +287,9 @@ async fn circuit_cooldown_and_single_half_open_probe_are_enforced() {
             runtime
                 .execute_read(
                     endpoint("circuit-endpoint"),
-                    ReadOperation::CompanyList,
                     ReadRetryPolicy::SINGLE_ATTEMPT,
                     CancellationToken::new(),
-                    |_| async {
-                        ReadAttempt::<_, ()>::Success {
-                            value: (),
-                            observed_body_bytes: BodyBytesObservation::Observed(1),
-                        }
-                    },
+                    |_| async { ReadAttempt::<_, ()>::Success { value: () } },
                 )
                 .await
         })
@@ -315,7 +317,6 @@ async fn queued_request_cannot_use_a_stale_closed_circuit_admission() {
             runtime
                 .execute_read(
                     endpoint("stale-admission-endpoint"),
-                    ReadOperation::CompanyList,
                     ReadRetryPolicy::SINGLE_ATTEMPT,
                     CancellationToken::new(),
                     |_| {
@@ -327,7 +328,6 @@ async fn queued_request_cannot_use_a_stale_closed_circuit_admission() {
                             ReadAttempt::<(), _>::Failure {
                                 error: "offline",
                                 class: ReadFailureClass::Connection,
-                                observed_body_bytes: BodyBytesObservation::Unavailable,
                             }
                         }
                     },
@@ -344,17 +344,13 @@ async fn queued_request_cannot_use_a_stale_closed_circuit_admission() {
             runtime
                 .execute_read(
                     endpoint("stale-admission-endpoint"),
-                    ReadOperation::CompanyList,
                     ReadRetryPolicy::SINGLE_ATTEMPT,
                     CancellationToken::new(),
                     move |_| {
                         let executed = Arc::clone(&executed);
                         async move {
                             executed.fetch_add(1, Ordering::SeqCst);
-                            ReadAttempt::<_, ()>::Success {
-                                value: (),
-                                observed_body_bytes: BodyBytesObservation::Observed(1),
-                            }
+                            ReadAttempt::<_, ()>::Success { value: () }
                         }
                     },
                 )
@@ -407,7 +403,6 @@ async fn deterministic_runtime_sequence_retries_server_failure_then_succeeds() {
     let xml = runtime
         .execute_read(
             endpoint("sequence-endpoint"),
-            ReadOperation::ReportExport,
             ReadRetryPolicy::new(2, Duration::ZERO, Duration::ZERO, 0).unwrap(),
             CancellationToken::new(),
             move |_| {
@@ -417,12 +412,10 @@ async fn deterministic_runtime_sequence_retries_server_failure_then_succeeds() {
                         ReadAttempt::Failure {
                             error: "http_server_failure",
                             class: ReadFailureClass::HttpServer,
-                            observed_body_bytes: BodyBytesObservation::Observed(64),
                         }
                     } else {
                         ReadAttempt::Success {
                             value: "<STATUS>1</STATUS>",
-                            observed_body_bytes: BodyBytesObservation::Observed(18),
                         }
                     }
                 }
@@ -435,8 +428,7 @@ async fn deterministic_runtime_sequence_retries_server_failure_then_succeeds() {
 }
 
 #[test]
-fn operation_and_retry_surface_are_read_only_and_redacted() {
-    assert_eq!(ReadOperation::Status.request_class(), RequestClass::Status);
+fn failure_classes_retry_policy_and_endpoint_debug_output_are_read_only_and_redacted() {
     assert!(ReadFailureClass::HttpServer.retryable());
     assert!(!ReadFailureClass::Application.retryable());
     assert!(format!("{:?}", endpoint("sensitive-loopback")).contains("[redacted]"));
@@ -444,4 +436,13 @@ fn operation_and_retry_surface_are_read_only_and_redacted() {
         ReadRetryPolicy::new(0, Duration::ZERO, Duration::ZERO, 0),
         Err(RuntimeConfigurationError::RetryPolicyInvalid)
     );
+}
+
+#[test]
+fn a_failed_response_body_counts_as_the_transport_failure_a_failed_request_does() {
+    let body = ReadFailureClass::ResponseBodyFailed;
+    let request = ReadFailureClass::RequestFailed;
+    assert_eq!(body.circuit_outcome(), CircuitOutcome::TransportFailure);
+    assert_eq!(body.circuit_outcome(), request.circuit_outcome());
+    assert!(!body.retryable());
 }

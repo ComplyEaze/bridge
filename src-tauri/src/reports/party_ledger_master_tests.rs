@@ -54,6 +54,8 @@ fn source() -> PartyLedgerMasterSource {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Customer".to_string(),
             parent: PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".to_string()),
@@ -75,6 +77,7 @@ fn source() -> PartyLedgerMasterSource {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     }
 }
 
@@ -171,6 +174,8 @@ fn captured_master_fields_lab_drives_the_party_export_and_schedule_iii_view() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20250401").unwrap(),
         to: TallyDate::parse("20260331").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260331").unwrap()),
+        last_voucher_date: TallyDate::parse("20260331").unwrap(),
         rows,
         request_sha256: "0".repeat(64),
         master_response_sha256: "def766e42d0e36b4b73d7a176fa0ad08d1a7467e301000650fb5ba9a2ae06f29"
@@ -185,6 +190,7 @@ fn captured_master_fields_lab_drives_the_party_export_and_schedule_iii_view() {
         groups,
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     };
     let workbook = build_party_ledger_master_workbook(source).expect("captured source admits");
     let xlsx =
@@ -338,5 +344,84 @@ fn captured_master_fields_lab_drives_the_party_export_and_schedule_iii_view() {
                 "an unestablished ledger stays excluded"
             );
         }
+    }
+}
+
+#[test]
+fn a_later_dated_voucher_note_names_both_dates_and_claims_neither_count_nor_cause() {
+    let mut later = source();
+    later.to = TallyDate::parse("20261001").unwrap();
+    later.last_voucher_date = TallyDate::parse("50261231").unwrap();
+    assert_eq!(
+        later.later_dated_vouchers_note().as_deref(),
+        Some("Vouchers dated after 20261001 (the book's last voucher date is 50261231) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first month boundary (the 1st, 2nd or 31st of a month) on or after this computer's date, or on or after the start of the books if that is later; if this computer's date is wrong, correct it and export again.")
+    );
+    // On or before the snapshot's end there is nothing to say.
+    for last in ["20260731", "20260401"] {
+        let mut source = source();
+        source.last_voucher_date = TallyDate::parse(last).unwrap();
+        assert_eq!(source.later_dated_vouchers_note(), None, "{last}");
+    }
+}
+
+#[test]
+fn notes_carry_their_kind_the_moved_date_first_and_only_a_typed_date_can_move() {
+    let mut typed = source();
+    typed.to = TallyDate::parse("20260831").unwrap();
+    typed.last_voucher_date = TallyDate::parse("20260907").unwrap();
+    typed.balance_date_basis = BalanceDateBasis::Requested(TallyDate::parse("20260815").unwrap());
+    let kinds = |source: &PartyLedgerMasterSource| {
+        source
+            .notes()
+            .iter()
+            .map(|note| note.kind)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        kinds(&typed),
+        vec![SourceNoteKind::DateMoved, SourceNoteKind::LaterDatedVoucher]
+    );
+    let moved = typed.date_moved_note().unwrap();
+    assert!(
+        moved.contains("20260815") && moved.contains("20260831"),
+        "{moved}"
+    );
+    // The later-dated note names the chosen date, not this computer's.
+    let later = typed.later_dated_vouchers_note().unwrap();
+    assert!(
+        later.contains("20260815") && !later.contains("computer"),
+        "{later}"
+    );
+
+    // The host's own date is never "moved": its rule is the #875 one.
+    let mut host = typed.clone();
+    host.balance_date_basis = BalanceDateBasis::HostToday(TallyDate::parse("20260815").unwrap());
+    assert_eq!(kinds(&host), vec![SourceNoteKind::LaterDatedVoucher]);
+    assert!(host
+        .later_dated_vouchers_note()
+        .unwrap()
+        .contains("computer"));
+
+    // A chosen boundary date, with nothing dated after it, says nothing.
+    typed.balance_date_basis = BalanceDateBasis::Requested(typed.to.clone());
+    typed.last_voucher_date = typed.to.clone();
+    assert!(kinds(&typed).is_empty());
+    assert_eq!(typed.notes_text(), None);
+}
+
+#[test]
+fn a_note_serialises_with_the_kind_the_app_reads() {
+    for (kind, name) in [
+        (SourceNoteKind::LaterDatedVoucher, "later_dated_voucher"),
+        (SourceNoteKind::DateMoved, "date_moved"),
+    ] {
+        let note = SourceNote {
+            kind,
+            text: "synthetic".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&note).unwrap(),
+            serde_json::json!({ "kind": name, "text": "synthetic" })
+        );
     }
 }

@@ -1,0 +1,16 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE OUTSTANDINGS LAB, seeded for #945: one request of an `outstandings` party-detail call made through a debug `bridge_mcp` built from commit 3f097e8654bb389126b7e7a0002d0cc8cce2601f (binary sha256 6b3ecf49c54ed5a2ed93c04a94ad819fe86ae69a13145293c290862dba0d303a), recorded by a serial read-only relay between the binary and the gateway",
+  "observed_date": "2026-10-01",
+  "source_response_bytes": 3414,
+  "source_response_sha256": "b8446ecfb936b46abd393efa01ff56e02644e2aaaed2f2c084a063c87a18bbd8",
+  "source_request_bytes": 980,
+  "source_request_sha256": "d086eee1c1df2142c3fd3b6ed8db873ac9f625ca209b16a322ff7720e864b5ca",
+  "request_rendered_by": "render_company_currency_request(company)",
+  "fixture_bytes": 3414,
+  "fixture_sha256": "b8446ecfb936b46abd393efa01ff56e02644e2aaaed2f2c084a063c87a18bbd8",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "One Currency master (the base currency, mailing name INR, 2 decimal places): a single-currency book.",
+  "provenance_limit": "One synthetic book on one build, seeded by this project over raw import (15 ledgers, 20 vouchers), so the capture shows how Tally answers these requests for those shapes; it is not evidence about a client's book. The request is the one Bridge itself sent during the tool call. Bridge sent it 2 times in the `unadjusted` call and 2 times in the `bill_trail` call (its paired reads and its brackets). Every answer to it was byte-identical to this one.",
+  "sensitivity_review": "Synthetic company name, synthetic ledger names (prefix OL), synthetic GUIDs; no party, person, GSTIN, address or credential."
+}

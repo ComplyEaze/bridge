@@ -1,0 +1,383 @@
+{
+ "comment": "party_monthly's Trial Balance matching at the reference's da9e2d3d, where a set of excluded vouchers matches only exactly. Sales: an optional and a post-dated credit note each account for the difference exactly, so both are listed with their sign (credits less debits) and none is chosen. Purchases: a one-paisa optional voucher does not explain a difference of Rs 1.01 (the one status tried, not matching). Direct expenses: two optional vouchers net to nil, and so do two cancelled ones, so the post-dated vouchers and all of them together (the post-dated, optional and cancelled vouchers) each match and none is named (the reference's recorded limit). Indirect expenses: post-dated, optional and cancelled vouchers tried, the optional ones a paisa off the difference, so none matches and the three are listed.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-pm_exact-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-pm_exact-001"
+  },
+  {
+   "name": "Cust A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-pm_exact-002"
+  },
+  {
+   "name": "Cust B",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-pm_exact-003"
+  },
+  {
+   "name": "Supp L",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-pm_exact-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-pm_exact-005"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-pm_exact-006"
+  },
+  {
+   "name": "Freight",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-pm_exact-007"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-pm_exact-008"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "Cust A",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 0,
+   "closing": 50000
+  },
+  {
+   "ledger": "Freight",
+   "opening": 0,
+   "debit": 58000,
+   "credit": 0,
+   "closing": 58000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 50101,
+   "credit": 0,
+   "closing": 50101
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 54001,
+   "credit": 0,
+   "closing": 54001
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 8000,
+   "credit": 50000,
+   "closing": -42000
+  },
+  {
+   "ledger": "Supp L",
+   "opening": 0,
+   "debit": 0,
+   "credit": 50000,
+   "closing": -50000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "e01",
+   "date": "2025-04-10",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Cust A",
+     50000
+    ],
+    [
+     "Sales",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "o01",
+   "date": "2025-06-01",
+   "base_type": "Credit Note",
+   "status": "optional",
+   "lines": [
+    [
+     "Sales",
+     8000
+    ],
+    [
+     "Cust A",
+     -8000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2026-03-01",
+   "base_type": "Credit Note",
+   "status": "postdated",
+   "lines": [
+    [
+     "Sales",
+     8000
+    ],
+    [
+     "Cust B",
+     -8000
+    ]
+   ]
+  },
+  {
+   "guid": "e02",
+   "date": "2025-04-12",
+   "base_type": "Purchase",
+   "lines": [
+    [
+     "Purchases",
+     50000
+    ],
+    [
+     "Supp L",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "o02",
+   "date": "2025-06-02",
+   "base_type": "Purchase",
+   "status": "optional",
+   "lines": [
+    [
+     "Purchases",
+     1
+    ],
+    [
+     "Supp L",
+     -1
+    ]
+   ]
+  },
+  {
+   "guid": "e03",
+   "date": "2025-04-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Freight",
+     50000
+    ],
+    [
+     "Bank",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "o03",
+   "date": "2025-06-03",
+   "base_type": "Payment",
+   "status": "optional",
+   "lines": [
+    [
+     "Freight",
+     500
+    ],
+    [
+     "Bank",
+     -500
+    ]
+   ]
+  },
+  {
+   "guid": "o04",
+   "date": "2025-06-04",
+   "base_type": "Receipt",
+   "status": "optional",
+   "lines": [
+    [
+     "Bank",
+     500
+    ],
+    [
+     "Freight",
+     -500
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2026-03-03",
+   "base_type": "Payment",
+   "status": "postdated",
+   "lines": [
+    [
+     "Freight",
+     8000
+    ],
+    [
+     "Bank",
+     -8000
+    ]
+   ]
+  },
+  {
+   "guid": "c03",
+   "date": "2025-07-03",
+   "base_type": "Payment",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Freight",
+     300
+    ],
+    [
+     "Bank",
+     -300
+    ]
+   ]
+  },
+  {
+   "guid": "c04",
+   "date": "2025-07-04",
+   "base_type": "Receipt",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Bank",
+     300
+    ],
+    [
+     "Freight",
+     -300
+    ]
+   ]
+  },
+  {
+   "guid": "e04",
+   "date": "2025-04-20",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent",
+     50000
+    ],
+    [
+     "Bank",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2026-03-04",
+   "base_type": "Payment",
+   "status": "postdated",
+   "lines": [
+    [
+     "Rent",
+     3000
+    ],
+    [
+     "Bank",
+     -3000
+    ]
+   ]
+  },
+  {
+   "guid": "o05",
+   "date": "2025-06-05",
+   "base_type": "Payment",
+   "status": "optional",
+   "lines": [
+    [
+     "Rent",
+     4000
+    ],
+    [
+     "Bank",
+     -4000
+    ]
+   ]
+  },
+  {
+   "guid": "c05",
+   "date": "2025-07-05",
+   "base_type": "Payment",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Rent",
+     5000
+    ],
+    [
+     "Bank",
+     -5000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank"
+ ],
+ "tests": [
+  "party_monthly"
+ ]
+}

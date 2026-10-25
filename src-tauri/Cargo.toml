@@ -1,10 +1,10 @@
 [package]
 name = "bridge"
-version = "0.3.0"
-description = "Bridge is the open-source Tauri implementation of the AXAL Sync desktop workflows."
+version = "0.6.0"
+description = "ComplyEaze Bridge lets an AI assistant read from, and write to, the TallyPrime running on your own computer."
 authors = ["AXAL"]
 license = "Apache-2.0"
-repository = "https://github.com/lamemustafa/bridge"
+repository = "https://github.com/ComplyEaze/bridge"
 publish = false
 edition = "2021"
 rust-version = "1.96"
@@ -14,17 +14,6 @@ default-run = "bridge"
 workspace = true
 
 [features]
-# Legacy voucher-scan outstandings path. Shipped/default builds take the
-# native Bills Receivable/Payable + List of Ledgers path unconditionally;
-# this gate exists so the ~4,800 lines of scan machinery (date/AlterID
-# partitioning, segment completeness proofs, the wildcard voucher fetch) do
-# not compile into a shipped build at all. Not a default feature.
-voucher-scan = ["bridge-tally-protocol/voucher-scan", "bridge-tally-transport/voucher-scan"]
-# Manual-only admission for the ignored, corpus-bound Unit A reconciliation
-# harness. Shipped/default builds have no constructor for an AlterID width.
-# The harness is what actually drives a voucher scan, so it implies the scan
-# machinery it needs.
-live-calibration-harness = ["voucher-scan"]
 # LAB-ONLY additive surface for the audit-sprint 2026-09-14 local rebuild
 # workflow (Phase 3). Not default; never enable in a release or CI workflow
 # (`tests/lab_writes_ci_gate.rs` fails the build if any `.github/workflows/*`
@@ -39,6 +28,7 @@ lab-writes = []
 [workspace]
 members = [
   ".",
+  "crates/bridge-approval-standin",
   "crates/bridge-bank-statement",
   "crates/bridge-tally-core",
   "crates/bridge-tally-primitives",
@@ -104,15 +94,15 @@ bridge-bank-statement = { path = "crates/bridge-bank-statement" }
 bridge-tally-core = { path = "crates/bridge-tally-core" }
 bridge-tally-protocol = { path = "crates/bridge-tally-protocol" }
 bridge-tally-transport = { path = "crates/bridge-tally-transport" }
+bridge-tax-audit = { path = "crates/bridge-tax-audit" }
 chrono = { version = "0.4", features = ["serde"] }
 getrandom = "0.4"
 icu_properties = "2.3"
 keyring = { version = "4.1.4", default-features = false, features = ["v1"] }
-quick-xml = { version = "0.41", features = ["serialize"] }
-reqwest = { version = "0.13", features = ["json", "stream"] }
+quick-xml = "0.42"
 # Bridge supports Windows and macOS; rfd's defaults add Linux portal/Wayland code.
 rfd = { version = "0.17", default-features = false }
-rust_xlsxwriter = { version = "0.99.0", default-features = false }
+rust_xlsxwriter = { version = "0.100.0", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
@@ -121,7 +111,7 @@ tauri = { version = "2", features = [] }
 thiserror = "2"
 tempfile = "3"
 tokio = { version = "1", features = ["full"] }
-tokio-util = { version = "0.7", features = ["io"] }
+tokio-util = "0.7"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4", "v5", "serde"] }
@@ -129,8 +119,9 @@ zeroize = "1"
 pdf-writer = "0.15.0"
 
 [dev-dependencies]
+reqwest = "0.13"
 tally-protocol-simulator = { path = "crates/tally-protocol-simulator" }
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -139,7 +130,7 @@ libc = "0.2"
 libsqlite3-sys = { version = "0.37.0", features = ["bundled-sqlcipher-vendored-openssl"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_JobObjects", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # On macOS, select SQLCipher's CommonCrypto provider rather than vendored

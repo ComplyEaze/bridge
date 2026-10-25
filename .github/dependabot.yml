@@ -1,27 +1,53 @@
 version: 2
+# Every bump needs a maintainer change that Dependabot cannot make: a regenerated third-party
+# inventory, an acknowledgement file for each pinned path it touches, and for a workflow-action bump
+# re-derived job digests. So bumps are grouped (one pull request per group, not one per package)
+# and version updates run monthly. Security updates are not affected by the schedule.
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     target-branch: master
     open-pull-requests-limit: 5
     groups:
+      # The JavaScript side of Tauri moves with the Rust side (same minor version).
+      tauri-javascript:
+        patterns:
+          - "@tauri-apps/*"
+      # Excluded by name as well: the first run after the groups were added put @tauri-apps/api and
+      # @tauri-apps/cli in these two groups although tauri-javascript is listed first.
       frontend-production:
         dependency-type: production
+        exclude-patterns:
+          - "@tauri-apps/*"
       frontend-development:
         dependency-type: development
+        exclude-patterns:
+          - "@tauri-apps/*"
 
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
-      interval: weekly
+      interval: monthly
     target-branch: master
     open-pull-requests-limit: 5
+    groups:
+      tauri-crates:
+        patterns:
+          - "tauri"
+          - "tauri-*"
+      cargo-other:
+        patterns:
+          - "*"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     target-branch: master
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"

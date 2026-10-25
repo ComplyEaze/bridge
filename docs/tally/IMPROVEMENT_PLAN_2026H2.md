@@ -40,7 +40,7 @@
 | **Minimized reads** | Vouchers lack narration, party GSTIN/address, bill allocations, inventory/GST lines — useless for recon, scrutiny, or any review UI. |
 | **Zero live evidence** | Compatibility matrix: every cell `unknown`, evidence `missing`. No `Unsupported` signing key even exists. The "evidence product" has no evidence. |
 | **Only CoreAccounting wired** | IndiaTax / Bills-Outstandings / Inventory packs are feature-gated parsers with no runtime. |
-| **No cloud path for Tally data** | AXAL sync exists only for DSC/documents; Tally data needs a versioned destination contract (fine for now — local-first is the positioning). |
+| **No cloud path for Tally data** | Bridge has no upload feature (the document-sync code was removed); Tally data would need a versioned destination contract (fine for now — local-first is the positioning). |
 | **Velocity sink** | ~30 PRs of pre-dispatch safety ritual produced zero rows of evidence. Safety engineering has been optimizing ceremony before dispatch instead of verifiability after dispatch. |
 
 ---
@@ -71,7 +71,7 @@ or refresh them.
 > follows is what has actually been sourced or explicitly marked. The remaining
 > claims — and the rule that any statement about a named competitor's security
 > or data handling must be sourced or removed rather than graded — are tracked
-> in **[issue #103](https://github.com/lamemustafa/bridge/issues/103)**.
+> in **[issue #103](https://github.com/ComplyEaze/bridge/issues/103)**.
 > Treat anything in §§0–4 not covered below as **unsourced until checked.**
 
 Covered here:
@@ -263,7 +263,7 @@ not measurement.** Treat the latter two as directional.
 
 ## 3. The debate: what survived, what was ruled, what died
 
-Four persona proposals (CA operator, product strategist, protocol engineer, UX designer) were attacked by two adversarial critics (engineering-reality, CA-adoption) and reconciled by an arbiter. Full transcripts are preserved in the session scratchpad.
+Four persona proposals (CA operator, product strategist, protocol engineer, UX designer) were attacked by two adversarial critics (engineering-reality, CA-adoption) and reconciled by an arbiter.
 
 ### 3.1 Consensus (adopt)
 1. **Full-fidelity reads first** — narration, party GSTIN/address, bill allocations, GST/inventory lines; quarantine-on-unknown for custom TDL/UDF; encoding/name-normalization hardening (non-English fixtures). Everything else depends on this.
@@ -272,7 +272,7 @@ Four persona proposals (CA operator, product strategist, protocol engineer, UX d
 4. **Excel/CSV → review grid → post pipeline** with saved per-client column mappings — the expansion product.
 5. **Drift Sentinel** — checkpoint → "changed/new/deleted/back-dated since sign-off" with before/after diffs. Firm-maintained books only in v1; calm "backup restored, re-baselining" state distinct from tamper alarm.
 6. **Honest freshness UX** — Sync Beacon with dual timestamps; Gap Map reborn as a fix-it list; Truth States compressed to three visual tiers (Verified+time / Attention+reason+fix / Broken+remediation).
-7. **Incremental sync v2** — ALTMSTID/ALTVCHID cheap probe, segmented per-FY/month GUID+AlterID scans (a full-books unbounded export can hang a 500k-voucher Tally at 11am — segment + off-hours + visible progress/cancel), verified-scan-only tombstones, wired to the existing `bridge-tally-incremental` crate (well-shaped, just unwired).
+7. **Incremental sync v2** — ALTMSTID/ALTVCHID cheap probe, segmented per-FY/month GUID+AlterID scans (a full-books unbounded export can hang Tally on a large book during working hours — segment + off-hours + visible progress/cancel), verified-scan-only tombstones, wired to the existing `bridge-tally-incremental` crate (well-shaped, just unwired).
 8. **Kill the ceremony, keep the evidence** — rule adopted verbatim: *no safety mechanism without a demonstrated failure mode it prevents; no capability claim without a receipt.*
 9. **Declared topology honesty** — v1 supports: local single-machine, loaded-company, licensed Tally, no TallyVault, no gateway auth. Tally-on-cloud/RDP (**internal hypothesis: market prevalence is unverified**), multi-user LAN, gateway-security setups = explicit `Unsupported` Passport states, not silent failures.
 
@@ -632,7 +632,7 @@ The table below covers `bridge-tally-protocol/src/xml_read_profiles.rs`, which h
 | `ledgers_request` | `BRIDGE Ledger Collection V1` | `connector.rs:122` |
 | `groups_request` | `BRIDGE Group Collection V1` | `connector.rs:109` |
 | `voucher_types_request` | `BRIDGE Voucher Type Collection V1` | `connector.rs:136` |
-| `vouchers_request` (and `selected_vouchers_request`) | `BRIDGE Voucher Collection V1` | `connector.rs:154` |
+| `vouchers_request` | `BRIDGE Voucher Collection V1` | `connector.rs:154` |
 | `ledger_period_balances_request` | `BRIDGE Ledger Period Collection V1` | `connector.rs:286` |
 
 **Consequence:** the CoreAccounting snapshot reads groups, ledgers, voucher types, vouchers and ledger period balances. Every one of those five builders carries the defect. The snapshot pipeline — and therefore the canonical model, reconciliation, Proof-of-Sync and the mirror that depend on it — cannot ever have completed against a real Tally. Three of the five object types (Groups, Voucher Types, Ledger Period Balances) were never probed on 2026-07-29 and remain entirely unverified.

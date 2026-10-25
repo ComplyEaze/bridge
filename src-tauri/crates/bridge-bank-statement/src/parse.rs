@@ -15,7 +15,8 @@ pub type Cells = BTreeMap<&'static str, Vec<Word>>;
 /// One statement row: a value per column, plus `<name>_spaced` for each text
 /// column. Both readings of a wrapped cell are kept on purpose: the de-wrapped
 /// form is the only one where a reference number is intact, the space-joined
-/// form the only one that never welds two words together.
+/// form the only one that never welds two words together. Name extraction (SBI and HDFC)
+/// reads the space-joined form, reference extraction the de-wrapped one.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Row(BTreeMap<String, String>);
 
@@ -47,6 +48,9 @@ impl Row {
 }
 
 /// y of the line that starts this page's transaction table, or `None`.
+///
+/// Anchors are tried in order, so a layout can put its strongest marker first: HDFC's
+/// page 1 carries the column header, later pages only the period line.
 fn table_top(page_lines: &[Line], bank: Bank) -> Option<f64> {
     bank.top_anchors().iter().find_map(|anchor| {
         page_lines
@@ -56,20 +60,41 @@ fn table_top(page_lines: &[Line], bank: Bank) -> Option<f64> {
     })
 }
 
+/// The words of one visual line, bucketed by column.
+fn cells_of(line: &Line, bank: Bank) -> Cells {
+    let mut cells = Cells::new();
+    for word in &line.words {
+        cells
+            .entry(bank.column_of(word.x0, word.x1))
+            .or_default()
+            .push(word.clone());
+    }
+    cells
+}
+
 /// Statement rows, in printed order (`parse_pages`).
 ///
 /// Page anchors, column bounds, row-start detection, multi-line row assembly
-/// and the wrap heuristic, reachable without a PDF.
+/// and the wrap heuristic, reachable without a PDF. For Bank of Baroda these are the printed
+/// rows, newest first, each balance still carrying its glued `Cr`/`Dr` marker: read a
+/// statement through [`parse_statement`], which orders and signs them.
 pub fn parse_pages(pages: &[Page], bank: Bank) -> Vec<Row> {
     let mut rows: Vec<BTreeMap<&'static str, Vec<(String, f64)>>> = Vec::new();
     let mut stop = false;
+    let mut header_seen = false;
     for page in pages {
         if stop {
             break;
         }
         let page_lines = lines(page);
-        let Some(top) = table_top(&page_lines, bank) else {
-            continue;
+        let top = match table_top(&page_lines, bank) {
+            Some(top) => {
+                header_seen = true;
+                top
+            }
+            // a header printed once: every later page's table starts at its top
+            None if bank.header_once() && header_seen => f64::NEG_INFINITY,
+            None => continue,
         };
         if !bank.end_anchors().is_empty()
             && page_lines
@@ -91,17 +116,27 @@ pub fn parse_pages(pages: &[Page], bank: Bank) -> Vec<Row> {
             {
                 continue;
             }
-            let mut cells = Cells::new();
-            for word in &line.words {
-                cells
-                    .entry(bank.column_of(word.x0, word.x1))
-                    .or_default()
-                    .push(word.clone());
-            }
+            let cells = cells_of(line, bank);
             // A line that opens a transaction is a transaction whatever else it
-            // says: the date decides, and the footer anchor only breaks ties.
+            // says: the date decides, and the footer test only breaks ties. This guard
+            // covers the footer tests of the lines below (the bottom anchors and, for a
+            // layout that has one, its column footer): a footer that is a subset test
+            // would otherwise end the page at a transaction whose counterparty is the
+            // bank itself, dropping that row and every row after it on the page.
+            //
+            // What it does not cover, and why it is left: a wrapped continuation line has
+            // no date, so a continuation that carried all the footer words as separate
+            // tokens would still end the page; and the page-wide `end_anchors` scan above
+            // looks at every line, dated or not. These narrations join fields with
+            // hyphens, so a payee such as a bank's own name rarely tokenises into bare
+            // words, but a wrap can leave some of them bare. Geometry does not separate
+            // the two either: the real `STATEMENT SUMMARY` footer centres inside the
+            // narration column, exactly where a continuation sits.
             let started = bank.is_row_start(&cells);
-            if !started && !bank.bottom_anchors().is_empty() && matches(line, bank.bottom_anchors())
+            let words: Vec<&str> = line.words.iter().map(|word| word.text.as_str()).collect();
+            if !started
+                && ((!bank.bottom_anchors().is_empty() && matches(line, bank.bottom_anchors()))
+                    || bank.column_footer(&words).is_some())
             {
                 break;
             }
@@ -160,9 +195,17 @@ pub fn parse_pages(pages: &[Page], bank: Bank) -> Vec<Row> {
 /// Statement rows for any layout, or the refusal a single-line table raises.
 ///
 /// A column layout cannot tell a stray line from a wrapped cell, so it has no
-/// refusals of its own here; the balance replay is its proof.
+/// refusals of its own here beyond the rules Bank of Baroda adds (a footer on every page, a
+/// row at the top of every later page, dates, value dates and balance markers a
+/// layout can produce, and newest-first order); the balance replay is its proof.
 pub fn parse_statement(pages: &[Page], bank: Bank) -> Result<Vec<Row>, Refusal> {
     match bank.layout() {
+        Layout::Columns if bank == Bank::Bob => {
+            require_bank_identity(pages)?;
+            require_page_footers(pages, bank)?;
+            require_later_pages_start_with_a_row(pages, bank)?;
+            Bank::bob_rows(parse_pages(pages, bank))
+        }
         Layout::Columns => Ok(parse_pages(pages, bank)),
         Layout::SingleLine => parse_single_line_pages(pages, bank),
     }
@@ -193,15 +236,7 @@ fn parse_single_line_pages(pages: &[Page], bank: Bank) -> Result<Vec<Row>, Refus
             !matches!(bank.classify_line(words), LineKind::Row(_))
                 && page_footer(words) == Some((index + 1, pages.len()))
         }) {
-            return Err(Refusal::new(
-                "page_sequence_unproven",
-                format!(
-                    "page {} does not print \"Page {} of {}\"; without printed totals, every page must be accounted for",
-                    index + 1,
-                    index + 1,
-                    pages.len()
-                ),
-            ));
+            return Err(page_sequence_unproven(index, pages.len()));
         }
         let Some(top) = table_top(&page_lines, bank) else {
             continue;
@@ -242,6 +277,126 @@ fn parse_single_line_pages(pages: &[Page], bank: Bank) -> Result<Vec<Row>, Refus
     Ok(rows)
 }
 
+/// The first four letters of the IFSC that page 1 of a Bank of Baroda statement prints.
+const BOB_IFSC_PREFIX: &str = "BARB";
+
+/// A statement is read as Bank of Baroda only if page 1 says so in the one place the
+/// measured statements do: a single visual line holding the word `IFSC` followed by
+/// the word `Code:`, whose next word is an 11-character IFSC (four capital letters,
+/// a zero, six capital letters or digits) that begins with the bank's prefix; the prefix is
+/// compared as capitals, so lower case never matches. The
+/// measured statements print the bank's name only in an image, so the text layer has
+/// nothing else to read; the same four letters inside a narration are a counterparty's
+/// bank and are never looked at. The check is by label and position: page 1 only, and only
+/// the lines above the table's column header row (as the masked account number is read), so a
+/// row that prints those words is neither identity nor a second line; a
+/// missing, repeated, malformed or other-bank code refuses the whole run, and the
+/// refusal never carries the code.
+fn require_bank_identity(pages: &[Page]) -> Result<(), Refusal> {
+    let refuse = |why: &'static str| {
+        Refusal::new(
+            "bank_not_recognised",
+            format!(
+                "page 1 of this statement does not carry the Bank of Baroda IFSC Code ({why}); this reader is measured on one Bank of Baroda layout only, so check the bank chosen"
+            ),
+        )
+    };
+    let first = pages
+        .first()
+        .ok_or_else(|| refuse("the statement has no page"))?;
+    let page_lines = lines(first);
+    let top = table_top(&page_lines, Bank::Bob)
+        .ok_or_else(|| refuse("the table's column header row was not found"))?;
+    let mut found = Vec::new();
+    for line in page_lines.iter().filter(|line| line.y < top) {
+        for (at, words) in line.words.windows(2).enumerate() {
+            if words[0].text == "IFSC" && words[1].text == "Code:" {
+                found.push(line.words.get(at + 2).map(|word| word.text.clone()));
+            }
+        }
+    }
+    let [value] = found.as_slice() else {
+        return Err(refuse(if found.is_empty() {
+            "no IFSC Code line"
+        } else {
+            "more than one IFSC Code"
+        }));
+    };
+    let value = value
+        .as_deref()
+        .ok_or_else(|| refuse("the IFSC Code has no value"))?;
+    let bytes = value.as_bytes();
+    // (the first four letters are checked against the bank's prefix below, capitals included)
+    let well_formed = bytes.len() == 11
+        && bytes[4] == b'0'
+        && bytes[5..]
+            .iter()
+            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit());
+    if !well_formed {
+        return Err(refuse("the IFSC Code is not an IFSC"));
+    }
+    if !value.starts_with(BOB_IFSC_PREFIX) {
+        return Err(refuse("the IFSC Code names another bank"));
+    }
+    Ok(())
+}
+
+fn page_sequence_unproven(index: usize, count: usize) -> Refusal {
+    Refusal::new(
+        "page_sequence_unproven",
+        format!(
+            "page {} does not print \"Page {} of {count}\"; without printed totals, every page must be accounted for",
+            index + 1,
+            index + 1,
+        ),
+    )
+}
+
+/// A table whose column header is printed once starts every later page with a row, so a
+/// later page opening with anything else is a banner, a note or a row split across the
+/// break, and none of them is read into the row above it.
+fn require_later_pages_start_with_a_row(pages: &[Page], bank: Bank) -> Result<(), Refusal> {
+    let mut header_seen = false;
+    for (index, page) in pages.iter().enumerate() {
+        let page_lines = lines(page);
+        if table_top(&page_lines, bank).is_some() {
+            header_seen = true;
+            continue;
+        }
+        if !(bank.header_once() && header_seen) {
+            continue;
+        }
+        if let Some(first) = page_lines.first() {
+            if !bank.is_row_start(&cells_of(first, bank)) {
+                return Err(Refusal::new(
+                    "unexpected_line_in_table",
+                    format!(
+                        "page {} does not start with a transaction; a banner, a note or a row split across the page break is not read into the row above it",
+                        index + 1
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A column layout without printed totals: every page must print its own footer
+/// `Page N of M`, N its position and M the document's page count, so a dropped page
+/// whose two sides cancel is refused (the balance replay cannot see one).
+fn require_page_footers(pages: &[Page], bank: Bank) -> Result<(), Refusal> {
+    for (index, page) in pages.iter().enumerate() {
+        let proven = lines(page).iter().any(|line| {
+            let words: Vec<&str> = line.words.iter().map(|word| word.text.as_str()).collect();
+            bank.column_footer(&words) == Some((index + 1, pages.len()))
+        });
+        if !proven {
+            return Err(page_sequence_unproven(index, pages.len()));
+        }
+    }
+    Ok(())
+}
+
 static DIGIT_RUN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\d+").unwrap());
 
 /// Digit runs printed on the statement's own account-number line, from the
@@ -249,7 +404,9 @@ static DIGIT_RUN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\d+").unwrap()
 ///
 /// Only the line the bank labels as the account number: a header block also
 /// prints a phone number, a customer id, an IFSC, a MICR code and a postcode,
-/// and on a real statement four different wrong tails matched those.
+/// and on a real statement four different wrong tails matched those. Narrowing was done
+/// twice, and the second step mattered: reading the whole document lets any transaction
+/// reference stand in for the account, and reading the whole header block is barely better.
 pub fn account_number_runs(pages: &[Page], bank: Bank) -> BTreeSet<String> {
     let mut runs = BTreeSet::new();
     if bank.account_anchors().is_empty() {
@@ -275,7 +432,7 @@ pub fn account_number_runs(pages: &[Page], bank: Bank) -> BTreeSet<String> {
     runs
 }
 
-/// The digits of the operator's free-form account label.
+/// The digits of the account label the operator typed, for matching only.
 pub fn account_digits(account_tail: &str) -> String {
     DIGIT_RUN
         .find_iter(account_tail)
@@ -288,11 +445,23 @@ pub fn account_digits(account_tail: &str) -> String {
 ///
 /// The running-balance proof validates the PDF's own arithmetic and nothing
 /// else, so it is equally happy to certify the wrong account's statement. This
-/// is the one check that ties the document to the ledger.
+/// is the one check that ties the document to the ledger. What it catches in practice:
+/// the other bank's file, a bank ledger named for the wrong account. It does not catch
+/// another month of the same account: only a date window that misses the statement does
+/// (the empty-selection refusal).
 ///
 /// Residual, stated rather than assumed: the label line can carry a second
 /// number (HDFC prints a product code beside it), so a tail that happens to end
-/// that number would also pass.
+/// that number would also pass. Four digits against one line is a far weaker coincidence
+/// than four digits against a page.
+///
+/// Where the number is printed with a clear tail, matching is on a trailing digit run,
+/// because banks mask the leading digits (`XXXXXX4230`) and may space the visible ones, and
+/// only against the line the statement labels as its account number (see
+/// [`account_number_runs`]); a layout that masks the middle is bound by
+/// `bob_account_match` instead. It runs before any proposal exists. The number returned
+/// is the statement's own, never the label the operator typed: a label can be respelled,
+/// an account number cannot, and the row labels in `proposals` are derived from it.
 pub fn require_account_match(
     pages: &[Page],
     bank: Bank,
@@ -307,6 +476,9 @@ pub fn require_account_match(
                 "the account label carries {digit_count} digits; at least 4 are needed to bind the statement to the ledger"
             ),
         ));
+    }
+    if bank == Bank::Bob {
+        return bob_account_match(pages, &digits);
     }
     let runs = account_number_runs(pages, bank);
     if runs.is_empty() {
@@ -330,4 +502,68 @@ pub fn require_account_match(
             "the account digits match more than one number on the account-number line; supply more digits",
         )),
     }
+}
+
+/// The measured statements print their own account number masked (`ddd` + `XXXXXXXX` + `ddd`, 14
+/// characters, in the page-1 header block above the table), so a tail cannot bind
+/// it: the supplied digits must begin with the clear leading digits, end with the
+/// clear trailing ones and carry more digits than those, so a tail is refused. Only
+/// those clear digits are compared; the masked middle cannot be, and the number's real
+/// length is not known (whether the mask keeps it is unverified), so the length is not
+/// checked either. Returns the masked number as printed. Masked numbers further down are
+/// a narration's counterparty, not this account, and are never read.
+fn bob_account_match(pages: &[Page], digits: &str) -> Result<String, Refusal> {
+    static MASKED: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^([0-9]+)[Xx*]+([0-9]+)$").unwrap());
+    let mut printed: BTreeSet<String> = BTreeSet::new();
+    for page in pages {
+        let page_lines = lines(page);
+        let Some(top) = table_top(&page_lines, Bank::Bob) else {
+            continue;
+        };
+        for line in page_lines.iter().filter(|line| line.y < top) {
+            printed.extend(
+                line.words
+                    .iter()
+                    .filter(|word| MASKED.is_match(&word.text))
+                    .map(|word| word.text.clone()),
+            );
+        }
+    }
+    let mut tokens = printed.iter();
+    let (Some(token), None) = (tokens.next(), tokens.next()) else {
+        return Err(if printed.is_empty() {
+            Refusal::new(
+                "no_account_number_line",
+                "no masked account number was found above the table's column header row; the header row itself may be missing, the layout may have changed, or this is not a Bank of Baroda statement in the measured layout",
+            )
+        } else {
+            Refusal::new(
+                "ambiguous_account_match",
+                "the statement prints more than one masked account number above its table",
+            )
+        });
+    };
+    let found = MASKED
+        .captures(token)
+        .expect("the token matched the pattern above");
+    if digits.chars().count() <= found[1].len() + found[2].len() {
+        return Err(Refusal::new(
+            "unbindable_account",
+            format!(
+                "a Bank of Baroda statement, as measured, prints its account number masked (only its first {} and last {} digits clear); the account label must carry the whole number",
+                found[1].len(),
+                found[2].len()
+            ),
+        ));
+    }
+    if !(digits.starts_with(&found[1]) && digits.ends_with(&found[2])) {
+        return Err(Refusal::new(
+            "account_not_in_statement",
+            "the account digits supplied disagree with the clear digits of the statement's masked account number; refusing to post it anywhere",
+        ));
+    }
+    // the number the statement prints, not the label's digits: the same statement must
+    // give the same transaction ids whatever the operator typed in the masked middle
+    Ok(token.clone())
 }

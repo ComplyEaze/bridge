@@ -6,7 +6,7 @@ use super::super::{
 use super::desktop_journal_review::{
     DesktopJournalCompany, DesktopJournalDetails, DesktopJournalEntry, DesktopJournalReview,
 };
-use super::post::{admit_saved_journal, admit_saved_journal_integrity};
+use super::post::{admit_saved_journal, admit_saved_journal_integrity, OnAccountMarks};
 use super::*;
 use crate::tally::{TallyConfig, TallyRuntime};
 use bridge_tally_transport::canonical_loopback_origin;
@@ -93,8 +93,10 @@ impl DesktopJournalService {
                 let no_attempt_recorded = failure.code == "import_not_dispatched";
                 let message = if no_attempt_recorded {
                     "No posting attempt is recorded for this original Journal."
+                } else if failure.code == super::post::DESKTOP_LEDGER_LINE_BREAK {
+                    super::post::DESKTOP_LEDGER_LINE_BREAK_ACTION
                 } else {
-                    "Bridge could not confirm this original Journal. Reconcile it again after the underlying condition changes."
+                    "ComplyEaze Bridge could not confirm this original Journal. Reconcile it again after the underlying condition changes."
                 };
                 let mut operation = DesktopJournalOperation::from_failure(failure, message);
                 if no_attempt_recorded {
@@ -123,6 +125,7 @@ impl DesktopJournalService {
     ) -> Result<DesktopJournalReview, String> {
         if snapshot.dispatched {
             let _ = admit_saved_journal_integrity(&snapshot.batch, &self.server.settings.endpoint)?;
+            super::post::refuse_a_line_break_name_on_the_desktop(&snapshot.batch)?;
         } else {
             let _ = admit_saved_journal(&snapshot.batch, &self.server.settings.endpoint)?;
         }
@@ -131,27 +134,36 @@ impl DesktopJournalService {
             .vouchers
             .first()
             .ok_or_else(|| "import_post_requires_one_journal".to_string())?;
+        let marks = OnAccountMarks::of(&snapshot.batch);
+        let ledgers = || voucher.entries.iter().map(|entry| entry.ledger.as_str());
+        let on_account_note = Some(marks.legend(ledgers()))
+            .filter(|note| !note.is_empty())
+            .map(str::to_owned);
+        let on_account: Vec<bool> = ledgers().map(|ledger| marks.marks(ledger)).collect();
         let company = snapshot
             .batch
             .company
             .ok_or_else(|| "import_post_company_missing".to_string())?;
         let (total_debit, total_credit) = totals(&snapshot.batch.vouchers)?;
         let details = DesktopJournalDetails {
-            date: voucher.date.clone(),
+            date: voucher.date.as_str().to_owned(),
             reference: voucher.reference.clone(),
-            narration: voucher.narration.clone(),
+            narration: super::posted_narration(voucher).map(str::to_owned),
             entries: voucher
                 .entries
                 .iter()
-                .map(|entry| DesktopJournalEntry {
+                .zip(on_account)
+                .map(|(entry, on_account)| DesktopJournalEntry {
                     ledger: entry.ledger.clone(),
                     side: match entry.side {
                         EntrySide::Dr => "Dr".into(),
                         EntrySide::Cr => "Cr".into(),
                     },
                     amount: entry.amount.clone(),
+                    on_account,
                 })
                 .collect(),
+            on_account_note,
             total_debit: total_debit.as_str().to_owned(),
             total_credit: total_credit.as_str().to_owned(),
         };
@@ -162,7 +174,7 @@ impl DesktopJournalService {
                 name: company.name,
                 guid: company.guid,
                 company_number: company.company_number,
-                books_from: company.books_from,
+                books_from: company.books_from.as_str().to_owned(),
             },
             built_at: snapshot.batch.built_at,
             dispatched: snapshot.dispatched,
@@ -237,7 +249,7 @@ impl DesktopJournalOperation {
             "attempt_recorded": result["attempt_recorded"].as_bool(),
             "error": (!error.is_null()).then(|| json!({
                 "code": bounded_action_text(&error["code"], 256).unwrap_or("journal_action_error"),
-                "message": message.as_deref().unwrap_or("Bridge could not confirm the Journal. Reconcile the original batch without resending it."),
+                "message": message.as_deref().unwrap_or("ComplyEaze Bridge could not confirm the Journal. Reconcile the original batch without resending it."),
                 "remediation": bounded_action_text(&error["remediation"], 4096),
             })),
         }});
@@ -286,8 +298,8 @@ impl Settings {
             max_bytes: MAX_SELECTED_JOURNAL_BYTES,
             redaction: Redaction::None,
             import_enabled: true,
-            writes_enabled: true,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::On,
+            audit_enabled: false,
         })
     }
 }
@@ -300,7 +312,11 @@ impl Server {
             runtime,
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(crate::agent::ListingSnapshots::default())),
+            voucher_pages: Arc::new(Mutex::new(crate::agent::VoucherPages::default())),
             post_approvals,
+            // The desktop app calls Bridge's operations directly and never dispatches an MCP
+            // tool, so there is no MCP client to accept anything.
+            terms: super::super::terms::TermsGate::NotRequired,
         }
     }
 }

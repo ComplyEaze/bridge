@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ComplyEaze/bridge-tally",
+  "title": "ComplyEaze Bridge",
+  "description": "Reads books; proposes vouchers from SBI, HDFC, Union Bank statement PDFs; posting off by default.",
+  "version": "0.6.0",
+  "websiteUrl": "https://bridge.complyeaze.com",
+  "repository": {
+    "url": "https://github.com/ComplyEaze/bridge",
+    "source": "github",
+    "id": "1298346634"
+  },
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.6.0/bridge-tally-mcp-v0.6.0-windows-x64.mcpb",
+      "fileSha256": "7bf81f08e058fc7ae00ccc51b3dceec10dc50d45dca8477a0438fd9b5a2852ca",
+      "transport": {
+        "type": "stdio"
+      }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.6.0/bridge-tally-mcp-v0.6.0-macos-arm64.mcpb",
+      "fileSha256": "64d38de33323e801a9d88e221ba611ab4bdab0bbea9be44d44d4a4d73f77b243",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

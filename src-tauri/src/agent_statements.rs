@@ -1,6 +1,6 @@
 //! Thin MCP presentation of the shared statement read (#692).
 use super::*;
-use crate::reports::statements::{Established, TieOut};
+use crate::reports::statements::{ClosingStockUse, Established, TieOut, CLOSING_STOCK_SOURCE};
 use bridge_tally_protocol::native_statement_reports::NativeStatementKind;
 
 /// Unclassified ledgers returned in full up to this many; the count is always
@@ -27,9 +27,6 @@ impl Server {
         let guid = required_string(args, "company_guid")?;
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
-        let from =
-            bridge_tally_core::TallyDate::parse(from).map_err(|_| "invalid_date".to_string())?;
-        let to = bridge_tally_core::TallyDate::parse(to).map_err(|_| "invalid_date".to_string())?;
         let period = crate::tally::runtime::TrialBalancePeriod::new(from, to)
             .map_err(|_| "invalid_date_range".to_string())?;
         let (company, identity, prior) = self.verified_company(guid).await?;
@@ -44,10 +41,9 @@ impl Server {
         let trial_balance = read.trial_balance;
         let evidence = combine_evidence(prior, evidence_from_runtime_read(trial_balance.evidence));
         let derived = read.derived;
-        let (lines, established, headline) = match kind {
+        let (lines, figures) = match kind {
             NativeStatementKind::ProfitAndLoss => (
                 &derived.profit_and_loss,
-                &derived.net_result,
                 json!({
                     "gross_result": established_json(&derived.gross_result),
                     "net_result": established_json(&derived.net_result),
@@ -55,7 +51,6 @@ impl Server {
             ),
             NativeStatementKind::BalanceSheet => (
                 &derived.balance_sheet,
-                &derived.balance_sheet_profit_and_loss,
                 json!({
                     "profit_and_loss": {
                         "ledger": derived.profit_and_loss_ledger.as_ref().map(|ledger| json!({
@@ -70,7 +65,48 @@ impl Server {
         // The derived lines are the statement only once its result is
         // established; until then they are withheld, and the gates show how
         // each of Tally's own lines compared.
-        let lines = matches!(established, Established::Established { .. }).then_some(lines);
+        // The headline's facts, from the same derived results the state is
+        // built from, before anything of `derived` is moved.
+        let (statement_kind, parts) = match kind {
+            NativeStatementKind::ProfitAndLoss => (
+                headline::StatementKind::ProfitAndLoss,
+                vec![
+                    (
+                        headline::StatementPart::GrossResult,
+                        headline::PartOutcome::of(&derived.gross_result),
+                    ),
+                    (
+                        headline::StatementPart::NetResult,
+                        headline::PartOutcome::of(&derived.net_result),
+                    ),
+                ],
+            ),
+            NativeStatementKind::BalanceSheet => (
+                headline::StatementKind::BalanceSheet,
+                vec![(
+                    headline::StatementPart::BalanceSheetProfitAndLoss,
+                    headline::PartOutcome::of(&derived.balance_sheet_profit_and_loss),
+                )],
+            ),
+        };
+        let mut statement_basis = headline::StatementBasis::new(
+            statement_kind,
+            trial_balance.from.clone(),
+            trial_balance.to.clone(),
+            parts,
+            derived.profit_and_loss_tie.is_some(),
+        );
+        if matches!(derived.closing_stock, ClosingStockUse::Applied { .. }) {
+            statement_basis = statement_basis.with_closing_stock_from_tally();
+        }
+        // One decision: the lines are withheld exactly when the headline says so.
+        let lines = (!statement_basis.lines_withheld()).then_some(lines);
+        let outcome = match kind {
+            NativeStatementKind::ProfitAndLoss => {
+                weakest(&[&derived.net_result, &derived.gross_result])
+            }
+            NativeStatementKind::BalanceSheet => &derived.balance_sheet_profit_and_loss,
+        };
         let unclassified_total = derived.unclassified.len();
         let unclassified = derived
             .unclassified
@@ -84,41 +120,75 @@ impl Server {
                 })
             })
             .collect::<Vec<_>>();
-        Ok(ToolOutcome {
-            payload: json!({
-                "company": company_json(&company, std::slice::from_ref(&company)),
-                "result": {
-                    "state": "observed",
+        // A balance sheet shows how Tally's Profit and Loss compared only when a
+        // closing stock was considered: offered, and the statement not refused
+        // for another reason first (then `closing_stock` is null as well).
+        let show_profit_and_loss_tie = kind == NativeStatementKind::ProfitAndLoss
+            || !matches!(derived.closing_stock, ClosingStockUse::NotApplicable);
+        let mut result = json!({
+                    "state": top_level(outcome).0,
                     "basis": "tally_native_trial_balance_classified_by_reserved_primary_group",
                     "from": trial_balance.from, "to": trial_balance.to,
                     "currency": trial_balance.currency, "read_at": trial_balance.read_at,
                     "lines": lines,
-                    "result": headline,
+                    "result": figures,
                     "unclassified": unclassified,
                     "unclassified_total": unclassified_total,
                     "stock_ledger_count": derived.stock_ledger_count,
+                    "closing_stock": closing_stock_json(&derived.closing_stock),
                     "balance_sheet_gate": tie_json(&derived.balance_sheet_tie),
-                    "tie_out": derived.profit_and_loss_tie.as_ref().map(tie_json),
+                    "tie_out": show_profit_and_loss_tie.then(|| derived.profit_and_loss_tie.as_ref().map(tie_json)).flatten(),
                     "verification": "stable_paired_sources_with_company_mode_and_extent_guards",
                     "limitations": [
                         "Each line sums the Trial Balance amounts Tally returned under one reserved primary group, and counts the empty amounts it left out",
                         "A ledger under a user-created primary group, or with an incomplete group chain, is listed in unclassified; while any carries an amount, no result is established",
-                        "Closing stock is not derived: with a Stock-in-Hand balance no result is established",
+                        "Closing stock is not derived: with a Stock-in-Hand balance no result is established. Tally's own Less: Closing Stock is used, and shown in closing_stock, only as the description says (one integrated book, no opening stock); a costing method, opening stock, a window spanning two years and any other book are not measured",
                         "lines is null while this tool's result is not established, so a derived line is never shown as the statement; balance_sheet_gate and tie_out then show how each of Tally's own lines compared",
-                        "Every result is established only if Tally's own Balance Sheet for the window ties line for line (balance_sheet_gate); gross and net also need Tally's own Profit and Loss to tie (tie_out), with one heading, Cost of Sales, allowed while it equals the derived cost of sales; a book with stock items is expected to refuse, and no inventory book has been measured",
+                        "Every result is established only if Tally's own Balance Sheet for the window ties line for line (balance_sheet_gate); gross and net also need Tally's own Profit and Loss to tie (tie_out), with one heading, Cost of Sales, allowed while it equals the derived cost of sales; with stock items it refuses unless Tally's own closing stock is used, as closing_stock says (one integrated book measured)",
                         "A book with more than one currency master is refused before the Trial Balance is read",
                         "A Tally line the derivation has no counterpart for, such as a heading with an amount or a difference in opening balances, refuses the results rather than being guessed at",
                         "Tally's own statements carry no company identity; they are bound only by the company, mode and book-extent checks around the read",
                         "The Balance Sheet gate has been measured over one full year on one book and one month on another; a window spanning more than one financial year is unmeasured",
                         "Not voucher-level reconciliation or an atomic snapshot",
                     ],
-                },
-            }),
+        });
+        // The reason a caller reads beside the state is the one the nested result carries.
+        if let (Some(reason), Some(result)) = (top_level(outcome).1, result.as_object_mut()) {
+            result.insert("reason".to_string(), json!(reason));
+        }
+        let mut payload = json!({
+            "company": company_json(&company, std::slice::from_ref(&company)),
+            "result": result,
+        });
+        payload["headline"] =
+            json!(statement_basis.headline(&headline::CompanyName::new(&company.name)));
+        Ok(ToolOutcome {
+            payload,
             evidence,
             company_guid: Some(guid.to_string()),
             truncated: unclassified_total > MAX_UNCLASSIFIED_RETURNED,
         })
     }
+}
+
+/// The top-level state and reason: `observed` only when this tool's result is
+/// established, so the field an agent reads first does not say `observed` over a
+/// refusal; the reason is the one the nested result carries (#984).
+fn top_level(outcome: &Established) -> (&'static str, Option<&'static str>) {
+    match outcome {
+        Established::Established { .. } => ("observed", None),
+        Established::NotEstablished { reason, .. } => ("not_established", Some(reason.as_str())),
+    }
+}
+
+/// The result the top-level state follows: the first that is not established,
+/// so the weaker outcome wins when a tool carries more than one.
+fn weakest<'a>(results: &[&'a Established]) -> &'a Established {
+    results
+        .iter()
+        .copied()
+        .find(|result| matches!(result, Established::NotEstablished { .. }))
+        .unwrap_or(results[0])
 }
 
 /// A result, with any line names that failed the gate masked as party names:
@@ -127,7 +197,22 @@ fn established_json(result: &Established) -> Value {
     match result {
         Established::Established { value } => json!({"state": "established", "value": value}),
         Established::NotEstablished { reason, lines } => json!({
-            "state": "not_established", "reason": reason,
+            "state": "not_established", "reason": reason.as_str(),
+            "lines": lines.iter().cloned().map(party_name).collect::<Vec<_>>(),
+        }),
+    }
+}
+
+/// Whether Tally's own closing stock was used, as a line of its own that names
+/// its source; null when Tally's Profit and Loss offered none.
+fn closing_stock_json(use_of: &ClosingStockUse) -> Value {
+    match use_of {
+        ClosingStockUse::NotApplicable => Value::Null,
+        ClosingStockUse::Applied { value } => {
+            json!({"state": "applied", "value": value, "source": CLOSING_STOCK_SOURCE})
+        }
+        ClosingStockUse::Declined { why, lines } => json!({
+            "state": "declined", "why": why.as_str(),
             "lines": lines.iter().cloned().map(party_name).collect::<Vec<_>>(),
         }),
     }

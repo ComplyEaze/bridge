@@ -61,28 +61,28 @@ pub fn run(
         Unit::Paise,
         &def("Debits to cash ledgers"),
         cash_ev.clone(),
-    );
+    )?;
     r.fig(
         "cash_payments",
         Value::Int(cp),
         Unit::Paise,
         &def("Credits to cash ledgers"),
         cash_ev.clone(),
-    );
+    )?;
     r.fig(
         "bank_receipts",
         Value::Int(br),
         Unit::Paise,
         &def("Debits to bank ledgers"),
         bank_ev.clone(),
-    );
+    )?;
     r.fig(
         "bank_payments",
         Value::Int(bp),
         Unit::Paise,
         &def("Credits to bank ledgers"),
         bank_ev.clone(),
-    );
+    )?;
     let total = |a: i64, b: i64| a.checked_add(b).ok_or_else(overflow);
     let rec_bp = pct_bp(cr, total(cr, br)?).ok_or_else(overflow)?;
     let pay_bp = pct_bp(cp, total(cp, bp)?).ok_or_else(overflow)?;
@@ -92,14 +92,14 @@ pub fn run(
         Unit::BasisPoints,
         "Cash receipts as a share of cash and bank receipts together.",
         Vec::new(),
-    );
+    )?;
     let share_payments_id = r.fig(
         "cash_share_payments",
         pay_bp.clone(),
         Unit::BasisPoints,
         "Cash payments as a share of cash and bank payments together.",
         Vec::new(),
-    );
+    )?;
     let lim = rules.cash_share_limit_bp;
     let within = matches!((&rec_bp, &pay_bp), (Value::Int(rec), Value::Int(pay)) if *rec <= lim && *pay <= lim);
     let thr = if within {
@@ -113,7 +113,7 @@ pub fn run(
         Unit::Paise,
         "₹10 crore if both cash shares are within 5%, else ₹1 crore",
         vec![EvidenceRef::new("rule", "s44ab")],
-    );
+    )?;
     // Turnover is not supplied in this slice (the reference dump passes none), so the two
     // turnover figures and their facts are never emitted.
     let facts = vec![

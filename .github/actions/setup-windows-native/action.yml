@@ -58,7 +58,7 @@ runs:
     # trusted pushes prevents executable cache contents from being introduced by
     # an untrusted contributor while still serving the default-branch cache to PRs.
     - name: Save pinned Strawberry Perl
-      if: inputs.save-cache == 'true' && steps.strawberry-perl.outputs.cache-hit != 'true' && github.event_name != 'pull_request'
+      if: inputs.save-cache == 'true' && steps.strawberry-perl.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: 'C:\Strawberry'

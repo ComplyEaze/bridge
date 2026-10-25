@@ -6,7 +6,7 @@
 > invisible to them until it merges. Two branches have already collided, and `1.2` is used twice
 > below. `scripts/check-protocol-section-numbers.mjs` fails CI on a duplicate; see
 > [`SECTION-REGISTER.md`](./SECTION-REGISTER.md) for what it does and does not guarantee.
-> Editing this index or any part also stales its compatibility-surface pin; the reseal procedure is in
+> Editing this index or any part changes a pinned file, which needs a compatibility-surface acknowledgement; the procedure is in
 > [`docs/release-process.md`](../release-process.md#compatibility-surface-reseal).
 
 **Purpose.** The reference set is the single source of truth for how Tally's XML gateway actually
@@ -150,6 +150,9 @@ base revision.
 <a id="82e-a-voucher-types-class-comes-from-tallys-class-functions-not-its-display-name--verified-2026-09-24-tallyprime-71-one-synthetic-book"></a>
 
 [8.2e A voucher type's class comes from Tally's class functions, not its display name — **VERIFIED 2026-09-24; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82e-a-voucher-types-class-comes-from-tallys-class-functions-not-its-display-name--verified-2026-09-24-tallyprime-71-one-synthetic-book)
+<a id="82f-referencedate-on-the-voucher-fetch--verified-2026-10-07-tallyprime-71-one-synthetic-book"></a>
+
+[8.2f `REFERENCEDATE` on the voucher `FETCH` — **VERIFIED 2026-10-07; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82f-referencedate-on-the-voucher-fetch--verified-2026-10-07-tallyprime-71-one-synthetic-book)
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)
@@ -171,6 +174,9 @@ base revision.
 <a id="93-voucher-idempotency-depends-on-remoteid--this-sections-title-used-to-say-the-opposite"></a>
 
 [9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#93-voucher-idempotency-depends-on-remoteid--this-sections-title-used-to-say-the-opposite)
+<a id="93a-after-a-refusal-a-corrected-send-under-the-same-remoteid-answered-altered1-while-creating"></a>
+
+[9.3a After a refusal, a corrected send under the same `REMOTEID` answered `ALTERED=1` while creating](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#93a-after-a-refusal-a-corrected-send-under-the-same-remoteid-answered-altered1-while-creating)
 <a id="94-master-re-create-is-a-silent-alter"></a>
 
 [9.4 Master re-create is a silent Alter](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94-master-re-create-is-a-silent-alter)
@@ -189,6 +195,18 @@ base revision.
 <a id="94e-when-fold-equal-ledgers-coexist-an-import-binds-the-exact-name"></a>
 
 [9.4e When fold-equal ledgers coexist, an import binds the exact name](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94e-when-fold-equal-ledgers-coexist-an-import-binds-the-exact-name)
+<a id="94f-a-name-filter-folds-ascii-case-not-accented-capitals"></a>
+
+[9.4f A `$Name` filter folds ASCII case, not accented capitals](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94f-a-name-filter-folds-ascii-case-not-accented-capitals)
+<a id="94g-a-ledger-create-on-an-existing-name-replaced-its-parent-bill-wise-flag-and-opening-balance"></a>
+
+[9.4g A ledger `Create` on an existing name replaced its parent, bill-wise flag and opening balance](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94g-a-ledger-create-on-an-existing-name-replaced-its-parent-bill-wise-flag-and-opening-balance)
+<a id="94h-a-ledgers-own-name-can-differ-in-case-or-symbols-from-its-rows-name-attribute"></a>
+
+[9.4h A ledger's own name can differ in case or symbols from its row's `NAME` attribute](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94h-a-ledgers-own-name-can-differ-in-case-or-symbols-from-its-rows-name-attribute)
+<a id="94i-a-ledger-create-on-a-new-name-moved-the-master-mark-by-one-and-changed-nothing-else"></a>
+
+[9.4i A ledger `Create` on a new name moved the master mark by one and changed nothing else](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94i-a-ledger-create-on-a-new-name-moved-the-master-mark-by-one-and-changed-nothing-else)
 <a id="95-identity-after-write"></a>
 
 [9.5 Identity after write](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#95-identity-after-write)
@@ -207,9 +225,27 @@ base revision.
 <a id="96-actioncancel-by-remoteid-creates-a-new-voucher--it-does-not-cancel--trap"></a>
 
 [9.6 `ACTION="Cancel"` by `REMOTEID` creates a new voucher — it does not cancel — **TRAP**](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#96-actioncancel-by-remoteid-creates-a-new-voucher--it-does-not-cancel--trap)
+<a id="917-tallys-gstr-1-flag-expects-a-sales-invoices-tax-per-sales-line-rounded-half-up-and-flags-a-figure-that-differs-from-it"></a>
+
+[9.17 Tally's GSTR-1 flag expects a Sales invoice's tax per sales line, rounded half-up, and flags a figure that differs from it](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#917-tallys-gstr-1-flag-expects-a-sales-invoices-tax-per-sales-line-rounded-half-up-and-flags-a-figure-that-differs-from-it)
+<a id="918-a-zero-value-sales-voucher-is-refused-unless-its-voucher-type-allows-zero-valued-transactions"></a>
+
+[9.18 A zero-value Sales voucher is refused unless its voucher type allows zero-valued transactions](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#918-a-zero-value-sales-voucher-is-refused-unless-its-voucher-type-allows-zero-valued-transactions)
+<a id="919-a-keyed-purchase-invoice-as-the-voucher-export-reads-it"></a>
+
+[9.19 A keyed Purchase invoice, as the voucher export reads it](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#919-a-keyed-purchase-invoice-as-the-voucher-export-reads-it)
+<a id="920-the-gstr-1-status-of-one-voucher-type-in-a-window-read-by-the-types-name-with-a-narrow-field-list"></a>
+
+[9.20 The GSTR-1 status of one voucher type in a window, read by the type's name with a narrow field list](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#920-the-gstr-1-status-of-one-voucher-type-in-a-window-read-by-the-types-name-with-a-narrow-field-list)
 <a id="914-a-remoteid-upsert-re-states-the-voucher-cancel-optional-delete-and-recreate"></a>
 
 [9.14 A `REMOTEID` upsert re-states the voucher: cancel, optional, delete and recreate](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#914-a-remoteid-upsert-re-states-the-voucher-cancel-optional-delete-and-recreate)
+<a id="915-an-import-fills-its-own-alterid-span-in-request-order"></a>
+
+[9.15 An import fills its own AlterID span in request order](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#915-an-import-fills-its-own-alterid-span-in-request-order)
+<a id="916-a-sales-invoice-what-was-measured-what-bridge-posts-what-is-not-established"></a>
+
+[9.16 A Sales invoice: what was measured, what Bridge posts, what is not established](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#916-a-sales-invoice-what-was-measured-what-bridge-posts-what-is-not-established)
 <a id="12-a-modal-error-dialog-in-tallys-ui-blocks-the-gateway-until-a-human-clicks-ok--p0-operationally"></a>
 
 [1.2 A modal error dialog in Tally's UI blocks the gateway until a human clicks OK — **P0 operationally**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#12-a-modal-error-dialog-in-tallys-ui-blocks-the-gateway-until-a-human-clicks-ok--p0-operationally)
@@ -225,9 +261,12 @@ base revision.
 <a id="911c-extent-reads-must-retain-the-verified-company-tuple--verified-on-one-endpoint"></a>
 
 [9.11c Extent reads must retain the verified company tuple — **VERIFIED on one endpoint**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#911c-extent-reads-must-retain-the-verified-company-tuple--verified-on-one-endpoint)
+<a id="911e-the-audit-reads-company-part-is-the-one-admitted-object-export--partial-shape-measured-live-once-failure-cases-unmeasured"></a>
+
+[9.11e The audit read's company part is the one admitted Object export — **PARTIAL: shape measured live once; failure cases unmeasured**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#911e-the-audit-reads-company-part-is-the-one-admitted-object-export--partial-shape-measured-live-once-failure-cases-unmeasured)
 <a id="911e-the-audit-reads-company-part-is-the-one-admitted-object-export--code-live-unmeasured"></a>
 
-[9.11e The audit read's company part is the one admitted Object export — **CODE; live unmeasured**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#911e-the-audit-reads-company-part-is-the-one-admitted-object-export--code-live-unmeasured)
+[9.11e The audit read's company part is the one admitted Object export — **PARTIAL: shape measured live once; failure cases unmeasured**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#911e-the-audit-reads-company-part-is-the-one-admitted-object-export--partial-shape-measured-live-once-failure-cases-unmeasured)
 <a id="910-company-creation-over-xml--partial-symbol-element-found-formal-name-element-not"></a>
 
 [9.10 Company creation over XML — **PARTIAL: symbol element found, formal-name element not**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#910-company-creation-over-xml--partial-symbol-element-found-formal-name-element-not)
@@ -315,6 +354,9 @@ base revision.
 <a id="11e-ledger-master-read-sizes-and-part-reads-on-two-books--partial"></a>
 
 [11e. Ledger master read sizes and part reads on two books — **PARTIAL**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11e-ledger-master-read-sizes-and-part-reads-on-two-books--partial)
+<a id="11f-how-long-claude-desktop-waits-on-one-tool-call--partial"></a>
+
+[11f. How long Claude Desktop waits on one tool call — **PARTIAL**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11f-how-long-claude-desktop-waits-on-one-tool-call--partial)
 <a id="11a-scale-measurements--11287-voucher-corpus"></a>
 
 [11a. Scale measurements — 11,287-voucher corpus](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11a-scale-measurements--11287-voucher-corpus)
@@ -369,6 +411,36 @@ base revision.
 <a id="12a11-balance-sheet-and-profit-and-loss-by-name-on-licensed-71"></a>
 
 [12a.11 Balance Sheet and Profit and Loss by name on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a11-balance-sheet-and-profit-and-loss-by-name-on-licensed-71)
+<a id="12a12-master-collections-on-licensed-71"></a>
+
+[12a.12 Master collections on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a12-master-collections-on-licensed-71)
+<a id="12a13-stock-items-and-the-stock-summary-by-name-on-licensed-71"></a>
+
+[12a.13 Stock items and the Stock Summary by name on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a13-stock-items-and-the-stock-summary-by-name-on-licensed-71)
+<a id="12a14-one-partys-bill-trail-tied-to-the-native-balance"></a>
+
+[12a.14 One party's bill trail, tied to the native balance](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a14-one-partys-bill-trail-tied-to-the-native-balance)
+<a id="12a15-the-ledger-catalogue-can-carry-each-ledgers-isbillwiseon"></a>
+
+[12a.15 The ledger catalogue can carry each ledger's `ISBILLWISEON`](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a15-the-ledger-catalogue-can-carry-each-ledgers-isbillwiseon)
+<a id="12a16-cash-flow-and-its-sibling-built-in-reports-by-name-on-licensed-71"></a>
+
+[12a.16 Cash Flow and its sibling built-in reports by name on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a16-cash-flow-and-its-sibling-built-in-reports-by-name-on-licensed-71)
+<a id="12a17-cost-centres-and-categories-are-returned-whatever-the-companys-setting-reads-an-imported-allocation-is-stored-although-it-reads-no"></a>
+
+[12a.17 Cost centres and categories are returned whatever the company's setting reads; an imported allocation is stored although it reads No](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a17-cost-centres-and-categories-are-returned-whatever-the-companys-setting-reads-an-imported-allocation-is-stored-although-it-reads-no)
+<a id="12a18-the-company-collections-settings-and-currency-symbol"></a>
+
+[12a.18 The Company collection's settings and currency symbol](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a18-the-company-collections-settings-and-currency-symbol)
+<a id="12a19-a-companys-gst-registration-is-a-tax-unit-with-dated-rows"></a>
+
+[12a.19 A company's GST registration is a tax unit, with dated rows](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a19-a-companys-gst-registration-is-a-tax-unit-with-dated-rows)
+<a id="12a20-a-ledgers-input-tax-credit-flag-on-the-wire-is-the-opposite-of-the-screens-setting-partial"></a>
+
+[12a.20 A ledger's input tax credit flag on the wire is the opposite of the screen's setting (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a20-a-ledgers-input-tax-credit-flag-on-the-wire-is-the-opposite-of-the-screens-setting-partial)
+<a id="12a21-tallys-own-profit-and-loss-carries-closing-stock-as-a-line-of-its-own-on-an-integrated-inventory-book"></a>
+
+[12a.21 Tally's own Profit and Loss carries closing stock as a line of its own on an integrated inventory book](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a21-tallys-own-profit-and-loss-carries-closing-stock-as-a-line-of-its-own-on-an-integrated-inventory-book)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

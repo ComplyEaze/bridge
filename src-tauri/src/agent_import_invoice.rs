@@ -17,6 +17,7 @@ use crate::tally::approved_import::{
     ApprovedImportAdmissionError, InvoiceAnswers, InvoicePrecheck, InvoicePrecheckInput,
     InvoiceReadPlan,
 };
+use bridge_tally_core::TallyDate;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
@@ -32,7 +33,7 @@ pub(super) use wire::HsnWarning;
 pub(in crate::agent) use wire::{
     render_company_registration_request, render_group_hsn_request, render_invoice_number_request,
     render_invoice_readback_request, render_ledger_rates_request_for_parents,
-    render_voucher_types_request,
+    render_voucher_types_request, VoucherTypeGuid,
 };
 
 /// What an invoice voucher carries besides its entries.
@@ -570,17 +571,27 @@ fn paise_text(paise: i128) -> String {
     format!("{}.{:02}", paise / 100, paise % 100)
 }
 
-/// The alphabet of an invoice number, as GST rule 46(b) allows it: at most 16
+/// An invoice number in the alphabet GST rule 46(b) allows: at most 16
 /// characters, letters and digits and the two characters hyphen and slash. A
 /// number outside it is rejected by the GSTR-1 upload, so it is refused here,
-/// and it is also a closed alphabet for the TDL literal the duplicate check
-/// puts it in.
-pub(super) fn invoice_number_safe(number: &str) -> bool {
-    !number.is_empty()
-        && number.chars().count() <= 16
-        && number
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '-'))
+/// and it is also a closed alphabet for the TDL literals the duplicate check
+/// and the read-back put it in. Parsed once; the builders take only this.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::agent) struct InvoiceNumber(String);
+
+impl InvoiceNumber {
+    pub(in crate::agent) fn parse(number: &str) -> Option<Self> {
+        let admitted = !number.is_empty()
+            && number.chars().count() <= 16
+            && number
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '-'));
+        admitted.then(|| Self(number.to_string()))
+    }
+
+    pub(in crate::agent) fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 /// What Tally returned is the build's to record, never the caller's: refused
@@ -645,7 +656,7 @@ pub(super) fn validate_invoice_voucher<D>(voucher: &ImportVoucher<D>) -> Result<
     let Some(number) = voucher.voucher_number.as_deref() else {
         return Err("invoice_number_required".to_string());
     };
-    if !invoice_number_safe(number) {
+    if InvoiceNumber::parse(number).is_none() {
         return Err("invoice_number_invalid".to_string());
     }
     // The supplier reference is a purchase notion; a Sales invoice has none.
@@ -1106,7 +1117,7 @@ impl super::super::Server {
         };
         let year = financial_year_window(voucher.date.as_str())
             .ok_or_else(|| "invoice_date_invalid".to_string())?;
-        self.import_invoice_number_control(&line.company_guid, (&year.0, &year.1))
+        self.import_invoice_number_control(&line.company_guid, (year.0.as_str(), year.1.as_str()))
             .map(Some)
     }
 }
@@ -1726,20 +1737,23 @@ impl super::super::Server {
         if voucher_mark_refusal(mark.value).is_some() {
             return only("invoice_readback_book_too_large", mark_evidence);
         }
-        let number = voucher.voucher_number.clone().unwrap_or_default();
-        let date = voucher.date.as_str().to_string();
-        let window = financial_year_window(&date).map(|year| (date, year));
-        let request = window.as_ref().and_then(|(_, year)| {
-            super::super::invoice_readback_read(
-                &company.name,
-                &observed.voucher_type_guid,
-                &number,
-                (&year.0, &year.1),
-            )
-        });
-        let (Some((date, _)), Some(request)) = (window.as_ref(), request) else {
+        let date = voucher.date.as_str();
+        let (Some(year), Some(type_guid), Some(number)) = (
+            financial_year_window(date),
+            VoucherTypeGuid::parse(&observed.voucher_type_guid),
+            voucher
+                .voucher_number
+                .as_deref()
+                .and_then(InvoiceNumber::parse),
+        ) else {
             return only("invoice_readback_failed", mark_evidence);
         };
+        let request = super::super::invoice_readback_read(
+            &company.name,
+            &type_guid,
+            &number,
+            (&year.0, &year.1),
+        );
         let Ok((xml, evidence)) = self.post_read(identity, request).await else {
             return only("invoice_readback_failed", mark_evidence);
         };
@@ -1870,12 +1884,16 @@ pub(super) fn party_entry(voucher: &ImportVoucher) -> Option<&ImportEntry> {
         .find(|entry| entry.side == EntrySide::Dr && Some(entry.ledger.as_str()) != round_off)
 }
 
-/// The financial year (1 April to 31 March) a YYYYMMDD date falls in.
-fn financial_year_window(date: &str) -> Option<(String, String)> {
+/// The financial year (1 April to 31 March) a YYYYMMDD date falls in, as the
+/// dates the request builders take.
+fn financial_year_window(date: &str) -> Option<(TallyDate, TallyDate)> {
     let year: i32 = date.get(..4)?.parse().ok()?;
     let month: u32 = date.get(4..6)?.parse().ok()?;
     let start = if month >= 4 { year } else { year - 1 };
-    Some((format!("{start}0401"), format!("{}0331", start + 1)))
+    Some((
+        TallyDate::parse(format!("{start}0401")).ok()?,
+        TallyDate::parse(format!("{}0331", start + 1)).ok()?,
+    ))
 }
 
 /// Why a build believes that no voucher carries its invoice number. The read
@@ -2090,7 +2108,7 @@ impl InvoiceJudge<'_> {
             .map_err(refusing)
     }
 
-    fn year(&self) -> Result<(String, String), Verdict> {
+    fn year(&self) -> Result<(TallyDate, TallyDate), Verdict> {
         financial_year_window(&self.as_of()?).ok_or_else(|| unusable("invoice_date_invalid"))
     }
 
@@ -2119,21 +2137,22 @@ impl InvoiceJudge<'_> {
             Need::Rates => {
                 let scope = self.scope()?;
                 let window = self.year()?;
-                let request = super::super::invoice_ledger_rates_scoped_read(
+                admitted(super::super::invoice_ledger_rates_scoped_read(
                     company,
-                    (&window.0, self.as_of()?.as_str()),
+                    (&window.0, &self.voucher.date),
                     scope.part(),
-                )
-                .ok_or_else(|| unusable("invoice_date_invalid"))?;
-                admitted(request)
+                ))
             }
             Need::Number => {
-                let number = self.voucher.voucher_number.clone().unwrap_or_default();
                 let year = self.year()?;
-                let request =
-                    super::super::invoice_number_read(company, &number, (&year.0, &year.1))
-                        .ok_or_else(|| refusing(refuse_value("invoice_number_invalid", &number)))?;
-                admitted(request)
+                let supplied = self.voucher.voucher_number.as_deref().unwrap_or_default();
+                let number = InvoiceNumber::parse(supplied)
+                    .ok_or_else(|| refusing(refuse_value("invoice_number_invalid", supplied)))?;
+                admitted(super::super::invoice_number_read(
+                    company,
+                    &number,
+                    (&year.0, &year.1),
+                ))
             }
             Need::NumberControl => match self.number_control_request()? {
                 Some(request) => Ok(request),
@@ -2151,12 +2170,17 @@ impl InvoiceJudge<'_> {
         let super::ledger::NumberControl::Known { number, date, .. } = self.control else {
             return Ok(None);
         };
-        let window = financial_year_window(date)
-            .ok_or_else(|| unusable("invoice_number_control_unreadable"))?;
-        let request =
-            super::super::invoice_number_read(self.company_name, number, (&window.0, &window.1))
-                .ok_or_else(|| unusable("invoice_number_control_unreadable"))?;
-        admitted(request).map(Some)
+        let (Some(window), Some(number)) =
+            (financial_year_window(date), InvoiceNumber::parse(number))
+        else {
+            return Err(unusable("invoice_number_control_unreadable"));
+        };
+        admitted(super::super::invoice_number_read(
+            self.company_name,
+            &number,
+            (&window.0, &window.1),
+        ))
+        .map(Some)
     }
 
     /// The plan of an admission: every request fixed from the invoice, the
@@ -2498,7 +2522,10 @@ impl super::super::Server {
         }
         // The journal's offer of a control for the number read, as it stands now.
         let control = self
-            .import_invoice_number_control(identity.company_guid(), (&year.0, &year.1))
+            .import_invoice_number_control(
+                identity.company_guid(),
+                (year.0.as_str(), year.1.as_str()),
+            )
             .map_err(|_| failed("invoice_number_control_unreadable"))?;
         let today = bridge_tally_core::TallyDate::parse(super::super::tally_host_today())
             .map_err(|_| failed("current_date_invalid"))?;

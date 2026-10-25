@@ -714,6 +714,17 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     // it: the restore reaches other posts of the company, and the posts it
     // covers keep their status until each is verified again (#1050).
     let mut summary = summary.to_string();
+    // A refusal whose likely cause is another change during the post says so,
+    // as an example, after the line that says what to check (#1633).
+    if report["state"] == "refused" {
+        if let Some(line) = report["code"]
+            .as_str()
+            .and_then(span_identity::concurrent_change_line_for)
+        {
+            summary.push(' ');
+            summary.push_str(line);
+        }
+    }
     if report["rollback_recorded"] == true && report["state"] != "book_rolled_back" {
         let count = report["other_batches_covered"]["count"]
             .as_u64()

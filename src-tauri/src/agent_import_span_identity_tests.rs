@@ -903,3 +903,62 @@ fn a_read_back_ledger_name_keeps_a_line_break_in_either_spelling() {
         );
     }
 }
+
+/// #1633: only a mark that moved by more than the post created, or a span that
+/// later held another number of vouchers, says another change was made during
+/// the post. The match has no wildcard, so a new refusal must be sorted here.
+#[test]
+fn only_the_step_and_count_refusals_name_a_concurrent_change() {
+    fn names_concurrent_change(refusal: &SpanRefusal) -> bool {
+        match refusal {
+            SpanRefusal::StepNotCreated { .. } | SpanRefusal::SpanCount { .. } => true,
+            SpanRefusal::EmptyBatch
+            | SpanRefusal::CountersNotClean
+            | SpanRefusal::CreatedNotCount { .. }
+            | SpanRefusal::LastVchIdAbsent
+            | SpanRefusal::MarkWentBack
+            | SpanRefusal::Position { .. }
+            | SpanRefusal::Content { .. }
+            | SpanRefusal::NotEffective { .. }
+            | SpanRefusal::MasterIdNotInSequence { .. }
+            | SpanRefusal::GuidNotMasterId { .. }
+            | SpanRefusal::IdentityReused { .. } => false,
+        }
+    }
+    let every = [
+        SpanRefusal::EmptyBatch,
+        SpanRefusal::CountersNotClean,
+        SpanRefusal::CreatedNotCount {
+            created: 1,
+            count: 2,
+        },
+        SpanRefusal::LastVchIdAbsent,
+        SpanRefusal::MarkWentBack,
+        SpanRefusal::StepNotCreated {
+            step: 4,
+            created: 1,
+        },
+        SpanRefusal::SpanCount {
+            expected: 1,
+            observed: 2,
+        },
+        SpanRefusal::Position { position: 0 },
+        SpanRefusal::Content {
+            position: 0,
+            fields: vec!["date"],
+        },
+        SpanRefusal::NotEffective { position: 0 },
+        SpanRefusal::MasterIdNotInSequence { position: 0 },
+        SpanRefusal::GuidNotMasterId { position: 0 },
+        SpanRefusal::IdentityReused { position: 0 },
+    ];
+    for refusal in &every {
+        assert_eq!(
+            concurrent_change_line_for(refusal.code()),
+            names_concurrent_change(refusal).then_some(CONCURRENT_CHANGE_LINE),
+            "{}",
+            refusal.code()
+        );
+    }
+    assert_eq!(concurrent_change_line_for("span_unknown_code"), None);
+}

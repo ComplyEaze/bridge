@@ -39,6 +39,10 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- When `post_import` or `verify_import` cannot confirm a post because the company's voucher mark moved by more than the
+  post created, or the post's span later held another number of vouchers, the post's summary now also says that another
+  change was made to the company during the post (for example a GST return exported from Tally, or another user's entry)
+  and that nothing was posted twice. Nothing about how a post is proven changes (part of #1633).
 - The approval window, and the review window, now open with a line that says what each answer does, before any
   detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
   voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N

@@ -116,6 +116,30 @@ impl SpanRefusal {
     }
 }
 
+/// Why a post's vouchers could not be confirmed when the company's voucher
+/// mark moved by more than the post created, or a later read found a different
+/// number of vouchers in the post's span. Phrased as an example, never as the
+/// established cause: one GST return export raised the mark with no voucher
+/// change (#1633).
+pub(super) const CONCURRENT_CHANGE_LINE: &str = "Another change was made to the company in Tally in the seconds of this post (for example a GST return exported from Tally, or another user's entry), so ComplyEaze Bridge cannot confirm that the vouchers it found are the ones it posted; nothing was posted twice.";
+
+/// The concurrent-change line for a refusal recorded by its code.
+pub(super) fn concurrent_change_line_for(code: &str) -> Option<&'static str> {
+    (code
+        == SpanRefusal::StepNotCreated {
+            step: 0,
+            created: 0,
+        }
+        .code()
+        || code
+            == SpanRefusal::SpanCount {
+                expected: 0,
+                observed: 0,
+            }
+            .code())
+    .then_some(CONCURRENT_CHANGE_LINE)
+}
+
 /// Why a binding could not be decided: nothing was refused, and the bind may
 /// be attempted again. Kept apart from [`SpanRefusal`] so that what could not
 /// be read, or was not observed, is never recorded as a refusal of what Tally
@@ -190,8 +214,13 @@ impl PostSpan {
     /// timeout or a crash), and by every later verification, including one
     /// after a bind left unsettled (as by a read without `EFFECTIVEDATE`). No
     /// step is checked here, because none was journaled; a later voucher change
-    /// always takes an AlterID above the mark, so the slots can only empty, and
-    /// `bind`'s count, positions and `LASTVCHID` decide. The caller must first have read
+    /// that raises the mark takes an AlterID above it, so the slots can only
+    /// empty, and `bind`'s count, positions and `LASTVCHID` decide. Not every
+    /// change raises the mark: opening TallyPrime 7.2's GST Annual Computation
+    /// and answering its prompt wrote GST status to vouchers of a synthetic
+    /// book without moving it (lab run of 25 Oct 2026; whether those vouchers'
+    /// own AlterIDs moved was not read). `bind` does not compare GST status, so
+    /// such a write neither binds nor refuses a voucher. The caller must first have read
     /// the company's mark at or above `before + count`; below it, the book was
     /// rolled back and nothing may bind.
     pub(super) fn after_clean_response(

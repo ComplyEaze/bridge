@@ -125,7 +125,8 @@ STOP:
 ## Phase B: the read (READ-ONLY, tool calls only)
 B0. Run C2 step 0 WITHOUT its MARKS request: this item has no MARKS request file for THE COMPANY and makes none (a request file
     for another book, edited, is not admitted). The marks come from a tool instead: `trial_balance` for `2025-04-01` to
-    `2026-03-31` (offset 0, a fresh read); record its `snapshot.master_alter_id` and `snapshot.voucher_alter_id`. Record the build:
+    `2026-03-31` (offset 0, a fresh read); record its `snapshot.master_alter_id` and `snapshot.voucher_alter_id`, and `snapshot.reused`, which must be false (a
+    fresh read; true = STOP). Record the build:
     its path, its sha256, and that `audit_test_run` is listed by the tools list.
 
 B1. `list_companies`. EXPECT one open company, `BRIDGE SFT LAB`, with the GUID A2 recorded. Anything else: STOP.
@@ -143,7 +144,7 @@ B3. `read_evidence` with `limit` 40. Keep the result as a file. It lists each re
 B4. `vouchers` for `2025-04-01` to `2026-03-31` (every page). Keep each page as a file. EXPECT 34 vouchers: 11 for S1-S6 and 23
     for S7-S18, and the types and dates A5 recorded.
 
-B5. Run C2 step 0 again, WITHOUT its MARKS request, and the same `trial_balance` call (offset 0). Its two snapshot marks equal
+B5. Run C2 step 0 again, WITHOUT its MARKS request, and the same `trial_balance` call (offset 0; `snapshot.reused` false). Its two snapshot marks equal
     B0's, and B4's snapshot marks equal them too (nothing was written in Phase B). Then C10.
 
 What Phase B does not give: Tally's raw answers. The tools keep none (B3 holds fingerprints and sizes only), so no committed

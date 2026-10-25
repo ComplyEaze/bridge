@@ -1006,7 +1006,8 @@ Even *rejected* requests can occupy Tally well beyond the HTTP response.
 membership left the gateway unresponsive with an *empty reply*, on an instance that had answered
 a minimal request a moment before. The identifier involved contained no spaces, so spacing is
 suspected not to be the only way to break I1; the self-reference is the prime suspect, not a
-proven cause. I1 states both conditions: no `$$` function may reference an identifier containing
+proven cause. The failing request also carried other computes and nested sub-paths; if the cause
+matters, isolate one variable at a time (P6). I1 states both conditions: no `$$` function may reference an identifier containing
 spaces, **and no collection may reference itself inside a `$$` function.**
 
 **An empty reply is its own failure class:** TCP connected and the server closed without sending
@@ -1026,8 +1027,10 @@ HTTP response. Tally reports the problem in a modal dialog on its own screen ins
 gateway stays blocked until a person acts there: the same asymmetry as §I1 and §3.1a.
 
 **Rule:** object, collection and report names come only from Tally's documentation or from its
-own UI, never from trying names against a live instance. Bridge's request builders fix every
-name in code or pick it from a closed set, so no name comes from input.
+own UI, never from trying names against a live instance. Bridge's request builders must fix every
+name in code or pick it from a closed set, so that no name comes from input: that is the
+requirement #1869 adds beside AGENTS.md P7, and #1872 audits the builders against it. No check
+enforces "from documentation" itself; review and lab practice do.
 
 **Never auto-retry a request that blocked the gateway** (§5.4). Retrying turns one blocked
 request into an outage; this rule has been broken once already, and the cause was procedural,
@@ -1189,14 +1192,14 @@ zero; fail closed or quarantine.
 | Omitting `BILLALLOCATIONS.LIST` | Allocation becomes `On Account` with no bill identity | §3.3c |
 | A collection that references itself in a `$$` function | Gateway blocked, empty reply | I1, §5.3b |
 | `<COMPUTE>` used for a per-request constant | Per-row work; request exceeds deadline | §2.3a |
-| A company-level import without a pinned current company | **Alters the loaded company** instead of creating one; `CREATED=0, ALTERED=1, ERRORS=0` | I2, §9.10d |
+| A company-level import without a pinned current company | **Renames the loaded company** instead of creating one; `CREATED=0, ALTERED=1, ERRORS=0` | I2, §9.10d; Bridge sends no company-level import |
 | Reading "the company" as row 1 of a `Company` collection | Returns the wrong company; `SVCURRENTCOMPANY` does not filter it | I3, corpus §7.1 |
 | Expecting `ALTVCHID` from the single-object company export | Absent there; only the collection returns it | corpus §7.2 |
 | Identifying the *instance* by company GUID | Backup/restore copies share a GUID across ports | corpus §7.3 |
 | Validating corpus ordering by counting inversions | Condemns a good corpus; measure `AlterID` **locality** | corpus §4 |
 | Narrowing the outstandings wildcard to cut cost | 11–30× faster, `BILLTYPE` silently empty | §2.4a |
 | Date-segmenting a book with a dense single day | No segment size can fit; use `AlterID` ranges | §2.4a, §10.1 |
-| Some company-level import shapes | Modal dialog; gateway blocked until a human clicks OK | §9.10b |
+| Some company-level import shapes | Modal dialog; gateway blocked until a human clicks OK | §9.10b; Bridge sends no company-level import |
 | Inferring "recovered on its own" from network polling | Attributes an operator's click to elapsed time | §9.10b |
 | Company data path sought as a `COMPANY` field | Not a field; it is the `SVCURRENTPATH` static variable | §9.10a |
 

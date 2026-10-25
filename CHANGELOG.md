@@ -39,6 +39,7 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- On macOS the first line of the approval alert (what each button does) is no longer broken by ComplyEaze Bridge at 100 characters: the alert wraps its own text, so a break of ours was wrapped a second time and left a ragged second row. The Windows box keeps its 100-character lines. The box's size caps are unchanged (part of #1780).
 - The next steps for five situations no longer send a person to enter a voucher in Tally themselves; each now says what
   ComplyEaze Bridge does and that it cannot put the voucher in the book yet: a voucher Tally reported as not
   created (and one later not found after that report), a row a rejected batch carried, a statement day that is

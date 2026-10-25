@@ -90,7 +90,7 @@ These changes are in source and not yet in a published build.
   mapping is unchanged: do not read `true` as eligible.
 
 - A read refused because the company it names is not loaded in Tally, was renamed since `list_companies`, or is
-  listed more than once now says so and says to open the company in Tally and ask again (part of #1699). Before,
+  listed more than once now says so and says to open the company in Tally and ask again (#1699). Before,
   an assistant saw only an operation code such as `ledger_movement_read_failed`, and the all-companies
   outstandings sweep and the All clients screen reported the same cases as a failed currency probe. The refusal
   carries `company_identity_absent_or_ambiguous`, `company_identity_presentation_collision` or
@@ -104,9 +104,8 @@ These changes are in source and not yet in a published build.
   with no voucher change, which is why a routine export can trip these. Not changed: a correct post that reads as
   unverified after such an export is still open on #1633.
 - A snapshot request that reaches its 20-second deadline is recorded as `request_deadline_exceeded` instead of
-  `tally_unreachable` (part of #1671), so a person is no longer told to check that Tally is running when it was
-  only slow. The deadline and the rule that such a request is not sent again are unchanged; whether to bound a
-  whole-period ledger export is not decided and stays on the issue. Covered by tests only.
+  `tally_unreachable` (#1671), so a person is no longer told to check that Tally is running when it was
+  only slow. The deadline and the rule that such a request is not sent again are unchanged. Covered by tests only.
 - The Proof of Sync screen no longer shows a rejected-row count (#1634): it could only ever read zero, because only
   accepted observations enter the local mirror. The summary line drops the "rejected rows" clause and the table
   column reads "Accepted returned rows"; a run that rejected source records is still shown by its gap. The count

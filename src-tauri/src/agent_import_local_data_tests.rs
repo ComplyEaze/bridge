@@ -625,6 +625,26 @@ fn the_exit_status_is_zero_only_for_a_complete_report() {
     assert_eq!(exit_status(&report, true), 0);
 }
 
+/// An audit read a lab build kept is counted file by file as `lab`, its
+/// manifest and every part, not as one folder with nothing in it.
+#[test]
+fn a_kept_audit_read_is_counted_with_its_files_and_bytes() {
+    let directory = tempfile::tempdir().unwrap();
+    let read = directory
+        .path()
+        .join("lab")
+        .join("audit-reads")
+        .join("a".repeat(64));
+    write(&read.join("manifest.json"), b"12");
+    write(&read.join("parts").join("ledgers.xml"), b"345");
+    write(&read.join("parts").join("vouchers-2025-04-01.xml"), b"6789");
+    write(&directory.path().join("lab").join("x.request.xml"), b"1");
+    let report = build(directory.path(), &[]);
+    assert_eq!(class(&report, "lab").files, 4);
+    assert_eq!(class(&report, "lab").bytes, 10);
+    assert_eq!(report.other_directories, 0);
+}
+
 /// A folder with more entries than the cap is listed up to the cap and reported
 /// as capped, not as complete.
 #[test]

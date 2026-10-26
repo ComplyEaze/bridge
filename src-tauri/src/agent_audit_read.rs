@@ -4,7 +4,8 @@
 //! Each part is one [`fetch_audit_part`] (single, identity-bracketed, kept byte
 //! for byte), the vouchers come from the sealing window reader, and the company
 //! marks are read before the first part and again by the window after the last.
-//! Nothing is written to disk. The crate then does what it does for a directory:
+//! Nothing is written to disk (a lab build may keep an admitted read: see
+//! `lab::persist_audit_read`). The crate then does what it does for a directory:
 //! `Read::open_from` (C1-C4, every blob re-hashed), `Read::check` (pin, period,
 //! bracket, windows) and `book::load_book` (C5, C8, C9, C11). A read it refuses
 //! is refused by its rule code; no detail, which can hold a ledger name, leaves
@@ -71,6 +72,7 @@ pub(super) struct AuditBook {
 #[cfg(feature = "lab-writes")]
 pub(super) struct StoredRead {
     pub(super) read_id: String,
+    pub(super) company_guid: String,
     pub(super) manifest: Vec<u8>,
     pub(super) manifest_sha256: String,
     pub(super) blobs: std::collections::BTreeMap<String, Vec<u8>>,
@@ -393,6 +395,7 @@ pub(super) async fn read_audit_book(
         #[cfg(feature = "lab-writes")]
         stored: StoredRead {
             read_id,
+            company_guid: identity.company_guid().to_string(),
             manifest: store.manifest,
             manifest_sha256,
             blobs: store.blobs,

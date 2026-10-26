@@ -370,8 +370,6 @@ async fn the_book_holds_what_the_crates_own_fixture_holds_of_the_same_bytes() {
     assert_eq!(guids(&audit.book), guids(&theirs)[..43]);
 }
 
-/// A book that has never held a voucher gets no census, so nothing outside the
-/// data says its window is whole: refused rather than run as an empty book.
 /// A lab build writes the admitted read as the directory `Read::open` reads,
 /// and that directory loads the same book. The same read is not written twice,
 /// and a part path that would leave the read's folder is refused.
@@ -379,12 +377,8 @@ async fn the_book_holds_what_the_crates_own_fixture_holds_of_the_same_bytes() {
 #[tokio::test]
 async fn a_lab_build_writes_the_admitted_read_as_a_directory_that_loads_the_same_book() {
     let audit = read_replay(&Replay::clean()).await.0.unwrap();
-    let reads = std::env::temp_dir().join(format!(
-        "bridge-audit-reads-{}-{}",
-        std::process::id(),
-        &audit.stored.manifest_sha256[..16]
-    ));
-    let _ = std::fs::remove_dir_all(&reads);
+    let scratch = tempfile::tempdir().unwrap();
+    let reads = scratch.path().join("audit-reads");
     crate::local_files::directory::ensure_private_directory(&reads).unwrap();
     super::super::lab::write_audit_read(&reads, &audit.stored).unwrap();
 
@@ -408,6 +402,7 @@ async fn a_lab_build_writes_the_admitted_read_as_a_directory_that_loads_the_same
     );
     let escaping = StoredRead {
         read_id: "r".to_string(),
+        company_guid: fixture_guid().to_string(),
         manifest: b"{}".to_vec(),
         manifest_sha256: "e".repeat(64),
         blobs: [("parts/../escape.xml".to_string(), b"x".to_vec())].into(),
@@ -416,11 +411,13 @@ async fn a_lab_build_writes_the_admitted_read_as_a_directory_that_loads_the_same
         super::super::lab::write_audit_read(&reads, &escaping),
         Err("lab_evidence_write_failed".to_string())
     );
-    assert!(!reads.join("e".repeat(64)).join("escape.xml").exists());
+    // Refused before anything is written: not even the read's folder.
+    assert!(!reads.join("e".repeat(64)).exists());
     assert!(!reads.join("escape.xml").exists());
-    std::fs::remove_dir_all(&reads).unwrap();
 }
 
+/// A book that has never held a voucher gets no census, so nothing outside the
+/// data says its window is whole: refused rather than run as an empty book.
 #[tokio::test]
 async fn a_window_no_census_counted_is_refused() {
     let mut replay = Replay::clean();

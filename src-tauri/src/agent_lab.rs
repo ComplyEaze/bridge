@@ -8,8 +8,9 @@
 //! `approved_import.rs`); this module adds a parallel, narrowly-scoped
 //! surface rather than changing those. Scope for this pass (3.1/3.2): the
 //! shared lab guard machinery (a later lab writer will reuse
-//! `admit_lab_target`) and one read-only tool, `lab_read_inventory`. No write
-//! path exists anywhere in this file.
+//! `admit_lab_target`) and one read-only tool, `lab_read_inventory`. No Tally
+//! write path exists anywhere in this file; it writes only lab evidence under
+//! the data folder (each exchange, and a kept audit read).
 //!
 //! No signed compatibility evidence exists for any inventory field read here
 //! on any Tally release/mode:
@@ -253,14 +254,38 @@ fn persist_lab_exchange(
     append_egress_line(&dir.join("lab-manifest.jsonl"), &record.to_string())
 }
 
+/// The guards a kept audit read must pass, before the read is made: the
+/// always-on lab preconditions (lab writes on, port 9001, a well-formed target
+/// and deny list), and the company being read being the lab's target. A run
+/// keeps a book only when `BRIDGE_LAB_TARGET_GUID` names it on purpose; the
+/// deny list never holds the target (`LabGuardConfig::from_values`), so the
+/// target check also keeps out every denied company.
+pub(super) fn admit_audit_read_capture(
+    server: &Server,
+    company_guid: &str,
+) -> Result<(), ToolFailure> {
+    let config = require_lab_read_guards(server)?;
+    capture_target_admitted(&config, company_guid).map_err(ToolFailure::from)
+}
+
+fn capture_target_admitted(config: &LabGuardConfig, company_guid: &str) -> Result<(), String> {
+    if company_guid.eq_ignore_ascii_case(&config.target_guid) {
+        Ok(())
+    } else {
+        Err("lab_audit_read_not_target".to_string())
+    }
+}
+
 /// Writes an admitted audit read to `data_dir/lab/audit-reads/<manifest
 /// sha256>/` as the directory `Read::open` and the crate's `local_parity`
 /// read, so a real-book parity record can be made from exactly what the audit
 /// read sent and admitted. The tool's answer does not change. The folder is
 /// new for each read: one that already exists is refused, never written into.
-/// It holds a book's raw answers; it stays on this computer, is never
-/// committed, and a client book's copy is deleted at the end of its review
-/// cycle.
+/// It holds a book's raw answers and stays on this computer; it is written
+/// only for the lab's target company (`admit_audit_read_capture`). Nothing
+/// deletes it: committing none of it, and deleting a client book's copy at the
+/// end of its review cycle (the manifest line names the company), are the
+/// lab's own duties, not this code's.
 pub(super) fn persist_audit_read(
     server: &Server,
     stored: &super::audit_read::StoredRead,
@@ -272,6 +297,9 @@ pub(super) fn persist_audit_read(
         "tool": "audit_test_run",
         "at": Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         "read_id": stored.read_id,
+        // The company, so a client book's copy can be found and deleted at
+        // the end of its review cycle.
+        "company_guid": stored.company_guid,
         "manifest_sha256": stored.manifest_sha256,
         "parts": stored.blobs.len(),
     });
@@ -286,6 +314,21 @@ pub(super) fn write_audit_read(
     reads: &std::path::Path,
     stored: &super::audit_read::StoredRead,
 ) -> Result<(), String> {
+    // A manifest path is `parts/` and one plain file name: anything else
+    // could leave the read's folder. Every name is checked before anything is
+    // written.
+    let parts = stored
+        .blobs
+        .iter()
+        .map(|(path, bytes)| {
+            path.strip_prefix("parts/")
+                .filter(|name| {
+                    !name.is_empty() && *name != ".." && *name != "." && !name.contains(['/', '\\'])
+                })
+                .map(|name| (name, bytes))
+                .ok_or_else(|| "lab_evidence_write_failed".to_string())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let dir = reads.join(&stored.manifest_sha256);
     // Not recursive, so a folder that already exists is refused; owner-only
     // from creation, as `ensure_private_directory` then checks.
@@ -302,15 +345,7 @@ pub(super) fn write_audit_read(
     private_dir(&dir)?;
     private_dir(&dir.join("parts"))?;
     write_private_file(&dir.join("manifest.json"), &stored.manifest)?;
-    for (path, bytes) in &stored.blobs {
-        // A manifest path is `parts/` and one plain file name: anything else
-        // could leave the read's folder.
-        let name = path
-            .strip_prefix("parts/")
-            .filter(|name| {
-                !name.is_empty() && *name != ".." && *name != "." && !name.contains(['/', '\\'])
-            })
-            .ok_or_else(|| "lab_evidence_write_failed".to_string())?;
+    for (name, bytes) in parts {
         write_private_file(&dir.join("parts").join(name), bytes)?;
     }
     Ok(())
@@ -988,6 +1023,26 @@ mod tests {
         ENV_MUTEX
             .lock()
             .unwrap_or_else(|poison| poison.into_inner())
+    }
+
+    /// A kept audit read is admitted only for the lab's target company, in
+    /// any case; any other company, a denied one included, is refused.
+    #[test]
+    fn only_the_lab_target_keeps_its_audit_read() {
+        let config =
+            LabGuardConfig::from_values(TARGET_GUID, &format!("{DENY_GUID_1},{DENY_GUID_2}"))
+                .unwrap();
+        assert!(capture_target_admitted(&config, &TARGET_GUID.to_uppercase()).is_ok());
+        for other in [
+            DENY_GUID_1,
+            DENY_GUID_2,
+            "00000000-0000-4000-8000-000000000002",
+        ] {
+            assert_eq!(
+                capture_target_admitted(&config, other),
+                Err("lab_audit_read_not_target".to_string())
+            );
+        }
     }
 
     fn synthetic_unit_collection() -> String {

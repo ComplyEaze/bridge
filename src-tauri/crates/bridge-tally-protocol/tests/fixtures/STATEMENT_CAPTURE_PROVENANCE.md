@@ -104,3 +104,13 @@ What they establish (confidence: partial; one book, one release, no opening stoc
 | `statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml` | 1606 | `a72afe57618cc6488d6920d706f3a4b52100073bcb015622e4f5f8f716bbebdf` | Profit and Loss, 1 October 2025 to 31 March 2026: Sales `1250.00` main; `Cost of Sales :` `-600.00` main; `Opening Stock` `-2640.00`; `Add: Purchase Accounts` empty; `Less: Closing Stock` `-2040.00` |
 
 What they establish (confidence: partial; one book, one release): a non-empty `Opening Stock` line is a debit in the sub column and can differ from the closing line, with movement in the window. The answers carry no `Profit & Loss A/c` leaf: the nett profit is the sum of the lines. Not established: a costing method other than the default, a stock group, negative stock, a non-integrated book.
+
+## `statement_groups_stock_book_72_live.utf16le.xml`: List of Groups on TallyPrime 7.2 (BRIDGE TIEOUT B), 25 Oct 2026
+
+| file | bytes | sha256 | report | window |
+|---|---|---|---|---|
+| `statement_groups_stock_book_72_live.utf16le.xml` | 54280 | `493256b22e131097da479f67d4280a272bec855d20c6314c6b37dfad530180c0` | List of Groups (28 groups) | none (a master collection) |
+
+- **Source.** The lab's 7.2 read pass of 25 Oct 2026: branch `lab/72-reads-answers-b` at `f3c9c7361402`, file `lab-evidence/72-reads-answers/answers/a1-4-groups-tieout-b.72.xml`, with `RESULTS.md` and `evidence/send-log.txt` beside it. Host: TallyPrime Release 7.2 (Latest), Silver, `tally.exe` 1.1.7.2, one process on port 9001. The book is `BRIDGE TIEOUT B`, loaded alone; the company list read before the group showed it alone, and the marks read before and after the group were equal.
+- **Request.** The request is `statement_groups_stock_book_request.utf16le.xml` of the section above (byte for byte, sha256 `130d5ffa6295243da2751e1cc1845e31da3763e2790276b2cc0dd9dc46e51757`), sent once with one `curl.exe --data-binary` line, HTTP 200, size equal to its `Content-Length`. The answer was saved as received.
+- **What it establishes (confidence: partial; one send, not repeated).** The same size, the same 28 `GROUP` rows in the same order and every value equal to `statement_groups_stock_book_live.utf16le.xml` (TallyPrime 7.1, the section above). In every row the request's computed `BRIDGECOMPANYGUID` comes before `PRIMARYGRPPARENT`; on 7.1 it came after it. The reorder was seen in this one send and was not repeated.

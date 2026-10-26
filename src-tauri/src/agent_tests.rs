@@ -760,6 +760,15 @@ fn a_read_refused_for_the_company_identity_names_that_cause_and_the_next_step() 
     }
 }
 
+/// A read for a company that is not among those open is refused as
+/// `company_identity_not_found`, and the refusal says what to do about it.
+#[test]
+fn a_company_identity_not_found_names_the_next_step() {
+    let step = remediation_for("company_identity_not_found", None).expect("a next step");
+    assert!(step.contains("list_companies"), "{step}");
+    assert!(step.contains("open it in Tally"), "{step}");
+}
+
 #[test]
 fn ledger_master_fields_reject_unknown_schema_values() {
     assert_eq!(
@@ -927,11 +936,9 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // item names and the voucher's party). The sample is built in this test like the others, so it
     // tests the walk, not the tool.
     //
-    // Known gap, lab-only (#999): the same names come back UNMARKED where they appear as another
-    // field: a stock item's `parent` and `base_unit`, and a voucher entry's `stock_item` and
-    // `godown` and a batch's `godown`. Under `MaskParties` a unit masked in `units` stays in the
-    // clear as a `base_unit`. The sample's values for those fields are not party-like, so the walk
-    // cannot see it. Marking them is a separate change.
+    // The names a stock item's `parent` and `base_unit`, a voucher entry's `stock_item` and `godown`
+    // and a batch's `godown` carry are marked too (#999), so the sample uses party-like values for
+    // them: a unit masked in `units` is masked as a `base_unit`, and the walk would see it if not.
     #[allow(unused_mut)] // only pushed to when the `lab-writes` feature is compiled in
     let mut lab_samples: Vec<(&str, Value)> = Vec::new();
     #[cfg(feature = "lab-writes")]
@@ -942,13 +949,19 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
                 "units": [{"name": party_name("Customer One"), "decimal_places": "3"}],
                 "stock_items": [{
                     "name": party_name("Supplier Two"),
-                    "parent": "Primary",
+                    "parent": party_name("Customer One"),
+                    "base_unit": party_name("Entry Ledger"),
                     "hsn_code": "2836",
                 }],
                 "vouchers": {
                     "items": [{
                         "party": party_name("Customer One"),
-                        "inventory_entries": [{"stock_item": "Widget", "amount": "-8000.00"}],
+                        "inventory_entries": [{
+                            "stock_item": party_name("Supplier Two"),
+                            "godown": party_name("PAN Holder"),
+                            "amount": "-8000.00",
+                            "batch_allocations": [{"godown": party_name("Entry Ledger")}],
+                        }],
                     }],
                     "offset": 0,
                 },
@@ -2354,32 +2367,41 @@ fn a_tool_date_that_is_not_a_tally_date_is_refused_at_the_boundary() {
 
 #[test]
 fn empty_voucher_window_corroboration_handles_all_three_control_branches() {
+    // what a widened read found: a voucher inside the window, one anywhere in the widened window
     assert_eq!(
-        corroborate_empty_voucher_window(
-            &[json!({"date":"20260831"}), json!({"date":"20260903"})],
-            "20260901",
-            "20260902",
-            None,
-        ),
+        corroborate_empty_by_days(false, true, None),
         Ok((true, Some("empty_window_wider_read_nonempty")))
     );
     assert_eq!(
-        corroborate_empty_voucher_window(
-            &[json!({"date":"20260901"})],
-            "20260901",
-            "20260902",
-            None,
-        ),
+        corroborate_empty_by_days(true, true, None),
         Err("window_contradicted".to_string())
     );
     assert_eq!(
-        corroborate_empty_voucher_window(&[], "20260901", "20260902", Some(0)),
+        corroborate_empty_by_days(false, false, Some(0)),
         Ok((false, Some("company_has_no_vouchers")))
     );
     assert_eq!(
-        corroborate_empty_voucher_window(&[], "20260901", "20260902", Some(1)),
+        corroborate_empty_by_days(false, false, Some(1)),
         Ok((true, Some("empty_uncorroborated")))
     );
+    // nothing found and no mark to decide on
+    assert_eq!(
+        corroborate_empty_by_days(false, false, None),
+        Err("voucher_checkpoint_invalid".to_string())
+    );
+    // the rows of a data read are in the window by their own day, ends included
+    for (date, inside) in [
+        ("20260831", false),
+        ("20260901", true),
+        ("20260902", true),
+        ("20260903", false),
+    ] {
+        assert_eq!(
+            row_in_window(&json!({"date": date}), "20260901", "20260902"),
+            inside,
+            "{date}"
+        );
+    }
 }
 
 #[tokio::test]

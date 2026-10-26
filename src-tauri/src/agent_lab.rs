@@ -598,6 +598,15 @@ fn optional_field(row: &BTreeMap<String, String>, key: &str) -> Value {
         .unwrap_or(Value::Null)
 }
 
+/// A master name that is not the row's own name (a parent group, a base unit, a godown, a stock
+/// item on a voucher entry), marked as a party name like the row names are, so that masking reaches
+/// it wherever it appears (#999): a unit masked in `units` is not in the clear as a `base_unit`.
+fn optional_name_field(row: &BTreeMap<String, String>, key: &str) -> Value {
+    row.get(key)
+        .filter(|value| !value.trim().is_empty())
+        .map_or(Value::Null, |value| json!(party_name(value.clone())))
+}
+
 fn lab_master_json(kind: LabMasterKind, row: &BTreeMap<String, String>) -> Value {
     match kind {
         LabMasterKind::Unit => json!({
@@ -607,12 +616,12 @@ fn lab_master_json(kind: LabMasterKind, row: &BTreeMap<String, String>) -> Value
         }),
         LabMasterKind::Godown | LabMasterKind::StockGroup => json!({
             "name": party_name(row.get("NAME").cloned().unwrap_or_default()),
-            "parent": optional_field(row, "PARENT"),
+            "parent": optional_name_field(row, "PARENT"),
         }),
         LabMasterKind::StockItem => json!({
             "name": party_name(row.get("NAME").cloned().unwrap_or_default()),
-            "parent": optional_field(row, "PARENT"),
-            "base_unit": optional_field(row, "BASEUNITS"),
+            "parent": optional_name_field(row, "PARENT"),
+            "base_unit": optional_name_field(row, "BASEUNITS"),
             "opening_qty": optional_field(row, "OPENINGBALANCE"),
             "opening_rate": optional_field(row, "OPENINGRATE"),
             "opening_value": optional_field(row, "OPENINGVALUE"),
@@ -745,7 +754,7 @@ fn parse_lab_inventory_vouchers(xml: &str) -> Result<Vec<Value>, String> {
                     if let Some(row) = batch.take() {
                         batches.push(json!({
                             "batch": optional_field(&row, "BATCHNAME"),
-                            "godown": optional_field(&row, "GODOWNNAME"),
+                            "godown": optional_name_field(&row, "GODOWNNAME"),
                             "actual_qty": optional_field(&row, "ACTUALQTY"),
                             "billed_qty": optional_field(&row, "BILLEDQTY"),
                             "amount": optional_field(&row, "AMOUNT"),
@@ -755,12 +764,12 @@ fn parse_lab_inventory_vouchers(xml: &str) -> Result<Vec<Value>, String> {
                 if closing_entry {
                     if let Some(row) = entry.take() {
                         let mut json_entry = json!({
-                            "stock_item": optional_field(&row, "STOCKITEMNAME"),
+                            "stock_item": optional_name_field(&row, "STOCKITEMNAME"),
                             "rate": optional_field(&row, "RATE"),
                             "amount": optional_field(&row, "AMOUNT"),
                             "actual_qty": optional_field(&row, "ACTUALQTY"),
                             "billed_qty": optional_field(&row, "BILLEDQTY"),
-                            "godown": optional_field(&row, "GODOWNNAME"),
+                            "godown": optional_name_field(&row, "GODOWNNAME"),
                         });
                         if !batches.is_empty() {
                             json_entry["batch_allocations"] = Value::Array(batches.clone());
@@ -1132,7 +1141,7 @@ mod tests {
         let rows = parse_lab_inventory_vouchers(&xml).expect("parses");
         assert_eq!(
             rows[0]["inventory_entries"][0]["godown"],
-            json!("\u{fffd}#4; Not Applicable")
+            json!(party_name("\u{fffd}#4; Not Applicable"))
         );
     }
 
@@ -1348,8 +1357,8 @@ mod tests {
         let json = lab_master_json(LabMasterKind::StockItem, &rows[0]);
         // The item's own name is marked as a party name, so masking reaches it (#999).
         assert_eq!(json["name"], json!(party_name("Sodium Bicarbonate")));
-        assert_eq!(json["parent"], "Chemicals");
-        assert_eq!(json["base_unit"], "Kgs");
+        assert_eq!(json["parent"], json!(party_name("Chemicals")));
+        assert_eq!(json["base_unit"], json!(party_name("Kgs")));
         assert_eq!(json["opening_qty"], "100");
         assert_eq!(json["opening_rate"], "50.00");
         assert_eq!(json["opening_value"], "5000.00");
@@ -1408,9 +1417,12 @@ mod tests {
         assert_eq!(rows[0]["voucher_number"], "1");
         let entries = rows[0]["inventory_entries"].as_array().unwrap();
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0]["stock_item"], "Sodium Bicarbonate");
+        assert_eq!(
+            entries[0]["stock_item"],
+            json!(party_name("Sodium Bicarbonate"))
+        );
         assert_eq!(entries[0]["actual_qty"], "100");
-        assert_eq!(entries[0]["godown"], "Main Godown");
+        assert_eq!(entries[0]["godown"], json!(party_name("Main Godown")));
         assert!(window_honoured(&rows, "20260401", "20260430"));
         assert!(!window_honoured(&rows, "20260401", "20260404"));
     }
@@ -1424,7 +1436,7 @@ mod tests {
         let batches = entries[0]["batch_allocations"].as_array().unwrap();
         assert_eq!(batches.len(), 1);
         assert_eq!(batches[0]["batch"], "Batch-01");
-        assert_eq!(batches[0]["godown"], "Main Godown");
+        assert_eq!(batches[0]["godown"], json!(party_name("Main Godown")));
         assert_eq!(batches[0]["actual_qty"], "50");
     }
 
@@ -1628,7 +1640,7 @@ mod tests {
         let entries = rows[0]["inventory_entries"].as_array().unwrap();
         assert_eq!(entries.len(), 1);
         let entry = &entries[0];
-        assert_eq!(entry["stock_item"], "Sodium Bicarbonate");
+        assert_eq!(entry["stock_item"], json!(party_name("Sodium Bicarbonate")));
         assert_eq!(entry["rate"], "80.00/Kgs");
         assert_eq!(entry["amount"], "-8000.00");
         // The leading space is Tally's own and must survive intact; only
@@ -1636,16 +1648,16 @@ mod tests {
         assert_eq!(entry["actual_qty"], " 100.000 Kgs");
         assert_eq!(entry["billed_qty"], " 100.000 Kgs");
         // The reported symptom, verbatim: this came back "Main Location\r\n      ".
-        assert_eq!(entry["godown"], "Main Location");
+        assert_eq!(entry["godown"], json!(party_name("Main Location")));
 
         let batches = entry["batch_allocations"].as_array().unwrap();
         assert_eq!(batches.len(), 2);
         assert_eq!(batches[0]["batch"], "Batch-01");
-        assert_eq!(batches[0]["godown"], "Main Location");
+        assert_eq!(batches[0]["godown"], json!(party_name("Main Location")));
         assert_eq!(batches[0]["actual_qty"], " 60.000 Kgs");
         assert_eq!(batches[0]["amount"], "-4800.00");
         assert_eq!(batches[1]["batch"], "Batch-02");
-        assert_eq!(batches[1]["godown"], "Second Location");
+        assert_eq!(batches[1]["godown"], json!(party_name("Second Location")));
         assert_eq!(batches[1]["billed_qty"], " 40.000 Kgs");
 
         // Nothing anywhere in the tree carries a whitespace tail.

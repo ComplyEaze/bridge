@@ -202,8 +202,12 @@ impl Lineage {
             // changed (a reference, an allocation) shows only as the voucher's
             // ALTERID moving past one Bridge recorded when it first verified a
             // build (#239). A voucher's ALTERID advances on every alteration
-            // (TALLY_PROTOCOL_REFERENCE §9.3, measured over the gateway; an edit
-            // in Tally's own screens is not yet measured), so a current value
+            // (TALLY_PROTOCOL_REFERENCE §9.3, measured over the gateway; saving
+            // a voucher unchanged on Tally's own screen, or cancelling it, moves
+            // it too (VERIFIED), and so did changing a bill allocation's
+            // reference, adding a cost-centre allocation and setting a
+            // bank-reconciliation date (PARTIAL): one run each, §11c.5 of the
+            // measurements part, 26 Sep 2026), so a current value
             // equal to any matching build's baseline means the voucher has not
             // been altered since that reading. A build never imported
             // has no baseline and is passed over. No equal baseline refuses:

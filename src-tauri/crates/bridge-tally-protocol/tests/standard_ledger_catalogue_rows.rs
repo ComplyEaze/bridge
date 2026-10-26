@@ -157,6 +157,25 @@ fn a_ledger_whose_stored_name_differs_carries_both_spellings() {
     );
 }
 
+/// The catalogue an import is bound against offers and binds a ledger by its
+/// row spelling, never by its stored name (#1085: slice (b), writing the stored
+/// name, is not built). On the captured book the row spelling `ROUND OFF`
+/// binds, and its stored name `Round Off` is neither offered nor bound. This
+/// pins the binding the build uses, not the build end to end.
+#[test]
+fn the_catalogue_binds_the_row_spelling_and_not_the_stored_name() {
+    let catalog = parse_standard_ledger_catalog_with_identities(
+        &decoded_shape_lab_catalogue(),
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("the shape lab capture parses");
+    assert!(catalog.names().any(|name| name == "ROUND OFF"));
+    assert!(!catalog.names().any(|name| name == "Round Off"));
+    assert!(catalog.bind_selected(["ROUND OFF".to_string()]).is_ok());
+    assert!(catalog.bind_selected(["Round Off".to_string()]).is_err());
+}
+
 /// Edits of the captured `ROUND OFF` row, to its list only. The capture holds
 /// one name there; these are the shapes the parser must still decide.
 fn shape_lab_with_round_off_list(list: &str) -> String {
@@ -247,6 +266,130 @@ fn a_name_nested_in_another_child_of_the_list_is_not_the_stored_name() {
     let list =
         "<LANGUAGENAME.LIST><LANGUAGEID><NAME>Round Off</NAME></LANGUAGEID></LANGUAGENAME.LIST>";
     assert_eq!(round_off_stored(list), None);
+}
+
+// ---- Aliases (#1688) ---------------------------------------------------------------------------------
+//
+// The capture holds no alias, so every aliased state below is the committed `ROUND OFF` row with its list
+// edited by these tests: constructed, not captured (the real captures are on lab branches, not in this tree).
+
+/// The `(carrying ledger, alias)` pairs the catalogue holds for `xml`.
+fn shape_lab_aliases(xml: &str) -> Vec<(String, String)> {
+    parse_standard_ledger_catalog_with_identities(
+        xml,
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("the edited shape lab capture still parses")
+    .aliases()
+    .map(|(owner, alias)| (owner.to_string(), alias.to_string()))
+    .collect()
+}
+
+fn round_off_aliases(list: &str) -> Vec<String> {
+    shape_lab_aliases(&shape_lab_with_round_off_list(list))
+        .into_iter()
+        .inspect(|(owner, _)| assert_eq!(owner, "ROUND OFF"))
+        .map(|(_, alias)| alias)
+        .collect()
+}
+
+/// A ledger with no alias, as every ledger of the capture, yields none.
+#[test]
+fn a_capture_without_aliases_has_none() {
+    assert_eq!(shape_lab_aliases(&decoded_shape_lab_catalogue()), []);
+}
+
+/// Every name after the first is an alias, read verbatim and in the order
+/// Tally listed it, once each; a name the ledger already answers to (its row
+/// spelling or its own name) is not an alias of it.
+#[test]
+fn the_names_after_the_first_are_the_ledgers_aliases() {
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>Round Off</NAME><NAME>Rounding</NAME><NAME>Paise  Adj</NAME>\
+         <NAME>Rounding</NAME><NAME>ROUND OFF</NAME><NAME>Round Off</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_aliases(&list), ["Rounding", "Paise  Adj"]);
+}
+
+/// A name the walk cannot use is left out and fails no read: blank, self-closing,
+/// undecodable, or a forged name.
+#[test]
+fn an_unusable_alias_is_left_out_and_fails_no_read() {
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>Round Off</NAME><NAME>   </NAME><NAME/><NAME>A &bogus; B</NAME>\
+         <NAME>Round\u{202e}Off</NAME><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_aliases(&list), ["Rounding"]);
+    assert_eq!(
+        round_off_stored(&list).as_deref(),
+        Some("Round Off"),
+        "the own name is read as before"
+    );
+}
+
+/// An unusable first name leaves the ledger on its row spelling and promotes
+/// nothing, but the names after it are still its aliases.
+#[test]
+fn an_unusable_first_name_does_not_stop_the_aliases_after_it() {
+    let list = format!("{ROUND_OFF_LIST_HEAD}<NAME/><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}");
+    assert_eq!(round_off_stored(&list), None);
+    assert_eq!(round_off_aliases(&list), ["Rounding"]);
+}
+
+/// A second `NAME.LIST` of the first list is "after the first name" too; a
+/// second `LANGUAGENAME.LIST` is not read (never measured to carry aliases).
+#[test]
+fn only_the_first_language_list_carries_aliases() {
+    let list = format!(
+        "<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\"><NAME>Round Off</NAME><NAME>Rounding</NAME></NAME.LIST>\
+         <NAME.LIST TYPE=\"String\"><NAME>Second Of First</NAME></NAME.LIST><LANGUAGEID>0</LANGUAGEID></LANGUAGENAME.LIST>\
+         {ROUND_OFF_LIST_HEAD}<NAME>Second List</NAME><NAME>Second List Alias</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_aliases(&list), ["Rounding", "Second Of First"]);
+}
+
+/// A name outside `NAME.LIST` is no alias.
+#[test]
+fn a_name_outside_the_name_list_is_no_alias() {
+    let list = "<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\"><NAME>Round Off</NAME></NAME.LIST>\
+                <NAME>Loose</NAME><LANGUAGEID><NAME>Nested</NAME></LANGUAGEID></LANGUAGENAME.LIST>";
+    assert_eq!(round_off_aliases(list), Vec::<String>::new());
+}
+
+/// An alias is not a ledger name: one equal, apart from case, to another
+/// ledger's name does not make the catalogue's names collide
+/// (`DuplicateIdentity`), and it is not counted among the names.
+#[test]
+fn an_alias_equal_apart_from_case_to_another_ledger_is_not_a_duplicate_identity() {
+    let xml = decoded_shape_lab_catalogue();
+    let catalogue = parse_standard_ledger_catalog_with_identities(
+        &xml,
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("parses");
+    let other = catalogue
+        .names()
+        .find(|name| *name != "ROUND OFF" && name.to_uppercase() != *name)
+        .expect("another ledger with lower case letters")
+        .to_string();
+    let alias = other.to_uppercase();
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>Round Off</NAME><NAME>{alias}</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    let edited = shape_lab_with_round_off_list(&list);
+    let parsed = parse_standard_ledger_catalog_with_identities(
+        &edited,
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("an alias is not an identity, so no duplicate");
+    assert_eq!(parsed.names().count(), 43);
+    assert_eq!(
+        parsed.aliases().collect::<Vec<_>>(),
+        [("ROUND OFF", alias.as_str())]
+    );
 }
 
 // ---- The V2 catalogue on captures of a live Tally (#1234) ------------------------------------------

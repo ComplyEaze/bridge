@@ -1,0 +1,9 @@
+#1237 restore plan (LAB-COMMON v3 C6), written 2026-10-26T16:39:41Z
+Folder: <lab folder>\1237-pan\backup (holds this one file only)
+File: TDBK1800_100033.001, 90,051 bytes, sha256 26276fa11541d523e65d1b514efc809a7dea7910bb64dc3ff8ff522172978661 (checked just now)
+Backup time as the Restore list should show it: 26-Oct-2026, 21:38 (9:38 pm)
+Company: BRIDGE PILOT LAB, number 100033
+Restore Data Path: Tally's data folder as the screen shows it (<Tally data folder>)
+Source: Specify Path, the backup folder above
+Prompts expected and the only ones answered: 'Accept ?' = Yes; 'Company data folder (100033) already exists ... Replace ...' = Replace (R)
+Before: Shut BRIDGE PILOT LAB (Alt+K, H, Enter). After: load it alone; p01 -> m4 (EXPECT 68 / 245 = m1); p02 -> c3 (EXPECT byte-equal to c0: 38,278 B, sha256 4976bbec...).

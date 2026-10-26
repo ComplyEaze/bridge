@@ -1,0 +1,130 @@
+{
+ "rows": 20,
+ "incometaxnumber_elements_present": 1,
+ "ledgers": [
+  {
+   "name": "BRIDGE CGST 2.5%",
+   "parent": "Duties & Taxes",
+   "alterid": "219",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE CGST 9%",
+   "parent": "Duties & Taxes",
+   "alterid": "220",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Goods 18%",
+   "parent": "Sales Accounts",
+   "alterid": "218",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Output CGST XML",
+   "parent": "Duties & Taxes",
+   "alterid": "224",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE PAN Party A",
+   "parent": "Sundry Debtors",
+   "alterid": "246",
+   "INCOMETAXNUMBER": "text 'ZZZZZ0000Z'",
+   "PARTYGSTIN": "absent",
+   "NAMEONPAN": "absent"
+  },
+  {
+   "name": "BRIDGE PAN Party B",
+   "parent": "Sundry Debtors",
+   "alterid": "247",
+   "INCOMETAXNUMBER": "absent",
+   "PARTYGSTIN": "absent",
+   "NAMEONPAN": "absent"
+  },
+  {
+   "name": "BRIDGE Purchase Svc 5%",
+   "parent": "Purchase Accounts",
+   "alterid": "232",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Round Off",
+   "parent": "Indirect Expenses",
+   "alterid": "223",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE SGST 2.5%",
+   "parent": "Duties & Taxes",
+   "alterid": "221",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE SGST 9%",
+   "parent": "Duties & Taxes",
+   "alterid": "222",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Supplier RJ",
+   "parent": "Sundry Creditors",
+   "alterid": "231",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Svc 4D 5%",
+   "parent": "Sales Accounts",
+   "alterid": "243",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Svc 998313 5%",
+   "parent": "Sales Accounts",
+   "alterid": "216",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Svc 998314 5%",
+   "parent": "Sales Accounts",
+   "alterid": "217",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Svc 998315 5%",
+   "parent": "Sales Accounts",
+   "alterid": "234",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Svc INH2 5%",
+   "parent": "BRIDGE Sales Sub",
+   "alterid": "237",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Svc INH 5%",
+   "parent": "Sales Accounts",
+   "alterid": "242",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "BRIDGE Walk-in",
+   "parent": "Sundry Debtors",
+   "alterid": "215",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "Cash",
+   "parent": "Cash-in-Hand",
+   "alterid": "32",
+   "INCOMETAXNUMBER": "absent"
+  },
+  {
+   "name": "Profit & Loss A/c",
+   "parent": "[4] Primary",
+   "alterid": "31",
+   "INCOMETAXNUMBER": "absent"
+  }
+ ]
+}

@@ -44,6 +44,7 @@ const MISMATCHES_SHOWN: usize = 20;
 const WR2_LAB: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const REGISTER_LAB: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+const TRANSFER_LAB: &str = "d6e4c24f-8c7a-4797-93ec-e44bdff60bc9";
 const OUTSTANDINGS_LAB: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const STOCK_LAB: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const READS_LAB: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
@@ -441,6 +442,11 @@ fn rows() -> Vec<Row> {
         "voucher_cost_centre_allocations_shape_lab_live.utf16le.xml",
         "parse_agent_rows(SHAPE_LAB)",
         |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml",
+        "parse_agent_rows(TRANSFER_LAB)",
+        |_, t| agent_rows(t, TRANSFER_LAB)
     ));
     rows.push(row!(
         "vouchers_agst_ref_reopen_live.utf16le.xml",

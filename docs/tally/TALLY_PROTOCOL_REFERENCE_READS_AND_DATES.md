@@ -718,6 +718,19 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
   allocation on a book whose Cost Centres setting is Yes; a read of a different voucher type; another release or book;
   that the allocations of an entry always add up to its amount (the tool does not check this).
 
+### 8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-12; TallyPrime 7.1, one synthetic book**
+
+**Scope: TallyPrime 7.1 Silver, licensed, `education_mode: false`, synthetic company `BRIDGE TRANSFER LAB`, one read of five days (1 to 5 Apr 2026): five Contras of 50,000.00 between two bank ledgers, typed on Tally's screen.** Request and response
+retained with sha256 in `tests/fixtures/VOUCHER_CONTRA_HAND_KEYED_CAPTURE_PROVENANCE.md`; the request is the one the vouchers read
+sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
+
+- **Where a hand-keyed transfer reference sits.** The voucher-level `REFERENCE` is empty on all five. A reference typed in the narration is only narration text. A reference typed in the bank allocation sits in `INSTRUMENTNUMBER` of the `BANKALLOCATIONS.LIST` on **each** of the voucher's two entries (voucher 2: `900000000002`, type `Same Bank Transfer`; voucher 5: a cheque number `123456`, type `Cheque` on one entry and `Cheque/DD` on the other). `TRANSACTIONID` was empty in every case.
+- **Every bank entry carries an allocation, with or without a number.** Vouchers 1, 3 and 4 carry one with a `TRANSACTIONTYPE` (`Cheque` or `Cheque/DD`) and an empty `<INSTRUMENTNUMBER/>`; the allocation's `INSTRUMENTDATE` equals the voucher date.
+- **The reconciliation fields, with nothing reconciled.** On all ten allocations `BANKERSDATE` was empty (`<BANKERSDATE/>`), `STATUS` was `No`, `BANKRECONSTATUS` (`TYPE="String"`) was `Available Only in Books` and `PAYMENTMODE` was `Transacted`. Counted with an XML parser over the capture. No entry had been reconciled, so what these read for a reconciled entry, or one reconciled and cleared, is not observed.
+- **Elsewhere in the repository's captures.** The other committed voucher answers carry 365 `BANKALLOCATIONS.LIST` elements, every one with no children (one more, populated, is a project-authored fixture and is not evidence).
+- **What the tool returns.** Only when `vouchers` is called with `bank_allocations: true`: an entry with one or more allocations that have children gains `bank_allocations`, at most eight, each with `bank_date` (`BANKERSDATE`), `instrument_number`, `instrument_date`, `transaction_type` and `status`, every one `absent`, `empty` or a trimmed `value`; a date that is not `YYYYMMDD` is not shown. No reconciliation verdict is drawn and `BANKRECONSTATUS` is not read. A list that cannot be read whole (a field sent twice in one allocation, more than eight, an allocation list inside another list of the entry, an element inside a field that is read, an undecodable text, a date that is not a date) is not shown in part: the entry carries `bank_allocations_unreadable` with a reason and the rest of the response is unchanged. Without the argument, and in the registers, neither key is returned.
+- **Not shown.** A reconciled entry; other transaction types (NEFT, RTGS, IMPS) and whether any keeps a UTR in `TRANSACTIONID`; a cash deposit or withdrawal; Payment, Receipt and Journal vouchers; Gold and other releases; several currencies. That the number on one entry equals the number on the other is observed here for two vouchers and is not enforced by the tool.
+
 ### 8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**
 
 **Scope: TallyPrime 7.1 Silver, licensed, one company, 28 ledger masters (2026-09-12) and 36 (2026-09-30).** Captured from

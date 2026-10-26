@@ -24,8 +24,10 @@ Not for merge. This is the ONE sheet of the sitting. It holds the order, the bui
 
 ## BUILD (filled in by whoever relays this sheet, before it goes to the lab)
 The release candidate's Windows bundle: artifact `unsigned-bundle-smoke-windows-latest` of the Bridge CI run on the release-candidate head. It holds, under `bundle\`, `bridge-tally.mcpb`, `mcpb-smoke.json` and the desktop installers (`nsis\*-setup.exe`, `msi\*.msi`); the installer to run is the `*-setup.exe`.
-- head sha: ______  run id: ______  artifact id: ______  zip digest: ______
-- `bridge-tally.mcpb` bytes and sha256: ______  `bridge_mcp.exe` (inside it) sha256: ______  `*-setup.exe` name, bytes and sha256: ______
+- head sha: 0617e6170a53183031c97c6b9512e45e058e42c6  run id: 40237923492  artifact id: 12617715059  zip digest: sha256:2bbc7cff828d599f3ed718c6445e173860db9c99a59ca347e058c9d673a396d0 (the zip is 61,489,003 bytes; the lab's own hash of it equals the API digest)
+- `bridge-tally.mcpb` bytes and sha256: 16,429,940 bytes, 5e4af741031e5ddb995cc9ee51a198a19716cfe2a5d751650eb1bf5165cfdbed (equals `archive_sha256` in `mcpb-smoke.json`)  `bridge_mcp.exe` (inside it) sha256: 7c22e1b5c16ca9a71ae0ad3495760fb914bedc73edac2ea38f86c29e1b987120 (33,890,304 bytes; equals `binary_sha256`)  `*-setup.exe` name, bytes and sha256: `nsis\Bridge_0.6.0_x64-setup.exe`, 18,607,803 bytes, 714f9deb0a1a4dde319fae48f8ea167dd74de6ee9c24c6ea7e715cdc82770d95
+- `mcpb-smoke.json`: `server_version` 0.6.0, 30 tools by default and 32 with the opt-in settings, stderr 0 bytes. The lab staged this artifact in `C:\bridge-lab\builds\sitting2-0617e617` and ran nothing from it.
+- What this head holds, and does not: it holds #1854 (the Mac alert line) and #1905 (the desktop app's Terms of Use window); it does NOT hold #1879 (the approval box fit check on Windows), #1714 (the transfer check at send) or anything merged after 0617e6170. The Store install rows do not depend on those; a row that does is run on a later build.
 
 The lab downloads into an EMPTY folder, hashes, and compares with this block. A different hash, an expired or missing artifact, or a head that is not the release candidate's is a STOP before anything is installed. Nothing is built on the PC.
 

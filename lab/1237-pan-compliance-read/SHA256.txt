@@ -1,0 +1,5 @@
+# sha256  bytes  file  (source of each request)
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md  byte for byte from lab/1331-scoped-listing-run-sheet at 36e2d37e
+92816fa63983c4e8f9ace27aa651e12eee968cd874ac60ef5d29a9df33b9584a  7366  RUN-SHEET.md  
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  976  requests/p01_marks.request.utf16le.xml  byte for byte from lab/1331-scoped-listing-run-sheet at 36e2d37e (requests/p01_marks.request.utf16le.xml)
+b0c02fc724502e10dc23a9d6b430c9cbb20c191df948082f06fab9d7e4c8f9bc  1736  requests/p02_compliance_listing.request.utf16le.xml  byte for byte from lab/1342-w18c-answers at 0c283834 (requests/w18c-ledgers-compliance-to-20260915.xml); request L of src-tauri/src/agent_import_w18_replay_tests.rs

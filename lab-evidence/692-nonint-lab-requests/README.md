@@ -1,5 +1,15 @@
 # Lab request: a new synthetic stock company whose inventory is NOT integrated with accounts (SETUP by hand, then READ-ONLY reads)
 
+## Added 26 Oct 2026 before the sitting (these lines win over the text below where they differ)
+- **LAB-COMMON v3 applies in full** (`LAB-COMMON.md` in this folder, a byte copy from `lab/626-1038-1050-run-sheets` at 8c602c15, sha256 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6); where it and this request differ, the stricter holds.
+- **Requests by curl** are allowed by the owner's decision of 26 Oct 2026 that requests sent by curl may be used to discover shapes. Every file in `requests/` is an existing builder's request, used as an instrument, with only the company and dates changed: each equals a committed fixture under `src-tauri/crates/bridge-tally-protocol/tests/fixtures/` once its company and dates are set aside (P&L and Balance Sheet: the `statement_profit_and_loss_*` and `statement_balance_sheet_*` requests; the ledger collection: the `statement_trial_balance_*` request; the group tree: the group-snapshot request (`shape-lab-group-snapshot.request`); Stock Summary: `stock_summary_report_*`; the marks template: `company_inventory_flags_*`). No new builder is made from them.
+- **Request-ID check** before the first send, in this folder: `python -I check-request-ids.py requests`; EXPECT `census: ok 3, skipped 3, FAIL 0`. The skipped files are report requests (TYPE Data) that define no collection: check by eye that each one's ID is the report's name and that it defines no `COLLECTION`. Run it again on the marks file after its `@@GUID@@` is filled in (EXPECT that file `ok`). Anything else = STOP, nothing sent.
+- **Read bounds (C3):** the marks read 8,192 bytes; every other read 2,000,000 bytes. An answer above its bound = STOP.
+- **Release:** record it from Tally's About screen. The lab PC runs TallyPrime 7.2 since 25 Oct 2026; the new company is created on that release.
+- **The owner's yes before keying:** the lab asks the owner in its own chat before the first key step, and keys nothing until the owner says yes.
+- **Dialogs:** any dialog or message box these steps do not describe = STOP (C7): press no key, send nothing more, screenshot, copy its text, report.
+- **Evidence:** on a new branch `lab-evidence/692-nonint-lab-answers`, with `SHA256.txt` listing every file, after the pre-push scan and the run coordinator's yes. Screenshots stay on the lab PC, listed by name, size and sha256.
+
 Why: every BRIDGE book read so far is integrated with accounts. The statements code decides from the company's integration flag and from the stock lines of Tally's own Profit and Loss; what a book with inventory on and integration off looks like in those reports, and in the ledger collection, has never been captured. One small book, built by hand, answers it.
 
 ## Rules

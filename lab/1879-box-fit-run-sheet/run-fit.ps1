@@ -4,7 +4,7 @@
 # what it printed. NO Tally, NO posting: the child only shows a box and prints a token if Yes is clicked. The box is answered by
 # MOUSE only (Yes, No, Cancel or the X, as the sheet says for the case). Type NOTHING while a box is open: Y answers it.
 # Written without a PowerShell to test it on: run -DryRun first (prints, opens nothing), then one real case.
-# Usage: powershell -NoProfile -ExecutionPolicy Bypass -File run-fit.ps1 -Exe <bridge_mcp.exe> -InputDir <folder holding probe-NN.txt> -Case probe-48 -OutDir <new folder> [-DryRun]
+# Usage: powershell -NoProfile -File run-fit.ps1 -Exe <bridge_mcp.exe> -InputDir <folder holding probe-NN.txt> -Case probe-48 -OutDir <new folder> [-DryRun]
 param(
   [Parameter(Mandatory=$true)][string]$Exe,
   [Parameter(Mandatory=$true)][string]$InputDir,

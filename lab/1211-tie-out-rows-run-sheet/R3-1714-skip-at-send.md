@@ -1,6 +1,6 @@
 # #1714 row: a skip recorded after a statement batch is built refuses that batch when it is sent
 
-Not for merge. BLOCKING for release 0.6.1 (the owner's decision of 26 Oct 2026: this row and the #724 numbering rows are the live write pass the release owes). `LAB-COMMON.md` in this folder (v3) applies in full; where this row and it differ, the stricter holds. It reuses the setup of `RUN-SHEET.md` in this folder (R1 and R2): the same company, statement and parse arguments.
+Not for merge. BLOCKING for release 0.6.1 (the owner's decision of 26 Oct 2026: this row and the #724 numbering rows are the live write pass the release owes). `LAB-COMMON.md` in this folder (v3) applies in full; where this row and it differ, the stricter holds. It reuses the setup of `RUN-SHEET.md` in this folder (R1 and R2): the same company, statement and parse arguments, and its "Before the sitting" items 1 to 3 (licensed Tally, `SHA256.txt` checked, the owner's go-ahead).
 
 **WHY.** Pull request #1714 checks a bank-statement batch against the transfer records when it is sent, as well as when it is built. Its own lab request: "a statement batch built, then a skip of its row recorded, then sent: refused before the dialog with nothing sent; a batch whose row is not skipped posts as before". Its end-to-end test (`a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog` in `src-tauri/src/agent_import_post_e2e_tests.rs`) refuses such a batch with `skip_row_paired_elsewhere`, before any Tally request and before the approval window, with nothing written to the batch journal. It has run only against a simulator; this row runs it on a real book.
 
@@ -12,47 +12,45 @@ Not for merge. BLOCKING for release 0.6.1 (the owner's decision of 26 Oct 2026: 
 
 RC COMMIT: <to fill>  CI RUN: <to fill>  ARTIFACT: <to fill>  ZIP DIGEST: <to fill>  EXE SHA256: <to fill>
 
-Run it over stdio with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, ONE new empty `BRIDGE_AGENT_DATA_DIR` for this row (`C:\bridge-lab\1714\data\`, never the folder R1 and R2 used), `BRIDGE_TERMS_ACCEPTED=true` (the person responsible for the lab accepting the Terms of Use) and `BRIDGE_AGENT_REDACTION` unset. POSTING is the owner's act: the owner sets `BRIDGE_AGENT_ENABLE_WRITES=true` in the launch configuration himself; the lab never sets, writes or copies it, and records only that it is present. `BRIDGE_AGENT_ENABLE_BATCH_POST` must be absent.
+Run it over stdio, ONE launch from step 0 to the close (never relaunched in between), with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, ONE new empty `BRIDGE_AGENT_DATA_DIR` for this row (`C:\bridge-lab\1714\data\`, never the folder R1 and R2 used), `BRIDGE_TERMS_ACCEPTED=true` (the person responsible for the lab accepting the Terms of Use), and `BRIDGE_AGENT_REDACTION` and `BRIDGE_AGENT_MAX_BYTES` unset. POSTING is the owner's act: the owner sets `BRIDGE_AGENT_ENABLE_WRITES=true` in the launch configuration himself, before that launch (it also lets the parses and builds of steps 2 to 4 run); the lab never sets, writes or copies it, and records at step 0 only that it is present. `BRIDGE_AGENT_ENABLE_BATCH_POST` must be absent. No other ComplyEaze Bridge, the desktop app included, may run against port 9001 during the row: record the process list at step 0.
 
-**THE APPROVAL WINDOW** opens on top and takes the keyboard focus: only the owner answers it, by mouse; nobody presses a key on the PC from a `post_import` call until its answer arrives. This row runs only while the owner is at the PC.
+**THE APPROVAL WINDOW** opens on top and takes the keyboard focus. While any approval window is open, nobody presses a key on the PC and no tool is called; only the owner's mouse closes it. This row runs only while the owner is at the PC.
 
-**THE CALLS.** Only the build's own tools, one at a time; no request is sent by curl. `parse_bank_statement` takes the required arguments the 14 October run used for THE STATEMENT (from that run's call records on the lab PC), changing only `from`, `to` and `mapping` as each step says. Every `build_import_xml` passes `company_guid` with that parse's `proposals_id` and `proposals_sha256`. MARKS means `ledger_masters` (first page, no `snapshot_id`): M = `snapshot.master_alter_id`, V = `snapshot.voucher_alter_id`; `snapshot.reused` must read false.
+**THE CALLS.** Only the build's own tools, one at a time; no request is sent by curl. `parse_bank_statement` takes the required arguments the 14 October run used for THE STATEMENT (from that run's call records on the lab PC), changing only `from`, `to` and `mapping` as each step says. Every `build_import_xml` passes `company_guid` with that parse's `proposals_id` and `proposals_sha256`. MARKS means `ledger_masters` (first page, no `snapshot_id`): M = `snapshot.master_alter_id`, V = `snapshot.voucher_alter_id`; `snapshot.reused` must read false. An answer's `next_step` or `next_steps` is recorded, never acted on: this row's steps decide every call.
 
 ## Step 0
-1. LAB-COMMON C2 step 0 with THE COMPANY loaded alone, without its MARKS request (its GET /status checks stay).
+1. LAB-COMMON C2 step 0 with THE COMPANY loaded alone, without its MARKS request (its GET /status checks stay). Record the process list and that `BRIDGE_AGENT_ENABLE_WRITES` is present.
 2. `list_companies`: EXPECT exactly THE COMPANY with the GUID above; anything else = STOP.
 3. MARKS: M0, V0.
 4. `ledger_movement` for Union Bank, 2026-07-01 to 2026-09-30: EXPECT opening -10000.00 and closing -11800, as on 14 October; another figure = STOP (the book is not as recorded).
-5. `masters` with `kind` `voucher_types`: record the Payment and Receipt rows whole. A statement row is built as a Payment or a Receipt, and a build refuses a type whose numbering is not Automatic with "Retain Original Voucher No." (`import_voucher_numbering_not_automatic`, `import_voucher_numbering_not_retain`). If either row reads otherwise: STOP and ask the run coordinator (setting it is an owner act on Tally's screen, after BK1).
+5. `masters` with `kind` `voucher_types`: record the Payment and Receipt rows whole. A statement row is built as a Payment or a Receipt, and a build refuses a type whose numbering is not Automatic with "Retain Original Voucher No." EXPECT, for each of the two, `series_numbering.observation` `observed`, `series_numbering.method` `automatic` and `series_numbering.sub_method` `auto_retain` (`numbering_method` does not decide this: ignore it). If either reads otherwise: STOP before anything changes and ask the run coordinator. Should he go on, the order is: BK1 (step 6), the owner sets that type's numbering on Tally's screen, MARKS, then step 1.
 6. Backup BK1 (C5) into a NEW empty folder `C:\bridge-lab\1714\backups\BK1\`: name, size and sha256.
 
 ## Step 1: a second bank ledger (by hand)
 OWNER: create ledger `BRIDGE Bank B` under Bank Accounts, no opening balance; screenshot before the accept. MARKS: M1 (EXPECT above M0), V1 = V0.
 
-## Step 2: choose two rows (the statement file only; nothing is posted)
-1. `parse_bank_statement` with `from` 2026-09-01 and `to` 2026-09-30, no `mapping`. Save the answer.
-2. From it, choose the first two days of September, D and then D2, on each of which the statement holds exactly one row, whose party is named (not unresolved or unnamed) and is not cash. Record each day's party exactly as `counterparties` prints it (P for D).
-3. Confirm each with a one-day parse (`from` = `to` = that day, no `mapping`): EXPECT `rows_in_window` 1 and `cash_questions_open` 0. Fewer than two such days = STOP and report the September rows (the run coordinator decides).
+## Step 2: choose two rows (the statement file only; nothing is written to Tally)
+Parse one day at a time from 2026-09-01 (`from` = `to` = that day, no `mapping`), saving each answer. A day qualifies when the answer reads `rows_in_window` 1, `cash_questions_open` 0, `skipped` 0, and its one `counterparties` entry is a named party (not unresolved or unnamed). D and D2 are the first two days that qualify; record each day's party exactly as `counterparties` prints it (P for D). Stop parsing once D2 is found. Fewer than two such days in September = STOP and report the answers (the run coordinator decides).
 
 ## Step 3: batch A, built for D (not sent)
-`parse_bank_statement` for D, no `mapping` (the row goes to the suspense ledger), then `build_import_xml` with that parse. EXPECT a saved batch with one voucher: record the answer whole and its `batch_id` as A. Any refusal: record it whole and STOP.
+`parse_bank_statement` for D, no `mapping` (the row goes to the suspense ledger), then `build_import_xml` with that parse. EXPECT `voucher_count` 1 and a `batch_id`: record the answer whole, and that `batch_id` as A. Any refusal: record it whole and STOP.
 The book: unchanged.
 
 ## Step 4: the skip of that row, recorded after A was built
-`parse_bank_statement` for D with `mapping` `[{"party": "<P>", "ledger": "BRIDGE Bank B", "treatment": "skip"}]`: EXPECT no voucher proposed and `skipped` 1. Then `build_import_xml` with that parse: EXPECT `state` `skips_recorded`, `skipped_rows` 1, a `record_id`, and a `transfers` section; record the answer whole, and the row's id R (`st-` and D's date) as the parse answer or the transfers section names it. Any refusal: record it whole and STOP (the row cannot go on as written; nothing was sent).
-The book: unchanged (a skip is recorded in the data folder only).
+`parse_bank_statement` for D with `mapping` `[{"party": "<P>", "ledger": "BRIDGE Bank B", "treatment": "skip"}]`: EXPECT `vouchers` 0 and `skipped` 1. Then `build_import_xml` with that parse. EXPECT `state` `skips_recorded`, `skipped_rows` 1 and a `record_id`, and in its `transfers` section: `state` `computed`, `skips_open` 1, `open_omitted` 0, and one `open` row with `state` `held_elsewhere` and `batch_id` A. R is that row's `bridge_txn_id` (it begins `st-` and D as yyyymmdd). Record the answer whole. Any refusal, another state, or the section cut short: record it whole and STOP (nothing was written to Tally).
+The book: unchanged (the skip is recorded in the data folder only).
 
 ## Step 5: batch A sent (the check)
-1. Record the name, size and sha256 of every file in the data folder. MARKS: V5a.
+1. Record the name, size and sha256 of every file in the data folder, among them `agent-import-ledger.jsonl` (the batch journal) and `agent-import-statement-skips.jsonl` (the skips). MARKS: V5a.
 2. Tell the owner that no approval window is expected. `post_import` with `company_guid` and `batch_id` A.
-3. EXPECT: no approval window; the answer's `error.code` `skip_row_paired_elsewhere`, `error.skipped_rows` holding R, and `error.next_step` beginning "Nothing was sent to Tally, and any approval of this batch is withdrawn." and ending "This batch cannot be sent as built: build it again."; record `attempt_recorded` (EXPECT false). Record the answer whole.
-4. MARKS: V = V5a. The data folder's batch journal: same size and sha256 as in 1. `egress_log`: record the lines this call added (EXPECT no request sent to Tally for it). `vouchers` for D: EXPECT no voucher on Union Bank that day.
-If an approval window opens: the owner answers **No** by mouse, screenshot, record the answer whole, STOP: that is the FINDING of this row. Any other code, a moved V, or a voucher on D: record it whole and STOP, and report what the book holds.
+3. EXPECT: no approval window; the answer's `error.code` `skip_row_paired_elsewhere`, `error.skipped_rows` holding R, `error.next_step` beginning "Nothing was sent to Tally, and any approval of this batch is withdrawn." and ending "This batch cannot be sent as built: build it again.", and `attempt_recorded` false. Record the answer whole. `attempt_recorded` null = STOP (another process may hold the dispatch lease).
+4. MARKS: V = V5a. Both files of 1: the same size and sha256. `egress_log`: record the lines this call added; EXPECT its `post_import` line to show no request sent to Tally. `vouchers` for D: EXPECT no voucher on Union Bank that day.
+If an approval window opens: the owner answers **No** by mouse, screenshot, record the answer whole, STOP: that is the FINDING of this row. Any other code, a moved V, a changed file, or a voucher on D: record it whole and STOP, and report what the book holds.
 The book: unchanged.
 
 ## Step 6: the control, a row not skipped posts as before
-`parse_bank_statement` for D2, no `mapping`, then `build_import_xml` with that parse: record its `batch_id` as B. Tell the owner a window will open. `post_import` with `company_guid` and `batch_id` B; the owner reads the window and answers **Yes** by mouse within its time. If the answer says the approval is `pending`, or `approved` without a send, call `post_import` again with B after its `retry_after_s` (the tool's own flow, not a retry). Record every answer whole.
-EXPECT `state` `posted_verified`. `verify_import` of B: `posted_verified`. MARKS: V moved by one. `vouchers` for D2: one voucher on Union Bank, as the statement row says. Any other final state or refusal: record it whole, do not call again, STOP.
+`parse_bank_statement` for D2, no `mapping`, then `build_import_xml` with that parse: EXPECT `voucher_count` 1; record its `batch_id` as B. MARKS: V6a, immediately before the post. Tell the owner a window will open. `post_import` with `company_guid` and `batch_id` B; the owner reads the window and answers **Yes** by mouse within its time. If `result.approval.state` reads `pending`, wait `result.approval.retry_after_s` seconds and call `post_import` again with B; if it reads `approved` without a send, call again at once (the tool's own flow, not a retry). Record every answer whole.
+EXPECT the last answer's `result.dispatch.state` `posted_verified`. `verify_import` of B: `result.verification_status` `posted_verified`. MARKS: V = V6a + 1. `vouchers` for D2: one voucher on Union Bank, as the statement row says. Any other final state or refusal: record it whole, do not call again, STOP.
 The book: plus one voucher dated D2.
 
 STOP RULES: C7 and C8; any dialog before a call; an approval window other than step 6's; a mark that moves outside the steps that change it; any answer outside the stated shape.
@@ -64,7 +62,7 @@ Restore BK1 (C6). `list_companies` (as step 0); MARKS: EXPECT M = M0 and V = V0;
 Step 0: unchanged. Step 1: plus `BRIDGE Bank B`. Steps 2 to 5: the same. Step 6: plus the D2 voucher. After the restore: as at BK1, the book of step 0.
 
 ## Not measured by this row
-A skip recorded while the approval window is open (the check under the admission lock); a batch that withdrew the skip and was then overtaken by a newer skip; Contra batches; `skip_row_already_posted`; Gold.
+A skip recorded while the approval window is open (the check under the admission lock); a batch that withdrew the skip and was then overtaken by a newer skip; Contra batches; `skip_row_already_posted`; a hand import of batch A's file; Gold.
 
 ## Close and evidence
 C10: Shut Company; no company loaded. Evidence on a new branch `lab/1714-skip-at-send-answers` with `SHA256.txt`, after the pre-push scan and the run coordinator's yes: every answer whole with its size and sha256, the data folder's file listing of step 5 (names, sizes, sha256), the `egress_log` lines, BK1's name, size and sha256, the build's hashes, and a notes file with UTC times. Screenshots, the statement PDF and the data folder stay on the lab PC, listed by name, size and sha256.

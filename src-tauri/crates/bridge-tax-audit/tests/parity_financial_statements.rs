@@ -7,7 +7,7 @@
 //! alters one thing and asserts the specific difference is reported, not merely that something was.
 //!
 //! The fixture's financial_statements cases (masterid 50-53 and the two Stock-in-Hand ledgers,
-//! `parity/generate_fixture.py`): a Direct Expenses ledger one subgroup below its primary, a Direct
+//! the deleted `parity/generate_fixture.py`): a Direct Expenses ledger one subgroup below its primary, a Direct
 //! Incomes and an Indirect Incomes ledger (the credit-balance sign flip), a partners'-interest
 //! ledger configured in `[partners.*]`, a Stock-in-Hand ledger whose TB closing field is stale
 //! (closing stock must come from opening + debit - credit) beside one that is not, and report

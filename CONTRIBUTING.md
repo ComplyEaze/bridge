@@ -85,6 +85,12 @@ evidence, compatibility and rollback notes, and the required security and
 platform details. Every pull request must link at least one completed item in
 the [review checklist](./review-checklist.md).
 
+A change a user or an integrator can see adds its entry to the change list as a new
+file, `docs/changelog/unreleased/<added|changed|removed>/<issue number>-<words-with-hyphens>.md`,
+holding one bullet that cites the issue; it does not edit `CHANGELOG.md`, which
+every other pull request would also edit. The format is in
+[docs/release-process.md](./docs/release-process.md), under `CHANGELOG.md`.
+
 Never paste raw production logs. Redact or replace names, email addresses,
 company and tax identifiers, financial data, document contents, certificate
 details, PINs, tokens, usernames, and absolute local paths.

@@ -1,4 +1,11 @@
-use std::{borrow::Cow, time::Duration};
+use std::{
+    borrow::Cow,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProductStatus {
@@ -120,10 +127,46 @@ pub enum WireEncoding {
 pub enum Delivery {
     Immediate,
     SlowHeaders(Duration),
-    SlowBody { chunk_bytes: usize, delay: Duration },
+    /// The response is held until the test opens the gate, so a test orders
+    /// another step before it by an event, not by a timer.
+    Held(DeliveryGate),
+    SlowBody {
+        chunk_bytes: usize,
+        delay: Duration,
+    },
     ResetBeforeBody,
-    ResetAfterRequestProcessed { delay: Duration },
+    ResetAfterRequestProcessed {
+        delay: Duration,
+    },
 }
+
+/// A switch a test opens to release a [`Delivery::Held`] response. Clones
+/// share one switch; two gates are equal only when they are the same switch.
+#[derive(Debug, Clone, Default)]
+pub struct DeliveryGate(Arc<AtomicBool>);
+
+impl DeliveryGate {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Lets the held response go.
+    pub fn open(&self) {
+        self.0.store(true, Ordering::Release);
+    }
+
+    pub fn is_open(&self) -> bool {
+        self.0.load(Ordering::Acquire)
+    }
+}
+
+impl PartialEq for DeliveryGate {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for DeliveryGate {}
 
 /// Synthetic HTTP response framing. These modes characterize Bridge's client
 /// resilience; they are not claims about framing guaranteed by Tally.

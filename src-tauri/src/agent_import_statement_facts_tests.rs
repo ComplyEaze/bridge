@@ -287,6 +287,7 @@ impl Journal {
             Cursor::new(skips.as_bytes()),
             company,
             candidate,
+            None,
         )
     }
 }
@@ -3474,4 +3475,83 @@ fn a_skip_recorded_again_after_the_withdrawal_keeps_the_row_open() {
         panic!("one held skip");
     };
     assert_eq!(held.by, HeldBy::PostedBatch);
+}
+
+// ---- the batch being sent, judged as it was built ---------------------------------
+
+/// Bank One's statement skipped `st(1)` (a skip-only record), and unsent builds
+/// each post it as a Contra into Bank Two.
+fn skip_of_row_one() -> String {
+    skip_file(&[skip_record(
+        1,
+        ENDPOINT,
+        "2026-09-01T09:00:00Z",
+        facts(B1).skip(skip_row(&st(1), "500.00", B2, None)),
+    )])
+}
+
+fn posts_row_one(id: u32) -> Build {
+    build(id).voucher(contra(&st(1), N2, N1, "500.00")).facts(
+        facts(B1)
+            .window("20260901", "20260930")
+            .contra(&st(1), None),
+    )
+}
+
+fn read_with_subject(
+    journal: &Journal,
+    candidate: Option<Candidate>,
+    subject: Option<u32>,
+) -> TransferFacts {
+    let subject = subject.map(batch_id);
+    ledger::transfer_facts(
+        Cursor::new(journal.0.as_bytes()),
+        Cursor::new(skip_of_row_one().as_bytes()),
+        company(),
+        candidate,
+        subject.as_deref(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn the_subject_batch_is_left_out_of_the_facts_and_read_again_as_the_candidate() {
+    let subject = posts_row_one(3);
+    let journal = Journal::default()
+        .batch(&subject)
+        .status(&subject, "verification_incomplete");
+    let without = read_with_subject(&journal, None, Some(3));
+    assert!(without.contras.is_empty() && without.held.is_empty());
+    let candidate = Candidate::Build(Box::new(BuildLine::of(&subject.line())));
+    let with = read_with_subject(&journal, Some(candidate), Some(3));
+    let as_built = read_with_subject(&Journal::default().batch(&subject), None, None);
+    assert_eq!(with.contras.len(), as_built.contras.len());
+    assert_eq!(with.held.len(), as_built.held.len());
+    assert_eq!(with.live_skips, as_built.live_skips);
+}
+
+#[test]
+fn another_batch_that_holds_the_row_is_not_the_subject() {
+    let journal = Journal::default()
+        .batch(&posts_row_one(3))
+        .batch(&posts_row_one(4));
+    let judged = read_with_subject(&journal, None, Some(3));
+    assert_eq!(judged.held.len(), 1);
+    assert_eq!(judged.contras.len(), 1);
+}
+
+/// A withdrawal counts against a skip only if built strictly after the skip's
+/// newest record; one built at the same instant fails closed.
+#[test]
+fn a_withdrawal_counts_only_when_built_strictly_after_the_skip() {
+    let at = |text: &str| DateTime::parse_from_rfc3339(text).unwrap();
+    let skip = at("2026-09-01T09:00:00.000Z");
+    assert!(withdrawal_counts(&at("2026-09-01T09:00:00.001Z"), &skip));
+    assert!(!withdrawal_counts(&at("2026-09-01T09:00:00.000Z"), &skip));
+    assert!(!withdrawal_counts(&at("2026-09-01T08:59:59.999Z"), &skip));
+    // the same instant written in another offset is the same instant
+    assert!(!withdrawal_counts(
+        &at("2026-09-01T14:30:00.000+05:30"),
+        &skip
+    ));
 }

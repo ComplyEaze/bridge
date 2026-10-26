@@ -16,7 +16,7 @@ The sheet is `lab/1975-release-box-row` at 576ff7a7d1647a30361524d80723a1d4f1f37
 - Four other `bridge_mcp.exe` processes were already running, all children of the desktop assistant app: its two Bridge connectors, each started twice. None had `--confirm-release`, so the script's child search did not match them.
 
 ## Step 1 (dry run)
-Deviation: the sheet's command line passes `-ExecutionPolicy Bypass`, and this session's tool refused that flag. The script was therefore run **unchanged** with PowerShell's call operator, under the PC's existing policy (CurrentUser RemoteSigned; a local script).
+Deviation: the sheet's command line passes `-ExecutionPolicy Bypass`, and the lab's command tool refused that flag. The script was therefore run **unchanged** with PowerShell's call operator, under the PC's existing policy (CurrentUser RemoteSigned; a local script).
 
 The output is in `step1-dryrun.txt`: the case, the exe's sha256, the screen and the command, then "DRY RUN: nothing opened". Nothing opened, and the output folder stayed empty. **As expected.**
 
@@ -63,7 +63,7 @@ No FINDING for #1975.
 - `build-SUMMARY.txt`: the build record.
 - `SHA256.txt`.
 
-Local folder paths are replaced by placeholders (`<item folder>`, `<build folder>`, `<lab folder>`, `<clean checkout>`, `<target dir>`) in four files. In `build-SUMMARY.txt`, the requesting session's name is also replaced, and in `notes.txt` the assistant app's product name. The sha256 of those files as kept on the lab PC:
+Local folder paths are replaced by placeholders (`<item folder>`, `<build folder>`, `<lab folder>`, `<clean checkout>`, `<target dir>`) in four files. In `build-SUMMARY.txt`, the requester's name is also replaced, and in `notes.txt` the assistant app's product name. The sha256 of those files as kept on the lab PC:
 
 | File | sha256 |
 |---|---|

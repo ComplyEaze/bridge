@@ -363,6 +363,12 @@ pub(super) async fn read_audit_book(
     limits: WindowReadLimits,
 ) -> Result<AuditBook, AuditReadFailure> {
     let engagement = Engagement::from_toml_for_read(&engagement_toml(identity, period, roles)?)?;
+    // C5 refuses a company whose books begin after the period ends. The verified
+    // identity already holds that date, and the company part must match it, so
+    // the same refusal comes before any request rather than after the whole read.
+    if identity.books_from_yyyymmdd() > period.1.as_str() {
+        return Err(refused("C5-books-from"));
+    }
     let (parts, marks) = collect_parts(runtime, config, identity, period, limits).await?;
     let (store, read_id, manifest_sha256) = memory_read(identity, period, marks, &parts)?;
     let admitted = Read::open_from(&store, &read_id, &manifest_sha256)?;

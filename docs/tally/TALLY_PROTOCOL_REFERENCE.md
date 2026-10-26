@@ -447,6 +447,9 @@ base revision.
 <a id="12a21-tallys-own-profit-and-loss-carries-closing-stock-as-a-line-of-its-own-on-an-integrated-inventory-book"></a>
 
 [12a.21 Tally's own Profit and Loss carries closing stock as a line of its own on an integrated inventory book](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a21-tallys-own-profit-and-loss-carries-closing-stock-as-a-line-of-its-own-on-an-integrated-inventory-book)
+<a id="12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read"></a>
+
+[12a.22 Stock items carry their own dated HSN and GST lists in a masters read; whether a group's or the company's setting reaches them is not read](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

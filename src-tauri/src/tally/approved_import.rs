@@ -621,6 +621,11 @@ pub(crate) enum UnderLockRefusal {
     /// or sent.
     #[error("invoice_company_stopped")]
     CompanyStopped,
+    /// The batch is no longer one the company's transfer records allow to be
+    /// sent: the reason is the code. The records changed after the check made
+    /// before the person was asked.
+    #[error("{0}")]
+    Transfers(&'static str),
 }
 
 impl UnderLockRefusal {
@@ -634,6 +639,7 @@ impl UnderLockRefusal {
             Self::MarkUnrecorded => "post_mark_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
             Self::CompanyStopped => "invoice_company_stopped",
+            Self::Transfers(reason) => reason,
         }
     }
 }
@@ -1183,6 +1189,55 @@ pub(crate) mod test_seam {
         assert_ran_to_its_end(&approves, "Post", "the control");
     }
 
+    /// A dialog whose box did not fit the screen exits with its own status
+    /// (#1832). That is a refusal that says the text is too large, for the
+    /// post and for the review, with or without a token: no answer, a
+    /// printed approval included, passes for a box the person could not see
+    /// whole. It is not a decline, not unavailable and never approved.
+    #[tokio::test]
+    async fn a_box_that_did_not_fit_the_screen_is_refused_whatever_it_printed() {
+        let directory = standin_directory();
+        let status = crate::tally::box_fit::DOES_NOT_FIT_EXIT;
+        for (name, answer) in [
+            ("no token", ""),
+            (
+                "the post token for this nonce",
+                "bridge-post-approved:{NONCE}\n",
+            ),
+            (
+                "the review token for this nonce",
+                "bridge-review-acknowledged:{NONCE}\n",
+            ),
+        ] {
+            let path = standin(directory.path(), status, answer);
+            assert_eq!(
+                super::confirm_with(&path, ONE, "Post").await,
+                Err("import_review_too_large".to_string()),
+                "post: {name}"
+            );
+            assert_ran_to_its_end(&path, "Post", name);
+            let path = standin(directory.path(), status, answer);
+            assert_eq!(
+                super::confirm_review_with(&path, ONE, "Review").await,
+                Err("ack_review_too_large".to_string()),
+                "review: {name}"
+            );
+            assert_ran_to_its_end(&path, "Review", name);
+        }
+        // The statuses next to it keep their meaning: a decline is exit 1, a
+        // clean exit with no token is unavailable.
+        let decline = standin(directory.path(), 1, "");
+        assert_eq!(
+            super::confirm_with(&decline, ONE, "Post").await,
+            Err("import_approval_declined".to_string())
+        );
+        let unavailable = standin(directory.path(), 0, "");
+        assert_eq!(
+            super::confirm_with(&unavailable, ONE, "Post").await,
+            Err("import_approval_unavailable".to_string())
+        );
+    }
+
     /// Each call sends a nonce of its own: a stand-in that answers every call
     /// with the token for the nonce it read sees a different one each time.
     #[tokio::test]
@@ -1299,24 +1354,25 @@ pub(crate) mod test_seam {
             "ComplyEaze Bridge — record that you reviewed these 50 vouchers?"
         );
         // What each window's answer text says: Y and N answer a message box
-        // that has the keyboard (#1780).
+        // that has the keyboard (#1780). The text is wrapped at 100 characters,
+        // so its words are compared with the breaks read as spaces.
         assert_eq!(
-            super::answer_text(super::Shown::Post, ONE),
+            super::answer_text(super::Shown::Post, ONE).replace('\n', " "),
             "Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to \
              cancel. Nothing is posted until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::Post, count(200)),
+            super::answer_text(super::Shown::Post, count(200)).replace('\n', " "),
             "Press Y (or click Yes) to post these 200 vouchers into Tally. Press N (or click No) \
              to cancel. Nothing is posted until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::Review, count(50)),
+            super::answer_text(super::Shown::Review, count(50)).replace('\n', " "),
             "Press Y (or click Yes) to record that you reviewed these 50 vouchers. Press N (or \
              click No) to cancel. Nothing is recorded until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::StopRelease, ONE),
+            super::answer_text(super::Shown::StopRelease, ONE).replace('\n', " "),
             "Press Y (or click Yes) to release the invoice stop for this company, so that \
              ComplyEaze Bridge builds and posts invoices for it again. Press N (or click No) to \
              cancel. Nothing is released until you answer."
@@ -1324,9 +1380,11 @@ pub(crate) mod test_seam {
     }
 
     /// The answer text is wrapped under the dialog's line width without losing
-    /// a word, and adds no more than three lines and 150 characters above a
-    /// post or review text, the size the dialog's caps were raised by (#1780).
-    /// A wording that outgrows it fails here, so the box does not grow unseen.
+    /// a word where the box needs it (Windows), is one line on the Mac, where
+    /// the alert wraps its own text, and adds no more than three lines and 150
+    /// characters above a post or review text, the size the dialog's caps were
+    /// raised by (#1780). A wording that outgrows it fails here, so the box
+    /// does not grow unseen.
     #[test]
     fn the_answer_text_is_wrapped_and_stays_within_the_size_the_caps_allow() {
         for shown in [
@@ -1336,11 +1394,14 @@ pub(crate) mod test_seam {
         ] {
             for n in [1, 2, 9, 10, 50] {
                 let text = super::answer_text(shown, count(n));
-                let wrapped = super::wrapped(&text);
-                assert_eq!(wrapped.replace('\n', " "), text, "{shown:?} {n}");
+                let joined = text.replace('\n', " ");
+                assert_eq!(super::wrapped(&joined, 100).replace('\n', " "), joined);
+                // The box's own text: Windows lines are within the width; the Mac
+                // text is a single line and stays one.
                 assert!(
-                    wrapped.lines().all(|line| line.chars().count() <= 100),
-                    "{wrapped}"
+                    text.lines().count() == 1
+                        || text.lines().all(|line| line.chars().count() <= 100),
+                    "{text}"
                 );
             }
         }
@@ -1373,9 +1434,7 @@ pub(crate) mod test_seam {
                 );
                 let shown_text = super::displayed_text(shown, count(n), &at_cap);
                 assert!(super::fits_the_box(shown, count(n), &shown_text), "{n}");
-                assert!(
-                    shown_text.starts_with(&super::wrapped(&super::answer_text(shown, count(n))))
-                );
+                assert!(shown_text.starts_with(&super::answer_text(shown, count(n))));
                 assert!(shown_text.ends_with(&at_cap));
                 // One line more, or characters past what the box has room for.
                 let over = super::displayed_text(shown, count(n), &preview(lines + 1, chars));
@@ -1387,6 +1446,25 @@ pub(crate) mod test_seam {
         }
     }
 
+    /// The Mac alert wraps its own text, so the parent does not break the
+    /// answer text: it is one line, shown whole and first (a break of ours
+    /// would be wrapped again by the alert and leave a ragged second row).
+    #[cfg(not(windows))]
+    #[test]
+    fn the_mac_answer_text_is_one_unbroken_line() {
+        for shown in [super::Shown::Post, super::Shown::Review] {
+            for n in [1, 2, 10, 50] {
+                let text = super::answer_text(shown, count(n));
+                assert!(!text.contains('\n'), "{text}");
+                let displayed = super::displayed_text(shown, count(n), "Details");
+                assert_eq!(displayed.lines().next(), Some(text.as_str()));
+                assert!(super::fits_the_box(shown, count(n), &displayed), "{n}");
+            }
+        }
+        let (lines, _) = super::answer_reserve();
+        assert_eq!(lines, 2, "one answer line and the blank line");
+    }
+
     /// Each use of the review dialog writes its own first lines, and a stop
     /// release keeps its statement first (#1780).
     #[test]
@@ -1395,7 +1473,7 @@ pub(crate) mod test_seam {
         let post = super::displayed_text(super::Shown::Post, ONE, "Details");
         let review = super::displayed_text(super::Shown::Review, ONE, "Details");
         let release = super::displayed_text(super::Shown::StopRelease, ONE, preview);
-        let wrapped = |shown| super::wrapped(&super::answer_text(shown, ONE));
+        let wrapped = |shown| super::answer_text(shown, ONE);
         assert_eq!(post, format!("{}\n\nDetails", wrapped(super::Shown::Post)));
         assert_eq!(
             review,
@@ -1511,7 +1589,10 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
 #[cfg(windows)]
 fn answer_text(shown: Shown, count: VoucherCount) -> String {
     let (yes, nothing) = answer_effect(shown, count);
-    format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}")
+    wrapped(
+        &format!("Press Y (or click Yes) to {yes}. Press N (or click No) to cancel. {nothing}"),
+        ANSWER_WIDTH,
+    )
 }
 
 /// The answer text of a Mac alert, which names its buttons and claims no key.
@@ -1522,21 +1603,27 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Post => post_words(count).1,
         Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
     };
-    format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}")
+    wrapped(
+        &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
+        usize::MAX,
+    )
 }
 
 /// The most characters a line of a dialog's text takes (the post dialog's cap).
 const ANSWER_WIDTH: usize = 100;
 
-/// `text` broken at spaces into lines of at most [`ANSWER_WIDTH`] characters.
-fn wrapped(text: &str) -> String {
+/// `text` broken at spaces into lines of at most `limit` characters. The
+/// Windows box needs it, to keep the box's width bounded; the Mac passes no
+/// limit, because the alert wraps its own text and a break of ours would be
+/// wrapped a second time.
+fn wrapped(text: &str, limit: usize) -> String {
     let (mut lines, mut width) = (String::new(), 0);
     for word in text.split(' ') {
         let length = word.chars().count();
         if width == 0 {
             lines.push_str(word);
             width = length;
-        } else if width + 1 + length <= ANSWER_WIDTH {
+        } else if width + 1 + length <= limit {
             lines.push(' ');
             lines.push_str(word);
             width += 1 + length;
@@ -1569,7 +1656,7 @@ fn answer_reserve() -> (usize, usize) {
     let mut reserve = (0, 0);
     for shown in [Shown::Post, Shown::Review] {
         for count in (1..=MOST_VOUCHERS).filter_map(VoucherCount::new) {
-            let answer = wrapped(&answer_text(shown, count));
+            let answer = answer_text(shown, count);
             let added = (answer.lines().count() + 1, answer.chars().count() + 2);
             reserve = (reserve.0.max(added.0), reserve.1.max(added.1));
         }
@@ -1578,8 +1665,10 @@ fn answer_reserve() -> (usize, usize) {
 }
 
 /// Whether the text the box will show is within the box's caps (#1780): the
-/// preview's own caps and room for the answer text, with no line over 100
-/// characters. The parent measures what is shown, so a text that does not fit
+/// preview's own caps and room for the answer text, with no preview line over
+/// 100 characters (the answer text's own lines are the Windows box's, wrapped
+/// at that width, or the Mac alert's one line, which the alert wraps itself).
+/// The parent measures what is shown, so a text that does not fit
 /// is refused before a window opens, never cut. A stop release has no caps
 /// beyond the byte limit.
 fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
@@ -1591,10 +1680,12 @@ fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
         Some(_) => (BATCH_LINES, BATCH_CHARS),
     };
     let (extra_lines, extra_chars) = answer_reserve();
+    let answer_lines = answer_text(shown, count).lines().count();
     displayed.lines().count() <= lines + extra_lines
         && displayed.chars().count() <= chars + extra_chars
         && displayed
             .lines()
+            .skip(answer_lines)
             .all(|line| line.chars().count() <= ANSWER_WIDTH)
 }
 
@@ -1608,7 +1699,7 @@ pub(crate) fn review_text(kind: ReviewKind, count: VoucherCount, preview: &str) 
 /// keeps its own statement first, because the title of the shared review
 /// dialog names only a review, and puts the answer text under it.
 fn displayed_text(shown: Shown, count: VoucherCount, preview: &str) -> String {
-    let answer = wrapped(&answer_text(shown, count));
+    let answer = answer_text(shown, count);
     match (shown, preview.split_once("\n\n")) {
         (Shown::StopRelease, Some((statement, rest))) => {
             format!("{statement}\n\n{answer}\n\n{rest}")
@@ -1649,6 +1740,9 @@ async fn confirm_with(
     )
     .await
     {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed: the text is too large for this person's screen.
+        Ok(answer) if answer.box_did_not_fit => Err("import_review_too_large".into()),
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1695,6 +1789,7 @@ async fn confirm_review_with(
     )
     .await
     {
+        Ok(answer) if answer.box_did_not_fit => Err("ack_review_too_large".into()),
         Ok(answer) if answer.token_matched => Ok(()),
         // A person's decline is no token and exit 1: `run_review_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1708,10 +1803,12 @@ async fn confirm_review_with(
 }
 
 /// What a dialog subprocess answered: whether it printed exactly the token
-/// for this call's nonce, and whether it exited cleanly.
+/// for this call's nonce, whether it exited cleanly, and whether it exited
+/// with the status that says its box did not fit the screen (#1832).
 struct DialogAnswer {
     token_matched: bool,
     exited_cleanly: bool,
+    box_did_not_fit: bool,
 }
 
 enum DialogFailure {
@@ -1770,6 +1867,7 @@ async fn nonce_bound_dialog(
     Ok(DialogAnswer {
         token_matched: answer == dialog_token(prefix, &nonce).as_bytes(),
         exited_cleanly: status.success(),
+        box_did_not_fit: status.code() == Some(super::box_fit::DOES_NOT_FIT_EXIT),
     })
 }
 
@@ -1898,23 +1996,28 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         .encode_utf16()
         .chain(Some(0))
         .collect();
-    // SAFETY: as for `show_review`: both buffers are NUL-terminated and live
-    // for the synchronous dialog, and no parent HWND is borrowed.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). With
-            // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the parent puts a first line on
-            // its text that says what Y and N do (#1780). No stays the
-            // default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and no parent HWND is borrowed.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // Topmost: a window the connector opens while Tally fills the
+                // screen is otherwise drawn behind it, since a background
+                // process may not take the foreground (#1589). With
+                // MB_SETFOREGROUND the box also takes the foreground, so a key
+                // typed for Tally answers it; the parent puts a first line on
+                // its text that says what Y and N do (#1780). No stays the
+                // default button.
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
 }
 
 /// The post dialog's title and positive button. One voucher keeps the
@@ -1971,23 +2074,29 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     // Win32 dependency so No is the default and Escape/close remain Cancel.
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
-    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
-    // no parent HWND is borrowed. No application state is exposed to callbacks.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). With
-            // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the parent puts a first line on
-            // its text that says what Y and N do (#1780). No stays the
-            // default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // The box cannot scroll: `guarded` measures it when it opens and, if it is
+    // not wholly on the screen, never returns (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: Both buffers are NUL-terminated and live for the synchronous
+        // dialog; no parent HWND is borrowed. No application state is exposed
+        // to callbacks.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // Topmost: a window the connector opens while Tally fills the
+                // screen is otherwise drawn behind it, since a background
+                // process may not take the foreground (#1589). With
+                // MB_SETFOREGROUND the box also takes the foreground, so a key
+                // typed for Tally answers it; the parent puts a first line on
+                // its text that says what Y and N do (#1780). No stays the
+                // default button.
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

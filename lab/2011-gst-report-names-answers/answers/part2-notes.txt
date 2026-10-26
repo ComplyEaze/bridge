@@ -1,0 +1,461 @@
+#2011 Part 2 (BRIDGE GST LEDGER LAB, 1-11-2025 to 30-11-2025). Sheet lab/2011-gst-report-names 23696859; 22 files = SHA256.txt; census ok 5 skipped 12 FAIL 0; answers.py self-test ok.
+Evidence folder for this part: answers/ (Part 1's files are the p- files beside them). Backup folder: backups\l (empty before).
+GUIDs: BRIDGE PILOT LAB (Part 1, not used now); BRIDGE GST LEDGER LAB aae372c5-a894-491c-8843-5532e43d2d2f (branch lab/gs1-l1-answers, answers/s10-state-marks.xml: ALTVCHID 64, ALTMSTID 225).
+Rule 2: no other item open on this book (last: GS1-L1 run-3 closed, #648 pushed); 628-C0 not run, so no GSTIN expected.
+2026-10-26T18:16:12Z step 0: tasklist one tally.exe PID 29692 (exit 0); netstat 9001 LISTENING x2 PID 29692 (exit 0); GET /status 200 51 B. About: TallyPrime Release 7.2 (Latest), Silver Rental, not Educational. Incident before L1: a click on the top bar plus typed filter letters opened Manage License > License Information (read-only); one Escape returned to Select Company; nothing loaded or changed.
+L1: BRIDGE GST LEDGER LAB (100077) loaded alone, no prompt; Gateway current date Thursday 27-Nov-2025, period 1-Apr-25 to 31-Mar-26.
+--- shape l-m0 (exit 0; run separately after the send helper's output pipe cut it short; request not resent)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+L2 marks l-m0:  (one COMPANY row under COLLECTION; committed GS1-L1 close was 64/225)
+--- shape l-s0 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 64
+    65  VOUCHER
+    65  VOUCHERNUMBERSERIES
+    64  ALTERID
+    64  ARESERIALMASTER
+    64  ASORIGINAL
+    64  ASPAYSLIP
+    64  DATE
+    64  GUID
+    64  ISCANCELLED
+    64  ISDELETED
+    64  ISDELETEDVCHRETAINED
+    64  ISGSTOVERRIDDEN
+    64  ISINVOICE
+    64  ISNEGISPOSSET
+    64  ISOPTIONAL
+    64  ISPOSTDATED
+    64  MASTERID
+    64  NUMBERINGSTYLE
+    64  PERSISTEDVIEW
+    64  REQUESTORRULE
+    64  REUSEHOLEID
+    64  SERIALMASTER
+    64  VCHGSTSTATUSISEXCLUDED
+    64  VCHGSTSTATUSISINCLUDED
+    64  VCHGSTSTATUSISUNCERTAIN
+    64  VOUCHERKEY
+    64  VOUCHERNUMBER
+    64  VOUCHERRETAINKEY
+    64  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+--- shape l-s0r (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 64
+    65  VOUCHER
+    65  VOUCHERNUMBERSERIES
+    64  ALTERID
+    64  ARESERIALMASTER
+    64  ASORIGINAL
+    64  ASPAYSLIP
+    64  DATE
+    64  GUID
+    64  ISCANCELLED
+    64  ISDELETED
+    64  ISDELETEDVCHRETAINED
+    64  ISGSTOVERRIDDEN
+    64  ISINVOICE
+    64  ISNEGISPOSSET
+    64  ISOPTIONAL
+    64  ISPOSTDATED
+    64  MASTERID
+    64  NUMBERINGSTYLE
+    64  PERSISTEDVIEW
+    64  REQUESTORRULE
+    64  REUSEHOLEID
+    64  SERIALMASTER
+    64  VCHGSTSTATUSISEXCLUDED
+    64  VCHGSTSTATUSISINCLUDED
+    64  VCHGSTSTATUSISUNCERTAIN
+    64  VOUCHERKEY
+    64  VOUCHERNUMBER
+    64  VOUCHERRETAINKEY
+    64  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+(the line above has an empty value: my script read the wrong folder; corrected:) L2 marks l-m0: GUID=aae372c5-a894-491c-8843-5532e43d2d2f ALTVCHID=64 ALTMSTID=225
+--- compare l-s0 l-s0r (exit 0)
+rows: 64 and 64
+CMPINFO: equal
+verdict: same rows
+L3 backup (LAB-COMMON C5): Gateway > Data > Backup & Restore > Backup; Backup Data Path set by Specify Path to backups\l (folder empty before; screen shows the path as typed with Tally's capital L in Lab); company BRIDGE GST LEDGER LAB (100077) only, then End of List; Accept Yes at 23:48 IST. After: one file TDBK1800_100077.001, 75,532 B, sha256 cb25df9701fadb5116f19a0dda1fe4087c37fb68e50c891622ea1e46b7079061, written 2026-10-26 23:48:12 local. No other message.
+--- shape l-m0b (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+L3 marks after backup l-m0b: GUID=aae372c5-a894-491c-8843-5532e43d2d2f ALTVCHID=64 ALTMSTID=225
+2026-10-26T18:19:48Z L4 PAUSE (C7): typing 'Display More' at the Gateway was read as menu keys: Display More Reports > Stock Group Summary > Select Stock Group picker; Tally shows box 'Error / Oops! / Spelling Error' (leftover letters match no group). Display-report picker only; no request sent since l-m0b; no key pressed since the box. Reported to the requester before any key.
+--- shape l-m0c (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+2026-10-26T18:20:31Z L4 resume on the requester's word (conditions: screenshot before keys; Esc, shot, Esc, shot; l-m0c must be 64/225; arrow keys and Enter only from now, no typed filters anywhere). Shot before keys (box + picker). Click on title band + Esc 1: box gone, picker left with an empty field. Esc 2: Gateway of Tally screen, menu panel at Display More Reports > Inventory Books (no dialog). l-m0c: GUID=aae372c5-a894-491c-8843-5532e43d2d2f ALTVCHID=64 ALTMSTID=225.
+DEVIATIONS (both operator slips, no gateway effect): (1) before L1, top-bar click + typed filter opened Manage License > License Information, one Esc back; (2) at L4 start, typed menu filter opened Stock Group Summary's picker with an 'Oops! Spelling Error' box, cleared as above.
+--- shape l-s1 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 64
+    65  VOUCHER
+    65  VOUCHERNUMBERSERIES
+    64  ALTERID
+    64  ARESERIALMASTER
+    64  ASORIGINAL
+    64  ASPAYSLIP
+    64  DATE
+    64  GUID
+    64  ISCANCELLED
+    64  ISDELETED
+    64  ISDELETEDVCHRETAINED
+    64  ISGSTOVERRIDDEN
+    64  ISINVOICE
+    64  ISNEGISPOSSET
+    64  ISOPTIONAL
+    64  ISPOSTDATED
+    64  MASTERID
+    64  NUMBERINGSTYLE
+    64  PERSISTEDVIEW
+    64  REQUESTORRULE
+    64  REUSEHOLEID
+    64  SERIALMASTER
+    64  VCHGSTSTATUSISEXCLUDED
+    64  VCHGSTSTATUSISINCLUDED
+    64  VCHGSTSTATUSISUNCERTAIN
+    64  VOUCHERKEY
+    64  VOUCHERNUMBER
+    64  VOUCHERRETAINKEY
+    64  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+--- shape l-m1 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+2026-10-26T18:21:52Z L4: menu path Gateway > Display More Reports > Statutory Reports > GST Reports (arrows + Enter). Menu titles: GST RETURNS/COMPUTATIONS: Track GST Return Activities; GSTR-1; GSTR-3B; Annual Computation. EXCHANGE REPORTS: e-Way Bill. RECONCILIATION REPORTS: GSTR-1 Reconciliation; GSTR-2A Reconciliation; GSTR-2B Reconciliation; Challan Reconciliation. Then: Invoice Management System (IMS); GST Utilities; Other Reports; Quit. No separate HSN/SAC entry on this menu.
+GSTR-1 opened with no question (N1 = none) at its default period 1-Oct-25 to 31-Oct-25; header: GST Registration blank, Status Not Filed, ARN blank, 'Last online GST activity: No Activity Found'; voucher counts blank. Period not changed to November (no keys typed; the registration header is blank whatever the period). Escape. RESULT: 'Part 2: no registration'. L5 to L11 skipped: no report request sent to this book.
+Closing state reads (not report requests): l-s1 vs l-s0 compare exit 0:
+rows: 64 and 64
+CMPINFO: equal
+verdict: same rows
+l-m1: GUID=aae372c5-a894-491c-8843-5532e43d2d2f ALTVCHID=64 ALTMSTID=225
+2026-10-26T18:22:48Z L12/C10: shut by Alt+K (Company menu) > Down x4 to Shut > Enter > Enter on the one row BRIDGE GST LEDGER LAB (100077); waited 6 s; Select Company with no company loaded. tasklist one tally.exe PID 29692; netstat 9001 LISTENING PID 29692; GET /status 200 (c10c). Tally date not changed (Gateway showed 27-Nov-2025 throughout). No XML request after the shut.

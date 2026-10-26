@@ -6,6 +6,7 @@ Ok(StandardLedgerCatalog {
         StandardLedgerCatalogEntry {
             name: "Cash",
             stored_name: None,
+            aliases: [],
             guid: "21463ec7-c236-44fb-a06d-20f0ad8a6df3-0000001f",
             parent: Some(
                 "Cash-in-Hand",
@@ -15,6 +16,7 @@ Ok(StandardLedgerCatalog {
         StandardLedgerCatalogEntry {
             name: "Profit & Loss A/c",
             stored_name: None,
+            aliases: [],
             guid: "21463ec7-c236-44fb-a06d-20f0ad8a6df3-0000001e",
             parent: Some(
                 "�#4; Primary",

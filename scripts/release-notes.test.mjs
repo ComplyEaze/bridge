@@ -420,11 +420,14 @@ test("the page and the notes list the entries, and a bad entry warns without fai
     const missing = run("unreleased", "--changelog", join(dir, "nowhere", "CHANGELOG.md"));
     assert.equal(missing.status, 1);
     assert.match(missing.stderr, /does not exist/);
-    writeEntries(dir, { "changed/7-odd\nname.md": "- Odd (#7).\n" });
-    const odd = run("page", "--changelog", join(dir, "CHANGELOG.md"), "--out", join(dir, "odd.html"));
-    assert.equal(odd.status, 0);
-    assert.equal(odd.stdout.split("\n").filter((line) => line !== "" && !line.startsWith("::warning::")).length, 0, "a file name cannot start another workflow command");
-    rmSync(join(dir, FRAGMENT_DIRECTORY, "changed", "7-odd\nname.md"));
+    // Windows cannot name a file with a line feed in it, so there the case cannot be built.
+    if (process.platform !== "win32") {
+      writeEntries(dir, { "changed/7-odd\nname.md": "- Odd (#7).\n" });
+      const odd = run("page", "--changelog", join(dir, "CHANGELOG.md"), "--out", join(dir, "odd.html"));
+      assert.equal(odd.status, 0);
+      assert.equal(odd.stdout.split("\n").filter((line) => line !== "" && !line.startsWith("::warning::")).length, 0, "a file name cannot start another workflow command");
+      rmSync(join(dir, FRAGMENT_DIRECTORY, "changed", "7-odd\nname.md"));
+    }
     rmSync(join(dir, FRAGMENT_DIRECTORY, "changed"), { recursive: true });
     const printed = run("unreleased", "--changelog", join(dir, "CHANGELOG.md"));
     assert.equal(printed.status, 0);

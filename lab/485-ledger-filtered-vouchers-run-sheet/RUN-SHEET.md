@@ -7,7 +7,7 @@ Not for merge. READS ONLY, on two companies the lab already holds, one after the
 - whether each row carries GUID, ALTERID and MASTERID;
 - what it costs on a dense book, against the whole-window read.
 
-**THE CANDIDATE** (one variable: the collection). It is the committed voucher-window request with only its collection changed:
+**THE CANDIDATE.** It is the committed voucher-window request with its collection changed: its ID and collection name, its type, the `CHILDOF` element, a narrower field list, and the class computations dropped; the date-window filter is the same. So it differs from the ground-truth request in more than one respect, and a difference between their answers is not ascribed to any one of them:
 - type `Vouchers : Ledger`, Tally's own "vouchers of a ledger";
 - the ledger named in `CHILDOF`;
 - an explicit field list of identity and flags only (DATE, GUID, ALTERID, MASTERID, VOUCHERTYPENAME, VOUCHERNUMBER, ISCANCELLED, ISOPTIONAL, ISPOSTDATED);
@@ -15,10 +15,12 @@ Not for merge. READS ONLY, on two companies the lab already holds, one after the
 
 It uses no `$$FilterCount` or `$$NumItems` and no report stack. Spellings of those have raised blocking dialogs or hung the gateway before, and a spaced name inside a function was one cause. Here the ledger name is element text, not a function argument.
 
+**REQUESTS BY CURL (allowed by the owner's decision of 26 Oct 2026 that requests sent by curl may be used to discover shapes).** `t03`, `d03` and `d04` are candidates for a new builder: a ledger-scoped voucher read for `ledger_movement`, to sit beside `render_agent_movement_vouchers_in_span` in `src-tauri/src/agent_read_profiles.rs`; the ledger name would enter it only through a type that refuses any character able to end a TDL literal. `t02` and `d02` are the committed class voucher window (`render_agent_class_vouchers_in_span`, same file) as captured on 1 October, without the `REFERENCEDATE` the builder now fetches last, used as an instrument; `t01` and `d01` are the company marks builder (`render_agent_company_high_water`, same file). Before the first send: `python -I check-request-ids.py requests` in this folder; EXPECT `census: ok 7, skipped 0, FAIL 0`; anything else = STOP, nothing sent. A marks answer's size bound is 8,192 bytes.
+
 **OWNER steps** are marked [OWNER]. The owner is AT THE LAB MACHINE for every NEW SHAPE request below. A wrong spelling can raise a modal dialog that holds the gateway; that needs a person, not a retry.
 
 ## Before the sitting
-1. [OWNER] Present at the machine for parts T and D. Tally licensed. Educational mode = STOP (C1).
+1. [OWNER] Present at the machine for parts T and D. Tally licensed. Educational mode = STOP (C1). Record the release from Tally's About screen (the lab PC runs 7.2 since 25 Oct 2026).
 2. Check every file here against `SHA256.txt`.
 3. [OWNER] Go-ahead.
 
@@ -28,7 +30,8 @@ For every request in this part, record the UTC time before the send and after th
 2. `t02_vouchers_fy.request.utf16le.xml`: the committed window for 1 Apr 2025 to 31 Mar 2026, the ground truth. Size bound 500,000 bytes.
 3. GET /status. Then `t03_ledger_vouchers_p1_fy.request.utf16le.xml`: the candidate, ledger `Lab Party P1`, same dates. NEW SHAPE: screenshot of the whole Tally window at once. Size bound 200,000 bytes. Then GET /status again.
 4. A dialog, a hang, a non-200 or an answer that does not parse = STOP (C3, C7, C9). The gateway is not probed again.
-5. C10 for this company (Shut Company), then go to part D only if part T answered in-band (any answer that parses, even an empty one).
+5. `t01_marks` again: EXPECT the marks of step 1 (the reads wrote nothing); a difference = record it and STOP.
+6. C10 for this company (Shut Company), then go to part D only if part T answered in-band (any answer that parses, even an empty one).
 
 ## Part D: one dense day, then one week (THE COMPANY = BRIDGE CORPUS DENSE, synthetic; STOP if absent)
 The ground truth from 28 September: 82 vouchers on 15 May 2025, every one with a ledger line named exactly `DN Sales`. The corpus runs about 82 vouchers a day and 574 a week.
@@ -36,8 +39,9 @@ The ground truth from 28 September: 82 vouchers on 15 May 2025, every one with a
 2. `d02_vouchers_20250515.request.utf16le.xml`: the committed window for that day, the ground truth tonight. Size bound 1,000,000 bytes.
 3. GET /status. Then `d03_ledger_vouchers_dn_sales_20250515.request.utf16le.xml`: the candidate for that day. NEW SHAPE on this book: screenshot at once. Size bound 1,000,000 bytes. Then GET /status.
 4. Only if step 3 answered in-band and its row count equals step 2's: GET /status, then `d04_ledger_vouchers_dn_sales_20250512_18.request.utf16le.xml`, the candidate for 12 to 18 May 2025. Size bound 4,000,000 bytes. Then GET /status.
-5. No month, no other ledger and no other shape in this item. A STOP leaves the gateway alone, and a gateway that stops answering is for the owner to restart.
-6. C10.
+5. In steps 3 and 4, a dialog, a hang, a non-200 or an answer that does not parse = STOP (C3, C7, C9). No month, no other ledger and no other shape in this item. A STOP leaves the gateway alone, and a gateway that stops answering is for the owner to restart.
+6. `d01_marks` again: EXPECT the marks of step 1; a difference = record it and STOP.
+7. C10.
 
 ## EXPECT (recorded; the lab judges only the STOP rules)
 For each candidate answer (t03, d03, d04), record:
@@ -55,11 +59,11 @@ For each candidate answer (t03, d03, d04), record:
 An empty envelope for t03 or d03 is a result, the same as the built-in report's on 28 September. Record it, with its size.
 
 ## The books
-Neither book changes; every request is a read. Marks are taken at each part's start only.
+Neither book changes; every request is a read. Marks are taken at each part's start and end, and must be equal.
 
 ## Close and evidence
 - **C10** after each part.
-- **C11:** evidence to a new branch `lab/485-ledger-filtered-vouchers-answers`, after the pre-push scan and [OWNER] yes. It holds:
+- **C11:** evidence to a new branch `lab/485-ledger-filtered-vouchers-answers`, after the pre-push scan and the run coordinator's yes. It holds:
   - every answer, whole, with headers, size, sha256 and its send and answer times;
   - the GUID comparison tables;
   - the notes.

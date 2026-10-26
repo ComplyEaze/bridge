@@ -1,6 +1,6 @@
 # Results: #648, the cost of dating an asset ledger's movement by trial-balance windows, through the built tools on two synthetic books, 26 Oct 2026. The sequence works: 1 + 12 + 5 + 1 calls date the movement to 5 Nov 2025 in 14.1 s, at about 0.67 s a window; on BRIDGE LARGE LAB the window's length does not change the cost
 
-The sheet is `lab/648-asset-dating-read-cost` at 76423064215286d06364e354b77af85dbee165bc (`SHA256.txt` 3/3 OK). It is owner-free (reads only); no owner act was needed.
+The sheet is `lab/648-asset-dating-read-cost` at 76423064215286d06364e354b77af85dbee165bc (`SHA256.txt` 3/3 OK). Reads only; no owner act was needed.
 
 TallyPrime 7.2, Silver, Licensed, Education mode false, from `tally_status` at A0; the About screen was not opened.
 

@@ -260,7 +260,7 @@ test("the questions page keeps the claims that tell a reader what ComplyEaze Bri
     "has no tool to delete or undo a posted voucher",
     "None of these files is encrypted",
     "not yet code-signed",
-    "Not run yet: the package of the latest release against a live TallyPrime",
+    "Run once so far: the package of the latest release against a live TallyPrime",
     "book with stock items is expected to be refused",
     "Intel Macs are not supported",
     "has not set a price for ComplyEaze Bridge and does not sell licences to it",

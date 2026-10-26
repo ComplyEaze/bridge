@@ -260,13 +260,14 @@ test("the questions page keeps the claims that tell a reader what ComplyEaze Bri
     "has no tool to delete or undo a posted voucher",
     "None of these files is encrypted",
     "not yet code-signed",
-    "Not run yet: the package of the latest release against a live TallyPrime",
+    "batches, other voucher types and other reads have no recorded run on it",
     "book with stock items is expected to be refused",
     "Intel Macs are not supported",
     "has not set a price for ComplyEaze Bridge and does not sell licences to it",
     "through ComplyEaze Bridge, ComplyEaze does not receive it (sections 4 to 6 of the Privacy Policy)",
     "We have not decided whether to charge for anything in future",
   ]) assert.ok(text.includes(needle), `the page no longer says: ${needle}`);
+  assert.ok(!text.includes("Not run yet: the package of the latest release"), "the page says the latest package was never run against a live TallyPrime, which #1780 contradicts for 0.6.0");
 });
 
 test("the jobs table gives one of four answers per row, links each row to its answer, and every \"No\" or \"Not yet\" is also in the list of what it cannot do", () => {

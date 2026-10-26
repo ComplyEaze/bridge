@@ -654,6 +654,8 @@ pub(super) struct TransferFacts {
     /// Every skip the company still has, live or not, kept or held: the skips a
     /// build that posts the row may withdraw. A retired skip is not one.
     pub(super) skip_mentions: BTreeSet<SkipKey>,
+    /// When the newest record of each skip in `skip_mentions` was built.
+    pub(super) skip_built: BTreeMap<SkipKey, DateTime<FixedOffset>>,
 }
 
 /// What is true of the batch that holds a skipped row as a voucher.
@@ -714,10 +716,25 @@ impl Batch {
     }
 }
 
-fn built_instant(source_id: &str, text: &str) -> Result<DateTime<FixedOffset>, TransferFactsError> {
+pub(super) fn built_instant(
+    source_id: &str,
+    text: &str,
+) -> Result<DateTime<FixedOffset>, TransferFactsError> {
     DateTime::parse_from_rfc3339(text).map_err(|_| TransferFactsError::BuiltAtUnparsable {
         source_id: source_id.to_string(),
     })
+}
+
+/// Whether a withdrawal built at `recorded` counts against a skip whose newest
+/// record was built at `mention_built`: only a withdrawal built strictly after
+/// it does. One built at the very instant cannot be told from one made before
+/// the skip, so it does not count. The facts apply this to a posted holder; the
+/// check at send applies it to the batch being sent.
+pub(super) fn withdrawal_counts(
+    recorded: &DateTime<FixedOffset>,
+    mention_built: &DateTime<FixedOffset>,
+) -> bool {
+    recorded > mention_built
 }
 
 /// The facts a batch's record holds, checked against that record, and the
@@ -1339,6 +1356,7 @@ pub(super) fn build_transfer_facts(
     let mut held = Vec::new();
     let mut live_skips = BTreeSet::new();
     let mut skip_mentions = BTreeSet::new();
+    let mut skip_built = BTreeMap::new();
     for (key, mention) in mentions {
         let live = mention.live;
         match holders.get(mention.row.as_str()) {
@@ -1347,7 +1365,7 @@ pub(super) fn build_transfer_facts(
                 let unwithdrawn = |at: usize| {
                     withdrawn_at
                         .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
-                        .is_none_or(|recorded| *recorded <= mention.built)
+                        .is_none_or(|recorded| !withdrawal_counts(recorded, &mention.built))
                 };
                 let contradicting = holding
                     .batches
@@ -1402,6 +1420,7 @@ pub(super) fn build_transfer_facts(
                 }
             }
         }
+        skip_built.insert(key.clone(), mention.built);
         skip_mentions.insert(key.clone());
         if live {
             live_skips.insert(key);
@@ -1470,6 +1489,7 @@ pub(super) fn build_transfer_facts(
         contras_superseded,
         live_skips,
         skip_mentions,
+        skip_built,
     })
 }
 

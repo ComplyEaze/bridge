@@ -776,6 +776,10 @@ pub(crate) enum PairedReadValidationError {
     MonthRegister,
     #[error("Tally company book changed during the month-wise register read")]
     MonthRegisterExtent,
+    #[error("Tally's own Negative Stock changed between paired reads")]
+    NativeNegativeStock,
+    #[error("Tally company book changed during the Negative Stock read")]
+    NegativeStockExtent,
     /// The company's inventory flags, read beside a statement that offers
     /// Tally's own closing stock.
     #[error("Tally company inventory flags changed between paired reads beside a statement")]
@@ -810,6 +814,8 @@ impl PairedReadValidationError {
             Self::MonthRegisterExtent => "month_register_extent_changed",
             Self::StockSummaryCollection => "stock_summary_collection_changed",
             Self::StockSummaryExtent => "stock_summary_extent_changed",
+            Self::NativeNegativeStock => "native_negative_stock_changed",
+            Self::NegativeStockExtent => "negative_stock_extent_changed",
             Self::StatementInventoryFlags => "statement_inventory_flags_changed",
         }
     }

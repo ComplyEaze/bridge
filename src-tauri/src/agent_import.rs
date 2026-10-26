@@ -138,8 +138,8 @@ const MAX_TEXT_CHARS: usize = 2_000;
 /// detail used to be discarded, so an empty book — a company that has never held
 /// a voucher, for which Tally omits ALTVCHID entirely — was indistinguishable
 /// from a malformed response, an unmatched company GUID or an ambiguous company
-/// row. Only the empty book has a next step the caller can take, so only it is
-/// promoted.
+/// row. Only the empty book has a cause the caller can be told plainly, so only
+/// it is promoted.
 ///
 /// This changes what a refusal is *called*, never whether it refuses. Without a
 /// voucher high-water mark there is no "before", so an import cannot be
@@ -663,7 +663,7 @@ impl super::WindowRow for ReadVoucher {
 fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     let summary = match report["state"].as_str() {
         Some("bound") => "Each voucher was matched to the Tally voucher this post created.",
-        Some("refused") => "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.",
+        Some("refused") => "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.",
         Some("unsettled")
             if report["code"]
                 == span_identity::BindUnsettled::EffectiveDateNotObserved.code() =>
@@ -706,9 +706,9 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
         .as_array()
         .is_some_and(|vouchers| vouchers.len() == matched_by_content)
     {
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it."
     } else {
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it."
     };
     // A check that recorded a restore while its own post reads intact names
     // it: the restore reaches other posts of the company, and the posts it
@@ -1216,6 +1216,7 @@ impl Server {
             let transfers = match self.admit_transfers_while_admitted(transfers::TransferInput {
                 company_guid: company_guid.clone(),
                 carries_statement: statement_record.is_some(),
+                subject: None,
                 skip_rows: resolved
                     .statement
                     .iter()
@@ -1713,6 +1714,7 @@ impl Server {
                 withdraw,
                 own_lineage: None,
                 carries_statement: true,
+                subject: None,
             })
             .map_err(fail)?
         {
@@ -3290,7 +3292,7 @@ fn holds_an_invoice(line: &ImportLedgerLine) -> bool {
 /// Why no file was written for a row another batch already sent (#876), and what
 /// to do instead. It never offers a hand import of this row: that is the second
 /// post the refusal exists to stop.
-const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and the user enters its unposted rows in Tally), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again: ask the user to enter the voucher in Tally.";
+const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and ComplyEaze Bridge cannot build the rest of that day from the statement yet), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so, and never build it again under a new bridge_txn_id to retry it.";
 
 /// The code of the refusal that stops an invoice build while voucher posting
 /// is off (see `build_import_xml`); its text is in agent.rs.

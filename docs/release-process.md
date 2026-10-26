@@ -538,8 +538,21 @@ one at that pair and one at the current merge base and head. The line is carried
 pair only when they are byte-identical apart from the `index` lines and the text after the hunk
 numbers (context lines and hunk numbers are part of the comparison, so a change moved in a file is
 not the same change), neither is empty or holds a binary change, the new one lists no file twice
-and names exactly the pull request's current file list. Only CLEAN is carried, never MERGE-ADVERSARY
-RECOMMEND, which must name the current pair, and every void still applies to a carried line. What
+and names exactly the pull request's current file list. A pull request whose binaries are all
+listed in the lab-capture manifest, none needing the owner's `--binary-review-sha` attestation
+and none removed, renamed or modified (only a binary addition is carried, because a modified
+binary's base blob is not bound), can still be carried: each binary section is then replaced by its
+path and its full 40-hex blob id from the compare API, so the blob ids are compared in full, the id
+for the current range must be the blob the manifest check verified, and a file list the API may
+have truncated (300 files or more) or a missing id is not carried. The gate prints the reason a
+verdict was not carried as a "verdict not carried" note. When the
+CLEAN line is carried, the MERGE-ADVERSARY RECOMMEND line is carried with it under the same proof,
+but only if it names exactly the same older head and merge base as the carried CLEAN line (never any
+other older pair, and never when CLEAN was not carried); a RECOMMEND line that names the current
+pair stands on its own. Every void applies to a carried line exactly as it does to the carried
+CLEAN line, and the gate's output says when the RECOMMEND line was carried. The review tier is
+decided at the current pair from master's classification, so a reclassification on master can
+newly require a RECOMMEND line that the older pair did not need. What
 master changed in other files, or in the same file outside the pull request's hunks, is not looked
 at: the required checks at the head cover it, not the reviewer. When the pull request's own lines
 cannot be shown unchanged the gate says so and the reviewer looks again.
@@ -593,7 +606,8 @@ the first eight binary paths in its message so the merger knows what to read. Th
 **Lab-capture manifest.** `scripts/merge-gate-lab-captures.json` (schema 1, at most 1000
 entries) lists captures the owner has already read, one entry for each: `path`, `blob` (the git
 blob id), `size`, `sha256`, `capture_id`, `lab_ref` (a note, never resolved), `company` and
-`seed_basis` (how the lab company's books were built). The gate reads the file only from the
+`seed_basis` (how the lab company's books were built: the owner's statement that the book is
+synthetic, which the gate does not check). The gate reads the file only from the
 master ref it fetched, as a regular-file blob, the way it reads the synthetic-UUID registry, so
 a pull request cannot list its own binaries. A binary addition or change is exempt from
 `--binary-review-sha` only if its path and the blob id GitHub reports for it both equal one
@@ -602,9 +616,10 @@ that blob id and have the entry's `size` and `sha256`. One different character i
 same blob at another path, a missing blob id, a removed file or differing bytes is not exempt.
 A blob request that fails, or answers malformed or with bytes that are not that blob, is
 reported as "could not check its bytes", apart from "bytes differ" (which names the size or the
-sha256), and is not exempt either. The file mode is not checked: the bytes are fixed by the
-blob id, so a listed blob committed as executable, or as a link whose target text is those
-bytes, carries nothing the owner did not read. The gate prints the exempt paths and the
+sha256), and is not exempt either. The file mode is not checked. A listed blob committed as
+executable carries exactly the bytes the owner read; committed as a link (mode 120000) it
+points at the path its bytes name up to their first NUL, a path the owner did not read, so a
+capture is committed as a regular file. The gate prints the exempt paths and the
 manifest's blob id, and anything unlisted still needs the attestation above. An invalid
 manifest, a link instead of a file, or a duplicate path means no exemptions, and the gate says
 why. Changing the manifest matches `scripts/merge-gate`, so that pull request is the owner's
@@ -612,9 +627,11 @@ own merge. There the owner reads each sitting's decoded captures (a UTF-16LE fil
 byte-order mark included, which a plain UTF-8 read shows as noise), their ownership and
 licence, their NOTICE obligation and their `PROVENANCE` entry
 (`scripts/check-fixture-provenance.mjs`), states `seed_basis`, and confirms on the file they
-read both `blob` (`git hash-object <file>`) and `sha256` (for example `shasum -a 256`), since
+read both `blob` (`git hash-object --no-filters <file>`) and `sha256` (for example `shasum -a 256`), since
 those are the values the gate checks. An entry stays valid for those bytes at that path until
-it is removed, so remove it when the capture is deleted or withdrawn. A lab branch is never
+it is removed, so remove it when the capture is deleted or withdrawn. The gate warns (never blocks)
+about a stale entry: one whose path master holds with another blob, or once held and has deleted;
+an entry whose path master never held is counted as pending. A lab branch is never
 read or trusted at gate time: lab branches are unprotected and are pushed with the owner's own
 account, so being on one proves nothing about where the bytes came from, and a branch can be
 moved or deleted later. A pointer to a lab branch or commit in a pull request body is ignored.

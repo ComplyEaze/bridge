@@ -307,16 +307,21 @@ fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
 /// The saved Journal of `saved_batch`, as any build may have saved it, with
 /// `narration`.
 fn saved_batch_with_narration(server: &Server, narration: &str) -> (ImportLedgerLine, Value) {
+    saved_batch_of_row(server, "journal-583", narration)
+}
+
+/// The same batch holding one voucher under the transaction id `txn`.
+fn saved_batch_of_row(server: &Server, txn: &str, narration: &str) -> (ImportLedgerLine, Value) {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-00000000-0000-4000-8000-000000000583", "identity_scheme":"batch_v1",
         "company_guid":GUID,
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
-        "txn_ids":["journal-583"],"date_from":"20260901","date_to":"20260901",
+        "txn_ids":[txn],"date_from":"20260901","date_to":"20260901",
         "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":10,"master_value":7},
-        "vouchers":[{"bridge_txn_id":"journal-583","date":"20260901","voucher_type":"Journal",
+        "vouchers":[{"bridge_txn_id":txn,"date":"20260901","voucher_type":"Journal",
             "narration":narration,"entries":[
                 {"ledger":"WR2 Sales","amount":"12.50","side":"Dr"},
                 {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]
@@ -5044,7 +5049,7 @@ async fn a_readback_whose_narration_differs_refuses_the_binding() {
     // never that it is this post's (#1039).
     assert_eq!(
         result["post_span_binding"]["summary"],
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.",
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.",
         "{posted}"
     );
 }
@@ -5076,7 +5081,7 @@ async fn a_refused_binding_matched_only_by_an_optional_voucher_keeps_the_open_li
     );
     assert_eq!(
         result["post_span_binding"]["summary"],
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.",
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.",
         "{posted}"
     );
 }
@@ -5381,13 +5386,14 @@ fn assert_reported_not_created(posted: &Value) {
     // Safety phrases, pinned before any shortening.
     for phrase in [
         "Tally reported this voucher as not created",
-        "Check that it is not in Tally",
-        "enter this one voucher",
-        "do not import it again through Tally's Import menu",
         "will not send this saved voucher again",
+        "nothing in ComplyEaze Bridge puts it in the book yet",
+        "do not import it again through Tally's Import menu",
     ] {
         assert!(next_step.contains(phrase), "{phrase}: {next_step}");
     }
+    // It sends no one to key the voucher into Tally (#1709).
+    assert!(!next_step.contains("voucher entry screen"), "{next_step}");
 }
 
 /// A single voucher Tally rejected (Education answer) reads as not created by
@@ -5467,13 +5473,13 @@ async fn a_rejected_single_voucher_verified_later_keeps_its_status_and_says_what
     assert_eq!(voucher["status"], "sent_not_attributed", "{later}");
     assert_eq!(
         voucher["next_step"],
-        "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered by hand with a different date, voucher type, ledger or amount: look for it in Tally first, and enter it in Tally's voucher entry screen only if it is not there; do not import its file through Tally's Import menu. ComplyEaze Bridge will not send this saved voucher again.",
+        super::super::verification::REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP,
         "{later}"
     );
     assert_eq!(result["post_span_binding"]["state"], "refused", "{later}");
     assert_eq!(
         result["post_span_binding"]["summary"],
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.",
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.",
         "{later}"
     );
 }
@@ -5685,7 +5691,7 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     // that they are this post's (#1039).
     assert_eq!(
         result["post_span_binding"]["summary"],
-        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.",
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.",
         "{posted}"
     );
     assert_eq!(result["counts"]["not_found"], 0, "{posted}");
@@ -5935,7 +5941,7 @@ fn later_next_steps(later: &Value) -> (Vec<String>, String) {
     (steps, summary)
 }
 
-const LATER_SUMMARY: &str = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+const LATER_SUMMARY: &str = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.";
 
 /// A batch Tally rejected whole, checked again later with the book unchanged:
 /// no voucher is read as not created, each keeps `sent_not_attributed`, and
@@ -7574,4 +7580,295 @@ async fn an_invoice_the_gstr_1_lists_as_uncertain_ends_divergent_and_stops_the_n
     // Every answer was asked for and none more: the second build's admission
     // sent Tally nothing.
     assert_eq!(observed.len(), order.len());
+}
+
+// ---- the transfer check at send ---------------------------------------------------
+
+/// The statement row of the send-time check: a date, zeros built at run time, then a suffix.
+fn statement_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260901-{:0>14}d1", 0));
+    &TEXT
+}
+
+/// A statement of only skipped rows, recorded for this company through the
+/// server's endpoint, that skips `statement_row()` as carried by another account.
+fn skip_the_row(server: &Server) {
+    use std::io::Write;
+    let record = statement_facts::SkipOnlyRecord {
+        record_id: format!("skips-{}", Uuid::new_v4().hyphenated()),
+        company_guid: canonical_batch_guid(GUID),
+        endpoint_origin: super::super::super::canonical_loopback_origin(&server.settings.endpoint)
+            .unwrap(),
+        built_at: "2026-09-22T00:00:01Z".into(),
+        statement: statement_facts::StatementFacts {
+            bank_ledger_guid: "guid-bank-a".into(),
+            coverage: None,
+            contra_rows: Vec::new(),
+            skip_rows: vec![statement_facts::SkipRow {
+                bridge_txn_id: statement_row().into(),
+                date: TallyDate::parse("20260901").unwrap(),
+                amount: "12.50".into(),
+                direction: statement_facts::RowDirection::Outflow,
+                other_ledger_guid: "guid-bank-b".into(),
+                reference: None,
+                instrument: None,
+                reversed_same_day: false,
+            }],
+        },
+    };
+    let mut bytes = serde_json::to_vec(&record).unwrap();
+    bytes.push(b'\n');
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(server.settings.data_dir.join(statement_facts::SKIPS_FILE))
+        .unwrap()
+        .write_all(&bytes)
+        .unwrap();
+}
+
+const SENT_FIRST: &str = "Nothing was sent to Tally, and any approval of this batch is withdrawn. ";
+const SENT_LAST: &str = " This batch cannot be sent as built: build it again.";
+
+/// A row another statement of the company skipped is refused when the batch
+/// holding it is sent, as it was refused when a build would have posted it:
+/// from the journal alone, before any Tally request and before the person is
+/// asked; nothing is appended.
+#[tokio::test]
+async fn a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+    skip_the_row(&server);
+    let before = journal(directory.path());
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "skip_row_paired_elsewhere", "{response}");
+    assert_eq!(
+        error["skipped_rows"],
+        json!([statement_row()]),
+        "{response}"
+    );
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.starts_with(SENT_FIRST), "{step}");
+    assert!(step.ends_with(SENT_LAST), "{step}");
+    assert!(!step.contains("No file was written"), "{step}");
+    // the batch is saved: it is not a build that posts the row
+    for build_wording in ["This build", "this build", "nothing was recorded"] {
+        assert!(!step.contains(build_wording), "{step}");
+    }
+    assert_eq!(observed.len(), 0);
+    assert_eq!(journal(directory.path()), before);
+}
+
+/// The skip is recorded while the dialog is open: the check under the
+/// admission lock refuses with the same code, before the intent, and its step is
+/// the fixed one that sends the caller back for the whole reason.
+#[tokio::test]
+async fn a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock() {
+    let mut plans = before_approval();
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+    let recorder = Server::new(server.settings.clone());
+    let scripted = ScriptedApproval::approving_after(move || skip_the_row(&recorder));
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted, server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "skip_row_paired_elsewhere",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert_eq!(observed, post_at, "the POST is never sent: {response}");
+    assert_eq!(
+        result["error"]["next_step"],
+        "The transfer records changed after this batch was checked and before it was sent; nothing was sent and any approval of this batch is withdrawn. Call post_import again: it gives the whole reason before asking.",
+        "{response}"
+    );
+    let intents = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .filter(|record| record.contains("\"dispatch_intent\""))
+        .count();
+    assert_eq!(intents, 0);
+}
+
+/// The refusal reaches the person on both surfaces, before any request and
+/// before the dialog: the agent's tool, and the desktop's post.
+#[tokio::test]
+async fn a_skipped_row_is_refused_before_the_dialog_on_both_surfaces() {
+    for desktop in [false, true] {
+        let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+        skip_the_row(&server);
+        let before = journal(directory.path());
+        let scripted = ScriptedApproval::approving();
+        let result = if desktop {
+            let outcome = SCRIPTED_APPROVAL
+                .scope(
+                    scripted.clone(),
+                    server.post_import_checked(&args, Some(&line.sha256), PostScope::JournalOnly),
+                )
+                .await
+                .expect("a refusal is reported as the post's outcome");
+            // What the desktop's webview receives.
+            super::super::desktop_journal::DesktopJournalOperation::from_outcome(outcome).result
+                ["result"]
+                .clone()
+        } else {
+            let response = SCRIPTED_APPROVAL
+                .scope(scripted.clone(), server.call_tool("post_import", args))
+                .await;
+            response["structuredContent"]["result"].clone()
+        };
+        let observed = sent(simulator);
+        let error = &result["error"];
+        assert_eq!(
+            error["code"], "skip_row_paired_elsewhere",
+            "{desktop}: {result}"
+        );
+        if desktop {
+            // the webview gets the code and a message that says to build it
+            // again, not the generic one that tells it to review the error
+            let message = error["message"].as_str().unwrap();
+            assert!(message.starts_with("Nothing was sent."), "{message}");
+            assert!(message.contains("build it again"), "{message}");
+            assert!(!message.contains("Review the error"), "{message}");
+        } else {
+            // the agent is told the rows and the way on
+            assert_eq!(error["skipped_rows"], json!([statement_row()]), "{result}");
+            let step = error["next_step"].as_str().unwrap();
+            assert!(step.starts_with(SENT_FIRST), "{step}");
+            assert!(step.ends_with(SENT_LAST), "{step}");
+        }
+        assert!(scripted.previews().is_empty(), "approval must not be asked");
+        assert_eq!(observed.len(), 0, "{desktop}");
+        assert_eq!(journal(directory.path()), before, "{desktop}");
+    }
+}
+
+/// The desktop's post is told an unreadable record is not the batch's fault:
+/// building it again meets the same record.
+#[tokio::test]
+async fn the_desktop_is_told_when_the_transfer_records_cannot_be_read() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+    std::fs::write(
+        directory.path().join(statement_facts::SKIPS_FILE),
+        b"not a record\n",
+    )
+    .unwrap();
+    let outcome = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.post_import_checked(&args, Some(&line.sha256), PostScope::JournalOnly),
+        )
+        .await
+        .expect("a refusal is reported as the post's outcome");
+    let result = super::super::desktop_journal::DesktopJournalOperation::from_outcome(outcome)
+        .result["result"]
+        .clone();
+    assert_eq!(
+        result["error"]["code"], "transfer_view_not_established",
+        "{result}"
+    );
+    let message = result["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("could not read its own record"),
+        "{message}"
+    );
+    assert!(
+        message.contains("Building it again meets the same record"),
+        "{message}"
+    );
+    assert_eq!(sent(simulator).len(), 0);
+}
+
+/// A batch that posts no statement row and carries no statement is not about
+/// transfers, and a view that cannot be read does not stop it.
+#[tokio::test]
+async fn a_batch_that_is_not_about_transfers_is_not_held_by_an_unreadable_view() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch(&server);
+    std::fs::write(
+        directory.path().join(statement_facts::SKIPS_FILE),
+        b"not a record\n",
+    )
+    .unwrap();
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let code = &response["structuredContent"]["result"]["error"]["code"];
+    assert_ne!(code, "transfer_view_not_established", "{response}");
+    // it went past the check: its next step, a read of Tally, was made
+    assert!(
+        !observed.is_empty(),
+        "the post stopped before Tally: {response}"
+    );
+}
+
+/// A batch that does post a statement row is held: nothing is sent while
+/// ComplyEaze Bridge cannot read its own record of the skipped rows.
+#[tokio::test]
+async fn an_unreadable_view_stops_the_send_of_a_statement_row() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+    std::fs::write(
+        directory.path().join(statement_facts::SKIPS_FILE),
+        b"not a record\n",
+    )
+    .unwrap();
+    let before = journal(directory.path());
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "transfer_view_not_established", "{response}");
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.starts_with(SENT_FIRST), "{step}");
+    assert!(step.contains("could not read its own record"), "{step}");
+    assert!(
+        step.contains(
+            "No batch of this company that posts a statement row can be sent until it is fixed"
+        ),
+        "{step}"
+    );
+    // not "build it again": building it meets the same record
+    assert!(!step.contains("build it again"), "{step}");
+    assert!(
+        step.contains("if a later release has been used here, send with that release"),
+        "{step}"
+    );
+    assert_eq!(observed.len(), 0);
+    assert_eq!(journal(directory.path()), before);
 }

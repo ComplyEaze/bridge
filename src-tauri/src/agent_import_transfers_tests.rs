@@ -106,6 +106,7 @@ fn facts_of(skips: Vec<SkipFact>, contras: Vec<ContraFact>) -> TransferFacts {
         contras_superseded: 0,
         live_skips: BTreeSet::new(),
         skip_mentions: BTreeSet::new(),
+        skip_built: BTreeMap::new(),
     }
 }
 
@@ -1303,4 +1304,89 @@ fn a_held_skip_is_judged_without_the_skips_in_the_main_view() {
         "{:?}",
         combined.skips
     );
+}
+
+// ---- what a refusal at send says -------------------------------------------------------
+
+/// A batch about to be sent is a saved batch, not a build in progress: its
+/// refusals say nothing was sent, never that a file was not written or that a
+/// build posts or skips a row, and end by saying the statement is built again.
+#[test]
+fn a_refusal_at_send_speaks_of_the_batch_and_not_of_a_build() {
+    let build_wording = [
+        "This build",
+        "this build",
+        "in this build",
+        "No file was written",
+        "nothing was recorded",
+    ];
+    let mut steps = Vec::new();
+    for reason in [
+        "skip_row_already_posted",
+        "skip_row_paired_elsewhere",
+        "withdraw_skip_invalid",
+        "transfer_double_booked",
+    ] {
+        // whatever the build said, the send says its own
+        let refusal = TransferRefusal {
+            reason,
+            detail: json!({}),
+            next_step: format!("{NOTHING_WRITTEN} This build posts a row."),
+        };
+        steps.push((reason, refusal.for_send().into_parts().2));
+    }
+    for kinds in [
+        BTreeSet::from([Carrier::Paired]),
+        BTreeSet::from([Carrier::OtherSideUnverified]),
+        BTreeSet::from([Carrier::MatchedUnconfirmed]),
+        BTreeSet::from([Carrier::Paired, Carrier::OtherSideUnverified]),
+    ] {
+        let refusal = TransferRefusal {
+            reason: "withdraw_skip_paired",
+            detail: json!({}),
+            next_step: Carrier::refusal_step(&kinds),
+        };
+        steps.push(("withdraw_skip_paired", refusal.for_send().into_parts().2));
+    }
+    for (reason, step) in steps {
+        assert!(step.starts_with(NOTHING_SENT), "{reason}: {step}");
+        assert!(step.ends_with(SEND_ENDING), "{reason}: {step}");
+        for wording in build_wording {
+            assert!(!step.contains(wording), "{reason}: {wording}: {step}");
+        }
+    }
+}
+
+/// The one send refusal that does not end by saying the statement is built
+/// again: building it again meets the same unreadable record. It says what the
+/// build's step says about a later release, and that nothing was sent.
+#[test]
+fn the_unreadable_view_refusal_at_send_has_no_build_again_ending() {
+    let build = TransferRefusal {
+        reason: "transfer_view_not_established",
+        detail: json!({}),
+        next_step: TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP.into(),
+    };
+    let step = build.for_send().into_parts().2;
+    assert!(step.starts_with(NOTHING_SENT), "{step}");
+    assert!(!step.contains(SEND_ENDING), "{step}");
+    assert!(!step.contains("build it again"), "{step}");
+    assert!(
+        step.contains("a later release of ComplyEaze Bridge wrote in this folder"),
+        "{step}"
+    );
+    assert!(step.contains("send with that release"), "{step}");
+    assert!(
+        step.contains("report it with the error named here"),
+        "{step}"
+    );
+    // and none of the build's own wording
+    for wording in [
+        "This build",
+        "this build",
+        "No file was written",
+        "nothing was recorded",
+    ] {
+        assert!(!step.contains(wording), "{wording}: {step}");
+    }
 }

@@ -261,3 +261,22 @@ fn every_built_text_fits_the_dialog() {
     assert!(shown.len() <= BATCH_REVIEW_MAX_BYTES);
     assert!(shown.lines().count() <= BATCH_REVIEW_MAX_LINES);
 }
+
+/// The preview is exactly nine lines for every admitted kind, whatever the
+/// names: nothing in it repeats or grows with the ledger, so the box it fills
+/// is the same height for all of them. The one-ledger dialog's fit rests on
+/// this (#1832); a tenth line must be a deliberate change here.
+#[test]
+fn every_kind_builds_exactly_nine_lines() {
+    for ledger in [
+        item("A", party(PartySide::SundryDebtors, Some(GSTIN), true)),
+        item("A", party(PartySide::SundryCreditors, None, false)),
+        item("A", AdmittedLedgerKind::Suspense),
+        item("A", duty()),
+        item(&"n".repeat(40), duty()),
+    ] {
+        let shown = text(&ledger).unwrap();
+        assert_eq!(shown.split('\n').count(), 9, "{shown}");
+        assert!(shown.lines().count() <= 9);
+    }
+}

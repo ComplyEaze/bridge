@@ -1023,20 +1023,26 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     }
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
-    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
-    // no parent HWND is borrowed. No application state is exposed to callbacks.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). It changes only
-            // the drawing order; No stays the default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: Both buffers are NUL-terminated and live for the synchronous
+        // dialog; no parent HWND is borrowed. No application state is exposed
+        // to callbacks.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // Topmost: a window the connector opens while Tally fills the
+                // screen is otherwise drawn behind it, since a background
+                // process may not take the foreground (#1589). It changes only
+                // the drawing order; No stays the default button.
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
 }"#;
 
 const POST_DIALOG: &str = r#"#[cfg(not(windows))]
@@ -1730,6 +1736,9 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     )
     .await
     {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed (#1832).
+        Ok(answer) if answer.box_did_not_fit => Err("master_review_too_large".into()),
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1. A clean exit without the
         // token is an executable that is not this dialog.
@@ -1927,7 +1936,26 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("super::box_fit::guarded(|| {", "(|| {", 1),
+        // The post dialog's own check, the middle one of the three in the file.
+        {
+            let first = source.find("super::box_fit::guarded(|| {").expect("the first check");
+            let second = first
+                + 1
+                + source[first + 1..]
+                    .find("super::box_fit::guarded(|| {")
+                    .expect("the second check");
+            format!(
+                "{}(|| {{{}",
+                &source[..second],
+                &source[second + "super::box_fit::guarded(|| {".len()..]
+            )
+        },
         replace_last(&source, "super::box_fit::guarded(|| {", "(|| {"),
+        source.replacen(
+            "        Ok(answer) if answer.box_did_not_fit => Err(\"master_review_too_large\".into()),\n",
+            "",
+            1,
+        ),
         source.replacen(
             "box_did_not_fit: status.code() == Some(super::box_fit::DOES_NOT_FIT_EXIT),",
             "box_did_not_fit: false,",
@@ -2012,7 +2040,7 @@ fn each_dialog_answers_only_on_its_positive_button() {
         ),
         source.replacen(
             MASTERS_DIALOG_WINDOWS,
-            &MASTERS_DIALOG_WINDOWS.replacen(") == IDYES", ") != IDNO", 1),
+            &MASTERS_DIALOG_WINDOWS.replacen("answer == IDYES", "answer != IDNO", 1),
             1,
         ),
         // The one-ledger dialog's title reads as the post's, or its count

@@ -8,7 +8,7 @@
 - **Release:** record it from Tally's About screen. The lab PC runs TallyPrime 7.2 since 25 Oct 2026; the new company is created on that release.
 - **The owner's yes before keying:** the lab asks the owner in its own chat before the first key step, and keys nothing until the owner says yes.
 - **Dialogs:** any dialog or message box these steps do not describe = STOP (C7): press no key, send nothing more, screenshot, copy its text, report.
-- **Evidence:** on a new branch `lab-evidence/692-nonint-lab-answers`, with `SHA256.txt` listing every file, after the pre-push scan and the run coordinator's yes. Screenshots stay on the lab PC, listed by name, size and sha256.
+- **Evidence:** on a new branch `lab/692-nonint-lab-answers` (its folder `lab-evidence/692-nonint-lab-answers/`), with `SHA256.txt` listing every file, after the pre-push scan and the run coordinator's yes. Screenshots stay on the lab PC, listed by name, size and sha256.
 
 Why: every BRIDGE book read so far is integrated with accounts. The statements code decides from the company's integration flag and from the stock lines of Tally's own Profit and Loss; what a book with inventory on and integration off looks like in those reports, and in the ledger collection, has never been captured. One small book, built by hand, answers it.
 

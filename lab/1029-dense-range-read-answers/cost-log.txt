@@ -1,0 +1,6 @@
+2026-10-26T11:29:53Z 00-list_companies list_companies round_trip=0.069s answer_text_bytes=572 bytes_prepared=None trail_sent=None isError=False codes=[]
+2026-10-26T11:29:59Z 01-tally_status tally_status round_trip=0.069s answer_text_bytes=686 bytes_prepared=None trail_sent=None isError=False codes=[]
+2026-10-26T11:30:00Z 02-ledger_masters-M0 ledger_masters round_trip=0.700s answer_text_bytes=14286 bytes_prepared=None trail_sent=None isError=False codes=[]
+2026-10-26T11:32:51Z 03-voucher_read_cost voucher_read_cost round_trip=0.642s answer_text_bytes=4395 bytes_prepared=None trail_sent=None isError=False codes=[]
+2026-10-26T11:33:35Z 04-vouchers-2025-04-01-to-07 vouchers round_trip=12.113s answer_text_bytes=92254 bytes_prepared=199077 trail_sent=88 isError=False codes=[]
+2026-10-26T11:34:30Z 06-ledger_masters-M1 ledger_masters round_trip=0.756s answer_text_bytes=14286 bytes_prepared=None trail_sent=None isError=False codes=[]

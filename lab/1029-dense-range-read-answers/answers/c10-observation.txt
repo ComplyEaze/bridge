@@ -1,0 +1,1 @@
+C10: Company > Shut (Alt+K, H, Enter on BRIDGE CORPUS DENSE); Select Company with none loaded (shot 1029-10). tasklist: 1 tally.exe, PID 29692. netstat: 9001 LISTENING (2 lines), same PID. GET /status 200, 51 B (c10-status.txt). Tally's current date at the shut: Tuesday 31-Mar-2026, as at step 0. No XML request after the shut.

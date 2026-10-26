@@ -195,6 +195,17 @@ fn evidence_binds_counters_response_and_redacted_line_errors() {
     assert_eq!(evidence.response_sha256().len(), 64);
     let debug = format!("{evidence:?}");
     assert!(!debug.contains("PRIVATE-SYNTHETIC-SENTINEL"));
+    // Its own last field is how many line errors there were (the counters' Debug holds a
+    // line_error_count too, so only the end pins this one); their digests are not shown.
+    assert!(debug.ends_with(", line_error_count: 1 }"), "{debug}");
+    assert!(!debug.contains(&evidence.line_error_sha256()[0]), "{debug}");
+}
+
+#[test]
+fn whitespace_only_cdata_between_elements_is_accepted_like_whitespace_text() {
+    let xml = "<RESPONSE><CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS><![CDATA[ \n ]]></RESPONSE>";
+    let outcome = parse_import_outcome(xml).expect("blank CDATA is not content");
+    assert!(outcome.counters().is_clean_success_for(1, 0, 0));
 }
 
 #[test]

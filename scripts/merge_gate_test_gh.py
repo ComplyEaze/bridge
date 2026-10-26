@@ -998,6 +998,22 @@ def state():
         else:
             s["body"] = DEFAULT_BODY + {"attribution-body-plain": plain, "attribution-body-link": link, "attribution-body-comment": "<!-- " + link + " -->"}[scenario] + "\n"
 
+    elif scenario in ("attribution-body-trailer", "attribution-body-markdown", "attribution-body-with-unproven-commits"):
+        # The body is copied into the commit on master by a squash merge, so a co-author line there counts; Markdown does not hide the line.
+        line = {"attribution-body-trailer": "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">",
+                "attribution-body-markdown": "Generated with **[Claude Code](https://claude.com/claude-code)**",
+                "attribution-body-with-unproven-commits": "Generated with Claude Code"}[scenario]
+        s["body"] = DEFAULT_BODY + line + "\n"
+        if scenario == "attribution-body-with-unproven-commits":
+            s["commits"] = []
+
+    elif scenario in ("attribution-identity-after", "attribution-identity-before"):
+        commit = dict(DEFAULT_COMMIT)
+        commit["commit"] = dict(DEFAULT_COMMIT["commit"])
+        commit["commit"]["committer"] = {"name": "Claude", "email": PUBLIC_AGENT_ADDRESS,
+                                         "date": "2026-10-26T09:00:00Z" if scenario == "attribution-identity-after" else "2026-10-01T09:00:00Z"}
+        s["commits"] = [commit]
+
     elif scenario in ("attribution-trailer-after", "attribution-trailer-before", "attribution-trailer-undated", "attribution-trailer-human-after"):
         commit = dict(DEFAULT_COMMIT)
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])

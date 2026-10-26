@@ -516,6 +516,36 @@ class MergeGateControls(unittest.TestCase):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "AI attribution: ")
 
+    def test_a_coauthor_line_in_the_body_blocks_because_a_squash_copies_the_body(self):
+        self.assert_blocked("attribution-body-trailer", "AI attribution: body: a Co-authored-by line")
+
+    def test_markdown_does_not_hide_the_generated_line(self):
+        self.assert_blocked("attribution-body-markdown", "AI attribution: body: a \"Generated with\" line")
+
+    def test_the_body_is_checked_even_when_the_commit_list_is_not_proven(self):
+        result = self.run_gate("attribution-body-with-unproven-commits")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("AI attribution: body: a \"Generated with\" line", result.stdout)
+        self.assertIn("could not prove complete head-bound PR commit metadata", result.stdout)
+
+    def test_a_committer_identity_naming_an_assistant_blocks_after_the_rule_and_is_reported_before(self):
+        self.assert_blocked("attribution-identity-after", "an author or committer identity naming an assistant, made after the rule")
+        self.assert_pass("attribution-identity-before", "AI attribution before the rule")
+
+    def test_a_check_that_crashes_is_not_a_pass(self):
+        # The helper exits 1 with nothing on stdout (a crash, an old node): no BLOCK line, so the gate must say it could not determine.
+        copy = self.private_copy("attribution-crash")
+        (copy / "scripts" / "check-ai-attribution.mjs").write_text("process.exit(1);\n")
+        self.git_copy(copy, "add", "-A")
+        self.git_copy(copy, "commit", "-q", "-m", "a broken helper")
+        self.git_copy(copy, "push", "-q", "origin", "master")
+        for scenario in ("attribution-trailer-after", "pass"):
+            with self.subTest(scenario=scenario):
+                result = self.run_copy(copy, scenario)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertNotIn("MAY MERGE", result.stdout)
+                self.assertIn("could not run the AI attribution check", result.stdout)
+
     def test_a_claude_trailer_on_a_commit_made_after_the_rule_blocks(self):
         self.assert_blocked("attribution-trailer-after", "made after the rule")
 

@@ -246,34 +246,42 @@ $commit_identity_names"
   fi
 fi
 # No AI attribution in public text (owner rule of 25 Oct 2026). The title and body, comments included, may not hold a
-# "Generated with Claude Code" line (plain or Markdown-link form), and a commit made on or after 2026-10-25T13:00Z may not
-# carry a Co-authored-by trailer naming Claude or Anthropic. An older commit with one is reported, not refused (the owner
-# decides what to do with those). scripts/check-ai-attribution.mjs decides; a commit with such a trailer and an unreadable
-# date counts as made after the rule. The commit list is the one proved complete above: without it this check has nothing
-# to read and the privacy scan has already reported that.
-if [ "${metadata_commits_proven:-0}" -eq 1 ]; then
-  attribution_input=$(jq -c --arg title "$title" --arg body "$raw_prbody" '{
-    title: $title, body: $body,
-    commits: ((if all(.[]; type == "array") then flatten else . end) |
-      map({sha: .sha, message: .commit.message, committed_at: (.commit.committer.date // "")}))}' <<<"$metadata_commits" 2>/dev/null) || attribution_input=""
-  if [ -z "$attribution_input" ]; then
-    unknown "could not prepare the AI attribution check"
+# "Generated with Claude Code" line (plain or Markdown-link form) or a Co-authored-by line naming an assistant, and a commit
+# made on or after 2026-10-25T13:00Z may not carry such a trailer or an author or committer identity naming one. An older
+# commit with one is reported, not refused (the owner decides what to do with those), but GitHub's squash merge copies each
+# commit's author and co-authors into the squash message, so the report says so. scripts/check-ai-attribution.mjs decides; a
+# commit with such text and an unreadable date counts as made after the rule. The title and body are checked even when the
+# commit list is not proven complete (that case is already INDETERMINATE above): then no commit is read.
+# The commit list goes in on stdin (a long list would not fit an argument); the title and body are arguments, and one too long
+# for that makes the whole check INDETERMINATE, never a pass.
+attribution_source="[]"
+[ "${metadata_commits_proven:-0}" -eq 1 ] && attribution_source="$metadata_commits"
+attribution_input=$(jq -c --arg title "$title" --arg body "$raw_prbody" '{
+  title: $title, body: $body,
+  commits: ((if all(.[]; type == "array") then flatten else . end) |
+    map({sha: .sha, message: .commit.message, committed_at: (.commit.committer.date // ""), parents: [.parents[]?.sha],
+         identities: [.commit.author.name, .commit.author.email, .commit.committer.name, .commit.committer.email]}))}' <<<"$attribution_source" 2>/dev/null) || attribution_input=""
+if [ -z "$attribution_input" ]; then
+  unknown "could not prepare the AI attribution check"
+else
+  : >"$errfile"
+  attribution_status=0
+  attribution_output=$(printf '%s' "$attribution_input" | node "$script_dir/check-ai-attribution.mjs" 2>"$errfile") || attribution_status=$?
+  attribution_refusals=$(printf '%s\n' "$attribution_output" | grep -c '^REFUSE ' || true)
+  # Exit 0 must come with no REFUSE line, and exit 1 with at least one: anything else (a crash, an old node, a missing
+  # module) is not an answer.
+  if { [ "$attribution_status" -eq 0 ] && [ "$attribution_refusals" -eq 0 ]; } || { [ "$attribution_status" -eq 1 ] && [ "$attribution_refusals" -gt 0 ]; }; then
+    while IFS= read -r attribution_line; do
+      case "$attribution_line" in
+        "REFUSE "*) bad "AI attribution: ${attribution_line#REFUSE }" ;;
+        "NOTE "*) say "note" "AI attribution before the rule: ${attribution_line#NOTE }" ;;
+      esac
+    done <<<"$attribution_output"
+    if [ "$attribution_status" -eq 0 ] && [ "${metadata_commits_proven:-0}" -eq 1 ]; then
+      say "ok" "no AI attribution in the title, body or commits made after the rule"
+    fi
   else
-    : >"$errfile"
-    attribution_status=0
-    attribution_output=$(printf '%s' "$attribution_input" | node "$script_dir/check-ai-attribution.mjs" 2>"$errfile") || attribution_status=$?
-    case "$attribution_status" in
-      0|1)
-        while IFS= read -r attribution_line; do
-          case "$attribution_line" in
-            "REFUSE "*) bad "AI attribution: ${attribution_line#REFUSE }" ;;
-            "NOTE "*) say "note" "AI attribution before the rule: ${attribution_line#NOTE }" ;;
-          esac
-        done <<<"$attribution_output"
-        if [ "$attribution_status" -eq 0 ]; then say "ok" "no AI attribution in the title, body or commits made after the rule"; fi
-        ;;
-      *) unknown "could not run the AI attribution check" ;;
-    esac
+    unknown "could not run the AI attribution check"
   fi
 fi
 # Paginate changed files through the REST endpoint; gh pr view hard-codes a

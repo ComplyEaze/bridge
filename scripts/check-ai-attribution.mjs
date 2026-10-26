@@ -2,15 +2,22 @@
 //
 // Owner rule of 25 Oct 2026: no AI attribution in public text. The merge gate (scripts/merge-gate.sh) feeds this the
 // pull request's title, body and commits as one JSON object on stdin and refuses when
-//   - the title or the body, comments included, holds a "Generated with Claude Code" line, in the plain form or the
-//     Markdown-link form, or
-//   - a commit made on or after RULE_FROM carries a Co-authored-by trailer that names Claude or Anthropic (or a
-//     "Generated with Claude" line in its message).
-// An older commit with the same text is reported, not refused: it predates the rule (the owner decides what to do
-// with them). A commit whose date cannot be read is treated as made after the rule, because a refusal can be argued
-// with and an unprovable pass cannot.
+//   - the title or the body, comments included, holds a "Generated with Claude" line (plain, Markdown-link, "by" and
+//     "using" forms; Claude or Anthropic) or a Co-authored-by trailer naming an assistant (Claude, Anthropic, Fable, Copilot,
+//     Codex, OpenAI, ChatGPT), or
+//   - a commit made on or after RULE_FROM carries such a trailer or line, or has an author or committer identity that
+//     names an assistant.
+// Text is read after normalisation, so that ordinary Markdown, HTML entities, invisible characters and look-alike letters
+// do not hide a line: NFKC, format characters removed, entities decoded, Unicode dashes made "-", a few Cyrillic and
+// Greek look-alikes made Latin, and (for the "Generated" line) Markdown and HTML punctuation read as spaces.
+// A commit with the same text from before RULE_FROM is reported as a NOTE, not refused (the owner decides what to do with
+// older text); GitHub's squash merge copies each commit's author and co-authors into the squash message as Co-authored-by
+// lines, so the note says so. A commit whose date cannot be read counts as made after the rule. A committer date is the
+// author's to set, so each commit also takes the latest date among its parents inside the pull request: that catches a
+// default of a tool, not a deliberately forged date on the first new commit.
 //
-// Input:  {"title": string, "body": string, "commits": [{"sha": string, "message": string, "committed_at": string}]}
+// Input:  {"title": string, "body": string, "commits": [{"sha": string, "message": string, "committed_at": string,
+//          "parents": [string], "identities": [string]}]}   (parents and identities may be omitted)
 // Output: one line per finding, "REFUSE <where>: <what>" or "NOTE <where>: <what>"; exit 0 clean, 1 refused, 2 bad input.
 // Run:    node scripts/check-ai-attribution.mjs < input.json
 
@@ -19,28 +26,73 @@ import { fileURLToPath } from "node:url";
 
 export const RULE_FROM = "2026-10-25T13:00:00Z";
 
-// "Generated with Claude Code", "Generated with [Claude Code](https://...)", and the "by" and bare-"Claude" variants, any case.
-const GENERATED_LINE = /generated\s+(?:with|by)\s+\[?\s*claude\b/i;
-// A trailer is a line that starts with the key (git reads them at the end of a message; a line anywhere in it is refused too).
-const CO_AUTHOR_TRAILER = /^[ \t]*co-authored-by[ \t]*:[^\r\n]*(?:claude|anthropic)[^\r\n]*$/im;
+// The assistants the rule names: Claude and Anthropic's model family names, and the other assistants that sign commits.
+const AGENT = "claude|anthropic|fable|copilot|codex|openai|chatgpt";
+// The generated-with line is the one the assistant adds; a sentence about another vendor's model ("generated with OpenAI") is ordinary text.
+const GENERATED_LINE = /generated\W+(?:with|by|using)\W+(?:an?\W+)?(?:claude|anthropic)/i;
+const CO_AUTHOR_TRAILER = new RegExp(`^[ \\t]*co-authored-by[ \\t]*:[^\\r\\n]*(?:${AGENT})[^\\r\\n]*$`, "im");
+const IDENTITY = new RegExp(AGENT, "i");
+
+const NAMED_ENTITIES = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", ensp: " ", emsp: " ", thinsp: " " };
+// Letters of the words above that Cyrillic and Greek write with the same shape as a Latin one.
+const LOOKALIKES = { "а": "a", "с": "c", "е": "e", "о": "o", "р": "p", "і": "i", "ѕ": "s", "ԁ": "d",
+  "А": "A", "С": "C", "Е": "E", "О": "O", "Р": "P", "І": "I", "Ѕ": "S", "ο": "o", "ι": "i", "Ο": "O", "Ι": "I" };
+
+function decodeEntities(text) {
+  return text.replace(/&(?:#x([0-9a-f]{1,6})|#(\d{1,7})|([a-z]{2,8}));/gi, (whole, hex, dec, name) => {
+    if (name !== undefined) return NAMED_ENTITIES[name.toLowerCase()] ?? whole;
+    const code = hex !== undefined ? Number.parseInt(hex, 16) : Number.parseInt(dec, 10);
+    return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+  });
+}
+
+export function normalise(text) {
+  let t = text.normalize("NFKC").replace(/\p{Cf}/gu, "");
+  t = decodeEntities(t).normalize("NFKC").replace(/\p{Cf}/gu, "");
+  t = t.replace(/\p{Pd}/gu, "-").replace(/[Ͱ-ϿЀ-ԯ]/g, (c) => LOOKALIKES[c] ?? c);
+  return t;
+}
+
+const generatedLine = (text) => GENERATED_LINE.test(normalise(text).replace(/[<>*_`~|:()[\]]/g, " "));
+const coAuthorTrailer = (text) => CO_AUTHOR_TRAILER.test(normalise(text));
 
 export function evaluate(input, ruleFrom = RULE_FROM) {
   const cutoff = Date.parse(ruleFrom);
   const refusals = [];
   const notes = [];
   for (const [where, text] of [["title", input.title], ["body", input.body]]) {
-    if (GENERATED_LINE.test(text)) refusals.push(`${where}: a "Generated with Claude" line`);
+    if (generatedLine(text)) refusals.push(`${where}: a "Generated with" line naming an assistant`);
+    if (coAuthorTrailer(text)) refusals.push(`${where}: a Co-authored-by line naming an assistant (a squash merge copies the body into the commit on master)`);
   }
+  // Each commit's date is the latest of its own and its parents' inside this pull request.
+  const byId = new Map(input.commits.map((c) => [c.sha, c]));
+  const bound = new Map();
+  const dateOf = (commit, seen = new Set()) => {
+    if (bound.has(commit.sha)) return bound.get(commit.sha);
+    if (seen.has(commit.sha)) return Date.parse(commit.committed_at);
+    seen.add(commit.sha);
+    let latest = Date.parse(commit.committed_at);
+    for (const parent of commit.parents ?? []) {
+      const known = byId.get(parent);
+      if (known !== undefined) {
+        const parentDate = dateOf(known, seen);
+        if (Number.isNaN(latest) || parentDate > latest) latest = parentDate;
+      }
+    }
+    bound.set(commit.sha, latest);
+    return latest;
+  };
   for (const commit of input.commits) {
     const found = [];
-    if (CO_AUTHOR_TRAILER.test(commit.message)) found.push("a Co-authored-by trailer naming Claude or Anthropic");
-    if (GENERATED_LINE.test(commit.message)) found.push('a "Generated with Claude" line');
+    if (coAuthorTrailer(commit.message)) found.push("a Co-authored-by trailer naming an assistant");
+    if (generatedLine(commit.message)) found.push('a "Generated with" line naming an assistant');
+    if ((commit.identities ?? []).some((identity) => IDENTITY.test(normalise(identity)))) found.push("an author or committer identity naming an assistant");
     if (found.length === 0) continue;
-    const when = Date.parse(commit.committed_at);
+    const when = dateOf(commit);
     const label = `commit ${commit.sha.slice(0, 12)}`;
     if (Number.isNaN(when)) refusals.push(`${label}: ${found.join(" and ")}, and its date cannot be read`);
-    else if (when >= cutoff) refusals.push(`${label}: ${found.join(" and ")}, made after the rule (${commit.committed_at})`);
-    else notes.push(`${label}: ${found.join(" and ")}, made before the rule (${commit.committed_at})`);
+    else if (when >= cutoff) refusals.push(`${label}: ${found.join(" and ")}, made after the rule (${new Date(when).toISOString()})`);
+    else notes.push(`${label}: ${found.join(" and ")}, made before the rule (${commit.committed_at}); a squash merge can copy it into the commit on master as a Co-authored-by line`);
   }
   return { refusals, notes };
 }
@@ -53,8 +105,9 @@ function parseInput(text) {
     return null;
   }
   const isString = (value) => typeof value === "string";
+  const isStrings = (value) => value === undefined || (Array.isArray(value) && value.every(isString));
   if (input === null || typeof input !== "object" || !isString(input.title) || !isString(input.body) || !Array.isArray(input.commits)) return null;
-  if (!input.commits.every((c) => c !== null && typeof c === "object" && isString(c.sha) && isString(c.message) && isString(c.committed_at))) return null;
+  if (!input.commits.every((c) => c !== null && typeof c === "object" && isString(c.sha) && isString(c.message) && isString(c.committed_at) && isStrings(c.parents) && isStrings(c.identities))) return null;
   return input;
 }
 

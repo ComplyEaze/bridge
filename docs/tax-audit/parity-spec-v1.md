@@ -448,20 +448,8 @@ identity keyed off this id will still diverge if the two engines disagree on how
 ## 12. Source of truth and declared divergences (ruling of 26 October 2026)
 
 The maintainers ruled on 26 October 2026 that this crate is the source of truth for the tax-audit
-tests. The reference implementation stays frozen as the FY 2025-26 parity oracle, and its goldens
-are never regenerated from this crate or written by hand. A change to a test's behaviour no longer
-waits for the reference to change first, and §10's route (the reference, then the port) is for
-porting a test, not for changing one already ported. Every change to an existing output is a
-declared divergence, never a quiet change:
-
-- it has its own invented test book: a unit test on typed inputs, or an edge book, worded as
-  pinning the change until a Chartered Accountant's hand-worked answer for such a book is
-  recorded;
-- the test's provenance note records it, under a "Declared behaviour difference" heading (or its
-  known limits or recorded divergences), naming that test book;
-- a change that moves a committed golden is declared in the crate's divergence registry with the
-  hand-worked answer, and is compared against the golden with its patch applied; a change that
-  moves no committed golden (a figure or finding that appears only in a case no golden holds, or a
-  refusal of malformed input) needs no registry record.
-
-An issue whose plan reads "reference first" now needs a fresh ruling before it is built.
+tests. A change to a test's behaviour no longer waits for the reference to change first; §10's route
+is for porting a test, not for changing one already ported. Every change to an existing output is a
+declared divergence, never a quiet change: it has its own invented test book (a unit test on typed
+inputs, or an edge book), and the test's provenance note records it under a "Declared behaviour
+difference" heading, naming that book.

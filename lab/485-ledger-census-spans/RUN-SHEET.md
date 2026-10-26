@@ -1,6 +1,6 @@
 # #485 part E: a ledger-scoped census in AlterID spans
 
-Not for merge. READS ONLY, on one company the lab already holds: BRIDGE CORPUS DENSE (synthetic, company number 100012, GUID `d45bc1b0-e5e3-4261-b3b2-cce3915f42d3`, voucher mark 29,900 on 26 Oct 2026). `LAB-COMMON.md` in this folder (v3, a byte copy of the one in `lab/485-ledger-filtered-vouchers-run-sheet`, itself from `lab/626-1038-1050-run-sheets` at 8c602c15) applies in full, with this company as THE COMPANY; where this sheet and it differ, the stricter holds.
+Not for merge. READS ONLY, on one company the lab already holds: BRIDGE CORPUS DENSE (synthetic, GUID `d45bc1b0-e5e3-4261-b3b2-cce3915f42d3`, voucher mark 29,900 on 26 Oct 2026). `LAB-COMMON.md` in this folder (v3, a byte copy of the one in `lab/485-ledger-filtered-vouchers-run-sheet`, itself from `lab/626-1038-1050-run-sheets` at 8c602c15) applies in full, with this company as THE COMPANY; where this sheet and it differ, the stricter holds.
 
 **WHEN.** Directly after part D of `lab/485-ledger-filtered-vouchers-run-sheet` (04a50315), in the same sitting, with the owner still at the machine. Part E runs only if part D step 3 (`d03`) answered in-band AND its GUID set equals the d02 vouchers that carry a `DN Sales` ledger line (82 on 15 May 2025). Otherwise part E is NOT RUN: record that, and why, and send nothing from this folder.
 

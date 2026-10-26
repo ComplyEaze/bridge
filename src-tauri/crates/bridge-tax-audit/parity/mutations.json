@@ -14278,5 +14278,29 @@
   "file": "src/book.rs",
   "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
   "to": ""
+ },
+ {
+  "id": "S1602-1",
+  "by": "author",
+  "what": "#1602: the opening total wraps instead of being refused",
+  "file": "src/book.rs",
+  "from": "                total.checked_add(m.opening_value_paise.unwrap_or(0))\n",
+  "to": "                Some(total.wrapping_add(m.opening_value_paise.unwrap_or(0)))\n"
+ },
+ {
+  "id": "S1602-2",
+  "by": "author",
+  "what": "#1602: an opening total too large to hold reads as a known zero",
+  "file": "src/book.rs",
+  "from": "            .map_or(\n                OpeningStock::Unknown(OpeningStockUnknown::TooLarge),\n",
+  "to": "            .map_or(\n                OpeningStock::Valued(0),\n"
+ },
+ {
+  "id": "S1602-3",
+  "by": "author",
+  "what": "#1602: the too-large reason loses its words",
+  "file": "src/book.rs",
+  "from": "                \"not taken: the stock items' opening values add up to more than can be held\"\n",
+  "to": "                \"not taken\"\n"
  }
 ]

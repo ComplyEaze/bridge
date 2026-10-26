@@ -837,6 +837,10 @@ balances.",
 first day",
             ),
             (OpeningStockUnknown::Unreadable, "unreadable"),
+            (
+                OpeningStockUnknown::TooLarge,
+                "not taken: the stock items' opening values add up to more than can be held",
+            ),
         ] {
             let r = run_on(&book(-1_000_000, OpeningStock::Unknown(why)));
             assert_eq!(

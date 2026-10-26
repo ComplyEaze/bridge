@@ -1,0 +1,2 @@
+src-tauri/crates/bridge-tally-core/src/lib.rs
+reviewer: lamemustafa

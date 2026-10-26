@@ -1,0 +1,70 @@
+{
+ "truth_rows": 7,
+ "truth_rows_with_ledger": 7,
+ "candidate_rows": 7,
+ "candidate_row_tags": [
+  "VOUCHER"
+ ],
+ "candidate_rows_with_guid_alterid_masterid_all_nonempty": 7,
+ "sets_equal": true,
+ "in_truth_not_candidate": [],
+ "in_candidate_not_truth": [],
+ "candidate_rows_table": [
+  {
+   "guid": "9ab5002c-e910-4242-83e4-a27cc490600b-00000001",
+   "alterid": "1",
+   "masterid": "1",
+   "date": "20250410",
+   "type": "Sales",
+   "number": "1"
+  },
+  {
+   "guid": "9ab5002c-e910-4242-83e4-a27cc490600b-00000002",
+   "alterid": "2",
+   "masterid": "2",
+   "date": "20250520",
+   "type": "Receipt",
+   "number": "1"
+  },
+  {
+   "guid": "9ab5002c-e910-4242-83e4-a27cc490600b-00000003",
+   "alterid": "3",
+   "masterid": "3",
+   "date": "20250610",
+   "type": "Receipt",
+   "number": "2"
+  },
+  {
+   "guid": "9ab5002c-e910-4242-83e4-a27cc490600b-00000004",
+   "alterid": "4",
+   "masterid": "4",
+   "date": "20250715",
+   "type": "Sales",
+   "number": "2"
+  },
+  {
+   "guid": "9ab5002c-e910-4242-83e4-a27cc490600b-00000005",
+   "alterid": "5",
+   "masterid": "5",
+   "date": "20250805",
+   "type": "Receipt",
+   "number": "3"
+  },
+  {
+   "guid": "9ab5002c-e910-4242-83e4-a27cc490600b-00000006",
+   "alterid": "6",
+   "masterid": "6",
+   "date": "20250901",
+   "type": "Credit Note",
+   "number": "1"
+  },
+  {
+   "guid": "9ab5002c-e910-4242-83e4-a27cc490600b-00000007",
+   "alterid": "7",
+   "masterid": "7",
+   "date": "20260310",
+   "type": "Receipt",
+   "number": "4"
+  }
+ ]
+}

@@ -1,0 +1,1 @@
+C10 (Part T): Company > Shut (Alt+K, H, Enter on BRIDGE BILLTRAIL LAB); Select Company with none loaded (shot 485-03). tasklist: 1 tally.exe, PID 29692. netstat: 9001 LISTENING (2 lines). GET /status 200, 51 B (T-c10-status.txt). No XML request after the shut.

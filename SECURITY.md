@@ -26,7 +26,9 @@ will be in a new release; we are not obliged to make one.
 
 - [GHSA-vm5g-r3p7-wxx7](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7):
   the bank statement tool opened file paths that name a network location on
-  Windows. It affects 0.3.0 and 0.4.0 and is fixed in 0.4.1.
+  Windows. It affects 0.3.0 and 0.4.0. Release 0.4.1 refuses the network
+  forms it recognises from the text of the path; some network locations are not
+  recognised that way, and the security and privacy page says which kinds.
 
 ## Reporting a vulnerability
 

@@ -403,6 +403,31 @@ async fn a_company_object_of_another_company_is_refused_by_code() {
     );
 }
 
+/// Books that begin after the period ends are refused by C5's own code before
+/// the read sends a request, not after the whole read.
+#[tokio::test]
+async fn books_that_begin_after_the_period_are_refused_before_any_request() {
+    let simulator = SequenceSimulator::spawn(Replay::clean().plans()).unwrap();
+    let config = TallyConfig {
+        host: simulator.address().ip().to_string(),
+        port: simulator.address().port(),
+    };
+    let book = read_audit_book(
+        &TallyRuntime::default(),
+        &config,
+        &identity(),
+        (&date("20240401"), &date("20250331")),
+        &roles(),
+        one_request_window(),
+    )
+    .await;
+    assert_eq!(
+        failure_of(book),
+        AuditReadFailure::new("C5-books-from", false)
+    );
+    assert_eq!(simulator.received(), 0);
+}
+
 #[tokio::test]
 async fn marks_that_moved_before_the_window_refuse_the_read_and_may_be_retried() {
     let mut replay = Replay::clean();

@@ -1033,6 +1033,12 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// voucher another way (#1709).
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "voucher_mark_contradiction" => Some(
+            "Tally gave this company's voucher mark earlier in this check and then twice without it, \
+             so this check recorded nothing and did not settle the post. Run the same call again \
+             once. If it is refused again, ask the person whether the company's books are being \
+             restored or replaced in Tally.",
+        ),
         "company_identity_absent_or_ambiguous" | "company_identity_not_matched" => Some(
             "Tally did not confirm the selected company as exactly one loaded company, so nothing \
              was returned. The company may not be loaded in Tally, may have been renamed since \

@@ -1,7 +1,10 @@
-// One source for what changed: CHANGELOG.md. `notes` composes a GitHub release body from it and
-// `page` renders the same file for the install site, so the two cannot drift. Neither may block a
-// release or a deploy: every fallback prints a warning and still writes a usable file.
-import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+// One source for what changed: CHANGELOG.md, plus the entries of changes not yet released, which sit one
+// file each under docs/changelog/unreleased/ so that no two pull requests edit the same lines. `notes`
+// composes a GitHub release body from them and `page` renders them for the install site, so the two cannot
+// drift. Neither may block a release or a deploy: every fallback prints a warning and still writes a usable
+// file. `unreleased` prints the entries for the version pull request to paste into its section.
+import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPOSITORY_URL = "https://github.com/ComplyEaze/bridge";
@@ -65,6 +68,119 @@ export function parseChangelogWithProblems(source) {
 
 export function parseChangelog(source) {
   return parseChangelogWithProblems(source).sections;
+}
+
+// An unreleased entry is one Markdown file, `<kind>/<N>-<slug>.md`, where the folder names the heading it
+// is listed under and N is the issue or pull request its text cites. The folder names are the only headings
+// there are: a file holds one bullet and no heading of its own.
+export const FRAGMENT_DIRECTORY = "docs/changelog/unreleased";
+const FRAGMENT_KINDS = [
+  ["added", "Added"],
+  ["changed", "Changed"],
+  ["removed", "Removed"],
+];
+const fragmentName = /^([0-9]{1,6})-([a-z0-9]+(?:-[a-z0-9]+){0,5})\.md$/;
+
+// What is wrong with the text of one entry, as sentences; none means it can be listed as it stands.
+export function fragmentProblems(number, text) {
+  const problems = [];
+  if (text.includes("\r")) problems.push("it has a carriage return; use line feeds");
+  if (!text.endsWith("\n") || text.endsWith("\n\n")) problems.push("it must end with exactly one line feed");
+  const lines = text.replace(/\n$/, "").split("\n");
+  if (!lines[0].startsWith("- ") || lines[0].trim() === "-") problems.push('it must start with "- " and text');
+  if (lines.slice(1).some((line) => !line.startsWith("  "))) problems.push("every line after the first must be indented two spaces; no blank line, heading or second bullet at the left edge");
+  if (lines.some((line) => /^\s*(`{3,}|~{3,})/.test(line))) problems.push("it must not hold a code fence");
+  if (lines.some((line) => /^\s*(?:[-*+]\s+)?(?:#{1,6}(?:\s|$)|[-=*_]{3,}\s*$)/.test(line))) problems.push("it must not hold a heading or a rule, which a reader would show as a heading");
+  if (!new RegExp(`(?<![\\w&/#])#${number}(?!\\d)`).test(text)) problems.push(`its text must cite #${number}, the number in its file name`);
+  return problems;
+}
+
+// Every entry under `directory`, in the order they are listed (kind, then number, then slug), and a sentence
+// for each file that is not a well-formed entry. A missing directory is no entries; a bad file is reported and
+// left out, never thrown, so an entry cannot stop a release or a deploy.
+export function readFragments(directory) {
+  const fragments = [];
+  const problems = [];
+  try {
+    for (const name of readdirSync(directory).filter((entry) => !entry.startsWith(".")).sort()) {
+      if (!FRAGMENT_KINDS.some(([kind]) => kind === name)) problems.push(`${FRAGMENT_DIRECTORY}/${JSON.stringify(name)} is not one of ${FRAGMENT_KINDS.map(([kind]) => kind).join(", ")}, so it is not listed`);
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") problems.push(`${FRAGMENT_DIRECTORY} could not be read (${error.message})`);
+  }
+  for (const [kind] of FRAGMENT_KINDS) {
+    let names;
+    try {
+      names = readdirSync(join(directory, kind), { withFileTypes: true }).filter((entry) => !entry.name.startsWith("."));
+    } catch (error) {
+      if (error.code !== "ENOENT") problems.push(`${FRAGMENT_DIRECTORY}/${kind} could not be read (${error.message})`);
+      continue;
+    }
+    for (const entry of names.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      const name = entry.name;
+      const where = `${FRAGMENT_DIRECTORY}/${kind}/${name}`;
+      const parts = fragmentName.exec(name);
+      if (!parts) {
+        problems.push(`${FRAGMENT_DIRECTORY}/${kind}/${JSON.stringify(name)} is not named <issue number>-<up to six lowercase words joined by hyphens>.md, so it is not listed`);
+        continue;
+      }
+      if (!entry.isFile()) {
+        problems.push(`${where} is not a plain file (a folder or a link), so it is not listed`);
+        continue;
+      }
+      let text;
+      try {
+        text = readFileSync(join(directory, kind, name), "utf8");
+      } catch (error) {
+        problems.push(`${where} could not be read (${error.message}), so it is not listed`);
+        continue;
+      }
+      const wrong = fragmentProblems(Number(parts[1]), text);
+      if (wrong.length > 0) problems.push(`${where} is not listed: ${wrong.join("; ")}`);
+      else fragments.push({ kind, number: Number(parts[1]), slug: parts[2], text: text.replace(/\n$/, "") });
+    }
+  }
+  const kindOrder = FRAGMENT_KINDS.map(([kind]) => kind);
+  fragments.sort((a, b) => kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) || a.number - b.number || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
+  return { fragments, problems };
+}
+
+// The entries as changelog text: a bold heading per kind that has any, then its bullets.
+export function assembleFragments(fragments) {
+  return FRAGMENT_KINDS.flatMap(([kind, heading]) => {
+    const own = fragments.filter((fragment) => fragment.kind === kind);
+    return own.length === 0 ? [] : [`**${heading}**\n\n${own.map((fragment) => fragment.text).join("\n")}`];
+  }).join("\n\n");
+}
+
+// A section's text with the entries added to its own **Added**, **Changed** and **Removed** groups (a group is the bold line
+// and everything up to the next bold line), so no heading appears twice; a kind the text has no group for gets one at the end.
+export function mergeFragments(body, fragments) {
+  const lines = body === "" ? [] : body.split("\n");
+  const created = [];
+  for (const [kind, heading] of FRAGMENT_KINDS) {
+    const own = fragments.filter((fragment) => fragment.kind === kind);
+    if (own.length === 0) continue;
+    const entries = own.map((fragment) => fragment.text).join("\n");
+    const at = lines.indexOf(`**${heading}**`);
+    if (at < 0) {
+      created.push(`**${heading}**\n\n${entries}`);
+      continue;
+    }
+    let end = at + 1;
+    while (end < lines.length && !/^\*\*[^*\n]+\*\*\s*$/.test(lines[end])) end += 1;
+    while (end > at + 1 && lines[end - 1].trim() === "") end -= 1;
+    lines.splice(end, 0, ...entries.split("\n"));
+  }
+  return [lines.join("\n"), ...created].filter((part) => part !== "").join("\n\n");
+}
+
+// The [Unreleased] section with the entries added to it, or one made for them when the file has none.
+export function withFragments(sections, fragments) {
+  if (fragments.length === 0) return sections;
+  const at = sections.findIndex(({ label }) => isUnreleased(label));
+  if (at < 0) return [{ label: "Unreleased", date: undefined, body: mergeFragments("", fragments) }, ...sections];
+  return sections.map((section, index) => (index === at ? { ...section, body: mergeFragments(section.body, fragments) } : section));
 }
 
 export function pickNotes(sections, tag) {
@@ -239,7 +355,17 @@ function wrap(article, template) {
 }
 
 function warn(message) {
-  console.log(`::warning::${message}`);
+  console.log(`::warning::${String(message).replace(/[\r\n]+/g, " ")}`);
+}
+
+// The sections of the changelog named on the command line, with the unreleased entries that sit beside it.
+function sectionsFrom(args) {
+  const changelogPath = argument(args, "--changelog");
+  const { sections, problems } = parseChangelogWithProblems(readFileSync(changelogPath, "utf8"));
+  for (const problem of problems) warn(problem);
+  const read = readFragments(join(dirname(changelogPath), FRAGMENT_DIRECTORY));
+  for (const problem of read.problems) warn(problem);
+  return { sections: withFragments(sections, read.fragments), fragments: read.fragments };
 }
 
 function argument(args, name) {
@@ -263,9 +389,13 @@ export function main(argv) {
     }
     let picked = { mode: "none", body: "" };
     try {
-      const { sections, problems } = parseChangelogWithProblems(readFileSync(argument(args, "--changelog"), "utf8"));
-      for (const problem of problems) warn(problem);
+      const { sections, fragments } = sectionsFrom(args);
       picked = pickNotes(sections, tag);
+      if (picked.mode === "version" && fragments.length > 0) {
+        // The build is cut from the head of master, so an entry still present is in this build: list it, and say so.
+        picked.body = `${picked.body}\n\n**Also in this build**\n\n${assembleFragments(fragments)}`;
+        warn(`${fragments.length} unreleased entr${fragments.length === 1 ? "y is" : "ies are"} still in ${FRAGMENT_DIRECTORY} and were listed in this release's notes (${fragments.map(({ kind, number, slug }) => `${kind}/${number}-${slug}`).join(", ")}); remove the files and put the entries in the ${versionFromTag(tag)} section of CHANGELOG.md after this release, or the next release lists them again`);
+      }
     } catch (error) {
       warn(`could not read release notes from CHANGELOG.md (${error.message})`);
     }
@@ -291,9 +421,7 @@ export function main(argv) {
     }
     let html;
     try {
-      const { sections, problems } = parseChangelogWithProblems(readFileSync(argument(args, "--changelog"), "utf8"));
-      for (const problem of problems) warn(problem);
-      html = renderPage(sections, template);
+      html = renderPage(sectionsFrom(args).sections, template);
     } catch (error) {
       warn(`could not render CHANGELOG.md for the site (${error.message}); the page links to the releases instead`);
       html = fallbackPage(template);
@@ -301,7 +429,20 @@ export function main(argv) {
     writeFileSync(argument(args, "--out"), html);
     return 0;
   }
-  console.error("usage: release-notes.mjs notes --tag T --changelog F --footer F [--header F] --out F | page --changelog F [--template F] --out F");
+  if (command === "unreleased") {
+    // For a person cutting a release: unlike the two commands above, a bad entry is an error here, so it cannot be left out unseen.
+    const changelogPath = argument(args, "--changelog");
+    if (!existsSync(changelogPath)) {
+      console.error(`${changelogPath} does not exist; the entries are read from the folder beside it`);
+      return 1;
+    }
+    const read = readFragments(join(dirname(changelogPath), FRAGMENT_DIRECTORY));
+    for (const problem of read.problems) console.error(problem);
+    if (read.problems.length > 0) return 1;
+    console.log(assembleFragments(read.fragments));
+    return 0;
+  }
+  console.error("usage: release-notes.mjs notes --tag T --changelog F --footer F [--header F] --out F | page --changelog F [--template F] --out F | unreleased --changelog F");
   return 2;
 }
 

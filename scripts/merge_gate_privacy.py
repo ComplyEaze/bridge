@@ -37,9 +37,9 @@ CREDENTIAL_CONTEXT_RE = re.compile(
     r"(?:credential|session|token|bearer)(?:[_-]|(?=[A-Z])))",
     re.I,
 )
-# The domain may end before a full stop that no domain character follows, as at the end of a sentence (`… .test.`,
-# `… .test.)`, `… .test..`); a full stop followed by a domain character continues the domain.
-EMAIL_RE = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+)(?!\.?[A-Za-z0-9_%+-])")
+# The domain ends before any character that cannot continue it: anything but a letter or digit, or a full stop that no
+# letter or digit follows (`… .test.`, `… .test.)`, `… .test..`). A full stop followed by a letter or digit continues it.
+EMAIL_RE = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+)(?!\.?[A-Za-z0-9])")
 EXAMPLE_EMAIL_DOMAINS = {"example.com", "example.org", "example.net", "example.invalid"}
 # A package specifier, such as a pnpm lockfile's name, an at sign and `1.2.3` (or `5.0.0-beta.1`), has the address
 # shape. It is not counted when its domain is a full semantic version whose last label is neither all letters nor an
@@ -299,18 +299,19 @@ def tokenize_credential_literals(text, record):
     return "".join(retained)
 
 
-def is_package_specifier(text, match):
-    domain = match.group(1)
+def is_package_specifier_domain(domain):
     last = domain.rsplit(".", 1)[-1].lower()
-    return (SEMVER_DOMAIN_RE.fullmatch(domain) is not None
-            and not last.isalpha() and not last.startswith("xn--")
-            and not ADDRESS_TAIL_RE.match(text, match.end()))
+    return SEMVER_DOMAIN_RE.fullmatch(domain) is not None and not last.isalpha() and not last.startswith("xn--")
 
 
 def customer_email_count(text):
+    # A match on an example domain or a package specifier is not counted, unless an at sign follows it within
+    # local-part characters: the match may then have taken the start of an address the scan would otherwise never see.
     count = 0
     for match in EMAIL_RE.finditer(text):
-        if match.group(1).lower() not in EXAMPLE_EMAIL_DOMAINS and not is_package_specifier(text, match):
+        domain = match.group(1)
+        allowed = domain.lower() in EXAMPLE_EMAIL_DOMAINS or is_package_specifier_domain(domain)
+        if not allowed or ADDRESS_TAIL_RE.match(text, match.end()):
             count += 1
     return count
 

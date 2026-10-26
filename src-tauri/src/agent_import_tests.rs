@@ -3234,12 +3234,16 @@ fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Resul
 
 #[tokio::test]
 async fn built_batch_guidance_matches_the_saved_native_admission() {
-    // Posting on admits a batch of 2 under the same setting (#1090).
+    // Posting on admits a batch of 2 under the same setting (#1090). With
+    // posting off the build still asks at the batch cap, so a batch of 2 is
+    // one the setting would give a route, not a one-voucher refusal.
     for (writes_enabled, voucher_count, numbered, native) in [
         (true, 1, false, true),
         (true, 2, false, true),
         (true, 1, true, false),
         (false, 1, false, false),
+        (false, 2, false, false),
+        (false, 1, true, false),
     ] {
         let simulator = SequenceSimulator::spawn(whole_build(build_numbering_plans(&[])))
             .expect("captured build plan");
@@ -3269,16 +3273,36 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
         let result = &built.payload["result"];
         assert_eq!(result["voucher_count"], voucher_count);
         let next_step = result["next_step"].as_str().unwrap();
+        let first = result["warnings"][0].as_str().unwrap();
+        // Posting off and a batch the setting would admit: the user is told,
+        // and nothing says it will be posted from this chat.
+        let would_post = !writes_enabled && !numbered;
         assert_eq!(next_step.starts_with("Call post_import"), native);
         assert_eq!(
-            next_step.starts_with("Confirm the loaded company matches this batch"),
-            !native
+            next_step.starts_with("Tell the user that this connection cannot post."),
+            would_post,
+            "{next_step}"
         );
+        assert_eq!(
+            next_step.starts_with("Confirm the loaded company matches this batch"),
+            !native && !would_post,
+            "{next_step}"
+        );
+        if would_post {
+            assert!(
+                next_step.contains("Until then: confirm the loaded company matches this batch"),
+                "{next_step}"
+            );
+        }
         if writes_enabled {
-            assert!(result["warnings"][0]
-                .as_str()
-                .unwrap()
-                .contains("do not call post_import"));
+            assert!(first.contains("do not call post_import"), "{first}");
+        } else {
+            assert!(first.contains("Voucher posting is off"), "{first}");
+            assert_eq!(first.contains("would still refuse"), numbered, "{first}");
+            assert!(
+                !first.contains("import_post_requires_one_voucher"),
+                "{first}"
+            );
         }
         // The company-identity warning is unconditional: present for this
         // Journal-only batch exactly as it would be for a bank one.
@@ -3386,7 +3410,10 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
         let first = result["warnings"][0].as_str().unwrap();
         let batch_id = result["batch_id"].as_str().unwrap();
         match refusal {
-            None => assert!(first.contains("call post_import; it requires"), "{first}"),
+            None => assert!(
+                first.contains("call post_import; the local user approves it"),
+                "{first}"
+            ),
             Some(code) => {
                 assert!(
                     first.contains(&format!("refuse it as {code} (")),
@@ -3419,8 +3446,8 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
     }
 }
 
-/// The count rule in the warning is the batch cap: the build asks only while
-/// posting is on, and posting on admits a batch (#866, #1090).
+/// The count rule in the warning is the batch cap: the build asks at the cap
+/// whether posting is on or off, and posting on admits a batch (#866, #1090).
 #[test]
 fn refusal_reason_states_the_current_voucher_limit() {
     let on = native_post_refusal_reason("import_post_requires_one_voucher");
@@ -5966,5 +5993,124 @@ async fn a_blank_voucher_number_is_refused_before_the_numbering_read() {
         };
         assert_eq!(failure.code, code, "{blank:?}");
         assert_eq!(written_files(directory.path()), 0, "{blank:?}");
+    }
+}
+
+/// The batch limit at the build: 50 vouchers are a route with posting on and a pointer to the
+/// setting with it off; 51 are refused either way with the rebuild route, which forbids importing
+/// this file once a rebuilt batch is posted. Every text that offers two routes warns both ways.
+#[tokio::test]
+async fn the_build_names_the_route_at_the_batch_limit_and_never_both_routes() {
+    let limit = ledger::MAX_BATCH_POST_VOUCHERS;
+    for (writes_enabled, voucher_count) in [
+        (true, limit),
+        (true, limit + 1),
+        (false, limit),
+        (false, limit + 1),
+    ] {
+        let simulator = SequenceSimulator::spawn(whole_build(build_numbering_plans(&[])))
+            .expect("captured build plan");
+        let directory = tempfile::tempdir().unwrap();
+        let server = Server::new(crate::agent::Settings {
+            endpoint: TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().into(),
+            max_rows: 10,
+            max_bytes: 400_000,
+            redaction: crate::agent::Redaction::None,
+            import_enabled: true,
+            posting: crate::agent::Posting::from_enabled(writes_enabled),
+            audit_enabled: false,
+        });
+        let mut input = captured_catalogue_payload();
+        input.vouchers.truncate(1);
+        while input.vouchers.len() < voucher_count {
+            let mut extra = input.vouchers[0].clone();
+            extra.bridge_txn_id = format!("txn-extra-{}", input.vouchers.len());
+            input.vouchers.push(extra);
+        }
+        let built = server
+            .build_import_xml(&serde_json::to_value(input).unwrap())
+            .await
+            .unwrap();
+        let result = &built.payload["result"];
+        assert_eq!(result["voucher_count"], voucher_count);
+        let first = result["warnings"][0].as_str().unwrap();
+        let next_step = result["next_step"].as_str().unwrap();
+        let over = voucher_count > limit;
+        assert_eq!(
+            first.contains("as import_post_batch_too_large ("),
+            over,
+            "{writes_enabled} {voucher_count}: {first}"
+        );
+        if over {
+            assert!(
+                first.contains("build it again in batches of at most 50 vouchers"),
+                "{first}"
+            );
+            assert!(
+                first.contains(
+                    "Once any of those batches is posted or imported, never import this file"
+                ),
+                "{first}"
+            );
+            assert!(!first.contains("is posted, never import"), "{first}");
+            assert_eq!(
+                first.contains("once Allow voucher posting is on"),
+                !writes_enabled,
+                "{first}"
+            );
+            assert!(next_step.starts_with("Confirm the loaded company matches this batch"));
+        } else if writes_enabled {
+            assert!(next_step.starts_with("Call post_import"), "{next_step}");
+            assert!(
+                first.contains("an import after a post is not checked against it"),
+                "{first}"
+            );
+            assert!(
+                first.contains(
+                    "If this file was already imported in Tally, do not call post_import"
+                ),
+                "{first}"
+            );
+        } else {
+            assert!(next_step.starts_with("Tell the user that this connection cannot post."));
+            for text in [first, next_step] {
+                assert!(
+                    text.contains("once this batch is posted, do not import this file"),
+                    "{text}"
+                );
+                assert!(
+                    text.contains("once this file is imported, do not post this batch"),
+                    "{text}"
+                );
+            }
+        }
+        drop(simulator);
+    }
+}
+
+#[test]
+fn the_rebuild_route_is_offered_only_for_a_batch_over_the_limit() {
+    let on = native_post_route("import_post_batch_too_large", true);
+    assert!(
+        on.starts_with(" To post it with ComplyEaze Bridge, build it again"),
+        "{on}"
+    );
+    assert!(on.ends_with(" Otherwise import"), "{on}");
+    let off = native_post_route("import_post_batch_too_large", false);
+    assert!(
+        off.starts_with(" To post it with ComplyEaze Bridge once Allow voucher posting is on,"),
+        "{off}"
+    );
+    for code in [
+        "import_post_numbered_journal_unsupported",
+        "import_review_layout_text",
+        "import_post_requires_one_voucher",
+    ] {
+        assert_eq!(native_post_route(code, true), " Import", "{code}");
+        assert_eq!(native_post_route(code, false), " Import", "{code}");
     }
 }

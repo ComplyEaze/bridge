@@ -2311,9 +2311,25 @@ refused as `proposals_legacy` (parse the statement again).
   only for a row that nothing else matches. One dated another day, or with a
   third leg, does not match and does not refuse: verify every batch of the
   other account's statement before naming a row.
+- **At send.** A batch built from a bank statement, or from vouchers given
+  directly that post a statement row or withdraw a skip, is checked against
+  these records when `post_import` sends it as well as when it was built, with
+  the same refusals, before the post (before the dialog, or in the call that
+  redeems an approval) and again under the admission lock. The step of each
+  begins by saying nothing was sent and any approval of the batch is withdrawn,
+  and, except for `transfer_view_not_established` (building it again meets the
+  same unreadable record), ends by saying the batch must be built again. A refusal under the lock carries its code and a step that sends the
+  caller back to `post_import` for the whole reason. The batch is judged as it
+  was built, with its own records left out of the journal, and a row it withdrew is judged on the withdrawal the batch
+  recorded (`withdrawn_skips`), whether it was built from a statement or from
+  vouchers given directly, and counts only if the batch was built after the
+  newest record of that skip: a skip recorded since refuses the batch, and a
+  build naming the row again is newer. A batch that is not about transfers (no statement row, no statement, no
+  withdrawal) is not checked.
 - **Records a release cannot read.** The statement records refuse unknown
   fields, so records written by a later release make this one refuse every
-  build that needs the view (`transfer_view_not_established`); builds that do
+  build that needs the view, and every send of such a batch
+  (`transfer_view_not_established`); builds that do
   not need it go on with `transfers.state: not_established`. A missing
   skip-only file reads as no skip-only records, as a missing import journal
   reads as no batches.
@@ -2748,7 +2764,9 @@ numbers the post's vouchers held (measured once on a synthetic company,
 bridge#1050), and no identifier a read returns tells the two apart. So a
 rollback, once seen, is recorded: when a check of a native post reads the
 company's voucher mark below the floor any native post of the company had
-proved (a mark Tally omits twice reads as a company holding no voucher), the
+proved (a mark Tally omits twice reads as a company holding no voucher, unless the same
+check's own window read saw a voucher mark: it is then refused as
+`voucher_mark_contradiction` and nothing is recorded), the
 import journal keeps a record of it whenever it covers a post no earlier record
 covers, so a second restore is recorded too (`post_span_binding.rollback_recorded`,
 with `other_batches_covered`: how many of the company's other native posts it

@@ -36,20 +36,35 @@ These changes are in source and not yet in a published build.
   missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one
   Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not
   measured.
+- A batch built from a bank statement is checked against the company's skipped rows and Contras when `post_import`
+  sends it, as it was when it was built, with the same refusals (`withdraw_skip_paired`,
+  `skip_row_paired_elsewhere`, `skip_row_already_posted`, `withdraw_skip_invalid`, `transfer_double_booked`,
+  `transfer_view_not_established`): before the post (before the dialog, or in the call that redeems an approval) and
+  again under the admission lock. The refusals at send speak of the saved batch: nothing was sent, any approval of it
+  is withdrawn and, except for `transfer_view_not_established`, the batch must be built again. A row the batch withdrew is judged on the
+  withdrawal it recorded (`withdrawn_skips`), whether it was built from a statement or from vouchers given
+  directly, and it counts only if the batch was built after the newest record of that skip: a skip recorded since
+  refuses the batch (part of #1703).
 
 **Changed**
 
-- When `post_import` or `verify_import` cannot confirm a post because the company's voucher mark moved by another amount than the
-  post created, or the post's span later held another number of vouchers, the post's summary now also says what was
-  observed and what can cause it (for example a GST return exported from Tally, an edit of one of the vouchers, or another
-  user's entry), and that ComplyEaze Bridge sent the post once and Tally reported creating each voucher once. Nothing about
-  how a post is proven changes (part of #1633).
 - On macOS the first line of the approval alert (what each button does) is no longer broken by ComplyEaze Bridge at 100 characters: the alert wraps its own text, so a break of ours was wrapped a second time and left a ragged second row. The Windows box keeps its 100-character lines. The box's size caps are unchanged (part of #1780).
 - The next steps for five situations no longer send a person to enter a voucher in Tally themselves; each now says what
   ComplyEaze Bridge does and that it cannot put the voucher in the book yet: a voucher Tally reported as not
   created (and one later not found after that report), a row a rejected batch carried, a statement day that is
   partly posted, the extra row of same-day twins, and the first voucher of a company that has never held one
   (part of #1709).
+- A saved batch built while voucher posting is off now says whether turning on **Allow voucher posting** would give
+  it a route: the build checks the batch as `post_import` would at the batch limit of 50, and the assistant is told
+  to say that, with the setting on (it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge
+  would check the batch again and ask for approval, and may still refuse it; the file import stays the route until
+  then. Every text that offers both routes says to use one only: once the file is imported, do not post the batch,
+  and once the batch is posted, do not import the file (an import after a post is not checked against it). With
+  posting on, a batch `post_import` can take no longer suggests importing its file as well; a batch over 50 is told to
+  be built again in batches of at most 50, and never to import the original file once one of them is posted or
+  imported. The desktop review names the assistant's batch posting for a saved batch it cannot post, says a saved
+  invoice is posted only that way, and no longer suggests choosing a Journal without its number. Wording only otherwise; the file routes for a voucher that carries
+  its own number and for text the approval window cannot show are unchanged (part of #1709).
 - The approval window, and the review window, now open with a line that says what each answer does, before any
   detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
   voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N

@@ -11,31 +11,37 @@ Not for merge. READS ONLY, on two companies the lab already holds, one after the
 - `d03` is `p02` with the company and period changed.
 - `d02` is the committed whole listing. `d03` differs from `d02` only by the parent formula and its `FILTERS` (checked).
 
+**REQUESTS BY CURL (allowed by the owner's decision of 26 Oct 2026 that requests sent by curl may be used to discover shapes).** Every request here is an existing builder's request, used as an instrument; no new builder is made from them: `d02` is the whole party ledger listing (`render_party_ledger_master_request` in `src-tauri/crates/bridge-tally-protocol/src/native_outstandings/request.rs`), `p02` and `d03` are its parent-part form for the four parents (`render_party_ledger_master_request_for_parents`, same file), and the marks files are the company marks builder (`render_agent_company_high_water` in `src-tauri/src/agent_read_profiles.rs`). The parent-part form has never been sent live in this production shape, so `p02` and the first `d03` are each a NEW SHAPE on their book (C3: a screenshot of the whole Tally window after each). Before the first send: `python -I check-request-ids.py requests` in this folder; EXPECT `census: ok 5, skipped 0, FAIL 0`; anything else = STOP, nothing sent. A marks answer's size bound is 8,192 bytes.
+
+**DIALOGS.** Any dialog or message box on Tally's screen, before or after a send = STOP (C7): press no key, send nothing more, screenshot, copy its text, report.
+
 **OWNER steps** are marked [OWNER].
 
 ## Before the sitting
-1. [OWNER] Tally licensed. Educational mode = STOP (C1).
+1. [OWNER] Tally licensed. Educational mode = STOP (C1). Record the release from Tally's About screen (the lab PC runs 7.2 since 25 Oct 2026).
 2. Check every file here against `SHA256.txt`.
 3. [OWNER] Go-ahead.
 
 ## Part P (THE COMPANY = BRIDGE PILOT LAB, synthetic; STOP if absent)
 1. C2 step 0. Then `requests/p01_marks.request.utf16le.xml`.
 
-   EXPECT: GUID `6b43e498-430c-4d5c-bfef-d32e2ab93c85`. Record ALTVCHID and ALTMSTID; on 10 October they were 35 and 234.
+   EXPECT: GUID `6b43e498-430c-4d5c-bfef-d32e2ab93c85`. Record ALTVCHID and ALTMSTID (M_P0). They were 35 and 234 on 10 October; the book has had ledgers and vouchers added since, so other values are recorded, not a STOP.
 2. `p02_listing_four_parents.request.utf16le.xml`. Size bound 200,000 bytes. Record the UTC time before the send and after the answer.
-3. C10 for this company.
+3. `p01_marks` again (M_P1). EXPECT equal to M_P0 (the read wrote nothing); a difference = record it and STOP.
+4. C10 for this company.
 
 ## Part D (THE COMPANY = BRIDGE CORPUS DENSE, synthetic, voucher mark about 29,900; STOP if absent)
 1. Load THE COMPANY alone (C1). C2 step 0. Then `d01_marks.request.utf16le.xml`. Record the books' first date, as the Gateway or the company's details show it.
 2. GET /status. Then `d02_listing_whole.request.utf16le.xml`, the whole listing. Size bound 16,000,000 bytes. An answer above it = STOP before it is used (C3). Record the send and answer times.
 3. GET /status. Then `d03_listing_four_parents.request.utf16le.xml`, the scoped listing. Size bound 16,000,000 bytes. Record the send and answer times.
 4. GET /status. Then `d02` again, and then `d03` again (a second timing of each, in the same order).
-5. C10.
+5. `d01_marks` again: EXPECT equal to step 1's marks; a difference = record it and STOP.
+6. C10.
 
 ## EXPECT (recorded; the lab judges only the STOP rules)
 - **p02:**
-  - 11 `LEDGER` rows, the same 11 GUIDs as the 10 October `q1`.
-  - Every element of each row equal to `q1`'s row, except the GST-details elements `q1` alone fetched.
+  - Every one of the 11 GUIDs of the 10 October `q1` present. The book has gained ledgers since, so further rows under the four parents are recorded with their parents, not a finding; a row whose parent is not one of the four is the finding.
+  - For the 11 GUIDs in both, every element of each row equal to `q1`'s row, except the GST-details elements `q1` alone fetched and elements a later alteration changed (record each, with the row's ALTERID against `q1`'s).
   - The computed company GUID is PILOT LAB's.
 - **d02 and d03:**
   - Row counts, bytes, and send-to-answer times, both runs.
@@ -47,7 +53,7 @@ Neither book changes; every request is a read.
 
 ## Close and evidence
 - **C10** after each part.
-- **C11:** evidence to a new branch `lab/1331-scoped-listing-answers`, after the pre-push scan and [OWNER] yes. It holds:
+- **C11:** evidence to a new branch `lab/1331-scoped-listing-answers`, after the pre-push scan and the run coordinator's yes. It holds:
   - every answer, whole, with headers, size, sha256 and its send and answer times;
   - the GUID comparison tables;
   - the notes.

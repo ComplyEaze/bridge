@@ -42,8 +42,9 @@
 //! character that draws nothing is. PDFium's own generated spaces and line
 //! breaks are kept, and their render mode is never asked (they have no text
 //! object). Mode 7 (`InvisibleClipping`) is read as before: content painted
-//! afterwards can show through its glyph shapes. Only render mode 3 is treated
-//! as hidden; no other way of hiding text is detected.
+//! afterwards can show through its glyph shapes. Only render mode 3 is left
+//! out of the reading. Other ways a character can be kept from being seen are
+//! counted per class (see [`ClassCounts`]) and change nothing that is read (#1656).
 //!
 //! Coordinates are converted to the top-left page space of `pdftotext`,
 //! relative to the crop box (or the media box when a page has no crop box).
@@ -233,20 +234,94 @@ fn classify<E>(
     }
 }
 
+/// A character whose scaled font size is below this many points is counted as
+/// tiny. A count threshold only: nothing is refused on it (#1656).
+pub const TINY_POINTS: f64 = 2.0;
+
+/// The classes a document's characters fall into besides drawn and
+/// render-mode-3, counted and never read differently (#1656). A character can
+/// fall into several, and each count is its own. Generated characters are not
+/// counted. A class whose value PDFium could not report counts nothing.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct ClassCounts {
+    /// Characters drawn (any render mode but 3), the denominator.
+    pub drawn: usize,
+    /// Characters in render mode 3, which are left out of the reading.
+    pub invisible_mode: usize,
+    /// Characters in the mode that only adds the glyph to the clip.
+    pub clip_only_mode: usize,
+    /// Characters whose scaled font size is under [`TINY_POINTS`].
+    pub tiny: usize,
+    /// Characters whose box lies wholly outside the page's crop box.
+    pub off_page: usize,
+    /// Characters filled opaque white.
+    pub white_fill: usize,
+    /// Characters filled with alpha 0.
+    pub transparent_fill: usize,
+}
+
+/// What one character is, besides drawn or invisible, from what PDFium reports.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct ExtraClasses {
+    clip_only_mode: bool,
+    tiny: bool,
+    off_page: bool,
+    white_fill: bool,
+    transparent_fill: bool,
+}
+
+/// The extra classes of one character that is not generated. `page` is the
+/// crop box's (width, height) and `bounds` the character's (left, right, top,
+/// bottom) in the same top-left space; either missing, like an unreadable fill,
+/// leaves its class out.
+fn extra_classes(
+    mode: Option<PdfPageTextRenderMode>,
+    size: f64,
+    bounds: Option<(f64, f64, f64, f64)>,
+    page: (f64, f64),
+    fill: Option<(u8, u8, u8, u8)>,
+) -> ExtraClasses {
+    ExtraClasses {
+        clip_only_mode: mode == Some(PdfPageTextRenderMode::InvisibleClipping),
+        tiny: size.is_finite() && size < TINY_POINTS,
+        off_page: bounds.is_some_and(|(left, right, top, bottom)| {
+            right <= 0.0 || left >= page.0 || bottom <= 0.0 || top >= page.1
+        }),
+        white_fill: fill.is_some_and(|(red, green, blue, alpha)| {
+            red == 255 && green == 255 && blue == 255 && alpha > 0
+        }),
+        transparent_fill: fill.is_some_and(|(_, _, _, alpha)| alpha == 0),
+    }
+}
+
 /// The document's own characters, hidden and drawn; generated ones are not
 /// counted.
 #[derive(Debug, Default)]
 struct TextCounts {
     hidden: usize,
     drawn: usize,
+    classes: ClassCounts,
 }
 
 impl TextCounts {
-    fn add(&mut self, origin: Origin) {
+    fn add(&mut self, origin: Origin, extra: ExtraClasses) {
         match origin {
             Origin::Hidden => self.hidden += 1,
             Origin::Drawn => self.drawn += 1,
-            Origin::Generated => {}
+            Origin::Generated => return,
+        }
+        self.classes.clip_only_mode += usize::from(extra.clip_only_mode);
+        self.classes.tiny += usize::from(extra.tiny);
+        self.classes.off_page += usize::from(extra.off_page);
+        self.classes.white_fill += usize::from(extra.white_fill);
+        self.classes.transparent_fill += usize::from(extra.transparent_fill);
+    }
+
+    fn class_counts(&self) -> ClassCounts {
+        ClassCounts {
+            drawn: self.drawn,
+            invisible_mode: self.hidden,
+            ..self.classes
         }
     }
 
@@ -262,6 +337,7 @@ impl TextCounts {
 pub struct StatementText {
     pages: Vec<Page>,
     mostly_hidden: bool,
+    class_counts: ClassCounts,
 }
 
 impl StatementText {
@@ -274,6 +350,12 @@ impl StatementText {
     /// More of the document's own characters were hidden than drawn.
     pub fn mostly_hidden(&self) -> bool {
         self.mostly_hidden
+    }
+
+    /// The document's characters counted by class. Counts only: nothing read
+    /// depends on them.
+    pub fn class_counts(&self) -> ClassCounts {
+        self.class_counts
     }
 }
 
@@ -331,6 +413,10 @@ pub fn extract_pages(
             .map_err(|_| unreadable("a page has no readable crop or media box"))?;
         let origin_left = f64::from(boundary.bounds.left().value);
         let origin_top = f64::from(boundary.bounds.top().value);
+        let page_size = (
+            f64::from(boundary.bounds.right().value) - origin_left,
+            origin_top - f64::from(boundary.bounds.bottom().value),
+        );
         let text = page
             .text()
             .map_err(|_| unreadable("a page's text could not be extracted"))?;
@@ -343,7 +429,29 @@ pub fn extract_pages(
         let mut glyphs = Vec::with_capacity(chars.len());
         for character in chars.iter() {
             let origin = classify(character.is_generated(), || character.render_mode())?;
-            counts.add(origin);
+            let bounds = character.loose_bounds().ok().map(|bounds| {
+                (
+                    f64::from(bounds.left().value) - origin_left,
+                    f64::from(bounds.right().value) - origin_left,
+                    origin_top - f64::from(bounds.top().value),
+                    origin_top - f64::from(bounds.bottom().value),
+                )
+            });
+            let extra = if origin == Origin::Generated {
+                ExtraClasses::default()
+            } else {
+                extra_classes(
+                    character.render_mode().ok(),
+                    f64::from(character.scaled_font_size().value),
+                    bounds,
+                    page_size,
+                    character
+                        .fill_color()
+                        .ok()
+                        .map(|color| (color.red(), color.green(), color.blue(), color.alpha())),
+                )
+            };
+            counts.add(origin, extra);
             if origin == Origin::Hidden {
                 // left out, so the word around it goes on
                 continue;
@@ -363,6 +471,7 @@ pub fn extract_pages(
     Ok(StatementText {
         pages: out,
         mostly_hidden: counts.mostly_hidden(),
+        class_counts: counts.class_counts(),
     })
 }
 

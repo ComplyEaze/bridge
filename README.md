@@ -64,7 +64,7 @@ update itself, so look for a newer version on the
 
 "You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.6.0 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
-**Its tools.** In name order; release 0.6.0 installs 28 of them, and `gst_uncertain_vouchers` and `negative_stock` are in source, not yet in a published build. None of them changes your TallyPrime books; `audit_test_run`, in source and not yet in a published build, and off unless its setting is on, does not change them either; with posting on, two more appear, described below the table. Every call adds a receipt line,
+**Its tools.** In name order; release 0.6.0 installs 28 of them, and `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` are in source, not yet in a published build. None of them changes your TallyPrime books; `audit_test_run`, in source and not yet in a published build, and off unless its setting is on, does not change them either; with posting on, two more appear, described below the table. Every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
@@ -83,6 +83,7 @@ with no figures, to a log on this computer.
 | `local_data_report` | What ComplyEaze Bridge keeps on this computer | Nothing |
 | `masters` | Voucher types, godowns, units, stock groups, stock items, cost centres, cost categories or account groups | Nothing |
 | `month_register` | Tally’s own month-wise Sales Register or Purchase Register for whole months: one row per month with Tally’s debit, credit and closing columns exactly as printed; not tied to the vouchers or the trial balance, and not compared with Tally’s register screen | Nothing |
+| `negative_ledgers` | Tally’s own Negative Ledgers list for a window, as Tally returns it and compared with no other report; an empty list is not a finding | Nothing |
 | `negative_stock` | Tally’s own Negative Stock list for a window, each item with its quantity, rate and value as Tally prints them, compared with no other report; being listed is not a finding, and an empty answer is not one either | Nothing |
 | `outstandings` | Receivables and payables with ageing, the top parties and the open bills | Nothing |
 | `parse_bank_statement` | Reads a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda statement PDF and proposes Payment, Receipt and Contra vouchers | A private proposals file on this computer |

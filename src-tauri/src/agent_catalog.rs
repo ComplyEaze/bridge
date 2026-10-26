@@ -367,6 +367,7 @@ impl ToolEffect {
             "local_data_report" => Self::Read,
             "masters" => Self::Read,
             "month_register" => Self::Read,
+            "negative_ledgers" => Self::Read,
             "negative_stock" => Self::Read,
             "outstandings" => Self::Read,
             "parse_bank_statement" => Self::LocalWrite(PARSE_STATEMENT_SENTENCE),
@@ -423,6 +424,7 @@ pub(super) const REGISTERED_TOOL_NAMES: &[&str] = &[
     "local_data_report",
     "masters",
     "month_register",
+    "negative_ledgers",
     "negative_stock",
     "outstandings",
     "parse_bank_statement",
@@ -470,6 +472,8 @@ fn parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
         ("month_register", "from") => "The first day of the first month, which must be the 1st (YYYYMMDD or YYYY-MM-DD).",
         ("month_register", "to") => "The last day of the last month, which must be a month's last day, so that from to to holds at most twelve whole months (YYYYMMDD or YYYY-MM-DD).",
         ("month_register", "kind") => "sales (Tally's Sales Register) or purchase (Tally's Purchase Register).",
+        ("negative_ledgers", "from") => "The first day of the window (YYYYMMDD or YYYY-MM-DD). Only a whole financial year, 1 April to 31 March, was measured: ask for that first.",
+        ("negative_ledgers", "to") => "The last day of the window (YYYYMMDD or YYYY-MM-DD), on or after from. Only a whole financial year was measured: how Tally dates the closing balance of a part-year window was not.",
         ("negative_stock", "from") => "The first day of the window (YYYYMMDD or YYYY-MM-DD). Only a 1 April start was measured: ask for the financial year's start first.",
         ("negative_stock", "to") => "The last day of the window (YYYYMMDD or YYYY-MM-DD), on or after from. The quantities are as at this date; only a window within one financial year was measured.",
         (_, "from") => "The first day of the date range, included (YYYYMMDD or YYYY-MM-DD).",
@@ -653,6 +657,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     "month_register" => (
                         "Return Tally's own month-wise Sales Register or Purchase Register for whole months, read by its report name: one row per month with Tally's debit, credit and closing columns exactly as Tally printed them. The rows are not tied to the vouchers, to the trial balance or to the sales_register and purchase_register tools; on the one synthetic book read, the Sales Register's credit was the month's sales invoices, tax included, and its closing a running total printed only for the months with sales, and the Purchase Register's debit was the month's purchases as a negative amount. The period must be whole months, at most twelve, and must not start before the book does. An empty amount is not zero. The result's limitations say what has not been measured.",
                         json!({"type":"object","additionalProperties":false,"required":["company_guid","kind","from","to"],"properties":{"company_guid":{"type":"string","minLength":1},"kind":{"type":"string","enum":["sales","purchase"]},"from":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"to":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"}}}),
+                    ),
+                    "negative_ledgers" => (
+                        "Return Tally's own Negative Ledgers list for a window: the ledgers on Tally's Negative Ledgers list, each with its side (debit or credit) and its amount. The list is Tally's own and is returned as it is: the rule by which Tally lists a ledger is not established and is not derived here (on three books each listed ledger's balance sat on the side opposite its group; on the first, a ledger under Suspense A/c with a credit balance was not listed), and it is not compared with the trial balance or any other report, so a ledger Tally did not list is not shown to be absent and a listed amount is not shown to equal the ledger's closing balance elsewhere (the result's checks say not_checked). Each ledger name is masked under mask_parties. An empty list is returned as empty with state not_established: Tally's empty answer cannot be told from a report that was not rendered, so it does not say that no ledger is negative (negative_ledgers_empty_answer_is_not_a_finding). `side` is the side of the closing balance Tally carried the ledger on. `from` and `to` are the window of Tally's screen; only a whole financial year (1 April to 31 March) on one synthetic company was measured, and any other window is named in unmeasured_in_this_answer. The window must not start before the book (negative_ledgers_before_books); Education mode is refused (negative_ledgers_education_unqualified); an answer that is not exactly one signed amount per listed ledger, or that names a ledger twice, is refused (the call fails as negative_ledgers_read_failed and error.cause is negative_ledgers_balance_unexpected or negative_ledgers_ledger_repeated). The report's cost on a large book is not known and the report is one paired read (two requests), never retried: ask for one financial year first, and if a call times out do not repeat it.",
+                        json!({"type":"object","additionalProperties":false,"required":["company_guid","from","to"],"properties":{"company_guid":{"type":"string","minLength":1},"from":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"to":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"}}}),
                     ),
                     "negative_stock" => (
                         "Return Tally's own Negative Stock list for a window: the stock items on Tally's list, each with its closing quantity, rate and value as Tally printed them. The list is returned as it is: being listed does not mean the quantity is below zero, so read each quantity, and an empty rate or value is not zero. The list is compared with no other report, an empty answer is not_established and does not say that no item is negative, and the result's limitations say what has not been measured.",

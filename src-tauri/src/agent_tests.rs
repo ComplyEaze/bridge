@@ -832,6 +832,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
         ),
         (
+            "negative_ledgers",
+            json!({"result":{"ledgers":[{"ledger":party_name("Customer One"),"side":"credit","amount":"10.00"}]}}),
+        ),
+        (
             "negative_stock",
             json!({"result":{"listed_items":[{"item":party_name("Stock Item One"),"quantity":{"state":"read","amount":"-3","unit":"Nos"},"rate":{"state":"present","value":"120.00"},"value":{"state":"present","value":"360.00"}}]}}),
         ),

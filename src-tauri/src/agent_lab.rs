@@ -253,6 +253,77 @@ fn persist_lab_exchange(
     append_egress_line(&dir.join("lab-manifest.jsonl"), &record.to_string())
 }
 
+/// Writes an admitted audit read to `data_dir/lab/audit-reads/<manifest
+/// sha256>/` as the directory `Read::open` and the crate's `local_parity`
+/// read, so a real-book parity record can be made from exactly what the audit
+/// read sent and admitted. The tool's answer does not change. The folder is
+/// new for each read: one that already exists is refused, never written into.
+/// It holds a book's raw answers; it stays on this computer, is never
+/// committed, and a client book's copy is deleted at the end of its review
+/// cycle.
+pub(super) fn persist_audit_read(
+    server: &Server,
+    stored: &super::audit_read::StoredRead,
+) -> Result<(), String> {
+    let reads = lab_evidence_dir(server)?.join("audit-reads");
+    private_dir(&reads)?;
+    write_audit_read(&reads, stored)?;
+    let record = json!({
+        "tool": "audit_test_run",
+        "at": Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        "read_id": stored.read_id,
+        "manifest_sha256": stored.manifest_sha256,
+        "parts": stored.blobs.len(),
+    });
+    append_egress_line(
+        &lab_evidence_dir(server)?.join("lab-manifest.jsonl"),
+        &record.to_string(),
+    )
+}
+
+/// The read's own folder under `reads`, made new, then its manifest and parts.
+pub(super) fn write_audit_read(
+    reads: &std::path::Path,
+    stored: &super::audit_read::StoredRead,
+) -> Result<(), String> {
+    let dir = reads.join(&stored.manifest_sha256);
+    // Not recursive, so a folder that already exists is refused; owner-only
+    // from creation, as `ensure_private_directory` then checks.
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(&dir).map_err(|error| match error.kind() {
+        std::io::ErrorKind::AlreadyExists => "lab_audit_read_exists".to_string(),
+        _ => "lab_evidence_write_failed".to_string(),
+    })?;
+    private_dir(&dir)?;
+    private_dir(&dir.join("parts"))?;
+    write_private_file(&dir.join("manifest.json"), &stored.manifest)?;
+    for (path, bytes) in &stored.blobs {
+        // A manifest path is `parts/` and one plain file name: anything else
+        // could leave the read's folder.
+        let name = path
+            .strip_prefix("parts/")
+            .filter(|name| {
+                !name.is_empty() && *name != ".." && *name != "." && !name.contains(['/', '\\'])
+            })
+            .ok_or_else(|| "lab_evidence_write_failed".to_string())?;
+        write_private_file(&dir.join("parts").join(name), bytes)?;
+    }
+    Ok(())
+}
+
+fn private_dir(dir: &std::path::Path) -> Result<(), String> {
+    ensure_private_directory(dir).map_err(|error| match error {
+        DirectoryAdmissionError::Unavailable => "lab_dir_unavailable".to_string(),
+        #[cfg(unix)]
+        DirectoryAdmissionError::Permissions => "lab_dir_permissions_failed".to_string(),
+    })
+}
+
 fn write_private_file(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
     fs::write(path, bytes).map_err(|_| "lab_evidence_write_failed".to_string())?;
     #[cfg(unix)]

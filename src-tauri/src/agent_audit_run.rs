@@ -95,6 +95,13 @@ impl Server {
             Ok(audit) => audit,
             Err(failure) => return Err(ToolFailure::from(failure.code).with_prior_evidence(prior)),
         };
+        // A lab build with lab writes on keeps the admitted read on this
+        // computer for a real-book parity record; the answer is unchanged.
+        #[cfg(feature = "lab-writes")]
+        if lab::env_lab_writes_enabled() {
+            lab::persist_audit_read(self, &audit.stored)
+                .map_err(|code| ToolFailure::from(code).with_prior_evidence(prior.clone()))?;
+        }
         let evidence = combine_evidence(prior, audit.evidence);
         let dump = run_test(test, &audit.engagement, &audit.book).map_err(|failure| {
             ToolFailure::from(failure.code).with_prior_evidence(evidence.clone())

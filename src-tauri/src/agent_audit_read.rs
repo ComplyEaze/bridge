@@ -60,6 +60,20 @@ pub(super) struct AuditBook {
     pub(super) engagement: Engagement,
     pub(super) book: Book,
     pub(super) evidence: Evidence,
+    /// The admitted read's stored bytes, kept only in a lab build, which can
+    /// write them out for a real-book parity record (`lab::persist_audit_read`).
+    #[cfg(feature = "lab-writes")]
+    pub(super) stored: StoredRead,
+}
+
+/// An admitted read as the crate opened it: its manifest, the manifest's
+/// sha256 and each part's bytes by their manifest path (`parts/<name>`).
+#[cfg(feature = "lab-writes")]
+pub(super) struct StoredRead {
+    pub(super) read_id: String,
+    pub(super) manifest: Vec<u8>,
+    pub(super) manifest_sha256: String,
+    pub(super) blobs: std::collections::BTreeMap<String, Vec<u8>>,
 }
 
 /// Why the read was not made or not admitted: a code and whether the same read
@@ -376,6 +390,13 @@ pub(super) async fn read_audit_book(
         engagement,
         book,
         evidence: evidence_of(&parts),
+        #[cfg(feature = "lab-writes")]
+        stored: StoredRead {
+            read_id,
+            manifest: store.manifest,
+            manifest_sha256,
+            blobs: store.blobs,
+        },
     })
 }
 

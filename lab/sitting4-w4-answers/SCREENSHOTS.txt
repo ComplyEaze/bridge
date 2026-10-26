@@ -1,0 +1,13 @@
+# Screenshots kept on the lab PC (not committed): name, bytes, sha256
+
+w4-c10-select-company.jpg  40923  594a6b135c8a8f87099750a7f4b92906f902f1bc23d20addf1e588959a652c9e
+w4-c10-shut-list.jpg  27771  6c0303c9d53130c3ff605e2e568eebe356d45b41d7a431b4a6b597a278b70c25
+w4-gateway-before-shut.jpg  34843  4540974480692b1cdac049ae6c09e0acbeec7ff83b6394b40e26a84e9fa578f0
+w4-s2-after-accept-list.jpg  28243  7ae8c19c9b4d945ef7157038c98b9d7922a9b53f2d2a3d959721e285a79836ee
+w4-s2-before-accept.jpg  33237  20e627f1e61ce32589797c4a520b3518c4630d5b825a094b2513d7df0c6ea0c4
+w4-s2-name-zoom.jpg  1892  70ada7fb843f01ec63984417e52f4d44bf82422afe843921482041c12eaf34ef
+w4-s3-after-accept-list.jpg  28022  d2bfe8d0e464bac761be57770b18d95aac4d3689376082e0046465bf19f81a65
+w4-s3-before-accept.jpg  33216  d646019b4048f8053ccaa73cafc34d913be2598b7ad3b6fbcdf1b555ce5ae895
+w4-s3-name-zoom.jpg  1801  5f9ea4435c5ea4fe95251ce9ae5df7a86c5768ba795b3510933ecd927a1473c1
+
+Step 2 and step 3 each: the alteration screen before accept, a zoom on the Name field, the List of Ledgers after accept. Then the Gateway before the shut, the Shut list and Select Company after it.

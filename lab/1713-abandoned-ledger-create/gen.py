@@ -3,7 +3,9 @@
 `python3 -I gen.py` writes the small requests into requests/ and SHA256.txt. `python3 -I gen.py bulk` writes the 192
 bulk Journal imports into bulk/ (not committed: about 56 MB) and checks every one against BULK-SHA256.txt, printing
 `bulk ok` only when all 192 match. Every body is copied from the builder in ComplyEaze Bridge's source that sends it,
-cited beside it; only the company, the names, the dates, the amounts and the REMOTEIDs are this sheet's own.
+cited beside it; only the company, the names, the dates, the amounts and the REMOTEIDs are this sheet's own. A builder
+cited "on master" is on master at 3d3dfdf2; one cited "at a71f416c" exists only on the head of the open pull request
+#1650 (branch masters-ledger-create-series, commit a71f416c9f94254e9786818965c93f37c5fb7863), not on master.
 """
 import hashlib
 import pathlib
@@ -23,7 +25,7 @@ def utf16(body):
     return b"\xff\xfe" + body.encode("utf-16-le")
 
 
-# src-tauri/src/agent_read_profiles.rs, render_agent_company_high_water.
+# src-tauri/src/agent_read_profiles.rs, render_agent_company_high_water (on master).
 def marks():
     return (
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE>"
@@ -34,9 +36,10 @@ def marks():
     ).format(esc(COMPANY))
 
 
-# The ledger index read Bridge's own post and reconcile send (`ledger_name_index_read`, the `StandardLedgerCatalogV3`
-# profile), byte for byte the file of lab/ml1-live-ledger-create-run-sheet requests/ML1/ledgers.utf16le.xml with only
-# the company changed; its line breaks and indentation are kept.
+# The ledger index read Bridge's own post and reconcile send (`ledger_name_index_read` in
+# src-tauri/src/agent_read_profiles.rs, rendering the `StandardLedgerCatalogV3` profile; both at a71f416c), byte for
+# byte the file of lab/ml1-live-ledger-create-run-sheet requests/ML1/ledgers.utf16le.xml with only the company changed;
+# its line breaks and indentation are kept.
 LEDGERS = """<ENVELOPE>
     <HEADER>
         <VERSION>1</VERSION>
@@ -72,8 +75,8 @@ def ledgers():
     return LEDGERS.format(esc(COMPANY))
 
 
-# src-tauri/src/agent_import.rs, the verification window read (no AlterID span filter), over the whole year: the
-# BUSY read. On about 24,000 vouchers it is expected to take tens of seconds (reference: ~710 rows a second).
+# src-tauri/src/agent_import.rs, the verification window read (no AlterID span filter; on master), over the whole
+# year: the BUSY read. On about 24,000 vouchers it is expected to take tens of seconds (reference: ~710 rows a second).
 def busy():
     d1, d2 = "20250401", "20260331"
     return (
@@ -90,7 +93,8 @@ def busy():
     ).format(c=esc(COMPANY), a=d1, b=d2)
 
 
-# src-tauri/crates/bridge-tally-protocol/src/import_envelope.rs, render_import_envelope.
+# src-tauri/crates/bridge-tally-protocol/src/import_envelope.rs, render_import_envelope (at a71f416c), for both
+# reports. On master the same bytes for "Vouchers" come from render_import_envelope in src-tauri/src/agent_import.rs.
 def envelope(report, messages):
     return (
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST>"
@@ -100,8 +104,9 @@ def envelope(report, messages):
     ).format(r=report, c=esc(COMPANY), m=messages)
 
 
-# src-tauri/crates/bridge-tally-protocol/src/ledger_create.rs, LedgerCreate::render_message, as
-# LedgerCreateItem::render_import calls it for a Suspense ledger (parent Suspense A/c, bill-wise No, nothing else).
+# src-tauri/crates/bridge-tally-protocol/src/ledger_create.rs, LedgerCreate::render_message (on master), as
+# LedgerCreateItem::render_import (src-tauri/src/tally/ledger_create_item.rs, at a71f416c) calls it for a Suspense
+# ledger (parent Suspense A/c, bill-wise No, nothing else).
 def ledger_create(name, parent="Suspense A/c"):
     return (
         "<TALLYMESSAGE><LEDGER NAME=\"{n}\" ACTION=\"Create\"><NAME>{n}</NAME><PARENT>{p}</PARENT>"
@@ -109,7 +114,7 @@ def ledger_create(name, parent="Suspense A/c"):
     ).format(n=esc(name), p=esc(parent))
 
 
-# src-tauri/src/agent_import.rs, render_voucher_xml for a Journal (no EFFECTIVEDATE, the caller's order, here the
+# src-tauri/src/agent_import.rs (on master), render_voucher_xml for a Journal (no EFFECTIVEDATE, the caller's order, here the
 # debit first), as render_native_vouchers_xml sends it (narration untagged).
 def journal(index):
     day = index % 365

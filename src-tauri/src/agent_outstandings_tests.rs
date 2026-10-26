@@ -585,7 +585,9 @@ fn the_outstandings_description_carries_the_party_details_caveats() {
         .expect("tool description");
     for needle in [
         "`tied` means the two figures are equal, not that the composition is proven",
-        "two changes that compensate, or allocations that net to zero, can still read `tied`",
+        "a detail whose marks moved is refused (`voucher_window_changed_during_read`)",
+        "a change that moves neither mark is not seen",
+        "allocations that net to zero can still read `tied`",
         "`no_residual_row_for_party` (with `residual` null)",
         "`no_named_bill_for_party`",
         "`window_returned_no_vouchers`",

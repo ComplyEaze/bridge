@@ -231,6 +231,19 @@ test("static control: a clean repository passes, and a comment naming clippy is 
   assert.match(result.stdout, /^Tally-path egress boundary is sealed:/);
 });
 
+test("a network-capable crate, or a TLS, HTTP/2 or QUIC crate, in the lock file is refused", { skip }, () => {
+  const lock = (name) => ({ "src-tauri/Cargo.lock": `[[package]]\nname = "reqwest"\n\n[[package]]\nname = "${name}"\n` });
+  assertRefused(sandbox(lock("ureq")).run(), "src-tauri/Cargo.lock contains ureq, a network-capable crate outside the pinned HTTP client");
+  for (const name of ["rustls", "aws-lc-sys", "h2", "quinn"]) {
+    assertRefused(
+      sandbox(lock(name)).run(),
+      `src-tauri/Cargo.lock contains ${name}, a TLS, HTTP/2 or QUIC crate the loopback-only transport does not use`,
+    );
+  }
+  // A name that only starts like a listed one is not refused.
+  assert.equal(sandbox(lock("h2o")).run().status, 0);
+});
+
 test("CLIPPY_CONF_DIR or CLIPPY_ARGS in any tracked file is refused", { skip }, () => {
   for (const name of ["CLIPPY_CONF_DIR", "CLIPPY_ARGS"]) {
     const result = sandbox({ ".github/workflows/x.yml": `env:\n  ${name}: elsewhere\n` }).run();

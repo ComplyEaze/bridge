@@ -526,12 +526,21 @@ const DENIED_CRATES = [
   "open", "opener", "webbrowser",
   "tauri-plugin-http", "tauri-plugin-opener", "tauri-plugin-shell", "tauri-plugin-websocket", "tauri-plugin-upload",
 ];
+// The Tally transport speaks plain HTTP to loopback only, so reqwest is built without its default
+// TLS, HTTP/2 and QUIC stacks (#2022). Any of these back in the lock means a feature brought them.
+// OpenSSL is not listed: SQLCipher vendors it on Windows.
+const DENIED_TRANSPORT_STACKS = [
+  "rustls", "hyper-rustls", "tokio-rustls", "aws-lc-sys", "ring", "native-tls", "hyper-tls", "h2", "h3", "quinn",
+];
 const DENIED_JS_PACKAGES = /@tauri-apps\/plugin-(?:http|opener|shell|websocket|upload)\b/;
 for (const lockfile of ["src-tauri/Cargo.lock"]) {
   const names = new Set([...readFileSync(`${root}${lockfile}`, "utf8").matchAll(/^name = "([^"]+)"$/gm)].map((match) => match[1]));
   if (names.size === 0) egressViolations.push(`${lockfile} lists no packages; it was not read`);
   for (const name of DENIED_CRATES) {
     if (names.has(name)) egressViolations.push(`${lockfile} contains ${name}, a network-capable crate outside the pinned HTTP client`);
+  }
+  for (const name of DENIED_TRANSPORT_STACKS) {
+    if (names.has(name)) egressViolations.push(`${lockfile} contains ${name}, a TLS, HTTP/2 or QUIC crate the loopback-only transport does not use`);
   }
 }
 for (const manifest of ["package.json", "pnpm-lock.yaml"]) {

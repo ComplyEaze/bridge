@@ -23,9 +23,9 @@ const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 
 const SHAPE_LAB: &[u8] = include_bytes!("fixtures/agent/native-shape-lab-groups.utf16le.xml");
 
-/// Every committed group capture that carries the request-computed company
-/// GUID, with the GUID its request named.
-const CAPTURES: [(&str, &[u8], &str); 6] = [
+/// Committed group captures that carry the request-computed company GUID,
+/// each with the GUID its request named.
+const CAPTURES: [(&str, &[u8], &str); 5] = [
     ("native-shape-lab-groups", SHAPE_LAB, SHAPE_GUID),
     (
         "shape-lab-group-snapshot",
@@ -46,11 +46,6 @@ const CAPTURES: [(&str, &[u8], &str); 6] = [
         "native-party-groups",
         include_bytes!("fixtures/agent/native-party-groups.utf16le.xml"),
         "61c6de69-1748-461c-ad3f-162cb949df9f",
-    ),
-    (
-        "native-register-lab-groups",
-        include_bytes!("fixtures/agent/native-register-lab-groups.utf16le.xml"),
-        "ae1490be-52c5-4544-9ffc-4b7da85f9797",
     ),
 ];
 

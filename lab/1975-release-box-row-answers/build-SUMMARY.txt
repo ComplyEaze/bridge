@@ -1,0 +1,22 @@
+PR #1975 release-box row (lab/1975-release-box-row 576ff7a7): bridge_mcp release build
+origin/fix/1828-release-window-title = af0efdb511420a696314daaffb92ae1477cddf88
+expected                              = af0efdb511420a696314daaffb92ae1477cddf88
+match: True
+worktree: <clean checkout>  HEAD=af0efdb511420a696314daaffb92ae1477cddf88
+git status --porcelain: empty
+rustc: rustc 1.96.0 (ac68faa20 2026-05-25)
+cargo: cargo 1.96.0 (30a34c682 2026-05-25)
+CARGO_BUILD_JOBS=3 CARGO_TARGET_DIR=<target dir> priority=BelowNormal; TEMP/TMP=%USERPROFILE%\bridge-smoke-tmp for cargo
+cargo build --locked --release --manifest-path src-tauri/Cargo.toml -p bridge --bin bridge_mcp
+  exit=0 elapsed=1933s
+original: <target dir>\release\bridge_mcp.exe  bytes=34083328 sha256=7c546a17f949916ed4d899774b2f3e066cc437169f9cafa78a0c84b0bb9c2559
+copy:     <build folder>\bridge_mcp.exe  bytes=34083328 sha256=7c546a17f949916ed4d899774b2f3e066cc437169f9cafa78a0c84b0bb9c2559
+copy equals original (bytes and sha256): True
+bridge_mcp.exe was NOT run in any mode.
+
+Source search (worktree <clean checkout> at af0efdb5; node_modules/target excluded):
+- Title string: src-tauri\src\tally\approved_import.rs:2116, fn release_question() (cfg(windows)): "ComplyEaze Bridge � release the invoice stop for this company?"  This is the WINDOW TITLE of the box, not its body. Also asserted in src-tauri\tests\approval_seam_gate.rs:1034 and :1983.
+- Buttons and default: show_release_acknowledgement (approved_import.rs:2121) calls native Win32 MessageBoxW inside box_fit::guarded, flags MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST (line 2140). Buttons Yes / No / Cancel; MB_DEFBUTTON2 makes the second button, No, the default; only IDYES returns true. No parent HWND.
+- Body (Windows), from answer_text (:1649) and answer_effect (:1638), wrapped at 100 characters: "Press Y (or click Yes) to release the invoice stop for this company, so that ComplyEaze Bridge builds and posts invoices for it again. Press N (or click No) to cancel. Nothing is released until you answer."
+- Non-Windows: title release_title() at :2045 "ComplyEaze Bridge � release the invoice stop" (no question mark), rfd dialog with a custom "Release the stop" button and Cancel.
+- Debug desktop-app build: DROPPED per the requester (an earlier run's results are in SUMMARY-earlier-debug-build.txt and bridge-debug.exe in this folder; not part of this row).

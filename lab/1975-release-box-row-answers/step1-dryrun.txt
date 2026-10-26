@@ -1,0 +1,6 @@
+﻿case=release-probe exe_sha256=7c546a17f949916ed4d899774b2f3e066cc437169f9cafa78a0c84b0bb9c2559
+screen=1920x1080 workarea=1920x1030 at (0,0) (physical pixels)
+command: cmd.exe /s /c ""<build folder>\bridge_mcp.exe" --confirm-release < 
+"<item folder>\inputs\release-probe.txt" > "<item folder>\out-dry\release-probe.stdout.txt" 
+2> "<item folder>\out-dry\release-probe.stderr.txt""
+DRY RUN: nothing opened

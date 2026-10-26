@@ -1,0 +1,22 @@
+﻿case=release-probe exe_sha256=7c546a17f949916ed4d899774b2f3e066cc437169f9cafa78a0c84b0bb9c2559
+screen=1920x1080 workarea=1920x1030 at (0,0) (physical pixels)
+command: cmd.exe /s /c ""<build folder>\bridge_mcp.exe" --confirm-release < 
+"<item folder>\inputs\release-probe.txt" > "<item folder>\out-run\release-probe.stdout.txt" 
+2> "<item folder>\out-run\release-probe.stderr.txt""
+started cmd pid=21060. If the box cannot be answered by mouse, from ANOTHER window: taskkill /PID 21060 /T /F (that 
+closes only this probe).
+child pid=13988
+window title='ComplyEaze Bridge — release the invoice stop for this company?' rect(L,T,R,B)=686,266,1252,840 
+size=566x574 top_off_screen=False bottom_below_workarea=False left_off=False right_off=False
+NOW take a WHOLE-SCREEN screenshot with the lab tool (not the keyboard), then answer by MOUSE as the sheet says for 
+this case.
+cmd exit=1 after 1106853 ms from start (77 box did not fit; 1 No/Cancel/X; 0 with the token Yes; 0 with no token = box 
+not measured or not shown)
+stdout file=<item folder>\out-run\release-probe.stdout.txt bytes=0 
+sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+stdout text: []
+stderr file=<item folder>\out-run\release-probe.stderr.txt bytes=127 
+sha256=8958d8e5850d58f44b45fea7f95ec5a459f37c054adb031ffd1456bbf5d78cc0
+stderr text: [box-fit: box=(686,266,1252,840) work=(0,0,1920,1030) fits=true
+box-fit: box=(1162,119,1728,693) work=(0,0,1920,1030) fits=true] (the box-fit line: the box and the work area the 
+product compared, and fits=true or false)

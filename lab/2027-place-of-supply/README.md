@@ -16,10 +16,14 @@ About 15 minutes. Reads only: four requests on one book. ComplyEaze Bridge write
 | `v-control.utf16le.xml` | the vouchers request as master sends it today, 1 to 2 June 2025 |
 | `v-candidate.utf16le.xml` | the same with `PLACEOFSUPPLY,STATENAME,GSTREGISTRATIONTYPE` added to `FETCH` |
 
+**REQUESTS BY CURL** are allowed by the owner's decision of 26 Oct 2026 that requests sent by curl may be used to discover shapes; every request here only reads. `m` and `v-control` are existing builders' requests used as instruments (`render_agent_company_high_water`; `render_agent_vouchers`, whose `FETCH` it equals on master); `v-candidate` is the candidate change to `render_agent_vouchers` named above. Before the first send, in this folder: `python -I check-request-ids.py .`; EXPECT `census: ok 3, skipped 0, FAIL 0`; anything else = STOP, nothing sent. Read bounds (C3): the marks read 8,192 bytes; each vouchers read 2,000,000 bytes; an answer above its bound = STOP.
+
+**THE BUILD (for `tally_status` only):** the build staged at the lab as `w1-2306d86d`, `bridge_mcp.exe` sha256 `92a899a21f904f88cb2d13ce44b1417d5aecaf333caad5230de598bf54d89524` (hashed first; another hash = STOP), over stdio with `BRIDGE_TALLY_PORT=9001`, a new empty `BRIDGE_AGENT_DATA_DIR` and `BRIDGE_TERMS_ACCEPTED=true`; posting, import and redaction unset.
+
 **RULES:**
 - Company BRIDGE NOTES LAB only (company number 100084; the four vouchers of W3 on 1 and 2 June 2025). Load only it. Port 9001 only. Never touch a client company. If it is not on the lab PC, STOP and report; do not re-key it.
 - Before the first send: ComplyEaze Bridge's `tally_status` shows a licensed release (not Education) and exactly that company loaded. Record the release and edition.
-- One request at a time; never abandon one; no `--max-time`. STOP on a Tally dialog you did not expect, a second company loaded, Education mode, or 10 minutes without an answer.
+- One request at a time; never abandon one; no `--max-time`. STOP on any dialog or message box on Tally's screen (press no key, send nothing more, screenshot), a second company loaded, Education mode, or 10 minutes without an answer.
 - Send with exactly: `curl.exe -sS --data-binary "@<file>" -H "Content-Type: text/xml; charset=utf-16" -o "evidence\<name>.response" -D "evidence\<name>.headers" -w "%{http_code} %{size_download} %{time_total}\n" http://localhost:9001/`. Record the exit code, the `-w` line and the ISO time of each send in `evidence\log.txt`. A non-zero exit or a non-200 answer is a transport failure: STOP, and report it as a failure, never as "no vouchers".
 - Evidence goes in `C:\bridge-lab\2027\evidence\`; zip it and report its SHA256. Do not trim or re-save any response.
 
@@ -36,5 +40,5 @@ About 15 minutes. Reads only: four requests on one book. ComplyEaze Bridge write
 - PASS: all four answers received in full (HTTP 200, complete XML), the marks equal before and after, and steps 6 and 7 reported. The sheet passes whatever the answers hold, including the elements being absent: that is also an answer.
 - FAIL: a transport failure, a dialog, a changed mark, or a count made by substring.
 
-**REPORT, one message:** the release and edition; the marks of steps 2 and 5; per response its size, SHA256 and `VOUCHER` count; step 6's table; step 7's result; any STOP; the evidence zip SHA256. Commit the responses, headers and log unedited to this branch under `lab/2027-place-of-supply/answers/`, with their SHA256 list, for the fixtures and their provenance. The answers carry the synthetic GSTINs typed in W3; they are synthetic and may be committed as received.
+**REPORT, one message:** the release and edition; the marks of steps 2 and 5; per response its size, SHA256 and `VOUCHER` count; step 6's table; step 7's result; any STOP; the evidence zip SHA256. The responses, headers and log, unedited, go on a NEW branch `lab/2027-place-of-supply-answers` under `answers/`, with their SHA256 list, for the fixtures and their provenance: send its SHA to the run coordinator before pushing, and push only after the pre-push scan and the coordinator's yes. Nothing is committed to this branch. The answers carry the synthetic GSTINs typed in W3; they are synthetic and may be committed as received.
 A command that errors is reported as an error, never as "absent" or "unchanged".

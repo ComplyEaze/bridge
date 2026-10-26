@@ -507,8 +507,12 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// data-free code, as the read before approval does (bridge#717).
     #[error("group_export_invalid")]
     GroupExportInvalid { cause: Option<&'static str> },
-    /// A bank voucher reached the queue without its group read, or a Journal
-    /// with one: a wiring fault, refused before any request is sent.
+    /// What the queue reads does not fit what the batch calls for: a bank
+    /// voucher without its group read or a Journal with one, an invoice without
+    /// its reads or reads without an invoice, a plan other than the one the
+    /// build carried, or a judge or precheck that still asks for an answer once
+    /// its reads are in. A wiring fault, refused before the POST is sent; the
+    /// queue's own reads may already have been sent.
     #[error("import_post_admission_inconsistent")]
     AdmissionInconsistent,
     /// The snapshot sent last before the POST no longer shows exactly one

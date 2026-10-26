@@ -753,7 +753,10 @@ class MergeGateControls(unittest.TestCase):
         self.assertNotIn("company" + ".test", result.stdout)
 
     def test_a_merge_commit_conflict_comment_block_after_the_trailer_is_not_a_customer_address(self):
-        self.assert_pass("merge-commit-conflict-comment-block", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+        # The commit is an accepted older one, so the attribution check reports it and the privacy scan is what is under test.
+        result = self.run_copy(self.accepted_copy("accepted-conflict-comment-block"), "merge-commit-conflict-comment-block")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head", result.stdout)
 
     def test_an_address_inside_the_conflict_comment_block_still_blocks(self):
         result = self.assert_blocked("merge-commit-conflict-block-customer-address", "customer email shape")

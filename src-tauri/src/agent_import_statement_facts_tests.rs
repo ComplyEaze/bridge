@@ -117,6 +117,9 @@ struct Build {
     statement: Option<StatementFacts>,
     withdrawn: Vec<String>,
     status: &'static str,
+    /// The batch record names its company in full, as a native post's does,
+    /// so a recorded rollback can cover it.
+    placed: bool,
 }
 
 fn build(id: u32) -> Build {
@@ -130,10 +133,15 @@ fn build(id: u32) -> Build {
         statement: None,
         withdrawn: Vec::new(),
         status: "built",
+        placed: false,
     }
 }
 
 impl Build {
+    fn placed(mut self) -> Self {
+        self.placed = true;
+        self
+    }
     fn amends(mut self, id: u32) -> Self {
         self.amends = Some(id);
         self
@@ -198,6 +206,15 @@ impl Build {
         });
         line.statement = self.statement.as_ref().map(statement_record);
         line.withdrawn_skips = (!self.withdrawn.is_empty()).then(|| self.withdrawn.clone());
+        if self.placed {
+            line.company = Some(
+                serde_json::from_value(json!({
+                    "name": "Synthetic Transfer Co", "guid": self.company,
+                    "company_number": "1", "books_from": "20260401"
+                }))
+                .unwrap(),
+            );
+        }
         line
     }
 }
@@ -248,7 +265,7 @@ fn skip_row(txn: &str, amount: &str, other: &str, reference: Option<&str>) -> Sk
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Journal(String);
 
 impl Journal {
@@ -269,6 +286,32 @@ impl Journal {
     /// A dispatch intent: the batch was sent.
     fn sent(self, build: &Build) -> Self {
         self.push(&ledger::StatusRecord::dispatch(&build.line()))
+    }
+    /// A native dispatch intent that recorded the company's voucher mark 10
+    /// before the post.
+    fn sent_natively(self, build: &Build) -> Self {
+        let mut intent = serde_json::to_value(ledger::StatusRecord::dispatch_native(
+            &build.line(),
+            "c".repeat(64),
+            Uuid::new_v4(),
+        ))
+        .unwrap();
+        intent["pre_post_voucher_mark"] = json!(10);
+        self.push(&intent)
+    }
+    /// A recorded rollback, seen by `build`'s own verification at mark 9, below
+    /// the floor (10) of every native post before it: it covers them (#1050).
+    fn restored(self, build: &Build) -> Self {
+        let before = self.0.lines().count() as u64;
+        self.restored_after(build, before)
+    }
+    /// The same, read after only the first `before` records.
+    fn restored_after(self, build: &Build, before: u64) -> Self {
+        self.push(&ledger::StatusRecord::rollback_seen(
+            &build.line(),
+            9,
+            before,
+        ))
     }
     fn read(&self) -> Result<TransferFacts, TransferFactsError> {
         self.read_with("", company())
@@ -823,6 +866,214 @@ fn a_skip_held_by_a_batch_only_built_or_only_sent_is_held_elsewhere() {
             vec![(key(B1, 6), BatchId::new(batch_id(65)), date("20260901"))]
         );
     }
+}
+
+/// A native batch that a recorded rollback covers may have lost its voucher
+/// to a restore (#1050): it is never found, so a skip it would retire stays
+/// held, naming it, and the facts mark it restored. A verification read
+/// afterwards does not make it found again.
+#[test]
+fn a_skip_a_restored_batch_would_retire_stays_held_by_it() {
+    let skipped = build(80).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
+    let posted = build(81)
+        .placed()
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
+    let before = Journal::default()
+        .batch(&skipped)
+        .batch(&posted)
+        .sent_natively(&posted)
+        .status(&posted, "posted_verified");
+    assert_eq!(before.read().unwrap().retired_skips, 1, "master retires it");
+    for journal in [
+        before.clone().restored(&posted),
+        before
+            .clone()
+            .restored(&posted)
+            .status(&posted, "verification_incomplete"),
+    ] {
+        let found = journal.read().unwrap();
+        assert_eq!(found.retired_skips, 0);
+        assert_eq!(
+            held_tuples(&found),
+            vec![(key(B1, 6), BatchId::new(batch_id(81)), date("20260901"))]
+        );
+        assert!(matches!(found.held[0].by, HeldBy::UnverifiedBatch));
+        assert_eq!(found.restored, [batch_id(81)].into());
+    }
+}
+
+/// A skip held only because a rollback covers the batch that retired it pairs
+/// with nothing: the view a withdrawal is judged against is the one master
+/// had, so a second skip of the same day and amount still meets the other
+/// account's Contra alone, and a withdrawal of it is still refused (#1050).
+#[test]
+fn a_skip_held_only_by_the_cover_is_left_out_of_the_withdrawal_view() {
+    let skipped = build(94).facts(
+        facts(B1)
+            .skip(skip_row(&st(6), "500.00", B2, None))
+            .skip(skip_row(&st(7), "500.00", B2, None)),
+    );
+    let posted = build(95)
+        .placed()
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
+    let other = build(96).voucher(payment(&st(7), "500.00"));
+    let contra_side = build(97)
+        .voucher(contra(&st(8), N2, N1, "500.00"))
+        .facts(facts(B2).contra(&st(8), None))
+        .status("posted_verified");
+    let before = Journal::default()
+        .batch(&skipped)
+        .batch(&posted)
+        .sent_natively(&posted)
+        .status(&posted, "posted_verified")
+        .batch(&other)
+        .batch(&contra_side);
+    let master = before.read().unwrap();
+    let restored = before.restored(&posted).read().unwrap();
+    // listed: the cover-only skip is held, naming the covered batch
+    assert_eq!(master.held.len(), 1);
+    assert_eq!(restored.held.len(), 2);
+    let cover_only = restored
+        .held
+        .iter()
+        .find(|held| held.fact.key == key(B1, 6))
+        .unwrap();
+    assert!(!cover_only.pairs);
+    assert_eq!(cover_only.holder, BatchId::new(batch_id(95)));
+    // judged: the withdrawal view is master's, row for row
+    let view = |facts: &TransferFacts| {
+        crate::agent::agent_import::transfers::held_carrier_view(facts)
+            .unwrap()
+            .skips
+            .into_iter()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(view(&restored), view(&master));
+    // and the skip is no skip to name in withdraw_skips, as on master
+    assert_eq!(restored.skip_mentions, master.skip_mentions);
+    assert_eq!(restored.live_skips, master.live_skips);
+}
+
+/// The mirror of a skip held only by the cover: a covered batch that never
+/// recorded the withdrawal, beside an uncovered batch found posted that did.
+/// Master holds the row against the covered batch; a rollback must not turn
+/// that into a retirement, which would drop the row from the live skips and
+/// name the covered batch nowhere (#1050).
+#[test]
+fn a_rollback_never_retires_a_skip_master_holds() {
+    let skipped = build(70)
+        .facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)))
+        .status("posted_verified");
+    let covered = build(71).placed().voucher(payment(&st(6), "500.00"));
+    let withdrew = build(72)
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)])
+        .status("posted_verified");
+    let before = Journal::default()
+        .batch(&skipped)
+        .batch(&covered)
+        .sent_natively(&covered)
+        .status(&covered, "posted_verified")
+        .batch(&withdrew);
+    let master = before.read().unwrap();
+    assert_eq!(master.retired_skips, 0, "master holds it");
+    assert!(master.live_skips.contains(&key(B1, 6)));
+    let restored = before.restored(&covered).read().unwrap();
+    assert_eq!(restored.retired_skips, 0);
+    assert_eq!(
+        held_tuples(&restored),
+        vec![(key(B1, 6), BatchId::new(batch_id(71)), date("20260901"))]
+    );
+    assert!(matches!(restored.held[0].by, HeldBy::UnverifiedBatch));
+    assert!(restored.held[0].pairs);
+    assert_eq!(restored.restored, [batch_id(71)].into());
+    assert_eq!(restored.skip_mentions, master.skip_mentions);
+    assert_eq!(restored.live_skips, master.live_skips);
+}
+
+/// A restored batch that posted a skipped row without its withdrawal is held
+/// elsewhere, not posted against the skip: whether its voucher is still in
+/// Tally is not known.
+#[test]
+fn a_restored_batch_never_posts_against_a_skip() {
+    let skipped = build(82).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
+    let posted = build(83).placed().voucher(payment(&st(6), "500.00"));
+    let before = Journal::default()
+        .batch(&skipped)
+        .batch(&posted)
+        .sent_natively(&posted)
+        .status(&posted, "posted_verified");
+    assert!(matches!(
+        before.read().unwrap().held[0].by,
+        HeldBy::PostedBatch
+    ));
+    let found = before.restored(&posted).read().unwrap();
+    assert!(matches!(found.held[0].by, HeldBy::UnverifiedBatch));
+    assert_eq!(found.held[0].holder, BatchId::new(batch_id(83)));
+}
+
+/// Of the batches holding a row, a restored one is named, the newest of them,
+/// even when a later build that was never sent holds it too.
+#[test]
+fn a_held_row_names_the_restored_batch_that_holds_it() {
+    let skipped = build(84).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
+    let posted = build(85)
+        .placed()
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
+    let later = build(86).voucher(payment(&st(6), "500.00"));
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&posted)
+        .sent_natively(&posted)
+        .status(&posted, "posted_verified")
+        .restored(&posted)
+        .batch(&later)
+        .read()
+        .unwrap();
+    assert_eq!(found.held[0].holder, BatchId::new(batch_id(85)));
+}
+
+/// A restored batch's Contra is not a verified Contra, whatever its status.
+#[test]
+fn a_restored_batch_s_contra_is_not_verified() {
+    let statement = build(87)
+        .placed()
+        .voucher(contra(&st(7), N2, N1, "300.00"))
+        .facts(facts(B2).contra(&st(7), None));
+    let before = Journal::default()
+        .batch(&statement)
+        .sent_natively(&statement)
+        .status(&statement, "posted_verified");
+    assert_eq!(
+        before.read().unwrap().contras[0].status,
+        BatchStatus::PostedVerified
+    );
+    let found = before.restored(&statement).read().unwrap();
+    assert_ne!(found.contras[0].status, BatchStatus::PostedVerified);
+}
+
+/// A rollback read before a batch was sent does not cover it, and changes
+/// nothing for it.
+#[test]
+fn a_rollback_read_before_the_post_leaves_the_batch_found() {
+    let skipped = build(88).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
+    let posted = build(89)
+        .placed()
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&posted)
+        .sent_natively(&posted)
+        .status(&posted, "posted_verified")
+        .restored_after(&posted, 2)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 1);
+    assert!(found.restored.is_empty());
 }
 
 #[test]

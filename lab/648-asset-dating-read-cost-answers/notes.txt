@@ -1,0 +1,16 @@
+#648 notes (UTC). Sheet lab/648-asset-dating-read-cost 76423064215286d06364e354b77af85dbee165bc; SHA256.txt 3/3 OK. Run on the run's review's order, owner-free (reads only); the owner said in the lab's chat to work autonomously until 19:00 IST. Built tool w1-2306d86d (exe sha256 checked by the client before every call), one new empty data folder per part (data-A, data-B), terms true, posting/import/redaction unset. No raw XML request sent. Every call timed by the lab client (tools/call round trip) and followed by egress_log (limit 8) in the same session.
+Release: TallyPrime 7.2 silver, Education false (tally_status A0); the About screen was not opened.
+Part A was run between the items of the GS1/628/1867 sequence: none was under way (no other item in progress on the PC).
+11:10Z A: Select Company filter GST LEDGER: one row BRIDGE GST LEDGER LAB (100077); loaded alone; Gateway period 1-Apr-25 to 31-Mar-26, current date 27-Nov-2025, last entry 27-Nov-25; no dialog.
+11:11Z A0: C2 without MARKS (answers/A0-c2-observations.txt); list_companies one company 100077 aae372c5-a894-491c-8843-5532e43d2d2f verified_tuple books_from 20250401; tally_status 7.2 silver education false; ledger_masters M0/V0 225 / 64 (reused false; 18 ledgers).
+11:11Z A1: ledger_masters basic, group Fixed Assets, ancestry: 1 row, GS1 Computer (Fixed Assets, opening 0.00).
+11:11Z A2: trial_balance 2025-04-01..2026-03-31: one page, 18 ledgers; GS1 Computer opening 0.00, debit -40000.00 (present), credit present_empty, closing -40000.00.
+11:12Z A3: twelve monthly trial_balance calls: GS1 Computer moved in 2025-11 only (debit -40000.00); every other month debit/credit present_empty. GS1 Computer is the only Fixed Assets ledger.
+11:12Z A4: bisection of November: [1,15] moved; [1,8] moved; [1,4] not; [5,6] moved; [5,5] moved: five calls, ended on 2025-11-05 (= EXPECT). Within a partial-month window the tool returns debit/credit "present" with value 0.00 where no movement, not present_empty.
+11:12Z A5: vouchers 2025-11-05: complete, total 1: Purchase 2, 20251105, party SYN GS1 Supplier: SYN GS1 Supplier 47200.00; GS1 Computer -40000.00; Input CGST -3600.00; Input SGST -3600.00 (= EXPECT).
+11:12Z A6: ledger_masters M1/V1 225 / 64 = M0/V0. C10: Alt+K, h, Enter; Select Company none loaded; one tally.exe 29692; 9001 LISTENING; /status 200 51 B; no XML after.
+11:13Z B: filter LARGE: one row BRIDGE LARGE LAB (100068); loaded alone; Gateway period 1-Apr-26 to 31-Mar-27, last entry 31-Mar-27; no dialog.
+11:14Z B0: C2 without MARKS; list_companies one company 100068 2ba6df28-d1e3-4e81-b6d2-eb50f0a693ab (= EXPECT) books_from 20260401; ledger_masters M0/V0 210 / 29930, 5 ledgers.
+11:14Z B1 year, B2 March 2027, B3 31-Mar-2027, B4 year again: each one page, 5 ledgers, state observed; round trips 0.653 / 0.646 / 0.902 / 0.677 s.
+11:14Z B5: ledger_masters M1/V1 210 / 29930 = M0/V0. C10 as Part A at 11:15Z.
+No call returned request_deadline_exceeded or response_size_limit_exceeded; no dialog appeared; no call took more than 2 s.

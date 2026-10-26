@@ -2030,12 +2030,12 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
 
 `party` is the voucher's `PARTYLEDGERNAME` as Tally answered it, and the parse takes that one element and no
 other. For a Sales or Purchase voucher it names the customer or supplier. On a Receipt, Payment or Contra Tally can
-answer the bank or cash ledger instead: it did for the Receipts that ComplyEaze Bridge imported with the party in
-`PARTYLEDGERNAME` (TallyPrime 7.1, protocol reference section 9, and again on 7.2 in one lab sitting), and committed
-captures of hand-keyed Payments carry the bank on some rows and the party on others. So the counterparty of a
-Receipt, Payment or Contra is read from the voucher's `amounts`, not from `party`. `verify_import` does not compare
-the field. The lab answers kept the sha256 of the `vouchers` response and not its bytes, so "Tally sent the bank
-ledger" is read from the import file and the parse, not from a saved response.
+answer the bank or cash ledger instead. On TallyPrime 7.1 it did for a Receipt and a Payment that ComplyEaze Bridge
+imported with the party in `PARTYLEDGERNAME`, and a Contra imported without the element came back with its debit
+bank ledger ([reference §9.13](../tally/TALLY_PROTOCOL_REFERENCE.md), the scoped correction of 2026-09-17).
+Committed captures of a synthetic book's Payments carry the bank on some rows and the party on others. So the
+counterparty of a Receipt, Payment or Contra is read from the voucher's `amounts`, not from `party`. `verify_import`
+does not compare the field for a Receipt, Payment or Contra.
 
 ## Voucher-file preparation and verification
 

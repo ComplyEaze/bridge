@@ -1866,7 +1866,7 @@ const TEXT_REFUSED_MESSAGE: &str = "Nothing was sent. This saved batch has a nar
 /// large to show whole, by the batch's length or for the screen it would open
 /// on, before any attempt (#1780). The desktop's Journal screen shows the
 /// message alone.
-const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. If the screen is the cause, a larger or less magnified screen may help. If the length is, a batch can be split into parts; a single voucher this long cannot be posted from here.";
+const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. If the screen is the cause and the batch has more than one voucher, asking again shows its totals only, which is smaller; a larger or less magnified screen may also help. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
 
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };
@@ -1905,8 +1905,9 @@ fn reconciliation_failure_payload(
     if code == "voucher_text_invalid" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
     }
-    // The window for the batch was too large to show whole. Asking again does
-    // not shrink it, so the message says what does (#1780).
+    // The window for the batch was too large to show whole. Asking again shows a
+    // batch of several vouchers as totals only (#1780), and does not shrink a
+    // single voucher's window, so the message says what does.
     if code == "import_review_too_large" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(REVIEW_TOO_LARGE_MESSAGE);
     }

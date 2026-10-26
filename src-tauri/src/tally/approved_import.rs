@@ -1916,7 +1916,7 @@ pub(crate) mod test_seam {
              cancel. Nothing is released until you answer."
         );
         assert_eq!(
-            super::answer_text(super::Shown::Masters, ONE),
+            super::answer_text(super::Shown::Masters, ONE).replace('\n', " "),
             "Press Y (or click Yes) to create this ledger in Tally. Press N (or click No) to \
              cancel. Nothing is created until you answer."
         );

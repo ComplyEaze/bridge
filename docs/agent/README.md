@@ -698,9 +698,9 @@ inventory, integrated and batch-wise flags from its own request.
 
 The company is bound by the GUID filter and by the row's own name, company number and books-from date,
 which must equal the verified company's; a row for another company, or not exactly one row, refuses the
-read. These arrive as `company_features_read_failed` with a `cause`: `company_features_company_mismatch`,
-`company_features_not_one_row` and `company_features_guid_unsupported` (the GUID cannot be put in the filter),
-and also `company_features_response_invalid` (the answer is not the
+read. These arrive as `company_features_read_failed` with a `cause`: `company_features_company_mismatch`
+and `company_features_not_one_row` (the GUID in the filter is the verified company's, in its parsed
+spelling, so it cannot fail there), and also `company_features_response_invalid` (the answer is not the
 collection shape), `company_features_currency_invalid` (a symbol over 16 characters, or with a
 control character, a bidirectional override or isolate, a zero-width or other invisible format character, or a line or paragraph separator), `company_features_tally_reported_failure`, and the stability codes
 `company_features_changed` and `company_features_extent_changed`. Measured on three synthetic books of one
@@ -2251,6 +2251,18 @@ refused as `proposals_legacy` (parse the statement again).
   equal reference, or by an equal date (k = 0 until two real statements of one
   transfer have been measured), so a Contra the other bank printed on another
   day is not matched.
+- **What `restored` means.** A batch that a restore ComplyEaze Bridge recorded
+  covers (see `verify_import`, `book_rolled_back`) is never found posted or
+  verified for the transfer check, whatever its last status: a row it holds
+  reads `held_elsewhere` naming it, its Contra is an unverified candidate, and
+  its days give no coverage. Every row naming such a batch carries
+  `"restored": true`, and `next_steps.restored` says what that means: no step
+  inside ComplyEaze Bridge settles the row, so do not name it in
+  `withdraw_skips` or build or amend its rows (that is advice: a withdrawal is
+  refused only when a Contra carries the row); check in Tally whether that
+  batch's voucher for it is there and tell the person, and do not enter the
+  transfer by hand or import that batch's file. A rollback never retires a skip
+  that would be held without it.
 - **What `held_elsewhere` and `posted_against_skip` mean.** A skipped row that
   a batch holds as a voucher is not a skip to pair. While no batch holding the
   row is found posted it reads `held_elsewhere`, with the batch to verify. Once
@@ -3161,9 +3173,12 @@ one request. The building blocks:
 - **Extent check.** On a later page of a listing, the two book-extent requests
   that decide whether the held read can be reused, folded with the runtime
   combination (`continued_listing` in `src-tauri/src/agent_ledgers.rs`).
-- **Corroboration.** The window read again, one day wider on each side, with
-  the marks already known, plus a scoped marks read if that window is empty
-  too (`corroborate_empty_voucher_read` in `src-tauri/src/agent_vouchers.rs`).
+- **Corroboration.** On a book large enough to be counted, a census of the
+  window one day wider on each side, with the marks already known (no read of
+  the neighbouring days' vouchers), then the marks read again if the census took
+  several requests, plus a scoped marks read if that window is empty too. A
+  book that fits one request has the window read whole instead
+  (`corroborate_empty_voucher_read` in `src-tauri/src/agent_vouchers.rs`).
 
 These requests are sent but never digested anywhere in a result:
 - the identity-bracket company-list requests around each scoped and runtime read;

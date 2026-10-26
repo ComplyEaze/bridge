@@ -124,8 +124,7 @@ async fn a_whole_read_sends_the_builders_request_twice_between_the_extents() {
     );
     assert!(!read.evidence.request_sha256.is_empty());
     let request =
-        render_company_features_request(identity().display_name(), identity().company_guid())
-            .unwrap();
+        render_company_features_request(identity().display_name(), identity().company_guid_value());
     let hash = body_hash(&request);
     assert_eq!(observed[AT_OPENING_EXTENT].request_body_sha256, hash);
     assert_eq!(observed[AT_OPENING_EXTENT + 2].request_body_sha256, hash);

@@ -778,14 +778,7 @@ impl Server {
         let counted = window.counted();
         let empty_window = if window.rows.is_empty() {
             let (corroboration, partial, corroboration_reason) = self
-                .corroborate_empty_voucher_read(
-                    identity,
-                    company_name,
-                    from,
-                    to,
-                    None,
-                    Some(first.marks),
-                )
+                .corroborate_empty_voucher_read(identity, company_name, from, to, Some(first.marks))
                 .await?;
             *evidence = combine_evidence(evidence.clone(), corroboration);
             Some((partial, corroboration_reason))

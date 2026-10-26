@@ -188,10 +188,18 @@ fn a_type_whose_guid_cannot_go_into_the_read_back_formula_is_refused_at_the_buil
     assert!(resolve_voucher_type(&types, "Sales Acc", "Sales").is_ok());
 }
 
+fn number(text: &str) -> InvoiceNumber {
+    InvoiceNumber::parse(text).expect("an admitted invoice number")
+}
+
+fn date(text: &str) -> TallyDate {
+    TallyDate::parse(text).expect("a calendar date")
+}
+
 #[test]
 fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
-    let request =
-        render_invoice_number_request("Co", "INV/26-27/0042", ("20250401", "20260331")).unwrap();
+    let (from, to) = (date("20250401"), date("20260331"));
+    let request = render_invoice_number_request("Co", &number("INV/26-27/0042"), (&from, &to));
     assert!(
         request.contains("$VoucherNumber = \"INV/26-27/0042\"</SYSTEM>"),
         "the number is the only literal beside the dates"
@@ -204,7 +212,8 @@ fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
         "the class is a compute, not an unmeasured filter"
     );
     assert!(request.contains("<TYPE>Voucher</TYPE>") && !request.contains("IMPORTDATA"));
-    // GST rule 46(b): 16 characters, letters, digits, hyphen, slash.
+    // GST rule 46(b): 16 characters, letters, digits, hyphen, slash. The
+    // renderer takes only a parsed number, so nothing else reaches the literal.
     for bad_number in [
         "A\"B",
         "A\\B",
@@ -218,15 +227,12 @@ fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
         "\u{e9}",
         "1".repeat(17).as_str(),
     ] {
-        assert!(
-            render_invoice_number_request("Co", bad_number, ("20250401", "20260331")).is_none(),
-            "{bad_number:?}"
-        );
+        assert_eq!(InvoiceNumber::parse(bad_number), None, "{bad_number:?}");
     }
-    assert!(
-        render_invoice_number_request("Co", &"1".repeat(16), ("20250401", "20260331")).is_some()
-    );
-    assert!(render_invoice_number_request("Co", "1", ("2025-04-01", "20260331")).is_none());
+    assert!(InvoiceNumber::parse(&"1".repeat(16)).is_some());
+    assert!(InvoiceNumber::parse("INV/26-27/0042").is_some());
+    // A date that is not YYYYMMDD never becomes one either.
+    assert!(TallyDate::parse("2025-04-01").is_err());
 }
 
 #[test]
@@ -264,14 +270,17 @@ fn only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate() {
 #[test]
 fn the_readback_read_is_dated_and_by_type_guid_and_number() {
     let guid = &format!("{}-00000193", sentinel_uuid(0x5));
-    let request =
-        render_invoice_readback_request("Co", guid, "278", ("20250401", "20260331")).unwrap();
+    let (from, to) = (date("20250401"), date("20260331"));
+    let type_guid = VoucherTypeGuid::parse(guid).expect("a hex-and-hyphen GUID");
+    let request = render_invoice_readback_request("Co", &type_guid, &number("278"), (&from, &to));
     assert!(request.contains(&format!("$Date &gt;= $$Date:\"20250401\" AND $Date &lt;= $$Date:\"20260331\" AND $VoucherNumber = \"278\" AND $GUID:VoucherType:$VoucherTypeName = \"{guid}\"</SYSTEM>")));
     assert!(request.contains("ALLLEDGERENTRIES.*"));
-    assert!(
-        render_invoice_readback_request("Co", "g\"", "278", ("20250401", "20260331")).is_none()
-    );
-    assert!(render_invoice_readback_request("Co", guid, "A B", ("20250401", "20260331")).is_none());
+    // Neither a GUID nor a number that could close the literal becomes one.
+    for bad_guid in ["g\"", "", "a b", &"a".repeat(65)] {
+        assert_eq!(VoucherTypeGuid::parse(bad_guid), None, "{bad_guid:?}");
+    }
+    assert!(VoucherTypeGuid::parse(&"a".repeat(64)).is_some());
+    assert_eq!(InvoiceNumber::parse("A B"), None);
 }
 
 /// The pilot lab's tax units as Tally answered the code's own request (see the
@@ -733,8 +742,8 @@ const RATES_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/test
 #[test]
 fn the_ledger_rates_request_is_the_answered_one_with_the_hsn_fields() {
     let sent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.request.utf16le.xml"));
-    let rendered =
-        render_ledger_rates_request("BRIDGE PILOT LAB", ("20260401", "20260801")).unwrap();
+    let (from, to) = (date("20260401"), date("20260801"));
+    let rendered = render_ledger_rates_request("BRIDGE PILOT LAB", (&from, &to));
     assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
     let answered = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.request.utf16le.xml"));
     assert_eq!(
@@ -744,17 +753,14 @@ fn the_ledger_rates_request_is_the_answered_one_with_the_hsn_fields() {
         ),
         rendered
     );
-    // A window that is not eight digits renders nothing.
-    for bad in ["2026-04-01", "2026040", "2026040a", ""] {
-        assert!(render_ledger_rates_request("X", (bad, "20260801")).is_none());
-        assert!(render_ledger_rates_request("X", ("20260401", bad)).is_none());
+    // A window that is not a YYYYMMDD calendar date never becomes one, so it
+    // cannot reach the request.
+    for bad in ["2026-04-01", "2026040", "2026040a", "", "20260230"] {
+        assert!(TallyDate::parse(bad).is_err(), "{bad:?}");
     }
     // A company name is escaped into the request.
-    assert!(
-        render_ledger_rates_request("A & B", ("20260401", "20260801"))
-            .unwrap()
-            .contains("<SVCURRENTCOMPANY>A &amp; B</SVCURRENTCOMPANY>")
-    );
+    assert!(render_ledger_rates_request("A & B", (&from, &to))
+        .contains("<SVCURRENTCOMPANY>A &amp; B</SVCURRENTCOMPANY>"));
 }
 
 /// One part naming exactly these parents, planned the way a scope plans them
@@ -794,16 +800,16 @@ fn part_of(parents: &[&str]) -> bridge_tally_protocol::parent_partition::ParentP
 /// listing's parts carry it (§11e).
 #[test]
 fn a_scoped_rates_request_adds_only_the_parent_formula_and_its_filter() {
-    let window = ("20260401", "20260801");
-    let whole = render_ledger_rates_request("BRIDGE PILOT LAB", window).unwrap();
+    let (from, to) = (date("20260401"), date("20260801"));
+    let window = (&from, &to);
+    let whole = render_ledger_rates_request("BRIDGE PILOT LAB", window);
     let part = part_of(&[
         "Sundry Debtors",
         "Sales Accounts",
         "Duties & Taxes",
         "Indirect Expenses",
     ]);
-    let scoped =
-        render_ledger_rates_request_for_parents("BRIDGE PILOT LAB", window, &part).unwrap();
+    let scoped = render_ledger_rates_request_for_parents("BRIDGE PILOT LAB", window, &part);
     let formula = concat!(
         "<SYSTEM TYPE=\"Formulae\" NAME=\"BridgeParentPart\">",
         "$Parent = \"Duties &amp; Taxes\" OR $Parent = \"Indirect Expenses\" OR ",
@@ -814,7 +820,6 @@ fn a_scoped_rates_request_adds_only_the_parent_formula_and_its_filter() {
         .replace(formula, "")
         .replace("<FILTERS>BridgeParentPart</FILTERS>", "");
     assert_eq!(undone, whole);
-    assert!(render_ledger_rates_request_for_parents("X", ("2026", "20260801"), &part).is_none());
 }
 
 /// The lab's answer, read at the edge: each sales ledger's one dated row with
@@ -1141,14 +1146,16 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
 /// has the SHA-256 of the request file the lab sent for that number.
 #[test]
 fn the_status_read_back_request_is_the_one_the_lab_answered() {
-    let sent = |number: &str| {
+    let type_guid =
+        VoucherTypeGuid::parse("6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce").unwrap();
+    let (from, to) = (date("20260401"), date("20270331"));
+    let sent = |text: &str| {
         let rendered = render_invoice_readback_request(
             "BRIDGE PILOT LAB",
-            "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce",
-            number,
-            ("20260401", "20270331"),
-        )
-        .unwrap();
+            &type_guid,
+            &number(text),
+            (&from, &to),
+        );
         [0xFF, 0xFE]
             .into_iter()
             .chain(rendered.encode_utf16().flat_map(u16::to_le_bytes))

@@ -48,6 +48,10 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- The three cash-line answers ComplyEaze Bridge cannot build yet (cash paid straight to someone, a deposit from
+  the cash box, unbooked cash sales) no longer say to record the line by hand or to record the sales in Tally
+  first; each keeps its reason and offers `dont_know`, which builds the line to the suspense ledger, marked for
+  the CA to move (part of #1709).
 - On macOS the first line of the approval alert (what each button does) is no longer broken by ComplyEaze Bridge at 100 characters: the alert wraps its own text, so a break of ours was wrapped a second time and left a ragged second row. The Windows box keeps its 100-character lines. The box's size caps are unchanged (part of #1780).
 - The next steps for five situations no longer send a person to enter a voucher in Tally themselves; each now says what
   ComplyEaze Bridge does and that it cannot put the voucher in the book yet: a voucher Tally reported as not
@@ -88,6 +92,21 @@ These changes are in source and not yet in a published build.
   **Do not go back to an earlier release after this one has seen a restore:** an earlier release refuses an import
   journal holding the new record, and stops every build, post and verification until ComplyEaze Bridge is upgraded
   again.
+- The transfer check now treats a batch a recorded restore covers as neither found posted nor verified, whatever
+  its last status (part of #1050). Before, a skipped row such a batch held could be retired, or listed as
+  `posted_against_skip`, for good, and its Contra could pair the other account's skip, although the restore may
+  have removed the voucher. Now the row stays open (`held_elsewhere`, naming the covered batch; a skip the batch
+  had retired is listed so, but a withdrawal is judged as before; a rollback never retires a skip that would
+  otherwise be held), its Contra is an unverified candidate, and its days give no coverage. Every row that names such a batch is marked
+  `"restored": true`, and the section's `next_steps.restored` (and the step of a withdrawal refused for such a
+  row) says that no step inside ComplyEaze Bridge settles it, not to withdraw it or build or amend its rows, to check
+  in Tally and tell the person, and not to enter the transfer by hand or import that batch's file. Nothing else in the journal changes, and no new record is
+  written. Limits: no step inside ComplyEaze Bridge settles such a row, and the note is advice, not a refusal (a
+  withdrawal of the row is refused only when a Contra carries it, and an amendment of the covered batch's lineage
+  is not refused); the covered statement's days stay blocked for the other account's
+  coverage, so skips there stay `not_established` or `matched_unconfirmed`; a voucher that comes back in Tally
+  after the restore is no longer flagged as `posted_against_skip`; the invoice stop and the local data report read
+  the batch's last status as before.
 
 - `voucher_presence` now checks a voucher type declared `manual` against the book's own numbering before it
   reads the window, because a voucher number is an identity only where the book's series for the type says

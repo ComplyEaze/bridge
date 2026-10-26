@@ -3118,7 +3118,7 @@ fn invoice_review_preview(
     if review_text.any(has_unreviewable_format_character) {
         return Err("import_review_format_text".into());
     }
-    if !super::invoice::invoice_number_safe(number) {
+    if super::invoice::InvoiceNumber::parse(number).is_none() {
         return Err("import_review_layout_text".into());
     }
     let marks = OnAccountMarks::of(line);

@@ -210,18 +210,29 @@ pub(super) fn render_agent_lab_inventory_vouchers(
     render_windowed_vouchers(company, from, to, "", AGENT_LAB_INVENTORY_VOUCHER_FETCH, "")
 }
 
-/// A voucher type's name is quoted into a TDL string literal in the status
-/// read, where XML escaping cannot protect it (Tally decodes `&quot;` before
-/// evaluating, #861), so a name is admitted only when it holds nothing a
-/// literal could be closed or broken by. `&`, `<`, `>` and `'` are refused as
-/// well: Tally's handling of them inside the literal has not been measured.
-pub(super) fn gst_status_type_name_literal_safe(name: &str) -> bool {
-    !name.is_empty()
-        && name.chars().count() <= 100
-        && name == name.trim()
-        && !name
-            .chars()
-            .any(|c| matches!(c, '"' | '\\' | '&' | '<' | '>' | '\'') || c.is_control())
+/// A voucher type's name as the status read quotes it into a TDL string
+/// literal, where XML escaping cannot protect it (Tally decodes `&quot;` before
+/// evaluating, #861). Parsed once, from the tool's argument: a name is admitted
+/// only when it holds nothing a literal could be closed or broken by. `&`, `<`,
+/// `>` and `'` are refused as well: Tally's handling of them inside the literal
+/// has not been measured.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct GstStatusTypeName(String);
+
+impl GstStatusTypeName {
+    pub(super) fn parse(name: &str) -> Option<Self> {
+        let admitted = !name.is_empty()
+            && name.chars().count() <= 100
+            && name == name.trim()
+            && !name
+                .chars()
+                .any(|c| matches!(c, '"' | '\\' | '&' | '<' | '>' | '\'') || c.is_control());
+        admitted.then(|| Self(name.to_string()))
+    }
+
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 /// The GST status of the vouchers of one type in a date window (R7, 10 Oct
@@ -237,7 +248,7 @@ pub(super) fn render_gst_status_window(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    type_name: &str,
+    type_name: &GstStatusTypeName,
 ) -> Result<String, String> {
     render_status_window(company, from, to, type_name, StatusFetch::Flags)
 }
@@ -252,7 +263,7 @@ pub(super) fn render_gst_uncertain_window(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    type_name: &str,
+    type_name: &GstStatusTypeName,
 ) -> Result<String, String> {
     render_status_window(company, from, to, type_name, StatusFetch::FlagsPartyAmount)
 }
@@ -284,21 +295,18 @@ fn render_status_window(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    type_name: &str,
+    type_name: &GstStatusTypeName,
     fetch: StatusFetch,
 ) -> Result<String, String> {
     let fetch_tail = fetch.tail();
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
-    if !gst_status_type_name_literal_safe(type_name) {
-        return Err("gst_status_type_name_invalid".to_string());
-    }
     // A quoted `$$Date:"…"` literal takes only a date (#861).
     let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN{fetch_tail}</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str()),
-        xml_escape(type_name)
+        xml_escape(type_name.as_str())
     ))
 }
 
@@ -306,7 +314,7 @@ pub(super) fn gst_uncertain_read(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    type_name: &str,
+    type_name: &GstStatusTypeName,
 ) -> Result<ReadRequest, String> {
     render_gst_uncertain_window(company, from, to, type_name).map(ReadRequest)
 }
@@ -315,7 +323,7 @@ pub(super) fn gst_status_read(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    type_name: &str,
+    type_name: &GstStatusTypeName,
 ) -> Result<ReadRequest, String> {
     render_gst_status_window(company, from, to, type_name).map(ReadRequest)
 }
@@ -404,21 +412,24 @@ pub(super) fn invoice_ledger_count_read(company: &str) -> ReadRequest {
 /// measured per-row Sales-class compute, for the duplicate-number check.
 pub(super) fn invoice_number_read(
     company: &str,
-    number: &str,
-    window: (&str, &str),
-) -> Option<ReadRequest> {
-    agent_import::invoice::render_invoice_number_request(company, number, window).map(ReadRequest)
+    number: &agent_import::invoice::InvoiceNumber,
+    window: (&TallyDate, &TallyDate),
+) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_invoice_number_request(
+        company, number, window,
+    ))
 }
 
 /// A posted invoice read back by type and number, every field the build wrote.
 pub(super) fn invoice_readback_read(
     company: &str,
-    type_guid: &str,
-    number: &str,
-    window: (&str, &str),
-) -> Option<ReadRequest> {
-    agent_import::invoice::render_invoice_readback_request(company, type_guid, number, window)
-        .map(ReadRequest)
+    type_guid: &agent_import::invoice::VoucherTypeGuid,
+    number: &agent_import::invoice::InvoiceNumber,
+    window: (&TallyDate, &TallyDate),
+) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_invoice_readback_request(
+        company, type_guid, number, window,
+    ))
 }
 
 /// The ledger listing with each ledger's GST rate and rounding, for the tax
@@ -427,11 +438,12 @@ pub(super) fn invoice_readback_read(
 /// date.
 pub(super) fn invoice_ledger_rates_scoped_read(
     company: &str,
-    window: (&str, &str),
+    window: (&TallyDate, &TallyDate),
     part: &bridge_tally_protocol::parent_partition::ParentPart,
-) -> Option<ReadRequest> {
-    agent_import::invoice::render_ledger_rates_request_for_parents(company, window, part)
-        .map(ReadRequest)
+) -> ReadRequest {
+    ReadRequest(
+        agent_import::invoice::render_ledger_rates_request_for_parents(company, window, part),
+    )
 }
 
 /// The group listing with each group's HSN/SAC rows, for the HSN/SAC check
@@ -533,7 +545,13 @@ mod sealed_read_tests {
             standard_ledger_catalog_read(company).unwrap(),
             native_group_snapshot_read(company),
             voucher_census_read(company, &from, &to, span).unwrap(),
-            gst_status_read(company, &from, &to, "Sales").unwrap(),
+            gst_status_read(
+                company,
+                &from,
+                &to,
+                &GstStatusTypeName::parse("Sales").unwrap(),
+            )
+            .unwrap(),
         ];
         for shape in [
             super::super::voucher_window::VoucherReadShape::ImportVerification,

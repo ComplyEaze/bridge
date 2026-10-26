@@ -1,0 +1,48 @@
+# 1108 partial landing (#1108): can a native post through `post_import` land partly, one voucher of a batch created and one rejected? OWNER sitting (keying and the approval window)
+
+Not for merge. Written 26 Oct 2026 for issue #1108's next step: "a partial landing reproduced through post_import itself on a synthetic company, with the answer, the marks before and after, and the verification readback" (the first condition its design waits on). `SHA256.txt` lists every file here with its bytes; check it before step 0.
+
+**What is known.** No partial landing has been produced through `post_import` so far: Bridge's own checks stop every known cause before anything is sent (the issue's comments of 12 and 16 Oct 2026). Before it sends, `post_import` re-reads the ledgers and refuses a batch whose ledgers changed name, GUID, bank or cash classification or bill-wise setting since the build. This item therefore SEARCHES, with one variable: a batch of two vouchers of two voucher types, and, between the build and the post, the second voucher's type is made inactive on Tally's screen (a voucher-type setting no check before the send reads). "Stopped by Bridge's own checks" and "no partial landing" are valid, useful results.
+
+## Rules and company
+`LAB-COMMON.md` in this folder applies in full. It is v3, a byte copy from `lab/626-1038-1050-run-sheets` at 8c602c15, sha256 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6.
+
+THE COMPANY is `BRIDGE PARTIAL LAB`. It does not exist yet: step 1 creates it. If a company of this name exists on the PC, STOP and report it.
+
+Differences from LAB-COMMON, the stricter rule holding everywhere else:
+1. **No raw requests.** No request file is sent by curl. C2 step 0 runs WITHOUT its MARKS request (its GET /status checks, which send no request body, still run). Every read and the post are calls of ComplyEaze Bridge's built tool, one at a time.
+2. **Marks.** `tally_status` carries no marks. M (ALTMSTID) and V (ALTVCHID) are read with `ledger_masters` (first page, no `snapshot_id`): `snapshot.master_alter_id` and `snapshot.voucher_alter_id`; record the whole answer and `snapshot.reused`, which must read false. A book with no voucher may give no V: record it.
+3. **OWNER.** Every act on Tally's screen (the company, its masters, the voucher-type alterations) is the owner's, or the lab's on the run coordinator's word, one act at a time with a screenshot before accepting. The approval window of step 5 is answered by the OWNER by mouse; nobody types on the PC while it is open (a key can answer it). This item runs only while the owner is at the PC.
+4. **Backup and restore.** BK1 of THE COMPANY after its masters and before the first post (C5), into the new empty folder `C:\bridge-lab\1108pl\backups\bk1\`; the restore of BK1 at the end is made only on the run coordinator's explicit RESTORE.
+5. **Grant.** The company and its masters (step 1), at most two voucher-type alterations (steps 4 and 7), ONE post of a batch of two vouchers (step 5), and the restore. Nothing else.
+
+Licensed mode only; Education mode = STOP.
+
+## Build
+The build already staged at the lab as `w1-2306d86d`: the Windows bundle of master `2306d86dfd4c86a3c5f6c19ea9ddff6818c460fb`, Bridge CI run `40077056130` (event `schedule`), artifact `12553782422` (zip digest `sha256:74ae2daa851397b71cb59e80373d9478a2da72c74398108e33e34ea83e56eb1e`); its `bridge_mcp.exe` as the lab recorded it on staging: sha256 `92a899a21f904f88cb2d13ce44b1417d5aecaf333caad5230de598bf54d89524`. Before the first call hash the exe that will run; any other hash is a STOP.
+
+Run it over stdio with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, ONE new empty `BRIDGE_AGENT_DATA_DIR` for the item, `BRIDGE_TERMS_ACCEPTED=true` (allowed for the lab on 25 Oct 2026) and `BRIDGE_AGENT_REDACTION` unset. POSTING is the owner's act: the owner sets `BRIDGE_AGENT_ENABLE_WRITES=true` in the launch configuration himself; the lab never sets, writes or copies it, and records only that it is present. `BRIDGE_AGENT_ENABLE_BATCH_POST` must be absent.
+
+## Steps
+0. LAB-COMMON step 0 with no company loaded, without its MARKS read (Select Company's list stands in for C2 d's Gateway, since THE COMPANY does not exist yet). EXPECT no company named `BRIDGE PARTIAL LAB`.
+1. OWNER: Create Company `BRIDGE PARTIAL LAB`: financial year and books beginning 1-4-2025, no password, every other field as the screen offers; if the Features screen opens, accept it unchanged and record every value it shows. Load it alone. Then, one at a time: ledger `PLab Bank` under Bank Accounts; ledger `PLab Party` under Sundry Debtors (bill-by-bill No if shown); ledger `PLab Expense` under Indirect Expenses. Then voucher types Receipt and Payment: each set to method of voucher numbering Automatic with "Retain Original Voucher No." Yes (duplicates not prevented); record the screen path and field names; accept with Ctrl+A; never Escape on these screens.
+2. `list_companies`: EXPECT exactly THE COMPANY with `identity_state` `verified_tuple`; record its `guid`. `masters` with `kind=voucher_types`: record the Receipt and Payment rows whole (EXPECT both automatic with auto_retain, and `is_active` as Tally reads it). `ledger_masters`: M0, V0.
+3. BK1 (Difference 4): its name, size and sha256. `ledger_masters`: M0′ (a move across the backup is recorded, not a STOP). Then `build_import_xml` with ONE batch of two vouchers dated 2025-04-15, no voucher numbers: V1 a Receipt of 1.00, `PLab Party` Cr, `PLab Bank` Dr, narration `PL-R1`; V2 a Payment of 1.00, `PLab Expense` Dr, `PLab Bank` Cr, narration `PL-P1`. Record the answer whole (batch id, `voucher_count` 2, warnings). A refusal: record it whole and STOP (nothing was sent).
+4. OWNER: alter voucher type Payment: set its "Activate this Voucher Type" (or the screen's equivalent) to No; nothing else. Record the screen path and the field's exact name; screenshot; Ctrl+A. If the screen offers no such field, or Tally refuses the change: record it, leave with Ctrl+Q after a screenshot shows the title, and go to step 7 (the search ends: "no inactive voucher type on this release"). Then `masters` with `kind=voucher_types`: record the Payment row (its `is_active`), and `ledger_masters`: M1 (record how far the alteration moved it). No key is pressed from here until step 5's answer.
+5. **The post.** `post_import` with `company_guid` and the batch id; the OWNER answers the approval window Yes by mouse. If an answer says the approval is `pending`, or `approved` without a send, call `post_import` again with the same batch id after its `retry_after_s` (the tool's own flow, not a retry). Record every answer whole: the state, whether the attempt was recorded (`attempt_recorded`, `dispatch`), and the counters Tally answered (created, altered, deleted, ignored, errors, cancelled, exceptions, as the result shows them). Then a screenshot of the whole Tally window.
+   - Refused before the send (`attempt_recorded` false): record the code and its next step whole; that is "stopped by Bridge's own checks": go to step 7.
+   - Sent: go to step 6.
+6. **The readback.** `verify_import` of the batch: record it whole. `vouchers` for 2025-04-15: record every voucher whole (number, type, MasterID, AlterID, GUID, narration). `ledger_masters`: M2, V2. `egress_log`: record it whole (the post's `response_prepared` line among it).
+   EXPECT (the target, recorded, not predicted): created 1 and errors or exceptions 1; `vouchers` shows the Receipt `PL-R1` and no Payment; V2 moved by one. Record also what `verify_import` says of each voucher.
+7. OWNER: set the Payment voucher type active again (record the path); `masters` with `kind=voucher_types`: EXPECT the Payment row active. Then the restore of BK1, only on the run coordinator's explicit RESTORE (C6), and `ledger_masters` after it. Then LAB-COMMON C10.
+
+STOP RULES: C7 and C8; any dialog before a call; an approval window other than the post's; `post_import` answering a state that names a write elsewhere (`posted_into_existing_master`, `master_write_located_elsewhere` or another alert): record it, never call again; a mark that moves outside the steps that change it.
+
+## What this gives, and its limit
+A partial landing, if it happens, is recorded through the tool's own answers (the post's answer and counters, the verification, the vouchers read, the marks before and after, and the egress log's fingerprints of each request and answer). The raw bytes of Tally's answers are NOT captured: no request may be sent by curl now, and the lab's relay admits only the purchase register's reads. Turning a partial landing into committed fixtures needs a capture route of its own (a relay that admits the post and its readback, reviewed as its own change), decided once this row has shown whether a partial landing can happen at all.
+
+## Not measured by this item
+Any other trigger (a ledger change is refused before the send by design); a two-user run; Gold; the order in which Tally creates and rejects vouchers inside a larger batch.
+
+## Evidence
+Every tool answer whole with its size and sha256, the screens' paths and field names, BK1's name, size and sha256, the marks, screenshots by name, size and sha256 (never pushed), and a notes file with UTC times and one line per step. THE COMPANY's GUID is new: it goes into the merge gate's synthetic-UUID registry when a pull request first cites it, or the evidence shows it as `<company guid>`. Evidence on a new branch `lab/1108-partial-landing-search-answers` with `SHA256.txt`; send the SHA to the run coordinator before pushing, and push only after the pre-push scan and the coordinator's yes.

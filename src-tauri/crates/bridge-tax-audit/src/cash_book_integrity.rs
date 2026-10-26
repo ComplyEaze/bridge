@@ -838,6 +838,14 @@ first day",
             ),
             (OpeningStockUnknown::Unreadable, "unreadable"),
             (
+                OpeningStockUnknown::NoStockItems,
+                "not taken: the read's stock items part lists no stock item",
+            ),
+            (
+                OpeningStockUnknown::NoOpeningValues,
+                "not taken: no stock item carries an opening value",
+            ),
+            (
                 OpeningStockUnknown::TooLarge,
                 "not taken: the stock items' opening values add up to more than can be held",
             ),

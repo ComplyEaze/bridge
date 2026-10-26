@@ -14302,5 +14302,45 @@
   "file": "src/book.rs",
   "from": "                \"not taken: the stock items' opening values add up to more than can be held\"\n",
   "to": "                \"not taken\"\n"
+ },
+ {
+  "id": "S1602-4",
+  "by": "author",
+  "what": "#1602: a stock-items part that lists no item reads as a known zero opening",
+  "file": "src/book.rs",
+  "from": "        Ok(masters) if masters.is_empty() => {\n            OpeningStock::Unknown(OpeningStockUnknown::NoStockItems)\n",
+  "to": "        Ok(masters) if masters.is_empty() => {\n            OpeningStock::Valued(0)\n"
+ },
+ {
+  "id": "S1602-5",
+  "by": "author",
+  "what": "#1602: items none of which carries an opening value read as a known zero opening",
+  "file": "src/book.rs",
+  "from": "            OpeningStock::Unknown(OpeningStockUnknown::NoOpeningValues)\n        }\n",
+  "to": "            OpeningStock::Valued(0)\n        }\n"
+ },
+ {
+  "id": "S1602-6",
+  "by": "author",
+  "what": "#1602: one item without an opening value makes the whole opening unknown",
+  "file": "src/book.rs",
+  "from": "        Ok(masters) if masters.values().all(|m| m.opening_value_paise.is_none()) => {\n",
+  "to": "        Ok(masters) if masters.values().any(|m| m.opening_value_paise.is_none()) => {\n"
+ },
+ {
+  "id": "S1602-7",
+  "by": "author",
+  "what": "#1602: the no-item reason loses its words",
+  "file": "src/book.rs",
+  "from": "            Self::NoStockItems => \"not taken: the read's stock items part lists no stock item\",\n",
+  "to": "            Self::NoStockItems => \"not taken\",\n"
+ },
+ {
+  "id": "S1602-8",
+  "by": "author",
+  "what": "#1602: the no-value reason loses its words",
+  "file": "src/book.rs",
+  "from": "            Self::NoOpeningValues => \"not taken: no stock item carries an opening value\",\n",
+  "to": "            Self::NoOpeningValues => \"not taken\",\n"
  }
 ]

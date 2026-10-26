@@ -2134,7 +2134,7 @@ fn totals_form_problems(post: &str, approval: &str, others: &[(String, String)])
     }
     // The note that remembers a batch is given only to a dialog asking the
     // listed form of a batch, so the totals form can never note itself.
-    let given = "(form == PreviewForm::Listed && line.vouchers.len() > 1)\n                                .then(|| self.post_approvals.note_listed_did_not_fit(batch_id)),";
+    let given = "(form == PreviewForm::Listed && preview_lists_vouchers)\n                                .then(|| self.post_approvals.note_listed_did_not_fit(batch_id)),";
     if post.matches(given).count() != 1 {
         problems.push("the note must be given only for a batch's listed form".into());
     }
@@ -2199,15 +2199,15 @@ fn only_the_approvals_holder_makes_the_totals_form() {
         ),
         (
             post.replace(
-                "(form == PreviewForm::Listed && line.vouchers.len() > 1)",
-                "(line.vouchers.len() > 1)",
+                "(form == PreviewForm::Listed && preview_lists_vouchers)",
+                "(preview_lists_vouchers)",
             ),
             approval.clone(),
             others.clone(),
         ),
         (
             post.replace(
-                "(form == PreviewForm::Listed && line.vouchers.len() > 1)",
+                "(form == PreviewForm::Listed && preview_lists_vouchers)",
                 "(form == PreviewForm::Listed)",
             ),
             approval.clone(),

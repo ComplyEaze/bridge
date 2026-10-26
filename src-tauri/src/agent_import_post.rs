@@ -773,7 +773,10 @@ impl Server {
                 send_transfer_refusal = Some((detail, step));
                 return Err(code.to_string().into());
             }
-            let preview = review_preview_for_form(&line, &self.settings.endpoint, scope, form)?;
+            let ShownPreview {
+                text: preview,
+                lists_vouchers: preview_lists_vouchers,
+            } = review_preview_for_form(&line, &self.settings.endpoint, scope, form)?;
             // Number matching precedence is not qualified for native Create.
             // Previously dispatched numbered batches remain reconcilable above.
             // Also admits, on this read's measurement, the whole-window request
@@ -1010,8 +1013,10 @@ impl Server {
                             company_marks_request.clone(),
                             // A batch's box with the voucher lines that does
                             // not fit the screen is noted, so its next ask
-                            // shows the totals (#1832). Nothing else is.
-                            (form == PreviewForm::Listed && line.vouchers.len() > 1)
+                            // shows the totals (#1832). Nothing else is: not
+                            // a totals box, nor a listed ask whose text
+                            // already stood in for the voucher lines.
+                            (form == PreviewForm::Listed && preview_lists_vouchers)
                                 .then(|| self.post_approvals.note_listed_did_not_fit(batch_id)),
                         );
                         match wait_for_answer(asked, call_budget(call_started)).await {
@@ -1866,7 +1871,7 @@ const TEXT_REFUSED_MESSAGE: &str = "Nothing was sent. This saved batch has a nar
 /// large to show whole, by the batch's length or for the screen it would open
 /// on, before any attempt (#1780). The desktop's Journal screen shows the
 /// message alone.
-const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. If the screen is the cause and the batch has more than one voucher, asking again shows its totals only, which is smaller; a larger or less magnified screen may also help. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
+const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. A larger or less magnified screen may help. If the window listed the batch's vouchers one line each, asking again soon shows its totals only, which is smaller. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
 
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };
@@ -1905,9 +1910,9 @@ fn reconciliation_failure_payload(
     if code == "voucher_text_invalid" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
     }
-    // The window for the batch was too large to show whole. Asking again shows a
-    // batch of several vouchers as totals only (#1780), and does not shrink a
-    // single voucher's window, so the message says what does.
+    // The window for the batch was too large to show whole. Asking again soon
+    // shows a window that listed the vouchers as totals only (#1832), and does
+    // not shrink any other, so the message says what does.
     if code == "import_review_too_large" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(REVIEW_TOO_LARGE_MESSAGE);
     }
@@ -2943,13 +2948,32 @@ pub(super) fn review_preview_for_form(
     endpoint: &super::super::TallyEndpointConfig,
     scope: PostScope,
     form: PreviewForm,
-) -> Result<String, String> {
+) -> Result<ShownPreview, String> {
     match scope {
-        PostScope::JournalOnly => admit_fresh_saved_voucher(line, endpoint),
+        PostScope::JournalOnly => {
+            admit_fresh_saved_voucher(line, endpoint).map(|text| ShownPreview {
+                text,
+                lists_vouchers: false,
+            })
+        }
         PostScope::Vouchers => {
-            review_preview_with_form(line, endpoint, &agent_post_timing_lines(), form)
+            review_text(line, endpoint, &agent_post_timing_lines(), form).map(|shown| {
+                let lists_vouchers = shown.lists_vouchers();
+                ShownPreview {
+                    text: shown.into_string(),
+                    lists_vouchers,
+                }
+            })
         }
     }
+}
+
+/// A preview and whether it lists the batch's vouchers one line each: what the
+/// box shows, so that a box that did not fit is noted only when it listed them
+/// (#1832).
+pub(super) struct ShownPreview {
+    pub(super) text: String,
+    pub(super) lists_vouchers: bool,
 }
 
 /// The preview an agent's post shows: the voucher or batch, and when it is
@@ -3726,7 +3750,9 @@ fn batch_review_text(
                 .collect(),
             );
             if fits(&listed) {
-                return marks.seal(line, listed.join("\n"));
+                return marks
+                    .seal(line, listed.join("\n"))
+                    .map(ReviewText::listing_vouchers);
             }
         }
         VOUCHER_LINES_DO_NOT_FIT

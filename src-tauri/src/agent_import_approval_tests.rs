@@ -3093,6 +3093,36 @@ async fn only_a_box_that_did_not_fit_notes_its_batch() {
     }
 }
 
+/// Only a text that lists the vouchers one line each says so: a batch of more
+/// than ten vouchers, and the totals form of any batch, stand in for the lines,
+/// so a box of theirs that does not fit is not one the totals can shrink
+/// (#1832).
+#[test]
+fn only_a_text_that_lists_the_vouchers_says_it_lists_them() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let (one, _) = saved_batch(&server);
+    let endpoint = server.settings.endpoint.clone();
+    let footer = agent_post_timing_lines();
+    let lists = |count: usize, form| {
+        review_text(&batch_of(&one, count), &endpoint, &footer, form)
+            .unwrap()
+            .lists_vouchers()
+    };
+    assert!(lists(2, PreviewForm::Listed));
+    assert!(lists(10, PreviewForm::Listed));
+    // over ten vouchers: the lines are not shown whichever form is asked
+    assert!(!lists(11, PreviewForm::Listed));
+    assert!(!lists(50, PreviewForm::Listed));
+    // the totals form never lists
+    assert!(!lists(2, PreviewForm::TotalsOnly));
+    assert!(!lists(10, PreviewForm::TotalsOnly));
+    // one voucher is the voucher: no lines to stand in for
+    assert!(!review_text(&one, &endpoint, &footer, PreviewForm::Listed)
+        .unwrap()
+        .lists_vouchers());
+}
+
 /// A batch of two whose box with the voucher lines does not fit the screen
 /// (#1832): the first call is refused as too large and posts nothing, the
 /// second asks the person for the totals only, and a later call posts what the

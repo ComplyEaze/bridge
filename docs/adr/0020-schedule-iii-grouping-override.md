@@ -68,6 +68,12 @@ applies those that still fit, and reports the rest without applying them. No dec
      reached through an unrelated book finds its ledger missing, or its group changed, and is not applied. After
      a year-end split the ledgers and groups match by construction, so there only the year and books-from in the
      key protect.
+   - **Events under another tuple are counted, not hidden.** The store hands the view only this book's decisions,
+     and also counts the events of the same GUID and year recorded under another company number or books-from
+     date (for example books restored into another data folder). They are never applied: they are not this
+     book's decisions. The view carries the count and is NOT FINAL, and the sheet says so instead of "None were
+     applied". Nothing clears that count in this version; deciding which book such events belong to is for the
+     authoring slice (H3).
 4. **Bound per read.** A decision applies only while its ledger keeps the **standing** it had when the decision
    was made. The standing is one of three:
    - the nearest predefined group (its `RESERVEDNAME`);
@@ -121,6 +127,9 @@ applies those that still fit, and reports the rest without applying them. No dec
    - A new append-only table in the encrypted Tally mirror, with update and delete refused by triggers.
    - Book data and a person's name belong only in the encrypted store (privacy model), never in an egress receipt,
      log or diagnostic.
+   - If the store cannot be opened, or a stored row cannot be read (one row this build does not understand fails
+     the whole set; none is skipped), the export says "Could not be read: ... NOT FINAL" and never that none
+     were applied.
 8. **Authoring is a desktop action by a person.** No MCP tool writes a decision, because a professional judgement
    needs a person as its "who". A decision leaves Bridge only in the exported workbook.
 9. **Carry-forward.** A decision from the previous year is offered in the new year, and is never applied until a
@@ -145,7 +154,7 @@ applies those that still fit, and reports the rest without applying them. No dec
   history.
 - Most early decisions will place ledgers the view refuses to classify today, rather than contradict a group
   subtotal. The record treats both the same way.
-- Until the store exists, the export presents no decisions. The view then differs from today's only by:
+- While no decision is stored for a book, the export presents none. The view then differs from today's only by:
   - a basis column;
   - a "None were applied to this export." line;
   - reworded notes;

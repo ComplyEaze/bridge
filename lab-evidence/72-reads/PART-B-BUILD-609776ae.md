@@ -1,0 +1,11 @@
+# Part B build line (27 Oct 2026): the tool rows run on master 609776ae, not on a release-candidate build
+
+`README.md` in this folder applies in full, except that part B's "built tool of the release-candidate build" is the build named here, by the run coordinator's decision of 27 Oct 2026. Every part-B tool exists on this commit: `negative_stock` (#1835), `negative_ledgers` (#1689, the commit itself), `profit_and_loss` and `balance_sheet` with `closing_stock` (#1818), `masters` with `kind=stock_items` (#1742).
+
+**BUILD.** Merge-queue run 40366984202 of Bridge CI, head `609776ae9f5cec48e6563f165480d3fe1adae445` (equal to master at this writing), artifact `unsigned-bundle-smoke-windows-latest` id 12670984633, zip digest `sha256:ae1f7267d49d099e3974cb724c1017fb1bf59501508d882718c332db129f2649` (expires 2 Nov 2026 17:27 UTC). The lab downloads it into a new empty folder, checks the zip against the digest, the `.mcpb` against `archive_sha256` and `bridge_mcp.exe` against `binary_sha256` in its `mcpb-smoke.json`, and records all three. Hash the exe before the first part-B call and after the last; another hash = STOP.
+
+**SETTINGS.** Over MCP stdio, one launch for part B, a new empty `BRIDGE_AGENT_DATA_DIR`, `BRIDGE_TERMS_ACCEPTED=true`, `BRIDGE_AGENT_ENABLE_WRITES`, `BRIDGE_AGENT_ENABLE_IMPORT`, `BRIDGE_AGENT_MAX_BYTES` and `BRIDGE_AGENT_REDACTION` unset. Record the version the tool list reports and that the four tools above are in it; a missing tool = STOP.
+
+**HOW EACH ROW IS RECORDED.** Before each row, `list_companies`: the row's company loaded alone, else STOP. Each call's answer saved whole with its sha256; the voucher and master marks from `ledger_masters` (first page, no `snapshot_id`; `snapshot.reused` false; on BRIDGE SHAPE LAB, a book with several currencies, with `fields` `compliance`, as earlier sheets read it) before and after each row, equal. The screen comparisons of B1 and B2 are made by the person at the lab computer after the call has returned, at Tally's own report screen, then back to the Gateway of Tally; no key is pressed during a call.
+
+**ANSWERS** on a new branch `lab/72-reads-rd21-b-answers` with its own `SHA256.txt`, after the pre-push scan and the run coordinator's yes.

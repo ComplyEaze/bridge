@@ -370,6 +370,52 @@ async fn the_book_holds_what_the_crates_own_fixture_holds_of_the_same_bytes() {
     assert_eq!(guids(&audit.book), guids(&theirs)[..43]);
 }
 
+/// A lab build writes the admitted read as the directory `Read::open` reads,
+/// and that directory loads the same book. The same read is not written twice,
+/// and a part path that would leave the read's folder is refused.
+#[cfg(feature = "lab-writes")]
+#[tokio::test]
+async fn a_lab_build_writes_the_admitted_read_as_a_directory_that_loads_the_same_book() {
+    let audit = read_replay(&Replay::clean()).await.0.unwrap();
+    let scratch = tempfile::tempdir().unwrap();
+    let reads = scratch.path().join("audit-reads");
+    crate::local_files::directory::ensure_private_directory(&reads).unwrap();
+    super::super::lab::write_audit_read(&reads, &audit.stored).unwrap();
+
+    let opened = Read::open(&reads.join(&audit.stored.manifest_sha256)).unwrap();
+    opened
+        .check(
+            &audit.engagement.period,
+            audit.engagement.allow_unbracketed_read,
+            audit.engagement.company_pin.as_ref(),
+        )
+        .unwrap();
+    let book = bridge_tax_audit::book::load_book(&opened, identity().display_name()).unwrap();
+    assert_eq!(
+        cash_dump(&audit.engagement, &book),
+        cash_dump(&audit.engagement, &audit.book)
+    );
+
+    assert_eq!(
+        super::super::lab::write_audit_read(&reads, &audit.stored),
+        Err("lab_audit_read_exists".to_string())
+    );
+    let escaping = StoredRead {
+        read_id: "r".to_string(),
+        company_guid: fixture_guid().to_string(),
+        manifest: b"{}".to_vec(),
+        manifest_sha256: "e".repeat(64),
+        blobs: [("parts/../escape.xml".to_string(), b"x".to_vec())].into(),
+    };
+    assert_eq!(
+        super::super::lab::write_audit_read(&reads, &escaping),
+        Err("lab_evidence_write_failed".to_string())
+    );
+    // Refused before anything is written: not even the read's folder.
+    assert!(!reads.join("e".repeat(64)).exists());
+    assert!(!reads.join("escape.xml").exists());
+}
+
 /// A book that has never held a voucher gets no census, so nothing outside the
 /// data says its window is whole: refused rather than run as an empty book.
 #[tokio::test]

@@ -974,11 +974,17 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // back from the target book. A sample would show a name that the walk cannot mask. The tools write only to a target admitted by `admit_lab_target`,
     // whose guard today is a deny list of other companies (#972); a client's ledger names could
     // appear unmasked only if that guard failed. Marking those names is a separate change.
+    // `lab_voucher_key_probe` (#685) returns no name a walk could mark: identifiers, a date,
+    // the voucher type's name and two flags, so it has no sample either.
     #[cfg(feature = "lab-writes")]
     without_a_sample.extend(
-        ["lab_import_masters", "lab_import_vouchers"]
-            .into_iter()
-            .filter(|name| registered.contains(*name)),
+        [
+            "lab_import_masters",
+            "lab_import_vouchers",
+            "lab_voucher_key_probe",
+        ]
+        .into_iter()
+        .filter(|name| registered.contains(*name)),
     );
     let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
     assert_eq!(

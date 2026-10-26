@@ -2026,6 +2026,17 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   if it is a placeholder (no name) and its `BILLDATE` is not validated; if it has a
   name, it refuses the read (`bill_allocation_field_missing`).
 
+### The `party` field of a voucher row
+
+`party` is the voucher's `PARTYLEDGERNAME` as Tally answered it, and the parse takes that one element and no
+other. For a Sales or Purchase voucher it names the customer or supplier. On a Receipt, Payment or Contra Tally can
+answer the bank or cash ledger instead: it did for the Receipts that ComplyEaze Bridge imported with the party in
+`PARTYLEDGERNAME` (TallyPrime 7.1, protocol reference section 9, and again on 7.2 in one lab sitting), and committed
+captures of hand-keyed Payments carry the bank on some rows and the party on others. So the counterparty of a
+Receipt, Payment or Contra is read from the voucher's `amounts`, not from `party`. `verify_import` does not compare
+the field. The lab answers kept the sha256 of the `vouchers` response and not its bytes, so "Tally sent the bank
+ledger" is read from the import file and the parse, not from a saved response.
+
 ## Voucher-file preparation and verification
 
 The MCPB extension exposes `verify_import` by default as a recovery tool (it

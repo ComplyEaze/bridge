@@ -798,6 +798,26 @@ fn each_tool_of_a_confusable_pair_points_to_the_other() {
 /// until the description named them an assistant reading only the tool list
 /// could not know the fields exist, or that their absence means Tally did not
 /// send them. The whole sentence is pinned, as the sentences above are.
+/// What `party` is on a Receipt: Tally's own value, which can be the bank ledger (lab sitting 4,
+/// W2), so the description sends the reader to `amounts` for the counterparty.
+#[test]
+fn the_vouchers_description_says_what_party_is_on_a_receipt() {
+    let definitions = registered_tool_definitions(true, true);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "vouchers"))
+        .expect("vouchers tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    for needle in [
+        "A row's `party` is Tally's own PARTYLEDGERNAME for the voucher",
+        "can name the bank or cash ledger",
+        "read the counterparty from `amounts`, not from `party`",
+    ] {
+        assert!(description.contains(needle), "missing: {needle}");
+    }
+}
+
 #[test]
 fn the_vouchers_description_names_the_bill_date_and_credit_period_of_an_allocation() {
     const SENTENCE: &str = "Each ledger entry's `bill_allocations` carries `reference`, `bill_type` and `amount`; where Tally sends them it also carries `bill_date` (YYYYMMDD, the original bill's date for an Agst Ref) and `credit_period` (a `value` and a `unit` of days, weeks or months, or `unit` `unrecognised` with its `text` when the text cannot be read); an allocation Tally sent neither for has neither";

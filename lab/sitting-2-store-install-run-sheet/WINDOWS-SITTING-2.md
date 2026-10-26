@@ -46,6 +46,8 @@ The lab downloads into an EMPTY folder, hashes, and compares with this block. A 
 
 STANDING RULE: Terms acceptance, posting, batch posting, ledger creation and the tax-audit box are the owner's acts in every form (the extension's settings, an environment variable, a Claude Desktop config entry, a script). This sheet writes the marker word OWNER-ACCEPTS-TERMS-HERE and never a value. The lab never touches `claude_desktop_config.json`. Posting found ON is a STOP in all three parts (nothing here posts). A tool answering `terms_not_accepted` is a STOP (in Part 2 it makes the setup VOID, as its source says).
 
+**Raw requests (Part 2 steps 0d and 8; allowed again by the owner's decision of 26 Oct 2026, which lets requests sent by curl be used to discover shapes).** Neither request is a new shape, and no builder is to be made from either: `r01` is ComplyEaze Bridge's own company-extent read (header ID `BridgeCompanyExtent`) and `r02` its company high-water read (`Bridge Agent Company High Water`), sent here only as instruments to name the loaded company and its marks. Before Part 2's step 0d, in this sheet's folder: `python -I check-request-ids.py requests`; EXPECT `census: ok 2, skipped 0, FAIL 0`; anything else = STOP, nothing sent. A screenshot of the whole Tally window comes before each send; a dialog or message box on Tally's screen before or after a send = STOP (press no key, send nothing more).
+
 ## Files (check size and sha256 first; a different value is a STOP)
 | file | bytes | sha256 |
 |---|---|---|

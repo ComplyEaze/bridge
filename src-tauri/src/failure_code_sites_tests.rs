@@ -2,15 +2,16 @@
 //! (`agent_failure_code.rs`), never a string a site writes. Sites not yet converted are counted
 //! here per production file: a snake_case literal made into a `String` (`.to_string()`,
 //! `.to_owned()`, `.into()`, `String::from(..)`, `ToolFailure::from(..)`), or a code built by
-//! `format!` with a name after its colon. The count may only fall; a converted site lowers its
-//! file's pin. Test modules (`#[cfg(test)] mod name {` to the end of a file, and `*tests.rs`)
-//! never count.
+//! `format!` with a name after its colon. Each file's pin is an upper bound that may only be
+//! lowered; a converted site lowers its file's pin. Test modules (`#[cfg(test)] mod name {` to
+//! the end of a file, and `*tests.rs`) never count.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
-/// Sites per production file under `src`, relative to the crate directory. May only shrink.
+/// Sites per production file under `src`, relative to the crate directory: upper bounds, which
+/// may only be lowered.
 const PINNED: &[(&str, usize)] = &[
     ("src/agent.rs", 38),
     ("src/agent_audit_run.rs", 2),
@@ -110,7 +111,12 @@ fn string_code_sites(source: &str) -> usize {
         .count()
 }
 
-fn scan(directory: &Path, relative: &str, found: &mut BTreeMap<String, usize>) {
+fn scan(
+    directory: &Path,
+    relative: &str,
+    found: &mut BTreeMap<String, usize>,
+    visited: &mut BTreeSet<String>,
+) {
     let Ok(entries) = fs::read_dir(directory) else {
         return;
     };
@@ -120,13 +126,15 @@ fn scan(directory: &Path, relative: &str, found: &mut BTreeMap<String, usize>) {
         let relative_path = format!("{relative}/{name}");
         if path.is_dir() {
             if name != "tests" {
-                scan(&path, &relative_path, found);
+                scan(&path, &relative_path, found, visited);
             }
         } else if name.ends_with(".rs") && !name.ends_with("tests.rs") {
             let source = fs::read_to_string(&path).expect("a production source file is readable");
+            let relative_path = relative_path.trim_start_matches('/').to_string();
+            visited.insert(relative_path.clone());
             let sites = string_code_sites(&source);
             if sites > 0 {
-                found.insert(relative_path.trim_start_matches('/').to_string(), sites);
+                found.insert(relative_path, sites);
             }
         }
     }
@@ -177,19 +185,47 @@ fn the_scan_counts_string_codes_and_nothing_else() {
 #[test]
 fn string_failure_codes_only_fall() {
     let mut found = BTreeMap::new();
+    let mut visited = BTreeSet::new();
     scan(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
         "src",
         &mut found,
+        &mut visited,
     );
-    assert!(found.len() > 10, "the scan read almost nothing: {found:?}");
-    let pinned: BTreeMap<String, usize> = PINNED
+    let pinned: BTreeMap<&str, usize> = PINNED.iter().copied().collect();
+    let mut problems = Vec::new();
+    // The floor: a scan that read nothing would find nothing. Every pinned file must have been
+    // read (it may hold fewer sites than its pin, or none), and the walk must have read the tree.
+    for file in pinned.keys() {
+        if !visited.contains(*file) {
+            problems.push(format!(
+                "{file}: pinned but not read by the scan (moved, or the tree is unreadable)"
+            ));
+        }
+    }
+    if visited.len() < 100 {
+        problems.push(format!(
+            "the scan read only {} production files",
+            visited.len()
+        ));
+    }
+    for (file, sites) in &found {
+        match pinned.get(file.as_str()) {
+            None => problems.push(format!(
+                "{file}: {sites} string failure code(s), none allowed"
+            )),
+            Some(pin) if sites > pin => problems.push(format!("{file}: {sites} > at most {pin}")),
+            Some(_) => {}
+        }
+    }
+    let table: String = found
         .iter()
-        .map(|(file, count)| ((*file).to_string(), *count))
+        .map(|(file, sites)| format!("    (\"{file}\", {sites}),\n"))
         .collect();
-    assert_eq!(
-        found, pinned,
-        "a file's count of string failure codes changed: lower its pin when a site is typed; a new \
-         string code is declared in agent_failure_code.rs instead"
+    assert!(
+        problems.is_empty(),
+        "A failure code is declared in agent_failure_code.rs, never made from a string (#1942). \
+         The pins are upper bounds and may only be lowered.\n{}\nPins as they stand now:\n{table}",
+        problems.join("\n")
     );
 }

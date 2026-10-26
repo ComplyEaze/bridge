@@ -1132,15 +1132,11 @@ impl Server {
                             &company.name,
                             &numbering_admission,
                         )?;
-                        let mark = location::parse_all_company_marks(queued.company_marks)
-                            .ok()
-                            .and_then(|rows| {
-                                location::target_voucher_mark(
-                                    &rows,
-                                    identity.company_guid(),
-                                    &company.name,
-                                )
-                            });
+                        let mark = location::aimed_voucher_mark(
+                            queued.company_marks,
+                            identity.company_guid(),
+                            &company.name,
+                        );
                         if let Ok(mut aimed) = aimed_mark.lock() {
                             *aimed = mark;
                         }
@@ -1507,8 +1503,16 @@ impl Server {
             let marks_read = self
                 .read_marks_after_post(company_marks_request.clone(), call_started)
                 .await;
+            // The after mark the span is bound with, read as the aim mark is (#1945): an omitted
+            // mark is none, so the span falls back to the post's own answer, never a zero.
+            let after_post_mark = marks_read.as_ref().ok().and_then(|marks| {
+                location::aimed_voucher_mark(marks, identity.company_guid(), &company.name)
+            });
             let (marks_after, after_read_cause) = match marks_read {
                 Ok(marks) => match location::parse_all_company_marks(&marks) {
+                    Ok(_) if location::omits_voucher_mark(&marks, identity.company_guid()) => {
+                        (None, Some("marks_readback_voucher_mark_omitted"))
+                    }
                     Ok(rows) => (Some(rows), None),
                     Err(_) => (None, Some("marks_readback_unparsed")),
                 },
@@ -1565,13 +1569,7 @@ impl Server {
                 &line.vouchers,
             ));
             let mut proof = self
-                .verify_import_after_current_dispatch(
-                    args,
-                    masters_after_post,
-                    marks_after.as_deref().and_then(|rows| {
-                        location::target_voucher_mark(rows, identity.company_guid(), &company.name)
-                    }),
-                )
+                .verify_import_after_current_dispatch(args, masters_after_post, after_post_mark)
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), proof.evidence.clone());
             proof.evidence = accumulated.clone();
@@ -3874,8 +3872,19 @@ pub(super) mod numbering;
 #[path = "agent_import_numbering_tests.rs"]
 mod numbering_tests;
 
-/// The aim snapshot's target voucher mark, for the journal tests: the post
-/// records it with its intent, and refuses (`post_mark_unrecorded`) without one.
+/// The aim snapshot's target voucher mark from its answer, for the journal tests: none when the
+/// target row omits the mark (#1945), so the post refuses (`post_mark_unrecorded`).
+#[cfg(test)]
+pub(super) fn location_aimed_voucher_mark_for_tests(
+    marks: &str,
+    guid: &str,
+    name: &str,
+) -> Option<u64> {
+    location::aimed_voucher_mark(marks, guid, name)
+}
+
+/// The target's voucher mark among parsed rows, for the journal tests: present only when exactly
+/// one loaded company is the target.
 #[cfg(test)]
 pub(super) fn location_target_voucher_mark_for_tests(
     rows: &[location::LoadedCompanyMarks],

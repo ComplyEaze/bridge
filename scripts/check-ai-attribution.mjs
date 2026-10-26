@@ -5,7 +5,7 @@
 // that never block a merge, where it finds
 //   - a "Generated with Claude" line in the title or the body, comments included (plain, Markdown-link, "by" and "using" forms;
 //     Claude or Anthropic), or a Co-authored-by trailer naming an assistant (Claude, Anthropic, Fable, Copilot, Codex, OpenAI,
-//     ChatGPT), or
+//     ChatGPT, Gemini, Aider, Cursor Agent, Devin AI, Amazon Q, Jules Bot), or
 //   - a commit that carries such a trailer or line, or has an author or committer identity that names an assistant.
 // A note says that GitHub's squash merge copies the body, and a trailer, into the commit on master as a Co-authored-by line.
 // Text is read after normalisation, so that ordinary Markdown, HTML entities, invisible characters and look-alike letters
@@ -24,11 +24,13 @@ import { fileURLToPath } from "node:url";
 
 // The assistants the rule names: Claude and Anthropic's model family names, and the other assistants that sign commits.
 // Names are matched wherever they sit ("ClaudeBot", "GitHubCopilot"), except that "Claudette" is a person.
-// "fable", "anthropic" and "codex" must not sit inside a longer word ("affable", "philanthropic").
-const AGENT = "(?:claude(?!tte)|(?<![a-z])anthropic|(?<![a-z])fable(?![a-z])|copilot|(?<![a-z])codex(?![a-z])|openai|chatgpt|(?<![a-z])(?:opus|sonnet|haiku)(?![a-z]))";
+// "fable", "anthropic", "codex", "gemini" and "aider" must not sit inside a longer word ("affable", "philanthropic", "raider"). The
+// other assistants are matched by the name they sign with ("Cursor Agent", "Devin AI", "Amazon Q", "Jules Bot"), because their bare
+// first words are ordinary names.
+const AGENT = "(?:claude(?!tte)|(?<![a-z])anthropic|(?<![a-z])fable(?![a-z])|copilot|(?<![a-z])codex(?![a-z])|openai|chatgpt|(?<![a-z])(?:opus|sonnet|haiku)(?![a-z])|(?<![a-z])gemini(?![a-z])|(?<![a-z])aider(?![a-z])|cursor\\W{0,3}agent|(?<![a-z])devin\\W{0,3}ai(?![a-z])|amazon\\W{0,3}q(?![a-z])|jules\\W{0,3}bot|google-labs-jules)";
 // The generated-with line is the one the assistant adds; a sentence about another vendor's model ("generated with OpenAI") is ordinary text.
-const GENERATED_LINE = /generated\W+(?:with|by|using)\W+(?:an?\W+)?(?:claude(?!tte)|anthropic)/i;
-const CO_AUTHOR_TRAILER = new RegExp(`^[ \\t]*co-authored-by[ \\t]*:[^\\r\\n]*${AGENT}[^\\r\\n]*$`, "im");
+const GENERATED_LINE = /generated\W+(?:with|by|using)\W+(?:(?:an?|the)\W+)?(?:claude(?!tte)|anthropic)/i;
+const CO_AUTHOR_TRAILER = new RegExp(`^[ \\t>#+*_~\`-]*co-authored-by[ \\t]*:[^\\r\\n]*${AGENT}[^\\r\\n]*$`, "im");
 const IDENTITY = new RegExp(AGENT, "i");
 
 const NAMED_ENTITIES = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", ensp: " ", emsp: " ", thinsp: " " };
@@ -68,10 +70,12 @@ const generatedLine = (text) => {
   const apart = unmarked.replace(TAG, " ").replace(ENTITY, " ").replace(/[<>|:()[\]]/g, " ");
   return GENERATED_LINE.test(spaced) || GENERATED_LINE.test(joined) || GENERATED_LINE.test(apart);
 };
-// A trailer is read plain and with comments and unknown entities deleted ("Co<!-- -->-authored-by").
+// A trailer is read plain, with comments and unknown entities deleted ("Co<!-- -->-authored-by"), and with Markdown emphasis and
+// HTML tags deleted too ("**Co-authored-by:** Claude", "<b>Co-authored-by:</b> Claude"); a quote, list or heading mark may precede it.
 const coAuthorTrailer = (text) => {
   const t = normalise(text);
-  return CO_AUTHOR_TRAILER.test(t) || CO_AUTHOR_TRAILER.test(t.replace(COMMENT, "").replace(ENTITY, ""));
+  const bare = t.replace(COMMENT, "").replace(ENTITY, "");
+  return CO_AUTHOR_TRAILER.test(t) || CO_AUTHOR_TRAILER.test(bare) || CO_AUTHOR_TRAILER.test(bare.replace(TAG, "").replace(/[*_~`\\]/g, ""));
 };
 
 // What a commit carries that the rule names: a list of short descriptions, empty for a clean commit.

@@ -88,6 +88,27 @@ test("names that only sit inside a longer word are not assistants", () => {
   assert.deepEqual(evaluate(input({ commits: [commit("Fix", SHA, ["affable", "philanthropic@example.invalid", "Opusculum Press"])] })), { findings: [] });
 });
 
+test("a Co-authored-by line with a quote, list or heading mark, emphasis or a tag before it is still noted", () => {
+  for (const line of ["> Co-authored-by: Claude <x@example.invalid>", "- Co-authored-by: Claude", "## Co-authored-by: Claude", "**Co-authored-by:** Claude", "__Co-authored-by__: Claude", "<b>Co-authored-by:</b> Claude", "<p>Co-authored-by: Claude</p>", "> > Co-authored-by: Claude"]) {
+    assert.equal(evaluate(input({ body: `Summary\n\n${line}\n` })).findings.length, 1, line);
+    assert.equal(evaluate(input({ commits: [commit(`Fix\n\n${line}\n`)] })).findings.length, 1, line);
+  }
+  assert.equal(evaluate(input({ body: "> Co-authored-by: A Person <x@example.invalid>\n" })).findings.length, 0);
+});
+
+test("the other assistants that sign commits are noted by the name they sign with, and ordinary names are not", () => {
+  for (const name of ["Gemini <x@example.invalid>", "aider (model) <noreply@example.invalid>", "Cursor Agent <x@example.invalid>", "Devin AI <x@example.invalid>", "Amazon Q <x@example.invalid>", "google-labs-jules[bot] <x@example.invalid>", "Jules Bot"]) {
+    assert.equal(evaluate(input({ commits: [commit(`Fix\n\nCo-authored-by: ${name}\n`)] })).findings.length, 1, name);
+  }
+  for (const name of ["Raider Smith", "Devin Patel", "Jules Verne", "Mouse Cursor Press", "Amazon Quinn"]) {
+    assert.deepEqual(evaluate(input({ commits: [commit(`Fix\n\nCo-authored-by: ${name}\n`)] })), { findings: [] }, name);
+  }
+});
+
+test("\"Generated with the Claude Code\" is the same line", () => {
+  assert.equal(evaluate(input({ body: "Generated with the Claude Code tool" })).findings.length, 1);
+});
+
 test("pathological markup does not make the match slow", () => {
   const started = Date.now();
   evaluate(input({ body: "<a".repeat(40_000) + "\n" + "](".repeat(40_000) + "\n" + '<a "'.repeat(20_000), commits: [commit("<a".repeat(40_000))] }));

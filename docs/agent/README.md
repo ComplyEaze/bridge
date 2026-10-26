@@ -52,7 +52,7 @@ names and bank account numbers to their first two and last two characters (a nam
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
 and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
-GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes and descriptions or contact details, and the bank statement tool's `account_last4` (the last
+GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes (an HSN description is masked under `mask_parties`) or contact details, and the bank statement tool's `account_last4` (the last
 four digits of the statement's account number) is sent under every setting. Set the
 environment variable before launch when that better fits the workflow.
 
@@ -2283,8 +2283,13 @@ refused as `proposals_legacy` (parse the statement again).
   its days give no coverage. Every row naming such a batch carries
   `"restored": true`, and `next_steps.restored` says what that means: no step
   inside ComplyEaze Bridge settles the row, so do not name it in
-  `withdraw_skips` or build or amend its rows (that is advice: a withdrawal is
-  refused only when a Contra carries the row); check in Tally whether that
+  `withdraw_skips` or build or amend its rows (that is advice, and the code refuses all
+  three: a withdrawal as `withdraw_skip_paired` where a Contra carries the row, naming that batch
+  with `"restored": true` when it is the covered one, or as `import_txn_already_posted` or
+  `withdraw_skip_invalid` where the covered batch holds the row; an amendment of the batch's
+  lineage as `import_amend_natively_posted`, since a recorded rollback covers only dispatched
+  batches and a dispatched batch's lineage is never amended; a new build that posts a row the
+  covered batch holds as `import_txn_already_posted`); check in Tally whether that
   batch's voucher for it is there and tell the person, and do not enter the
   transfer by hand or import that batch's file. A rollback never retires a skip
   that would be held without it.

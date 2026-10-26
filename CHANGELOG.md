@@ -101,9 +101,13 @@ These changes are in source and not yet in a published build.
   `"restored": true`, and the section's `next_steps.restored` (and the step of a withdrawal refused for such a
   row) says that no step inside ComplyEaze Bridge settles it, not to withdraw it or build or amend its rows, to check
   in Tally and tell the person, and not to enter the transfer by hand or import that batch's file. Nothing else in the journal changes, and no new record is
-  written. Limits: no step inside ComplyEaze Bridge settles such a row, and the note is advice, not a refusal (a
-  withdrawal of the row is refused only when a Contra carries it, and an amendment of the covered batch's lineage
-  is not refused); the covered statement's days stay blocked for the other account's
+  written. Limits: no step inside ComplyEaze Bridge settles such a row, and the note is advice, which the code
+  backs with refusals: a withdrawal of the row is refused (`withdraw_skip_paired` where a Contra carries the row,
+  naming that batch, with `"restored": true` when it is the covered one; `import_txn_already_posted` or
+  `withdraw_skip_invalid` where the covered batch holds the row), so is an amendment of the covered batch's lineage
+  (`import_amend_natively_posted`: a recorded rollback covers only dispatched batches, and a dispatched batch's lineage
+  is never amended), and so is a new build that posts a row the covered batch holds (`import_txn_already_posted`);
+  the covered statement's days stay blocked for the other account's
   coverage, so skips there stay `not_established` or `matched_unconfirmed`; a voucher that comes back in Tally
   after the restore is no longer flagged as `posted_against_skip`; the invoice stop and the local data report read
   the batch's last status as before.

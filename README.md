@@ -6,8 +6,8 @@
 ComplyEaze Bridge is an open-source (Apache-2.0) MCP server that connects
 Claude Desktop to the TallyPrime (also written Tally Prime) running on your own
 computer. It is built for chartered accountants, CA firms and accountants. It
-reads your books; from a password-protected SBI, HDFC or Union Bank of India
-statement PDF it proposes Payment, Receipt and Contra vouchers, and once every
+reads your books; from a password-protected SBI, HDFC, Union Bank of India or
+Bank of Baroda statement PDF it proposes Payment, Receipt and Contra vouchers, and once every
 ledger name is exact and every question is answered it writes them to a file
 that you import in TallyPrime yourself. What Claude reads from your books goes to your AI provider as part of
 the chat. You can ask about the trial balance, outstanding receivables and
@@ -59,12 +59,12 @@ update itself, so look for a newer version on the
 **At a glance, release 0.6.0.**
 
 - **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), one ledger's movement, and Tally's own month-wise Sales or Purchase Register for whole months (not tied to the vouchers; read on one synthetic book).
-- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
+- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
 - **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags, and Tally's Funds Flow, Ratio Analysis and negative-balance reports.
 
 "You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.6.0 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
-**Its tools.** In name order; release 0.6.0 installs 28 of them, and `gst_uncertain_vouchers` and `negative_stock` are in source, not yet in a published build. None of them changes your TallyPrime books; `audit_test_run`, in source and not yet in a published build, and off unless its setting is on, does not change them either; with posting on, two more appear, described below the table. Every call adds a receipt line,
+**Its tools.** In name order; release 0.6.0 installs 28 of them, and `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` are in source, not yet in a published build. None of them changes your TallyPrime books; `audit_test_run`, in source and not yet in a published build, and off unless its setting is on, does not change them either; with posting on, two more appear, described below the table. Every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
@@ -81,11 +81,12 @@ with no figures, to a log on this computer.
 | `ledger_movement` | A ledger’s opening, debits, credits and closing for a period | Nothing |
 | `list_companies` | The companies loaded in TallyPrime (start here) | Nothing |
 | `local_data_report` | What ComplyEaze Bridge keeps on this computer | Nothing |
-| `masters` | Voucher types, godowns, units, stock groups, cost centres, cost categories or account groups | Nothing |
+| `masters` | Voucher types, godowns, units, stock groups, stock items, cost centres, cost categories or account groups | Nothing |
 | `month_register` | Tally’s own month-wise Sales Register or Purchase Register for whole months: one row per month with Tally’s debit, credit and closing columns exactly as printed; not tied to the vouchers or the trial balance, and not compared with Tally’s register screen | Nothing |
+| `negative_ledgers` | Tally’s own Negative Ledgers list for a window, as Tally returns it and compared with no other report; an empty list is not a finding | Nothing |
 | `negative_stock` | Tally’s own Negative Stock list for a window, each item with its quantity, rate and value as Tally prints them, compared with no other report; being listed is not a finding, and an empty answer is not one either | Nothing |
 | `outstandings` | Receivables and payables with ageing, the top parties and the open bills | Nothing |
-| `parse_bank_statement` | Reads a password-protected SBI, HDFC or Union Bank of India statement PDF and proposes Payment, Receipt and Contra vouchers | A private proposals file on this computer |
+| `parse_bank_statement` | Reads a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda statement PDF and proposes Payment, Receipt and Contra vouchers | A private proposals file on this computer |
 | `profit_and_loss` | The Profit and Loss for a date range, by primary group (a book with stock items is expected to be refused) | Nothing |
 | `purchase_register` | Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
@@ -306,8 +307,9 @@ hosted CI runners for Windows x64 and Apple Silicon Mac.
 
 - Stock quantities of items inside a stock group, and stock reads on books with many masters of any kind; sales,
   purchase or tax posting; creating masters; bill-wise allocation
-- TallyPrime Education mode: the trial balance, Profit and Loss, Balance Sheet,
-  the stock summary and the `masters` read are refused; so is a read of vouchers,
+- TallyPrime Education mode: the trial balance, Profit and Loss, Balance Sheet, the
+  cash flow, the month register, `company_features`, the stock summary and the
+  `masters` read are refused; so is a read of vouchers,
   ledger movement, either register or another date-window read whose window starts
   or ends on a day other than the 1st, 2nd or 31st; so is an import file or a post
   with a voucher dated on any other day (posting on Education has not been run)

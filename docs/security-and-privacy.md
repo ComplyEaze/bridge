@@ -109,7 +109,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     each voucher `gst_uncertain_vouchers` lists, the ledgers
     listed under a group total, the ledger named when a group total cannot be
     given, the list of bill-wise ledgers waiting for approval, the suspense ledger
-    named in a build warning and the ledger in a refused cash-or-bank row), stock
+    named in a build warning, the ledger in a refused cash-or-bank row and the
+    ledgers on Tally's Negative Ledgers list), stock
     item names and their parents, godown, stock-group, cost-centre and cost-category
     names and their parents, the category a cost centre belongs to,
     and three fields of a ledger's details: the name on the PAN, the bank account
@@ -175,7 +176,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       and alteration number of each. Names, parents and categories are
       shortened under `mask_parties`; the flags are not names. In the answers
       captured they carry no amounts and no narrations. How a voucher was
-      allocated to a cost centre is not read.
+      allocated to a cost centre is not returned in 0.5.0, 0.5.1 and 0.6.0 (Tally's
+      answer to the vouchers read carries it, and those releases drop it); in
+      source and not yet in a published build, the voucher reads return it (see
+      "What the reads added since 0.5.0 send").
     - The list of bill-wise ledgers waiting for your approval sends each
       ledger's name (shortened under `mask_parties`), the date, voucher type,
       side and amount of each of its rows with its transaction label, its totals
@@ -216,6 +220,11 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       post-dated and what its status flags read) and whether it was accepted
       as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
+    - The negative ledgers read (`negative_ledgers`) sends the company name and
+      its identifier and the dates, and for each ledger on Tally's Negative
+      Ledgers list, the ledger's name (shortened under `mask_parties`), the side
+      and the closing amount. The side and the amount are not masked under any
+      setting. It holds no narrations.
     - The uncertain-voucher read (`gst_uncertain_vouchers`) sends the company,
       the voucher type name and the dates, the counts of the whole window and
       the pre-filing line, and, only for each voucher it lists as uncertain or
@@ -227,6 +236,17 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       amounts to the assistant. `mask_parties` shortens the party names in
       it and does not shorten the amounts. It holds no narrations and no
       ledger entries of the voucher.
+    - Cost-centre allocations of a voucher's ledger entries (in source and not
+      yet in a published build): each entry that carries them sends, for each
+      allocation, the name of its cost category, the name of its cost centre and
+      the amount. The reads that return a voucher's entries carry them: the
+      vouchers read and its search, and the entries the purchase and sales
+      registers list. The two names are shortened under
+      `mask_parties`, like the cost centre and cost category lists; the amount
+      is not a name and is sent under every setting. An entry whose allocations
+      cannot be read whole says so with a reason and sends none of them; an
+      allocation in a shape the read does not recognise is not sent and is not
+      flagged.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

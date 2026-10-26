@@ -128,6 +128,11 @@ impl VerifiedCompanyIdentity {
         self.company_guid.as_str()
     }
 
+    /// The GUID as its parsed type, for a builder that puts it in a formula.
+    pub(crate) fn company_guid_value(&self) -> &bridge_tally_core::company_guid::CompanyGuid {
+        &self.company_guid
+    }
+
     pub(crate) fn company_number(&self) -> &str {
         self.company_number.as_str()
     }

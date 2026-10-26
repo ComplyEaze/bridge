@@ -176,7 +176,6 @@ impl Server {
                         &company.name,
                         &from,
                         &to,
-                        None,
                         source_marks,
                     )
                     .await?;

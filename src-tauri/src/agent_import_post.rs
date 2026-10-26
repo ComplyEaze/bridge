@@ -835,6 +835,7 @@ impl Server {
             if !folded_twins(
                 &requested_ledger_names(&payload),
                 catalogue_identities.catalog().parents(),
+                catalogue_identities.catalog().aliases(),
             )
             .is_empty()
             {
@@ -1112,8 +1113,7 @@ impl Server {
                     |queued| {
                         recheck_import_admission(
                             &line,
-                            identity.company_guid(),
-                            &company.name,
+                            &identity,
                             queued.first,
                             queued.second,
                             queued.catalogue,
@@ -1131,15 +1131,11 @@ impl Server {
                             &company.name,
                             &numbering_admission,
                         )?;
-                        let mark = location::parse_all_company_marks(queued.company_marks)
-                            .ok()
-                            .and_then(|rows| {
-                                location::target_voucher_mark(
-                                    &rows,
-                                    identity.company_guid(),
-                                    &company.name,
-                                )
-                            });
+                        let mark = location::aimed_voucher_mark(
+                            queued.company_marks,
+                            identity.company_guid(),
+                            &company.name,
+                        );
                         if let Ok(mut aimed) = aimed_mark.lock() {
                             *aimed = mark;
                         }
@@ -1506,8 +1502,16 @@ impl Server {
             let marks_read = self
                 .read_marks_after_post(company_marks_request.clone(), call_started)
                 .await;
+            // The after mark the span is bound with, read as the aim mark is (#1945): an omitted
+            // mark is none, so the span falls back to the post's own answer, never a zero.
+            let after_post_mark = marks_read.as_ref().ok().and_then(|marks| {
+                location::aimed_voucher_mark(marks, identity.company_guid(), &company.name)
+            });
             let (marks_after, after_read_cause) = match marks_read {
                 Ok(marks) => match location::parse_all_company_marks(&marks) {
+                    Ok(_) if location::omits_voucher_mark(&marks, identity.company_guid()) => {
+                        (None, Some("marks_readback_voucher_mark_omitted"))
+                    }
                     Ok(rows) => (Some(rows), None),
                     Err(_) => (None, Some("marks_readback_unparsed")),
                 },
@@ -1564,13 +1568,7 @@ impl Server {
                 &line.vouchers,
             ));
             let mut proof = self
-                .verify_import_after_current_dispatch(
-                    args,
-                    masters_after_post,
-                    marks_after.as_deref().and_then(|rows| {
-                        location::target_voucher_mark(rows, identity.company_guid(), &company.name)
-                    }),
-                )
+                .verify_import_after_current_dispatch(args, masters_after_post, after_post_mark)
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), proof.evidence.clone());
             proof.evidence = accumulated.clone();
@@ -1853,11 +1851,17 @@ const STOPPED_NEXT_STEP: &str = "Nothing was sent and the approval is withdrawn.
 /// What a caller does when another batch already sent, or was found to have
 /// posted, a row of this one (#876). Tally's counters for a rejected send are
 /// not proof that the row is absent now, so Bridge never lifts the block itself.
-const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot post this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it, except an invoice released as described above.";
+const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot post this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so. The same holds when verify_import reports that batch book_rolled_back: a backup was restored over the book and its voucher may be gone, but ComplyEaze Bridge cannot tell whether it is, so tell the user that too. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it, except an invoice released as described above.";
 
 /// What a caller is told when `post_import` refuses a saved batch's own text
 /// before any attempt (#1055).
 const TEXT_REFUSED_MESSAGE: &str = "Nothing was sent. This saved batch has a narration, reference or voucher number that cannot be posted, and a saved batch cannot be changed. Correct the text, build the batch again, then post the new one.";
+
+/// What a caller is told when the approval window for a saved batch was too
+/// large to show whole, by the batch's length or for the screen it would open
+/// on, before any attempt (#1780). The desktop's Journal screen shows the
+/// message alone.
+const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. If the screen is the cause, a larger or less magnified screen may help. If the length is, a batch can be split into parts; a single voucher this long cannot be posted from here.";
 
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };
@@ -1895,6 +1899,11 @@ fn reconciliation_failure_payload(
     // have been sent is reconciled, never rebuilt.
     if code == "voucher_text_invalid" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
+    }
+    // The window for the batch was too large to show whole. Asking again does
+    // not shrink it, so the message says what does (#1780).
+    if code == "import_review_too_large" && attempted == Some(false) {
+        payload["result"]["error"]["message"] = json!(REVIEW_TOO_LARGE_MESSAGE);
     }
     // A transfer check refused the batch, and it refuses again on every request
     // until the batch is built again: the desktop is told so, not to review.
@@ -2253,8 +2262,7 @@ fn admit_queued_aim(
 #[allow(clippy::too_many_arguments)]
 fn recheck_import_admission(
     line: &ImportLedgerLine,
-    company_guid: &str,
-    company_name: &str,
+    identity: &crate::tally::VerifiedCompanyIdentity,
     first: &str,
     second: &str,
     catalogue: &str,
@@ -2265,6 +2273,7 @@ fn recheck_import_admission(
     invoice: Option<crate::tally::approved_import::QueuedInvoice<'_>>,
     invoice_control: Option<&ledger::NumberControl>,
 ) -> anyhow::Result<()> {
+    let (company_guid, company_name) = (identity.company_guid(), identity.display_name());
     // The ledgers the build found under Cash-in-Hand (#815): a record without
     // them predates the field and has nothing to check again.
     let cash_in_hand = line
@@ -2311,7 +2320,7 @@ fn recheck_import_admission(
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
-    if !folded_twins(&named, parents.parents()).is_empty() {
+    if !folded_twins(&named, parents.parents(), parents.aliases()).is_empty() {
         return Err(ApprovedImportAdmissionError::LedgerFoldedTwin.into());
     }
     // A ledger switched to bill-wise since the build would take an entry On
@@ -2355,13 +2364,7 @@ fn recheck_import_admission(
             },
         )?;
         super::invoice::admit_queued_invoice(
-            voucher,
-            company_name,
-            company_guid,
-            &catalogue,
-            control,
-            &today,
-            &queued,
+            voucher, identity, &catalogue, control, &today, &queued,
         )?;
     }
     // The binding above compares each ledger's name and GUID, not its parent,
@@ -3124,7 +3127,7 @@ fn invoice_review_preview(
     if review_text.any(has_unreviewable_format_character) {
         return Err("import_review_format_text".into());
     }
-    if !super::invoice::invoice_number_safe(number) {
+    if super::invoice::InvoiceNumber::parse(number).is_none() {
         return Err("import_review_layout_text".into());
     }
     let marks = OnAccountMarks::of(line);
@@ -3873,8 +3876,19 @@ pub(super) mod numbering;
 #[path = "agent_import_numbering_tests.rs"]
 mod numbering_tests;
 
-/// The aim snapshot's target voucher mark, for the journal tests: the post
-/// records it with its intent, and refuses (`post_mark_unrecorded`) without one.
+/// The aim snapshot's target voucher mark from its answer, for the journal tests: none when the
+/// target row omits the mark (#1945), so the post refuses (`post_mark_unrecorded`).
+#[cfg(test)]
+pub(super) fn location_aimed_voucher_mark_for_tests(
+    marks: &str,
+    guid: &str,
+    name: &str,
+) -> Option<u64> {
+    location::aimed_voucher_mark(marks, guid, name)
+}
+
+/// The target's voucher mark among parsed rows, for the journal tests: present only when exactly
+/// one loaded company is the target.
 #[cfg(test)]
 pub(super) fn location_target_voucher_mark_for_tests(
     rows: &[location::LoadedCompanyMarks],

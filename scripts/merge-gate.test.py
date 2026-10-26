@@ -82,7 +82,7 @@ class MergeGateControls(unittest.TestCase):
         # The gate runs only from origin/master's tree: build a throwaway repository whose origin/master holds exactly these scripts.
         cls.repo = cls.bin / "gate-repo"
         (cls.repo / "scripts").mkdir(parents=True)
-        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json"):
+        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json", "check-ai-attribution.mjs"):
             shutil.copyfile(ROOT / "scripts" / name, cls.repo / "scripts" / name)
         os.chmod(cls.repo / "scripts" / "merge-gate.sh", 0o755)
         cls.origin = cls.bin / "origin.git"
@@ -508,6 +508,27 @@ class MergeGateControls(unittest.TestCase):
 
     def test_known_public_agent_address_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
         self.assert_pass("public-agent-coauthor-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+
+    # -- No AI attribution (owner rule of 25 Oct 2026) -------------------------
+
+    def test_a_generated_with_line_in_the_title_or_body_blocks_in_both_forms(self):
+        for scenario in ("attribution-body-plain", "attribution-body-link", "attribution-body-comment", "attribution-title"):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "AI attribution: ")
+
+    def test_a_claude_trailer_on_a_commit_made_after_the_rule_blocks(self):
+        self.assert_blocked("attribution-trailer-after", "made after the rule")
+
+    def test_a_claude_trailer_on_a_commit_whose_date_cannot_be_read_blocks(self):
+        self.assert_blocked("attribution-trailer-undated", "its date cannot be read")
+
+    def test_a_claude_trailer_on_a_commit_made_before_the_rule_is_reported_not_refused(self):
+        result = self.assert_pass("attribution-trailer-before", "AI attribution before the rule")
+        self.assertNotIn("BLOCK", result.stdout)
+
+    def test_a_human_coauthor_after_the_rule_passes_and_a_clean_pull_request_says_so(self):
+        self.assert_pass("attribution-trailer-human-after", "no AI attribution in the title, body or commits made after the rule")
+        self.assert_pass("pass", "no AI attribution in the title, body or commits made after the rule")
 
     def test_arbitrary_customer_address_in_a_coauthor_trailer_still_blocks(self):
         self.assert_blocked("customer-coauthor-trailer", "customer email shape")

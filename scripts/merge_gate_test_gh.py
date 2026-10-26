@@ -104,7 +104,7 @@ DEFAULT_COMMIT = {
     "commit": {
         "message": "safe commit metadata",
         "author": {"name": "Maintainer", "email": "maintainer@example.invalid"},
-        "committer": {"name": "Maintainer", "email": "maintainer@example.invalid"},
+        "committer": {"name": "Maintainer", "email": "maintainer@example.invalid", "date": "2026-10-01T09:00:00Z"},
     },
     "author": {"login": "author"},
     "committer": {"login": "author"},
@@ -987,6 +987,26 @@ def state():
             "Keep the ledger-tag refusal typed.\r\n\r\n"
             "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\r\n"
         )
+        s["commits"] = [commit]
+
+    elif scenario in ("attribution-body-plain", "attribution-body-link", "attribution-body-comment", "attribution-title"):
+        # The line the owner banned on 25 Oct 2026, in both of its forms, in the body (visible and inside an HTML comment) and the title.
+        plain = "\U0001F916 Generated with Claude Code"
+        link = "\U0001F916 Generated with [Claude Code](https://claude.com/claude-code)"
+        if scenario == "attribution-title":
+            s["title"] = "Fix a thing " + plain
+        else:
+            s["body"] = DEFAULT_BODY + {"attribution-body-plain": plain, "attribution-body-link": link, "attribution-body-comment": "<!-- " + link + " -->"}[scenario] + "\n"
+
+    elif scenario in ("attribution-trailer-after", "attribution-trailer-before", "attribution-trailer-undated", "attribution-trailer-human-after"):
+        commit = dict(DEFAULT_COMMIT)
+        commit["commit"] = dict(DEFAULT_COMMIT["commit"])
+        committer = dict(DEFAULT_COMMIT["commit"]["committer"])
+        co_author = "Co-Authored-By: " + ("A Person <person@example.invalid>" if scenario == "attribution-trailer-human-after" else "Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">")
+        commit["commit"]["message"] = "Keep the ledger-tag refusal typed.\n\n" + co_author + "\n"
+        committer["date"] = {"attribution-trailer-after": "2026-10-25T13:00:00Z", "attribution-trailer-human-after": "2026-10-26T09:00:00Z",
+                             "attribution-trailer-before": "2026-10-25T12:59:59Z", "attribution-trailer-undated": ""}[scenario]
+        commit["commit"]["committer"] = committer
         s["commits"] = [commit]
 
     elif scenario == "customer-coauthor-trailer":

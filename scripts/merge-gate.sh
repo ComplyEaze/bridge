@@ -245,6 +245,37 @@ $commit_messages
 $commit_identity_names"
   fi
 fi
+# No AI attribution in public text (owner rule of 25 Oct 2026). The title and body, comments included, may not hold a
+# "Generated with Claude Code" line (plain or Markdown-link form), and a commit made on or after 2026-10-25T13:00Z may not
+# carry a Co-authored-by trailer naming Claude or Anthropic. An older commit with one is reported, not refused (the owner
+# decides what to do with those). scripts/check-ai-attribution.mjs decides; a commit with such a trailer and an unreadable
+# date counts as made after the rule. The commit list is the one proved complete above: without it this check has nothing
+# to read and the privacy scan has already reported that.
+if [ "${metadata_commits_proven:-0}" -eq 1 ]; then
+  attribution_input=$(jq -c --arg title "$title" --arg body "$raw_prbody" '{
+    title: $title, body: $body,
+    commits: ((if all(.[]; type == "array") then flatten else . end) |
+      map({sha: .sha, message: .commit.message, committed_at: (.commit.committer.date // "")}))}' <<<"$metadata_commits" 2>/dev/null) || attribution_input=""
+  if [ -z "$attribution_input" ]; then
+    unknown "could not prepare the AI attribution check"
+  else
+    : >"$errfile"
+    attribution_status=0
+    attribution_output=$(printf '%s' "$attribution_input" | node "$script_dir/check-ai-attribution.mjs" 2>"$errfile") || attribution_status=$?
+    case "$attribution_status" in
+      0|1)
+        while IFS= read -r attribution_line; do
+          case "$attribution_line" in
+            "REFUSE "*) bad "AI attribution: ${attribution_line#REFUSE }" ;;
+            "NOTE "*) say "note" "AI attribution before the rule: ${attribution_line#NOTE }" ;;
+          esac
+        done <<<"$attribution_output"
+        if [ "$attribution_status" -eq 0 ]; then say "ok" "no AI attribution in the title, body or commits made after the rule"; fi
+        ;;
+      *) unknown "could not run the AI attribution check" ;;
+    esac
+  fi
+fi
 # Paginate changed files through the REST endpoint; gh pr view hard-codes a
 # first:100 GraphQL fragment in some versions. Retain the line counts as well:
 # the privacy scan can only be complete when the textual diff describes every

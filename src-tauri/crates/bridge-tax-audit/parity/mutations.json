@@ -3636,15 +3636,15 @@
   "by": "author (Lane B)",
   "what": "rupees: paise written without zero padding",
   "file": "src/support.rs",
-  "from": "format!(\"{sign}\u20b9{grouped}.{frac:02}\")",
-  "to": "format!(\"{sign}\u20b9{grouped}.{frac}\")"
+  "from": "format!(\"{sign}₹{grouped}.{frac:02}\")",
+  "to": "format!(\"{sign}₹{grouped}.{frac}\")"
  },
  {
   "id": "SB-03",
   "by": "author (Lane B)",
   "what": "rupees: ASCII hyphen for a negative amount",
   "file": "src/support.rs",
-  "from": "let sign = if paise < 0 { \"\u2212\" } else { \"\" };",
+  "from": "let sign = if paise < 0 { \"−\" } else { \"\" };",
   "to": "let sign = if paise < 0 { \"-\" } else { \"\" };"
  },
  {
@@ -7716,8 +7716,8 @@
   "by": "author",
   "what": "the limit text prints rupees as lakh of paise",
   "file": "src/applicability_44ab.rs",
-  "from": "Some(paise) => format!(\"\u20b9{} lakh\", lakh_g(paise)?),",
-  "to": "Some(paise) => format!(\"\u20b9{} lakh\", paise),"
+  "from": "Some(paise) => format!(\"₹{} lakh\", lakh_g(paise)?),",
+  "to": "Some(paise) => format!(\"₹{} lakh\", paise),"
  },
  {
   "id": "AP-06",
@@ -14278,5 +14278,13 @@
   "file": "src/lib.rs",
   "from": "            _ => Err(AuditError::refused(\n                \"CFG-no-directory\",\n                \"a legacy_json trade-creditor source names a file this engagement did not read: only its own [roles], parsed with a directory, is read\",\n            )),\n",
   "to": "            _ => Ok(None),\n"
+ },
+ {
+  "id": "S1-12",
+  "by": "author",
+  "what": "a legacy source's stored read error taken as no names",
+  "file": "src/lib.rs",
+  "from": "                read.names.clone().map(Some).map_err(AuditError::Config)\n",
+  "to": "                read.names.clone().map(Some).or(Ok(None))\n"
  }
 ]

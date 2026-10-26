@@ -2016,6 +2016,45 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// A legacy source's file is read at parse, and what the read refused with is returned by bind
+    /// where the file was read before: after the ledger locations' refusals, as a config error.
+    #[test]
+    fn a_legacy_source_read_error_is_returned_by_bind_after_the_ledger_refusals() {
+        let dir = std::env::temp_dir().join(format!(
+            "bridge-tax-audit-legacy-error-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("bad.json"), "{ not json").unwrap();
+        let source = |path: &str| {
+            format!("trade_creditors_source = {{ kind = \"legacy_json\", path = \"{path}\" }}\n")
+        };
+        let b = book("Cash-in-Hand", "", None);
+        for (path, start) in [
+            (
+                "missing.json",
+                "legacy trade-creditor source: cannot read missing.json",
+            ),
+            ("bad.json", "legacy trade-creditor source: bad.json: "),
+        ] {
+            let e = Engagement::from_toml(&base_toml(&source(path)), &dir).unwrap();
+            match e.bind(&b) {
+                Err(AuditError::Config(m)) => assert!(m.starts_with(start), "{m}"),
+                other => panic!("{path}: {other:?}"),
+            }
+            let both = Engagement::from_toml(
+                &base_toml(&format!(
+                    "round_off_ledgers = [\"Round Off\"]\n{}",
+                    source(path)
+                )),
+                &dir,
+            )
+            .unwrap();
+            assert_eq!(both.bind(&b).unwrap_err().code(), Some(BIND_NAME_UNKNOWN));
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     // ---- [tds] and [tds_payees] (tds_payees) ----
 
     const TDS_TABLES: &str =

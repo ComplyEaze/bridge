@@ -247,7 +247,9 @@ struct LegacyRead {
 }
 
 /// An engagement whose book is read from a directory ([`Engagement::from_toml`]): the
-/// configuration both kinds share, and the read's directory. Only this type can be given to
+/// configuration both kinds share (an [`Engagement`], through `Deref` and `DerefMut`), and the
+/// read's directory. Changing or replacing the shared configuration cannot give it a path: an
+/// `Engagement` holds none. Only this type can be given to
 /// [`load_book`] and [`registry::run_canonical`]; an engagement for a book the caller holds
 /// ([`Engagement::from_toml_for_read`]) is a plain [`Engagement`] and has no directory to give.
 ///

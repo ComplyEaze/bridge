@@ -42,7 +42,8 @@ to 30 September and to 31 May 2025 on a book whose stock changes after each date
 5. `k4` Stock Summary, 1 Apr to 31 May 2025.
 6. `m-marks-D` again: must equal step 1, or STOP and report.
 7. Screenshots of Tally's own Stock Summary for 1-4-2025 to 30-9-2025 and for 1-4-2025 to 31-5-2025 (period changed
-   with Alt+F2 on the Stock Summary screen only; nothing else changed).
+   with Alt+F2 on the Stock Summary screen only; nothing else changed). Then set the period back to the one recorded at
+   step 0 of the sitting (Alt+F2 again), screenshot the Gateway showing it, and leave the report (LAB-COMMON C10).
 
 ## What to record (a record to compare, not pass/fail)
 For each of `k1` and `k3`: the `CLOSINGBALANCE` and `CLOSINGVALUE` of `Lab Gadget`, written exactly as sent. For `j-r4`
@@ -62,7 +63,7 @@ PASS: every read answered with HTTP 200, saved with size and sha256, under its b
 FAIL: anything else, reported as it happened.
 
 ## Evidence
-On a new branch `lab-evidence/1233-stock-mid-year-answers`: the answers, `SHA256.txt` listing every file, and the
+On a new branch `lab/1233-stock-mid-year-answers` (its folder `lab-evidence/1233-stock-mid-year-answers/`): the answers, `SHA256.txt` listing every file, and the
 recorded values above, after the pre-push scan and the run coordinator's yes. Screenshots stay on the lab PC, listed by
 name, size and sha256.
 

@@ -2685,7 +2685,7 @@ impl Server {
         // below a mark read after the post, unless the book was rolled back
         // (a backup restored, or another copy put in its place).
         let floor = before
-            .saturating_add(outcome.map_or(0, |outcome| outcome.counters().created))
+            .saturating_add(outcome.map_or(0, ledger::landed_count))
             .max(after_post_mark.unwrap_or(0));
         if current < floor {
             return PostSpanDecision {

@@ -813,6 +813,10 @@
       "path": "src-tauri/src/tally/connector.rs"
     },
     {
+      "path": "src-tauri/src/tally/mac_fit.rs",
+      "reason": "builds the macOS approval alert, shows it only if it fits the screen, and approves only on its second button"
+    },
+    {
       "path": "src-tauri/src/tally/mod.rs"
     },
     {

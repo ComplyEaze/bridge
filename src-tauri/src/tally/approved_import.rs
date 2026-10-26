@@ -2021,8 +2021,14 @@ fn review_title(count: VoucherCount) -> String {
 /// button may read as approving a post.
 #[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
+    // On macOS the alert is built, measured and shown by `mac_fit`, and never
+    // shown if it is taller than the screen (#1832); `rfd` shows it elsewhere.
+    let title = review_title(count);
+    if let Some(answered) = super::mac_fit::ask(&title, preview, REVIEW_BUTTON) {
+        return answered;
+    }
     rfd::MessageDialog::new()
-        .set_title(review_title(count))
+        .set_title(title)
         .set_description(preview)
         .set_level(rfd::MessageLevel::Warning)
         .set_buttons(rfd::MessageButtons::OkCancelCustom(
@@ -2101,6 +2107,10 @@ fn post_words(count: VoucherCount) -> (String, String) {
 #[cfg(not(windows))]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
     let (title, button) = post_words(count);
+    // As for the review (#1832).
+    if let Some(answered) = super::mac_fit::ask(&title, preview, &button) {
+        return answered;
+    }
     rfd::MessageDialog::new()
         .set_title(title)
         .set_description(preview)

@@ -376,6 +376,7 @@ version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "block2",
  "bridge-bank-statement",
  "bridge-tally-core",
  "bridge-tally-protocol",

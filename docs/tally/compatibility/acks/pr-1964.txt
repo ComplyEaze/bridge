@@ -1,0 +1,6 @@
+src-tauri/Cargo.lock
+src-tauri/Cargo.toml
+src-tauri/src/tally/approved_import.rs
+src-tauri/src/tally/mac_fit.rs
+src-tauri/src/tally/mod.rs
+reviewer: lamemustafa

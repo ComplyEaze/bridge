@@ -1,12 +1,19 @@
-# The bulk Journal sender of the #1713 sheet (README, steps S4 and M0). Windows PowerShell 5.1. Run from this folder:
-#   powershell -NoProfile -File .\bulk.ps1 -First 1 -Last 96 [-DryRun]
-#   powershell -NoProfile -File .\bulk.ps1 -First 97 -Last <the file read.py plan names> [-DryRun]
-# -DryRun prints the plan and sends nothing. Sends bulk\bulk-NNN.xml (made by `python -I gen.py bulk`) one at a time,
+# The bulk Journal sender of the #1713 sheet (README, steps S4 and M0). Windows PowerShell 5.1, under the PC's own
+# execution policy (never -ExecutionPolicy Bypass). From this folder:
+#   powershell -NoProfile -File .\bulk.ps1 -First 1 -Last 96 -DryRun
+# A live run is started in its own console window (README, "Running the scripts"), never as a foreground call:
+#   Start-Process powershell.exe -WorkingDirectory . -ArgumentList '-NoProfile','-File','.\bulk.ps1','-First','1','-Last','96'
+#   (M0's run: '-First','97','-Last','<the last file read.py plan names>')
+# -DryRun prints the plan and sends nothing. Before each send it writes <file>.sent in the answers folder, and it
+# refuses to start if any file of its range has a .sent file or an answer, so no write is ever sent twice; it is never
+# run again after a STOP. Sends bulk\bulk-NNN.xml (made by `python -I gen.py bulk`) one at a time,
 # in order, each once in the sheet's life, by LAB-COMMON C3's line. Before each send: the STOP file check (a file named
 # STOP in this folder, made by whoever sees a dialog on Tally's screen) and the file's sha256 against BULK-SHA256.txt.
 # After each: C3's checks (exit 0, status 200, a body whose size equals CONTENT-LENGTH, at most 2,000,000 bytes) and
 # `python -I read.py import <answer> 250`. The next file is sent only when both hold; any other answer is a STOP.
-# It pauses after the first and the last file of the run for the screenshot of Tally's window. A send with no answer
+# After the first and the last file of the run it waits for the screenshot of Tally's window: it logs WAITING and
+# sends nothing until a file named GO-<file> (for example GO-bulk-001) exists in this folder, checking for STOP
+# meanwhile. A send with no answer
 # in 10 minutes is a STOP that leaves the window open and the curl running (C3, C9); the script never ends a process.
 # Exit codes: 0 = done; 1 = STOP, a check failed; 3 = STOP, a sha256 differs; 4 = STOP, no answer in 10 minutes;
 # 5 = STOP, the STOP file.
@@ -25,32 +32,53 @@ $out = Join-Path $Evidence 'bulk'
 $log = Join-Path $out 'bulk-answers.txt'
 $readBound = 2000000
 
+$who = "bulk.ps1 -First $First -Last $Last"
+# Every start, and every refusal before the row's own log exists, is also written to <Evidence>\starts.txt, so a
+# script started in its own window leaves a record the watcher can read (README, "Running the scripts").
+function Starts([string]$what) {
+    if ($DryRun) { return }
+    try {
+        if (-not (Test-Path $Evidence)) { New-Item -ItemType Directory -Path $Evidence | Out-Null }
+        $stamp = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [Globalization.CultureInfo]::InvariantCulture)
+        Add-Content -Encoding UTF8 -Path (Join-Path $Evidence 'starts.txt') -Value ('{0} {1}: {2}' -f $stamp, $who, $what)
+    } catch { }
+}
+
+function Refuse([int]$code, [string]$why) {
+    Write-Output $why
+    Starts $why
+    exit $code
+}
+
 if (-not (($First -eq 1 -and $Last -eq 96) -or ($First -eq 97 -and $Last -ge 97))) {
-    Write-Output 'STOP: the runs are -First 1 -Last 96 (S4) and -First 97 -Last <n> (M0); nothing sent'; exit 1
+    Refuse 1 'STOP: the runs are -First 1 -Last 96 (S4) and -First 97 -Last <n> (M0); nothing sent'
 }
 $names = @($First..$Last | ForEach-Object { 'bulk-{0:000}' -f $_ })
 $plan = @(
     "bulk: $($names[0]).xml to $($names[-1]).xml ($($names.Count) files of 250 Journals), one at a time, to $url",
     "answers: $out; one line each in $log",
-    "screenshot pause after $($names[0]) and after $($names[-1]); STOP file $stopFile"
+    "screenshot pause after $($names[0]) and after $($names[-1]) (files GO-$($names[0]), GO-$($names[-1])); STOP file: STOP in this script's folder"
 )
 if ($DryRun) { $plan | ForEach-Object { Write-Output $_ }; exit 0 }
 
-if (Test-Path $stopFile) { Write-Output "STOP: the STOP file $stopFile is present; nothing sent"; exit 5 }
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Write-Output 'STOP: python is not on PATH; nothing sent'; exit 1 }
+if (Test-Path $stopFile) { Refuse 5 "STOP: the STOP file $stopFile is present; nothing sent" }
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Refuse 1 'STOP: python is not on PATH; nothing sent' }
 $expected = @{}
 foreach ($line in Get-Content -Path (Join-Path $here 'BULK-SHA256.txt')) {
     $parts = $line -split '  ', 2
     if ($parts.Count -eq 2) { $expected[$parts[1]] = $parts[0] }
 }
 foreach ($n in $names) {
-    if (-not (Test-Path (Join-Path $here "bulk\$n.xml"))) { Write-Output "STOP: bulk\$n.xml is missing (run python -I gen.py bulk); nothing sent"; exit 1 }
-    if (Test-Path (Join-Path $out "$n.answer.xml")) { Write-Output "STOP: $n was already sent (its answer file exists); nothing sent"; exit 1 }
+    if (-not (Test-Path (Join-Path $here "bulk\$n.xml"))) { Refuse 1 "STOP: bulk\$n.xml is missing (run python -I gen.py bulk); nothing sent" }
+    if ((Test-Path (Join-Path $out "$n.answer.xml")) -or (Test-Path (Join-Path $out "$n.sent"))) {
+        Refuse 1 "STOP: $n was already sent (its .sent or answer file exists); nothing sent"
+    }
 }
-if ($First -eq 97 -and -not (Test-Path (Join-Path $out 'bulk-096.answer.xml'))) {
-    Write-Output 'STOP: bulk-096 has no answer file, so S4 did not end; nothing sent'; exit 1
+if ($First -eq 97 -and -not ((Test-Path (Join-Path $out 'bulk-096.answer.xml')) -and (Test-Path (Join-Path $out 'bulk-096.sent')))) {
+    Refuse 1 'STOP: bulk-096 has no .sent and answer file, so S4 did not end; nothing sent'
 }
 if (-not (Test-Path $out)) { New-Item -ItemType Directory -Path $out | Out-Null }
+Starts "started; log $log"
 $invariant = [Globalization.CultureInfo]::InvariantCulture
 
 function Note([string]$what) {
@@ -66,9 +94,10 @@ foreach ($n in $names) {
     if ($hash -ne $expected["bulk/$n.xml"]) { Note "STOP before ${n}: its sha256 differs from BULK-SHA256.txt; not sent"; exit 3 }
     $answer = Join-Path $out "$n.answer.xml"
     $headers = Join-Path $out "$n.headers.txt"
-    $curlArgs = @('-sS', '-w', '%{http_code} %{size_download} %{time_total}', '--data-binary', ('@' + $file),
+    $curlArgs = @('-sS', '--noproxy', '*', '-w', '%{http_code} %{size_download} %{time_total}', '--data-binary', ('@' + $file),
         '-H', 'Content-Type: text/xml; charset=utf-16', '-D', $headers, $url, '-o', $answer,
         '--stderr', (Join-Path $out "$n.curl.err"))
+    New-Item -ItemType File -Path (Join-Path $out "$n.sent") | Out-Null
     Note "send $n (sha256 $hash)"
     $job = Start-Job -ScriptBlock {
         param($argv)
@@ -103,8 +132,13 @@ foreach ($n in $names) {
     Note "read ${n}: $("$check".Trim())"
     if ($code -ne 0) { Note "STOP after ${n}: its answer is not CREATED 250 with every other counter 0"; exit 1 }
     if ($n -eq $names[0] -or $n -eq $names[-1]) {
-        Read-Host "Take the screenshot of Tally's whole window now (a dialog: create the STOP file, press no key in Tally), then press Enter here" | Out-Null
-        Note "screenshot pause after $n ended"
+        $go = Join-Path $here "GO-$n"
+        Note "WAITING: take the screenshot of Tally's whole window, then create the file GO-$n in this folder (a dialog: create STOP instead, press no key in Tally)"
+        while (-not (Test-Path $go)) {
+            if (Test-Path $stopFile) { Note "STOP while waiting for GO-${n}: the STOP file is present; nothing more is sent"; exit 5 }
+            Start-Sleep -Seconds 1
+        }
+        Note "GO-$n found; the screenshot pause after $n ended"
     }
 }
 Note "DONE: $($names[0]) to $($names[-1]), $($names.Count) files, each CREATED 250"

@@ -5,7 +5,8 @@ says why; the sheet treats it as STOP), 2 = the command line is wrong.
 
   import  <answer> <created>                  an import answer: every counter present, CREATED as given, the others
                                               0, no LINEERROR; prints LASTVCHID and LASTMID
-  marks   <answer> [<company-guid>]           MARKS: exactly one COMPANY row (with that GUID, if given)
+  marks   <answer> [<company-guid>]           MARKS: exactly one COMPANY row (with that GUID, if given), its GUID,
+                                              ALTVCHID and ALTMSTID present (one absent = FAIL)
   ledgers <answer> <company-guid> [<probe>]   LEDGERS: every row of THE COMPANY, `Lab Bulk Expense` present once;
                                               prints probe=present (with GUID, parent, ALTERID) or probe=absent
   busy    <answer> <company-guid> <rows>      BUSY: VOUCHER rows counted by structure, each GUID THE COMPANY's
@@ -16,6 +17,7 @@ Decoding is C4's: UTF-16LE with or without a byte-order mark; only the character
 count lines are not rows); names are never trimmed and are printed with repr, so a trailing line break shows.
 """
 import codecs
+import math
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -112,6 +114,11 @@ def number(element, tag):
     return None if text is None else text.strip()
 
 
+def shown(value):
+    """A field that is missing prints as `absent`, never as `None` or as an empty string."""
+    return "absent" if value is None or value == "" else value
+
+
 def check_import(path, created):
     seen = {}
     results = 0
@@ -152,6 +159,10 @@ def check_marks(path, guid):
     row_guid, altvchid, altmstid = found[0]
     if guid is not None and row_guid != guid:
         raise Failed("the COMPANY row's GUID is {}, not THE COMPANY's".format(row_guid))
+    missing = [tag for tag, value in (("GUID", row_guid), ("ALTVCHID", altvchid), ("ALTMSTID", altmstid))
+               if shown(value) == "absent"]
+    if missing:
+        raise Failed("the COMPANY row has {} absent".format(", ".join(missing)))
     return "marks ok GUID {} ALTVCHID {} ALTMSTID {}".format(row_guid, altvchid, altmstid)
 
 
@@ -180,8 +191,8 @@ def check_ledgers(path, guid, probe):
             raise Failed("{} appears {} times".format(repr(probe), len(mine)))
         if mine:
             _, row_guid, parent, alterid = mine[0]
-            line += "; probe=present {} GUID {} PARENT {} ALTERID {}".format(repr(probe), row_guid, repr(parent),
-                                                                             alterid)
+            line += "; probe=present {} GUID {} PARENT {} ALTERID {}".format(
+                repr(probe), shown(row_guid), "absent" if parent is None else repr(parent), shown(alterid))
         else:
             line += "; probe=absent {}".format(repr(probe))
     return line
@@ -200,6 +211,10 @@ def check_busy(path, guid, expected):
 
 
 def plan(m0_bytes, d0_seconds):
+    if not 0 < m0_bytes <= 400_000_000:
+        raise Failed("M0's size {} is not between 1 and 400,000,000 bytes".format(m0_bytes))
+    if not (math.isfinite(d0_seconds) and d0_seconds > 0):
+        raise Failed("D0 {} is not a time above 0 s".format(d0_seconds))
     per_row = m0_bytes / M0_ROWS
     if d0_seconds >= 60:
         return "plan: D0 {} s is 60 s or more: send no more bulk files; go to S5".format(d0_seconds)

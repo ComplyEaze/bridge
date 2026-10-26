@@ -1,11 +1,13 @@
 # One row of the #1713 abandoned-create sheet (README, "Rows"), sent by script so its times are exact.
-# Windows PowerShell 5.1. Run from this folder:
+# Windows PowerShell 5.1, under the PC's own execution policy (never -ExecutionPolicy Bypass). From this folder:
 #   powershell -NoProfile -File .\row.ps1 -Row L2 -DryRun
-#   powershell -NoProfile -File .\row.ps1 -Row L2 -CompanyGuid <S1's GUID> -BusySeconds <D> -BusyBytes <M1's size> -BusyRows <M1's rows>
+# A live row runs in its own console window, started as README "Running the scripts" says, never as a foreground call:
+#   Start-Process powershell.exe -WorkingDirectory . -ArgumentList '-NoProfile','-File','.\row.ps1','-Row','L2',
+#     '-CompanyGuid','<S1''s GUID>','-BusySeconds','<D>','-BusyBytes','<M1''s size>','-BusyRows','<M1''s rows>'
 # -DryRun prints the row's five plan lines and sends nothing. Every curl.exe runs in its own job; each job records its
 # own start and end time (UTC, milliseconds) and exit code into times.txt, so the order of answers is read from the log.
 # Every line written to times.txt is also printed. The script sends nothing more once a file named STOP exists in this
-# folder (made by whoever sees a dialog on Tally's screen): it checks before every send and about five times a second
+# folder (made by whoever sees a dialog on Tally's screen): it checks before every send and at least once a second
 # while it waits, then waits for any curl still running to end by itself and exits. It never ends a curl or a process.
 # Exit codes: 0 = row done or VOID; 1 = STOP, a check failed; 3 = STOP, a request's sha256 differs; 4 = STOP, the
 # D + 10 minute watchdog; 5 = STOP, the STOP file.
@@ -36,37 +38,55 @@ $bLimit = if ($Row -in @('L1', 'L1B')) { 0 } else { 20 }
 $readBound = 2000000
 $busyBound = 400000000
 
+$who = "row.ps1 -Row $Row"
+# Every start, and every refusal before the row's own log exists, is also written to <Evidence>\starts.txt, so a
+# script started in its own window leaves a record the watcher can read (README, "Running the scripts").
+function Starts([string]$what) {
+    if ($DryRun) { return }
+    try {
+        if (-not (Test-Path $Evidence)) { New-Item -ItemType Directory -Path $Evidence | Out-Null }
+        $stamp = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [Globalization.CultureInfo]::InvariantCulture)
+        Add-Content -Encoding UTF8 -Path (Join-Path $Evidence 'starts.txt') -Value ('{0} {1}: {2}' -f $stamp, $who, $what)
+    } catch { }
+}
+
+function Refuse([int]$code, [string]$why) {
+    Write-Output $why
+    Starts $why
+    exit $code
+}
+
 $plan = @(
-    "row $Row; evidence $dir; STOP file $stopFile",
+    "row $Row; evidence $dir; STOP file: STOP in this script's folder",
     "A: busy-year.xml, limit $aLimit (0 = none), at T0",
     $(if ($Row -eq 'L5') { "B: $create, limit $bLimit, when A's curl has exited; netstat 10 s after B is sent" }
       else { "B: $create, limit $bLimit (0 = none), at T0 + 5 s; netstat 10 s after B is sent" }),
     $(if ($Row -eq 'L1') { 'C: none' }
-      elseif ($Row -eq 'L1B') { 'C: ledgers.xml, no limit, at T0 + 26 s; sent again every 10 s, up to 30 times, only after curl exit 7, 52 or 56' }
-      else { 'C: ledgers.xml, no limit, at T0 + 26 s or 1 s after B''s curl has exited, whichever is later; sent again every 10 s, up to 30 times, only after curl exit 7, 52 or 56' }),
+      elseif ($Row -eq 'L1B') { 'C: ledgers.xml, no limit, at T0 + 26 s; sent again 30 s apart after curl exit 7 until D + 10 minutes after the first C, and at most 5 times after exit 52 or 56' }
+      else { 'C: ledgers.xml, no limit, at T0 + 26 s or 1 s after B''s curl has exited, whichever is later; sent again 30 s apart after curl exit 7 until D + 10 minutes after the first C, and at most 5 times after exit 52 or 56' }),
     $(if ($Row -eq 'L1') { 'observation: none (LEDGERS and MARKS by hand after the row)' }
       else { 'observation: LEDGERS, MARKS and netstat at C answered + 1, + 5, + 15 and + 30 minutes' })
 )
 if ($DryRun) { $plan | ForEach-Object { Write-Output $_ }; exit 0 }
 
 # Nothing is sent, and no folder is made, unless every one of these holds.
-if (Test-Path $stopFile) { Write-Output "STOP: the STOP file $stopFile is present; nothing sent"; exit 5 }
+if (Test-Path $stopFile) { Refuse 5 "STOP: the STOP file $stopFile is present; nothing sent" }
 if ($CompanyGuid -notmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {
-    Write-Output 'STOP: -CompanyGuid must be THE COMPANY''s GUID as MARKS recorded it at S1; nothing sent'; exit 1
+    Refuse 1 'STOP: -CompanyGuid must be THE COMPANY''s GUID as MARKS recorded it at S1; nothing sent'
 }
-if ($BusySeconds -lt 40 -or $BusySeconds -gt 300) { Write-Output 'STOP: -BusySeconds (D, from M1) must be 40 to 300; nothing sent'; exit 1 }
+if ($BusySeconds -lt 40 -or $BusySeconds -gt 300) { Refuse 1 'STOP: -BusySeconds (D, from M1) must be 40 to 300; nothing sent' }
 if ($Row -eq 'L5' -and $BusySeconds -lt 55) {
-    Write-Output 'STOP: L5 needs D of at least 55 s, because B is sent only when A has exited; record L5 as not run; nothing sent'; exit 1
+    Refuse 1 'STOP: L5 needs D of at least 55 s, because B is sent only when A has exited; record L5 as not run; nothing sent'
 }
-if ($BusyBytes -le 0 -or $BusyBytes -gt $busyBound) { Write-Output 'STOP: -BusyBytes (M1''s size) must be 1 to 400,000,000; nothing sent'; exit 1 }
-if ($BusyRows -le 0) { Write-Output 'STOP: -BusyRows (M1''s VOUCHER rows) must be given; nothing sent'; exit 1 }
+if ($BusyBytes -le 0 -or $BusyBytes -gt $busyBound) { Refuse 1 'STOP: -BusyBytes (M1''s size) must be 1 to 400,000,000; nothing sent' }
+if ($BusyRows -le 0) { Refuse 1 'STOP: -BusyRows (M1''s VOUCHER rows) must be given; nothing sent' }
 $drive = New-Object System.IO.DriveInfo ((Split-Path -Qualifier $Evidence))
 $needed = 2 * $BusyBytes + 1073741824
 if ($drive.AvailableFreeSpace -lt $needed) {
-    Write-Output "STOP: $($drive.AvailableFreeSpace) bytes available on the evidence drive, below 2 x M1's size + 1 GB ($needed); nothing sent"; exit 1
+    Refuse 1 "STOP: $($drive.AvailableFreeSpace) bytes available on the evidence drive, below 2 x M1's size + 1 GB ($needed); nothing sent"
 }
-if (Test-Path $dir) { Write-Output "STOP: the evidence folder $dir already exists; nothing sent"; exit 1 }
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Write-Output 'STOP: python is not on PATH, so no answer can be read; nothing sent'; exit 1 }
+if (Test-Path $dir) { Refuse 1 "STOP: the evidence folder $dir already exists; nothing sent" }
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Refuse 1 'STOP: python is not on PATH, so no answer can be read; nothing sent' }
 
 $expected = @{}
 foreach ($line in Get-Content -Path (Join-Path $here 'SHA256.txt')) {
@@ -77,8 +97,10 @@ foreach ($line in Get-Content -Path (Join-Path $here 'SHA256.txt')) {
 New-Item -ItemType Directory -Path $dir | Out-Null
 $log = Join-Path $dir 'times.txt'
 $plan | Set-Content -Encoding UTF8 $log
+Starts "started; log $log"
 $script:running = @{}
 $script:queued = @{}
+$script:bytes = @{}
 $script:halting = $false
 $invariant = [Globalization.CultureInfo]::InvariantCulture
 
@@ -114,7 +136,9 @@ function Start-Send([string]$file, [string]$name, [int]$limit) {
     $path = Join-Path $requests $file
     $hash = (Get-FileHash -Algorithm SHA256 -Path $path).Hash.ToLower()
     if ($hash -ne $expected["requests/$file"]) { Halt 3 "STOP before ${name}: the sha256 of $file differs from SHA256.txt; $name not sent" }
-    $curlArgs = @('-sS', '-w', '%{http_code} %{size_download} %{time_connect} %{time_starttransfer} %{time_total}',
+    $script:bytes[$name] = (Get-Item -Path $path).Length
+    $curlArgs = @('-sS', '--noproxy', '*', '-w',
+        '%{http_code} %{size_download} %{size_upload} %{time_connect} %{time_starttransfer} %{time_total}',
         '--data-binary', ('@' + $path), '-H', 'Content-Type: text/xml; charset=utf-16',
         '-D', (Join-Path $dir "$name.headers.txt"), '-o', (Join-Path $dir "$name.xml"),
         '--stderr', (Join-Path $dir "$name.curl.err"))
@@ -154,13 +178,14 @@ function Finish([string]$name) {
     $script:running.Remove($name)
     $fields = "$($result.Printed)" -split ' '
     $r = [pscustomobject]@{ Name = $name; Code = [int]$result.Code; Start = [DateTime]::new([long]$result.Start, 'Utc');
-        End = [DateTime]::new([long]$result.End, 'Utc'); Status = ''; Size = -1L; Connect = -1.0; Total = -1.0; Length = '';
+        End = [DateTime]::new([long]$result.End, 'Utc'); Status = ''; Size = -1L; Upload = -1L; Connect = -1.0; Total = -1.0; Length = '';
         File = (Join-Path $dir "$name.xml") }
     try {
         $r.Status = $fields[0]
         $r.Size = [long]$fields[1]
-        $r.Connect = [double]::Parse($fields[2], $invariant)
-        $r.Total = [double]::Parse($fields[4], $invariant)
+        $r.Upload = [long]$fields[2]
+        $r.Connect = [double]::Parse($fields[3], $invariant)
+        $r.Total = [double]::Parse($fields[5], $invariant)
     } catch { }
     $headers = Join-Path $dir "$name.headers.txt"
     if (Test-Path $headers) {
@@ -236,7 +261,7 @@ function Read-State([string]$tag) {
 # end by itself rather than ended with the script.
 $script:ready = $true
 trap {
-    if (-not $script:ready) { Write-Output "STOP: the script failed before anything was sent: $($_.Exception.Message)"; exit 1 }
+    if (-not $script:ready) { Refuse 1 "STOP: the script failed before anything was sent: $($_.Exception.Message)" }
     if ($script:halting) { exit 1 }
     Halt 1 "STOP: the script failed: $($_.Exception.Message)"
 }
@@ -282,8 +307,11 @@ if ($Row -ne 'L1B') {
         Require-Abandoned $aResult 'A'
     }
     $void = ''
-    if ($bResult.Code -eq 28 -and $bResult.Connect -gt 0) {
-        Note 'B abandoned at its limit with a connection made: the row counts'
+    $bBytes = $script:bytes['B']
+    if ($bResult.Code -eq 28 -and $bResult.Connect -gt 0 -and $bResult.Upload -eq $bBytes) {
+        Note "B abandoned at its limit with a connection made and all $bBytes bytes uploaded: the row counts"
+    } elseif ($bResult.Code -eq 28 -and $bResult.Connect -gt 0) {
+        $void = "VOID-not-sent: B's connection was made but only $($bResult.Upload) of its $bBytes bytes were uploaded"
     } elseif ($bResult.Code -eq 0) {
         $void = 'VOID-answered: B was answered within its limit, so nothing was abandoned'
         $check = Read-Check @('import', $bResult.File, '1')
@@ -299,6 +327,9 @@ if ($Row -ne 'L1B') {
         Note "$void; no C is sent"
         if ($Row -in @('L2', 'L3')) {
             $aResult = Require 'A' $busyBound $null
+            $busy = Read-Check @('busy', $aResult.File, $CompanyGuid, "$BusyRows")
+            Note "read A: $($busy.Out)"
+            if ($busy.Code -ne 0) { Halt 1 'STOP: A''s answer failed its read' }
         }
         Note 'row done (void)'
         exit 0
@@ -310,9 +341,17 @@ $cAt = $t0.AddSeconds(26)
 if ($Row -ne 'L1B' -and $bResult.End.AddSeconds(1) -gt $cAt) { $cAt = $bResult.End.AddSeconds(1) }
 Wait-Until $cAt
 $cResult = $null
-for ($try = 1; $try -le 30; $try++) {
+# C is sent again only while Tally refuses it (exit 7), 30 s apart, until D + 10 minutes after the first C: well past
+# the 523 s of refusals reference 11b.2 measured after an abandoned read. A send that ended 52 or 56 may have reached
+# Tally, so those are sent again at most 5 times.
+$cDeadline = $null
+$closed = 0
+$try = 0
+while (-not $cResult) {
+    $try++
     $name = "C$try"
     Start-Send 'ledgers.xml' $name 0 | Out-Null
+    if (-not $cDeadline) { $cDeadline = $script:queued[$name].AddSeconds($BusySeconds + 600) }
     $r = Finish $name
     if ($r.Code -eq 0) {
         $why = Test-Answer $r $readBound
@@ -323,15 +362,21 @@ for ($try = 1; $try -le 30; $try++) {
         $r | Add-Member -NotePropertyName Read -NotePropertyValue $check.Out
         $cResult = $r
         Note "C is $name"
-        break
     } elseif ($r.Code -in @(7, 52, 56)) {
-        Note "$name not answered (curl exit $($r.Code)); sent again in 10 s"
-        Wait-Until ([DateTime]::UtcNow.AddSeconds(10))
+        if ($r.Code -ne 7) {
+            $closed++
+            if ($closed -gt 5) { Halt 1 "STOP: $name is the sixth C to end with exit 52 or 56; no C is sent again" }
+        }
+        $next = [DateTime]::UtcNow.AddSeconds(30)
+        if ($next -gt $cDeadline) {
+            Halt 1 'STOP: no C was answered by D + 10 minutes after the first C. C9: do nothing more, report and wait'
+        }
+        Note "$name not answered (curl exit $($r.Code)); sent again in 30 s"
+        Wait-Until $next
     } else {
         Halt 1 "STOP: $name ended with curl exit $($r.Code): the request failed"
     }
 }
-if (-not $cResult) { Halt 1 'STOP: no C was answered in 30 tries' }
 $cState = Probe-State $cResult.Read
 
 if ($Row -eq 'L1B') {
@@ -347,6 +392,7 @@ if ($Row -eq 'L1B') {
         Halt 1 'STOP: the ends are not ordered A < B < C; L2 is not run; the run coordinator decides'
     }
     Note 'ORDER ok: A < B < C'
+    if ($cState -ne 'present') { Halt 1 'STOP: L1B''s C, answered after B, does not show Lab Probe L1B; L2 is not run; the run coordinator decides' }
 }
 if ($Row -in @('L2', 'L3') -and $cResult.End -le $aResult.End) {
     Note 'FINDING: C ended before A''s answer ended (C did not queue behind A)'

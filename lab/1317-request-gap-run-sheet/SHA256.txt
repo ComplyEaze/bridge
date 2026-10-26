@@ -1,8 +1,9 @@
 # sha256  bytes  file  (source of each request)
+030fd76873c0331517a34e7b659a1ff1f661c4271948a68f35d3b3f5746e012c  63  .gitattributes  
 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md  byte for byte from lab/626-1038-1050-run-sheets at 8c602c15
-5a9efefb7a6ae4748087be710152a43d09bb35503c8ba4301d0d609c819dac2a  5033  RUN-SHEET.md  
+040108dd02e50f7fc2c87e5624b04f2200dc0e0ed80cc9a5691214f56070ed54  6233  RUN-SHEET.md  
 1a52f9324376186f6d6da6af3abe98a9b8187010a50c91807ec183d48c55eb4e  1055  RESPONSE-FORM.md  
-19ad1e9143152710d6afe4c76e202546fbdd57ae3df8e4a02143aaa6eb9faa9d  3323  driver.ps1  
+48b8c359ba694f560a33ff06b51571a82cb598c1e4339f032225ea3cef84066b  3547  driver.ps1  
 d27b9734312d541bb667f6865a3f69f2afebc11811880fe34eac5d1b6b89bdc8  1442  requests/c01_census_20250501.request.utf16le.xml  committed note-days/credit_note_day_voucher_census_request.utf16le.xml, company and day changed
 68be0c49e04d928e143a33d0c988be8a296de76383f394e9c1f1aa606bb01a13  1442  requests/c02_census_20250502.request.utf16le.xml  committed note-days/credit_note_day_voucher_census_request.utf16le.xml, company and day changed
 3034c0771b7e752485b27ab483496dc16725b31af07c1cf655f3ff7d63b8edeb  1442  requests/c03_census_20250503.request.utf16le.xml  committed note-days/credit_note_day_voucher_census_request.utf16le.xml, company and day changed
@@ -44,3 +45,4 @@ df669997d12e3d455bbc1a7baae0ae23a41820f5a5e36fff23843945e35e32c8  1442  requests
 d234613cbb3202396cd2e681a56e51ac7143f99163e3d816763659fab88d583a  1442  requests/c39_census_20250608.request.utf16le.xml  committed note-days/credit_note_day_voucher_census_request.utf16le.xml, company and day changed
 d5c58f17d2f64509c278981cfbe5b2aff55ee5fb0ee15ba2f87c92dd5e4e8ef1  1442  requests/c40_census_20250609.request.utf16le.xml  committed note-days/credit_note_day_voucher_census_request.utf16le.xml, company and day changed
 040ac47754c40a4e2e736f8be2b3f37cac924213ea66c8c4f0074222f9a00280  982  requests/m00_marks.request.utf16le.xml  committed note-days/shape_lab_company_marks_request.utf16le.xml, company changed
+8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py  byte for byte from lab/628-c0 at fa7412db

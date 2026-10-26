@@ -1,7 +1,8 @@
 # Sends the 40 census requests of this folder one at a time, with a fixed gap between the end of one answer and the
 # next send, and records each with LAB-COMMON C3's checks. Reads only. Usage (Windows PowerShell, from this folder):
-#   powershell -NoProfile -ExecutionPolicy Bypass -File .\driver.ps1 -GapMs 500 -RunName A1
+#   powershell -NoProfile -File .\driver.ps1 -GapMs 500 -RunName A1
 # It stops at the first request that fails C3 or takes more than 20 s, and never sends a request twice.
+# It also sends nothing more once a file named STOP exists in this folder (made by a person who sees a dialog).
 param(
     [Parameter(Mandatory = $true)][ValidateSet(250, 500)][int]$GapMs,
     [Parameter(Mandatory = $true)][ValidatePattern('^[AB][12]$')][string]$RunName
@@ -28,6 +29,7 @@ $first = $true
 foreach ($f in $files) {
     if (-not $first) { Start-Sleep -Milliseconds $GapMs }
     $first = $false
+    if (Test-Path (Join-Path $here 'STOP')) { "STOP before $($f.Name): the STOP file is present; not sent" | Add-Content $log; exit 5 }
     $rel = 'requests/' + $f.Name
     $hash = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
     if ($hash -ne $expected[$rel]) { "STOP before $($f.Name): its sha256 differs from SHA256.txt; not sent" | Add-Content $log; exit 3 }

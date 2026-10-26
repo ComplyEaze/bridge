@@ -24,6 +24,30 @@
     {
       "uuid": "aae372c5-a894-491c-8843-5532e43d2d2f",
       "note": "company identifier of the synthetic lab company BRIDGE GST LEDGER LAB, created on Tally's screen for a lab item on 25 Oct 2026: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml added by pull request 1867, whose provenance table names the book; every ledger and voucher identifier in those captures carries it as a prefix"
+    },
+    {
+      "uuid": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c",
+      "note": "company identifier of the invented company of the tax-audit crate's synthetic read: the hand-written GUID constant in src-tauri/crates/bridge-tax-audit/parity/generate_fixture.py on master (added in a845b66a1, #501); the synthetic read and its goldens carry it, the voucher and ledger identifiers in them with a counter suffix; already in 45 tracked files"
+    },
+    {
+      "uuid": "f107e523-3d6b-4516-bd24-5b1a14498fa6",
+      "note": "company identifier of the synthetic lab company BRIDGE MASTERS LAB: src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab.PROVENANCE.md names the company beside this GUID, beside the read-only captures src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-*.utf16le.xml; both are added by pull request #1650 (commit e40ebb65259d135e5c7c5557e7703ab8660a7377), so the value is listed ahead of that merge"
+    },
+    {
+      "uuid": "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
+      "note": "company identifier of the synthetic lab company BRIDGE OUTSTANDINGS LAB: the parse record src-tauri/crates/bridge-tally-protocol/tests/parse_record/agent__native-outstandings-detail-company-list.utf16le.xml.parse_companies_from_collection.txt on master (added in 4d4ca9e32dda203206a01665e05d9811a7dd62d9) lists the company by that name with this GUID, and the identifiers of its groups and ledgers in the same captures carry this value as a prefix"
+    },
+    {
+      "uuid": "ae1490be-52c5-4544-9ffc-4b7da85f9797",
+      "note": "company identifier of the synthetic lab company BRIDGE GST RECON LAB, whose register captures the parse records named REGISTER_LAB describe: src-tauri/crates/bridge-tally-protocol/tests/parse_record/agent__register-e2e__native-register-e2e-book-extent.utf16le.xml.parse_company_book_extent_v2_REGISTER_LAB_.txt on master (added in 4d4ca9e32dda203206a01665e05d9811a7dd62d9) gives the company name and this GUID, and the identifiers of that company's groups and ledgers carry this value as a prefix"
+    },
+    {
+      "uuid": "eebb9a9f-1679-4468-9e8f-814c729674cb",
+      "note": "company identifier of the synthetic lab company Bridge Ageing Lab: src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml on master (added in 15e7549088aedd5eb2331391dc8bfa7931450afc) names it, beside this GUID"
+    },
+    {
+      "uuid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+      "note": "company identifier of the synthetic lab company BRIDGE PILOT LAB: src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md on master (added in 16b934397e28976b3e4ec0ed4a460123dd4d9e95) names the company beside this GUID, and the pilot-lab captures in that folder carry it"
     }
   ]
 }

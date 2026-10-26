@@ -760,6 +760,15 @@ fn a_read_refused_for_the_company_identity_names_that_cause_and_the_next_step() 
     }
 }
 
+/// A read for a company that is not among those open is refused as
+/// `company_identity_not_found`, and the refusal says what to do about it.
+#[test]
+fn a_company_identity_not_found_names_the_next_step() {
+    let step = remediation_for("company_identity_not_found", None).expect("a next step");
+    assert!(step.contains("list_companies"), "{step}");
+    assert!(step.contains("open it in Tally"), "{step}");
+}
+
 #[test]
 fn ledger_master_fields_reject_unknown_schema_values() {
     assert_eq!(
@@ -927,11 +936,9 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // item names and the voucher's party). The sample is built in this test like the others, so it
     // tests the walk, not the tool.
     //
-    // Known gap, lab-only (#999): the same names come back UNMARKED where they appear as another
-    // field: a stock item's `parent` and `base_unit`, and a voucher entry's `stock_item` and
-    // `godown` and a batch's `godown`. Under `MaskParties` a unit masked in `units` stays in the
-    // clear as a `base_unit`. The sample's values for those fields are not party-like, so the walk
-    // cannot see it. Marking them is a separate change.
+    // The names a stock item's `parent` and `base_unit`, a voucher entry's `stock_item` and `godown`
+    // and a batch's `godown` carry are marked too (#999), so the sample uses party-like values for
+    // them: a unit masked in `units` is masked as a `base_unit`, and the walk would see it if not.
     #[allow(unused_mut)] // only pushed to when the `lab-writes` feature is compiled in
     let mut lab_samples: Vec<(&str, Value)> = Vec::new();
     #[cfg(feature = "lab-writes")]
@@ -942,13 +949,19 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
                 "units": [{"name": party_name("Customer One"), "decimal_places": "3"}],
                 "stock_items": [{
                     "name": party_name("Supplier Two"),
-                    "parent": "Primary",
+                    "parent": party_name("Customer One"),
+                    "base_unit": party_name("Entry Ledger"),
                     "hsn_code": "2836",
                 }],
                 "vouchers": {
                     "items": [{
                         "party": party_name("Customer One"),
-                        "inventory_entries": [{"stock_item": "Widget", "amount": "-8000.00"}],
+                        "inventory_entries": [{
+                            "stock_item": party_name("Supplier Two"),
+                            "godown": party_name("PAN Holder"),
+                            "amount": "-8000.00",
+                            "batch_allocations": [{"godown": party_name("Entry Ledger")}],
+                        }],
                     }],
                     "offset": 0,
                 },

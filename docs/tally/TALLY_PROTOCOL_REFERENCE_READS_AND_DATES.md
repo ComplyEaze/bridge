@@ -417,6 +417,17 @@ company profile described here. It does **not** establish that other releases,
 modes, or Group shapes emit the field; Bridge must continue to fail closed when
 the response lacks or mismatches the selected company GUID.
 
+**Release 7.2 sends the computed field earlier in each row — PARTIAL; one book, one release, one send.** The
+same request on licensed TallyPrime 7.2 Silver (25 Oct 2026) against `BRIDGE TIEOUT B` returned a
+response of the same size (54,280 bytes) with the same 28 Group rows in the same order and every value
+equal to the 7.1 capture of that book. Inside each row the computed `BRIDGECOMPANYGUID` comes before
+Tally's `PRIMARYGRPPARENT`; on 7.1 it came after it. The reorder was seen in one send and was not repeated. The fixture is
+`statement_groups_stock_book_72_live.utf16le.xml` (sha256 `493256b2…`; provenance in
+`STATEMENT_CAPTURE_PROVENANCE.md`). The group readers take a row's children by name, so both
+captures give the same records; only the per-row source hash, taken over the row's bytes, differs
+(`tests/groups_release_72.rs`). A reader that depended on the order of a row's children would not be
+safe across the two releases. Not measured: another book on 7.2, Gold, another release.
+
 ### 8.2a Curated `BILLALLOCATIONS` drops the `On Account` type — **VERIFIED 2026-09-11; single instance**
 
 **Scope: TallyPrime 7.1 Silver, licensed, `education_mode: false`, one company, 144 allocations.**

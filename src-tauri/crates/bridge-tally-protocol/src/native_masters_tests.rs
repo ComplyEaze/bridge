@@ -37,6 +37,10 @@ fn response(kind: NativeMasterKind) -> String {
         NativeMasterKind::StockGroups => {
             &include_bytes!("../tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml")[..]
         }
+        // The item list with an item that carries two dated HSN and two dated GST entries.
+        NativeMasterKind::StockItems => &include_bytes!(
+            "../tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml"
+        )[..],
         // Captured 7 Oct 2026 on a book whose Cost Centres flag reads No and that holds two centres.
         NativeMasterKind::CostCentres => &include_bytes!(
             "../tests/fixtures/masters_cost_centres_shape_lab_flag_no_live.utf16le.xml"
@@ -62,6 +66,9 @@ fn request_fixture(kind: NativeMasterKind) -> String {
         NativeMasterKind::StockGroups => {
             &include_bytes!("../tests/fixtures/masters_stock_groups_request.utf16le.xml")[..]
         }
+        NativeMasterKind::StockItems => {
+            &include_bytes!("../tests/fixtures/masters_stock_items_request.utf16le.xml")[..]
+        }
         NativeMasterKind::CostCentres => {
             &include_bytes!("../tests/fixtures/masters_cost_centres_request.utf16le.xml")[..]
         }
@@ -85,6 +92,7 @@ fn reads_lab_response(kind: NativeMasterKind) -> String {
             &include_bytes!("../tests/fixtures/masters_godowns_reads_lab_live.utf16le.xml")[..]
         }
         NativeMasterKind::VoucherTypes
+        | NativeMasterKind::StockItems
         | NativeMasterKind::CostCentres
         | NativeMasterKind::CostCategories => {
             panic!("no READS LAB capture of this kind")
@@ -99,6 +107,7 @@ fn captured_rows(kind: NativeMasterKind) -> usize {
         NativeMasterKind::Godowns => 2,
         NativeMasterKind::Units => 4,
         NativeMasterKind::StockGroups => 3,
+        NativeMasterKind::StockItems => 12,
         NativeMasterKind::CostCentres | NativeMasterKind::CostCategories => 2,
     }
 }

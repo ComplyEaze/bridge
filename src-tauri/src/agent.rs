@@ -1016,12 +1016,28 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// voucher another way (#1709).
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "voucher_mark_contradiction" => Some(
+            "Tally gave this company's voucher mark earlier in this check and then twice without it, \
+             so this check recorded nothing and did not settle the post. Run the same call again \
+             once. If it is refused again, ask the person whether the company's books are being \
+             restored or replaced in Tally.",
+        ),
         "company_identity_absent_or_ambiguous" | "company_identity_not_matched" => Some(
             "Tally did not confirm the selected company as exactly one loaded company, so nothing \
              was returned. The company may not be loaded in Tally, may have been renamed since \
              list_companies, or Tally may list it more than once. Ask the user to open the company \
              in Tally, then call list_companies again and repeat the request with the \
              company_guid it returns.",
+        ),
+        // The company list Tally returned held no company with the GUID given (or, after a read
+        // began, none with the identity it began on). The 7.2 read regression passed the GUID of a
+        // company that was not open and got this code with no step.
+        "company_identity_not_found" => Some(
+            "The company list Tally returned held no company with this company_guid, so nothing \
+             from its books was returned. The company may not be open in Tally, or may have been \
+             closed while the read ran. Call list_companies and use a company_guid it returns; if \
+             the company the user named is not listed, ask the user to open it in Tally, then call \
+             list_companies again before repeating the request.",
         ),
         "setting_retired" => Some(
             "BRIDGE_AGENT_ENABLE_BATCH_POST was retired: batch posting now follows the posting \

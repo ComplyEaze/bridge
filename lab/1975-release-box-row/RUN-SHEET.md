@@ -22,7 +22,7 @@ The `bridge_mcp` program of pull request #1975 at head `af0efdb511420a696314daaf
 
 ## Steps
 0. Check `SHA256.txt`. Record the exe's sha256, the screen's resolution and scale and the work area. Copy `inputs\` into a new folder and run nothing from this branch's folder.
-1. `powershell -NoProfile -ExecutionPolicy Bypass -File run-release-fit.ps1 -Exe <exe> -InputDir <inputs folder> -Case release-probe -OutDir <new empty folder> -DryRun`. EXPECT it to print the case, the exe hash, the screen and the command, and to open nothing.
+1. `powershell -NoProfile -File run-release-fit.ps1 -Exe <exe> -InputDir <inputs folder> -Case release-probe -OutDir <new empty folder> -DryRun`. EXPECT it to print the case, the exe hash, the screen and the command, and to open nothing.
 2. The same without `-DryRun`. The box opens. The person named by the run coordinator, using the mouse only:
    - RECORD the window's title exactly (EXPECT "ComplyEaze Bridge — release the invoice stop for this company?");
    - RECORD its text line by line against `inputs/release-probe.txt`'s displayed text (EXPECT the same lines);

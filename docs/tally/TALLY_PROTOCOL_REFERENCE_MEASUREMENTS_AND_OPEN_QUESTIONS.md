@@ -349,8 +349,14 @@ request is predicted over a budget well below the cap.
   still refuse mid-census when its count passes the allowance). A book that fits one request is read whole, uncounted, as before. Either way a voucher in the
   window refuses the read as `window_contradicted` (a census of several requests whose marks moved refuses as
   `voucher_window_changed_during_read` first), and otherwise the empty result is corroborated or
-  reported partial by the existing empty-window control. **Confidence: UNVERIFIED**: the request counts are
-  from scripted doubles through the tool call, not from a live Tally; for a neighbour-empty widened window
+  reported partial by the existing empty-window control. **Confidence: PARTIAL**: one live run (26 Oct 2026,
+  TallyPrime 7.2 Silver, two synthetic books; `RESULTS.md` on the branch `lab/1240-empty-window-live-answers` at
+  `ce849cc6`) gave the same state, reason and items as the previous build on all five windows read. On the book
+  counted in one request it sent 28 and 34 requests where the previous build sent 34 and 40, as the doubles predict.
+  On the book counted in four requests it sent 76 against 76 where the widened window was empty, and 70 against 88
+  (475 KB of answers against 6.08 MB) where a neighbouring day held vouchers, where the doubles predicted equal
+  counts; which of the previous build's requests are saved there is not established, since the trail keeps only the
+  last 32 sends. The counts that follow are from scripted doubles through the tool call: for a neighbour-empty widened window
   a census of one request replaces one paired window read and so saves six requests (a census of
   several requests adds a closing marks read, so a small widened window saves none), and with vouchers on the
   neighbouring days it saves every part those days would have taken. The saving is counted in requests;
@@ -1754,3 +1760,4 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 | 2026-10-09 | §12a.14: capture 4 of #1356 on one synthetic licensed 7.1 Silver party (`BRIDGE BILLTRAIL LAB`, the published 0.5.1 tool): an `as_of` earlier than the last voucher, a post-dated receipt before and after its date, an advance later adjusted by an invoice (listed as allocated in the unadjusted detail, closed in the bill trail), a note with and without a reference, and a hand-keyed opening bill, each compared with Tally's Pending Bills screen. VERIFIED for this party; what was not measured is listed in the section |
 | 2026-10-14 | §12a.22: the stock items of a `masters` read with their dated HSN and GST lists, on three committed captures of one synthetic licensed 7.1 Silver book (baseline, item as first saved, item with two dated entries in each list): list shapes, the reserved character, Tally's own rows on a first save, the credit element present on one entry only, a stock group's code not on the group's four other items (an item deferring to a coded group not observed), row sizes. PARTIAL, one book, one release |
 | 2026-10-21 | §12a.21: the Profit and Loss of an integrated inventory book with `Less: Closing Stock` as a `PLSUBAMT` leaf, the Balance Sheet without a stock leaf, no Gross Profit leaf, on four committed captures of one synthetic licensed 7.1 Silver book; a second book with opening stock reported by the lab, not committed. |
+| 2026-10-26 | §11c.4: the empty-window corroboration by census marked PARTIAL after one live run on TallyPrime 7.2 Silver (`lab/1240-empty-window-live-answers`, `ce849cc6`): the same answers, the request counts as predicted except one window that sent fewer. |

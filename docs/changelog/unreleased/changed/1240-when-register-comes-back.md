@@ -9,5 +9,6 @@
   vouchers are read, a refusal that came from reading them (a part that failed or was not admitted, a part
   Education cannot serve, a read plan that could not be made or went over its allowance, a disagreement between
   the count and the read) no longer happens. A count of several requests can still be refused when it passes
-  its own allowance. A book that fits one request is read as before. The request counts come from test doubles,
-  not from a live Tally.
+  its own allowance. A book that fits one request is read as before. One live run on TallyPrime 7.2 gave the same answers and
+  the request counts the test doubles predict, except one window of a book counted in several requests whose
+  neighbouring day held vouchers, which sent fewer requests than predicted.

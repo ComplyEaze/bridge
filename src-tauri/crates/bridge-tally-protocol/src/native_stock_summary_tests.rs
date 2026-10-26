@@ -6,6 +6,7 @@ use super::*;
 use crate::native_statement_reports::{render_native_statement_request, NativeStatementKind};
 use crate::outstandings_shared::DateBoundaryProfile;
 use crate::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName, ValidatedDateRange};
+use bridge_tally_primitives::company_guid::CompanyGuid;
 
 const COMPANY: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const FOREIGN_COMPANY: &str = "ffffffff-b835-4bff-89dd-8a6af138c346";
@@ -269,7 +270,7 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
         utf16le(&include_bytes!("../tests/fixtures/stock_items_fy_request.utf16le.xml")[..])
     );
     assert_eq!(
-        render_company_inventory_flags_request(LAB, COMPANY).unwrap(),
+        render_company_inventory_flags_request(LAB, &company_guid(COMPANY)),
         utf16le(
             &include_bytes!("../tests/fixtures/company_inventory_flags_request.utf16le.xml")[..]
         )
@@ -295,7 +296,7 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
         )
     );
     assert_eq!(
-        render_company_inventory_flags_request(EMPTY_BOOK_LAB, EMPTY_BOOK).unwrap(),
+        render_company_inventory_flags_request(EMPTY_BOOK_LAB, &company_guid(EMPTY_BOOK)),
         utf16le(
             &include_bytes!(
                 "../tests/fixtures/company_inventory_flags_empty_book_request.utf16le.xml"
@@ -319,7 +320,7 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
             include_bytes!("../tests/fixtures/stock_items_fy_request.utf16le.xml"),
         ),
         (
-            render_company_inventory_flags_request(LAB, COMPANY).unwrap(),
+            render_company_inventory_flags_request(LAB, &company_guid(COMPANY)),
             include_bytes!("../tests/fixtures/company_inventory_flags_request.utf16le.xml"),
         ),
         (
@@ -337,7 +338,7 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
             include_bytes!("../tests/fixtures/stock_items_empty_book_fy_request.utf16le.xml"),
         ),
         (
-            render_company_inventory_flags_request(EMPTY_BOOK_LAB, EMPTY_BOOK).unwrap(),
+            render_company_inventory_flags_request(EMPTY_BOOK_LAB, &company_guid(EMPTY_BOOK)),
             include_bytes!(
                 "../tests/fixtures/company_inventory_flags_empty_book_request.utf16le.xml"
             ),
@@ -348,16 +349,19 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
     }
 }
 
+fn company_guid(spelling: &str) -> CompanyGuid {
+    CompanyGuid::parse(spelling).expect("captured GUID is the strict spelling")
+}
+
+/// The builder takes a `CompanyGuid`, so a spelling that could break its
+/// formula never becomes one; the name is escaped.
 #[test]
-fn the_flags_request_refuses_a_guid_that_could_break_its_formula_and_escapes_the_name() {
+fn the_flags_request_cannot_be_built_with_a_guid_that_could_break_its_formula_and_escapes_the_name()
+{
     for guid in ["", "abc\" OR 1", "a b", "ab;c", "ab\u{fc}", "a\"b"] {
-        assert_eq!(
-            render_company_inventory_flags_request(LAB, guid),
-            Err(NativeStockError::CompanyFlagsGuidUnsupported),
-            "{guid:?}"
-        );
+        assert!(CompanyGuid::parse(guid).is_err(), "{guid:?}");
     }
-    let request = render_company_inventory_flags_request("A & <B>", COMPANY).unwrap();
+    let request = render_company_inventory_flags_request("A & <B>", &company_guid(COMPANY));
     assert!(request.contains("<SVCURRENTCOMPANY>A &amp; &lt;B&gt;</SVCURRENTCOMPANY>"));
 }
 
@@ -2102,12 +2106,9 @@ fn every_code_carries_the_stock_prefix_but_the_company_flags_refusals() {
     ] {
         assert!(error.code().starts_with("stock_"), "{error:?}");
     }
-    for error in [
-        NativeStockError::CompanyFlagsNotOneRow,
-        NativeStockError::CompanyFlagsGuidUnsupported,
-    ] {
-        assert!(error.code().starts_with("company_flags_"), "{error:?}");
-    }
+    assert!(NativeStockError::CompanyFlagsNotOneRow
+        .code()
+        .starts_with("company_flags_"));
     // Every code the shared helpers raise is translated, not defaulted.
     for code in [
         "masters_xml_malformed",

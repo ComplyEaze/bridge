@@ -14,6 +14,7 @@
 //! cost-centre allocation is stored although the setting reads No, §12a.17).
 use crate::native_stock_summary::{read_collection, read_row_fields, NativeStockError};
 use crate::xml_text::escape_text as xml_escape;
+use bridge_tally_primitives::company_guid::CompanyGuid;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt;
@@ -38,23 +39,14 @@ const FIELDS: [&str; 8] = [
 
 /// The Company collection of the captured request, filtered to one GUID: a
 /// `Company` collection ignores `SVCURRENTCOMPANY` and returns every loaded
-/// company (§12a.7), so the filter makes the answer this company's alone. A
-/// GUID that could break the formula's string is refused, not escaped.
-pub fn render_company_features_request(
-    company: &str,
-    company_guid: &str,
-) -> Result<String, NativeCompanyFeaturesError> {
-    if company_guid.is_empty()
-        || !company_guid
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-    {
-        return Err(NativeCompanyFeaturesError::GuidUnsupported);
-    }
-    Ok(format!(
+/// company (§12a.7), so the filter makes the answer this company's alone. The
+/// GUID is a [`CompanyGuid`], whose hex-and-hyphen spelling cannot close the
+/// formula's string.
+pub fn render_company_features_request(company: &str, company_guid: &CompanyGuid) -> String {
+    format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>BridgeCompanyFeaturesV1</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeCompanyGuidFilter">$GUID = "{company_guid}"</SYSTEM><COLLECTION NAME="BridgeCompanyFeaturesV1" ISMODIFY="No"><TYPE>Company</TYPE><FETCH>{FETCH}</FETCH><FILTERS>BridgeCompanyGuidFilter</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
         company = xml_escape(company),
-    ))
+    )
 }
 
 /// A setting as the Company collection holds it. An element Tally did not
@@ -111,8 +103,6 @@ pub enum NativeCompanyFeaturesError {
     SettingInvalid(&'static str),
     /// A currency symbol over the bound or with a character that hides text.
     CurrencyInvalid,
-    /// A GUID that could break the filter formula's string.
-    GuidUnsupported,
 }
 
 impl NativeCompanyFeaturesError {
@@ -128,7 +118,6 @@ impl NativeCompanyFeaturesError {
             Self::SettingInvalid("batch_wise") => "company_features_setting_invalid:batch_wise",
             Self::SettingInvalid(_) => "company_features_setting_invalid",
             Self::CurrencyInvalid => "company_features_currency_invalid",
-            Self::GuidUnsupported => "company_features_guid_unsupported",
         }
     }
 

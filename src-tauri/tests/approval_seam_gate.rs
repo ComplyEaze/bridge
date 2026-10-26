@@ -2246,6 +2246,21 @@ const MAC_FIT_APPROVES: &str = r#"pub(crate) fn approves(response: isize) -> boo
 /// The constant it compares with, verbatim: AppKit's second-button response.
 const MAC_FIT_SECOND_BUTTON: &str = r#"const SECOND_BUTTON: isize = 1001;"#;
 
+/// `mac_fit::measured_on_any`, verbatim (#1832): an alert fits only if it fits
+/// on at least one screen, and a screen that could not be read never makes it
+/// fit.
+const MAC_FIT_MEASURED_ON_ANY: &str = r#"pub(crate) fn measured_on_any(alert: Option<Size>, visibles: &[Size]) -> Measured {
+    let mut result = Measured::Unavailable;
+    for visible in visibles {
+        match measured(alert, Some(*visible)) {
+            Measured::Fits => return Measured::Fits,
+            Measured::DoesNotFit => result = Measured::DoesNotFit,
+            Measured::Unavailable => {}
+        }
+    }
+    result
+}"#;
+
 /// `mac_fit::ask`, the macOS dialog, verbatim (#1832). An edit that shows an
 /// alert that did not fit or could not be measured, reads the buttons the
 /// other way round, or measures before layout would show or approve what the
@@ -2275,10 +2290,13 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     if policy == NSApplicationActivationPolicy::Prohibited {
         app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
     }
-    let visible = NSScreen::mainScreen(mtm).map(|screen| {
-        let frame = screen.visibleFrame();
-        (frame.size.width, frame.size.height)
-    });
+    let screens = NSScreen::screens(mtm);
+    let visibles: Vec<Size> = (0..screens.count())
+        .map(|index| {
+            let frame = screens.objectAtIndex(index).visibleFrame();
+            (frame.size.width, frame.size.height)
+        })
+        .collect();
     // The alert this function shows if it fits: measured, then run.
     let alert = NSAlert::new(mtm);
     alert.setAlertStyle(NSAlertStyle::Warning);
@@ -2298,9 +2316,9 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     let size = Some((frame.size.width, frame.size.height));
     let _ = writeln!(
         std::io::stderr(),
-        "box-fit: alert={size:?} visible={visible:?}"
+        "box-fit: alert={size:?} visible={visibles:?}"
     );
-    match measured(size, visible) {
+    match measured_on_any(size, &visibles) {
         Measured::Fits => {}
         Measured::DoesNotFit => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
         Measured::Unavailable => std::process::exit(0),
@@ -2375,6 +2393,7 @@ fn mac_fit_problems(source: &str) -> Vec<String> {
     for (name, pin) in [
         ("approves", MAC_FIT_APPROVES),
         ("second button", MAC_FIT_SECOND_BUTTON),
+        ("measured on any screen", MAC_FIT_MEASURED_ON_ANY),
         ("ask", MAC_FIT_ASK),
         ("ask elsewhere", MAC_FIT_ASK_ELSEWHERE),
     ] {
@@ -2414,7 +2433,10 @@ fn the_mac_alert_is_shown_only_if_it_fits_and_approved_only_on_its_second_button
             "alert.addButtonWithTitle(&NSString::from_str(positive));\n    alert.addButtonWithTitle(&NSString::from_str(\"Cancel\"));",
             1,
         ),
-        source.replacen("let visible = NSScreen::mainScreen(mtm)", "let visible = Some((f64::MAX, f64::MAX)).filter(|_| false).or(None::<Size>); let _unused = NSScreen::mainScreen(mtm)", 1),
+        // Only the first screen is measured, or the alert need fit none of them.
+        source.replacen("match measured_on_any(size, &visibles) {", "match measured(size, visibles.first().copied()) {", 1),
+        source.replacen("match measured_on_any(size, &visibles) {", "match measured_on_any(size, &visibles[..0]) {", 1),
+        source.replacen("            Measured::Fits => return Measured::Fits,\n            Measured::DoesNotFit => result = Measured::DoesNotFit,", "            Measured::Fits => result = Measured::Fits,\n            Measured::DoesNotFit => result = Measured::DoesNotFit,", 1),
         source.replacen("#[cfg(target_os = \"macos\")]\npub(crate) fn ask(", "#[cfg(any())]\npub(crate) fn ask(", 1),
         source.replacen("#[cfg(not(target_os = \"macos\"))]\npub(crate) fn ask(", "#[cfg(all())]\npub(crate) fn ask(", 1),
     ] {

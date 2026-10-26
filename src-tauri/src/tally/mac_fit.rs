@@ -10,8 +10,10 @@
 //!
 //! Before it is shown: this module builds the alert itself, lays it out
 //! (`layout()` gives the frame the alert then has; nothing is shown yet) and
-//! compares its size with the main screen's visible frame. One that does not
-//! fit is never shown: the dialog child exits
+//! compares its size with the visible frame of every screen. Which screen the
+//! alert will open on is not known here, so one that fits on at least one
+//! screen goes on to be shown, and the check after it is shown is the one that
+//! binds. One that fits on none is never shown: the dialog child exits
 //! [`super::box_fit::DOES_NOT_FIT_EXIT`], which the parent reads as a text too
 //! large for the box, as it does on Windows. One that could not be measured is
 //! not shown either: exit 0 with no token, which the parent reads as
@@ -39,10 +41,12 @@
 //! `runModal` in this child (it is added in the common and the modal-panel run
 //! loop modes; if it never fires every approval reads as unavailable and the
 //! dialog is unusable, which fails closed), that an alert opened by this
-//! background child is in front with keyboard focus, that the main screen is
-//! the one it opens on, and that a person who uses Full Keyboard Access can
-//! still approve (the approving button refuses first responder, so Tab and
-//! Space do not reach it; the mouse does).
+//! background child is in front with keyboard focus, which screen the alert
+//! opens on when there are several (the check before it is shown only refuses
+//! what fits on none of them; the check after it is shown refuses a placement
+//! on a screen it does not fit), and that a person who uses Full Keyboard
+//! Access can still approve (the approving button refuses first responder, so
+//! Tab and Space do not reach it; the mouse does).
 #![cfg_attr(all(not(target_os = "macos"), not(test)), allow(dead_code))]
 
 /// What the measurement of one alert came to.
@@ -72,6 +76,24 @@ pub(crate) fn measured(alert: Option<Size>, visible: Option<Size>) -> Measured {
         }
         _ => Measured::Unavailable,
     }
+}
+
+/// Decide from the alert's size and the visible size of every screen: it fits
+/// if it fits on any one of them, does not fit if it fits on none, and is
+/// unavailable if no screen's size was read properly. It is not known which
+/// screen the alert will open on, so a screen it does not fit on is no reason
+/// to refuse while another would hold it; the check after the alert is shown
+/// is what binds.
+pub(crate) fn measured_on_any(alert: Option<Size>, visibles: &[Size]) -> Measured {
+    let mut result = Measured::Unavailable;
+    for visible in visibles {
+        match measured(alert, Some(*visible)) {
+            Measured::Fits => return Measured::Fits,
+            Measured::DoesNotFit => result = Measured::DoesNotFit,
+            Measured::Unavailable => {}
+        }
+    }
+    result
 }
 
 /// A rectangle in points, `(x, y, width, height)`, as `NSWindow.frame` and
@@ -133,10 +155,13 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     if policy == NSApplicationActivationPolicy::Prohibited {
         app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
     }
-    let visible = NSScreen::mainScreen(mtm).map(|screen| {
-        let frame = screen.visibleFrame();
-        (frame.size.width, frame.size.height)
-    });
+    let screens = NSScreen::screens(mtm);
+    let visibles: Vec<Size> = (0..screens.count())
+        .map(|index| {
+            let frame = screens.objectAtIndex(index).visibleFrame();
+            (frame.size.width, frame.size.height)
+        })
+        .collect();
     // The alert this function shows if it fits: measured, then run.
     let alert = NSAlert::new(mtm);
     alert.setAlertStyle(NSAlertStyle::Warning);
@@ -156,9 +181,9 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     let size = Some((frame.size.width, frame.size.height));
     let _ = writeln!(
         std::io::stderr(),
-        "box-fit: alert={size:?} visible={visible:?}"
+        "box-fit: alert={size:?} visible={visibles:?}"
     );
-    match measured(size, visible) {
+    match measured_on_any(size, &visibles) {
         Measured::Fits => {}
         Measured::DoesNotFit => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
         Measured::Unavailable => std::process::exit(0),
@@ -296,6 +321,52 @@ mod tests {
                 "{alert:?} {visible:?}"
             );
         }
+    }
+
+    /// With several screens an alert fits if one of them holds it: the first
+    /// screen being too small is no reason to refuse while another would hold
+    /// it. It does not fit only when none does.
+    #[test]
+    fn an_alert_fits_if_any_screen_holds_it() {
+        let small: Size = (1280.0, 700.0);
+        let large: Size = (2560.0, 1360.0);
+        let alert = Some((520.0, 934.0));
+        assert_eq!(measured_on_any(alert, &[large]), Measured::Fits);
+        assert_eq!(measured_on_any(alert, &[small, large]), Measured::Fits);
+        assert_eq!(measured_on_any(alert, &[large, small]), Measured::Fits);
+        assert_eq!(measured_on_any(alert, &[small]), Measured::DoesNotFit);
+        assert_eq!(
+            measured_on_any(alert, &[small, small]),
+            Measured::DoesNotFit
+        );
+        // The alert must fit on ONE screen in both directions: a tall narrow
+        // screen and a wide short one do not add up.
+        let tall: Size = (400.0, 1400.0);
+        let wide: Size = (2000.0, 600.0);
+        assert_eq!(measured_on_any(alert, &[tall, wide]), Measured::DoesNotFit);
+    }
+
+    /// A screen whose size was not read is not a refusal while another holds
+    /// the alert; no screen at all, or no alert size, is unavailable.
+    #[test]
+    fn screens_that_were_not_read_are_unavailable_unless_another_fits() {
+        let alert = Some((520.0, 400.0));
+        assert_eq!(
+            measured_on_any(alert, &[(0.0, 0.0), VISIBLE]),
+            Measured::Fits
+        );
+        assert_eq!(measured_on_any(alert, &[]), Measured::Unavailable);
+        assert_eq!(
+            measured_on_any(alert, &[(0.0, 865.0), (f64::NAN, 865.0)]),
+            Measured::Unavailable
+        );
+        assert_eq!(measured_on_any(None, &[VISIBLE]), Measured::Unavailable);
+        // An unreadable screen beside one that is too small is still a
+        // refusal: the readable one did not fit.
+        assert_eq!(
+            measured_on_any(Some((520.0, 934.0)), &[(0.0, 0.0), (1280.0, 700.0)]),
+            Measured::DoesNotFit
+        );
     }
 
     /// An alert is wholly inside the visible frame, with no slack either way.

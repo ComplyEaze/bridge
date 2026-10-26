@@ -596,10 +596,15 @@ fn each_next_step_says_what_was_decided() {
     // `vouchers` returns, and the one-side and double-booking warnings stay
     let unchecked = step(OpenState::TallyUnchecked);
     assert!(unchecked.contains("did not read every voucher of this date in Tally"));
-    assert!(unchecked.contains("look for a Contra voucher type with this row's amount"));
+    assert!(unchecked
+        .contains("look for a voucher of the Contra voucher class, or of any other type such as a Journal or Payment"));
     assert!(unchecked.contains(
-        "a Contra dated another day, or booked against another ledger, is not looked for"
+        "a voucher dated another day, or booked against another ledger, is not looked for"
     ));
+    assert!(unchecked.contains("a masked ledger name can read like another"));
+    assert!(unchecked.contains("where it was not dropped"));
+    assert!(!unchecked.contains("where it is not masked"));
+    assert!(!unchecked.contains("banks often"));
     assert!(unchecked.contains("keep the skip"));
     assert!(unchecked.contains("withdraw the skip on one side only"));
     assert!(unchecked.contains("would book it twice"));

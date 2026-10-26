@@ -2206,16 +2206,19 @@ refused as `proposals_legacy` (parse the statement again).
   established, because ComplyEaze Bridge did not read every voucher of that day in
   Tally, so a Contra entered in Tally directly is not in its records. Every row that
   would be `not_found` is `tally_unchecked` until a whole-day read exists. The
-  assistant reads that day's vouchers with `vouchers`, looks for a Contra voucher
-  type with the row's amount on the bank ledger the other account's statement was
-  built for (and reads its narration where it is not masked), tells the person what it found, and keeps the
-  skip; it does not look for a Contra dated another day or booked against another
-  ledger, and banks often print a transfer a day apart. A skip is withdrawn, on one
-  side only, solely on the person's confirmation that no entry in Tally carries the
-  transfer (`withdraw_skips`, as for any open row), and the step says not to book
-  the transfer in Tally another way, because a later post of the other statement
-  would book it twice. Reading the day sends its
-  vouchers to the AI provider; `mask_parties` hides the narration, not the amounts.
+  assistant reads that day's vouchers with `vouchers` and looks for a voucher of
+  the Contra voucher class, or of any other type such as a Journal or Payment,
+  that carries the row's amount on the bank ledger the other account's statement
+  was built for (and reads its narration where it was not dropped). It tells the
+  person what it found, and keeps the skip; it does not look for a voucher dated
+  another day or booked against another ledger, a transfer may print on different
+  days, and a masked ledger name can read like another, so it compares amounts and
+  dates too. A skip is withdrawn, on one side only, solely on the person's
+  confirmation that no entry in Tally carries the transfer (`withdraw_skips`, as
+  for any open row), and the step says not to book the transfer in Tally another
+  way, because a later post of the other statement would book it twice. Reading
+  the day sends its vouchers to the AI provider: `mask_parties` shortens party and
+  ledger names, `drop_narration` drops narrations, and neither hides amounts.
 - **What `restored` means.** A batch that a restore ComplyEaze Bridge recorded
   covers (see `verify_import`, `book_rolled_back`) is never found posted or
   verified for the transfer check, whatever its last status: a row it holds

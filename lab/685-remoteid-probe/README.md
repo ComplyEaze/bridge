@@ -4,6 +4,8 @@ Not for merge. LAB-COMMON v3 (C1 to C11) applies in full. One row, K1, on a NEW 
 
 **Marks (26 Oct 2026).** `tally_status` carries no marks on the builds these rows run (it returns the product, release, licence, Education mode, endpoint, loaded companies and the date). Wherever a row below says "`tally_status`: Mx, Vx" (or reads a mark from it), call `tally_status` as written and ALSO `ledger_masters` (first page, no `snapshot_id`), and take the marks from its `snapshot.master_alter_id` (M) and `snapshot.voucher_alter_id` (V); record both answers whole and `snapshot.reused`, which must read false. A book that holds no voucher may give no V: record it. The stop rules on marks apply to these values.
 
+**No XML by curl (26 Oct 2026).** No request file is sent by curl in these rows. LAB-COMMON C2 step 0 runs WITHOUT its MARKS request (its GET /status checks, which send no request body, still run), and no marks or company-list request is sent beside the tools as a cross-check: the marks come only from the tools, as the Marks paragraph says. A row that seems to need a raw read STOPs and asks the run coordinator.
+
 ## Why
 
 A voucher ComplyEaze Bridge posts directly carries a private REMOTEID, recorded in Bridge's journal, and no narration marker. A read returns the voucher's GUID where the REMOTEID attribute stands, never the key that was sent (protocol reference 9.3). Whether such a voucher could ever be corrected in place depends on whether Tally can find it by that key. K1 asks it once, through a reviewed read builder, with controls on both sides.

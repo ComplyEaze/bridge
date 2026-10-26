@@ -245,22 +245,30 @@ $commit_messages
 $commit_identity_names"
   fi
 fi
-# No AI attribution in public text (owner rule of 25 Oct 2026). The title and body, comments included, may not hold a
-# "Generated with Claude Code" line (plain or Markdown-link form) or a Co-authored-by line naming an assistant, and a commit
-# made on or after 2026-10-25T13:00Z may not carry such a trailer or an author or committer identity naming one. An older
-# commit with one is reported, not refused (the owner decides what to do with those), but GitHub's squash merge copies each
-# commit's author and co-authors into the squash message, so the report says so. scripts/check-ai-attribution.mjs decides; a
-# commit with such text and an unreadable date counts as made after the rule. The title and body are checked even when the
-# commit list is not proven complete (that case is already INDETERMINATE above): then no commit is read.
-# The commit list goes in on stdin (a long list would not fit an argument); the title and body are arguments, and one too long
-# for that makes the whole check INDETERMINATE, never a pass.
+# No AI attribution in public text (owner rule of 25 Oct 2026). The title and body, comments included, may not hold the
+# assistant's generated-with signature line (plain or Markdown-link form) or a Co-authored-by line naming an assistant, and a
+# commit may not carry such a trailer or an author or committer identity naming one unless its SHA is on the accepted list
+# (scripts/check-ai-attribution-accepted.json: the older commits of the branches that were open when the owner decided, on 26 Oct
+# 2026, to accept them and block every new one). A commit is accepted by SHA and not by date, because a committer date is the
+# pusher's to set. An accepted commit with such text is reported, and the report says that GitHub's squash merge can copy it into
+# the commit on master. scripts/check-ai-attribution.mjs decides. The title and body are checked even when the commit list is not
+# proven complete (that case is already INDETERMINATE above): then no commit is read. The accepted list is read from this tree
+# (master's), and an unreadable or malformed one is INDETERMINATE.
+attribution_accepted=$(jq -c 'if (type == "object") and (.accepted | type == "array") and
+    (all(.accepted[]; (.sha | type == "string" and test("^[0-9a-f]{40}$")))) and ([.accepted[].sha] | (unique | length) == length)
+  then [.accepted[].sha] else error("the accepted list is malformed") end' "$script_dir/check-ai-attribution-accepted.json" 2>/dev/null) || attribution_accepted=""
+# The commit list goes in on stdin (a long list would not fit an argument); the title, body and accepted list are arguments, and
+# one too long for that makes the whole check INDETERMINATE, never a pass.
 attribution_source="[]"
 [ "${metadata_commits_proven:-0}" -eq 1 ] && attribution_source="$metadata_commits"
-attribution_input=$(jq -c --arg title "$title" --arg body "$raw_prbody" '{
-  title: $title, body: $body,
-  commits: ((if all(.[]; type == "array") then flatten else . end) |
-    map({sha: .sha, message: .commit.message, committed_at: (.commit.committer.date // ""), parents: [.parents[]?.sha],
-         identities: [.commit.author.name, .commit.author.email, .commit.committer.name, .commit.committer.email]}))}' <<<"$attribution_source" 2>/dev/null) || attribution_input=""
+attribution_input=""
+if [ -n "$attribution_accepted" ]; then
+  attribution_input=$(jq -c --arg title "$title" --arg body "$raw_prbody" --argjson accepted "$attribution_accepted" '{
+    title: $title, body: $body, accepted: $accepted,
+    commits: ((if all(.[]; type == "array") then flatten else . end) |
+      map({sha: .sha, message: .commit.message,
+           identities: [.commit.author.name, .commit.author.email, .commit.committer.name, .commit.committer.email]}))}' <<<"$attribution_source" 2>/dev/null) || attribution_input=""
+fi
 if [ -z "$attribution_input" ]; then
   unknown "could not prepare the AI attribution check"
 else
@@ -268,17 +276,19 @@ else
   attribution_status=0
   attribution_output=$(printf '%s' "$attribution_input" | node "$script_dir/check-ai-attribution.mjs" 2>"$errfile") || attribution_status=$?
   attribution_refusals=$(printf '%s\n' "$attribution_output" | grep -c '^REFUSE ' || true)
-  # Exit 0 must come with no REFUSE line, and exit 1 with at least one: anything else (a crash, an old node, a missing
-  # module) is not an answer.
-  if { [ "$attribution_status" -eq 0 ] && [ "$attribution_refusals" -eq 0 ]; } || { [ "$attribution_status" -eq 1 ] && [ "$attribution_refusals" -gt 0 ]; }; then
+  attribution_checked=$(printf '%s\n' "$attribution_output" | grep -c '^CHECKED [0-9][0-9]*$' || true)
+  # An answer is a final CHECKED line (the check ran to the end) and an exit status that agrees with the refusals: exit 0 with
+  # none, exit 1 with at least one. Anything else (a crash, an old node, a missing module, a replaced file that prints nothing)
+  # is not an answer.
+  if [ "$attribution_checked" -eq 1 ] && { { [ "$attribution_status" -eq 0 ] && [ "$attribution_refusals" -eq 0 ]; } || { [ "$attribution_status" -eq 1 ] && [ "$attribution_refusals" -gt 0 ]; }; }; then
     while IFS= read -r attribution_line; do
       case "$attribution_line" in
         "REFUSE "*) bad "AI attribution: ${attribution_line#REFUSE }" ;;
-        "NOTE "*) say "note" "AI attribution before the rule: ${attribution_line#NOTE }" ;;
+        "NOTE "*) say "note" "AI attribution (accepted older commit): ${attribution_line#NOTE }" ;;
       esac
     done <<<"$attribution_output"
     if [ "$attribution_status" -eq 0 ] && [ "${metadata_commits_proven:-0}" -eq 1 ]; then
-      say "ok" "no AI attribution in the title, body or commits made after the rule"
+      say "ok" "no AI attribution in the title, body or commits"
     fi
   else
     unknown "could not run the AI attribution check"

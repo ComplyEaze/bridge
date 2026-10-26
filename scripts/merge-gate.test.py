@@ -82,7 +82,7 @@ class MergeGateControls(unittest.TestCase):
         # The gate runs only from origin/master's tree: build a throwaway repository whose origin/master holds exactly these scripts.
         cls.repo = cls.bin / "gate-repo"
         (cls.repo / "scripts").mkdir(parents=True)
-        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json", "check-ai-attribution.mjs"):
+        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json", "check-ai-attribution.mjs", "check-ai-attribution-accepted.json"):
             shutil.copyfile(ROOT / "scripts" / name, cls.repo / "scripts" / name)
         os.chmod(cls.repo / "scripts" / "merge-gate.sh", 0o755)
         cls.origin = cls.bin / "origin.git"
@@ -503,11 +503,27 @@ class MergeGateControls(unittest.TestCase):
     def test_email_in_title_blocks(self):
         self.assert_blocked("privacy-email-blocker", "customer email shape")
 
-    def test_known_public_agent_address_in_a_well_formed_commit_trailer_is_identity_metadata(self):
-        self.assert_pass("public-agent-coauthor-trailer", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+    def accepted_copy(self, name, shas=(HEAD,)):
+        """A copy of the gate repository whose accepted-older-commits list holds `shas` (changing that list is the owner's act in the real tree)."""
+        copy = self.private_copy(name)
+        (copy / "scripts" / "check-ai-attribution-accepted.json").write_text(json.dumps({"note": "test", "accepted": [{"pull": 1, "sha": sha} for sha in shas]}))
+        self.git_copy(copy, "add", "-A")
+        self.git_copy(copy, "commit", "-q", "-m", "an accepted list for the test")
+        self.git_copy(copy, "push", "-q", "origin", "master")
+        return copy
 
-    def test_known_public_agent_address_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
-        self.assert_pass("public-agent-coauthor-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+    def test_known_public_agent_address_in_a_well_formed_commit_trailer_is_identity_metadata(self):
+        # The privacy scan treats the address in an exact terminal trailer as identity metadata; the commit is an accepted older one.
+        for scenario in ("public-agent-coauthor-trailer", "public-agent-coauthor-trailer-crlf"):
+            with self.subTest(scenario=scenario):
+                result = self.run_copy(self.accepted_copy("accepted-" + scenario), scenario)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head", result.stdout)
+                self.assertIn("accepted older commit", result.stdout)
+
+    def test_the_same_trailer_on_a_commit_that_is_not_accepted_blocks(self):
+        for scenario in ("public-agent-coauthor-trailer", "public-agent-coauthor-trailer-crlf"):
+            self.assert_blocked(scenario, "it is not one of the accepted older commits")
 
     # -- No AI attribution (owner rule of 25 Oct 2026) -------------------------
 
@@ -528,37 +544,61 @@ class MergeGateControls(unittest.TestCase):
         self.assertIn("AI attribution: body: a \"Generated with\" line", result.stdout)
         self.assertIn("could not prove complete head-bound PR commit metadata", result.stdout)
 
-    def test_a_committer_identity_naming_an_assistant_blocks_after_the_rule_and_is_reported_before(self):
-        self.assert_blocked("attribution-identity-after", "an author or committer identity naming an assistant, made after the rule")
-        self.assert_pass("attribution-identity-before", "AI attribution before the rule")
+    def test_a_committer_identity_naming_an_assistant_blocks_unless_the_commit_is_accepted(self):
+        self.assert_blocked("attribution-identity", "an author or committer identity naming an assistant, and it is not one of the accepted older commits")
+        result = self.run_copy(self.accepted_copy("accepted-identity"), "attribution-identity")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("accepted older commit", result.stdout)
 
     def test_a_check_that_crashes_is_not_a_pass(self):
         # The helper exits 1 with nothing on stdout (a crash, an old node): no BLOCK line, so the gate must say it could not determine.
         copy = self.private_copy("attribution-crash")
-        (copy / "scripts" / "check-ai-attribution.mjs").write_text("process.exit(1);\n")
-        self.git_copy(copy, "add", "-A")
-        self.git_copy(copy, "commit", "-q", "-m", "a broken helper")
-        self.git_copy(copy, "push", "-q", "origin", "master")
-        for scenario in ("attribution-trailer-after", "pass"):
+        for source in ("process.exit(1);\n", "process.exit(0);\n", "throw new Error('boom');\n", "console.log('REFUSE x');\nprocess.exit(0);\n", "console.log('NOTE x');\nconsole.log('CHECKED 0');\nprocess.exit(1);\n"):
+            (copy / "scripts" / "check-ai-attribution.mjs").write_text(source)
+            self.git_copy(copy, "add", "-A")
+            self.git_copy(copy, "commit", "-q", "-m", "a broken helper")
+            self.git_copy(copy, "push", "-q", "origin", "master")
+            for scenario in ("attribution-trailer-after", "pass"):
+                with self.subTest(scenario=scenario, helper=source):
+                    result = self.run_copy(copy, scenario)
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertNotIn("MAY MERGE", result.stdout)
+                    self.assertIn("could not run the AI attribution check", result.stdout)
+
+    def test_a_claude_trailer_on_a_commit_that_is_not_accepted_blocks_whatever_its_date(self):
+        # Neither a date after the rule, a date before it, nor no date at all makes the commit acceptable: only its SHA on the list does.
+        for scenario in ("attribution-trailer-after", "attribution-trailer-before", "attribution-trailer-undated"):
             with self.subTest(scenario=scenario):
-                result = self.run_copy(copy, scenario)
+                self.assert_blocked(scenario, "it is not one of the accepted older commits")
+
+    def test_an_accepted_older_commit_is_reported_not_refused_and_the_report_says_a_squash_can_copy_it(self):
+        copy = self.accepted_copy("accepted-trailer")
+        result = self.run_copy(copy, "attribution-trailer-before")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertIn("a squash merge can copy it into the commit on master", result.stdout)
+        self.assertNotIn("BLOCK", result.stdout)
+        # Another SHA on the list does not accept this commit.
+        other = self.accepted_copy("accepted-other", ("f" * 40,))
+        self.assertEqual(self.run_copy(other, "attribution-trailer-before").returncode, 1)
+
+    def test_a_malformed_accepted_list_is_not_a_pass(self):
+        copy = self.private_copy("accepted-malformed")
+        for text in ("not json", "{}", json.dumps({"accepted": [{"sha": "short"}]}), json.dumps({"accepted": [{"sha": "A" * 40}]}),
+                     json.dumps({"accepted": [{"sha": "a" * 40}, {"sha": "a" * 40}]})):
+            (copy / "scripts" / "check-ai-attribution-accepted.json").write_text(text)
+            self.git_copy(copy, "add", "-A")
+            self.git_copy(copy, "commit", "-q", "-m", "a bad list", "--allow-empty")
+            self.git_copy(copy, "push", "-q", "origin", "master")
+            with self.subTest(text=text):
+                result = self.run_copy(copy, "pass")
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertNotIn("MAY MERGE", result.stdout)
-                self.assertIn("could not run the AI attribution check", result.stdout)
-
-    def test_a_claude_trailer_on_a_commit_made_after_the_rule_blocks(self):
-        self.assert_blocked("attribution-trailer-after", "made after the rule")
-
-    def test_a_claude_trailer_on_a_commit_whose_date_cannot_be_read_blocks(self):
-        self.assert_blocked("attribution-trailer-undated", "its date cannot be read")
-
-    def test_a_claude_trailer_on_a_commit_made_before_the_rule_is_reported_not_refused(self):
-        result = self.assert_pass("attribution-trailer-before", "AI attribution before the rule")
-        self.assertNotIn("BLOCK", result.stdout)
+                self.assertIn("could not prepare the AI attribution check", result.stdout)
 
     def test_a_human_coauthor_after_the_rule_passes_and_a_clean_pull_request_says_so(self):
-        self.assert_pass("attribution-trailer-human-after", "no AI attribution in the title, body or commits made after the rule")
-        self.assert_pass("pass", "no AI attribution in the title, body or commits made after the rule")
+        self.assert_pass("attribution-trailer-human-after", "no AI attribution in the title, body or commits")
+        self.assert_pass("pass", "no AI attribution in the title, body or commits")
 
     def test_arbitrary_customer_address_in_a_coauthor_trailer_still_blocks(self):
         self.assert_blocked("customer-coauthor-trailer", "customer email shape")

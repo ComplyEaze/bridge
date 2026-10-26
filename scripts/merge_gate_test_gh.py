@@ -1010,11 +1010,10 @@ def state():
         if scenario == "attribution-body-with-unproven-commits":
             s["commits"] = []
 
-    elif scenario in ("attribution-identity-after", "attribution-identity-before"):
+    elif scenario == "attribution-identity":
         commit = dict(DEFAULT_COMMIT)
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
-        commit["commit"]["committer"] = {"name": "Claude", "email": PUBLIC_AGENT_ADDRESS,
-                                         "date": "2026-10-26T09:00:00Z" if scenario == "attribution-identity-after" else "2026-10-01T09:00:00Z"}
+        commit["commit"]["committer"] = {"name": "Claude", "email": PUBLIC_AGENT_ADDRESS, "date": "2026-10-01T09:00:00Z"}
         s["commits"] = [commit]
 
     elif scenario in ("attribution-trailer-after", "attribution-trailer-before", "attribution-trailer-undated", "attribution-trailer-human-after"):

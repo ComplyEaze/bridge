@@ -1,0 +1,289 @@
+# fixture: tests/fixtures/masters_stock_items_tieout_b_live.utf16le.xml
+# parser: parse_native_masters(StockItems)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Lab Widget A",
+            guid: "d64eda55-da7c-4106-a171-3e3cb6cdd331-000000d6",
+            master_id: 214,
+            alter_id: 216,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [
+                        HsnDetailsEntry {
+                            applicable_from: "20250401",
+                            hsn_code: None,
+                            description: None,
+                            source: Some(
+                                "As per Company/Stock Group",
+                            ),
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+                gst: Entries {
+                    entries: [
+                        GstDetailsEntry {
+                            applicable_from: "20250401",
+                            taxability: None,
+                            source: Some(
+                                "As per Company/Stock Group",
+                            ),
+                            ineligible_itc: Some(
+                                true,
+                            ),
+                            states: [
+                                GstStateDetails {
+                                    state_name: Some(
+                                        "�#4; Any",
+                                    ),
+                                    rates: [
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "CGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "SGST/UTGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "IGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "�#4; Not Applicable",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "State Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                    ],
+                                    slab_rates_present: false,
+                                },
+                            ],
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Lab Widget B",
+            guid: "d64eda55-da7c-4106-a171-3e3cb6cdd331-000000d7",
+            master_id: 215,
+            alter_id: 217,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [
+                        HsnDetailsEntry {
+                            applicable_from: "20250401",
+                            hsn_code: None,
+                            description: None,
+                            source: Some(
+                                "As per Company/Stock Group",
+                            ),
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+                gst: Entries {
+                    entries: [
+                        GstDetailsEntry {
+                            applicable_from: "20250401",
+                            taxability: None,
+                            source: Some(
+                                "As per Company/Stock Group",
+                            ),
+                            ineligible_itc: Some(
+                                true,
+                            ),
+                            states: [
+                                GstStateDetails {
+                                    state_name: Some(
+                                        "�#4; Any",
+                                    ),
+                                    rates: [
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "CGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "SGST/UTGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "IGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "�#4; Not Applicable",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "State Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                    ],
+                                    slab_rates_present: false,
+                                },
+                            ],
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Lab Widget C",
+            guid: "d64eda55-da7c-4106-a171-3e3cb6cdd331-000000d8",
+            master_id: 216,
+            alter_id: 218,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [
+                        HsnDetailsEntry {
+                            applicable_from: "20250401",
+                            hsn_code: None,
+                            description: None,
+                            source: Some(
+                                "As per Company/Stock Group",
+                            ),
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+                gst: Entries {
+                    entries: [
+                        GstDetailsEntry {
+                            applicable_from: "20250401",
+                            taxability: None,
+                            source: Some(
+                                "As per Company/Stock Group",
+                            ),
+                            ineligible_itc: Some(
+                                true,
+                            ),
+                            states: [
+                                GstStateDetails {
+                                    state_name: Some(
+                                        "�#4; Any",
+                                    ),
+                                    rates: [
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "CGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "SGST/UTGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "IGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "�#4; Not Applicable",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "State Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                    ],
+                                    slab_rates_present: false,
+                                },
+                            ],
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+            },
+        },
+    ],
+})

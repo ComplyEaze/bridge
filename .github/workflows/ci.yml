@@ -934,7 +934,7 @@ jobs:
   tax-audit-mutations:
     name: Tax-audit mutation records
     # No build: this checks the committed results file, never re-runs a mutation.
-    # parity/mutations.py's docstring states the guarantee it enforces. Required,
+    # parity/mutations.mjs's header comment states the guarantee it enforces. Required,
     # but only on a pull request that touches the crate (or this workflow): a
     # master left inconsistent by a merge that bypassed it then reds crate PRs and
     # the nightly run, not every unrelated PR.
@@ -950,8 +950,11 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: .node-version
       - name: Test the mutation runner
-        run: python3 -m unittest discover -s src-tauri/crates/bridge-tax-audit/parity -p 'test_mutations.py'
+        run: node --test src-tauri/crates/bridge-tax-audit/parity/mutations.test.mjs
       # The nightly run writes the ids it found failing into its open tracking issue.
       - name: Read any open nightly mutation issue
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
@@ -971,7 +974,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: >-
-          python3 src-tauri/crates/bridge-tax-audit/parity/mutations.py --verify
+          node src-tauri/crates/bridge-tax-audit/parity/mutations.mjs --verify
           --changed-since "$BASE_SHA" --nightly-issues "$RUNNER_TEMP/nightly-issues.txt"
 
   required-checks:

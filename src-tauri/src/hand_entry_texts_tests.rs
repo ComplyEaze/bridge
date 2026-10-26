@@ -28,7 +28,7 @@ const PINNED: &[(&str, usize)] = &[
     ("src/agent_catalog.rs", 21),
     ("src/agent_desktop_journal_review.rs", 4),
     ("src/agent_gst_status.rs", 1),
-    ("src/agent_import.rs", 11),
+    ("src/agent_import.rs", 8),
     ("src/agent_import_numbering.rs", 2),
     ("src/agent_import_post.rs", 5),
     ("src/agent_masters.rs", 1),

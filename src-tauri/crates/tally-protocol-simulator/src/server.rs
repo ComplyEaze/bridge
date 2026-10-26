@@ -20,6 +20,10 @@ use sha2::{Digest, Sha256};
 // from the start of its accept: the request must have arrived whole by then.
 const PLAN_DEADLINE: Duration = Duration::from_secs(30);
 const REQUEST_READ_POLL_INTERVAL: Duration = Duration::from_millis(100);
+// The accept poll starts short, so a request that arrives right after the previous answer is picked up at once, and
+// backs off to the ceiling while the simulator waits for a slow or absent client. Every request starts it again.
+const ACCEPT_POLL_FIRST: Duration = Duration::from_micros(100);
+const ACCEPT_POLL_CEILING: Duration = Duration::from_millis(2);
 const MAX_REQUEST_BYTES: usize = 128 * 1024;
 /// A divided agent read replayed end to end (bridge#520) is about ninety legs:
 /// six per paired read, plus the identity and ledger legs around them. A post
@@ -367,9 +371,13 @@ fn serve_request(
     deadline: Duration,
 ) -> io::Result<ObservedRequest> {
     let started = Instant::now();
+    let mut accept_pause = ACCEPT_POLL_FIRST;
     let (mut stream, request) = loop {
         let (mut stream, _) = match listener.accept() {
-            Ok(accepted) => accepted,
+            Ok(accepted) => {
+                accept_pause = ACCEPT_POLL_FIRST;
+                accepted
+            }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 // A cancel ends the wait here too, so it does not depend on
                 // the wake-up connection reaching `accept` (#1441).
@@ -379,7 +387,8 @@ fn serve_request(
                 if started.elapsed() >= deadline {
                     return Err(io::Error::new(io::ErrorKind::TimedOut, unanswered));
                 }
-                thread::sleep(Duration::from_millis(2));
+                thread::sleep(accept_pause);
+                accept_pause = (accept_pause * 2).min(ACCEPT_POLL_CEILING);
                 continue;
             }
             Err(error) => return Err(error),
@@ -464,6 +473,31 @@ fn serve_request(
             if sleep_cancellable(delay, cancelled) {
                 observed.cancelled = true;
                 return Ok(observed);
+            }
+            observed.request_processed = true;
+            if !write_headers(&mut stream, &headers)? {
+                observed.client_stopped_reading_response = true;
+                return Ok(observed);
+            }
+            record_response_write_outcome(
+                &mut observed,
+                write_complete_response(&mut stream, &body, plan.framing, None, cancelled)?,
+            );
+        }
+        Delivery::Held(gate) => {
+            // A gate never opened fails the test after a minute, never hangs it.
+            let deadline = Instant::now() + HELD_DELIVERY_LIMIT;
+            while !gate.is_open() {
+                if Instant::now() >= deadline {
+                    return Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "a held response's gate was never opened",
+                    ));
+                }
+                if sleep_cancellable(Duration::from_millis(5), cancelled) {
+                    observed.cancelled = true;
+                    return Ok(observed);
+                }
             }
             observed.request_processed = true;
             if !write_headers(&mut stream, &headers)? {
@@ -590,7 +624,12 @@ fn finish_complete_response(stream: &mut TcpStream) -> io::Result<()> {
     stream.flush()?;
     stream.shutdown(Shutdown::Write)?;
     // Give Windows' loopback stack time to deliver the FIN and buffered body before the
-    // server thread drops the socket. Immediate drop is observably flaky under parallel CI.
+    // server thread drops the socket. Immediate drop is observably flaky under parallel CI there.
+    // Elsewhere the pause protects nothing: every response says `Connection: close`, `read_request`
+    // takes exactly the bytes the request head declares so none are left unread, and closing a
+    // socket with nothing unread after `shutdown(Write)` is a graceful close, not a reset. The
+    // pause also cost one fixed 5 ms (7 ms measured on macOS) per request, on the path of the next one.
+    #[cfg(windows)]
     thread::sleep(Duration::from_millis(5));
     Ok(())
 }
@@ -895,6 +934,9 @@ fn write_framed_body(
     }
     Ok(false)
 }
+
+/// How long a [`Delivery::Held`] response waits for its gate.
+const HELD_DELIVERY_LIMIT: Duration = Duration::from_secs(60);
 
 fn sleep_cancellable(duration: Duration, cancelled: &AtomicBool) -> bool {
     let deadline = Instant::now() + duration;

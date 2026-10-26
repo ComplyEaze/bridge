@@ -324,6 +324,47 @@ fn the_catalog_lists_exactly_the_admitted_tests() {
     for test in ADMITTED {
         assert!(registry::find(test).is_some());
     }
+    // The description names the tests it admits by hand: it names each one,
+    // and no ported test it does not admit.
+    let words: std::collections::BTreeSet<&str> = tool["description"]
+        .as_str()
+        .unwrap()
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .collect();
+    for ported in registry::PORTED {
+        assert_eq!(
+            words.contains(ported.id),
+            ADMITTED.contains(&ported.id),
+            "{}",
+            ported.id
+        );
+    }
+    // The `test` parameter's own line names no test: it points at the enum.
+    let line = tool["inputSchema"]["properties"]["test"]["description"]
+        .as_str()
+        .unwrap();
+    for ported in registry::PORTED {
+        assert!(!line.contains(ported.id), "{}", ported.id);
+    }
+}
+
+/// Only a name in `ADMITTED`, exactly as written, makes an `AdmittedTest`.
+#[test]
+fn only_an_admitted_name_parses_as_an_admitted_test() {
+    assert_eq!(
+        AdmittedTest::parse("cash_44ab").map(AdmittedTest::name),
+        Some("cash_44ab")
+    );
+    assert!(registry::find("cash_payments_40a3").is_some());
+    for name in [
+        "cash_payments_40a3",
+        "CASH_44AB",
+        " cash_44ab",
+        "cash_44ab ",
+        "",
+    ] {
+        assert!(AdmittedTest::parse(name).is_none(), "{name:?}");
+    }
 }
 
 /// A test the crate has ported but this tool has not admitted, and a name the

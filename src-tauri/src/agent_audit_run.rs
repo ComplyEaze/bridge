@@ -23,6 +23,31 @@ use bridge_tax_audit::registry::{self, CallerData};
 /// 53938eb8), on one book with no cash payments: that side was checked at zero.
 pub(super) const ADMITTED: &[&str] = &["cash_44ab"];
 
+mod admitted {
+    use super::ADMITTED;
+
+    /// A test in [`ADMITTED`]: the only kind of name `run_test` takes. Its field
+    /// is private to this module, so outside it only [`AdmittedTest::parse`]
+    /// makes one, and no other ported test can be run through the tool.
+    #[derive(Clone, Copy)]
+    pub(super) struct AdmittedTest(&'static str);
+
+    impl AdmittedTest {
+        pub(super) fn parse(name: &str) -> Option<Self> {
+            ADMITTED
+                .iter()
+                .copied()
+                .find(|admitted| *admitted == name)
+                .map(Self)
+        }
+
+        pub(super) fn name(self) -> &'static str {
+            self.0
+        }
+    }
+}
+use admitted::AdmittedTest;
+
 /// Refused rather than cut short: a result past these is not one a caller
 /// can read whole.
 const MAX_FIGURES: usize = 64;
@@ -66,8 +91,9 @@ impl Server {
         }
         // The tool's schema lists `ADMITTED` as the only values of `test`, so
         // the catalog has refused any other as `argument_invalid:test` before
-        // this runs.
-        let test = required_string(args, "test")?;
+        // this runs; the parse makes that a type rather than an assumption.
+        let test = AdmittedTest::parse(required_string(args, "test")?)
+            .ok_or_else(|| "argument_invalid:test".to_string())?;
         let roles = AuditRoles {
             cash_groups: group_list(args, "cash_groups")?,
             bank_groups: group_list(args, "bank_groups")?,
@@ -135,7 +161,7 @@ impl Server {
 
 /// The test on the book, as the crate's canonical dump.
 fn run_test(
-    test: &str,
+    test: AdmittedTest,
     engagement: &bridge_tax_audit::Engagement,
     book: &bridge_tax_audit::book::Book,
 ) -> Result<Value, AuditReadFailure> {
@@ -143,7 +169,7 @@ fn run_test(
         code: AUDIT_TEST_REFUSED.to_string(),
         retryable: false,
     };
-    let ported = registry::find(test).ok_or_else(refused)?;
+    let ported = registry::find(test.name()).ok_or_else(refused)?;
     let rules = bridge_tax_audit::rules_for(engagement).map_err(|_| refused())?;
     // A refusal by the test carries the crate's detail, which can name a
     // ledger: only its rule code, when it has one, is kept.

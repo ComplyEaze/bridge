@@ -462,7 +462,7 @@ fn parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
         (_, "batch_id") => "The batch_id build_import_xml returned for the saved batch.",
         ("parse_bank_statement", "from") => "Optional: only statement rows dated on or after this day (YYYYMMDD or YYYY-MM-DD) are proposed. Left out, the window has no start.",
         ("parse_bank_statement", "to") => "Optional: only statement rows dated on or before this day (YYYYMMDD or YYYY-MM-DD) are proposed. Left out, the window has no end.",
-        ("audit_test_run", "test") => "Only cash_44ab is admitted.",
+        ("audit_test_run", "test") => "The test to run: one of this parameter's enum values, the tests this tool admits.",
         ("audit_test_run", "cash_groups") => "The groups holding cash ledgers, spelt as in the book (masters kind=groups). Ask the user; a group left out is not counted.",
         ("audit_test_run", "bank_groups") => "The groups holding bank ledgers, spelt as in the book. Ask the user whether an overdraft group is one; not a cash group.",
         ("cash_flow", "from") => "The first day of the first month, which must be the 1st (YYYYMMDD or YYYY-MM-DD).",

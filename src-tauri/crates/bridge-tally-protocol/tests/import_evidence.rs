@@ -160,6 +160,32 @@ fn non_numeric_lastvchid_is_rejected_even_when_import_counters_are_clean() {
 }
 
 #[test]
+fn an_empty_element_or_cdata_content_refuses_an_otherwise_clean_response() {
+    const COUNTERS: &str = "<CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS>";
+    let clean = format!("<RESPONSE>{COUNTERS}</RESPONSE>");
+    let outcome = parse_import_outcome(&clean).expect("the clean base parses");
+    assert!(outcome.counters().is_clean_success_for(1, 0, 0));
+
+    // An empty IMPORTRESULT is a container only directly under ENVELOPE/BODY/DATA; anywhere
+    // else it is an unexpected empty element.
+    for (defect, xml) in [
+        (
+            "an empty IMPORTRESULT under RESPONSE",
+            format!("<RESPONSE>{COUNTERS}<IMPORTRESULT/></RESPONSE>"),
+        ),
+        (
+            "CDATA content after the counters",
+            format!("<RESPONSE>{COUNTERS}<![CDATA[1]]></RESPONSE>"),
+        ),
+    ] {
+        assert!(
+            parse_import_outcome(&xml).is_err(),
+            "{defect} must refuse the response"
+        );
+    }
+}
+
+#[test]
 fn evidence_binds_counters_response_and_redacted_line_errors() {
     let xml = "<RESPONSE><CREATED>0</CREATED><ALTERED>0</ALTERED><IGNORED>1</IGNORED><ERRORS>1</ERRORS><EXCEPTIONS>0</EXCEPTIONS><LINEERROR>PRIVATE-SYNTHETIC-SENTINEL</LINEERROR></RESPONSE>";
     let evidence = parse_import_evidence(xml).unwrap();

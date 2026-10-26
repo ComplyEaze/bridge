@@ -1,0 +1,206 @@
+{
+ "p02_rows": 13,
+ "q1_rows": 11,
+ "q1_guids_missing_from_p02": [],
+ "p02_rows_not_in_q1": [
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e5",
+   "name": "BRIDGE Svc 4D 5%",
+   "parent": "Sales Accounts",
+   "alterid": "243"
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e3",
+   "name": "BRIDGE Svc INH 5%",
+   "parent": "Sales Accounts",
+   "alterid": "242"
+  }
+ ],
+ "p02_rows_parent_outside_four": [],
+ "p02_parents_as_returned": [
+  "Duties & Taxes",
+  "Indirect Expenses",
+  "Sales Accounts",
+  "Sundry Debtors"
+ ],
+ "common_guid_comparison": [
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d4",
+   "name": "BRIDGE CGST 2.5%",
+   "parent": "Duties & Taxes",
+   "alterid_q1": "219",
+   "alterid_now": "219",
+   "elements_only_in_q1": [
+    "ROUNDINGMETHOD",
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5",
+   "name": "BRIDGE CGST 9%",
+   "parent": "Duties & Taxes",
+   "alterid_q1": "220",
+   "alterid_now": "220",
+   "elements_only_in_q1": [
+    "ROUNDINGMETHOD",
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3",
+   "name": "BRIDGE Goods 18%",
+   "parent": "Sales Accounts",
+   "alterid_q1": "218",
+   "alterid_now": "218",
+   "elements_only_in_q1": [
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d9",
+   "name": "BRIDGE Output CGST XML",
+   "parent": "Duties & Taxes",
+   "alterid_q1": "224",
+   "alterid_now": "224",
+   "elements_only_in_q1": [
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8",
+   "name": "BRIDGE Round Off",
+   "parent": "Indirect Expenses",
+   "alterid_q1": "223",
+   "alterid_now": "223",
+   "elements_only_in_q1": [
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d6",
+   "name": "BRIDGE SGST 2.5%",
+   "parent": "Duties & Taxes",
+   "alterid_q1": "221",
+   "alterid_now": "221",
+   "elements_only_in_q1": [
+    "ROUNDINGMETHOD",
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7",
+   "name": "BRIDGE SGST 9%",
+   "parent": "Duties & Taxes",
+   "alterid_q1": "222",
+   "alterid_now": "222",
+   "elements_only_in_q1": [
+    "ROUNDINGMETHOD",
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d1",
+   "name": "BRIDGE Svc 998313 5%",
+   "parent": "Sales Accounts",
+   "alterid_q1": "216",
+   "alterid_now": "216",
+   "elements_only_in_q1": [
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d2",
+   "name": "BRIDGE Svc 998314 5%",
+   "parent": "Sales Accounts",
+   "alterid_q1": "217",
+   "alterid_now": "217",
+   "elements_only_in_q1": [
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e1",
+   "name": "BRIDGE Svc 998315 5%",
+   "parent": "Sales Accounts",
+   "alterid_q1": "234",
+   "alterid_now": "234",
+   "elements_only_in_q1": [
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  },
+  {
+   "guid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0",
+   "name": "BRIDGE Walk-in",
+   "parent": "Sundry Debtors",
+   "alterid_q1": "215",
+   "alterid_now": "215",
+   "elements_only_in_q1": [
+    "ROUNDINGLIMIT",
+    "RATEOFTAXCALCULATION",
+    "GSTDETAILS.LIST"
+   ],
+   "elements_only_now": [],
+   "elements_differing": [],
+   "differing_values": {}
+  }
+ ],
+ "element_tags_only_in_q1_any_row": [
+  "GSTDETAILS.LIST",
+  "RATEOFTAXCALCULATION",
+  "ROUNDINGLIMIT",
+  "ROUNDINGMETHOD"
+ ],
+ "company_guid_prefixes_in_p02": [
+  "6b43e498-430c-4d5c-bfef-d32e2ab93c85"
+ ]
+}

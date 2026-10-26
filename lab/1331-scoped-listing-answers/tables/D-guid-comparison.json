@@ -1,0 +1,48 @@
+{
+ "d02_rows": 123,
+ "d03_rows": 121,
+ "d02_rows_under_four_parents_casefolded": 121,
+ "missing_from_d03": [],
+ "extra_in_d03": [],
+ "d02_parent_counts": {
+  "Sundry Debtors": 120,
+  "Cash-in-Hand": 1,
+  "Sales Accounts": 1,
+  "&#4; Primary": 1
+ },
+ "d03_parent_counts": {
+  "Sundry Debtors": 120,
+  "Sales Accounts": 1
+ },
+ "d03_rows_identical_to_d02_row": 121,
+ "d02_tags": [
+  "ALTERID",
+  "BRIDGECOMPANYGUID",
+  "GUID",
+  "LANGUAGENAME.LIST",
+  "LEDADDRESS.LIST",
+  "LEDGSTPINCODE",
+  "LEDGSTREGDETAILS.LIST",
+  "LEDPINCODE",
+  "LEDUDYAMREGNUMBER",
+  "MASTERID",
+  "OPENINGBALANCE",
+  "PARENT",
+  "TAXTYPE"
+ ],
+ "d03_tags": [
+  "ALTERID",
+  "BRIDGECOMPANYGUID",
+  "GUID",
+  "LANGUAGENAME.LIST",
+  "LEDADDRESS.LIST",
+  "LEDGSTPINCODE",
+  "LEDGSTREGDETAILS.LIST",
+  "LEDPINCODE",
+  "LEDUDYAMREGNUMBER",
+  "MASTERID",
+  "OPENINGBALANCE",
+  "PARENT",
+  "TAXTYPE"
+ ]
+}

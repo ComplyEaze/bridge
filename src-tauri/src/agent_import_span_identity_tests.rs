@@ -337,8 +337,18 @@ fn a_reply_reporting_status_zero_binds_no_span_whatever_its_counters() {
     };
     // The same counters under STATUS=1 make a span: only the status differs.
     assert!(PostSpan::after_clean_post(before, 1805, &failed("1"), 10).is_ok());
-    assert!(PostSpan::after_clean_post(before, 1805, &failed("0"), 10).is_err());
-    assert!(PostSpan::after_clean_response(before, &failed("0"), 10).is_err());
+    assert!(matches!(
+        PostSpan::after_clean_post(before, 1805, &failed("0"), 10),
+        Err(BindError::Refused(SpanRefusal::StatusFailure))
+    ));
+    assert_eq!(
+        PostSpan::after_clean_response(before, &failed("0"), 10),
+        Err(SpanRefusal::StatusFailure)
+    );
+    assert_eq!(
+        SpanRefusal::StatusFailure.code(),
+        "span_response_status_failure"
+    );
 }
 
 /// Verification treats an absent `EFFECTIVEDATE` as not observed, so the

@@ -1,0 +1,15 @@
+0f9d3c1e-6b7a-4c58-9a21-5d3e8b1c7f40
+1
+THIS RELEASES THE INVOICE STOP FOR THE COMPANY.
+
+Press Y (or click Yes) to release the invoice stop for this company, so that ComplyEaze Bridge
+builds and posts invoices for it again. Press N (or click No) to cancel. Nothing is released until
+you answer.
+
+Company: BRIDGE STOP PROBE (a synthetic probe; no Tally company is read)
+ComplyEaze Bridge sent this invoice to Tally and cannot confirm it as posted:
+  SYN-INV-0001 dated 20250410
+Batch: bridge-00000000-0000-4000-8000-000000000002
+What ComplyEaze Bridge saw just now: ComplyEaze Bridge could not complete its read (probe_only), so it reports nothing about this invoice.
+
+Click the button only if you have checked this invoice in Tally yourself. ComplyEaze Bridge will then build and post invoices for this company again. This changes nothing in Tally.

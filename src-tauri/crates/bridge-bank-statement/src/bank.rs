@@ -336,7 +336,7 @@ impl Bank {
         }
     }
 
-    /// The statement text a cash line is grouped by: the de-wrapped narration
+    /// The statement text a cash line is grouped by: the space-joined narration
     /// where the layout has one, else the narration cell as printed.
     pub fn cash_text(self, row: &Row) -> String {
         let spaced = strip(row.get("narr_spaced"));

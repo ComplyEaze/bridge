@@ -1344,7 +1344,8 @@ fn the_ledgers_to_validate_are_bounded_and_counted() {
 /// The one row-level exception (owner ruling b1): an open, recognised cash
 /// line's bridge_txn_id, date and amount, and its party as printed (masked
 /// under redaction), leave so a person can answer it. Nothing else of any row
-/// does, and an answered cash line takes no exception.
+/// does, and an answered cash line takes no exception. (Beside them an open line carries only
+/// an opaque group number and two counts; see the grouping test.)
 #[test]
 fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
     use bridge_bank_statement::parse::Row;
@@ -2600,4 +2601,11 @@ fn cash_lines_with_the_same_printed_text_are_asked_as_one_group_and_a_sibling_an
         .find(|record| record.bridge_txn_id == sibling)
         .unwrap();
     assert_eq!(sibling_record.cash_answer, None);
+    // The group is computed at each parse and is not written to the proposals file.
+    for record in &partly.build.records {
+        assert!(serde_json::to_value(record)
+            .unwrap()
+            .get("cash_group")
+            .is_none());
+    }
 }

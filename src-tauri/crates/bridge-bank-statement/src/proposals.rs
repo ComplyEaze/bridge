@@ -223,7 +223,8 @@ pub struct StatementRecord {
     pub cash_answer: Option<CashAnswer>,
     /// Which group of identical statement text the cash line belongs to, numbered from 1 in
     /// order of first appearance (see [`crate::cash::group_key`]); `None` for a line that is not
-    /// a cash line. The group is only a way to ask once: it applies no answer.
+    /// a cash line. The group is only a way to ask about lines together: it applies no answer, and it is not written to the proposals file.
+    #[serde(skip)]
     pub cash_group: Option<u32>,
     /// Which way the row moved money on the statement's own account.
     pub direction: Direction,

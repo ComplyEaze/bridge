@@ -729,6 +729,14 @@ fn five_captured_journals_are_bridges_own_request_and_bind_in_request_order() {
 /// The ten captured vouchers saved as one batch on a server of its own, with
 /// the journal on disk that `decide_post_span` records its verdict in.
 fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, ImportLedgerLine) {
+    journaled_batch_answered(directory, outcome())
+}
+
+/// [`journaled_batch`], with `answer` as the post's recorded response.
+fn journaled_batch_answered(
+    directory: &std::path::Path,
+    answer: bridge_tally_protocol::TallyImportOutcome,
+) -> (crate::agent::Server, ImportLedgerLine) {
     let server = crate::agent::Server::new(crate::agent::Settings {
         endpoint: bridge_tally_transport::TallyEndpointConfig {
             host: "127.0.0.1".into(),
@@ -782,12 +790,53 @@ fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, Import
                     request_sha256: native.request_sha256.clone(),
                     response_sha256: crate::agent::sha256_hex(RESPONSE),
                     bytes: RESPONSE.len(),
-                    outcome: Some(outcome()),
+                    outcome: Some(answer),
                 },
             ))
             .unwrap();
     }
     (server, line)
+}
+
+/// A recorded answer that reported `STATUS=0` proves no voucher landed
+/// (#2035): a check that reads the company's mark where it stood before the
+/// post, with no mark read after it, does not read the book as rolled back.
+#[test]
+fn a_status_zero_answer_does_not_read_an_unchanged_book_as_rolled_back() {
+    let failed = bridge_tally_protocol::parse_import_outcome(
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>1805</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>",
+    )
+    .unwrap();
+    assert_eq!(failed.counters().created, 10);
+    assert_eq!(
+        failed.application_status(),
+        bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let (server, line) = journaled_batch_answered(directory.path(), failed);
+    let snapshot = server
+        .latest_import_snapshot(&line.batch_id)
+        .unwrap()
+        .unwrap();
+    let response = snapshot.response.expect("the post's recorded response");
+    let before = snapshot
+        .pre_post_voucher_mark
+        .expect("the recorded pre-POST mark");
+    let decision = server.decide_post_span(
+        &line,
+        PreMark::recorded(before),
+        snapshot.span_verdict,
+        Some(&response),
+        &span_read(),
+        None,
+        before,
+        snapshot.generation,
+    );
+    assert_ne!(
+        decision.report["state"], "book_rolled_back",
+        "{}",
+        decision.report
+    );
 }
 
 /// One verification's decision on the captured post, as `verify_import` makes

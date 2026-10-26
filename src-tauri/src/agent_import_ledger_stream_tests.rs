@@ -1533,6 +1533,11 @@ fn an_answer_reporting_status_zero_raises_no_floor() {
         "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>11</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>",
     )
     .unwrap();
+    assert_eq!(failed.counters().created, 10);
+    assert_eq!(
+        failed.application_status(),
+        bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    );
     let refused = placed("refused", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
     let seer = placed("seer", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
     let mut journal = vec![
@@ -1551,7 +1556,9 @@ fn an_answer_reporting_status_zero_raises_no_floor() {
         intent(&seer, Some(1)),
     ];
     let read = journal.len() as u64;
-    // The mark still reads 1: Tally created nothing for the refused post.
+    // The mark still reads 1: Tally created nothing for the refused post, so
+    // no record would be written for it.
+    assert!(!rollback_record_extends(Cursor::new(journal.concat()), "seer", 1, read).unwrap());
     journal.push(seen(&seer, 1, read));
     assert_eq!(cover(&journal, "refused").covered_by, None);
     assert!(covered_by_records_of(Cursor::new(journal.concat()), "seer")

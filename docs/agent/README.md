@@ -237,7 +237,7 @@ company with fewer ledgers may be refused. The limits are unverified against a l
 two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
 these books.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
-false). With any other `fields` it is refused before any read as `ledger_masters_gst_details_requires_compliance`,
+false). With any other `fields`, a true value is refused before any read as `ledger_masters_gst_details_requires_compliance`,
 and a value that is not a boolean is `argument_invalid:include_gst_details`. Without it (absent or false) every
 request, the request commitment, the sizing and the result are what they were, and no row has a `gst_details`
 key. With it, the master read of each request (the whole book or each part by parent group) also names every
@@ -385,8 +385,10 @@ converted to zero. `totals` sums numeric observations across all returned ledger
 and carries an `empty_count` for each column. A fully observed nonzero opening
 net is the difference in opening balances; Bridge does not add a balancing row.
 
-`offset` and `limit` restrict output, not the source read. Each call captures a
-fresh report; compare source evidence before combining separate pages. Native
+`offset` and `limit` restrict output, not the source read. A first page captures a
+fresh report and holds it in memory; a later page continues from it while the book's extent is
+unchanged (`snapshot`, `snapshot_id`, `listing_snapshot_changed`), as `masters` does, so compare source
+evidence before combining pages from separate calls. Native
 Trial Balance uses Tally's TBAL fields, including the Profit & Loss treatment;
 see [protocol semantics](../tally/TALLY_PROTOCOL_REFERENCE.md#56-native-trial-balance-fields).
 It may include dormant ledgers hidden by Tally's screen. Paired response,
@@ -766,7 +768,8 @@ measurement of this report, and the mark counts masters of every kind. A larger 
 report request as `negative_stock_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
 `limit_bytes` and `limit_master_alter_id`), and retrying refuses again. After a read, the row count and the
 response size are checked against the mark and the admitted size, and a breach refuses the whole read as
-`negative_stock_read_failed` with cause `negative_stock_bound_premise_violated`'s reason, unless the closing extent shows the book moved
+`negative_stock_bound_premise_violated`, with the reason (`stock_rows_exceed_master_mark` or
+`stock_response_over_admitted_bytes`) in `error.cause`, unless the closing extent shows the book moved
 (`negative_stock_extent_changed`). The report is one paired read (two requests), never retried. Any other
 refused answer fails the call as `negative_stock_read_failed` with the specific code in `error.cause`
 (for example `negative_stock_item_duplicated`, `negative_stock_amount_invalid`,
@@ -1088,7 +1091,7 @@ the stock items and Tally's Stock Summary are each read twice and compared, the 
 extent is read before and after and must be equal, and Education mode is refused.
 A book whose `ISINVENTORYON` is `No` is refused as `stock_not_enabled` before any
 item is read; an absent flag is reported `unknown` and does not refuse. `offset`,
-`limit`, `snapshot` and `snapshot_id` behave as in `masters`.
+`limit` and `snapshot_id` behave as in `masters`, and the result reports `snapshot`.
 
 Small books only. The items are read whole only when the master-alteration mark
 (`ALTMSTID`) times an assumed worst-case row (18,296 bytes) fits 16,000,000 bytes, which admits
@@ -1137,7 +1140,8 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
     ones it left out.
   - `lines` is null while the tool's result (`net_result`, or the Balance
     Sheet's `carried`) is not established, so a derived line is never shown
-    as the statement. `balance_sheet_gate` and `tie_out` then show how each
+    as the statement. `balance_sheet_gate` and, where it is not null (on a Balance
+    Sheet only when a closing stock was considered), `tie_out` then show how each
     of Tally's own lines compared.
 - **When a result is established.** Only when all of these hold:
   - every ledger is classified; a ledger under a user-created primary group,
@@ -1332,7 +1336,7 @@ divided window is checked whole before its first part, and a read whose closing 
 reports Education is refused the same way, since either mode may have served it. Any
 `EDUMODE` value other than `No` counts as Education even when the other capability fields
 do not parse; a company list with no `EDUMODE` field keeps ordinary boundaries, and
-`EDUMODE = Yes` itself has not yet been captured from a live Education instance. The end
+`EDUMODE = Yes` itself was observed on a live Education instance on 22 September 2026 (with `SILVER = Yes` and `GOLD = No`). The end
 side is held to the same rule without a live measurement in these shapes, so an Education
 whole-month read ending on the 30th is refused.
 A genuinely empty voucher response uses the same wider-window
@@ -2157,9 +2161,9 @@ posting setting covers both, in the MCPB extension and on the command line (#109
    ComplyEaze Bridge never reads it back. Every pair is kept until you delete
    it; nothing in ComplyEaze Bridge deletes one. A batch last verified by an earlier build keeps its
    single `<batch>.proof.json`, which no longer changes. It compares the
-   date, voucher type and entries; it does **not** compare `EFFECTIVEDATE` or
-   `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see
-   the limits noted in reference §9.13.
+   date, voucher type, the voucher number when you supplied one, the narration, the entries and, for a
+   `Payment`, `Receipt` or `Contra`, the effective date (a value Tally leaves out is reported as not observed); it does
+   **not** compare `PARTYLEDGERNAME`, which those files carry — see the limits noted in reference §9.13.
 
 ### Skipped rows and the `transfers` section (#1392)
 
@@ -2691,9 +2695,12 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    narration, every debit/credit entry, and totals; for a bank voucher, also the
    side that must be bank or cash. A batch's dialog shows the same company and
    endpoint, and summarises the vouchers: their count, types and date range,
-   each ledger's totals, and the overall totals. It does not show any voucher's
-   own date, amounts, entries, narration or reference: equal ledger totals do
-   not prove each voucher is right, so check those before building the batch.
+   each ledger's totals, and the overall totals. A batch of at most 10 vouchers
+   also lists one line per voucher (type, date, amount, ledger and the start of the
+   narration, quoted); no line shows a reference, and a batch of more than 10, or
+   one whose lines do not fit or hold an unsafe narration or reference, shows totals
+   only, with a sentence saying why. Equal ledger totals do
+   not prove each voucher is right, so check the vouchers before building the batch.
    Choose **Post voucher** (for a batch,
    **Post N vouchers**) on macOS or **Yes** on Windows to permit this attempt. **Cancel** or Escape
    declines on macOS; Return may leave the dialog open. Windows defaults to
@@ -3326,7 +3333,7 @@ beside a gap. The headline sorts ahead of `result` in the serialized form (the k
 are in alphabetical order), so it is read before the figures. When a byte cap trims the page of rows
 the headline lists, the `rows` sentence is restated from the rows that are left, and `page` (`offset`,
 `shown`, `total`) keeps the numbers it is made from; a headline that cannot be restated loses its
-`rows` sentence rather than keeping a stale one. A partial read names every gap with its counts, and
+`rows` sentence and its `page` rather than keeping a stale one. A partial read names every gap with its counts, and
 the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. `profit_and_loss` and `balance_sheet` carry one too, with no `rows`:
 when every result of the statement is established, the lead says so and what the derived lines passed
 the comparison with (Tally's own Balance Sheet, and its own Profit and Loss when a profit and loss read it
@@ -3336,7 +3343,7 @@ until it has words) and, for a difference, how many lines did not tie (a Tally l
 amount that nothing derived was compared with, a derived line Tally has no counterpart for, and for a
 profit and loss the Cost of Sales heading when it is off the derived cost of sales), says when the
 derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
-`profit_and_loss` and `balance_sheet` carry one, and `post_import` and `verify_import` carry one of
+`profit_and_loss`, `balance_sheet`, `cash_flow`, `company_features` and `statement_tie_out` carry one, and `post_import` and `verify_import` carry one of
 another shape (below); the other read tools and the refusals follow.
 
 `post_import` (after a send was read back) and every page of `verify_import` carry a headline that
@@ -3353,8 +3360,8 @@ confirmed. When only some vouchers read back, the counts hold the rows only and 
 about the whole batch from a doubt about one row, so the lead says that the vouchers read back and that
 the batch is not confirmed, and never calls those vouchers confirmed. When some vouchers are not
 confirmed, the lead says that each row says what was found and
-gives a next step where there is one: only four statuses (`bound_not_in_window`, `book_rolled_back`,
-`sent_not_attributed`, `tally_reported_not_created`) carry a `next_step`. Only a batch ComplyEaze Bridge dispatched natively
+gives a next step where there is one: only five statuses (`bound_not_in_window`, `book_rolled_back`,
+`sent_not_attributed`, `tally_reported_not_created` and `posted_divergent`) carry a `next_step`. Only a batch ComplyEaze Bridge dispatched natively
 (`result.dispatch.state` present and not `not_dispatched`) carries one: a built batch not yet posted, a
 file imported by hand and a refusal before anything was sent carry none, because the batch can still be
 posted.

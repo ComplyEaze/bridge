@@ -141,8 +141,8 @@ impl AgentReadRequest {
         ))
     }
 
-    /// Whether this is an Object export. [`Self::company_object`] and the invoice
-    /// company HSN/SAC builders are the only ways to build one ([`Self::parse`] refuses
+    /// Whether this is an Object export. [`Self::company_object`] and
+    /// [`Self::invoice_company_hsn`] are the only ways to build one ([`Self::parse`] refuses
     /// every `Object` envelope), and only the first is sent as an audit part, so on the
     /// audit read a request that says so is that template. The text is tested, not a
     /// stored flag: a flag made `cargo clippy` fail `large_enum_variant` in `agent_import_post.rs` (measured). A

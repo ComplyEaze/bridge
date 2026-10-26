@@ -185,10 +185,9 @@ never through `parse`:
   - It has no TDL, filter, compute, `ORIGINALNAME` or wildcard. A structural test pins
     every element of the rendered request.
 - **A second Object export (12 Oct 2026).** The invoice build's HSN/SAC check reads the
-  company object through `AgentReadRequest::invoice_company_hsn_named(&str)`, built from the
-  verified company's name that the admission carries (the identity-typed
-  `invoice_company_hsn(&VerifiedCompanyIdentity)` is used only in tests; typing the name is a
-  named follow-up), which renders the pinned `invoice_company_hsn_v1` template: the same envelope with a
+  company object through `AgentReadRequest::invoice_company_hsn(&VerifiedCompanyIdentity)`, the
+  only builder of that request, which takes the verified identity rather than a name (#1828) and
+  renders the pinned `invoice_company_hsn_v1` template: the same envelope with a
   `FETCHLIST` of `*`, the shape §9.11a measured, because the company-level HSN/SAC lists came
   back in it (§9.16). It is the only Object export besides this one, and it is built the same
   way: the verified name is its only variable, and its answer is admitted by GUID.

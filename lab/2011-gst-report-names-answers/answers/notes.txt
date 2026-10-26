@@ -1,0 +1,1384 @@
+#2011 notes (UTC). Sheet lab/2011-gst-report-names 23696859f8aff6ca9ac1be83dff00bbfa5b6ab1d: SHA256.txt 22/22 OK (sha256 and bytes); check-request-ids census ok 5, skipped 12, FAIL 0 (exit 0); answers.py --self-test 'self-test: ok (17 controls)' (exit 0). Evidence and backup folders absent before (created empty).
+GUIDs (rule 2): BRIDGE PILOT LAB 6b43e498-430c-4d5c-bfef-d32e2ab93c85 (fixture pilot-lab-gst-uncertain-august-marks.utf16le.xml, origin/master: ALTVCHID 68, ALTMSTID 245); BRIDGE GST LEDGER LAB aae372c5-a894-491c-8843-5532e43d2d2f (lab/gs1-l1-answers answers/s10-state-marks.xml: ALTVCHID 64, ALTMSTID 225).
+This sitting: Part 1 only. P10 (the optional Yes) is not run in this sitting.
+Rule 2 between items: #1237 (PAN item on PILOT LAB) has not started: no backup/restore of it is open.
+2026-10-26T15:55:06Z Step 0, rule 1: Tally's About screen (F1: Help > About, from Select Company with no company loaded): Application TallyPrime, Release 7.2 (Latest), Edition Silver Rental (licensed Silver); not Educational mode; ODBC/Client-Server port 9001 (shot 2011-01, kept on the lab PC; it carries licence and machine details).
+2026-10-26T15:55:27Z P1: loaded BRIDGE PILOT LAB (100033) alone (Select Company, Enter); no question or prompt. Gateway: period 1-Apr-26 to 31-Mar-27, current date Tuesday 15-Sep-2026, last entry 15-Sep-26, footnote '(e) Data exceptions exist' (a Gateway note, not a dialog) (shot 2011-02).
+--- shape p-m0 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+--- shape p-s0 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 40
+    41  VOUCHER
+    41  VOUCHERNUMBERSERIES
+    40  ALTERID
+    40  ARESERIALMASTER
+    40  ASORIGINAL
+    40  ASPAYSLIP
+    40  DATE
+    40  GUID
+    40  ISCANCELLED
+    40  ISDELETED
+    40  ISDELETEDVCHRETAINED
+    40  ISGSTOVERRIDDEN
+    40  ISINVOICE
+    40  ISNEGISPOSSET
+    40  ISOPTIONAL
+    40  ISPOSTDATED
+    40  MASTERID
+    40  NUMBERINGSTYLE
+    40  PERSISTEDVIEW
+    40  REQUESTORRULE
+    40  REUSEHOLEID
+    40  SERIALMASTER
+    40  VCHGSTSTATUSISEXCLUDED
+    40  VCHGSTSTATUSISINCLUDED
+    40  VCHGSTSTATUSISUNCERTAIN
+    40  VOUCHERKEY
+    40  VOUCHERNUMBER
+    40  VOUCHERRETAINKEY
+    40  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+--- shape p-s0r (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 40
+    41  VOUCHER
+    41  VOUCHERNUMBERSERIES
+    40  ALTERID
+    40  ARESERIALMASTER
+    40  ASORIGINAL
+    40  ASPAYSLIP
+    40  DATE
+    40  GUID
+    40  ISCANCELLED
+    40  ISDELETED
+    40  ISDELETEDVCHRETAINED
+    40  ISGSTOVERRIDDEN
+    40  ISINVOICE
+    40  ISNEGISPOSSET
+    40  ISOPTIONAL
+    40  ISPOSTDATED
+    40  MASTERID
+    40  NUMBERINGSTYLE
+    40  PERSISTEDVIEW
+    40  REQUESTORRULE
+    40  REUSEHOLEID
+    40  SERIALMASTER
+    40  VCHGSTSTATUSISEXCLUDED
+    40  VCHGSTSTATUSISINCLUDED
+    40  VCHGSTSTATUSISUNCERTAIN
+    40  VOUCHERKEY
+    40  VOUCHERNUMBER
+    40  VOUCHERRETAINKEY
+    40  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+--- shape p-x0 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 32
+    33  VOUCHER
+    33  VOUCHERNUMBERSERIES
+    32  ALTERID
+    32  ARESERIALMASTER
+    32  ASORIGINAL
+    32  ASPAYSLIP
+    32  DATE
+    32  GUID
+    32  ISCANCELLED
+    32  ISDELETED
+    32  ISDELETEDVCHRETAINED
+    32  ISGSTOVERRIDDEN
+    32  ISINVOICE
+    32  ISNEGISPOSSET
+    32  ISOPTIONAL
+    32  ISPOSTDATED
+    32  MASTERID
+    32  NUMBERINGSTYLE
+    32  PERSISTEDVIEW
+    32  REQUESTORRULE
+    32  REUSEHOLEID
+    32  SERIALMASTER
+    32  VCHGSTSTATUSISEXCLUDED
+    32  VCHGSTSTATUSISINCLUDED
+    32  VCHGSTSTATUSISUNCERTAIN
+    32  VOUCHERKEY
+    32  VOUCHERNUMBER
+    32  VOUCHERRETAINKEY
+    32  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+2026-10-26T15:55:50Z P2: p-m0 marks: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245 (one COMPANY row; GUID = PILOT LAB's; ALTVCHID below 25,000). p-s0 40 rows (at least one: the window holds vouchers). p-s0r 40 rows. p-x0 32 rows.
+--- compare p-s0 p-s0r (exit 0)
+rows: 40 and 40
+CMPINFO: equal
+verdict: same rows
+2026-10-26T15:57:59Z P3 backup (LAB-COMMON v3 C5): <lab folder>\2011\backups\p empty before (0 entries). Data > Backup & Restore > Backup; Backup Data Path showed C:\ (local, not cloud); changed by its list > Specify Path to <lab folder>\2011\backups\p; company BRIDGE PILOT LAB (100033) selected, the only one (shot 2011-03 before accepting); End of List, Enter; 'Accept ?' Yes. No other message. Back at the Gateway (shot 2011-04). AFTER: exactly one file TDBK1800_100033.001, 90,051 bytes, sha256 e9f86f0a07a452e05e52cb1c46eb15b935b1393f4c915e19f26a1f49660488ef, written 2026-10-26 21:27 IST (backup time to the minute). C5's after-backup marks read was not sent: this sheet's P3 names no request, and P5 reads the marks next.
+2026-10-26T15:59:24Z P4 (screen; the owner present and watching; keyed by the lab one key at a time): Gateway > Display More Reports (D) > Statutory Reports (O) > GST Reports (G). GST Reports menu titles, exactly: GST RETURNS/COMPUTATIONS: 'Track GST Return Activities', 'GSTR-1', 'GSTR-3B', 'Annual Computation'; EXCHANGE REPORTS: 'e-Way Bill'; RECONCILIATION REPORTS: 'GSTR-1 Reconciliation', 'GSTR-2A Reconciliation', 'GSTR-2B Reconciliation', 'Challan Reconciliation', 'Invoice Management System (IMS)', 'GST Utilities', 'Other Reports', 'Quit' (shot 2011-05). No separate HSN/SAC summary entry on this menu.
+  GSTR-1 (key 1): opened at once with NO question: N1 = none. Header: GST Registration 08ZZZZZ0000Z1ZQ; Status Not Filed; period 1-Aug-26 to 31-Aug-26 (as opened; not changed); 'Last online GST activity: No Activity Found'. Voucher Count: Total Vouchers 39; Included in Return 27; Ready for Upload 27; Modified in Books After Upload/Export 27; Not Relevant for This Return 7; Uncertain Transactions (Corrections needed) 5; 'Check Vouchers Having Potential Conflicts with Masters' Yes. Return View: B2C (Small) Invoices - 7: Vch Count 27 (Summary 2), Taxable 13,508.70, IGST blank, CGST 383.26, SGST/UTGST 383.24, Cess blank, Tax Amount 766.50, Invoice Amount blank; every other row blank: B2B Invoices - 4A,4B,4C,6B,6C; B2C (Large) - 5A,5B; Exports - 6A; Credit or Debit Notes (Registered) - 9B; (Unregistered) - 9B; Amended B2B - 9A; Amended B2C (Large) - 9A; Amended Exports - 9A; Amended CDN (Registered) - 9C; (Unregistered) - 9C; Nil Rated - 8A,8B,8C,8D; Amendment B2C (Small) - 10; Tax Liability (Advances Received) - 11A(1),11A(2); Adjustment of Advances - 11B(1),11B(2); Amended Tax Liability (Advances Received) - 11A; Amendment of Adjusted Advances - 11B; HSN Summary - 12 (B2B - B2C Supplies) (no figures shown); Document Summary - 13 (no figures shown). Total: Taxable 13,508.70, CGST 383.26, SGST 383.24, Tax 766.50 (shots 2011-06, 2011-07; only Ctrl+End moved the highlight).
+2026-10-26T15:59:44Z P4 GSTR-3B (Escape from GSTR-1 back to the GST Reports menu, key 3): opened at once with NO question: N1 = none. Header: GST Registration 08ZZZZZ0000Z1ZQ; Status Not Filed; 1-Aug-26 to 31-Aug-26; 'Last online GST activity: No Activity Found'. Voucher Count: Total Vouchers 39; Included in Return 27; Not Relevant for This Return 5; Uncertain Transactions (Corrections needed) 7; 'Check Vouchers Having Potential Conflicts with Masters' Yes. Return View: 3.1 Tax on Outward and Reverse Charge Inward Supplies: Taxable 13,508.70, IGST blank, CGST 383.26, SGST/UTGST 383.24, Cess blank, Tax 766.50; 3.2 Interstate Supplies blank; 4 Eligible for Input Tax Credit: A, B, C (Net (A)-(B)), D Other Details 1 and 2: all blank; 5 Exempt, Nil Rated, and Non-GST Inward Supplies blank; 6.1 Interest, Late Fee, Penalty and Others blank (shot 2011-08). Recorded: GSTR-3B's 'Not Relevant' 5 and 'Uncertain' 7 are the reverse of GSTR-1's 7 and 5. No separate HSN/SAC entry on the menu, so no third report. Escape to the GST Reports menu and Escape to the Gateway.
+2026-10-26T16:00:17Z P5: p-s1 and p-m1 sent after the P4 screen step.
+--- compare p-s0 p-s1 (exit 0)
+rows: 40 and 40
+CMPINFO: equal
+verdict: same rows
+--- shape p-unknown (exit 0)
+parsed: yes
+class: refused
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+LINEERROR: "Could not find Report 'Bridge Unknown Report Probe'!"
+     1  BODY
+     1  DATA
+     1  ENVELOPE
+     1  HEADER
+     1  LINEERROR
+     1  STATUS
+     1  VERSION
+--- shape p-m2 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+2026-10-26T16:00:52Z P6: p-unknown sent; class refused, LINEERROR 'Could not find Report ''Bridge Unknown Report Probe''!'; screenshot after: Gateway, no dialog (shot 2011-09). Rule 6: p-s2 sent (200); the lab's rule-6 script then misread its own output filter as a failed send (a script error, not a transport failure: the send log shows HTTP 200) and stopped before p-m2; script fixed; p-m2 sent next, about 30 s later, nothing sent in between.
+--- rule 6: compare p-s1 p-s2 (exit 0)
+rows: 40 and 40
+CMPINFO: equal
+verdict: same rows
+    marks p-m2 byte-identical to p-m1: True
+--- shape p-gstr1-a (exit 0)
+parsed: yes
+class: refused
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+LINEERROR: "Could not find Report 'GSTR-1'!"
+     1  BODY
+     1  DATA
+     1  ENVELOPE
+     1  HEADER
+     1  LINEERROR
+     1  STATUS
+     1  VERSION
+2026-10-26T16:01:18Z P7 p-gstr1-a: class refused, LINEERROR 'Could not find Report ''GSTR-1''!'; screenshot after: Gateway, no dialog (shot 2011-10).
+--- shape p-s3 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 40
+    41  VOUCHER
+    41  VOUCHERNUMBERSERIES
+    40  ALTERID
+    40  ARESERIALMASTER
+    40  ASORIGINAL
+    40  ASPAYSLIP
+    40  DATE
+    40  GUID
+    40  ISCANCELLED
+    40  ISDELETED
+    40  ISDELETEDVCHRETAINED
+    40  ISGSTOVERRIDDEN
+    40  ISINVOICE
+    40  ISNEGISPOSSET
+    40  ISOPTIONAL
+    40  ISPOSTDATED
+    40  MASTERID
+    40  NUMBERINGSTYLE
+    40  PERSISTEDVIEW
+    40  REQUESTORRULE
+    40  REUSEHOLEID
+    40  SERIALMASTER
+    40  VCHGSTSTATUSISEXCLUDED
+    40  VCHGSTSTATUSISINCLUDED
+    40  VCHGSTSTATUSISUNCERTAIN
+    40  VOUCHERKEY
+    40  VOUCHERNUMBER
+    40  VOUCHERRETAINKEY
+    40  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+--- shape p-m3 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+--- rule 6: compare p-s1 p-s3 (exit 0)
+rows: 40 and 40
+CMPINFO: equal
+verdict: same rows
+    marks p-m3: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245; baseline p-m1: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245; equal: True
+--- shape p-gstr1-b (exit 0)
+parsed: yes
+class: refused
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+LINEERROR: "Could not find Report 'GSTR1'!"
+     1  BODY
+     1  DATA
+     1  ENVELOPE
+     1  HEADER
+     1  LINEERROR
+     1  STATUS
+     1  VERSION
+2026-10-26T16:01:37Z P7 p-gstr1-b: class refused, LINEERROR 'Could not find Report ''GSTR1''!'; screenshot after: Gateway, no dialog (shot 2011-11).
+--- shape p-s4 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 40
+    41  VOUCHER
+    41  VOUCHERNUMBERSERIES
+    40  ALTERID
+    40  ARESERIALMASTER
+    40  ASORIGINAL
+    40  ASPAYSLIP
+    40  DATE
+    40  GUID
+    40  ISCANCELLED
+    40  ISDELETED
+    40  ISDELETEDVCHRETAINED
+    40  ISGSTOVERRIDDEN
+    40  ISINVOICE
+    40  ISNEGISPOSSET
+    40  ISOPTIONAL
+    40  ISPOSTDATED
+    40  MASTERID
+    40  NUMBERINGSTYLE
+    40  PERSISTEDVIEW
+    40  REQUESTORRULE
+    40  REUSEHOLEID
+    40  SERIALMASTER
+    40  VCHGSTSTATUSISEXCLUDED
+    40  VCHGSTSTATUSISINCLUDED
+    40  VCHGSTSTATUSISUNCERTAIN
+    40  VOUCHERKEY
+    40  VOUCHERNUMBER
+    40  VOUCHERRETAINKEY
+    40  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+--- shape p-m4 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+--- rule 6: compare p-s1 p-s4 (exit 0)
+rows: 40 and 40
+CMPINFO: equal
+verdict: same rows
+    marks p-m4: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245; baseline p-m1: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245; equal: True
+--- shape p-gstr3b-a (exit 0)
+parsed: yes
+class: refused
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+LINEERROR: "Could not find Report 'GSTR-3B'!"
+     1  BODY
+     1  DATA
+     1  ENVELOPE
+     1  HEADER
+     1  LINEERROR
+     1  STATUS
+     1  VERSION
+2026-10-26T16:01:49Z P7 p-gstr3b-a: class refused, LINEERROR 'Could not find Report ''GSTR-3B''!'; screenshot after: Gateway, no dialog (shot 2011-12).
+--- shape p-s5 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 40
+    41  VOUCHER
+    41  VOUCHERNUMBERSERIES
+    40  ALTERID
+    40  ARESERIALMASTER
+    40  ASORIGINAL
+    40  ASPAYSLIP
+    40  DATE
+    40  GUID
+    40  ISCANCELLED
+    40  ISDELETED
+    40  ISDELETEDVCHRETAINED
+    40  ISGSTOVERRIDDEN
+    40  ISINVOICE
+    40  ISNEGISPOSSET
+    40  ISOPTIONAL
+    40  ISPOSTDATED
+    40  MASTERID
+    40  NUMBERINGSTYLE
+    40  PERSISTEDVIEW
+    40  REQUESTORRULE
+    40  REUSEHOLEID
+    40  SERIALMASTER
+    40  VCHGSTSTATUSISEXCLUDED
+    40  VCHGSTSTATUSISINCLUDED
+    40  VCHGSTSTATUSISUNCERTAIN
+    40  VOUCHERKEY
+    40  VOUCHERNUMBER
+    40  VOUCHERRETAINKEY
+    40  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+--- shape p-m5 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+--- rule 6: compare p-s1 p-s5 (exit 0)
+rows: 40 and 40
+CMPINFO: equal
+verdict: same rows
+    marks p-m5: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245; baseline p-m1: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245; equal: True
+--- shape p-gstr3b-b (exit 3)
+parsed: no (no element found: line 1, column 0)
+first 500 characters: ''
+2026-10-26T16:02:12Z P7 p-gstr3b-b: HTTP 200, curl exit 0, CONTENT-LENGTH 0, a zero-byte body (sha256 e3b0c442..., the empty-input hash), curl time_total 0.921 s (the other report names: 0.020 s). Headers exactly: 'HTTP/1.1 200 OK', 'RESPSTATUS: 1', 'CONNECTION: KEEP-ALIVE', 'CONTENT-LENGTH: 0' (no CONTENT-TYPE and no 'Unicode' line, unlike every other answer). answers.py shape: exit 3, 'parsed: no (no element found: line 1, column 0)'. Not a rule 7 stop (200, curl exit 0, no dialog): recorded as an answer that does not parse (rule 10); it cannot be told from a report that was not rendered. Screenshot after: Gateway, no dialog (shot 2011-13).
+--- shape p-s6 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 40
+    41  VOUCHER
+    41  VOUCHERNUMBERSERIES
+    40  ALTERID
+    40  ARESERIALMASTER
+    40  ASORIGINAL
+    40  ASPAYSLIP
+    40  DATE
+    40  GUID
+    40  ISCANCELLED
+    40  ISDELETED
+    40  ISDELETEDVCHRETAINED
+    40  ISGSTOVERRIDDEN
+    40  ISINVOICE
+    40  ISNEGISPOSSET
+    40  ISOPTIONAL
+    40  ISPOSTDATED
+    40  MASTERID
+    40  NUMBERINGSTYLE
+    40  PERSISTEDVIEW
+    40  REQUESTORRULE
+    40  REUSEHOLEID
+    40  SERIALMASTER
+    40  VCHGSTSTATUSISEXCLUDED
+    40  VCHGSTSTATUSISINCLUDED
+    40  VCHGSTSTATUSISUNCERTAIN
+    40  VOUCHERKEY
+    40  VOUCHERNUMBER
+    40  VOUCHERRETAINKEY
+    40  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+--- shape p-m6 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+--- rule 6: compare p-s1 p-s6 (exit 0)
+rows: 40 and 40
+CMPINFO: equal
+verdict: same rows
+    marks p-m6: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245; baseline p-m1: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245; equal: True
+--- shape p-hsn-a (exit 0)
+parsed: yes
+class: refused
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+LINEERROR: "Could not find Report 'HSN/SAC Summary'!"
+     1  BODY
+     1  DATA
+     1  ENVELOPE
+     1  HEADER
+     1  LINEERROR
+     1  STATUS
+     1  VERSION
+2026-10-26T16:02:32Z P7 p-hsn-a: class refused, LINEERROR 'Could not find Report ''HSN/SAC Summary''!'; headers RESPSTATUS 0; screenshot after: Gateway, no dialog (shot 2011-14).
+--- shape p-s7 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 40
+    41  VOUCHER
+    41  VOUCHERNUMBERSERIES
+    40  ALTERID
+    40  ARESERIALMASTER
+    40  ASORIGINAL
+    40  ASPAYSLIP
+    40  DATE
+    40  GUID
+    40  ISCANCELLED
+    40  ISDELETED
+    40  ISDELETEDVCHRETAINED
+    40  ISGSTOVERRIDDEN
+    40  ISINVOICE
+    40  ISNEGISPOSSET
+    40  ISOPTIONAL
+    40  ISPOSTDATED
+    40  MASTERID
+    40  NUMBERINGSTYLE
+    40  PERSISTEDVIEW
+    40  REQUESTORRULE
+    40  REUSEHOLEID
+    40  SERIALMASTER
+    40  VCHGSTSTATUSISEXCLUDED
+    40  VCHGSTSTATUSISINCLUDED
+    40  VCHGSTSTATUSISUNCERTAIN
+    40  VOUCHERKEY
+    40  VOUCHERNUMBER
+    40  VOUCHERRETAINKEY
+    40  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+--- shape p-m7 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+--- rule 6: compare p-s1 p-s7 (exit 0)
+rows: 40 and 40
+CMPINFO: equal
+verdict: same rows
+    marks p-m7: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245; baseline p-m1: GUID=6b43e498-430c-4d5c-bfef-d32e2ab93c85 ALTVCHID=68 ALTMSTID=245; equal: True
+--- shape p-x1 (exit 0)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 32
+    33  VOUCHER
+    33  VOUCHERNUMBERSERIES
+    32  ALTERID
+    32  ARESERIALMASTER
+    32  ASORIGINAL
+    32  ASPAYSLIP
+    32  DATE
+    32  GUID
+    32  ISCANCELLED
+    32  ISDELETED
+    32  ISDELETEDVCHRETAINED
+    32  ISGSTOVERRIDDEN
+    32  ISINVOICE
+    32  ISNEGISPOSSET
+    32  ISOPTIONAL
+    32  ISPOSTDATED
+    32  MASTERID
+    32  NUMBERINGSTYLE
+    32  PERSISTEDVIEW
+    32  REQUESTORRULE
+    32  REUSEHOLEID
+    32  SERIALMASTER
+    32  VCHGSTSTATUSISEXCLUDED
+    32  VCHGSTSTATUSISINCLUDED
+    32  VCHGSTSTATUSISUNCERTAIN
+    32  VOUCHERKEY
+    32  VOUCHERNUMBER
+    32  VOUCHERRETAINKEY
+    32  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+2026-10-26T16:02:35Z P8: p-x1 sent.
+--- compare p-x0 p-x1 (exit 0)
+rows: 32 and 32
+CMPINFO: equal
+verdict: same rows
+2026-10-26T16:03:14Z P9 (screen again, the owner watching; keyed by the lab): D > O > G; GSTR-1 (key 1) opened at once with NO question: N2 = none; every figure as at P4 (Total Vouchers 39; Included 27; Ready for Upload 27; Modified after Upload/Export 27; Not Relevant 7; Uncertain 5; Conflicts Yes; B2C (Small) - 7: 27 (2), 13,508.70, CGST 383.26, SGST 383.24, Tax 766.50; Total the same) (shot 2011-15). Escape; GSTR-3B (key 3) opened at once with NO question: N2 = none; every figure as at P4 (39; 27; Not Relevant 5; Uncertain 7; Conflicts Yes; 3.1 13,508.70 / 383.26 / 383.24 / 766.50; all other tables blank) (shot 2011-16). N1 and N2 were both none: no update question was pending, so this run cannot show whether a gateway request would update a pending GST status.
+2026-10-26T16:03:14Z P10: not run (not in this sitting's scope; no yes for it at this step). P11: not run (P10 did not run).
+2026-10-26T16:03:39Z P9 exit: Escape four times through GSTR-3B and the three menus back to the Gateway (report and menus only). P12: Company > Shut (Alt+K, H, Enter on BRIDGE PILOT LAB); Select Company with none loaded (shot 2011-17). tasklist: 1 tally.exe, PID 29692; 9001 LISTENING (2 lines); GET /status 200, 51 B. No request after the shut. Tally's current date was Tuesday 15-Sep-2026 throughout. Backup kept: <lab folder>\2011\backups\p\TDBK1800_100033.001 (e9f86f0a...), not restored (P11 not run). Part 2: not run in this sitting.
+--- shape p-s1 (exit 0; run on the saved file after P12: the send's output filter had cut the script before its shape step; no request involved)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 40
+    41  VOUCHER
+    41  VOUCHERNUMBERSERIES
+    40  ALTERID
+    40  ARESERIALMASTER
+    40  ASORIGINAL
+    40  ASPAYSLIP
+    40  DATE
+    40  GUID
+    40  ISCANCELLED
+    40  ISDELETED
+    40  ISDELETEDVCHRETAINED
+    40  ISGSTOVERRIDDEN
+    40  ISINVOICE
+    40  ISNEGISPOSSET
+    40  ISOPTIONAL
+    40  ISPOSTDATED
+    40  MASTERID
+    40  NUMBERINGSTYLE
+    40  PERSISTEDVIEW
+    40  REQUESTORRULE
+    40  REUSEHOLEID
+    40  SERIALMASTER
+    40  VCHGSTSTATUSISEXCLUDED
+    40  VCHGSTSTATUSISINCLUDED
+    40  VCHGSTSTATUSISUNCERTAIN
+    40  VOUCHERKEY
+    40  VOUCHERNUMBER
+    40  VOUCHERRETAINKEY
+    40  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE
+--- shape p-m1 (exit 0; run on the saved file after P12: the send's output filter had cut the script before its shape step; no request involved)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 0
+     2  COMPANY
+     1  ADJUSTMENTCLASSIFICATION
+     1  ALTMSTID
+     1  ALTVCHID
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  GUID
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHER
+     1  VOUCHERNUMBERSERIES
+     1  VOUCHERTYPE
+--- shape p-s2 (exit 0; run on the saved file after P12: the send's output filter had cut the script before its shape step; no request involved)
+parsed: yes
+class: answered
+root: ENVELOPE
+COLLECTION/VOUCHER rows: 40
+    41  VOUCHER
+    41  VOUCHERNUMBERSERIES
+    40  ALTERID
+    40  ARESERIALMASTER
+    40  ASORIGINAL
+    40  ASPAYSLIP
+    40  DATE
+    40  GUID
+    40  ISCANCELLED
+    40  ISDELETED
+    40  ISDELETEDVCHRETAINED
+    40  ISGSTOVERRIDDEN
+    40  ISINVOICE
+    40  ISNEGISPOSSET
+    40  ISOPTIONAL
+    40  ISPOSTDATED
+    40  MASTERID
+    40  NUMBERINGSTYLE
+    40  PERSISTEDVIEW
+    40  REQUESTORRULE
+    40  REUSEHOLEID
+    40  SERIALMASTER
+    40  VCHGSTSTATUSISEXCLUDED
+    40  VCHGSTSTATUSISINCLUDED
+    40  VCHGSTSTATUSISUNCERTAIN
+    40  VOUCHERKEY
+    40  VOUCHERNUMBER
+    40  VOUCHERRETAINKEY
+    40  VOUCHERTYPENAME
+     1  ADJUSTMENTCLASSIFICATION
+     1  ATTENDANCETYPE
+     1  BODY
+     1  BUDGET
+     1  CLIENTRULE
+     1  CMPINFO
+     1  COLLECTION
+     1  COMPANY
+     1  COSTCATEGORY
+     1  COSTCENTRE
+     1  CURRENCY
+     1  DATA
+     1  DEDUCTEETYPE
+     1  DESC
+     1  ENVELOPE
+     1  EXCISEDUTYCLASSIFICATION
+     1  FBTASSESSEETYPE
+     1  FBTCATEGORY
+     1  GODOWN
+     1  GROUP
+     1  GSTCLASSIFICATION
+     1  HEADER
+     1  INCOMETAXCLASSIFICATION
+     1  INCOMETAXSLAB
+     1  LBTCLASSIFICATION
+     1  LEDGER
+     1  RETURNMASTER
+     1  SERIALNUMBER
+     1  SERVERRULE
+     1  STATE
+     1  STATUS
+     1  STCATEGORY
+     1  STOCKCATEGORY
+     1  STOCKGROUP
+     1  STOCKITEM
+     1  TARIFFCLASSIFICATION
+     1  TAXCLASSIFICATION
+     1  TAXUNIT
+     1  TDSRATE
+     1  UNIT
+     1  VERSION
+     1  VOUCHERTYPE

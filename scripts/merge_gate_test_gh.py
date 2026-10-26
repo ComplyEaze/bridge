@@ -1003,7 +1003,7 @@ def state():
 
     elif scenario in ("attribution-body-trailer", "attribution-body-markdown", "attribution-body-with-unproven-commits"):
         # The body is copied into the commit on master by a squash merge, so a co-author line there counts; Markdown does not hide the line.
-        line = {"attribution-body-trailer": "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">",
+        line = {"attribution-body-trailer": "Co-Authored-By: Claude",
                 "attribution-body-markdown": "Generated with **[Claude Code](https://claude.com/claude-code)**",
                 "attribution-body-with-unproven-commits": "Generated with Claude Code"}[scenario]
         s["body"] = DEFAULT_BODY + line + "\n"

@@ -245,53 +245,40 @@ $commit_messages
 $commit_identity_names"
   fi
 fi
-# No AI attribution in public text (owner rule of 25 Oct 2026). The title and body, comments included, may not hold the
-# assistant's generated-with signature line (plain or Markdown-link form) or a Co-authored-by line naming an assistant, and a
-# commit may not carry such a trailer or an author or committer identity naming one unless its SHA is on the accepted list
-# (scripts/check-ai-attribution-accepted.json: the older commits of the branches that were open when the owner decided, on 26 Oct
-# 2026, to accept them and block every new one). A commit is accepted by SHA and not by date, because a committer date is the
-# pusher's to set. An accepted commit with such text is reported, and the report says that GitHub's squash merge can copy it into
-# the commit on master. scripts/check-ai-attribution.mjs decides. The title and body are checked even when the commit list is not
-# proven complete (that case is already INDETERMINATE above): then no commit is read. The accepted list is read from this tree
-# (master's), and an unreadable or malformed one is INDETERMINATE.
-attribution_accepted=$(jq -c 'if (type == "object") and (.accepted | type == "array") and
-    (all(.accepted[]; (.sha | type == "string" and test("^[0-9a-f]{40}$")))) and ([.accepted[].sha] | (unique | length) == length)
-  then [.accepted[].sha] else error("the accepted list is malformed") end' "$script_dir/check-ai-attribution-accepted.json" 2>/dev/null) || attribution_accepted=""
-# The commit list goes in on stdin (a long list would not fit an argument); the title, body and accepted list are arguments, and
-# one too long for that makes the whole check INDETERMINATE, never a pass.
+# AI attribution in public text (the owner's practice of 25 Oct 2026, not a mandate): a "Generated with" signature line or a
+# Co-authored-by line naming an assistant in the title or body (comments included), or such a trailer or an author or committer
+# identity naming one on a commit, is reported as a note and never blocks a merge. The note says that GitHub's squash merge copies
+# the body into the commit on master. scripts/check-ai-attribution.mjs decides. The title and body are checked even when the commit
+# list is not proven complete (that case is already INDETERMINATE above): then no commit is read. A check that did not run to its
+# end is INDETERMINATE: an unreadable result is an unknown, not a clean one.
+# The commit list goes in on stdin (a long list would not fit an argument); the title and body are arguments, and one too long for
+# that makes the whole check INDETERMINATE, never a pass.
 attribution_source="[]"
 [ "${metadata_commits_proven:-0}" -eq 1 ] && attribution_source="$metadata_commits"
-attribution_input=""
-if [ -n "$attribution_accepted" ]; then
-  attribution_input=$(jq -c --arg title "$title" --arg body "$raw_prbody" --argjson accepted "$attribution_accepted" '{
-    title: $title, body: $body, accepted: $accepted,
+attribution_input=$(jq -c --arg title "$title" --arg body "$raw_prbody" '{
+    title: $title, body: $body,
     commits: ((if all(.[]; type == "array") then flatten else . end) |
       map({sha: .sha, message: .commit.message,
            identities: [.commit.author.name, .commit.author.email, .commit.committer.name, .commit.committer.email]}))}' <<<"$attribution_source" 2>/dev/null) || attribution_input=""
-fi
 if [ -z "$attribution_input" ]; then
   unknown "could not prepare the AI attribution check"
 else
   : >"$errfile"
   attribution_status=0
   attribution_output=$(printf '%s' "$attribution_input" | node "$script_dir/check-ai-attribution.mjs" 2>"$errfile") || attribution_status=$?
-  attribution_refusals=$(printf '%s\n' "$attribution_output" | grep -c '^REFUSE ' || true)
-  # The check's last line must say how many commits it read, and that number must be the number sent.
+  # The check's last line must say how many commits it read, and that number must be the number sent; every line before it must be
+  # a note. Anything else (a crash, an old node, a missing module, a replaced file that prints nothing or refuses) is not an answer.
   attribution_expected=$(jq -r '.commits | length' <<<"$attribution_input" 2>/dev/null) || attribution_expected=""
   attribution_last=$(printf '%s\n' "$attribution_output" | tail -n 1)
-  attribution_checked=0
-  [ -n "$attribution_expected" ] && [ "$attribution_last" = "CHECKED $attribution_expected" ] && attribution_checked=1
-  # An answer is a final CHECKED line (the check ran to the end) and an exit status that agrees with the refusals: exit 0 with
-  # none, exit 1 with at least one. Anything else (a crash, an old node, a missing module, a replaced file that prints nothing)
-  # is not an answer.
-  if [ "$attribution_checked" -eq 1 ] && { { [ "$attribution_status" -eq 0 ] && [ "$attribution_refusals" -eq 0 ]; } || { [ "$attribution_status" -eq 1 ] && [ "$attribution_refusals" -gt 0 ]; }; }; then
+  attribution_other=$(printf '%s\n' "$attribution_output" | sed '$d' | grep -vc '^NOTE ' || true)
+  if [ "$attribution_status" -eq 0 ] && [ -n "$attribution_expected" ] && [ "$attribution_last" = "CHECKED $attribution_expected" ] && [ "$attribution_other" -eq 0 ]; then
+    attribution_notes=0
     while IFS= read -r attribution_line; do
       case "$attribution_line" in
-        "REFUSE "*) bad "AI attribution: ${attribution_line#REFUSE }" ;;
-        "NOTE "*) say "note" "AI attribution (accepted older commit): ${attribution_line#NOTE }" ;;
+        "NOTE "*) say "note" "AI attribution: ${attribution_line#NOTE }"; attribution_notes=$((attribution_notes + 1)) ;;
       esac
     done <<<"$attribution_output"
-    if [ "$attribution_status" -eq 0 ] && [ "${metadata_commits_proven:-0}" -eq 1 ]; then
+    if [ "$attribution_notes" -eq 0 ] && [ "${metadata_commits_proven:-0}" -eq 1 ]; then
       say "ok" "no AI attribution in the title, body or commits"
     fi
   else

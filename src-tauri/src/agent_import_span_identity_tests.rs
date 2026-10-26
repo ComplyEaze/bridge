@@ -323,6 +323,24 @@ fn a_post_span_needs_clean_counters_a_lastvchid_and_a_step_equal_to_created() {
     );
 }
 
+/// A wrapped reply that reports `STATUS=0` failed whatever its counters say
+/// (IMPLEMENTATION_GUIDE.md §3.2, I6), so no span is bound from it, with or
+/// without a mark read after the post (#2008).
+#[test]
+fn a_reply_reporting_status_zero_binds_no_span_whatever_its_counters() {
+    let before = PreMark::recorded(1795);
+    let failed = |status: &str| {
+        bridge_tally_protocol::parse_import_outcome(&format!(
+            "<ENVELOPE><HEADER><STATUS>{status}</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>1733</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>"
+        ))
+        .unwrap()
+    };
+    // The same counters under STATUS=1 make a span: only the status differs.
+    assert!(PostSpan::after_clean_post(before, 1805, &failed("1"), 10).is_ok());
+    assert!(PostSpan::after_clean_post(before, 1805, &failed("0"), 10).is_err());
+    assert!(PostSpan::after_clean_response(before, &failed("0"), 10).is_err());
+}
+
 /// Verification treats an absent `EFFECTIVEDATE` as not observed, so the
 /// binding is decided again by the next read, never refused for good. A real
 /// difference later in the span still refuses: the absence, met first, never

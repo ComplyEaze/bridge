@@ -36,7 +36,7 @@ Both periods were set back as the screens offered: the Day Book to 31-Mar-26 alo
 - `state` counted;
 - `request_spacing_ms` 500.
 
-The whole answer, `03-voucher_read_cost.json` (9,599 bytes, sha256 b0b3aaf8794e2b454f219db655ac21b28a601219dc7739df761727737768c343), stays on the lab PC. Its `host_limits` list names hosts by product names that the evidence text check refuses. Its other fields are given above. Its `measured` block quotes the two calls from protocol reference 11c.5 (34.3 s and 104.7 s, `not_a_bound`).
+The whole answer, `03-voucher_read_cost.json` (9,599 bytes, sha256 b0b3aaf8794e2b454f219db655ac21b28a601219dc7739df761727737768c343), is in `answers/`. It was added in a second commit: its `host_limits` list names the host apps by the tool's own product field values. Its other fields are given above. Its `measured` block quotes the two calls from protocol reference 11c.5 (34.3 s and 104.7 s, `not_a_bound`).
 
 ## Step 3: `vouchers`, 2025-04-01 to 2025-04-07, offset 0, one call
 - **Wall clock (the client's tools/call round trip): 12.113 s.** The answer's own `evidence.duration_ms` is 11,837.
@@ -93,7 +93,7 @@ C10: Company > Shut. Then Select Company with none loaded; one tally.exe; 9001 L
 #1029 item 1 and item 3; a window crossing a month or a financial year; Gold; Education mode.
 
 ## In this commit
-- `answers/`: every tool answer whole, with the client's timing, except step 2's (kept on the lab PC, listed above by sha256); step 3's `egress_log` answer; the `read_evidence` answer; the C2 and C10 /status answers and the C10 observation.
+- `answers/`: every tool answer whole, with the client's timing; step 3's `egress_log` answer; the `read_evidence` answer; the C2 and C10 /status answers and the C10 observation.
 - `notes.txt`: UTC times, one line per step.
 - `cost-log.txt`: the client's one-line log of each call.
 - `call1029.py`: the lab's client, not product code.

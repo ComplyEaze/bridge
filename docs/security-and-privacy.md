@@ -79,7 +79,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
 - **Between ComplyEaze Bridge and Tally:** only to a loopback address on this
   computer. If you forward that port to a virtual machine or another machine,
   the traffic follows your forward.
-- **A Windows network path, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The
+- **A Windows network path, in 0.3.0 and 0.4.0 (its network forms refused from 0.4.1; some paths still pass).** The
   bank statement tool could be given a path that names another computer, and
   Windows then connects to that computer by itself. Section 3 describes it.
 - **To your AI provider: yes, whatever the assistant reads.** ComplyEaze Bridge
@@ -302,7 +302,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   The changelog adds that the check does not by itself prove that no data
   leaves the machine.
 
-- **One exception, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The Windows network
+- **One exception, in 0.3.0 and 0.4.0 (its network forms refused from 0.4.1; some paths still pass).** The Windows network
   path ([advisory](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7)):
   - *What was wrong.* The `parse_bank_statement` tool opened any absolute path
     it was given for the statement or the password file, including a Windows
@@ -512,15 +512,15 @@ begin (for example when the batch is not found or the journal is busy); a
 refusal inside the checks already withdrew it. In 0.5.0 a window for one voucher
 puts "On Account" before the name of each ledger you approved for it and shows
 the voucher's own reference and narration as its last two lines; if they hold
-characters it cannot show safely, or do not fit, it refuses. In the next build,
+characters it cannot show safely, or do not fit, it refuses. From 0.6.0,
 a narration too long for one line is shown instead in numbered parts, each
 quoted and split only at a space, under a line that counts them; one that
 cannot be split so, and a reference too long for one line, are still refused.
 The review window for a posted voucher shows its narration last, under the
 same heading (#1535). A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
-and up to 40 characters of its narration, with no reference; from the next
-build a Journal's line names its first debit and first credit ledger and up to
+and up to 40 characters of its narration, with no reference; from 0.6.0
+a Journal's line names its first debit and first credit ledger and up to
 20 characters of its narration, fewer (never under 10) when that makes the line
 fit, and the line above says a narration may be cut) and marks the
 approved ledgers On Account on its totals lines. A batch of more than ten

@@ -238,9 +238,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       registers list. The two names are shortened under
       `mask_parties`, like the cost centre and cost category lists; the amount
       is not a name and is sent under every setting. An entry whose allocations
-      cannot be read whole says so with a reason and sends none of them; an
-      allocation in a shape the read does not recognise is not sent and is not
-      flagged.
+      cannot be read whole says so with a reason and sends none of them, an
+      allocation in a shape the read does not recognise included. Allocations on
+      the inventory entries of an item invoice are not read and not sent, so an
+      entry with no allocations listed may still have some.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

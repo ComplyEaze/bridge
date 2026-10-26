@@ -1388,7 +1388,8 @@ or vouchers.
 - **Tax comes only from the GST duty head on the ledger master.** An entry on a
   ledger with a recognised head is listed in `tax_in_books` as
   `{ledger, head, raw_head, amount}` (each entry also carries what the vouchers read carries on it, among it
-  `cost_centre_allocations`, with the cost-centre and category names masked as `vouchers` masks them). An entry on a Duties & Taxes ledger with
+  `cost_centre_allocations`, with the cost-centre and category names masked as `vouchers` masks them; allocations on
+  an item invoice's inventory entries are not read, so an entry without the key may still have some). An entry on a Duties & Taxes ledger with
   no GST head is listed in `duties_taxes_entries_without_gst_head` and is never
   assigned one. Its `observation` says which case it is: `not_tax_ledger` is a
   ledger whose own tax type is not GST (usually TDS or another payable), and
@@ -2035,12 +2036,17 @@ Each ledger entry that carries cost-centre allocations has `cost_centre_allocati
 own amount.
 
 - An entry without allocations has no such key. In the one capture of the read the vouchers tool sends, Tally printed no allocation element for such an entry.
+  No key does not by itself mean none: allocations on an item invoice's inventory entries are not read (the read does
+  not ask for inventory entries), and whether Tally puts such an invoice's ledger allocations under its inventory
+  entries is not captured.
 - **A list that cannot be read whole does not refuse the read.** The entry carries
   `cost_centre_allocations_unreadable` with one reason, and no partial list; the rest of the response is unchanged.
   The reasons: `cost_centre_name_missing`, `cost_centre_amount_missing` (an empty amount is never read as zero),
   `cost_centre_amount_unparsable`, `cost_centre_duplicate` (one centre named twice in one category),
   `cost_category_missing`, `cost_category_without_centres`, `cost_category_present_but_empty`,
-  `cost_centre_field_duplicated` and `cost_centre_text_undecodable`.
+  `cost_category_repeated` (one category named twice in one entry), `cost_centre_field_duplicated`,
+  `cost_centre_text_undecodable` and `cost_centre_allocation_shape_unrecognised` (an allocation list at a depth the
+  read does not take).
 - Names are carried trimmed; the amount is carried exactly as Tally sent it (an amount with space around it is
   refused as `cost_centre_amount_unparsable`, as the entry's own amount would be). Under `mask_parties` the category and
   cost-centre names are masked like a party name (as the masters read masks the same names); the amounts are sent.
@@ -2053,7 +2059,7 @@ own amount.
 - No request changed: the allocations were already in the answers the read asks for, and were dropped.
 - It reaches the readers that return a voucher's entries from this parser: the vouchers read (and its search) and
   the entries the purchase and sales registers list; each marks the two names the same way, so `mask_parties` masks
-  them in all of them (`changed_since` marks them too, but every call to it is refused before Tally is asked). The presence, bill-trail and summary reads, `verify_import` and
+  them in all of them. The presence, bill-trail and summary reads, `verify_import` and
   `ledger_movement` do not return them (`ledger_movement`'s fetch names three entry fields).
 
 ## Voucher-file preparation and verification

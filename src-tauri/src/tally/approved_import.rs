@@ -1588,8 +1588,9 @@ enum Shown {
     StopRelease,
 }
 
-/// The two uses of the review dialog. [`ReviewAcknowledged::confirm`] takes
-/// one, so the invoice-stop release cannot be shown with the review's words.
+/// The two kinds of acknowledgement. [`ReviewAcknowledged::confirm`] takes one,
+/// and each has its own subprocess mode, so the invoice-stop release is never
+/// shown with the review's title or button (#1828).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReviewKind {
     Review,
@@ -1814,8 +1815,9 @@ async fn confirm_with(
     }
 }
 
-/// The review dialog for a doubted post (#239): its own subprocess mode, so
-/// its title and button never read as approving a post. It is answered by
+/// The review dialog for a doubted post (#239), or the invoice-stop release
+/// dialog (#1828): each its own subprocess mode, so neither title nor button
+/// reads as approving a post, nor one as the other. It is answered by
 /// the token alone, as the post dialog is by the token and a clean exit; a
 /// clean exit without the token is unavailable, as the post dialog's is.
 async fn confirm_review(
@@ -1845,9 +1847,9 @@ async fn confirm_review_with(
         Ok(answer) if answer.box_did_not_fit => Err("ack_review_too_large".into()),
         Ok(answer) if answer.token_matched => Ok(()),
         // A person's decline is no token and exit 1: `run_review_confirmation`
-        // and `run_release_confirmation` return false. A clean exit without the token is never that; it is
-        // an executable that is not this dialog, such as one ignoring the
-        // flag (#689).
+        // and `run_release_confirmation` return false. A clean exit without
+        // the token is never that; it is an executable that is not this
+        // dialog, such as one ignoring the flag (#689).
         Ok(answer) if answer.exited_cleanly => Err("ack_review_unavailable".into()),
         Ok(_) => Err("ack_review_declined".into()),
         Err(DialogFailure::Unavailable) => Err("ack_review_unavailable".into()),

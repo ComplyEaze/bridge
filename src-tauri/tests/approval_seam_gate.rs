@@ -698,6 +698,12 @@ fn dialog_mode_problems(lib: &str) -> Vec<String> {
 fn each_dialog_mode_runs_its_own_dialog() {
     let lib = read("src-tauri/src/lib.rs");
     assert_eq!(dialog_mode_problems(&lib), Vec::<String>::new());
+    let release_as_review = lib.replace(
+        "agent::run_release_confirmation,",
+        "agent::run_review_confirmation,",
+    );
+    assert_ne!(release_as_review, lib);
+    assert!(!dialog_mode_problems(&release_as_review).is_empty());
     let swapped = lib
         .replace("agent::run_confirmation as fn() -> bool,", "SWAP,")
         .replace(
@@ -1208,9 +1214,9 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
         Ok(answer) if answer.box_did_not_fit => Err("ack_review_too_large".into()),
         Ok(answer) if answer.token_matched => Ok(()),
         // A person's decline is no token and exit 1: `run_review_confirmation`
-        // and `run_release_confirmation` return false. A clean exit without the token is never that; it is
-        // an executable that is not this dialog, such as one ignoring the
-        // flag (#689).
+        // and `run_release_confirmation` return false. A clean exit without
+        // the token is never that; it is an executable that is not this
+        // dialog, such as one ignoring the flag (#689).
         Ok(answer) if answer.exited_cleanly => Err("ack_review_unavailable".into()),
         Ok(_) => Err("ack_review_declined".into()),
         Err(DialogFailure::Unavailable) => Err("ack_review_unavailable".into()),
@@ -1660,7 +1666,7 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
     }
 }
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 28] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 30] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -1715,6 +1721,15 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 28] = [
     ),
     ("pub(crate) const REVIEW_BUTTON: &str = \"Yes\";", 1),
     ("const RELEASE_BUTTON: &str = \"Release the stop\";", 1),
+    // Each token's value, so no two modes can share one (#1828).
+    (
+        "const REVIEW_TOKEN_PREFIX: &str = \"bridge-review-acknowledged:\";",
+        1,
+    ),
+    (
+        "const POST_TOKEN_PREFIX: &str = \"bridge-post-approved:\";",
+        1,
+    ),
     (
         "const RELEASE_TOKEN_PREFIX: &str = \"bridge-stop-release-acknowledged:\";",
         1,
@@ -1737,10 +1752,10 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     ("#[cfg(not(test))]", 4),
     // #702 ran the parent's seven unix-only test items on every platform.
     ("#[cfg(unix)]", 0),
-    // #1828: the release window's title and dialog on each platform, and its
-    // Mac button.
+    // #1828: the release window's question and box on Windows.
     ("#[cfg(windows)]", 9),
-    // #1780 follow-up: the Mac one-line answer text test.
+    // #1780 follow-up: the Mac one-line answer text test. #1828: the release
+    // window's title, dialog and button on a Mac.
     ("#[cfg(not(windows))]", 12),
     ("cfg", 33),
 ];
@@ -1955,6 +1970,23 @@ fn each_dialog_answers_only_on_its_positive_button() {
         source.replacen(
             "Self::StopRelease => (\"--confirm-release\", RELEASE_TOKEN_PREFIX),",
             "Self::StopRelease => (\"--confirm-review\", REVIEW_TOKEN_PREFIX),",
+            1,
+        ),
+        // Two modes share a token, the Windows release box asks the review's
+        // question, or loses its default No (#1828).
+        source.replacen(
+            "\"bridge-review-acknowledged:\"",
+            "\"bridge-stop-release-acknowledged:\"",
+            1,
+        ),
+        source.replacen(
+            "\"ComplyEaze Bridge — release the invoice stop for this company?\".into()",
+            "\"ComplyEaze Bridge — record that you reviewed this voucher?\".into()",
+            1,
+        ),
+        source.replacen(
+            RELEASE_ACK_DIALOG_WINDOWS,
+            &RELEASE_ACK_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
             1,
         ),
     ] {

@@ -42,9 +42,9 @@
 // the pull request's target branch (GITHUB_BASE_REF, else origin/master).
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -52,12 +52,17 @@ const DEFAULT_LOCKFILE = "src-tauri/Cargo.lock";
 const MAX_REPORTED_IDS = 30;
 
 function parseArgs(argv) {
-  const args = { base: null, head: "HEAD", lockfile: DEFAULT_LOCKFILE };
+  const args = { base: null, head: "HEAD", lockfile: DEFAULT_LOCKFILE, advisoryDb: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--base") args.base = requireValue(argv, ++i, "--base");
     else if (arg === "--head") args.head = requireValue(argv, ++i, "--head");
     else if (arg === "--lockfile") args.lockfile = requireValue(argv, ++i, "--lockfile");
+    // A fixed advisory database (a directory laid out like the RustSec database, with a crates/ folder) read
+    // instead of the live one, for both scans and without a fetch: the result then depends on the two lockfiles
+    // and on that snapshot alone (yanked-crate findings, which come from the live crates.io index, are left out).
+    // The tests use it; CI and local runs leave it out and use the live database.
+    else if (arg === "--advisory-db") args.advisoryDb = resolve(requireValue(argv, ++i, "--advisory-db"));
     else throw new Error(`check-advisory-delta: unknown argument: ${arg}`);
   }
   return args;
@@ -114,13 +119,14 @@ function lockfileAt(commit, lockfilePath) {
   return show.stdout;
 }
 
-function runCargoAudit(lockfileContents, { fetch }) {
+function runCargoAudit(lockfileContents, { fetch, advisoryDb }) {
   const scratchDir = mkdtempSync(join(tmpdir(), "bridge-advisory-delta-"));
   const scratchLockfile = join(scratchDir, "Cargo.lock");
   writeFileSync(scratchLockfile, lockfileContents);
   try {
     const args = ["audit", "--file", scratchLockfile, "--json"];
-    if (!fetch) args.push("--no-fetch");
+    if (advisoryDb) args.push("--db", advisoryDb);
+    if (!fetch || advisoryDb) args.push("--no-fetch");
     const result = spawnSync("cargo", args, {
       cwd: REPO_ROOT, // so ./.cargo/audit.toml resolves the same way it does in CI
       encoding: "utf8",
@@ -147,7 +153,7 @@ function runCargoAudit(lockfileContents, { fetch }) {
 // yanked-crate warning carries no advisory at all (see .cargo/audit.toml's
 // note on `chacha20`), so without a synthetic key it would be invisible to
 // this diff entirely, on both sides, forever.
-function idsAndDetails(report) {
+function idsAndDetails(report, { skipYanked = false } = {}) {
   const details = new Map();
   const record = (id, detail) => {
     if (!details.has(id)) details.set(id, detail);
@@ -161,6 +167,8 @@ function idsAndDetails(report) {
     });
   }
   for (const kind of Object.keys(report.warnings ?? {})) {
+    // A yanked crate comes from the live crates.io index, which a fixed advisory snapshot does not hold.
+    if (skipYanked && kind === "yanked") continue;
     for (const warning of report.warnings[kind]) {
       const id =
         warning.advisory?.id ?? `${kind}:${warning.package.name}@${warning.package.version}`;
@@ -182,6 +190,10 @@ function formatFinding(detail) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const head = args.head;
+
+  if (args.advisoryDb && !(existsSync(args.advisoryDb) && statSync(args.advisoryDb).isDirectory() && existsSync(join(args.advisoryDb, "crates")))) {
+    throw new Error(`check-advisory-delta: --advisory-db '${args.advisoryDb}' is not a directory holding crates/ (a snapshot laid out like the RustSec database)`);
+  }
 
   const headCommitCheck = git(["rev-parse", "--verify", head]);
   if (headCommitCheck.status !== 0) {
@@ -214,11 +226,14 @@ function main() {
   // difference between the two id sets is caused by the Cargo.lock content
   // difference alone, never by the advisory database changing between the
   // two `cargo audit` invocations.
-  const baseReport = runCargoAudit(baseLockfile, { fetch: true });
-  const headReport = runCargoAudit(headLockfile, { fetch: false });
+  // (With --advisory-db neither scan fetches: both read that snapshot.)
+  const baseReport = runCargoAudit(baseLockfile, { fetch: true, advisoryDb: args.advisoryDb });
+  const headReport = runCargoAudit(headLockfile, { fetch: false, advisoryDb: args.advisoryDb });
 
-  const baseDetails = idsAndDetails(baseReport);
-  const headDetails = idsAndDetails(headReport);
+  // With a fixed snapshot the yanked-crate findings are left out of the comparison: they are read from the live
+  // crates.io index, so a crate yanked tomorrow would change the result of a run that is meant to be reproducible.
+  const baseDetails = idsAndDetails(baseReport, { skipYanked: Boolean(args.advisoryDb) });
+  const headDetails = idsAndDetails(headReport, { skipYanked: Boolean(args.advisoryDb) });
 
   const newIds = [...headDetails.keys()].filter((id) => !baseDetails.has(id)).sort();
   const resolvedIds = [...baseDetails.keys()].filter((id) => !headDetails.has(id)).sort();

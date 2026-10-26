@@ -86,7 +86,7 @@ for (const [file, job, head] of PINNED) {
 // build on every run, which no test failure would show.
 const NATIVE_CACHE_CASES = [
   ["a changed CARGO_PROFILE variable", (text) => text.replace("      CARGO_PROFILE_TEST_DEBUG: '0'\n    # A cold Windows native build", "      CARGO_PROFILE_TEST_DEBUG: '1'\n    # A cold Windows native build")],
-  ["narrower cache workspaces", (text) => text.replace("            tools -> target\n          # Separate the Windows", "          # Separate the Windows")],
+  ["narrower cache workspaces", (text) => text.replace("            src-tauri -> target\n          # Separate the Windows", "          # Separate the Windows")],
   ["a different env-var list", (text) => text.replace("'ImageOS ImageVersion OPENSSL LIBCLANG' || ''", "'ImageOS ImageVersion OPENSSL' || ''")],
 ];
 for (const [name, change] of NATIVE_CACHE_CASES) {
@@ -276,12 +276,12 @@ const OWN_HALF = "native: the test step must run nextest on its own half of the 
 const ONCE = "so it runs once per operating system";
 const STRAY = "native: matrix.shard may appear only in the pinned lines";
 
-test("native shards: the unmodified workflow carries both shards, the partition flag and nine once-per-system conditions", () => {
+test("native shards: the unmodified workflow carries both shards, the partition flag and five once-per-system conditions", () => {
   const text = readFileSync(join(copy, CI_FILE), "utf8");
   assert.equal(text.split("\n").filter((line) => line === SHARD_ROW).length, 1);
   assert.equal(text.split("\n").filter((line) => line === PARTITION).length, 1);
-  assert.equal(text.split("\n").filter((line) => line === "        if: matrix.shard == 1").length, 5);
-  assert.equal(text.split("\n").filter((line) => line === "        if: matrix.shard == 2").length, 4);
+  assert.equal(text.split("\n").filter((line) => line === "        if: matrix.shard == 1").length, 3);
+  assert.equal(text.split("\n").filter((line) => line === "        if: matrix.shard == 2").length, 2);
 });
 
 for (const [name, change, message] of [
@@ -321,3 +321,15 @@ test("native shards: the Windows prerequisites cache saved by both shards (the s
 test("native shards: both shards uploading one artifact name (a name without the shard) is refused", () => {
   refused(withChange(CI_FILE, (text) => text.replace("          name: native-crash-binaries-macos-shard-${{ matrix.shard }}", "          name: native-crash-binaries-macos")), "native: the pinned shard line must appear exactly once: name: native-crash-binaries-macos-shard-${{ matrix.shard }}");
 });
+
+// The nightly records run must not hold eight of the account's twenty runner slots at once.
+for (const [name, replacement] of [
+  ["the limit removed", ""],
+  ["the limit raised to eight", "      max-parallel: 8\n"],
+]) {
+  test(`mutation shards: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/tax-audit-mutations-nightly.yml", (text) => text.replace("      max-parallel: 4\n", replacement)),
+      "the mutation shards must run four at a time");
+  });
+}
+

@@ -1,11 +1,16 @@
 //! Renders the exact party and ledger master source as one `.xlsx` workbook.
 
+use std::collections::BTreeMap;
+
 use bridge_tally_protocol::PartyLedgerMasterFieldObservation;
 use rust_xlsxwriter::{Format, Workbook, XlsxError};
 
 use super::party_ledger_master::PartyLedgerMasterWorkbook;
 use super::party_statement_xlsx::amount_to_f64;
-use super::schedule_iii::{build_schedule_iii_view, ScheduleIIIError};
+use super::schedule_iii::{
+    build_schedule_iii_view, DecisionInput, DecisionSource, DecisionStatus, DecisionsUnavailable,
+    Finality, LineBasis, NotApplied, ScheduleIIIError, ScheduleIIIView,
+};
 use crate::tally::OutstandingsCurrencyAssertion;
 
 const EXCEL_MAX_ROWS: usize = 1_048_576;
@@ -39,6 +44,7 @@ pub(crate) enum PartyLedgerMasterXlsxError {
 
 pub(crate) fn render_party_ledger_master_xlsx(
     workbook_source: &PartyLedgerMasterWorkbook,
+    decisions: DecisionInput<'_>,
 ) -> Result<Vec<u8>, PartyLedgerMasterXlsxError> {
     let source = workbook_source.source();
     if source.rows.len().saturating_add(15) > EXCEL_MAX_ROWS {
@@ -212,7 +218,7 @@ pub(crate) fn render_party_ledger_master_xlsx(
     worksheet.set_column_width(20, 18)?;
     worksheet.set_column_width(21, 22)?;
     worksheet.set_column_width(22, 22)?;
-    write_schedule_iii(&mut workbook, workbook_source)?;
+    write_schedule_iii(&mut workbook, workbook_source, decisions)?;
     workbook
         .save_to_buffer()
         .map_err(PartyLedgerMasterXlsxError::from)
@@ -221,9 +227,10 @@ pub(crate) fn render_party_ledger_master_xlsx(
 fn write_schedule_iii(
     workbook: &mut Workbook,
     workbook_source: &PartyLedgerMasterWorkbook,
+    decisions: DecisionInput<'_>,
 ) -> Result<(), PartyLedgerMasterXlsxError> {
     let source = workbook_source.source();
-    let view = build_schedule_iii_view(source)?;
+    let view = build_schedule_iii_view(workbook_source, decisions)?;
     let worksheet = workbook.add_worksheet();
     worksheet.set_name("Group subtotal trace")?;
     let bold = Format::new().set_bold();
@@ -233,7 +240,7 @@ fn write_schedule_iii(
     worksheet.write_string(
         0,
         1,
-        "Tally group identity and balance polarity only; Schedule III mapping is withheld for a CA decision.",
+        "Tally group identity and balance polarity only. A Schedule III head appears only where a CA grouping decision applies; see CA grouping decisions below.",
     )?;
     worksheet.write_string_with_format(1, 0, "Currency", &bold)?;
     worksheet.write_string(1, 1, currency_label(source.currency_assertion))?;
@@ -254,22 +261,25 @@ fn write_schedule_iii(
         ),
     )?;
     for (row, label, value) in [
-        (4, "Debit total", view.debit_total.as_str()),
-        (5, "Credit total", view.credit_total.as_str()),
-        (6, "Dr=Cr difference", view.difference.as_str()),
+        (4, "Debit total", view.debit_total().as_str()),
+        (5, "Credit total", view.credit_total().as_str()),
+        (6, "Dr=Cr difference", view.difference().as_str()),
     ] {
         worksheet.write_string_with_format(row, 0, label, &bold)?;
         worksheet.write_string(row, 1, value)?;
     }
     worksheet.write_string_with_format(7, 0, "Check interpretation", &bold)?;
     worksheet.write_string(7, 1, "Difference 0 is the Tally-sign self-check over every captured ledger closing balance; it is evidence, not an assertion of statement completeness.")?;
+    worksheet.write_string_with_format(8, 0, "CA grouping decisions", &bold)?;
+    worksheet.write_string(8, 1, decisions_summary(&view))?;
 
     let header_row = 9u32;
     for (column, label) in [
-        "Balance side",
-        "Group-derived subtotal",
+        "Balance side or section",
+        "Group subtotal or decided head",
         "Closing balance",
         "Closing balance (exact text)",
+        "Basis",
     ]
     .into_iter()
     .enumerate()
@@ -277,18 +287,19 @@ fn write_schedule_iii(
         worksheet.write_string_with_format(header_row, column as u16, label, &bold)?;
     }
     let mut row = header_row + 1;
-    for line in &view.lines {
-        worksheet.write_string(row, 0, line.section)?;
-        worksheet.write_string(row, 1, line.label)?;
+    for line in view.lines() {
+        worksheet.write_string(row, 0, line.section())?;
+        worksheet.write_string(row, 1, line.label())?;
         worksheet.write_number_with_format(
             row,
             2,
-            amount_to_f64(line.total.as_str()).map_err(|_| {
-                PartyLedgerMasterXlsxError::InvalidAmount(line.total.as_str().to_string())
+            amount_to_f64(line.total().as_str()).map_err(|_| {
+                PartyLedgerMasterXlsxError::InvalidAmount(line.total().as_str().to_string())
             })?,
             &amount,
         )?;
-        worksheet.write_string(row, 3, line.total.as_str())?;
+        worksheet.write_string(row, 3, line.total().as_str())?;
+        worksheet.write_string(row, 4, basis_text(line.basis()))?;
         row += 1;
     }
 
@@ -301,6 +312,7 @@ fn write_schedule_iii(
         "Parent",
         "GUID",
         "Closing balance (exact text)",
+        "Basis",
     ]
     .into_iter()
     .enumerate()
@@ -308,10 +320,21 @@ fn write_schedule_iii(
         worksheet.write_string_with_format(row, column as u16, label, &bold)?;
     }
     row += 1;
-    for line in &view.lines {
-        for index in &line.row_indices {
+    let drift_by_row: BTreeMap<usize, String> = view
+        .decisions()
+        .iter()
+        .filter_map(|status| {
+            let DecisionStatus::Applied { row_index, .. } = status else {
+                return None;
+            };
+            let notes = drift_notes(status);
+            (!notes.is_empty()).then(|| (*row_index, notes.join(" ")))
+        })
+        .collect();
+    for line in view.lines() {
+        for index in line.row_indices() {
             let ledger = &source.rows[*index];
-            worksheet.write_string(row, 0, line.label)?;
+            worksheet.write_string(row, 0, line.label())?;
             worksheet.write_string(row, 1, &ledger.name)?;
             worksheet.write_string(row, 2, ledger.parent.workbook_text())?;
             worksheet.write_string(row, 3, &ledger.guid)?;
@@ -324,6 +347,14 @@ fn write_schedule_iii(
                     .expect("Schedule III includes only established closing balances")
                     .as_str(),
             )?;
+            match drift_by_row.get(index) {
+                Some(notes) => worksheet.write_string(
+                    row,
+                    5,
+                    format!("{}. {notes}", basis_text(line.basis())),
+                )?,
+                None => worksheet.write_string(row, 5, basis_text(line.basis()))?,
+            };
             row += 1;
         }
     }
@@ -343,22 +374,216 @@ fn write_schedule_iii(
         worksheet.write_string_with_format(row, column as u16, label, &bold)?;
     }
     row += 1;
-    for exclusion in &view.exclusions {
-        let ledger = &source.rows[exclusion.row_index];
+    for exclusion in view.exclusions() {
+        let ledger = &source.rows[exclusion.row_index()];
         worksheet.write_string(row, 0, &ledger.name)?;
         worksheet.write_string(row, 1, ledger.parent.workbook_text())?;
         worksheet.write_string(row, 2, &ledger.guid)?;
-        worksheet.write_string(row, 3, &exclusion.reason)?;
+        worksheet.write_string(row, 3, exclusion.reason())?;
         row += 1;
     }
+    let given = match decisions {
+        DecisionInput::Read(set) => set.decisions(),
+        DecisionInput::Unavailable(_) => &[],
+    };
+    if !given.is_empty() {
+        row += 1;
+        worksheet.write_string_with_format(row, 0, "CA GROUPING DECISIONS", &bold)?;
+        row += 1;
+        for (column, label) in [
+            "Decision",
+            "Ledger when decided",
+            "GUID",
+            "Decided head",
+            "Status",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            worksheet.write_string_with_format(row, column as u16, label, &bold)?;
+        }
+        row += 1;
+        for (decision, status) in given.iter().zip(view.decisions()) {
+            worksheet.write_string(row, 0, decision.id.0.to_string())?;
+            worksheet.write_string(row, 1, &decision.ledger_name_when_made)?;
+            worksheet.write_string(row, 2, decision.ledger.as_str())?;
+            worksheet.write_string(row, 3, decision.head.caption())?;
+            worksheet.write_string(row, 4, status_text(status))?;
+            row += 1;
+        }
+    }
     worksheet.write_string_with_format(row + 1, 0, "Read did not cover", &bold)?;
-    worksheet.write_string(row + 1, 1, "Prior-year balances, voucher-level classification, maturity/current-vs-non-current split, note disclosures, share-capital reconciliation, reserves movement, and CA mapping decisions.")?;
+    worksheet.write_string(row + 1, 1, "Prior-year balances, voucher-level classification, maturity/current-vs-non-current split, note disclosures, share-capital reconciliation, and reserves movement.")?;
     worksheet.set_column_width(0, 34)?;
     worksheet.set_column_width(1, 46)?;
     worksheet.set_column_width(2, 28)?;
     worksheet.set_column_width(3, 62)?;
     worksheet.set_column_width(4, 24)?;
+    worksheet.set_column_width(5, 22)?;
     Ok(())
+}
+
+fn basis_text(basis: LineBasis) -> &'static str {
+    match basis {
+        LineBasis::GroupSubtotal(_) => "Tally group evidence",
+        LineBasis::Decided(_) => "CA grouping decision",
+    }
+}
+
+fn decisions_summary(view: &ScheduleIIIView) -> String {
+    let unavailable = match view.decision_source() {
+        DecisionSource::Read => None,
+        DecisionSource::Unavailable(DecisionsUnavailable::StoreUnavailable) => {
+            Some("the encrypted store could not be opened or read")
+        }
+        DecisionSource::Unavailable(DecisionsUnavailable::Unreadable) => {
+            Some("the stored decisions could not be read by this version of ComplyEaze Bridge")
+        }
+    };
+    if let Some(why) = unavailable {
+        return format!(
+            "Could not be read: {why}. NOT FINAL: no decision could be applied, and none is assumed absent."
+        );
+    }
+    let (statuses, finality) = (view.decisions(), view.finality());
+    let excluded_ledgers = view.exclusions().len();
+    let elsewhere = view.decisions_elsewhere();
+    let elsewhere_note = format!(
+        " {elsewhere} grouping event(s) for this company and financial year are recorded under another company number or books-from date and were not applied: confirm which book they belong to."
+    );
+    if statuses.is_empty() {
+        // With no decision given, what can keep the view from being final is a ledger still
+        // excluded, or events kept under another book.
+        let mut text = String::from("None were applied to this export.");
+        if finality == Finality::NotFinal {
+            text.push_str(" NOT FINAL:");
+            if excluded_ledgers > 0 {
+                text.push_str(&format!(
+                    " {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
+                ));
+            }
+            if elsewhere > 0 {
+                text.push_str(&elsewhere_note);
+            }
+        }
+        return text;
+    }
+    let applied = statuses
+        .iter()
+        .filter(|status| matches!(status, DecisionStatus::Applied { .. }))
+        .count();
+    let other_year = statuses
+        .iter()
+        .filter(|status| {
+            matches!(
+                status,
+                DecisionStatus::NotApplied {
+                    reason: NotApplied::OtherYear,
+                    ..
+                }
+            )
+        })
+        .count();
+    let attention = statuses.len() - applied - other_year;
+    // An applied decision whose ledger moved between subgroups stays applied, but its reason may
+    // have rested on the subgroup the ledger has left, so the verdict says to look at it.
+    let moved = statuses
+        .iter()
+        .filter(|status| {
+            matches!(
+                status,
+                DecisionStatus::Applied {
+                    ancestry_changed: Some(_),
+                    ..
+                }
+            )
+        })
+        .count();
+    let verdict = match finality {
+        Finality::Final if moved == 0 => "Nothing needs attention.".to_string(),
+        Finality::Final => format!(
+            "Applied, but {moved} decided ledger(s) now sit under other groups than when decided: review each decision's status."
+        ),
+        Finality::NotFinal => {
+            let mut text = String::from("NOT FINAL:");
+            if attention > 0 {
+                text.push_str(" resolve each decision that needs attention.");
+            }
+            if excluded_ledgers > 0 {
+                text.push_str(&format!(
+                    " {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
+                ));
+            }
+            if elsewhere > 0 {
+                text.push_str(&elsewhere_note);
+            }
+            text
+        }
+    };
+    format!("{applied} applied; {attention} not applied and need attention; {other_year} for another financial year. {verdict}")
+}
+
+/// What changed in Tally since an applied decision was made, without stopping
+/// it from applying. Empty for a decision that is not applied.
+fn drift_notes(status: &DecisionStatus) -> Vec<String> {
+    let DecisionStatus::Applied {
+        ancestry_changed, ..
+    } = status
+    else {
+        return Vec::new();
+    };
+    let mut notes = Vec::new();
+    if let Some(change) = ancestry_changed {
+        notes.push(format!(
+            "Ancestry changed since the decision: {} → {}.",
+            group_path(&change.was),
+            group_path(&change.now)
+        ));
+    }
+    notes
+}
+
+/// Groups from the top down, as a trial balance reads them.
+fn group_path(nearest_first: &[String]) -> String {
+    if nearest_first.is_empty() {
+        return "(account root)".to_string();
+    }
+    let mut path: Vec<&str> = nearest_first.iter().map(String::as_str).collect();
+    path.reverse();
+    path.join(" > ")
+}
+
+fn status_text(status: &DecisionStatus) -> String {
+    match status {
+        DecisionStatus::Applied { .. } => {
+            let mut text = "Applied.".to_string();
+            for note in drift_notes(status) {
+                text.push(' ');
+                text.push_str(&note);
+            }
+            text
+        }
+        DecisionStatus::NotApplied { reason, .. } => match reason {
+            NotApplied::OtherYear => "Not applied: made for another financial year.".to_string(),
+            NotApplied::LedgerMissing => "Not applied: the ledger is not in this read.".to_string(),
+            NotApplied::Renamed { was, now } => format!(
+                "Not applied: Tally now names this ledger \"{now}\", and the decision was made for \"{was}\". Confirm it for the ledger as it is named now."
+            ),
+            NotApplied::BalanceNotEstablished => {
+                "Not applied: Tally returned no closing balance for the ledger.".to_string()
+            }
+            NotApplied::ReadIncomplete => {
+                "Not applied: the group read is incomplete for the ledger.".to_string()
+            }
+            NotApplied::GroupChanged { now } => format!(
+                "Not applied: the ledger's group changed after the decision. Now: {}",
+                now.description()
+            ),
+            NotApplied::OppositeSide => {
+                "Not applied: the balance is on the other side from the decided head.".to_string()
+            }
+        },
+    }
 }
 
 #[cfg(test)]

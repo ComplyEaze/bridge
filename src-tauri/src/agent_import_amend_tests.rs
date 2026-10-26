@@ -798,8 +798,8 @@ fn the_amendment_admission_module_stays_pinned() {
     // check-surface-ack.mjs reads the branch history and requires a `removed-pin:` line for it
     // (#1006); one that existed at the base is a removed pin, which merge-gate.sh blocks
     // without a `removed-pin:` line.
-    // This module decides what an import file may overwrite; its reason sits
-    // beside MAX_SURFACE_FILES.
+    // This module decides what an import file may overwrite; its reason is recorded in the
+    // module documentation of bridge-tally-core's compatibility_surface_stays_whole test.
     let surface: Value = serde_json::from_str(include_str!(
         "../../docs/tally/compatibility/compatibility-surface.json"
     ))
@@ -1309,4 +1309,49 @@ async fn an_amendment_of_a_posted_batch_is_not_a_second_post_of_its_row() {
     assert!(result.get("error").is_none(), "{result}");
     assert_eq!(result["amendment"]["identity_batch_id"], original.as_str());
     simulator.finish().unwrap();
+}
+
+/// #685: the build's own voucher mark keeps an amendment that was not imported
+/// from reading verified, even when its file changes nothing the read compares
+/// (here the content is equal to the book's), and its verification then records
+/// no baseline. Once imported, the upsert has moved the voucher's ALTERID past
+/// the mark, so it reads verified and that ALTERID becomes the baseline. The
+/// mark is the company's as the build read it, at or above every voucher's
+/// ALTERID: 50 here, with the voucher at 40 before the import and 51 after.
+#[test]
+fn an_amendment_reads_verified_only_above_the_build_mark() {
+    let amendment: ImportLedgerLine = {
+        let mut line =
+            serde_json::to_value(build(AMENDMENT, Some(ORIGINAL), "12.50", "20260901")).unwrap();
+        line["pre_import_mark"]["value"] = json!(50);
+        serde_json::from_value(line).unwrap()
+    };
+    let verify = |row: ReadVoucher| {
+        verification::verify_batch(
+            &amendment,
+            &ImportReadSource::admit(vec![row]).unwrap(),
+            verification::Attribution::Tag,
+        )
+        .unwrap()
+    };
+    let mut baseline = amend::VerifiedBaseline::default();
+    // not imported: the book holds the voucher at ALTERID 40, below the mark
+    let not_imported = verify(book_row(&amendment));
+    assert_eq!(
+        not_imported["counts"]["posted_verified"], 0,
+        "{not_imported}"
+    );
+    assert_eq!(not_imported["vouchers"][0]["status"], "not_attributable");
+    assert_eq!(
+        not_imported["vouchers"][0]["reason"],
+        "tag_precedes_pre_import_voucher_mark"
+    );
+    assert!(!amend::record_first_verified(&mut baseline, &not_imported));
+    // imported: the same voucher, its ALTERID moved past the mark
+    let mut altered = book_row(&amendment);
+    altered.alter_id = Some(51);
+    let imported = verify(altered);
+    assert_eq!(imported["counts"]["posted_verified"], 1, "{imported}");
+    assert!(amend::record_first_verified(&mut baseline, &imported));
+    assert_eq!(baseline.vouchers["txn-001"], 51);
 }

@@ -21,8 +21,6 @@ pub use pack_models::*;
 pub const PROOF_CONTRACT_VERSION: u16 = 3;
 pub const CORE_ACCOUNTING_SCHEMA_VERSION: PackSchemaVersion =
     PackSchemaVersion { major: 3, minor: 0 };
-pub const BILLS_AND_PAYMENTS_SCHEMA_VERSION: PackSchemaVersion =
-    PackSchemaVersion { major: 2, minor: 0 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -239,13 +237,13 @@ impl CoreAccountingBatch {
     }
 }
 
+/// The canonical records one snapshot window read. Only the core accounting
+/// pack is read; the batch stays an enum so its `pack`-tagged wire shape, and
+/// with it the batch's content hash, is unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(tag = "pack", content = "batch", rename_all = "snake_case")]
 pub enum PackBatch {
     CoreAccounting(CoreAccountingBatch),
-    IndiaTax(IndiaTaxBatch),
-    BillsAndPayments(BillsAndPaymentsBatch),
-    Inventory(InventoryBatch),
 }
 
 pub type CanonicalPackWindow = PackWindow<PackBatch>;
@@ -282,16 +280,6 @@ impl PackWindow<PackBatch> {
 
 fn canonical_record_keys(batch: &PackBatch) -> BTreeSet<(String, String)> {
     let mut keys = BTreeSet::new();
-    macro_rules! insert_records {
-        ($records:expr, $object_type:literal) => {
-            keys.extend($records.iter().map(|record| {
-                (
-                    $object_type.to_string(),
-                    record.source_id.as_str().to_string(),
-                )
-            }));
-        };
-    }
     macro_rules! insert_core_records {
         ($records:expr, $object_type:literal) => {
             keys.extend(
@@ -302,34 +290,12 @@ fn canonical_record_keys(batch: &PackBatch) -> BTreeSet<(String, String)> {
         };
     }
 
-    match batch {
-        PackBatch::CoreAccounting(core) => {
-            insert_core_records!(core.groups, "group");
-            insert_core_records!(core.ledgers, "ledger");
-            insert_core_records!(core.voucher_types, "voucher_type");
-            insert_core_records!(core.vouchers, "voucher");
-            insert_core_records!(core.ledger_entries, "ledger_entry");
-        }
-        PackBatch::IndiaTax(tax) => {
-            insert_records!(tax.tax_registrations, "tax_registration");
-            insert_records!(tax.voucher_taxes, "voucher_tax");
-        }
-        PackBatch::BillsAndPayments(bills) => {
-            for party in &bills.parties {
-                keys.insert((
-                    "party_outstanding".to_string(),
-                    party.party_ledger_source_id.as_str().to_string(),
-                ));
-                insert_records!(party.allocations, "bill_allocation");
-                insert_records!(party.outstanding, "bill_outstanding");
-            }
-        }
-        PackBatch::Inventory(inventory) => {
-            insert_records!(inventory.stock_items, "stock_item");
-            insert_records!(inventory.godowns, "godown");
-            insert_records!(inventory.inventory_entries, "inventory_entry");
-        }
-    }
+    let PackBatch::CoreAccounting(core) = batch;
+    insert_core_records!(core.groups, "group");
+    insert_core_records!(core.ledgers, "ledger");
+    insert_core_records!(core.voucher_types, "voucher_type");
+    insert_core_records!(core.vouchers, "voucher");
+    insert_core_records!(core.ledger_entries, "ledger_entry");
     keys
 }
 

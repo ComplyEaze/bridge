@@ -54,31 +54,7 @@
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md"
     },
     {
-      "path": "docs/tally/compatibility/README.md"
-    },
-    {
-      "path": "docs/tally/compatibility/bills-native-probe-runbook.md"
-    },
-    {
-      "path": "docs/tally/compatibility/fixtures/education-native-outstandings-v0.json"
-    },
-    {
-      "path": "docs/tally/compatibility/fixtures/education-small-v1.json"
-    },
-    {
-      "path": "docs/tally/compatibility/native-outstandings-profile.example.json"
-    },
-    {
-      "path": "docs/tally/compatibility/native-outstandings-ui-after.example.json"
-    },
-    {
-      "path": "docs/tally/compatibility/native-outstandings-ui-before.example.json"
-    },
-    {
       "path": "docs/tally/compatibility/synthetic-write-canary-fixture.md"
-    },
-    {
-      "path": "docs/tally/support-matrix.md"
     },
     {
       "path": "package.json"
@@ -93,9 +69,6 @@
     {
       "path": "scripts/check-surface-ack.mjs",
       "reason": "decides whether a change to a sealed file was acknowledged in review; it replaces the stored-hash tripwire, so weakening it must itself be acknowledged"
-    },
-    {
-      "path": "scripts/check-tally-live-read-boundary.mjs"
     },
     {
       "path": "scripts/check-tally-request-builder-hazards.mjs"
@@ -204,6 +177,14 @@
       "path": "src-tauri/crates/bridge-tally-core/src/report_tie_out.rs"
     },
     {
+      "path": "src-tauri/crates/bridge-tally-core/tests/compatibility_surface_stays_whole.rs",
+      "reason": "Checks this pin list on disk: every pinned file exists and is a regular file, no symbolic link leads to one, the required directories and eighteen required files are pinned, and each pin obeys the shape rules. Removing or weakening it lets a pin vanish unnoticed."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-core/tests/lower_crates_stay_clean.rs",
+      "reason": "Keeps the primitives, protocol and transport crates without dependencies on the application, tauri, a database driver, or the storage and delivery crates (the layering check the removed live-read boundary script made). Removing it drops that check."
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-primitives/Cargo.toml"
     },
     {
@@ -214,9 +195,6 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/Cargo.toml"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/bills_native_outstandings_probe.rs"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/currency_composite.rs"
@@ -578,6 +556,10 @@
       "path": "src-tauri/src/db/encrypted.rs"
     },
     {
+      "path": "src-tauri/src/db/grouping_decisions.rs",
+      "reason": "reads the append-only store of a CA's Schedule III grouping decisions back, refusing the whole set when one row cannot be parsed, and folds it into the decisions an export applies; a defect there could present a ledger under a head the CA did not choose, or drop a recorded decision unseen"
+    },
+    {
       "path": "src-tauri/src/db/migrations/0002_tally_mirror.sql"
     },
     {
@@ -657,6 +639,10 @@
     },
     {
       "path": "src-tauri/src/db/migrations/0027_tally_retire_resurrected_guid_index.sql"
+    },
+    {
+      "path": "src-tauri/src/db/migrations/0028_schedule_iii_grouping_events.sql",
+      "reason": "creates the append-only store of a CA's Schedule III grouping decisions, which decides the head an exported Schedule III view presents a ledger under; it is under a directory the compatibility gate requires to be pinned whole (REQUIRED_DIRECTORIES in bridge-tally-core's compatibility_surface_stays_whole test), and a defect there could apply or silently drop a recorded decision"
     },
     {
       "path": "src-tauri/src/db/tally_incremental.rs"
@@ -814,6 +800,10 @@
       "path": "src-tauri/src/tally/approved_import.rs"
     },
     {
+      "path": "src-tauri/src/tally/box_fit.rs",
+      "reason": "decides whether the Windows approval box was wholly on the screen, and ends the dialog without an answer when it was not or could not be measured"
+    },
+    {
       "path": "src-tauri/src/tally/canonical_window.rs"
     },
     {
@@ -965,42 +955,6 @@
     },
     {
       "path": "src/tally-error-copy.ts"
-    },
-    {
-      "path": "tools/Cargo.lock"
-    },
-    {
-      "path": "tools/bridge-tally-compatibility/Cargo.toml"
-    },
-    {
-      "path": "tools/bridge-tally-compatibility/src/bills_native_outstandings_probe_receipt.rs"
-    },
-    {
-      "path": "tools/bridge-tally-compatibility/src/lib.rs"
-    },
-    {
-      "path": "tools/bridge-tally-compatibility/src/main.rs"
-    },
-    {
-      "path": "tools/bridge-tally-live-read/Cargo.toml"
-    },
-    {
-      "path": "tools/bridge-tally-live-read/src/bin/native_outstandings_probe.rs"
-    },
-    {
-      "path": "tools/bridge-tally-live-read/src/lib.rs"
-    },
-    {
-      "path": "tools/bridge-tally-live-read/src/main.rs"
-    },
-    {
-      "path": "tools/bridge-tally-live-read/src/native_outstandings_qualification.rs"
-    },
-    {
-      "path": "tools/bridge-tally-read-transport/Cargo.toml"
-    },
-    {
-      "path": "tools/bridge-tally-read-transport/src/lib.rs"
     }
   ]
 }

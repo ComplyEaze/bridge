@@ -37,10 +37,8 @@ corepack pnpm run build
 corepack pnpm run cargo:check
 ```
 
-For changes under `tools/`, also run
-`cargo test --locked --manifest-path tools/Cargo.toml --workspace`. CI includes
-additional feature-specific, formatting, lint and compatibility gates; use the
-workflow as the complete command reference.
+CI includes additional formatting, lint and boundary gates; use the workflow as
+the complete command reference.
 
 Run `corepack pnpm run tauri:build` on each native target host when validating
 packaging. Do not treat a Windows build as macOS evidence or the reverse.
@@ -86,6 +84,12 @@ for one concrete outcome, scope and reuse/deletion decisions, exact candidate
 evidence, compatibility and rollback notes, and the required security and
 platform details. Every pull request must link at least one completed item in
 the [review checklist](./review-checklist.md).
+
+A change a user or an integrator can see adds its entry to the change list as a new
+file, `docs/changelog/unreleased/<added|changed|removed>/<issue number>-<words-with-hyphens>.md`,
+holding one bullet that cites the issue; it does not edit `CHANGELOG.md`, which
+every other pull request would also edit. The format is in
+[docs/release-process.md](./docs/release-process.md), under `CHANGELOG.md`.
 
 Never paste raw production logs. Redact or replace names, email addresses,
 company and tax identifiers, financial data, document contents, certificate

@@ -34,6 +34,12 @@ other companies' programs and they change, so a screen of yours may differ a lit
   for this. Get it from <https://claude.com/download>, install it, and sign in to your Claude account. In one test on
   Windows, a Claude account with no paid plan worked; we make no claim about other plans.
 
+**On Windows, ComplyEaze Bridge also needs Microsoft's Visual C++ Redistributable (x64).** Many programs install it,
+so you may already have it. If you do not have it, or are not sure, download and run Microsoft's installer for the
+latest supported x64 version, `vc_redist.x64.exe`, from <https://aka.ms/vc14/vc_redist.x64.exe>
+([Microsoft's page](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) lists it), before Step 3.
+Installing the latest version updates an older one. We have not measured what Claude Desktop shows when it is missing.
+
 **Three things to know:**
 
 - **Use a test company first.** Make a new company in TallyPrime with a few made-up entries (press **Alt+K**, choose
@@ -199,7 +205,7 @@ which failed with the same error; after Claude Desktop was quit and reopened the
 | --- | --- |
 | Claude says the Terms of Use are not accepted | Go back to Step 4, tick the first line, click Save, then do Step 5. |
 | Claude says it cannot reach Tally | Check that TallyPrime is open with a company open. Do the browser check in Step 1 again (on a Mac, in Safari on the Mac itself). Check that the Tally port in Step 4 is the same number. |
-| Claude does not seem to know about Tally at all | Open Settings, then Extensions. Check that ComplyEaze Bridge is listed and switched on. Then do Step 5. In a new chat, **Connectors** also shows whether it is connected. If you updated to 0.5.0 from 0.4.2, see "Remove or update it". |
+| Claude does not seem to know about Tally at all | Open Settings, then Extensions. Check that ComplyEaze Bridge is listed and switched on. Then do Step 5. In a new chat, **Connectors** also shows whether it is connected. On Windows, also check that Microsoft's Visual C++ Redistributable (x64) is installed (see "Before you start"). If you updated to 0.5.0 from 0.4.2, see "Remove or update it". |
 | The settings window did not open in Step 4, or you want to change a setting | Open Settings, then Extensions. Click ComplyEaze Bridge, then **Configure**. |
 
 Still stuck? See [Help](#help).
@@ -291,10 +297,11 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 
 - **Checking the download.** Releases are on [GitHub Releases](https://github.com/ComplyEaze/bridge/releases), the
   newest first. Each archive has a same-named `.sha256` file and a small provenance record on its release, so an
-  organization can identify the downloaded bytes and the source commit. Run `certutil -hashfile <file> SHA256` on
-  Windows or `shasum -a 256 <file>` on a Mac, in the folder that holds the file (a command window opens in your home
-  folder, so `cd Downloads` first), and compare the 64-character code it prints with the code at the start of the
-  `.sha256` file.
+  organization can identify the downloaded bytes and the source commit. Run `certutil -hashfile "<file>" SHA256` on
+  Windows or `shasum -a 256 "<file>"` on a Mac, in the folder that holds the file (a command window opens in your
+  home folder, so `cd Downloads` first), with the file's name in place of `<file>`, brackets included, and keep the quotes (a file
+  downloaded twice can get a name with "(1)" in it, which needs them). Compare the 64-character code it prints with the code
+  at the start of the `.sha256` file (open that file in Notepad or TextEdit).
 - **Build attestation.** From 0.4.0 each archive also has a build attestation, which `gh attestation verify` can
   check. It says which workflow run and commit produced those bytes. It is not a code signature, no client checks it
   yet, and it does not show that the code is safe.

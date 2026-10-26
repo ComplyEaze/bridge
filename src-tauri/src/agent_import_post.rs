@@ -394,7 +394,17 @@ impl Server {
     /// whenever posting is on, since one setting governs every post (#1090);
     /// the desktop posts one Journal.
     pub(super) fn post_voucher_limit(&self, scope: PostScope) -> usize {
-        if scope == PostScope::Vouchers && self.settings.posting.enabled() {
+        if self.settings.posting.enabled() {
+            Self::post_voucher_limit_when_enabled(scope)
+        } else {
+            1
+        }
+    }
+
+    /// The limit `post_voucher_limit` gives once posting is on; a build asks admission at it
+    /// whatever the setting, to say whether turning posting on would give the batch a route.
+    pub(super) fn post_voucher_limit_when_enabled(scope: PostScope) -> usize {
+        if scope == PostScope::Vouchers {
             ledger::MAX_BATCH_POST_VOUCHERS
         } else {
             1
@@ -595,6 +605,10 @@ impl Server {
         let mut invoice_plan: Option<crate::tally::approved_import::InvoiceReadPlan> = None;
         // The voucher types refused for their voucher numbering (bridge#724).
         let mut numbering_refused: Option<(Value, String)> = None;
+        // What the transfer check at send listed and said, for the refusal.
+        let mut send_transfer_refusal: Option<(Value, String)> = None;
+        // The transfer check under the admission lock refused: its code only.
+        let mut transfers_changed_under_lock = false;
         let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
@@ -747,6 +761,18 @@ impl Server {
             };
             if row_posted.is_some() {
                 return Err("import_txn_already_posted".to_string().into());
+            }
+            // The transfer view, as the build judged it, against the journal as it
+            // is now: refused before the person is asked, with the build's code.
+            // The check that binds runs under the exclusive lock below.
+            let transfers_refused = {
+                let _lock = self.lock_import_admission_shared()?;
+                self.transfers_refusal_for_send_while_admitted(&line)?
+            };
+            if let Some(refusal) = transfers_refused {
+                let (code, detail, step) = refusal.into_parts();
+                send_transfer_refusal = Some((detail, step));
+                return Err(code.to_string().into());
             }
             let preview = review_preview_for(&line, &self.settings.endpoint, scope)?;
             // Number matching precedence is not qualified for native Create.
@@ -1172,6 +1198,17 @@ impl Server {
                                 UnderLockRefusal::CompanyStopped,
                             ));
                         }
+                        // The transfer records again, between the check before the
+                        // dialog and the intent: the approval is withdrawn and the
+                        // next call gives the whole reason before asking.
+                        if let Some(refusal) = self
+                            .transfers_refusal_for_send_while_admitted(&current.batch)
+                            .map_err(BeforeDispatchError::Other)?
+                        {
+                            return Err(BeforeDispatchError::Refused(UnderLockRefusal::Transfers(
+                                refusal.reason(),
+                            )));
+                        }
                         // Before the approval is spent: a refusal here withdraws it,
                         // and the next call asks the person again.
                         let pre_post_voucher_mark =
@@ -1215,6 +1252,12 @@ impl Server {
             // listing of this company is continued from before it (#630).
             self.drop_listing_snapshots(identity.company_guid());
             let posted = posted.map_err(|error| {
+                transfers_changed_under_lock = error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<UnderLockRefusal>(),
+                        Some(UnderLockRefusal::Transfers(_))
+                    )
+                });
                 currencies_seen = error
                     .chain()
                     .find_map(|cause| cause.downcast_ref::<ApprovedImportAdmissionError>())
@@ -1659,6 +1702,15 @@ impl Server {
                         );
                     }
                 }
+                if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
+                    if let Some((detail, step)) = &send_transfer_refusal {
+                        name_transfer_refusal(&mut outcome.payload, detail, step);
+                    }
+                    if transfers_changed_under_lock {
+                        outcome.payload["result"]["error"]["next_step"] =
+                            json!(transfers::TRANSFERS_CHANGED_UNDER_LOCK_STEP);
+                    }
+                }
                 if let Some(ledgers) = ledgers_changed {
                     name_changed_ledgers(&mut outcome.payload, &ledgers);
                 } else {
@@ -1801,7 +1853,7 @@ const STOPPED_NEXT_STEP: &str = "Nothing was sent and the approval is withdrawn.
 /// What a caller does when another batch already sent, or was found to have
 /// posted, a row of this one (#876). Tally's counters for a rejected send are
 /// not proof that the row is absent now, so Bridge never lifts the block itself.
-const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot post this row again: ask the user to enter the voucher in Tally. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it, except an invoice released as described above.";
+const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot post this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it, except an invoice released as described above.";
 
 /// What a caller is told when `post_import` refuses a saved batch's own text
 /// before any attempt (#1055).
@@ -1843,6 +1895,15 @@ fn reconciliation_failure_payload(
     // have been sent is reconciled, never rebuilt.
     if code == "voucher_text_invalid" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
+    }
+    // A transfer check refused the batch, and it refuses again on every request
+    // until the batch is built again: the desktop is told so, not to review.
+    if attempted == Some(false) && transfers::SEND_REFUSALS.contains(&code) {
+        payload["result"]["error"]["message"] = json!(if code == "transfer_view_not_established" {
+            transfers::TRANSFER_VIEW_REFUSED_MESSAGE
+        } else {
+            transfers::TRANSFER_REFUSED_MESSAGE
+        });
     }
     if code == DESKTOP_LEDGER_LINE_BREAK {
         payload["result"]["error"]["message"] = json!(DESKTOP_LEDGER_LINE_BREAK_ACTION);
@@ -2034,7 +2095,7 @@ fn batch_step_doubt(step: Option<&Value>) -> Option<(&'static str, String)> {
     }
     Some((
         "batch_step_unconfirmed",
-        "Tally reported creating the batch, and every voucher reads back, but ComplyEaze Bridge did not confirm that this company's voucher mark moved by exactly that many: the mark moved by another amount or backwards, it could not be read, or the check did not finish. Another change may have been made in it while the batch was posting. Review the batch's vouchers in Tally. They are already posted, so do not rebuild this batch. Record that review with acknowledge_post_review.".to_string(),
+        "Tally reported creating the batch, and every voucher reads back, but ComplyEaze Bridge did not confirm that this company's voucher mark moved by exactly that many: the mark moved by another amount or backwards, it could not be read, or the check did not finish. Another change may have been made in it while the batch was posting. Review the batch's vouchers in Tally. They are already posted, so do not rebuild this batch. Record that review with acknowledge_post_review: the record is kept on this computer and does not change the batch's status, so this notice stays.".to_string(),
     ))
 }
 
@@ -2112,11 +2173,21 @@ fn present_txn_ids(result: &Value) -> Vec<String> {
 
 /// What to do when a batch's rows are already in the book, or look like rows
 /// that are (#901). It names no amount, ledger or narration.
-const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in error.preexisting_txn_ids each look like a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Rows with the same date, type, ledgers, amounts and sides match the same voucher, so no more of them are in the book than Tally holds vouchers: count them in Tally. Open the matching voucher and confirm it is a regular voucher (if it is optional or post-dated, ask the user what it should be, and leave the row out until then) and the same bank row as the statement's. If it is, the row is in the book: leave it out. If you cannot find the voucher, do not enter the row by hand: build the batch again and ComplyEaze Bridge checks the book again; if the voucher is there it refuses again, and if no voucher with that fingerprint is there it can go on to approval. If it is refused again and you still cannot find the voucher, ask the user, and never change a row (its date, ledger, type or amount) to get it past this check. Only for a genuinely different transaction (the statement has more rows with this date, ledgers and amount than Tally holds vouchers) that shares the fingerprint of a voucher you have opened and confirmed, leave it out of this batch and enter it in Tally by hand. Then build the other rows again without them so those post; a rebuilt batch can be refused again, naming rows this answer did not list. Cut inline batches on whole days, so same-day rows of one amount are not split across batches.";
+const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in error.preexisting_txn_ids each look like a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Rows with the same date, type, ledgers, amounts and sides match the same voucher, so no more of them are in the book than Tally holds vouchers: count them in Tally. Open the matching voucher and confirm it is a regular voucher (if it is optional or post-dated, ask the user what it should be, and leave the row out until then) and the same bank row as the statement's. If it is, the row is in the book: leave it out. If you cannot find the voucher, do not enter the row by hand: build the batch again and ComplyEaze Bridge checks the book again; if the voucher is there it refuses again, and if no voucher with that fingerprint is there it can go on to approval. If it is refused again and you still cannot find the voucher, ask the user, and never change a row (its date, ledger, type or amount) to get it past this check. For a genuinely different transaction (the statement has more rows with this date, ledgers and amount than Tally holds vouchers) that shares the fingerprint of a voucher you have opened and confirmed, ComplyEaze Bridge cannot post the extra row yet: leave it out of this batch and tell the user so. Then build the other rows again without it so those post; a rebuilt batch can be refused again, naming rows this answer did not list. Cut inline batches on whole days, so same-day rows of one amount are not split across batches.";
 
 /// The same refusal for an invoice, which is recognised by its number and not
 /// by its figures (ADR 0004). It names no amount, ledger or narration.
 const PREEXISTING_INVOICE_NEXT_STEP: &str = "Nothing was sent. A voucher already in the book looks like this invoice, in one or more of three ways. Open it in Tally first and confirm it is a regular voucher (not optional, post-dated or cancelled): if you cannot find it, do not enter the invoice by hand, ask the user. (1) It has this invoice's number under this voucher type. If it is this invoice, the invoice is in the book: do not build it again. If it is another invoice, tell the user the number is in use and ask which invoice number to use; never choose a number yourself. (2) It has no number and the same date, ledgers, amounts and sides. If it is this invoice, it is in the book: do not build it again. If it is another sale, a new number does not get past this check: tell the user and enter the invoice in Tally by hand. (3) error.unsettled_batch_id is present: an earlier batch from this computer with the same date, ledgers, amounts and sides was sent to Tally and has not been confirmed, so a voucher with those figures may be that batch's invoice whatever its number. If the voucher is that batch's invoice, it is in the book: do not build it again. If that batch's answer was received, verify_import on it can confirm it and end this refusal; that is not permission to build this invoice again if it is already in the book. If you have found the voucher and it is not that batch's invoice, or the user says this is another sale, ComplyEaze Bridge cannot post it while that batch is unconfirmed: enter it in Tally by hand. If error.unsettled_batch_unread is present instead, and no voucher in the book is this invoice by case (1) or (2), the check could not read the journal or the invoice, and its value says why: if it is import_admission_busy, another action of ComplyEaze Bridge holds the journal, so build the invoice again once; for any other value tell the user, and do not assume a batch exists. Apart from the new number the user chooses in case (1), never change a number, date, ledger, amount or side to get past this check.";
+
+/// What the transfer check at send listed (the rows it names, never a value
+/// from a record) and what to do about it.
+fn name_transfer_refusal(payload: &mut Value, detail: &Value, step: &str) {
+    let error = &mut payload["result"]["error"];
+    if let (Some(error), Some(detail)) = (error.as_object_mut(), detail.as_object()) {
+        error.extend(detail.clone());
+        error.insert("next_step".into(), json!(step));
+    }
+}
 
 /// Name the rows of the batch that are already in the book, with the way on.
 /// `invoice` is set for a batch that holds an invoice, to the unsettled batch

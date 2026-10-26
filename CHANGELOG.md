@@ -36,9 +36,35 @@ These changes are in source and not yet in a published build.
   missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one
   Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not
   measured.
+- A batch built from a bank statement is checked against the company's skipped rows and Contras when `post_import`
+  sends it, as it was when it was built, with the same refusals (`withdraw_skip_paired`,
+  `skip_row_paired_elsewhere`, `skip_row_already_posted`, `withdraw_skip_invalid`, `transfer_double_booked`,
+  `transfer_view_not_established`): before the post (before the dialog, or in the call that redeems an approval) and
+  again under the admission lock. The refusals at send speak of the saved batch: nothing was sent, any approval of it
+  is withdrawn and, except for `transfer_view_not_established`, the batch must be built again. A row the batch withdrew is judged on the
+  withdrawal it recorded (`withdrawn_skips`), whether it was built from a statement or from vouchers given
+  directly, and it counts only if the batch was built after the newest record of that skip: a skip recorded since
+  refuses the batch (part of #1703).
 
 **Changed**
 
+- On macOS the first line of the approval alert (what each button does) is no longer broken by ComplyEaze Bridge at 100 characters: the alert wraps its own text, so a break of ours was wrapped a second time and left a ragged second row. The Windows box keeps its 100-character lines. The box's size caps are unchanged (part of #1780).
+- The next steps for five situations no longer send a person to enter a voucher in Tally themselves; each now says what
+  ComplyEaze Bridge does and that it cannot put the voucher in the book yet: a voucher Tally reported as not
+  created (and one later not found after that report), a row a rejected batch carried, a statement day that is
+  partly posted, the extra row of same-day twins, and the first voucher of a company that has never held one
+  (part of #1709).
+- A saved batch built while voucher posting is off now says whether turning on **Allow voucher posting** would give
+  it a route: the build checks the batch as `post_import` would at the batch limit of 50, and the assistant is told
+  to say that, with the setting on (it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge
+  would check the batch again and ask for approval, and may still refuse it; the file import stays the route until
+  then. Every text that offers both routes says to use one only: once the file is imported, do not post the batch,
+  and once the batch is posted, do not import the file (an import after a post is not checked against it). With
+  posting on, a batch `post_import` can take no longer suggests importing its file as well; a batch over 50 is told to
+  be built again in batches of at most 50, and never to import the original file once one of them is posted or
+  imported. The desktop review names the assistant's batch posting for a saved batch it cannot post, says a saved
+  invoice is posted only that way, and no longer suggests choosing a Journal without its number. Wording only otherwise; the file routes for a voucher that carries
+  its own number and for text the approval window cannot show are unchanged (part of #1709).
 - The approval window, and the review window, now open with a line that says what each answer does, before any
   detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
   voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N
@@ -88,6 +114,81 @@ These changes are in source and not yet in a published build.
   carry a Yes on their keyed entries, and Tally's own default entry (source `As per Company/Group`) carries one with
   no keyed No; neither was read against the screen. The value
   mapping is unchanged: do not read `true` as eligible.
+
+- A read refused because the company it names is not loaded in Tally, was renamed since `list_companies`, or is
+  listed more than once now says so and says to open the company in Tally and ask again (#1699). Before,
+  an assistant saw only an operation code such as `ledger_movement_read_failed`, and the all-companies
+  outstandings sweep and the All clients screen reported the same cases as a failed currency probe. The refusal
+  carries `company_identity_absent_or_ambiguous`, `company_identity_presentation_collision` or
+  `company_identity_not_matched` as its cause. Nothing about what is refused changes; only the reason and the
+  next step are named. Not yet run by us against a renamed company in a live Tally.
+- A read that stops because the company's books changed in Tally while it was being read
+  (`voucher_window_changed_during_read` and the `*_extent_changed` codes) now says that nothing is wrong with the
+  request and to run the same request again once the saving or exporting in Tally has finished; a later page of a
+  held listing that cannot be served (`listing_snapshot_changed`) says to start again from the first page without
+  `snapshot_id` (part of #1633). One GST return export in TallyPrime 7.1 Silver raised the voucher mark by 3
+  with no voucher change, which is why a routine export can trip these. Not changed: a correct post that reads as
+  unverified after such an export is still open on #1633.
+- A snapshot request that reaches its 20-second deadline is recorded as `request_deadline_exceeded` instead of
+  `tally_unreachable` (#1671), so a person is no longer told to check that Tally is running when it was
+  only slow. The deadline and the rule that such a request is not sent again are unchanged. Covered by tests only.
+- The Proof of Sync screen no longer shows a rejected-row count (#1634): it could only ever read zero, because only
+  accepted observations enter the local mirror. The summary line drops the "rejected rows" clause and the table
+  column reads "Accepted returned rows"; a run that rejected source records is still shown by its gap. The count
+  stays in the proof's data and in the export.
+- The summary of a post whose binding was refused now says that ComplyEaze Bridge cannot close the batch or amend it
+  (part of #1039). Before, it said only that the batch "stays open". The notice for a multi-voucher batch whose
+  voucher mark step was not confirmed no longer suggests that recording a review with `acknowledge_post_review`
+  clears it: the record is kept on this computer and the notice stays. No behaviour changes. A way to close a batch
+  with a refused binding from ComplyEaze Bridge is not built: a person's confirmation cannot stand for a voucher's
+  identity before it is measured whether Tally names the post's own vouchers when another user is writing.
+- When a withdrawn skipped transfer row's other statement may sit in a batch that is not verified
+  (`other_side_unverified`), the next step now offers to build that statement again only if every batch named for
+  the row was never sent to Tally, `verify_import` listed every one of their vouchers as `not_found`, and the person
+  confirms none of their files was ever imported; if any voucher was found or a file was imported, it says to check
+  in Tally which of their vouchers are there (#1820). Wording only.
+- The tool list is answered whole under its own fixed ceiling of 1,000,000 bytes, apart from the cap on what a
+  tool returns from the books (#1798). Before, a `BRIDGE_AGENT_MAX_BYTES` set below about 197 KB made the list
+  itself too large (`agent_response_too_large`) and left the assistant with no tools. Every tool answer still
+  keeps the configured cap, and a test holds the tool list under 225,000 bytes.
+
+- `profit_and_loss` and `balance_sheet` can now be established on a book with stock items (part of #692), using
+  Tally's own `Less: Closing Stock` figure from its Profit and Loss, shown as `closing_stock` (`applied`, with its
+  value and source, or `declined`, with the reason) and not derived or taken from `stock_summary`. It is used only when
+  that one figure closes every gap at once (Current Assets, the Balance Sheet's Profit & Loss A/c line and the
+  trading result, and the `Cost of Sales :` heading), the company's own flags show inventory on and integrated, the
+  `Opening Stock` line is shown empty and no Stock-in-Hand ledger carries an amount; otherwise the read refuses as it
+  did. Both tools now read Tally's own Profit and Loss (one more pair of requests for `balance_sheet`, which stays the
+  sheet it was if that read fails), and a book that offers a closing stock also has its inventory flags read (a failed
+  read declines the figure as `inventory_flags_not_read`). The derived lines must also sum to zero. Measured on one synthetic book; opening stock, a costing
+  method, a book that is not integrated and a window spanning two years are not measured.
+
+- `masters` can list a company's stock items (`kind` `stock_items`): each row carries the item's own dated HSN
+  entries (`hsn`) and GST rate entries (`gst`) as Tally sent them, nothing choosing the code or the rate for a date
+  (part of #1233). An empty or missing list is not "no HSN or GST": after a code was keyed on a stock group, the group's four other items still carried empty lists
+  (one book); a GST rate or an HSN code on the company, and whether an item that defers to a coded group inherits its code, were not measured; the group's and the company's setting is not read, and every row says so
+  (`inherited_from_group_or_company: not_read`). A defect in one item's list marks that list `unreadable` with its
+  defect and the read stands; a Tally `ERROR`, markup inside a value or a cut-off list refuses the read. Item names
+  and parents are masked under `mask_parties`, and so are HSN descriptions (a person can edit them); HSN codes and rates are returned as sent. Tally's
+  `GSTINELIGIBLEITC` is returned as sent under `ineligible_itc`: it was Yes where the screen read
+  `Eligible for Input Tax Credit: No` and absent where it read Yes (one item, two rows, PARTIAL), which fits an
+  ineligibility flag; null is neither eligible nor ineligible, and what an absent element means for the tax is
+  not known. On an entry whose source is `As per Company/Stock Group` (the entry Tally adds itself on a first save; a person can also choose that source) a flag Tally sent is withheld:
+  `ineligible_itc` is null and `ineligible_itc_withheld` is `tally_default_entry`, because the Yes seen on such an
+  entry was never compared with the screen; a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is. `ledger_masters` names the same element the same way (#1741). A book is read only up to a master mark of 489 (a limit of 489 refuses, by arithmetic, both client
+  books measured; not tried on them). Measured on one synthetic book of TallyPrime 7.1 Silver (three captures, one item
+  with two dated entries in each list); a state row other than `Any`, slab rates, another release, a larger book
+  and a zero-row stock-item answer are not measured. `stock_summary` is unchanged.
+
+- `negative_stock` (new tool; part of #1358): Tally's own Negative Stock list for a window, as `item`, `quantity`,
+  `rate` and `value` per listed stock item, returned as Tally prints them and compared with no other report
+  (`checks` says so). Being listed is not a finding that the quantity is below zero, and an empty answer is
+  `not_established`, never "no negative stock": Tally's empty answer cannot be told from a report that was not
+  rendered. Measured on synthetic books: a short item listed for a whole financial year, the same item at
+  another quantity for a window ending mid-year (with its rate and value empty), and a book with none short answered
+  an empty envelope. Any other window is named as unmeasured, a book whose master mark is over 874 is
+  refused before the report is asked for (a stated guess, as for `stock_summary`), and the cost on a large book is not known. Not yet run
+  against Tally.
 
 ## [0.6.0] - 2026-10-16
 

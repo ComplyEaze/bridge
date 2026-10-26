@@ -21,6 +21,7 @@ The date window, the AlterID span, the fetch list (`GUID,ALTERID,DATE`) and the 
 | `e02` to `e05` | ledger census, `DN Sales` | 15 May 2025 | (0, 8192], (8192, 16384], (16384, 24576], (24576, 29900] | 1,000,000 bytes each (the day holds 82 vouchers) |
 | `e06` to `e09` | ledger census, `DN Party 001` | 1 Apr 2025 to 31 Mar 2026 | the same four spans | 4,000,000 bytes each (8,192 rows at most by construction; an answer near that would mean the ledger was not applied, and its bound stops the part first) |
 | `e10` | part D's `d03` request with the ledger `DN Party 001` and the dates 1 Apr 2025 to 31 Mar 2026 | 1 Apr 2025 to 31 Mar 2026 | none | 8,000,000 bytes |
+| `e11` | the shipped `ledger_movement` window request (`render_agent_movement_vouchers`, same file) with the same three changes (ID and NAME `Bridge Agent Ledger Vouchers`, TYPE `Vouchers : Ledger`, `CHILDOF DN Party 001`): each voucher's ledger lines and amounts | 1 to 31 May 2025 | none | 8,000,000 bytes |
 
 `DN Party 001` is one of the book's 123 generated ledgers (`DN Party 001` to `DN Party 120`, `DN Sales`, `Cash`, `Profit & Loss A/c`; recorded in `STATEMENT_CAPTURE_PROVENANCE.md` under the protocol crate's test fixtures). How many vouchers it holds is not known before E5.
 
@@ -29,7 +30,7 @@ The date window, the AlterID span, the fetch list (`GUID,ALTERID,DATE`) and the 
 ## Before part E
 1. Part D finished and recorded, its C10 included. Load THE COMPANY alone (C1) and run step 0 (C2).
 2. Check every file in this folder against `SHA256.txt` (hash and bytes). A difference = STOP, nothing is sent.
-3. `python -I check-request-ids.py requests` in this folder. EXPECT `census: ok 10, skipped 0, FAIL 0`. Anything else = STOP, nothing is sent.
+3. `python -I check-request-ids.py requests` in this folder. EXPECT `census: ok 11, skipped 0, FAIL 0`. Anything else = STOP, nothing is sent.
 4. [OWNER] Go-ahead.
 
 ## Part E
@@ -38,19 +39,21 @@ For every request record the UTC time before the send and after the answer.
 2. `e02` (span 1 of the day). NEW SHAPE: screenshot at once. Then GET /status.
 3. `e03`, `e04`, `e05`, one at a time, GET /status after each.
 4. In steps 2 and 3, and in every send of steps 5 to 7: a dialog, a hang, a non-200, an answer over its bound or an answer that does not parse = STOP (C3, C4, C7, C9). The gateway is not probed again.
-5. `e06` (span 1 of the year, `DN Party 001`). NEW SHAPE for a whole year: screenshot at once. Then GET /status. Count its VOUCHER rows (C4). If they are more than 1,000: record, send nothing more from `e07` to `e10`, go to step 8.
+5. `e06` (span 1 of the year, `DN Party 001`). NEW SHAPE for a whole year: screenshot at once. Then GET /status. Count its VOUCHER rows (C4). If they are more than 1,000: record, send nothing more from `e07` to `e11`, go to step 8.
 6. `e07`, `e08`, `e09`, one at a time, GET /status after each. Add the VOUCHER rows of `e06` to `e09`.
-7. Only if that sum is 1,000 or fewer: `e10`. Then GET /status. Otherwise record the sum and do not send `e10`.
+7. Only if that sum is 1,000 or fewer: `e10`, then GET /status, then `e11`, then GET /status. Otherwise record the sum and send neither.
 8. `e01_marks` again. EXPECT the marks of step 1 (every request here is a read); a difference = record it and STOP.
 9. C10.
 
 ## RECORD (the lab judges only the STOP rules)
-For every answer: the curl line's status and bytes, CONTENT-LENGTH and every response header as received, the sha256, the send and answer times; whether it parses; the row element name and the VOUCHER row count (rows under ENVELOPE/BODY/DATA/COLLECTION, counted after parsing, never by text search; the CMPINFO block holds counters, not rows); for each row its GUID, ALTERID and DATE, and whether each is non-empty. An answer with no rows is a result: keep it whole, with its size.
+For every answer: the curl line's status and bytes, CONTENT-LENGTH and every response header as received, the sha256, the send and answer times; whether it parses; the row element name and the VOUCHER row count (rows under ENVELOPE/BODY/DATA/COLLECTION, counted after parsing, never by text search; the CMPINFO block holds counters, not rows); for each row its GUID, ALTERID and DATE, and whether each is non-empty. For `e11`, the voucher table of C4 (each ledger line's LEDGERNAME, AMOUNT and ISDEEMEDPOSITIVE). An answer with no rows is a result: keep it whole, with its size.
 
 ## COMPARED BY THE REQUESTER AFTER THE RUN
 - The union of the GUIDs of `e02` to `e05` against part D's `d03` GUIDs (82): equal sets is the result wanted; any difference, either way, is the finding. Which span held them.
 - The union of `e06` to `e09` against `e10`: equal sets wanted.
 - Every row's ALTERID inside its request's span, and its DATE inside its window.
+- `e11`'s GUIDs against the rows of `e06` to `e09` dated in May 2025: equal sets wanted.
+- The sum of `e11`'s `DN Party 001` amounts against that ledger's debit and credit totals for May 2025 in the committed one-month Trial Balance capture of this book (`statement_trial_balance_dense_month_live.utf16le.xml`, protocol crate test fixtures): equal is the result wanted. This is the check a ledger-scoped read would rest on for vouchers its own count cannot see.
 - The time of each span request against the shipped census requests of part D's day (if part D recorded them) and against each other (empty and non-empty spans).
 
 ## The book

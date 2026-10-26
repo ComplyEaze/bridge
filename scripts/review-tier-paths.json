@@ -53,6 +53,7 @@
  {"class": "write-path", "match": {"prefix": "src-tauri/src/tally/connection"}, "note": "The one dispatch path to Tally and what rides on it."},
  {"class": "write-path", "match": {"prefix": "src-tauri/src/tally/connector"}},
  {"class": "write-path", "match": {"prefix": "src-tauri/src/tally/approved_import"}},
+ {"class": "write-path", "match": {"exact": "src-tauri/src/tally/box_fit.rs"}, "note": "Whether the Windows approval box was wholly on the screen: it ends the dialog without an answer when not."},
  {"class": "write-path", "match": {"prefix": "src-tauri/src/tally/runtime.rs"}},
  {"class": "write-path", "match": {"prefix": "src-tauri/src/tally/runtime_control"}},
  {"class": "write-path", "match": {"prefix": "src-tauri/src/tally/mod.rs"}},

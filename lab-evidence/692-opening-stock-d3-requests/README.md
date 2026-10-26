@@ -8,7 +8,7 @@
 - **Release:** record it from Tally's About screen. The lab PC runs TallyPrime 7.2 since 25 Oct 2026; BRIDGE TIEOUT D was built on 7.1: a prompt on opening it on 7.2 (a migration or any other) is a STOP before anything is keyed or sent.
 - **The owner's yes before keying:** the lab asks the owner in its own chat before the first key step, and keys nothing until the owner says yes.
 - **Dialogs:** any dialog or message box these steps do not describe = STOP (C7): press no key, send nothing more, screenshot, copy its text, report.
-- **Evidence:** on a new branch `lab-evidence/692-opening-stock-d3-answers`, with `SHA256.txt` listing every file, after the pre-push scan and the run coordinator's yes. Screenshots stay on the lab PC, listed by name, size and sha256.
+- **Evidence:** on a new branch `lab/692-opening-stock-d3-answers` (its folder `lab-evidence/692-opening-stock-d3-answers/`), with `SHA256.txt` listing every file, after the pre-push scan and the run coordinator's yes. Screenshots stay on the lab PC, listed by name, size and sha256.
 
 Why: the book `BRIDGE TIEOUT D` (opening stock with a matching capital entry, one item, one October sale) is the one book on which the statements add up. Before anything is built on it, five things that real books do and D does not are tried one at a time, each from the same starting state, so that a difference can only come from the one change. The expected figures below are a record to compare, not a pass/fail.
 

@@ -560,6 +560,10 @@
       "path": "src-tauri/src/db/encrypted.rs"
     },
     {
+      "path": "src-tauri/src/db/grouping_decisions.rs",
+      "reason": "reads the append-only store of a CA's Schedule III grouping decisions back, refusing the whole set when one row cannot be parsed, and folds it into the decisions an export applies; a defect there could present a ledger under a head the CA did not choose, or drop a recorded decision unseen"
+    },
+    {
       "path": "src-tauri/src/db/migrations/0002_tally_mirror.sql"
     },
     {
@@ -639,6 +643,10 @@
     },
     {
       "path": "src-tauri/src/db/migrations/0027_tally_retire_resurrected_guid_index.sql"
+    },
+    {
+      "path": "src-tauri/src/db/migrations/0028_schedule_iii_grouping_events.sql",
+      "reason": "creates the append-only store of a CA's Schedule III grouping decisions, which decides the head an exported Schedule III view presents a ledger under; it is under a directory the compatibility gate requires to be pinned whole (REQUIRED_DIRECTORIES in bridge-tally-core's compatibility_surface_stays_whole test), and a defect there could apply or silently drop a recorded decision"
     },
     {
       "path": "src-tauri/src/db/tally_incremental.rs"
@@ -794,6 +802,10 @@
     },
     {
       "path": "src-tauri/src/tally/approved_import.rs"
+    },
+    {
+      "path": "src-tauri/src/tally/box_fit.rs",
+      "reason": "decides whether the Windows approval box was wholly on the screen, and ends the dialog without an answer when it was not or could not be measured"
     },
     {
       "path": "src-tauri/src/tally/canonical_window.rs"

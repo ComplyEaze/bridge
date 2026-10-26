@@ -6,7 +6,7 @@
 //! thing and asserts the specific difference is reported, not merely that something was.
 //!
 //! Two of the fixture's cases sit exactly AT a legal limit this module tests (masterid 43-49,
-//! `parity/generate_fixture.py`): an addition put to use for exactly 180 days (full rate, "Office
+//! the deleted `parity/generate_fixture.py`): an addition put to use for exactly 180 days (full rate, "Office
 //! Furniture") beside one at 179 days (half rate, one calendar day later, "Showroom Furniture"),
 //! and a cash-paid addition of exactly Rs 10,000 -- the s.43(1) second proviso limit itself -- not
 //! flagged ("Office Computers") beside one Rs 0.01 over it, flagged ("Reception Computers", plus

@@ -2827,6 +2827,50 @@ async fn a_batch_lost_between_the_passes_does_not_strand_its_approval() {
     );
 }
 
+/// A transfer refusal found when the approval is redeemed is a refusal before the
+/// intent like any other: the approval is withdrawn, nothing more is read from
+/// Tally, nothing is sent, and the next call asks the person again.
+#[tokio::test]
+async fn a_skip_recorded_after_the_click_is_refused_in_the_redeeming_call_and_withdraws_the_approval(
+) {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+    let scripted = ScriptedApproval::held();
+    let pending = SCRIPTED_APPROVAL
+        .scope(
+            scripted.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    // the click lands, and a statement skips the row before the next call
+    scripted.answer(true);
+    until_answered(&server, &line.batch_id).await;
+    skip_the_row(&server);
+    let refused = server.call_tool("post_import", args).await;
+    let observed = sent(simulator);
+    let error = &result(&refused)["error"];
+    assert_eq!(error["code"], "skip_row_paired_elsewhere", "{refused}");
+    assert_eq!(error["skipped_rows"], json!([statement_row()]), "{refused}");
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.starts_with(SENT_FIRST), "{step}");
+    assert!(step.ends_with(SENT_LAST), "{step}");
+    assert!(!server.post_approvals.holds(&line.batch_id));
+    assert_eq!(
+        server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "post_refused_before_intent"
+    );
+    // the redeeming call read nothing: only the first call's reads were made
+    assert_eq!(observed.len(), before_approval().len());
+    assert_eq!(intents(directory.path()), 0);
+}
+
 // A master approval is a second kind in the same single slot. Everything below
 // is held and redeemed through the same `PostApprovals`; only the kind differs.
 

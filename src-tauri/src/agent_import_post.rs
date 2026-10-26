@@ -407,7 +407,17 @@ impl Server {
     /// whenever posting is on, since one setting governs every post (#1090);
     /// the desktop posts one Journal.
     pub(super) fn post_voucher_limit(&self, scope: PostScope) -> usize {
-        if scope == PostScope::Vouchers && self.settings.posting.enabled() {
+        if self.settings.posting.enabled() {
+            Self::post_voucher_limit_when_enabled(scope)
+        } else {
+            1
+        }
+    }
+
+    /// The limit `post_voucher_limit` gives once posting is on; a build asks admission at it
+    /// whatever the setting, to say whether turning posting on would give the batch a route.
+    pub(super) fn post_voucher_limit_when_enabled(scope: PostScope) -> usize {
+        if scope == PostScope::Vouchers {
             ledger::MAX_BATCH_POST_VOUCHERS
         } else {
             1
@@ -753,6 +763,10 @@ impl Server {
         let mut invoice_plan: Option<crate::tally::approved_import::InvoiceReadPlan> = None;
         // The voucher types refused for their voucher numbering (bridge#724).
         let mut numbering_refused: Option<(Value, String)> = None;
+        // What the transfer check at send listed and said, for the refusal.
+        let mut send_transfer_refusal: Option<(Value, String)> = None;
+        // The transfer check under the admission lock refused: its code only.
+        let mut transfers_changed_under_lock = false;
         let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
@@ -862,6 +876,18 @@ impl Server {
             };
             if row_posted.is_some() {
                 return Err("import_txn_already_posted".to_string().into());
+            }
+            // The transfer view, as the build judged it, against the journal as it
+            // is now: refused before the person is asked, with the build's code.
+            // The check that binds runs under the exclusive lock below.
+            let transfers_refused = {
+                let _lock = self.lock_import_admission_shared()?;
+                self.transfers_refusal_for_send_while_admitted(&line)?
+            };
+            if let Some(refusal) = transfers_refused {
+                let (code, detail, step) = refusal.into_parts();
+                send_transfer_refusal = Some((detail, step));
+                return Err(code.to_string().into());
             }
             let preview = review_preview_for(&line, &self.settings.endpoint, scope)?;
             // Number matching precedence is not qualified for native Create.
@@ -1248,6 +1274,17 @@ impl Server {
                                 UnderLockRefusal::CompanyStopped,
                             ));
                         }
+                        // The transfer records again, between the check before the
+                        // dialog and the intent: the approval is withdrawn and the
+                        // next call gives the whole reason before asking.
+                        if let Some(refusal) = self
+                            .transfers_refusal_for_send_while_admitted(&current.batch)
+                            .map_err(BeforeDispatchError::Other)?
+                        {
+                            return Err(BeforeDispatchError::Refused(UnderLockRefusal::Transfers(
+                                refusal.reason(),
+                            )));
+                        }
                         // Before the approval is spent: a refusal here withdraws it,
                         // and the next call asks the person again.
                         let pre_post_voucher_mark =
@@ -1291,6 +1328,12 @@ impl Server {
             // listing of this company is continued from before it (#630).
             self.drop_listing_snapshots(identity.company_guid());
             let posted = posted.map_err(|error| {
+                transfers_changed_under_lock = error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<UnderLockRefusal>(),
+                        Some(UnderLockRefusal::Transfers(_))
+                    )
+                });
                 currencies_seen = error
                     .chain()
                     .find_map(|cause| cause.downcast_ref::<ApprovedImportAdmissionError>())
@@ -1585,6 +1628,15 @@ impl Server {
                             &ids,
                             preexisting_invoice.as_ref(),
                         );
+                    }
+                }
+                if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
+                    if let Some((detail, step)) = &send_transfer_refusal {
+                        name_transfer_refusal(&mut outcome.payload, detail, step);
+                    }
+                    if transfers_changed_under_lock {
+                        outcome.payload["result"]["error"]["next_step"] =
+                            json!(transfers::TRANSFERS_CHANGED_UNDER_LOCK_STEP);
                     }
                 }
                 if let Some(ledgers) = ledgers_changed {
@@ -2016,6 +2068,15 @@ fn reconciliation_failure_payload(
     if code == "voucher_text_invalid" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
     }
+    // A transfer check refused the batch, and it refuses again on every request
+    // until the batch is built again: the desktop is told so, not to review.
+    if attempted == Some(false) && transfers::SEND_REFUSALS.contains(&code) {
+        payload["result"]["error"]["message"] = json!(if code == "transfer_view_not_established" {
+            transfers::TRANSFER_VIEW_REFUSED_MESSAGE
+        } else {
+            transfers::TRANSFER_REFUSED_MESSAGE
+        });
+    }
     if code == DESKTOP_LEDGER_LINE_BREAK {
         payload["result"]["error"]["message"] = json!(DESKTOP_LEDGER_LINE_BREAK_ACTION);
     }
@@ -2289,6 +2350,16 @@ const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in e
 /// The same refusal for an invoice, which is recognised by its number and not
 /// by its figures (ADR 0004). It names no amount, ledger or narration.
 const PREEXISTING_INVOICE_NEXT_STEP: &str = "Nothing was sent. A voucher already in the book looks like this invoice, in one or more of three ways. Open it in Tally first and confirm it is a regular voucher (not optional, post-dated or cancelled): if you cannot find it, do not enter the invoice by hand, ask the user. (1) It has this invoice's number under this voucher type. If it is this invoice, the invoice is in the book: do not build it again. If it is another invoice, tell the user the number is in use and ask which invoice number to use; never choose a number yourself. (2) It has no number and the same date, ledgers, amounts and sides. If it is this invoice, it is in the book: do not build it again. If it is another sale, a new number does not get past this check: tell the user and enter the invoice in Tally by hand. (3) error.unsettled_batch_id is present: an earlier batch from this computer with the same date, ledgers, amounts and sides was sent to Tally and has not been confirmed, so a voucher with those figures may be that batch's invoice whatever its number. If the voucher is that batch's invoice, it is in the book: do not build it again. If that batch's answer was received, verify_import on it can confirm it and end this refusal; that is not permission to build this invoice again if it is already in the book. If you have found the voucher and it is not that batch's invoice, or the user says this is another sale, ComplyEaze Bridge cannot post it while that batch is unconfirmed: enter it in Tally by hand. If error.unsettled_batch_unread is present instead, and no voucher in the book is this invoice by case (1) or (2), the check could not read the journal or the invoice, and its value says why: if it is import_admission_busy, another action of ComplyEaze Bridge holds the journal, so build the invoice again once; for any other value tell the user, and do not assume a batch exists. Apart from the new number the user chooses in case (1), never change a number, date, ledger, amount or side to get past this check.";
+
+/// What the transfer check at send listed (the rows it names, never a value
+/// from a record) and what to do about it.
+fn name_transfer_refusal(payload: &mut Value, detail: &Value, step: &str) {
+    let error = &mut payload["result"]["error"];
+    if let (Some(error), Some(detail)) = (error.as_object_mut(), detail.as_object()) {
+        error.extend(detail.clone());
+        error.insert("next_step".into(), json!(step));
+    }
+}
 
 /// Name the rows of the batch that are already in the book, with the way on.
 /// `invoice` is set for a batch that holds an invoice, to the unsettled batch

@@ -965,23 +965,28 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         .encode_utf16()
         .chain(Some(0))
         .collect();
-    // SAFETY: as for `show_review`: both buffers are NUL-terminated and live
-    // for the synchronous dialog, and no parent HWND is borrowed.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). With
-            // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the parent puts a first line on
-            // its text that says what Y and N do (#1780). No stays the
-            // default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and no parent HWND is borrowed.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // Topmost: a window the connector opens while Tally fills the
+                // screen is otherwise drawn behind it, since a background
+                // process may not take the foreground (#1589). With
+                // MB_SETFOREGROUND the box also takes the foreground, so a key
+                // typed for Tally answers it; the parent puts a first line on
+                // its text that says what Y and N do (#1780). No stays the
+                // default button.
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
 }"#;
 
 /// The one-ledger dialog (the masters twin of [`POST_DIALOG`]): shown for one
@@ -1061,23 +1066,29 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     // Win32 dependency so No is the default and Escape/close remain Cancel.
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
-    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
-    // no parent HWND is borrowed. No application state is exposed to callbacks.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). With
-            // MB_SETFOREGROUND the box also takes the foreground, so a key
-            // typed for Tally answers it; the parent puts a first line on
-            // its text that says what Y and N do (#1780). No stays the
-            // default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // The box cannot scroll: `guarded` measures it when it opens and, if it is
+    // not wholly on the screen, never returns (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: Both buffers are NUL-terminated and live for the synchronous
+        // dialog; no parent HWND is borrowed. No application state is exposed
+        // to callbacks.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // Topmost: a window the connector opens while Tally fills the
+                // screen is otherwise drawn behind it, since a background
+                // process may not take the foreground (#1589). With
+                // MB_SETFOREGROUND the box also takes the foreground, so a key
+                // typed for Tally answers it; the parent puts a first line on
+                // its text that says what Y and N do (#1780). No stays the
+                // default button.
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
 }"#;
 
 /// The post button a batch sees (#746): what `show_review` shows and
@@ -1219,6 +1230,9 @@ const CONFIRM_WITH: &str = r#"async fn confirm_with(
     )
     .await
     {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed: the text is too large for this person's screen.
+        Ok(answer) if answer.box_did_not_fit => Err("import_review_too_large".into()),
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1248,6 +1262,7 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
     )
     .await
     {
+        Ok(answer) if answer.box_did_not_fit => Err("ack_review_too_large".into()),
         Ok(answer) if answer.token_matched => Ok(()),
         // A person's decline is no token and exit 1: `run_review_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1259,6 +1274,448 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
         Err(DialogFailure::TimedOut) => Err("ack_review_timed_out".into()),
     }
 }"#;
+
+/// `box_fit::guarded`, the Windows dialog's fit check, verbatim (#1832). Both
+/// Windows dialogs answer through it, so an edit that lets `Unavailable` or a
+/// box that did not fit return a result would approve with no box or a
+/// clipped one.
+const BOX_FIT_GUARDED: &str = r#"#[cfg(windows)]
+pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
+    if !windows_hook::make_dpi_aware() {
+        // Rectangles could not be read in one unit, so no box is shown.
+        std::process::exit(0);
+    }
+    let Some(hook) = windows_hook::install() else {
+        // No way to measure the box, so none is shown.
+        std::process::exit(0);
+    };
+    let front = windows_hook::Front::start();
+    let result = show();
+    let seen = windows_hook::seen();
+    drop(front);
+    drop(hook);
+    match outcome(result, seen) {
+        Outcome::Answered(result) => result,
+        Outcome::DoesNotFit => std::process::exit(DOES_NOT_FIT_EXIT),
+        Outcome::Unavailable => std::process::exit(0),
+    }
+}"#;
+
+/// The hook that measures the box and cancels one that does not fit, verbatim
+/// (#1832). An edit that measured nothing, or always found a fit, would leave
+/// the unit-tested outcome logic intact and measure nothing.
+const BOX_FIT_HOOK: &str = r#"#[cfg(windows)]
+mod windows_hook {
+    use super::{Rect, Seen};
+    use std::ffi::c_void;
+    use std::io::Write;
+    use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use windows_sys::core::BOOL;
+    use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
+    use windows_sys::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    };
+    use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        BringWindowToTop, CallNextHookEx, EnumThreadWindows, FlashWindowEx, GetForegroundWindow,
+        GetWindowRect, GetWindowThreadProcessId, IsWindowVisible, PostMessageW,
+        SetForegroundWindow, SetWindowsHookExW, UnhookWindowsHookEx, FLASHWINFO, FLASHW_ALL,
+        FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT, WM_COMMAND,
+    };
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetModuleHandleW(name: *const u16) -> *mut c_void;
+        fn GetProcAddress(module: *mut c_void, name: *const u8) -> *const c_void;
+    }
+
+    /// `DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2`, a pseudo handle.
+    const PER_MONITOR_AWARE_V2: isize = -4;
+
+    /// Make this process per-monitor DPI aware (version 2), before any window
+    /// exists, so that a window's rectangle and its monitor's work area are
+    /// both physical pixels on every monitor. `false` if the process is not
+    /// in that mode afterwards: the three functions are looked up when they
+    /// are called, so that a Windows that lacks them (before Windows 10
+    /// version 1703) still starts the program and simply shows no box.
+    pub(super) fn make_dpi_aware() -> bool {
+        let user32: Vec<u16> = "user32.dll\0".encode_utf16().collect();
+        // SAFETY: `user32` is a NUL-terminated wide string that outlives the
+        // call; the module is already loaded by the program's own imports.
+        let module = unsafe { GetModuleHandleW(user32.as_ptr()) };
+        if module.is_null() {
+            return false;
+        }
+        let find = |name: &'static [u8]| -> *const c_void {
+            debug_assert_eq!(name.last(), Some(&0));
+            // SAFETY: `module` is a loaded module and `name` is a
+            // NUL-terminated ASCII name.
+            unsafe { GetProcAddress(module, name.as_ptr()) }
+        };
+        let set = find(b"SetProcessDpiAwarenessContext\0");
+        let get = find(b"GetThreadDpiAwarenessContext\0");
+        let same = find(b"AreDpiAwarenessContextsEqual\0");
+        if set.is_null() || get.is_null() || same.is_null() {
+            return false;
+        }
+        // SAFETY: each pointer is the address of the exported function of
+        // that name, whose signature is the one given here (user32.dll).
+        unsafe {
+            let set =
+                std::mem::transmute::<*const c_void, extern "system" fn(*mut c_void) -> i32>(set);
+            let get =
+                std::mem::transmute::<*const c_void, extern "system" fn() -> *mut c_void>(get);
+            let same = std::mem::transmute::<
+                *const c_void,
+                extern "system" fn(*mut c_void, *mut c_void) -> i32,
+            >(same);
+            set(PER_MONITOR_AWARE_V2 as *mut c_void);
+            same(get(), PER_MONITOR_AWARE_V2 as *mut c_void) != 0
+        }
+    }
+
+    /// A helper thread that, once, when the box first appears, tries to bring
+    /// it to the front, and flashes its taskbar button if Windows refuses. A
+    /// background process is often refused the foreground, and a box nobody
+    /// sees is a box nobody answers. It never takes the foreground back after
+    /// that single attempt, so a person who moves to another window is not
+    /// pulled away from it. It stops when dropped.
+    pub(super) struct Front {
+        stop: Arc<AtomicBool>,
+        worker: Option<std::thread::JoinHandle<()>>,
+    }
+
+    impl Front {
+        /// Start the helper for the box this thread is about to show.
+        pub(super) fn start() -> Front {
+            let stop = Arc::new(AtomicBool::new(false));
+            // SAFETY: no arguments; reads this thread's id.
+            let owner = unsafe { GetCurrentThreadId() };
+            let flag = Arc::clone(&stop);
+            let worker = std::thread::Builder::new()
+                .spawn(move || raise_once_shown(owner, &flag))
+                .ok();
+            Front { stop, worker }
+        }
+    }
+
+    impl Drop for Front {
+        fn drop(&mut self) {
+            self.stop.store(true, Ordering::SeqCst);
+            if let Some(worker) = self.worker.take() {
+                let _ = worker.join();
+            }
+        }
+    }
+
+    unsafe extern "system" fn first_visible(window: HWND, found: LPARAM) -> BOOL {
+        // SAFETY: `found` is the address of the `HWND` slot `box_of` passed.
+        let slot = unsafe { &mut *(found as *mut HWND) };
+        // SAFETY: `window` is a handle Windows is enumerating.
+        if unsafe { IsWindowVisible(window) } != 0 {
+            *slot = window;
+            0
+        } else {
+            1
+        }
+    }
+
+    /// The first visible top-level window of `thread`, or null.
+    fn box_of(thread: u32) -> HWND {
+        let mut found: HWND = std::ptr::null_mut();
+        // SAFETY: the callback only writes the slot whose address is passed,
+        // which outlives the call.
+        unsafe {
+            EnumThreadWindows(
+                thread,
+                Some(first_visible),
+                &mut found as *mut HWND as LPARAM,
+            );
+        }
+        found
+    }
+
+    /// Try to make `window` the foreground window; if Windows refuses, flash
+    /// its taskbar button until it is.
+    fn raise(window: HWND) {
+        // SAFETY: every handle is one just read from Windows; the input
+        // attachment is undone before returning.
+        unsafe {
+            let foreground = GetForegroundWindow();
+            if foreground == window {
+                return;
+            }
+            let me = GetCurrentThreadId();
+            let other = if foreground.is_null() {
+                0
+            } else {
+                GetWindowThreadProcessId(foreground, std::ptr::null_mut())
+            };
+            let attached = other != 0 && other != me && AttachThreadInput(me, other, 1) != 0;
+            SetForegroundWindow(window);
+            BringWindowToTop(window);
+            if attached {
+                AttachThreadInput(me, other, 0);
+            }
+            if GetForegroundWindow() != window {
+                let flash = FLASHWINFO {
+                    cbSize: std::mem::size_of::<FLASHWINFO>() as u32,
+                    hwnd: window,
+                    dwFlags: FLASHW_ALL | FLASHW_TIMERNOFG,
+                    uCount: 0,
+                    dwTimeout: 0,
+                };
+                FlashWindowEx(&flash);
+            }
+        }
+    }
+
+    fn raise_once_shown(owner: u32, stop: &AtomicBool) {
+        // About ten seconds to appear: the box has long appeared by then.
+        for _ in 0..100 {
+            if stop.load(Ordering::SeqCst) {
+                return;
+            }
+            let window = box_of(owner);
+            if !window.is_null() {
+                raise(window);
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    /// What the hook has seen, for this process's one box (0 nothing, 1 fits,
+    /// 2 does not fit).
+    static SEEN: AtomicU8 = AtomicU8::new(0);
+
+    pub(super) fn seen() -> Seen {
+        match SEEN.load(Ordering::SeqCst) {
+            1 => Seen::Fits,
+            2 => Seen::DoesNotFit,
+            _ => Seen::Nothing,
+        }
+    }
+
+    fn remember(seen: Seen) {
+        SEEN.store(
+            match seen {
+                Seen::Nothing => 0,
+                Seen::Fits => 1,
+                Seen::DoesNotFit => 2,
+            },
+            Ordering::SeqCst,
+        );
+    }
+
+    /// The hook, removed when it is dropped.
+    pub(super) struct Hook(HHOOK);
+
+    impl Drop for Hook {
+        fn drop(&mut self) {
+            // SAFETY: the handle came from `SetWindowsHookExW` and is removed
+            // once, here.
+            unsafe {
+                UnhookWindowsHookEx(self.0);
+            }
+        }
+    }
+
+    /// Install a computer-based-training hook on this thread, the one that is
+    /// about to show the box. `None` if Windows refuses.
+    pub(super) fn install() -> Option<Hook> {
+        remember(Seen::Nothing);
+        // SAFETY: `on_activate` is an `extern "system"` function with the
+        // hook procedure's signature; a null module handle with this thread's
+        // id hooks this thread only.
+        let handle = unsafe {
+            SetWindowsHookExW(
+                WH_CBT,
+                Some(on_activate),
+                std::ptr::null_mut(),
+                GetCurrentThreadId(),
+            )
+        };
+        (!handle.is_null()).then_some(Hook(handle))
+    }
+
+    /// The rectangle of `window` and the work area of the monitor nearest to
+    /// it, in the same unit. `None` if either cannot be read.
+    fn measure(window: HWND) -> Option<(Rect, Rect)> {
+        let mut rect = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
+        // SAFETY: `window` is the window being activated and `rect` is a
+        // live out-parameter of the right type.
+        if unsafe { GetWindowRect(window, &mut rect) } == 0 {
+            return None;
+        }
+        // SAFETY: as above.
+        let monitor = unsafe { MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST) };
+        if monitor.is_null() {
+            return None;
+        }
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            rcMonitor: RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
+            rcWork: RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
+            dwFlags: 0,
+        };
+        // SAFETY: `monitor` is a handle just returned for this window and
+        // `info` has its `cbSize` set, as the call requires.
+        if unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {
+            return None;
+        }
+        let rect = Rect {
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+        };
+        let work = Rect {
+            left: info.rcWork.left,
+            top: info.rcWork.top,
+            right: info.rcWork.right,
+            bottom: info.rcWork.bottom,
+        };
+        Some((rect, work))
+    }
+
+    /// Whether `window` lies wholly inside the work area of the monitor
+    /// nearest to it. Any failure to read either is "does not fit". One line
+    /// of the numbers goes to the process's own error output (the parent
+    /// discards it; a person running the dialog by hand can read it).
+    fn fits(window: HWND) -> bool {
+        let measured = measure(window);
+        let fitted = measured.is_some_and(|(rect, work)| rect.is_wholly_inside(work));
+        let _ = match measured {
+            Some((r, w)) => writeln!(
+                std::io::stderr(),
+                "box-fit: box=({},{},{},{}) work=({},{},{},{}) fits={fitted}",
+                r.left,
+                r.top,
+                r.right,
+                r.bottom,
+                w.left,
+                w.top,
+                w.right,
+                w.bottom
+            ),
+            None => writeln!(std::io::stderr(), "box-fit: not readable fits=false"),
+        };
+        fitted
+    }
+
+    /// The hook procedure: when the box is about to be activated, measure it;
+    /// if it does not fit, post it a Cancel and remember that it did not.
+    unsafe extern "system" fn on_activate(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        if code == HCBT_ACTIVATE as i32 {
+            let window = wparam as HWND;
+            let fitted = fits(window);
+            remember(seen().after(fitted));
+            if !fitted {
+                // SAFETY: `window` is the box being activated; Cancel is a
+                // button every box this module guards has.
+                unsafe {
+                    PostMessageW(window, WM_COMMAND, IDCANCEL as WPARAM, 0);
+                }
+            }
+        }
+        // SAFETY: passing the hook's own arguments on, with no hook handle,
+        // is what the documentation prescribes.
+        unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
+    }
+}"#;
+
+/// Every `cfg` in box_fit.rs: the inner attribute, the two Windows items and
+/// the test module. The last entry counts the bare text `cfg`.
+const BOX_FIT_CFG_CENSUS: [(&str, usize); 4] = [
+    (
+        "#![cfg_attr(all(not(windows), not(test)), allow(dead_code))]",
+        1,
+    ),
+    ("#[cfg(windows)]", 2),
+    ("#[cfg(test)]", 1),
+    ("cfg", 4),
+];
+
+fn box_fit_problems(source: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (pin, expected) in [(BOX_FIT_GUARDED, 1), (BOX_FIT_HOOK, 1)]
+        .iter()
+        .chain(BOX_FIT_CFG_CENSUS.iter())
+    {
+        if source.matches(pin).count() != *expected {
+            problems.push(format!("expected {expected} of `{pin}`"));
+        }
+    }
+    problems
+}
+
+fn replace_last(source: &str, from: &str, to: &str) -> String {
+    let at = source.rfind(from).expect("the text to replace is there");
+    format!("{}{to}{}", &source[..at], &source[at + from.len()..])
+}
+
+#[test]
+fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
+    let source = read("src-tauri/src/tally/box_fit.rs");
+    assert_eq!(box_fit_problems(&source), Vec::<String>::new());
+    for broken in [
+        // The process is not made DPI-aware, or the check passes anyway, so
+        // the rectangle and the work area may be read in different units.
+        source.replacen("if !windows_hook::make_dpi_aware() {", "if false {", 1),
+        source.replacen("same(get(), PER_MONITOR_AWARE_V2 as *mut c_void) != 0", "true", 1),
+        source.replacen("set(PER_MONITOR_AWARE_V2 as *mut c_void);", "", 1),
+        source.replacen("if set.is_null() || get.is_null() || same.is_null() {\n            return false;", "if set.is_null() || get.is_null() || same.is_null() {\n            return true;", 1),
+        // The helper takes the foreground back again and again, so a person
+        // who moves to another window is pulled away from it.
+        source.replacen("                raise(window);\n                return;", "                raise(window);", 1),
+        // The helper that brings the box to the front is not started.
+        source.replacen("let front = windows_hook::Front::start();", "", 1),
+        // A box never measured, or a box that did not fit, returns a result
+        // instead of ending the process.
+        source.replacen("Outcome::Unavailable => std::process::exit(0),", "Outcome::Unavailable => result,", 1),
+        source.replacen("Outcome::DoesNotFit => std::process::exit(DOES_NOT_FIT_EXIT),", "Outcome::DoesNotFit => result,", 1),
+        source.replacen("Outcome::Answered(result) => result,", "Outcome::Answered(_) => 6,", 1),
+        // No hook: the box is shown unmeasured, or the answer is made up.
+        source.replacen("        std::process::exit(0);\n    };\n    let front", "        return show();\n    };\n    let front", 1),
+        source.replacen("let result = show();", "let result = { show(); 6 };", 1),
+        source.replacen("let seen = windows_hook::seen();", "let seen = Seen::Fits;", 1),
+        // The measurement always finds a fit, or never cancels.
+        source.replacen("rect.is_wholly_inside(work));", "true);", 1),
+        source.replacen("if !fitted {", "if false {", 1),
+        source.replacen("remember(seen().after(fitted));", "remember(Seen::Fits);", 1),
+        source.replacen("let fitted = measured.is_some_and(", "let fitted = measured.is_none() || measured.is_some_and(", 1),
+        source.replacen("== 0 {\n            return None;", "== 0 {\n            return Some((Rect { left: 0, top: 0, right: 1, bottom: 1 }, Rect { left: 0, top: 0, right: 2, bottom: 2 }));", 1),
+        // The guard made non-Windows beside a Windows twin that approves.
+        source.replacen(
+            "#[cfg(windows)]\npub(crate) fn guarded",
+            "#[cfg(not(windows))]\npub(crate) fn guarded",
+            1,
+        ),
+        format!("{source}\n#[cfg(windows)]\npub(crate) fn guarded_twin(show: impl FnOnce() -> i32) -> i32 {{\n    show()\n}}\n"),
+        format!("{source}\n#[cfg_attr(windows, allow(unused))]\nfn extra() {{}}\n"),
+    ] {
+        assert_ne!(broken, source);
+        assert!(!box_fit_problems(&broken).is_empty());
+    }
+}
 
 const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
@@ -1283,7 +1740,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 27] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 28] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -1330,6 +1787,12 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 27] = [
     ),
     (CONFIRM_WITH, 1),
     (CONFIRM_REVIEW_WITH, 1),
+    // The child's "my box did not fit the screen" exit status is read as
+    // that and nothing else (#1832).
+    (
+        "box_did_not_fit: status.code() == Some(super::box_fit::DOES_NOT_FIT_EXIT),",
+        1,
+    ),
     ("pub(crate) const REVIEW_BUTTON: &str = \"Yes\";", 1),
     // The one-ledger dialog: its words, its count, both native dialogs, and
     // the two functions that ask it and decide from the child's answer.
@@ -1398,7 +1861,11 @@ fn discard_answer(dialog: &str) -> String {
             1,
         )
     } else {
-        dialog.replacen("        MessageBoxW(", "        let _ = MessageBoxW(", 1)
+        dialog.replacen(
+            "    answer == IDYES\n}",
+            "    let _ = answer == IDYES;\n    true\n}",
+            1,
+        )
     };
     let discarded = if discarded.ends_with(")\n}") || discarded.ends_with("))\n}") {
         format!("{};\n    true\n}}", discarded.trim_end_matches("\n}"))
@@ -1428,7 +1895,7 @@ fn each_dialog_answers_only_on_its_positive_button() {
             "!= rfd::MessageDialogResult::Custom(REVIEW_BUTTON.into())",
             1,
         ),
-        source.replacen(") == IDYES", ") != IDNO", 1),
+        source.replacen("answer == IDYES", "answer != IDNO", 1),
         source.replacen(
             "MB_YESNOCANCEL | MB_DEFBUTTON2",
             "MB_YESNOCANCEL | MB_DEFBUTTON1",
@@ -1447,6 +1914,25 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("let (extra_lines, extra_chars) = answer_reserve();", "let (extra_lines, extra_chars) = (0, 0);", 1),
+        // The parent stops reading a box that did not fit as a refusal, or
+        // the dialog stops measuring its box (#1832).
+        source.replacen(
+            "        Ok(answer) if answer.box_did_not_fit => Err(\"import_review_too_large\".into()),\n",
+            "",
+            1,
+        ),
+        source.replacen(
+            "        Ok(answer) if answer.box_did_not_fit => Err(\"ack_review_too_large\".into()),\n",
+            "",
+            1,
+        ),
+        source.replacen("super::box_fit::guarded(|| {", "(|| {", 1),
+        replace_last(&source, "super::box_fit::guarded(|| {", "(|| {"),
+        source.replacen(
+            "box_did_not_fit: status.code() == Some(super::box_fit::DOES_NOT_FIT_EXIT),",
+            "box_did_not_fit: false,",
+            1,
+        ),
         source.replacen("\"Post voucher\"", "\"Cancel\"", 1),
         source.replacen("\"I reviewed it\"", "\"Cancel\"", 1),
         source.replacen(

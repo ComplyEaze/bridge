@@ -22,9 +22,36 @@ fn server(path: &Path) -> Server {
 fn symlink_file(target: &Path, link: &Path) {
     std::os::unix::fs::symlink(target, link).unwrap();
 }
+/// Windows error 1314, "a required privilege is not held by the client": the account may not
+/// create symbolic links (not elevated, Developer Mode off).
+const ERROR_PRIVILEGE_NOT_HELD: i32 = 1314;
+
+/// Whether a failed link creation says the host account lacks the privilege, not that the code
+/// under test misbehaved.
+fn link_privilege_missing(raw_os_error: Option<i32>) -> bool {
+    raw_os_error == Some(ERROR_PRIVILEGE_NOT_HELD)
+}
+
 #[cfg(windows)]
 fn symlink_file(target: &Path, link: &Path) {
-    std::os::windows::fs::symlink_file(target, link).unwrap();
+    if let Err(error) = std::os::windows::fs::symlink_file(target, link) {
+        if link_privilege_missing(error.raw_os_error()) {
+            panic!(
+                "this test needs the privilege to create symbolic links, which this Windows \
+                 account does not hold (error 1314): turn on Developer Mode or run the tests \
+                 from an elevated session"
+            );
+        }
+        panic!("could not create a symbolic link for the test: {error}");
+    }
+}
+
+#[test]
+fn only_windows_error_1314_is_read_as_a_missing_link_privilege() {
+    assert!(link_privilege_missing(Some(1314)));
+    assert!(!link_privilege_missing(Some(5)));
+    assert!(!link_privilege_missing(Some(1315)));
+    assert!(!link_privilege_missing(None));
 }
 
 fn assert_alias_refused(symbolic: bool) {

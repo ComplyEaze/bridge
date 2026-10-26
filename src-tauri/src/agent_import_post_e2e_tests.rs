@@ -308,16 +308,21 @@ fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
 /// The saved Journal of `saved_batch`, as any build may have saved it, with
 /// `narration`.
 fn saved_batch_with_narration(server: &Server, narration: &str) -> (ImportLedgerLine, Value) {
+    saved_batch_of_row(server, "journal-583", narration)
+}
+
+/// The same batch holding one voucher under the transaction id `txn`.
+fn saved_batch_of_row(server: &Server, txn: &str, narration: &str) -> (ImportLedgerLine, Value) {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-00000000-0000-4000-8000-000000000583", "identity_scheme":"batch_v1",
         "company_guid":GUID,
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
-        "txn_ids":["journal-583"],"date_from":"20260901","date_to":"20260901",
+        "txn_ids":[txn],"date_from":"20260901","date_to":"20260901",
         "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":10,"master_value":7},
-        "vouchers":[{"bridge_txn_id":"journal-583","date":"20260901","voucher_type":"Journal",
+        "vouchers":[{"bridge_txn_id":txn,"date":"20260901","voucher_type":"Journal",
             "narration":narration,"entries":[
                 {"ledger":"WR2 Sales","amount":"12.50","side":"Dr"},
                 {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]
@@ -5138,6 +5143,113 @@ async fn a_rollback_once_seen_outlasts_the_mark_rising_again() {
     assert_eq!(verdicts.len(), 1, "the post's own binding, and no other");
 }
 
+/// A second post of the same company and address, recorded after the first: its own batch,
+/// dispatch intent (pre-POST mark 11) and Tally's answer, copied from the first post's records
+/// with the id `later`, its own digest and REMOTEID. Appended once.
+fn append_later_post(text: String, later: &str) -> String {
+    if text.contains(later) {
+        return text;
+    }
+    let records: Vec<Value> = text
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let batch = records
+        .iter()
+        .find(|record| record.get("record_type").is_none())
+        .unwrap();
+    let of = |kind: &str| {
+        records
+            .iter()
+            .find(|record| record["record_type"] == kind)
+            .unwrap()
+            .clone()
+    };
+    let sha = "f".repeat(64);
+    let mut later_batch = batch.clone();
+    later_batch["batch_id"] = json!(later);
+    later_batch["sha256"] = json!(sha);
+    let mut intent = of("dispatch_intent");
+    intent["batch_id"] = json!(later);
+    intent["batch_sha256"] = json!(sha);
+    intent["pre_post_voucher_mark"] = json!(11);
+    intent["native_remote_id"] =
+        json!(crate::agent::agent_import::tests::sentinel_uuid(0x10b1).to_string());
+    let mut response = of("dispatch_response");
+    response["batch_id"] = json!(later);
+    response["batch_sha256"] = json!(sha);
+    let mut out = text;
+    for record in [later_batch, intent, response] {
+        out.push_str(&serde_json::to_string(&record).unwrap());
+        out.push('\n');
+    }
+    out
+}
+
+/// #1819: a batch an earlier record already covers is refused the same way: a contradicted double
+/// omission must not become a mark 0 that is recorded, because that record would cover a second
+/// post sent after the first record was written. The retry still reads the first post as rolled back
+/// and the second post is not covered.
+#[tokio::test]
+async fn a_contradicted_omission_for_a_covered_batch_records_nothing_that_covers_a_later_post() {
+    let later = crate::agent::agent_import::tests::sentinel_batch_id(0x1052);
+    let no_voucher_mark = format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY>\
+         <GUID>{GUID}</GUID><ALTMSTID>7</ALTMSTID>\
+         </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+    );
+    let mut contradicted = probe();
+    contradicted.extend(verified_company());
+    contradicted.extend(paired(marks()));
+    contradicted.extend(paired(empty_collection()));
+    contradicted.extend(paired(empty_collection()));
+    contradicted.extend(paired(no_voucher_mark.clone()));
+    contradicted.extend(paired(no_voucher_mark));
+    // The second post exists only from the second verification on, so the first record cannot cover it.
+    let checks = std::cell::Cell::new(0);
+    let (_, verified, _) = post_and_verify_with_journal(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![
+            span_readback(empty_collection(), 10),
+            contradicted,
+            span_readback(untagged_posted_journal(), 12),
+        ],
+        |text| {
+            checks.set(checks.get() + 1);
+            if checks.get() > 1 {
+                append_later_post(text, &later)
+            } else {
+                text
+            }
+        },
+    )
+    .await;
+    let first = &verified[0]["structuredContent"]["result"];
+    assert_eq!(
+        first["post_span_binding"]["rollback_recorded"], true,
+        "{first}"
+    );
+    let refused = &verified[1];
+    assert_eq!(refused["isError"], json!(true), "{refused}");
+    assert_eq!(
+        refused["structuredContent"]["result"]["error"]["code"], "voucher_mark_contradiction",
+        "{refused}"
+    );
+    let retry = &verified[2]["structuredContent"]["result"];
+    assert_eq!(
+        retry["post_span_binding"]["state"], "book_rolled_back",
+        "{retry}"
+    );
+    assert_eq!(retry["post_span_binding"]["mark_read"], 10, "{retry}");
+    assert!(
+        retry["post_span_binding"]
+            .get("rollback_recorded")
+            .is_none(),
+        "{retry}"
+    );
+}
+
 /// #1050: a check of a post that reads intact can still see a restore that
 /// reaches another post of the company: here a second post, sent after this
 /// one, had proved the mark at 12, and this post's check reads 11. The record
@@ -5146,53 +5258,11 @@ async fn a_rollback_once_seen_outlasts_the_mark_rising_again() {
 #[tokio::test]
 async fn an_intact_posts_check_records_a_restore_that_reaches_a_later_post() {
     let later = crate::agent::agent_import::tests::sentinel_batch_id(0x1051);
-    // A second post of the same company and address, recorded after this one:
-    // its own batch, dispatch intent (pre-POST mark 11) and Tally's answer,
-    // copied from this post's records with its own id, digest and REMOTEID.
-    let add_later_post = |text: String| {
-        if text.contains(later.as_str()) {
-            return text;
-        }
-        let records: Vec<Value> = text
-            .lines()
-            .map(|line| serde_json::from_str(line).unwrap())
-            .collect();
-        let batch = records
-            .iter()
-            .find(|record| record.get("record_type").is_none())
-            .unwrap();
-        let of = |kind: &str| {
-            records
-                .iter()
-                .find(|record| record["record_type"] == kind)
-                .unwrap()
-                .clone()
-        };
-        let sha = "f".repeat(64);
-        let mut later_batch = batch.clone();
-        later_batch["batch_id"] = json!(later);
-        later_batch["sha256"] = json!(sha);
-        let mut intent = of("dispatch_intent");
-        intent["batch_id"] = json!(later);
-        intent["batch_sha256"] = json!(sha);
-        intent["pre_post_voucher_mark"] = json!(11);
-        intent["native_remote_id"] =
-            json!(crate::agent::agent_import::tests::sentinel_uuid(0x10b1).to_string());
-        let mut response = of("dispatch_response");
-        response["batch_id"] = json!(later);
-        response["batch_sha256"] = json!(sha);
-        let mut out = text;
-        for record in [later_batch, intent, response] {
-            out.push_str(&serde_json::to_string(&record).unwrap());
-            out.push('\n');
-        }
-        out
-    };
     let (_, verified, _) = post_and_verify_with_journal(
         company_marks(11, 50, "WR2 Unicode Lab"),
         span_readback(untagged_posted_journal(), 11),
         vec![span_readback(untagged_posted_journal(), 11)],
-        add_later_post,
+        |text| append_later_post(text, &later),
     )
     .await;
     let result = &verified[0]["structuredContent"]["result"];
@@ -5224,9 +5294,10 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
          <GUID>{GUID}</GUID><ALTMSTID>7</ALTMSTID>\
          </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
     );
+    // The window's own marks omit the voucher mark too: the company really holds no voucher (#1819).
     let mut later = probe();
     later.extend(verified_company());
-    later.extend(paired(marks()));
+    later.extend(paired(no_voucher_mark.clone()));
     later.extend(paired(empty_collection()));
     later.extend(paired(empty_collection()));
     later.extend(paired(no_voucher_mark.clone()));
@@ -5263,6 +5334,63 @@ async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
         ),
         "{result}"
     );
+}
+
+/// The verification's own window read saw a voucher mark and the two later reads omit it: the answers
+/// contradict each other, so it is refused retryably and nothing is recorded (#1819). A retry that
+/// reads the mark again verifies the post, which it could not if a rollback had been recorded.
+#[tokio::test]
+async fn a_voucher_mark_seen_by_the_window_and_omitted_twice_is_refused_not_recorded() {
+    let no_voucher_mark = format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY>\
+         <GUID>{GUID}</GUID><ALTMSTID>7</ALTMSTID>\
+         </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+    );
+    let mut contradicted = probe();
+    contradicted.extend(verified_company());
+    contradicted.extend(paired(marks()));
+    contradicted.extend(paired(empty_collection()));
+    contradicted.extend(paired(empty_collection()));
+    contradicted.extend(paired(no_voucher_mark.clone()));
+    contradicted.extend(paired(no_voucher_mark));
+    let (_, verified, _) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![contradicted, span_readback(untagged_posted_journal(), 11)],
+    )
+    .await;
+    let refused = &verified[0];
+    assert_eq!(refused["isError"], json!(true), "{refused}");
+    assert_eq!(
+        refused["structuredContent"]["result"]["error"]["code"], "voucher_mark_contradiction",
+        "{refused}"
+    );
+    assert!(
+        refused["structuredContent"]["result"]["error"]["remediation"]
+            .as_str()
+            .is_some_and(|step| step.contains("Run the same call again once")),
+        "{refused}"
+    );
+    // Nothing was recorded: the retry is not covered by a rollback, and verifies the post.
+    assert_eq!(verified[1]["isError"], json!(false), "{}", verified[1]);
+    let retry = &verified[1]["structuredContent"]["result"];
+    assert_eq!(retry["post_span_binding"]["state"], "bound", "{retry}");
+    assert_eq!(retry["verification_status"], "posted_verified", "{retry}");
+    assert_ne!(
+        retry["post_span_binding"]["rollback_recorded"], true,
+        "{retry}"
+    );
+}
+
+/// The mark recorded when Tally omits the voucher mark twice (#1819): 0 when the window read saw none
+/// (or saw 0), a contradiction when it saw one.
+#[test]
+fn an_omitted_voucher_mark_is_a_contradiction_only_when_the_window_saw_one() {
+    let omitted_twice = super::super::mark_omitted_twice;
+    assert_eq!(omitted_twice(None), Ok(0));
+    assert_eq!(omitted_twice(Some(0)), Ok(0));
+    assert_eq!(omitted_twice(Some(1)), Err("voucher_mark_contradiction"));
+    assert_eq!(omitted_twice(Some(10)), Err("voucher_mark_contradiction"));
 }
 
 /// An untagged post whose binding was refused cannot be found by a tag, so a
@@ -7578,4 +7706,295 @@ async fn an_invoice_the_gstr_1_lists_as_uncertain_ends_divergent_and_stops_the_n
     // Every answer was asked for and none more: the second build's admission
     // sent Tally nothing.
     assert_eq!(observed.len(), order.len());
+}
+
+// ---- the transfer check at send ---------------------------------------------------
+
+/// The statement row of the send-time check: a date, zeros built at run time, then a suffix.
+fn statement_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260901-{:0>14}d1", 0));
+    &TEXT
+}
+
+/// A statement of only skipped rows, recorded for this company through the
+/// server's endpoint, that skips `statement_row()` as carried by another account.
+fn skip_the_row(server: &Server) {
+    use std::io::Write;
+    let record = statement_facts::SkipOnlyRecord {
+        record_id: format!("skips-{}", Uuid::new_v4().hyphenated()),
+        company_guid: canonical_batch_guid(GUID),
+        endpoint_origin: super::super::super::canonical_loopback_origin(&server.settings.endpoint)
+            .unwrap(),
+        built_at: "2026-09-22T00:00:01Z".into(),
+        statement: statement_facts::StatementFacts {
+            bank_ledger_guid: "guid-bank-a".into(),
+            coverage: None,
+            contra_rows: Vec::new(),
+            skip_rows: vec![statement_facts::SkipRow {
+                bridge_txn_id: statement_row().into(),
+                date: TallyDate::parse("20260901").unwrap(),
+                amount: "12.50".into(),
+                direction: statement_facts::RowDirection::Outflow,
+                other_ledger_guid: "guid-bank-b".into(),
+                reference: None,
+                instrument: None,
+                reversed_same_day: false,
+            }],
+        },
+    };
+    let mut bytes = serde_json::to_vec(&record).unwrap();
+    bytes.push(b'\n');
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(server.settings.data_dir.join(statement_facts::SKIPS_FILE))
+        .unwrap()
+        .write_all(&bytes)
+        .unwrap();
+}
+
+const SENT_FIRST: &str = "Nothing was sent to Tally, and any approval of this batch is withdrawn. ";
+const SENT_LAST: &str = " This batch cannot be sent as built: build it again.";
+
+/// A row another statement of the company skipped is refused when the batch
+/// holding it is sent, as it was refused when a build would have posted it:
+/// from the journal alone, before any Tally request and before the person is
+/// asked; nothing is appended.
+#[tokio::test]
+async fn a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+    skip_the_row(&server);
+    let before = journal(directory.path());
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "skip_row_paired_elsewhere", "{response}");
+    assert_eq!(
+        error["skipped_rows"],
+        json!([statement_row()]),
+        "{response}"
+    );
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.starts_with(SENT_FIRST), "{step}");
+    assert!(step.ends_with(SENT_LAST), "{step}");
+    assert!(!step.contains("No file was written"), "{step}");
+    // the batch is saved: it is not a build that posts the row
+    for build_wording in ["This build", "this build", "nothing was recorded"] {
+        assert!(!step.contains(build_wording), "{step}");
+    }
+    assert_eq!(observed.len(), 0);
+    assert_eq!(journal(directory.path()), before);
+}
+
+/// The skip is recorded while the dialog is open: the check under the
+/// admission lock refuses with the same code, before the intent, and its step is
+/// the fixed one that sends the caller back for the whole reason.
+#[tokio::test]
+async fn a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock() {
+    let mut plans = before_approval();
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+    let recorder = Server::new(server.settings.clone());
+    let scripted = ScriptedApproval::approving_after(move || skip_the_row(&recorder));
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted, server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "skip_row_paired_elsewhere",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert_eq!(observed, post_at, "the POST is never sent: {response}");
+    assert_eq!(
+        result["error"]["next_step"],
+        "The transfer records changed after this batch was checked and before it was sent; nothing was sent and any approval of this batch is withdrawn. Call post_import again: it gives the whole reason before asking.",
+        "{response}"
+    );
+    let intents = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .filter(|record| record.contains("\"dispatch_intent\""))
+        .count();
+    assert_eq!(intents, 0);
+}
+
+/// The refusal reaches the person on both surfaces, before any request and
+/// before the dialog: the agent's tool, and the desktop's post.
+#[tokio::test]
+async fn a_skipped_row_is_refused_before_the_dialog_on_both_surfaces() {
+    for desktop in [false, true] {
+        let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+        skip_the_row(&server);
+        let before = journal(directory.path());
+        let scripted = ScriptedApproval::approving();
+        let result = if desktop {
+            let outcome = SCRIPTED_APPROVAL
+                .scope(
+                    scripted.clone(),
+                    server.post_import_checked(&args, Some(&line.sha256), PostScope::JournalOnly),
+                )
+                .await
+                .expect("a refusal is reported as the post's outcome");
+            // What the desktop's webview receives.
+            super::super::desktop_journal::DesktopJournalOperation::from_outcome(outcome).result
+                ["result"]
+                .clone()
+        } else {
+            let response = SCRIPTED_APPROVAL
+                .scope(scripted.clone(), server.call_tool("post_import", args))
+                .await;
+            response["structuredContent"]["result"].clone()
+        };
+        let observed = sent(simulator);
+        let error = &result["error"];
+        assert_eq!(
+            error["code"], "skip_row_paired_elsewhere",
+            "{desktop}: {result}"
+        );
+        if desktop {
+            // the webview gets the code and a message that says to build it
+            // again, not the generic one that tells it to review the error
+            let message = error["message"].as_str().unwrap();
+            assert!(message.starts_with("Nothing was sent."), "{message}");
+            assert!(message.contains("build it again"), "{message}");
+            assert!(!message.contains("Review the error"), "{message}");
+        } else {
+            // the agent is told the rows and the way on
+            assert_eq!(error["skipped_rows"], json!([statement_row()]), "{result}");
+            let step = error["next_step"].as_str().unwrap();
+            assert!(step.starts_with(SENT_FIRST), "{step}");
+            assert!(step.ends_with(SENT_LAST), "{step}");
+        }
+        assert!(scripted.previews().is_empty(), "approval must not be asked");
+        assert_eq!(observed.len(), 0, "{desktop}");
+        assert_eq!(journal(directory.path()), before, "{desktop}");
+    }
+}
+
+/// The desktop's post is told an unreadable record is not the batch's fault:
+/// building it again meets the same record.
+#[tokio::test]
+async fn the_desktop_is_told_when_the_transfer_records_cannot_be_read() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+    std::fs::write(
+        directory.path().join(statement_facts::SKIPS_FILE),
+        b"not a record\n",
+    )
+    .unwrap();
+    let outcome = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.post_import_checked(&args, Some(&line.sha256), PostScope::JournalOnly),
+        )
+        .await
+        .expect("a refusal is reported as the post's outcome");
+    let result = super::super::desktop_journal::DesktopJournalOperation::from_outcome(outcome)
+        .result["result"]
+        .clone();
+    assert_eq!(
+        result["error"]["code"], "transfer_view_not_established",
+        "{result}"
+    );
+    let message = result["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("could not read its own record"),
+        "{message}"
+    );
+    assert!(
+        message.contains("Building it again meets the same record"),
+        "{message}"
+    );
+    assert_eq!(sent(simulator).len(), 0);
+}
+
+/// A batch that posts no statement row and carries no statement is not about
+/// transfers, and a view that cannot be read does not stop it.
+#[tokio::test]
+async fn a_batch_that_is_not_about_transfers_is_not_held_by_an_unreadable_view() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch(&server);
+    std::fs::write(
+        directory.path().join(statement_facts::SKIPS_FILE),
+        b"not a record\n",
+    )
+    .unwrap();
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let code = &response["structuredContent"]["result"]["error"]["code"];
+    assert_ne!(code, "transfer_view_not_established", "{response}");
+    // it went past the check: its next step, a read of Tally, was made
+    assert!(
+        !observed.is_empty(),
+        "the post stopped before Tally: {response}"
+    );
+}
+
+/// A batch that does post a statement row is held: nothing is sent while
+/// ComplyEaze Bridge cannot read its own record of the skipped rows.
+#[tokio::test]
+async fn an_unreadable_view_stops_the_send_of_a_statement_row() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
+    std::fs::write(
+        directory.path().join(statement_facts::SKIPS_FILE),
+        b"not a record\n",
+    )
+    .unwrap();
+    let before = journal(directory.path());
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "transfer_view_not_established", "{response}");
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.starts_with(SENT_FIRST), "{step}");
+    assert!(step.contains("could not read its own record"), "{step}");
+    assert!(
+        step.contains(
+            "No batch of this company that posts a statement row can be sent until it is fixed"
+        ),
+        "{step}"
+    );
+    // not "build it again": building it meets the same record
+    assert!(!step.contains("build it again"), "{step}");
+    assert!(
+        step.contains("if a later release has been used here, send with that release"),
+        "{step}"
+    );
+    assert_eq!(observed.len(), 0);
+    assert_eq!(journal(directory.path()), before);
 }

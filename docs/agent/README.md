@@ -2236,10 +2236,12 @@ refused as `proposals_legacy` (parse the statement again).
   `"restored": true`, and `next_steps.restored` says what that means: no step
   inside ComplyEaze Bridge settles the row, so do not name it in
   `withdraw_skips` or build or amend its rows (that is advice, and the code refuses all
-  three: a withdrawal as `withdraw_skip_paired`, naming the batch with `"restored": true`;
-  an amendment of the batch's lineage as `import_amend_natively_posted`, because a
-  recorded rollback covers only batches that were sent; a new build that posts the row as
-  `import_txn_already_posted`); check in Tally whether that
+  three: a withdrawal as `withdraw_skip_paired` where a Contra carries the row, naming that batch
+  with `"restored": true` when it is the covered one, or as `import_txn_already_posted` or
+  `withdraw_skip_invalid` where the covered batch holds the row; an amendment of the batch's
+  lineage as `import_amend_natively_posted`, since a recorded rollback covers only dispatched
+  batches and a dispatched batch's lineage is never amended; a new build that posts a row the
+  covered batch holds as `import_txn_already_posted`); check in Tally whether that
   batch's voucher for it is there and tell the person, and do not enter the
   transfer by hand or import that batch's file. A rollback never retires a skip
   that would be held without it.

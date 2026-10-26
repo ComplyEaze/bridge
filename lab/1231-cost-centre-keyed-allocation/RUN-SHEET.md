@@ -17,7 +17,7 @@ Not for merge. Written 26 Oct 2026. `LAB-COMMON.md` in this folder (v3, a byte c
 
 The files are UTF-16LE with a byte-order mark and no final line break; send them as they are, with LAB-COMMON C3's line. Before the first send: `python -I check-request-ids.py requests` in this folder; EXPECT `census: ok 5, skipped 0, FAIL 0`; anything else = STOP, nothing sent. Read bounds (C3): MARKS 8,192 bytes; each other read 200,000 bytes.
 
-**THE BUILD (for the built-tool reads of step 8).** The build staged at the lab as `w1-2306d86d`, `bridge_mcp.exe` sha256 `92a899a21f904f88cb2d13ce44b1417d5aecaf333caad5230de598bf54d89524` (hash it first; another hash = STOP), over stdio with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, a new empty `BRIDGE_AGENT_DATA_DIR`, `BRIDGE_TERMS_ACCEPTED=true` (allowed for the lab on 25 Oct 2026), and posting, import and redaction unset.
+**THE BUILD (for the built-tool reads of step 8).** A Windows build of master that holds #1707 (merged 26 Oct 2026 as `ca4acb9f`, the change that reads `cost_centre_allocations` on a voucher's ledger entries): the 0.6.1 cut build once its Build block elsewhere is filled, or another build of master after `ca4acb9f` that the run coordinator names, with its commit and exe sha256 recorded and the exe hashed before the first call (another hash = STOP). The build staged as `w1-2306d86d` predates #1707 and is NOT used here. If no such build is staged when the row runs, the built-tool reads of step 8 are recorded as not run and everything else runs. Run it over stdio with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, a new empty `BRIDGE_AGENT_DATA_DIR`, `BRIDGE_TERMS_ACCEPTED=true` (allowed for the lab on 25 Oct 2026), and posting, import and redaction unset.
 
 **WHO ACTS, AND DIALOGS.** Every master, setting and voucher is keyed on Tally's screen, one act at a time, with a screenshot before accepting and MARKS after. Before step 1 the lab asks the owner in its own chat whether to create and key this book, and keys nothing until the owner says yes. Any dialog or message box a step does not name = STOP (C7): press no key, send nothing more, screenshot, copy its text, report. Never Escape on a master or voucher screen (C7).
 
@@ -42,7 +42,7 @@ Licensed TallyPrime only; Educational mode = STOP. Record the release from Tally
    The allocation screen opens on the Dr line; its prompts are answered only by keying the centres and amounts above. Screenshot each voucher before accepting, then the Day Book for each day. MARKS (M7): EXPECT ALTVCHID above M6's by at least two.
 8. Reads, one at a time, in this order:
    - by curl: `cost-categories`, `cost-centres`, `vch-20250515`, `vch-20250516`, each answer to `evidence\<name>.xml` with headers (C3's line; record exit, status, bytes, CONTENT-LENGTH);
-   - by the build's tools: `list_companies`; `company_features` (EXPECT the cost-centre setting `yes`); `masters` with `kind` `cost_centres` and then `cost_categories`; `vouchers` for 2025-05-15 to 2025-05-16. Record every answer whole.
+   - by the build's tools (only on a build holding #1707, above): `list_companies`; `company_features` (EXPECT the cost-centre setting `yes`); `masters` with `kind` `cost_centres` and then `cost_categories`; `vouchers` for 2025-05-15 to 2025-05-16. Record every answer whole.
    Then MARKS (M8): EXPECT equal to M7 (the reads wrote nothing).
 9. LAB-COMMON C10. THE COMPANY stays on the PC as step 7 left it, for later reads; it is never used for another item.
 

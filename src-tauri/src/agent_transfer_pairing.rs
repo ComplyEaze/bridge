@@ -86,6 +86,8 @@ macro_rules! text_id {
                 Self(value.into())
             }
 
+            // Not every identifier's text is read back.
+            #[allow(dead_code)]
             pub(crate) fn as_str(&self) -> &str {
                 &self.0
             }

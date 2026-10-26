@@ -2252,12 +2252,16 @@ const MAC_FIT_SECOND_BUTTON: &str = r#"const SECOND_BUTTON: isize = 1001;"#;
 /// person could not see.
 const MAC_FIT_ASK: &str = r#"#[cfg(target_os = "macos")]
 pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
+    use block2::RcBlock;
     use objc2::MainThreadMarker;
     use objc2_app_kit::{
         NSAlert, NSAlertStyle, NSApplication, NSApplicationActivationPolicy, NSScreen,
     };
-    use objc2_foundation::NSString;
+    use objc2_foundation::{NSRunLoop, NSRunLoopCommonModes, NSString, NSTimer};
+    use std::cell::Cell;
     use std::io::Write;
+    use std::ptr::NonNull;
+    use std::rc::Rc;
 
     // The dialog child runs this on its main thread, before Tokio starts.
     let Some(mtm) = MainThreadMarker::new() else {
@@ -2281,8 +2285,15 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     alert.addButtonWithTitle(&NSString::from_str(positive));
     alert.setMessageText(&NSString::from_str(title));
     alert.setInformativeText(&NSString::from_str(text));
+    // Return and Escape answer Cancel; the approving button is never the one
+    // keyboard navigation lands on.
+    alert
+        .buttons()
+        .objectAtIndex(1)
+        .setRefusesFirstResponder(true);
     alert.layout();
-    let frame = alert.window().frame();
+    let window = alert.window();
+    let frame = window.frame();
     let size = Some((frame.size.width, frame.size.height));
     let _ = writeln!(
         std::io::stderr(),
@@ -2290,10 +2301,46 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     );
     match measured(size, visible) {
         Measured::Fits => {}
-        Measured::DoesNotFit => std::process::exit(DOES_NOT_FIT_EXIT),
+        Measured::DoesNotFit => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
         Measured::Unavailable => std::process::exit(0),
     }
+    // Once shown, the alert is measured again where it is: its frame against
+    // the visible frame of the screen it is on. A miss, or a frame that cannot
+    // be read, ends the run loop and the process, whatever was clicked.
+    let missed = Rc::new(Cell::new(None::<i32>));
+    let check = {
+        let window = window.clone();
+        let missed = Rc::clone(&missed);
+        RcBlock::new(move |_timer: NonNull<NSTimer>| {
+            let placed = window.screen().map(|screen| {
+                let f = window.frame();
+                let v = screen.visibleFrame();
+                wholly_inside(
+                    (f.origin.x, f.origin.y, f.size.width, f.size.height),
+                    (v.origin.x, v.origin.y, v.size.width, v.size.height),
+                )
+            });
+            let exit = match placed {
+                Some(true) => return,
+                Some(false) => super::box_fit::DOES_NOT_FIT_EXIT,
+                None => 0,
+            };
+            missed.set(Some(exit));
+            NSApplication::sharedApplication(mtm).stopModalWithCode(-1001);
+        })
+    };
+    // SAFETY: the block runs on this thread's run loop only, and is dropped
+    // after the timer is invalidated below.
+    let timer = unsafe { NSTimer::timerWithTimeInterval_repeats_block(0.1, true, &check) };
+    unsafe { NSRunLoop::currentRunLoop().addTimer_forMode(&timer, NSRunLoopCommonModes) };
+    // Once, as the Windows box is: in front, without taking it back later.
+    #[allow(deprecated)]
+    app.activateIgnoringOtherApps(true);
     let response = alert.runModal();
+    timer.invalidate();
+    if let Some(exit) = missed.get() {
+        std::process::exit(exit);
+    }
     if policy == NSApplicationActivationPolicy::Prohibited {
         app.setActivationPolicy(policy);
     }
@@ -2321,7 +2368,7 @@ fn mac_fit_problems(source: &str) -> Vec<String> {
     }
     // Nothing may widen the two gates around them.
     if source.matches("cfg").count() != 5 {
-        problems.push("mac_fit.rs: expected five `cfg` in all".into());
+        problems.push("mac_fit.rs: expected 5 `cfg` in all".into());
     }
     problems
 }
@@ -2332,9 +2379,14 @@ fn the_mac_alert_is_shown_only_if_it_fits_and_approved_only_on_its_second_button
     assert_eq!(mac_fit_problems(&source), Vec::<String>::new());
     // The check itself: each way of showing or approving what it must not.
     for broken in [
-        source.replacen("Measured::DoesNotFit => std::process::exit(DOES_NOT_FIT_EXIT),", "Measured::DoesNotFit => {}", 1),
+        source.replacen("Measured::DoesNotFit => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),", "Measured::DoesNotFit => {}", 1),
         source.replacen("Measured::Unavailable => std::process::exit(0),", "Measured::Unavailable => {}", 1),
         source.replacen("    alert.layout();\n", "", 1),
+        source.replacen("    timer.invalidate();\n", "", 1),
+        source.replacen("    if let Some(exit) = missed.get() {\n        std::process::exit(exit);\n    }\n", "", 1),
+        source.replacen("Some(false) => super::box_fit::DOES_NOT_FIT_EXIT,", "Some(false) => 0,", 1),
+        source.replacen("None => 0,", "None => return,", 1),
+        source.replacen("        .setRefusesFirstResponder(true);\n", "        ;\n", 1),
         source.replacen("response == SECOND_BUTTON", "response == 1000", 1),
         source.replacen("const SECOND_BUTTON: isize = 1001;", "const SECOND_BUTTON: isize = 1000;", 1),
         source.replacen("Some(approves(response))", "Some(response == 1000)", 1),

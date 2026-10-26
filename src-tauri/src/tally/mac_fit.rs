@@ -12,7 +12,7 @@
 //! frame the alert then has; nothing is shown yet), compares its size with the
 //! main screen's visible frame, and shows that same object with `runModal`
 //! only if it fits. One that does not fit is never shown: the dialog child
-//! exits [`DOES_NOT_FIT_EXIT`], which the parent reads as a text too large for
+//! exits [`super::box_fit::DOES_NOT_FIT_EXIT`], which the parent reads as a text too large for
 //! the box, as it does on Windows. One that could not be measured is not shown
 //! either: exit 0 with no token, which the parent reads as unavailable. The
 //! measured alert is the shown alert by construction, so no twin is involved.
@@ -36,8 +36,6 @@
 //! the main screen is the one it opens on, and that a fitting alert is placed
 //! wholly inside the visible frame.
 #![cfg_attr(all(not(target_os = "macos"), not(test)), allow(dead_code))]
-
-use super::box_fit::DOES_NOT_FIT_EXIT;
 
 /// What the measurement of one alert came to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,6 +66,24 @@ pub(crate) fn measured(alert: Option<Size>, visible: Option<Size>) -> Measured {
     }
 }
 
+/// A rectangle in points, `(x, y, width, height)`, as `NSWindow.frame` and
+/// `NSScreen.visibleFrame` give them (the origin is the lower left).
+pub(crate) type Frame = (f64, f64, f64, f64);
+
+/// Whether `frame` lies wholly inside `visible`, with no slack either way. Any
+/// number that is not finite, or a frame with no area, is not inside: a frame
+/// that was not read properly is not a fit.
+pub(crate) fn wholly_inside(frame: Frame, visible: Frame) -> bool {
+    let sound =
+        |f: Frame| [f.0, f.1, f.2, f.3].iter().all(|n| n.is_finite()) && f.2 > 0.0 && f.3 > 0.0;
+    sound(frame)
+        && sound(visible)
+        && frame.0 >= visible.0
+        && frame.1 >= visible.1
+        && frame.0 + frame.2 <= visible.0 + visible.2
+        && frame.1 + frame.3 <= visible.1 + visible.3
+}
+
 /// `NSAlertSecondButtonReturn`: the response of the second button added.
 const SECOND_BUTTON: isize = 1001;
 
@@ -86,12 +102,16 @@ pub(crate) fn approves(response: isize) -> bool {
 /// a platform where `rfd` shows the dialog.
 #[cfg(target_os = "macos")]
 pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
+    use block2::RcBlock;
     use objc2::MainThreadMarker;
     use objc2_app_kit::{
         NSAlert, NSAlertStyle, NSApplication, NSApplicationActivationPolicy, NSScreen,
     };
-    use objc2_foundation::NSString;
+    use objc2_foundation::{NSRunLoop, NSRunLoopCommonModes, NSString, NSTimer};
+    use std::cell::Cell;
     use std::io::Write;
+    use std::ptr::NonNull;
+    use std::rc::Rc;
 
     // The dialog child runs this on its main thread, before Tokio starts.
     let Some(mtm) = MainThreadMarker::new() else {
@@ -115,8 +135,15 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     alert.addButtonWithTitle(&NSString::from_str(positive));
     alert.setMessageText(&NSString::from_str(title));
     alert.setInformativeText(&NSString::from_str(text));
+    // Return and Escape answer Cancel; the approving button is never the one
+    // keyboard navigation lands on.
+    alert
+        .buttons()
+        .objectAtIndex(1)
+        .setRefusesFirstResponder(true);
     alert.layout();
-    let frame = alert.window().frame();
+    let window = alert.window();
+    let frame = window.frame();
     let size = Some((frame.size.width, frame.size.height));
     let _ = writeln!(
         std::io::stderr(),
@@ -124,10 +151,46 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     );
     match measured(size, visible) {
         Measured::Fits => {}
-        Measured::DoesNotFit => std::process::exit(DOES_NOT_FIT_EXIT),
+        Measured::DoesNotFit => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
         Measured::Unavailable => std::process::exit(0),
     }
+    // Once shown, the alert is measured again where it is: its frame against
+    // the visible frame of the screen it is on. A miss, or a frame that cannot
+    // be read, ends the run loop and the process, whatever was clicked.
+    let missed = Rc::new(Cell::new(None::<i32>));
+    let check = {
+        let window = window.clone();
+        let missed = Rc::clone(&missed);
+        RcBlock::new(move |_timer: NonNull<NSTimer>| {
+            let placed = window.screen().map(|screen| {
+                let f = window.frame();
+                let v = screen.visibleFrame();
+                wholly_inside(
+                    (f.origin.x, f.origin.y, f.size.width, f.size.height),
+                    (v.origin.x, v.origin.y, v.size.width, v.size.height),
+                )
+            });
+            let exit = match placed {
+                Some(true) => return,
+                Some(false) => super::box_fit::DOES_NOT_FIT_EXIT,
+                None => 0,
+            };
+            missed.set(Some(exit));
+            NSApplication::sharedApplication(mtm).stopModalWithCode(-1001);
+        })
+    };
+    // SAFETY: the block runs on this thread's run loop only, and is dropped
+    // after the timer is invalidated below.
+    let timer = unsafe { NSTimer::timerWithTimeInterval_repeats_block(0.1, true, &check) };
+    unsafe { NSRunLoop::currentRunLoop().addTimer_forMode(&timer, NSRunLoopCommonModes) };
+    // Once, as the Windows box is: in front, without taking it back later.
+    #[allow(deprecated)]
+    app.activateIgnoringOtherApps(true);
     let response = alert.runModal();
+    timer.invalidate();
+    if let Some(exit) = missed.get() {
+        std::process::exit(exit);
+    }
     if policy == NSApplicationActivationPolicy::Prohibited {
         app.setActivationPolicy(policy);
     }
@@ -209,6 +272,41 @@ mod tests {
                 "{alert:?} {visible:?}"
             );
         }
+    }
+
+    /// An alert is wholly inside the visible frame, with no slack either way.
+    #[test]
+    fn a_frame_is_inside_only_if_every_edge_is() {
+        let visible = (0.0, 84.0, 1512.0, 865.0);
+        assert!(wholly_inside((496.0, 100.0, 520.0, 700.0), visible));
+        assert!(wholly_inside(visible, visible));
+        for frame in [
+            (496.0, 83.5, 520.0, 700.0),   // below the visible frame
+            (496.0, 100.0, 520.0, 850.0),  // its top above the menu bar
+            (-0.5, 100.0, 520.0, 700.0),   // off the left
+            (1000.0, 100.0, 520.0, 700.0), // off the right
+        ] {
+            assert!(!wholly_inside(frame, visible), "{frame:?}");
+        }
+    }
+
+    /// A frame that was not read properly is not inside.
+    #[test]
+    fn a_frame_that_was_not_read_is_not_inside() {
+        let visible = (0.0, 84.0, 1512.0, 865.0);
+        for frame in [
+            (f64::NAN, 100.0, 520.0, 700.0),
+            (496.0, f64::INFINITY, 520.0, 700.0),
+            (496.0, 100.0, 0.0, 700.0),
+            (496.0, 100.0, 520.0, -1.0),
+        ] {
+            assert!(!wholly_inside(frame, visible), "{frame:?}");
+        }
+        assert!(!wholly_inside(
+            (0.0, 0.0, 10.0, 10.0),
+            (0.0, 0.0, f64::NAN, 865.0)
+        ));
+        assert!(!wholly_inside((0.0, 0.0, 10.0, 10.0), (0.0, 0.0, 0.0, 0.0)));
     }
 
     /// Only the second button approves; the first, the close box and anything

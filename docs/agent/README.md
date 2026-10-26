@@ -3531,7 +3531,7 @@ voucher window, and a detail whose marks moved between them is refused as
 `voucher_window_changed_during_read` (a voucher entered or saved, a ledger renamed, or a report
 that raises a mark; an export raised the voucher mark by 3 once): the bills, the ledger catalogue
 and the vouchers are tied by the party's spelling, so a rename between those reads would have
-tied different ledgers. It costs two small reads (the window reads no marks of its own),
+tied different ledgers. It reads the marks twice and the window reads none of its own, so it costs one marks read more than before,
 and any edit in Tally during the call refuses it, so run it again once. A change that moves
 neither mark is not seen: one letter-case-only rename of a ledger moved neither (reference,
 the walk-in ledger's spelling), so that rename can still answer as a finding. Allocations that net

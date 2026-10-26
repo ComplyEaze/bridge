@@ -222,6 +222,49 @@ fn duplicate_or_wrongly_nested_status_and_counters_are_rejected() {
 }
 
 #[test]
+fn each_shape_refusal_holds_on_an_otherwise_clean_response() {
+    // Each refused response below is a clean one with exactly one defect added, so the
+    // refusal can only come from the rule that defect breaks.
+    const COUNTERS: &str = "<CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS>";
+    const HEADER: &str = "<HEADER><STATUS>1</STATUS></HEADER>";
+    let response = format!("<RESPONSE>{COUNTERS}</RESPONSE>");
+    let body = format!("<BODY><DATA><IMPORTRESULT>{COUNTERS}</IMPORTRESULT></DATA></BODY>");
+    let envelope = format!("<ENVELOPE>{HEADER}{body}</ENVELOPE>");
+    for clean in [&response, &envelope] {
+        let outcome = parse_import_outcome(clean).expect("the clean base parses");
+        assert!(outcome.counters().is_clean_success_for(1, 0, 0));
+    }
+
+    for (defect, xml) in [
+        (
+            "a second root element",
+            format!("{response}<RESPONSE></RESPONSE>"),
+        ),
+        (
+            "BODY before HEADER",
+            format!("<ENVELOPE>{body}{HEADER}</ENVELOPE>"),
+        ),
+        (
+            "an extra ENVELOPE child between HEADER and BODY",
+            format!("<ENVELOPE>{HEADER}<EXTRA></EXTRA>{body}</ENVELOPE>"),
+        ),
+        (
+            "an extra ENVELOPE child after BODY",
+            format!("<ENVELOPE>{HEADER}{body}<EXTRA></EXTRA></ENVELOPE>"),
+        ),
+        (
+            "an undocumented result field",
+            format!("<RESPONSE>{COUNTERS}<UNDOCUMENTED>1</UNDOCUMENTED></RESPONSE>"),
+        ),
+    ] {
+        assert!(
+            parse_import_outcome(&xml).is_err(),
+            "{defect} must refuse the response"
+        );
+    }
+}
+
+#[test]
 fn exact_envelope_import_result_path_is_accepted() {
     let xml = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>";
     let evidence = parse_import_evidence(xml).unwrap();

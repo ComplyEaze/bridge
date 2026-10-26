@@ -17,10 +17,10 @@ on:
     inputs:
       mode:
         # full: every mutation against the full suite (finds new killers). proof: each
-        # mutation with a killed record runs its recorded killers first, and the full suite
-        # only when they do not kill it; a kill is still a kill on this exact tree, after the
-        # full suite passed unmutated on it, which is all a pull request's records need.
-        # Master's runs are always full.
+        # mutation with a committed killed record runs those killers first, and the full suite
+        # only when they do not kill it; every kill is still seen on this exact tree, after the
+        # full suite passed unmutated on it, which is all a pull request's records need, and
+        # every other verdict comes from the full suite. Master's runs are always full.
         description: "full, or proof (a pull request head's records)"
         type: choice
         options: [full, proof]
@@ -37,8 +37,7 @@ concurrency:
   # queue: max keeps up to 100 waiting runs, roughly first in, first out; the
   # default keeps only the newest, so a second branch's dispatch silently
   # cancelled the first's.
-  # A proof run has a group of its own, so it does not wait behind master's full run.
-  group: tax-audit-mutations-${{ (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/master' && inputs.mode == 'proof') && 'proof' || 'nightly' }}
+  group: tax-audit-mutations-nightly
   cancel-in-progress: false
   queue: max
 
@@ -77,8 +76,12 @@ jobs:
           MODE: ${{ (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/master' && inputs.mode == 'proof') && 'proof' || 'full' }}
         run: |
           set +e
+          # A proof run reads the committed records for their killer lists only; its shard's own
+          # results file starts empty, so nothing old is counted as run.
           full=(--full)
-          if [ "$MODE" = "proof" ]; then full=(); fi
+          if [ "$MODE" = "proof" ]; then
+            full=(--killers-from src-tauri/crates/bridge-tax-audit/parity/mutation-results.json)
+          fi
           echo "mode: $MODE"
           node src-tauri/crates/bridge-tax-audit/parity/mutations.mjs \
             "${full[@]}" --jobs 2 --shard "${{ matrix.shard }}/8" \

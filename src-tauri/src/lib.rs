@@ -535,3 +535,6 @@ mod client_preference_mount_tests;
 
 #[cfg(test)]
 mod hand_entry_texts_tests;
+
+#[cfg(test)]
+mod failure_code_sites_tests;

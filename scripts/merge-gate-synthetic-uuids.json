@@ -44,6 +44,10 @@
     {
       "uuid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
       "note": "company identifier of the synthetic lab company BRIDGE PILOT LAB: src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md on master (added in 16b934397e28976b3e4ec0ed4a460123dd4d9e95) names the company beside this GUID, and the pilot-lab captures in that folder carry it"
+    },
+    {
+      "uuid": "9b5b6d54-4cdb-4b90-9600-cab45ee70c3a",
+      "note": "company identifier of the synthetic lab company BRIDGE HANDIMPORT LAB, a book created on Tally's screen for a lab item on 26 Oct 2026; the live captures read from it carry this value, and the identifiers of its groups, ledgers and vouchers carry it as a prefix"
     }
   ]
 }

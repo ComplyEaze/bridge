@@ -1,0 +1,33 @@
+# W1 (#1050, #1814): a restore once seen keeps a re-keyed post from reading posted_verified (v2, 27 Oct 2026)
+
+Not for merge. This file replaces the W1 section of `SHEET.md` in this folder; that file's "Rules for every row" apply, and so do these additions:
+- A `verify_import` EXPECT is met only by a result, never by a refusal. Any refusal (`voucher_mark_contradiction`, `import_verification_conflict_retry`, `import_batch_not_found`, `import_post_endpoint_mismatch` or another) = record it whole and STOP.
+- MARKS means `ledger_masters` with `company_guid`, first page, no `snapshot_id`: V = `result.snapshot.voucher_alter_id`; EXPECT `result.snapshot.reused` false; a null mark = STOP. `tally_status` carries no marks on these builds and is not used for them.
+- A post: `post_import` {company_guid, batch_id}; the owner answers the window by mouse; nobody types anywhere on the PC while the call is open. If `result.approval.state` reads `pending`, call `post_import` again with the same batch after `result.approval.retry_after_s` seconds; if it reads `approved` with nothing sent, call once more at once; never call again after a send, never rebuild.
+
+**WHY.** Decides that the 12 Oct finding (a voucher keyed again by hand after a restore read `posted_verified`) no longer reproduces on a build with #1814 (`631b9386`).
+
+**BUILD.** The 0.6.1 cut build if it exists by the sitting (the blocking rows' build line), else master `fd6f7c0d032ec51f9d9de9c80e8bcd33d930ad77` (run 40362694215, artifact 12668144368, `bridge_mcp.exe` sha256 `63641231787492201133443cb1a887705c7137f495a9205ffd33c2d0068f7484`). Both hold #1814, #1853 and #1920; the files this row exercises are byte-identical between fd6f7c0d and 609776ae. Record which build ran and its exe hash at the start, before step 9's restart and at the end; another hash = STOP. Over stdio; posting ON set by the owner; `BRIDGE_TERMS_ACCEPTED=true`; `BRIDGE_AGENT_ENABLE_BATCH_POST` absent; `BRIDGE_AGENT_MAX_BYTES` and `BRIDGE_AGENT_REDACTION` unset; ONE new empty `BRIDGE_AGENT_DATA_DIR` kept for the whole row, step 9's restart included.
+
+**COMPANY.** BRIDGE TRANSFER PAIR LAB (company number 100066 on 15 Oct), loaded alone: ledgers TLab Bank A and TLab Suspense, and its seed Journal of 1 Apr 2026, so V0 is a number and V3 = V0 can be checked (on these builds a mark omitted twice is read as 0 and recorded unless the same check's window read saw one, #1819). Its GUID is not in the merge gate's synthetic-UUID registry: before any evidence holding it goes to a pull request, it is registered there with its provenance. Day D is 20 Aug 2026.
+
+**BACKUP.** BK0 into a NEW empty folder before step 1 (name, size, sha256). Before each restore (steps 3 and 10), hash BK0 again: another sha256 = STOP.
+
+## Steps
+0. `list_companies`: EXPECT exactly BRIDGE TRANSFER PAIR LAB; record its GUID; STOP otherwise. MARKS: V0. `vouchers` for day D: EXPECT none.
+1. `build_import_xml`: batch P1, one Receipt dated D, 1.00, Dr TLab Bank A, Cr TLab Suspense, narration "W1 P1". Post P1. `verify_import` {company_guid, batch_id P1}: EXPECT `result.verification_status` `posted_verified`, `result.post_span_binding.state` `bound`. MARKS: V1 = V0 + 1.
+2. The same for batch P2, one Receipt dated D, 2.00, narration "W1 P2": EXPECT `posted_verified`; MARKS: V2 = V0 + 2. `vouchers` for day D: record both (MasterID, AlterID, GUID, number).
+3. OWNER STEP, on the coordinator's word: restore BK0 by Tally's own Restore (hash check first). `list_companies`: EXPECT exactly BRIDGE TRANSFER PAIR LAB with the step-0 GUID; STOP otherwise. MARKS: V3; EXPECT V3 = V0; STOP otherwise.
+4. Hash `agent-import-ledger.jsonl` in the data folder; count its records whose `status` is `rollback_seen` with a JSON parser: EXPECT 0.
+5. `verify_import` {company_guid, batch_id P2}. EXPECT a result with `result.verification_status` `verification_incomplete`; `result.post_span_binding.state` `book_rolled_back` with `current_mark` V0 and `expected_at_least` V0 + 2; `rollback_recorded` true; `other_batches_covered` with `count` 1 and `first` naming P1's batch id; `result.unverified_vouchers[0].status` `book_rolled_back`. Journal: exactly one `rollback_seen` record, on P2's batch id.
+6. OWNER STEP: key K1 by hand in Tally: a Receipt on day D with P1's content (same ledgers, 1.00, narration "W1 P1"). MARKS: V4 = V3 + 1. `vouchers` for day D: record K1 (MasterID, AlterID, GUID, number) and whether its GUID and MasterID equal P1's from step 2. If either differs, step 7 cannot tell a build without #1814 from one with it (an older build would read `bound_not_in_window`, not `posted_verified`): the row still runs and its PASS is reported as "not discriminating".
+7. `verify_import` {company_guid, batch_id P1}. EXPECT a result with `result.verification_status` `verification_incomplete`; `result.post_span_binding` with `state` `book_rolled_back`, `mark_read` V0 and `seen_by` P2's batch id, and no `rollback_recorded` key; `result.post_span_binding.summary` beginning "The company's books were restored from a backup, or replaced by another copy, after this post"; `result.unverified_vouchers[0].status` either `matching_content_observed` (K1 found by its content) or `book_rolled_back` (not found): record which. Journal: still exactly one `rollback_seen` record.
+8. `verify_import` P1 again: EXPECT the same as step 7, and no second `rollback_seen` record.
+9. RESTART. The lab script ends the Bridge process and confirms it exited; hashes `agent-import-ledger.jsonl`; starts the same exe (same sha256) with the same environment (the same data folder, Tally host and port, posting ON) and initializes again. EXPECT the journal hash unchanged. `verify_import` P1: EXPECT the same as step 7.
+10. OWNER STEP, on the coordinator's word: restore BK0 (hash check first). `list_companies` as step 3. MARKS: EXPECT V0. `vouchers` for day D: EXPECT none (P1, P2 and K1 gone).
+
+**PASS** = steps 5, 7, 8 and 9 as above (with "not discriminating" added when step 6 says so). **FAIL** (a finding) = step 7, 8 or 9 reads `posted_verified`; step 5 records nothing although V3 was a number; a second `rollback_seen` record. **STOP** on any refusal, a mark that moves outside the steps that change it, or anything the rules above name.
+
+**Writes:** two native posts and one voucher keyed by hand, all removed at step 10.
+
+**Evidence** on a new branch `lab/w1-1814-restore-answers` with its own `SHA256.txt`, after the pre-push scan and the coordinator's yes: every answer whole with its sha256, the journal hashes and `rollback_seen` counts at steps 4, 5, 7, 8 and 9, BK0's name, size and sha256, the exe hashes, a notes file with UTC times. A pull request that later cites the company GUID registers it first (see COMPANY).

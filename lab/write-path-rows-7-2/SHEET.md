@@ -23,7 +23,7 @@ never REGISTER LAB.
 
 | row | needs a build that contains | why |
 |---|---|---|
-| W1 | master at or after `631b9386` (#1814) | the restore record; an older build reads `posted_verified` at step 7, which is the wrong build, not a failure |
+| W1 | master at or after `631b9386` (#1814) | the restore record; see `W1-1814-RESTORE-REMEMBERED.md` step 6 for when step 7 tells the builds apart |
 | W2 | #1650's head (`289fcd15` or later, which contains #1545) | the ledger tools exist only there |
 | W3 | #1714's head (`5772eb15` or later) | the send-time transfer check exists only there |
 
@@ -32,6 +32,8 @@ posting on (owner types it); for W2 also `BRIDGE_AGENT_ENABLE_MASTER_WRITES` on;
 absent. A fresh data folder for each row.
 
 ## W1. A restore once seen keeps a re-keyed post from reading posted_verified (#1050, #1814)
+
+SUPERSEDED (27 Oct 2026) by `W1-1814-RESTORE-REMEMBERED.md` in this folder, which reads the marks, the fields and the restart as the tools give them. Run that file, not the steps below.
 
 Decides that the 12 Oct finding (a voucher keyed again by hand after a restore read `posted_verified`) no longer
 reproduces. Company: BRIDGE TRANSFER PAIR LAB, loaded alone (ledgers TLab Bank A and TLab Suspense; at least one

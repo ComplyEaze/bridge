@@ -44,6 +44,50 @@
     {
       "uuid": "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
       "note": "company identifier of the synthetic lab company BRIDGE PILOT LAB: src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md on master (added in 16b934397e28976b3e4ec0ed4a460123dd4d9e95) names the company beside this GUID, and the pilot-lab captures in that folder carry it"
+    },
+    {
+      "uuid": "d6e4c24f-8c7a-4797-93ec-e44bdff60bc9",
+      "note": "company identifier of the synthetic lab company BRIDGE TRANSFER LAB, as Tally returned it in a read-only capture (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml; its vouchers' identifiers carry it as a prefix"
+    },
+    {
+      "uuid": "033b772c-c429-408f-ad10-3d55425c932b",
+      "note": "identifier Tally gave one bank allocation (its NAME) of a voucher of the synthetic lab company BRIDGE TRANSFER LAB, in the same read-only capture of the synthetic lab company BRIDGE TRANSFER LAB (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
+    },
+    {
+      "uuid": "4e2fe023-d72e-477d-a826-63653a832e1d",
+      "note": "identifier Tally gave one bank allocation (its NAME) of a voucher of the synthetic lab company BRIDGE TRANSFER LAB, in the same read-only capture of the synthetic lab company BRIDGE TRANSFER LAB (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
+    },
+    {
+      "uuid": "571fe3f7-fd19-4349-89c3-312a80077742",
+      "note": "identifier Tally gave one bank allocation (its NAME) of a voucher of the synthetic lab company BRIDGE TRANSFER LAB, in the same read-only capture of the synthetic lab company BRIDGE TRANSFER LAB (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
+    },
+    {
+      "uuid": "5900c749-48b9-4ab7-8a4a-19917ffc31a1",
+      "note": "identifier Tally gave one bank allocation (its NAME) of a voucher of the synthetic lab company BRIDGE TRANSFER LAB, in the same read-only capture of the synthetic lab company BRIDGE TRANSFER LAB (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
+    },
+    {
+      "uuid": "9798f2cb-bd81-45cd-a7f1-cf1faa0cacc7",
+      "note": "identifier Tally gave one bank allocation (its NAME) of a voucher of the synthetic lab company BRIDGE TRANSFER LAB, in the same read-only capture of the synthetic lab company BRIDGE TRANSFER LAB (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
+    },
+    {
+      "uuid": "ad4d7793-89aa-423b-a766-14be8427a441",
+      "note": "identifier Tally gave one bank allocation (its NAME) of a voucher of the synthetic lab company BRIDGE TRANSFER LAB, in the same read-only capture of the synthetic lab company BRIDGE TRANSFER LAB (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
+    },
+    {
+      "uuid": "c169825f-e46b-4886-a56a-33fd3b966aa8",
+      "note": "identifier Tally gave one bank allocation (its NAME) of a voucher of the synthetic lab company BRIDGE TRANSFER LAB, in the same read-only capture of the synthetic lab company BRIDGE TRANSFER LAB (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
+    },
+    {
+      "uuid": "c293e31f-17a7-4ecd-8086-b2292a5b3e19",
+      "note": "identifier Tally gave one bank allocation (its NAME) of a voucher of the synthetic lab company BRIDGE TRANSFER LAB, in the same read-only capture of the synthetic lab company BRIDGE TRANSFER LAB (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
+    },
+    {
+      "uuid": "ec5b0edd-1da3-4c7a-bb0d-b9679f877bae",
+      "note": "identifier Tally gave one bank allocation (its NAME) of a voucher of the synthetic lab company BRIDGE TRANSFER LAB, in the same read-only capture of the synthetic lab company BRIDGE TRANSFER LAB (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
+    },
+    {
+      "uuid": "ef83624c-3c8e-4c76-8779-9e86359ec2a3",
+      "note": "identifier Tally gave one bank allocation (its NAME) of a voucher of the synthetic lab company BRIDGE TRANSFER LAB, in the same read-only capture of the synthetic lab company BRIDGE TRANSFER LAB (TallyPrime 7.1 Silver, licensed, 12 October 2026), lab branch lab/transfer-1392-requests at f0250cb9830f6ab413dec30153f00fb88b41198f (answers-1392-h/h-contra.response), committed as voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
     }
   ]
 }

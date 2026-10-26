@@ -1,0 +1,2 @@
+src-tauri/src/tally/mac_fit.rs
+reviewer: lamemustafa

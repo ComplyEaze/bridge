@@ -47,6 +47,17 @@
 //! on a screen it does not fit), and that a person who uses Full Keyboard
 //! Access can still approve (the approving button refuses first responder, so
 //! Tab and Space do not reach it; the mouse does).
+//!
+//! Standing. At its first check the timer raises the window once if it is not
+//! the key window (`makeKeyAndOrderFront`, and the cooperative `activate` on a
+//! macOS that has it), so Return and Escape reach Cancel; it is never raised
+//! again, and the stderr line names whether the window was key and the app
+//! active at the first and the last check, and whether the raise was made.
+//! `raised` records that the raise was attempted, not that it worked: `key last`
+//! says whether the window ended up key. The check made in the tick that raised
+//! the window does not count towards an approval, so an answer needs a later
+//! check. Nothing else changes: the buttons, the default and the response that
+//! approves are as before.
 #![cfg_attr(all(not(target_os = "macos"), not(test)), allow(dead_code))]
 
 /// What the measurement of one alert came to.
@@ -96,6 +107,37 @@ pub(crate) fn measured_on_any(alert: Option<Size>, visibles: &[Size]) -> Measure
     result
 }
 
+/// What the timer has seen of the alert's standing: whether its window was the
+/// key window and the app active at the first check and at the latest, and
+/// whether the one raise was made. Read only for the diagnostic line.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Standing {
+    key_first: Option<bool>,
+    active_first: Option<bool>,
+    key_last: Option<bool>,
+    active_last: Option<bool>,
+    raised: bool,
+}
+
+/// One check of the alert's standing. Returns the standing afterwards and
+/// whether to raise the window now: only at the first check, and only if it is
+/// not the key window, so a person who moves to another window afterwards is
+/// not pulled back (the Windows box is raised once for the same reason).
+pub(crate) fn observe(before: Standing, key: bool, active: bool) -> (Standing, bool) {
+    let first = before.key_first.is_none();
+    let raise = first && !key && !before.raised;
+    (
+        Standing {
+            key_first: before.key_first.or(Some(key)),
+            active_first: before.active_first.or(Some(active)),
+            key_last: Some(key),
+            active_last: Some(active),
+            raised: before.raised || raise,
+        },
+        raise,
+    )
+}
+
 /// A rectangle in points, `(x, y, width, height)`, as `NSWindow.frame` and
 /// `NSScreen.visibleFrame` give them (the origin is the lower left).
 pub(crate) type Frame = (f64, f64, f64, f64);
@@ -133,7 +175,8 @@ pub(crate) fn approves(response: isize) -> bool {
 #[cfg(target_os = "macos")]
 pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     use block2::RcBlock;
-    use objc2::MainThreadMarker;
+    use objc2::runtime::NSObjectProtocol;
+    use objc2::{sel, MainThreadMarker};
     use objc2_app_kit::{
         NSAlert, NSAlertStyle, NSApplication, NSApplicationActivationPolicy,
         NSModalPanelRunLoopMode, NSScreen,
@@ -193,11 +236,25 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     // be read, ends the run loop and the process, whatever was clicked.
     let missed = Rc::new(Cell::new(None::<i32>));
     let checked = Rc::new(Cell::new(0_u32));
+    let standing = Rc::new(Cell::new(Standing::default()));
     let check = {
         let window = window.clone();
         let missed = Rc::clone(&missed);
         let checked = Rc::clone(&checked);
+        let standing = Rc::clone(&standing);
         RcBlock::new(move |_timer: NonNull<NSTimer>| {
+            // A window that is not key takes no key press, so Return and
+            // Escape would not reach Cancel: raised once, at the first check.
+            let app = NSApplication::sharedApplication(mtm);
+            let (next, raise) = observe(standing.get(), window.isKeyWindow(), app.isActive());
+            standing.set(next);
+            if raise {
+                window.makeKeyAndOrderFront(None);
+                // cooperative activation: macOS 14 and later only
+                if app.respondsToSelector(sel!(activate)) {
+                    app.activate();
+                }
+            }
             let placed = window.screen().map(|screen| {
                 let f = window.frame();
                 let v = screen.visibleFrame();
@@ -208,7 +265,11 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
             });
             let exit = match placed {
                 Some(true) => {
-                    checked.set(checked.get().saturating_add(1));
+                    // The check of the tick that raised the window does not
+                    // count: an approval needs a check made after the raise.
+                    if !raise {
+                        checked.set(checked.get().saturating_add(1));
+                    }
                     return;
                 }
                 Some(false) => super::box_fit::DOES_NOT_FIT_EXIT,
@@ -232,6 +293,16 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     app.activateIgnoringOtherApps(true);
     let response = alert.runModal();
     timer.invalidate();
+    let seen = standing.get();
+    let _ = writeln!(
+        std::io::stderr(),
+        "box-fit: key first={:?} last={:?} active first={:?} last={:?} raised={}",
+        seen.key_first,
+        seen.key_last,
+        seen.active_first,
+        seen.active_last,
+        seen.raised
+    );
     if let Some(exit) = missed.get() {
         std::process::exit(exit);
     }
@@ -367,6 +438,31 @@ mod tests {
             measured_on_any(Some((520.0, 934.0)), &[(0.0, 0.0), (1280.0, 700.0)]),
             Measured::DoesNotFit
         );
+    }
+
+    /// The alert is raised at the first check if it is not the key window, and
+    /// never again, whatever the later checks see.
+    #[test]
+    fn the_window_is_raised_once_at_the_first_check_and_only_if_it_is_not_key() {
+        // not key at the first check: raise, once
+        let (first, raise) = observe(Standing::default(), false, false);
+        assert!(raise && first.raised);
+        assert_eq!(first.key_first, Some(false));
+        assert_eq!(first.active_first, Some(false));
+        let (second, raise) = observe(first, false, false);
+        assert!(!raise, "no second raise");
+        let (third, raise) = observe(second, true, true);
+        assert!(!raise);
+        // the first values are kept, the last ones follow
+        assert_eq!(third.key_first, Some(false));
+        assert_eq!(third.key_last, Some(true));
+        assert_eq!(third.active_last, Some(true));
+        // key already at the first check: never raised
+        let (key, raise) = observe(Standing::default(), true, true);
+        assert!(!raise && !key.raised);
+        let (later, raise) = observe(key, false, false);
+        assert!(!raise, "a window that lost key later is not pulled back");
+        assert!(!later.raised);
     }
 
     /// An alert is wholly inside the visible frame, with no slack either way.

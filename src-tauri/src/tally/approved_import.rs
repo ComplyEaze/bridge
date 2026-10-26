@@ -607,8 +607,8 @@ pub(crate) enum UnderLockRefusal {
     #[error("import_txn_already_posted")]
     TxnAlreadyPosted,
     /// The aim snapshot did not yield the target's voucher mark to record with
-    /// the intent. The aim check before it requires exactly one target row, so
-    /// this should not fire; if it does, no dispatch intent is recorded and
+    /// the intent: its target row omits the mark (#1945), or the company's GUID
+    /// is on more than one loaded row. No dispatch intent is recorded and
     /// nothing is sent.
     #[error("post_mark_unrecorded")]
     MarkUnrecorded,

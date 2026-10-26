@@ -549,6 +549,8 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
     #[cfg(feature = "lab-writes")]
     names.push("lab_read_purchase_identity");
     #[cfg(feature = "lab-writes")]
+    names.push("lab_voucher_key_probe");
+    #[cfg(feature = "lab-writes")]
     names.push("lab_import_masters");
     #[cfg(feature = "lab-writes")]
     names.push("lab_import_vouchers");
@@ -575,6 +577,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     name,
                     &"lab_read_inventory"
                         | &"lab_read_purchase_identity"
+                        | &"lab_voucher_key_probe"
                         | &"lab_import_masters"
                         | &"lab_import_vouchers"
                 ) || lab_tools_env_enabled()
@@ -745,6 +748,11 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         "LAB-ONLY (#1904). Compiled only behind the `lab-writes` feature and refuses unless BRIDGE_LAB_WRITES=1, BRIDGE_TALLY_PORT=9001, and BRIDGE_LAB_TARGET_GUID is set to a well-formed GUID (the deny list applies only to a lab write batch). A read: company_guid selects and verifies the company as any read does. For one date window it sends the voucher read `vouchers` sends when it filters by type, and the candidate narrow read a check for a supplier invoice already in the books would send (the same window and class fields; only the entry fields and the bill allocations are fetched), parses both with the same parser and returns each read's rows and characters per row, and every difference by voucher GUID and field name (at most 100 listed; the values stay in the exchange the lab keeps). The window is at most 31 days (lab_identity_window_too_wide otherwise, before any request). Only the fields the parser keeps are compared (the voucher's own fields, each entry's ledger, amount and side, and its bill allocations); sizes are the decoded answer's characters per row. No differences means the narrow read returned those fields of every voucher as the agent read did on this book and window, nothing more; two empty reads are reported inconclusive, and a narrow answer the parser refuses is reported with its code beside the agent read's size. Writes nothing.",
                         json!({"type":"object","additionalProperties":false,"required":["company_guid","from","to"],"properties":{"company_guid":{"type":"string","minLength":1},"from":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"to":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"}}}),
                     ),
+
+                    "lab_voucher_key_probe" => (
+                        "LAB-ONLY (#685). Compiled only behind the `lab-writes` feature and refuses unless BRIDGE_LAB_WRITES=1, BRIDGE_TALLY_PORT=9001, and BRIDGE_LAB_TARGET_GUID is set to a well-formed GUID (and BRIDGE_LAB_DENY_GUIDS, unless the target is the only company loaded). A read of the lab target company only (company_guid must be BRIDGE_LAB_TARGET_GUID, else lab_probe_company_not_target), verified like any other read. Reads one day's vouchers whose GUID (term guid) or $RemoteID (term remote_id) equals key, and returns each voucher's GUID, MasterID, ALTERID, date, voucher type, cancelled and optional flags, and the voucher's $RemoteID as Tally computes it, with whether that equals the key or the voucher's own GUID. Only a row with a GUID counts as a voucher (vouchers_with_guid); rows without one are counted apart (rows_without_guid). key is a lowercase UUID, optionally followed by a hyphen and eight hex digits; anything else is refused (lab_probe_key_invalid). It asks whether a voucher's $RemoteID holds the REMOTEID a native post sent, which no read has returned so far: every answer is exploratory, not a qualified claim.",
+                        json!({"type":"object","additionalProperties":false,"required":["company_guid","date","term","key"],"properties":{"company_guid":{"type":"string","minLength":1,"description":"The company to read, from list_companies."},"date":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$","description":"The one day whose vouchers are read."},"term":{"type":"string","enum":["guid","remote_id"],"description":"The voucher method compared with key: guid (the control) or remote_id."},"key":{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(-[0-9a-f]{8})?$","description":"A lowercase UUID, or a voucher GUID (a UUID, a hyphen and eight hex digits)."}}}),
+                    ),
                     _ => (
                         "ComplyEaze Bridge read-only Tally tool",
                         json!({"type":"object", "additionalProperties": false}),
@@ -768,7 +776,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                 if let Some(effect) = effect {
                     tool["annotations"] = effect.annotations();
                 }
-                if matches!(name, "lab_read_inventory" | "lab_read_purchase_identity") {
+                if matches!(name, "lab_read_inventory" | "lab_read_purchase_identity" | "lab_voucher_key_probe") {
                     tool["annotations"] = json!({"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true});
                 }
                 if matches!(name, "lab_import_masters" | "lab_import_vouchers") {

@@ -2609,6 +2609,7 @@ impl Server {
             name,
             "lab_read_inventory"
                 | "lab_read_purchase_identity"
+                | "lab_voucher_key_probe"
                 | "lab_import_masters"
                 | "lab_import_vouchers"
         ) {
@@ -2679,6 +2680,8 @@ impl Server {
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
             #[cfg(feature = "lab-writes")]
             "lab_read_purchase_identity" => lab::lab_read_purchase_identity(self, args).await,
+            #[cfg(feature = "lab-writes")]
+            "lab_voucher_key_probe" => lab::lab_voucher_key_probe(self, args).await,
             #[cfg(feature = "lab-writes")]
             "lab_import_masters" => lab::lab_import_masters(self, args).await,
             #[cfg(feature = "lab-writes")]

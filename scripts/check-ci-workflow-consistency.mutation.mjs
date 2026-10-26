@@ -321,3 +321,15 @@ test("native shards: the Windows prerequisites cache saved by both shards (the s
 test("native shards: both shards uploading one artifact name (a name without the shard) is refused", () => {
   refused(withChange(CI_FILE, (text) => text.replace("          name: native-crash-binaries-macos-shard-${{ matrix.shard }}", "          name: native-crash-binaries-macos")), "native: the pinned shard line must appear exactly once: name: native-crash-binaries-macos-shard-${{ matrix.shard }}");
 });
+
+// The nightly records run must not hold eight of the account's twenty runner slots at once.
+for (const [name, replacement] of [
+  ["the limit removed", ""],
+  ["the limit raised to eight", "      max-parallel: 8\n"],
+]) {
+  test(`mutation shards: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/tax-audit-mutations-nightly.yml", (text) => text.replace("      max-parallel: 4\n", replacement)),
+      "the mutation shards must run four at a time");
+  });
+}
+

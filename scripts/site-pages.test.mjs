@@ -368,12 +368,13 @@ test("the home page carries an at-a-glance block for the manifest's release, wit
   for (const needle of ["You can ask", "Partly, with limits", `Not in release ${version}`, "GSTR-2B", "AI provider", "Check any figure you rely on against Tally"]) {
     assert.ok(text.includes(needle), `the home page's at-a-glance block lacks "${needle}"`);
   }
+  assert.ok(!/itself has not been run by us/.test(html), "the home page still says the published package was never run against a live TallyPrime, which #1780 contradicts");
   // the limits the Download page puts on the same claims go with them, so the home page cannot say more than that page
   const squash = (value) => value.replace(/\s+/g, " ");
   const download = squash(visibleText(region(read("download.html"), 'id="at-a-glance"', "</section>")));
   const home = squash(text);
   for (const needle of ["synthetic book", "not tied to the vouchers", "ties to the trial balance", "none has been tried yet", "Funds Flow", "several currencies",
-    "cannot build onto a Cash-in-Hand ledger", "has not yet been run on a real bank statement", "we have not yet run the published 0.6.0 file against TallyPrime"]) {
+    "cannot build onto a Cash-in-Hand ledger", "has not yet been run on a real bank statement", "our one recorded run of the published 0.6.0 file"]) {
     assert.ok(home.includes(needle), `the home page's at-a-glance block lacks "${needle}"`);
     assert.ok(download.includes(needle), `the Download page's at-a-glance block lacks "${needle}", which the home page's block carries`);
   }

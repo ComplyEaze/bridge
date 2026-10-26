@@ -700,10 +700,16 @@ async fn a_payment_and_receipt_batch_builds_against_the_captured_masters() {
             "report":"docs/tally/TALLY_PROTOCOL_REFERENCE.md",
             "voucher_types":["Payment","Receipt"]}])
     );
+    // Posting is off here and the batch is one the setting would admit, so the
+    // user is told of the setting first and the file route follows.
     assert!(result["next_step"]
         .as_str()
         .unwrap()
-        .starts_with("Confirm the loaded company matches this batch"));
+        .starts_with("Tell the user that this connection cannot post."));
+    assert!(result["next_step"]
+        .as_str()
+        .unwrap()
+        .contains("Until then: confirm the loaded company matches this batch"));
     // Its first verification is what a later amendment compares against
     // (#239), so the manual import step asks for it at once.
     assert!(result["next_step"]
@@ -3460,7 +3466,7 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
         .import_journal_while_admitted()
         .unwrap()
         .expect("a journal");
-    let found = ledger::transfer_facts(journal, no_skip_file(), CAPTURED_GUID, None).unwrap();
+    let found = ledger::transfer_facts(journal, no_skip_file(), CAPTURED_GUID, None, None).unwrap();
     let [skip, outflow] = &found.skips[..] else {
         panic!("two skips: {found:?}");
     };
@@ -3693,6 +3699,7 @@ async fn a_statement_of_only_skipped_rows_is_recorded_and_builds_nothing() {
         no_skip_file(),
         std::io::BufReader::new(text.as_bytes()),
         CAPTURED_GUID,
+        None,
         None,
     )
     .unwrap();

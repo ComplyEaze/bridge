@@ -10,6 +10,15 @@ use crate::reports::party_ledger_master::{
 };
 use bridge_tally_protocol::{PartyLedgerMasterFieldObservation, PartyLedgerMasterFields};
 
+fn render_with(
+    workbook: &crate::reports::party_ledger_master::PartyLedgerMasterWorkbook,
+    decisions: &[crate::reports::schedule_iii::Decision],
+) -> Result<Vec<u8>, PartyLedgerMasterXlsxError> {
+    let set = crate::reports::schedule_iii::DecisionSet::for_tests(workbook, decisions.to_vec())
+        .expect("a valid synthetic decision set");
+    render_party_ledger_master_xlsx(workbook, DecisionInput::Read(&set))
+}
+
 fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
     PartyLedgerMasterSource {
         company: "Synthetic Books".to_string(),
@@ -48,7 +57,7 @@ fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
 #[test]
 fn three_decimal_currency_renders_1234_without_a_two_decimal_format() {
     let workbook = build_party_ledger_master_workbook(source_with_precision(3)).unwrap();
-    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let bytes = render_with(&workbook, &[]).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut sheet = String::new();
     std::io::Read::read_to_string(
@@ -114,7 +123,7 @@ fn renders_evidence_currency_and_returned_fields_in_the_workbook() {
         count_cross_check: None,
     })
     .unwrap();
-    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let bytes = render_with(&workbook, &[]).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut text = String::new();
     for name in [
@@ -183,7 +192,7 @@ fn normally_signed_sundry_debtor_renders_as_a_group_subtotal_not_trade_receivabl
     })
     .unwrap();
 
-    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let bytes = render_with(&workbook, &[]).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut text = String::new();
     for name in [
@@ -248,7 +257,7 @@ fn gstin_not_observed_is_labeled_while_an_explicit_empty_gstin_is_not() {
         count_cross_check: None,
     })
     .unwrap();
-    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let bytes = render_with(&workbook, &[]).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut sheet = String::new();
     std::io::Read::read_to_string(
@@ -314,7 +323,7 @@ fn worksheet_with_parent(parent: PartyLedgerMasterFieldObservation) -> (String, 
         count_cross_check: None,
     })
     .unwrap();
-    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let bytes = render_with(&workbook, &[]).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut sheet = String::new();
     std::io::Read::read_to_string(
@@ -375,8 +384,8 @@ fn explicitly_empty_parent_renders_an_empty_group_cell() {
 #[test]
 fn decided_heads_their_basis_and_a_stale_decision_reach_the_group_subtotal_sheet() {
     use crate::reports::schedule_iii::{
-        DecisionId, Derivation, DerivedOutcome, FinancialYear, GroupSubtotalKind, LedgerGuid,
-        ScheduleIIIHead,
+        Decision, DecisionId, Derivation, DerivedOutcome, FinancialYear, GroupSubtotalKind,
+        LedgerGuid, ScheduleIIIHead,
     };
     let ledger = |name: &str, guid: &str, balance: &str| PartyLedgerMasterRow {
         name: name.to_string(),
@@ -426,7 +435,7 @@ fn decided_heads_their_basis_and_a_stale_decision_reach_the_group_subtotal_sheet
         ),
     ];
 
-    let bytes = render_party_ledger_master_xlsx(&workbook, &decisions).unwrap();
+    let bytes = render_with(&workbook, &decisions).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut text = String::new();
     for name in ["xl/worksheets/sheet2.xml", "xl/sharedStrings.xml"] {
@@ -448,8 +457,8 @@ fn decided_heads_their_basis_and_a_stale_decision_reach_the_group_subtotal_sheet
 #[test]
 fn a_renamed_ledger_and_an_excluded_one_each_say_so_and_the_sheet_is_not_final() {
     use crate::reports::schedule_iii::{
-        DecisionId, Derivation, DerivedOutcome, FinancialYear, LedgerGuid, ScheduleIIIHead,
-        Undetermined,
+        Decision, DecisionId, Derivation, DerivedOutcome, FinancialYear, LedgerGuid,
+        ScheduleIIIHead, Undetermined,
     };
     let mut source = source_with_precision(2);
     source.rows[0].name = "Term loan from director".to_string();
@@ -477,7 +486,7 @@ fn a_renamed_ledger_and_an_excluded_one_each_say_so_and_the_sheet_is_not_final()
         year: FinancialYear::beginning_in(2026),
     }];
 
-    let bytes = render_party_ledger_master_xlsx(&workbook, &decisions).unwrap();
+    let bytes = render_with(&workbook, &decisions).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut text = String::new();
     for name in ["xl/worksheets/sheet2.xml", "xl/sharedStrings.xml"] {
@@ -495,8 +504,8 @@ fn a_renamed_ledger_and_an_excluded_one_each_say_so_and_the_sheet_is_not_final()
 #[test]
 fn a_decision_whose_ledger_moved_between_subgroups_reports_the_change_on_the_row_and_in_the_list() {
     use crate::reports::schedule_iii::{
-        DecisionId, Derivation, DerivedOutcome, FinancialYear, GroupSubtotalKind, LedgerGuid,
-        ScheduleIIIHead,
+        Decision, DecisionId, Derivation, DerivedOutcome, FinancialYear, GroupSubtotalKind,
+        LedgerGuid, ScheduleIIIHead,
     };
     let group =
         |name: &str, parent: &str, reserved: &str| bridge_tally_protocol::TallyNamedMaster {
@@ -526,7 +535,7 @@ fn a_decision_whose_ledger_moved_between_subgroups_reports_the_change_on_the_row
         year: FinancialYear::beginning_in(2026),
     }];
 
-    let bytes = render_party_ledger_master_xlsx(&workbook, &decisions).unwrap();
+    let bytes = render_with(&workbook, &decisions).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut strings = String::new();
     std::io::Read::read_to_string(
@@ -553,7 +562,7 @@ fn a_decision_whose_ledger_moved_between_subgroups_reports_the_change_on_the_row
 
 fn workbook_text(source: PartyLedgerMasterSource) -> String {
     let workbook = build_party_ledger_master_workbook(source).unwrap();
-    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let bytes = render_with(&workbook, &[]).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut text = String::new();
     for name in [
@@ -603,7 +612,7 @@ fn no_later_dated_voucher_adds_nothing_to_the_workbook() {
 fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
     use sha2::{Digest, Sha256};
     let workbook = build_party_ledger_master_workbook(source).unwrap();
-    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let bytes = render_with(&workbook, &[]).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut parts = Vec::new();
     for index in 0..archive.len() {
@@ -689,10 +698,96 @@ fn a_chosen_date_that_is_a_boundary_adds_no_moved_note_to_the_workbook() {
 }
 
 #[test]
+fn decisions_recorded_under_another_book_are_said_and_the_sheet_is_not_final() {
+    use crate::reports::schedule_iii::DecisionSet;
+    let workbook = build_party_ledger_master_workbook(source_with_precision(2)).unwrap();
+    let set = DecisionSet::for_tests(&workbook, Vec::new())
+        .unwrap()
+        .with_elsewhere(2);
+    let bytes = render_party_ledger_master_xlsx(&workbook, DecisionInput::Read(&set)).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut strings,
+    )
+    .unwrap();
+    assert!(strings.contains(
+        "None were applied to this export. NOT FINAL: 1 ledger(s) are excluded: a client mapping decision is required. 2 grouping event(s) for this company and financial year are recorded under another company number or books-from date and were not applied: confirm which book they belong to."
+    ));
+}
+
+#[test]
+fn decisions_under_another_book_are_said_beside_the_decisions_that_were_read() {
+    use crate::reports::schedule_iii::{
+        Decision, DecisionId, DecisionSet, Derivation, DerivedOutcome, FinancialYear,
+        GroupSubtotalKind, LedgerGuid, ScheduleIIIHead,
+    };
+    let workbook = build_party_ledger_master_workbook(source_with_precision(2)).unwrap();
+    // A decision for last year: listed, needing no attention itself.
+    let last_year = Decision {
+        id: DecisionId(5),
+        ledger: LedgerGuid::new("some-ledger").unwrap(),
+        ledger_name_when_made: "Some ledger".to_string(),
+        made_against: Derivation {
+            outcome: DerivedOutcome::GroupSubtotal(GroupSubtotalKind::SundryDebtors),
+            ancestry: vec!["Sundry Debtors".to_string()],
+        },
+        head: ScheduleIIIHead::TradeReceivables,
+        year: FinancialYear::beginning_in(2025),
+    };
+    let set = DecisionSet::for_tests(&workbook, vec![last_year])
+        .unwrap()
+        .with_elsewhere(1);
+    let bytes = render_party_ledger_master_xlsx(&workbook, DecisionInput::Read(&set)).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut strings,
+    )
+    .unwrap();
+    assert!(strings.contains(
+        "0 applied; 0 not applied and need attention; 1 for another financial year. NOT FINAL:"
+    ));
+    assert!(strings.contains(
+        "1 grouping event(s) for this company and financial year are recorded under another company number or books-from date and were not applied: confirm which book they belong to."
+    ));
+}
+
+#[test]
+fn decisions_that_could_not_be_read_are_never_reported_as_absent() {
+    use crate::reports::schedule_iii::DecisionsUnavailable;
+    let workbook = build_party_ledger_master_workbook(source_with_precision(2)).unwrap();
+    for (why, text) in [
+        (
+            DecisionsUnavailable::StoreUnavailable,
+            "Could not be read: the encrypted store could not be opened or read. NOT FINAL",
+        ),
+        (
+            DecisionsUnavailable::Unreadable,
+            "Could not be read: the stored decisions could not be read by this version of ComplyEaze Bridge. NOT FINAL",
+        ),
+    ] {
+        let bytes =
+            render_party_ledger_master_xlsx(&workbook, DecisionInput::Unavailable(why)).unwrap();
+        let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+        let mut strings = String::new();
+        std::io::Read::read_to_string(
+            &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+            &mut strings,
+        )
+        .unwrap();
+        assert!(strings.contains(text), "{why:?}");
+        assert!(!strings.contains("None were applied"));
+    }
+}
+
+#[test]
 fn an_excluded_ledger_with_no_decision_is_printed_not_final_in_the_decisions_row() {
     // The default synthetic source has no group read, so its ledger is excluded.
     let workbook = build_party_ledger_master_workbook(source_with_precision(2)).unwrap();
-    let bytes = render_party_ledger_master_xlsx(&workbook, &[]).unwrap();
+    let bytes = render_with(&workbook, &[]).unwrap();
     let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut strings = String::new();
     std::io::Read::read_to_string(

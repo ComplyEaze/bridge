@@ -1884,7 +1884,10 @@ fn an_invoice_is_built_alone_and_never_amended() {
 
 #[test]
 fn the_financial_year_runs_from_april_to_march() {
-    let year = |date: &str| financial_year_window(date).unwrap();
+    let year = |date: &str| {
+        let (from, to) = financial_year_window(date).unwrap();
+        (from.as_str().to_string(), to.as_str().to_string())
+    };
     assert_eq!(
         year("20260331"),
         ("20250401".to_string(), "20260331".to_string())

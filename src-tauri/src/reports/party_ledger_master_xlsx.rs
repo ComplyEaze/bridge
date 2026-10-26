@@ -8,8 +8,8 @@ use rust_xlsxwriter::{Format, Workbook, XlsxError};
 use super::party_ledger_master::PartyLedgerMasterWorkbook;
 use super::party_statement_xlsx::amount_to_f64;
 use super::schedule_iii::{
-    build_schedule_iii_view, Decision, DecisionStatus, Finality, LineBasis, NotApplied,
-    ScheduleIIIError,
+    build_schedule_iii_view, DecisionInput, DecisionSource, DecisionStatus, DecisionsUnavailable,
+    Finality, LineBasis, NotApplied, ScheduleIIIError, ScheduleIIIView,
 };
 use crate::tally::OutstandingsCurrencyAssertion;
 
@@ -44,7 +44,7 @@ pub(crate) enum PartyLedgerMasterXlsxError {
 
 pub(crate) fn render_party_ledger_master_xlsx(
     workbook_source: &PartyLedgerMasterWorkbook,
-    decisions: &[Decision],
+    decisions: DecisionInput<'_>,
 ) -> Result<Vec<u8>, PartyLedgerMasterXlsxError> {
     let source = workbook_source.source();
     if source.rows.len().saturating_add(15) > EXCEL_MAX_ROWS {
@@ -227,7 +227,7 @@ pub(crate) fn render_party_ledger_master_xlsx(
 fn write_schedule_iii(
     workbook: &mut Workbook,
     workbook_source: &PartyLedgerMasterWorkbook,
-    decisions: &[Decision],
+    decisions: DecisionInput<'_>,
 ) -> Result<(), PartyLedgerMasterXlsxError> {
     let source = workbook_source.source();
     let view = build_schedule_iii_view(workbook_source, decisions)?;
@@ -271,11 +271,7 @@ fn write_schedule_iii(
     worksheet.write_string_with_format(7, 0, "Check interpretation", &bold)?;
     worksheet.write_string(7, 1, "Difference 0 is the Tally-sign self-check over every captured ledger closing balance; it is evidence, not an assertion of statement completeness.")?;
     worksheet.write_string_with_format(8, 0, "CA grouping decisions", &bold)?;
-    worksheet.write_string(
-        8,
-        1,
-        decisions_summary(view.decisions(), view.exclusions().len(), view.finality()),
-    )?;
+    worksheet.write_string(8, 1, decisions_summary(&view))?;
 
     let header_row = 9u32;
     for (column, label) in [
@@ -386,7 +382,11 @@ fn write_schedule_iii(
         worksheet.write_string(row, 3, exclusion.reason())?;
         row += 1;
     }
-    if !decisions.is_empty() {
+    let given = match decisions {
+        DecisionInput::Read(set) => set.decisions(),
+        DecisionInput::Unavailable(_) => &[],
+    };
+    if !given.is_empty() {
         row += 1;
         worksheet.write_string_with_format(row, 0, "CA GROUPING DECISIONS", &bold)?;
         row += 1;
@@ -403,7 +403,7 @@ fn write_schedule_iii(
             worksheet.write_string_with_format(row, column as u16, label, &bold)?;
         }
         row += 1;
-        for (decision, status) in decisions.iter().zip(view.decisions()) {
+        for (decision, status) in given.iter().zip(view.decisions()) {
             worksheet.write_string(row, 0, decision.id.0.to_string())?;
             worksheet.write_string(row, 1, &decision.ledger_name_when_made)?;
             worksheet.write_string(row, 2, decision.ledger.as_str())?;
@@ -430,20 +430,43 @@ fn basis_text(basis: LineBasis) -> &'static str {
     }
 }
 
-fn decisions_summary(
-    statuses: &[DecisionStatus],
-    excluded_ledgers: usize,
-    finality: Finality,
-) -> String {
+fn decisions_summary(view: &ScheduleIIIView) -> String {
+    let unavailable = match view.decision_source() {
+        DecisionSource::Read => None,
+        DecisionSource::Unavailable(DecisionsUnavailable::StoreUnavailable) => {
+            Some("the encrypted store could not be opened or read")
+        }
+        DecisionSource::Unavailable(DecisionsUnavailable::Unreadable) => {
+            Some("the stored decisions could not be read by this version of ComplyEaze Bridge")
+        }
+    };
+    if let Some(why) = unavailable {
+        return format!(
+            "Could not be read: {why}. NOT FINAL: no decision could be applied, and none is assumed absent."
+        );
+    }
+    let (statuses, finality) = (view.decisions(), view.finality());
+    let excluded_ledgers = view.exclusions().len();
+    let elsewhere = view.decisions_elsewhere();
+    let elsewhere_note = format!(
+        " {elsewhere} grouping event(s) for this company and financial year are recorded under another company number or books-from date and were not applied: confirm which book they belong to."
+    );
     if statuses.is_empty() {
-        // With no decision given, the only thing that can keep the view from being final is a
-        // ledger still excluded.
-        return match finality {
-            Finality::Final => "None were applied to this export.".to_string(),
-            Finality::NotFinal => format!(
-                "None were applied to this export. NOT FINAL: {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
-            ),
-        };
+        // With no decision given, what can keep the view from being final is a ledger still
+        // excluded, or events kept under another book.
+        let mut text = String::from("None were applied to this export.");
+        if finality == Finality::NotFinal {
+            text.push_str(" NOT FINAL:");
+            if excluded_ledgers > 0 {
+                text.push_str(&format!(
+                    " {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
+                ));
+            }
+            if elsewhere > 0 {
+                text.push_str(&elsewhere_note);
+            }
+        }
+        return text;
     }
     let applied = statuses
         .iter()
@@ -490,6 +513,9 @@ fn decisions_summary(
                 text.push_str(&format!(
                     " {excluded_ledgers} ledger(s) are excluded: a client mapping decision is required."
                 ));
+            }
+            if elsewhere > 0 {
+                text.push_str(&elsewhere_note);
             }
             text
         }

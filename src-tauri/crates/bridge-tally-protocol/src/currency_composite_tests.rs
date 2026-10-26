@@ -516,3 +516,53 @@ fn the_shapes_admitted_without_a_capture_are_pinned() {
         parse_currency_composite("-$ 100.00 @ \u{20ac} 0.9/$  = -\u{20ac} 90.00", &euro).is_ok()
     );
 }
+
+// ---- the two classifiers, side by side (#683) ---------------------------------
+//
+// `is_currency_composite` is the strict classifier the readers that withhold or refuse use;
+// `is_foreign_currency_balance` is the loose structural one `outstandings` uses to name a refusal.
+// They disagree in both directions, and every outcome is still a refusal or a set-aside, so only an
+// error's name differs. These tests pin where they disagree on the committed captures, so a change
+// to either one is a visible decision (#683 asks for the readers to move onto the typed parse; this
+// records what that move would change).
+
+use crate::native_outstandings::is_foreign_currency_balance;
+
+#[test]
+fn captured_composites_satisfy_both_classifiers_except_the_empty_rate_zero() {
+    let found = composites_by_text_node();
+    assert_eq!(found.len(), 15, "{found:?}");
+    let mut loose_only_misses = Vec::new();
+    for composite in found.keys() {
+        assert!(is_currency_composite(composite), "{composite}");
+        if !is_foreign_currency_balance(composite) {
+            loose_only_misses.push(composite.clone());
+        }
+    }
+    // The one composite the loose classifier does not know is the captured zero with an empty
+    // rate: its rate has no digit, which that classifier requires.
+    assert_eq!(loose_only_misses.len(), 1, "{loose_only_misses:?}");
+    assert!(
+        loose_only_misses[0].contains(" /$"),
+        "{loose_only_misses:?}"
+    );
+}
+
+#[test]
+fn a_digit_grouped_composite_is_accepted_by_the_loose_classifier_and_not_the_strict_one() {
+    // A captured composite with comma digit grouping added to both amounts: a book whose number
+    // format groups digits. No capture shows one; this pins what the code does with it today.
+    let found = composites_by_text_node();
+    let captured = found
+        .keys()
+        .find(|composite| composite.contains("1100.00") && composite.contains("94600.00"))
+        .expect("the captured composite of 1100 dollars at 86");
+    let grouped = captured
+        .replacen("1100.00", "1,100.00", 1)
+        .replacen("94600.00", "94,600.00", 1);
+    assert_ne!(&grouped, captured);
+    assert!(is_foreign_currency_balance(&grouped), "{grouped}");
+    assert!(!is_currency_composite(&grouped), "{grouped}");
+    // The typed parse has no layout for it either: it is refused, never read.
+    assert!(parse(&grouped).is_err(), "{grouped}");
+}

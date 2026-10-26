@@ -101,6 +101,13 @@ impl Lineage {
     /// and cash/bank shapes, and is a different business event rather than a
     /// correction of this one. A supplied voucher number is ignored under
     /// automatic numbering (§9.8), so changing it is not a correction either.
+    ///
+    /// A reference may not change either (#1941), against any build of the
+    /// lineage. An import that omits it keeps the one stored (§9.14), a changed
+    /// one replacing it by upsert is not measured, and the verification read does
+    /// not fetch it, so whether the import applied it could never be confirmed:
+    /// an amendment that changed only the reference read posted_verified once
+    /// anything else altered the voucher.
     pub(super) fn admit_proposal(&self, vouchers: &[ImportVoucher]) -> Result<(), String> {
         for voucher in vouchers {
             let mut versions = self.versions(&voucher.bridge_txn_id).peekable();
@@ -113,6 +120,9 @@ impl Lineage {
                 }
                 if recorded.voucher_number != voucher.voucher_number {
                     return Err("import_amend_voucher_number_changed".into());
+                }
+                if recorded.reference != voucher.reference {
+                    return Err("import_amend_voucher_reference_changed".into());
                 }
             }
         }
@@ -202,8 +212,12 @@ impl Lineage {
             // changed (a reference, an allocation) shows only as the voucher's
             // ALTERID moving past one Bridge recorded when it first verified a
             // build (#239). A voucher's ALTERID advances on every alteration
-            // (TALLY_PROTOCOL_REFERENCE §9.3, measured over the gateway; an edit
-            // in Tally's own screens is not yet measured), so a current value
+            // (TALLY_PROTOCOL_REFERENCE §9.3, measured over the gateway; saving
+            // a voucher unchanged on Tally's own screen, or cancelling it, moves
+            // it too (VERIFIED), and so did changing a bill allocation's
+            // reference, adding a cost-centre allocation and setting a
+            // bank-reconciliation date (PARTIAL): one run each, §11c.5 of the
+            // measurements part, 26 Sep 2026), so a current value
             // equal to any matching build's baseline means the voucher has not
             // been altered since that reading. A build never imported
             // has no baseline and is passed over. No equal baseline refuses:

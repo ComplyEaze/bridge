@@ -1,0 +1,355 @@
+# fixture: tests/fixtures/masters_stock_items_shape_lab_item_created_live.utf16le.xml
+# parser: parse_native_masters(StockItems)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Carton Box Small",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000110",
+            master_id: 272,
+            alter_id: 274,
+            parent: Some(
+                "Packaging",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Caustic Soda Flakes",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010c",
+            master_id: 268,
+            alter_id: 270,
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Cleaning Kit A",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000112",
+            master_id: 274,
+            alter_id: 276,
+            parent: Some(
+                "Finished Kits",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Cleaning Kit B",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000113",
+            master_id: 275,
+            alter_id: 277,
+            parent: Some(
+                "Finished Kits",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Descaler Concentrate",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000114",
+            master_id: 276,
+            alter_id: 278,
+            parent: Some(
+                "Finished Kits",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "HDPE Drum 50L",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010f",
+            master_id: 271,
+            alter_id: 273,
+            parent: Some(
+                "Packaging",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "HSN Two Dates Test Item",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000011a",
+            master_id: 282,
+            alter_id: 290,
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [
+                        HsnDetailsEntry {
+                            applicable_from: "20250401",
+                            hsn_code: None,
+                            description: None,
+                            source: Some(
+                                "As per Company/Stock Group",
+                            ),
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+                gst: Entries {
+                    entries: [
+                        GstDetailsEntry {
+                            applicable_from: "20250401",
+                            taxability: None,
+                            source: Some(
+                                "As per Company/Stock Group",
+                            ),
+                            ineligible_itc: Some(
+                                true,
+                            ),
+                            states: [
+                                GstStateDetails {
+                                    state_name: Some(
+                                        "�#4; Any",
+                                    ),
+                                    rates: [
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "CGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "SGST/UTGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "IGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "�#4; Not Applicable",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "State Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                    ],
+                                    slab_rates_present: false,
+                                },
+                            ],
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Hydrochloric Acid 33pc",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010d",
+            master_id: 269,
+            alter_id: 271,
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Label Roll",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000111",
+            master_id: 273,
+            alter_id: 275,
+            parent: Some(
+                "Packaging",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Soda Ash Light",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010e",
+            master_id: 270,
+            alter_id: 283,
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [
+                        GstDetailsEntry {
+                            applicable_from: "20250401",
+                            taxability: Some(
+                                "Taxable",
+                            ),
+                            source: Some(
+                                "Specify Details Here",
+                            ),
+                            ineligible_itc: None,
+                            states: [
+                                GstStateDetails {
+                                    state_name: Some(
+                                        "�#4; Any",
+                                    ),
+                                    rates: [
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "CGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Value {
+                                                raw: " 9",
+                                                decimal: "9",
+                                            },
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "SGST/UTGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Value {
+                                                raw: " 9",
+                                                decimal: "9",
+                                            },
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "IGST",
+                                            ),
+                                            valuation_type: Some(
+                                                "Based on Value",
+                                            ),
+                                            rate: Value {
+                                                raw: " 18",
+                                                decimal: "18",
+                                            },
+                                        },
+                                        GstRateDetails {
+                                            duty_head: Some(
+                                                "Cess",
+                                            ),
+                                            valuation_type: Some(
+                                                "�#4; Not Applicable",
+                                            ),
+                                            rate: Absent,
+                                        },
+                                    ],
+                                    slab_rates_present: false,
+                                },
+                            ],
+                            other_content_skipped: false,
+                        },
+                    ],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Sulphuric Acid 98pc",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000dc",
+            master_id: 220,
+            alter_id: 221,
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [],
+                },
+            },
+        },
+        NativeMasterRow {
+            name: "Zero Stock Item",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000115",
+            master_id: 277,
+            alter_id: 279,
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            detail: StockItem {
+                hsn: Entries {
+                    entries: [],
+                },
+                gst: Entries {
+                    entries: [],
+                },
+            },
+        },
+    ],
+})

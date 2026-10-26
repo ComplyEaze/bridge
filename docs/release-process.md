@@ -794,10 +794,13 @@ patch for a fix-only release:
 It checks every file first and writes none if one fails. Then:
 
 1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because three of those files are pinned (see "Compatibility-surface reseal").
-2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`.
+2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`, and move the
+   unreleased entries into the new section (see "At cut time" under `CHANGELOG.md` below).
 3. Commit, and open the version pull request.
 4. After it merges, dispatch the preview release with the matching tag.
-5. After the release is published, change the tag and date in the two managed
+5. After the release is published, if the release run warned that unreleased entries were
+   listed under "Also in this build", put each in the new section of `CHANGELOG.md` and `git rm`
+   its file, or the next release lists it again. Then change the tag and date in the two managed
    spans that name the newest published build (`managed:current-release` in
    `README.md` and `managed:latest-preview` in `SECURITY.md`; search both files
    for `managed:`), and check that the install page and the repository
@@ -850,6 +853,22 @@ disagree.
   now" when the section becomes the release.
 - Keep the detailed entries as they are. They serve maintainers and
   integrators.
+- An entry for a change that is not yet in a published build is a file, not lines
+  of `CHANGELOG.md`, so two pull requests never edit the same lines. It is
+  `docs/changelog/unreleased/<added|changed|removed>/<N>-<words-with-hyphens>.md`: the
+  folder names the heading it is listed under, `<N>` is the issue or pull request
+  its text cites, and the words tell two entries on one issue apart. A file holds
+  one bullet: the first line starts with `- `, every other line is indented two
+  spaces, there is no blank line, heading, rule or code fence, and the text cites `#<N>`.
+  The words are up to six lowercase words of letters and digits joined by hyphens, and
+  must not contain privacy, security, redact or egress, which the review tiers send to the
+  full tier whatever the folder (see `scripts/review-tier-paths.json`);
+  `scripts/release-notes.test.mjs` fails on a file that is malformed, misplaced (anything
+  outside the three folders is reported) or not in the one review tier. The install page joins the files into the groups of
+  the `[Unreleased]` text, and a malformed file is left out with a warning, so a bad entry
+  cannot stop a release or a deploy. The release notes list them when the tag has no
+  section of its own and, with a warning, when it has one (see "At cut time"). Entries already in `CHANGELOG.md` stay where they are
+  until a release moves them.
 - `CHANGELOG.md` is the one source for the notes. The publish workflow takes
   the `## [X.Y.Z]` section that matches the tag (for `mcp-vX.Y.Z` or `mcp-preview-X.Y.Z`),
   puts it above the release-notes footer, and appends GitHub's list. The
@@ -869,7 +888,15 @@ disagree.
   plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, change
   its first part's heading from "What the next build adds" to "What you can do
   now" and its "in source since" title to name the new build, and leave a fresh
-  `## [Unreleased]` above it. If the section is missing, the
+  `## [Unreleased]` above it. In the same pull request, run
+  `node scripts/release-notes.mjs unreleased --changelog CHANGELOG.md` (it stops with a
+  message on a malformed, misplaced or unreadable file; it prints one group per kind that has
+  entries), rewrite what it prints in plain words into the new section's parts, as for the
+  other draft notes (a released section has no **Added** or **Changed** groups), and `git rm`
+  the files under `docs/changelog/unreleased/`. Run the command again after the last merge of master
+  into that pull request, because the build is cut from the head of master. An entry merged
+  after that, before the dispatch, is in the build: the release notes then list it too, under "Also in this
+  build", and warn in the run; step 5 of the release steps above moves it into the section. If the section is missing, the
   release carries the `[Unreleased]` text instead (with a warning), which may
   describe changes that build does not have, so read the release body; if that
   is empty too, only the standard text and GitHub's list. Headings must read

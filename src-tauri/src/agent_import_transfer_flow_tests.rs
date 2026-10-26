@@ -8,6 +8,11 @@ use super::bank_tests::{
 };
 use super::*;
 
+/// A synthetic GUID: version 4 shape, zeros, then `n` in hex.
+fn guid(n: u128) -> String {
+    uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | n).to_string()
+}
+
 /// `n` behind zeros to `width` characters.
 fn padn(n: u64, width: usize) -> String {
     format!("{n:0>width$}")
@@ -2080,7 +2085,7 @@ fn an_unreadable_journal_stops_the_view_and_the_verification_section() {
     let error = {
         let _lock = server.lock_import_admission().unwrap();
         server
-            .transfer_view_while_admitted(&canonical_batch_guid(CAPTURED_GUID), None)
+            .transfer_view_while_admitted(&canonical_batch_guid(CAPTURED_GUID), None, None)
             .unwrap_err()
     };
     assert!(
@@ -2389,4 +2394,297 @@ async fn a_written_record_is_answered_without_its_section_before_it_is_called_to
         "computed"
     );
     assert_eq!(wide["structuredContent"]["truncated"], false);
+}
+
+// ---- the transfer check at send -----------------------------------------------------
+
+pub(super) const TRANSFER_REASONS: [&str; 6] = [
+    "skip_row_already_posted",
+    "withdraw_skip_invalid",
+    "withdraw_skip_paired",
+    "skip_row_paired_elsewhere",
+    "transfer_double_booked",
+    "transfer_view_not_established",
+];
+
+/// What a post says went wrong: the error of an outcome, or of a failure.
+pub(super) async fn post_error(server: &Server, batch_id: &str) -> Value {
+    let args = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
+    match server.post_import(&args).await {
+        Ok(outcome) => outcome.payload["result"]["error"].clone(),
+        Err(failure) => json!({"code": failure.code}),
+    }
+}
+
+/// A post that went past the transfer check: it is not refused for a transfer
+/// reason, and its next step, a read of Tally, reached the rig (whose last plan
+/// answers it and is not a Tally the post can use). Returns what the post said.
+async fn past_the_transfer_check(rig: &Rig, batch_id: &str) -> Value {
+    let before = rig.simulator.received();
+    let error = post_error(&rig.server, batch_id).await;
+    let code = error["code"].as_str().unwrap_or_default();
+    assert!(!TRANSFER_REASONS.contains(&code), "{error}");
+    assert!(
+        rig.simulator.received() > before,
+        "the post stopped before it read Tally: {error}"
+    );
+    error
+}
+
+/// The record a verification before a send writes for a batch never sent.
+fn mark_unverified(directory: &Path, batch_id: &str) {
+    let server = journal(directory);
+    let mut line = latest(directory, batch_id);
+    line.status = "verification_incomplete".into();
+    let record = ledger::StatusRecord::from(&line);
+    let _admission = server.lock_import_admission().unwrap();
+    server.append_import_record_while_admitted(&record).unwrap();
+}
+
+/// A skip withdrawn while nothing carried it, built and never sent; then the
+/// other statement's Contra, verified, which does carry it.
+#[tokio::test]
+async fn a_withdrawn_row_the_other_statement_now_carries_is_refused_when_the_batch_is_sent() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let first = rig.build(withdrawing(directory.path())).await;
+    let batch_id = first["batch_id"].as_str().unwrap().to_string();
+    let carrying = rig
+        .build(contra_statement(directory.path(), BANK_B, booked(), None))
+        .await;
+    let carrier = carrying["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &carrier);
+    // the pre-send read of Tally has recorded its status, as it does
+    mark_unverified(directory.path(), &batch_id);
+    let before = fs::read(directory.path().join("agent-import-ledger.jsonl")).unwrap();
+    let error = post_error(&rig.server, &batch_id).await;
+    assert_eq!(error["code"], "withdraw_skip_paired", "{error}");
+    let rows = error["paired_rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 1, "{error}");
+    assert_eq!(rows[0]["bridge_txn_id"], skipped_row());
+    assert_eq!(rows[0]["batch_id"], carrier.as_str());
+    let step = error["next_step"].as_str().unwrap();
+    assert!(
+        step.starts_with(
+            "Nothing was sent to Tally, and any approval of this batch is withdrawn. "
+        ),
+        "{step}"
+    );
+    assert!(
+        step.ends_with(" This batch cannot be sent as built: build it again."),
+        "{step}"
+    );
+    // nothing was written: no intent, no status
+    let after = fs::read(directory.path().join("agent-import-ledger.jsonl")).unwrap();
+    assert_eq!(before, after);
+}
+
+/// What the build read, the send reads again: a batch whose facts are as they
+/// were when it was built, with a verification written for it before the send,
+/// passes.
+#[tokio::test]
+async fn an_unchanged_statement_batch_passes_the_transfer_check_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), skip_only_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let first = rig.build(withdrawing(directory.path())).await;
+    let batch_id = first["batch_id"].as_str().unwrap().to_string();
+    mark_unverified(directory.path(), &batch_id);
+    past_the_transfer_check(&rig, &batch_id).await;
+}
+
+/// Two builds withdrew the row and neither was sent: sending one judges the row
+/// the other holds as a build of it would, so the explicit choice of the person
+/// who withdrew it stands.
+#[tokio::test]
+async fn sending_one_of_two_unsent_holders_judges_the_row_held_by_the_other() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            two_bank_plans(),
+            skip_only_plans(),
+        ]
+        .concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let carrying = rig
+        .build(statement_v2(
+            directory.path(),
+            BANK_B,
+            window(),
+            json!([contra_voucher(booked()), contra_voucher(other_booked())]),
+            json!([
+                contra_record(booked(), None),
+                contra_record(other_booked(), None)
+            ]),
+        ))
+        .await;
+    mark_found(directory.path(), carrying["batch_id"].as_str().unwrap());
+    let first = rig.build(withdrawing(directory.path())).await;
+    let batch_id = first["batch_id"].as_str().unwrap().to_string();
+    // a second build of the same withdrawal, as the first build left it
+    let mut second = latest(directory.path(), &batch_id);
+    second.batch_id = format!("bridge-{}", guid(0x999));
+    journal(directory.path())
+        .append_import_ledger(&second)
+        .unwrap();
+    mark_unverified(directory.path(), &batch_id);
+    past_the_transfer_check(&rig, &batch_id).await;
+}
+
+/// An inline build (vouchers given directly, no statement) that names a skip in
+/// `withdraw_skips` records the withdrawal on the batch, so the check at send
+/// judges it as the build did and does not refuse the row it withdrew.
+#[tokio::test]
+async fn an_inline_build_that_withdraws_a_skip_records_it_and_is_not_refused_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), skip_only_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let built = rig
+        .build(json!({"company_guid": CAPTURED_GUID,
+            "vouchers": [contra_voucher(skipped_row())], "withdraw_skips": [skipped_row()]}))
+        .await;
+    let batch_id = built["batch_id"].as_str().unwrap().to_string();
+    // no statement was given, and the withdrawal is on the record all the same
+    let line = latest(directory.path(), &batch_id);
+    assert!(line.statement.is_none(), "{built}");
+    assert_eq!(line.withdrawn_skips, Some(vec![skipped_row().to_string()]));
+    past_the_transfer_check(&rig, &batch_id).await;
+}
+
+/// The withdrawal counts only if it was built after the newest record of the
+/// skip, as the facts judge a posted holder: here a skip of the same row is
+/// recorded after the inline build that withdrew the first, so the batch is
+/// refused at send, and a build naming the row again is newer and goes through.
+#[tokio::test]
+async fn a_withdrawal_older_than_a_later_skip_of_the_row_does_not_excuse_it_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            skip_only_plans(),
+            two_bank_plans(),
+            skip_only_plans(),
+        ]
+        .concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let inline = json!({"company_guid": CAPTURED_GUID,
+        "vouchers": [contra_voucher(skipped_row())], "withdraw_skips": [skipped_row()]});
+    let old = rig.build(inline.clone()).await;
+    let old = old["batch_id"].as_str().unwrap().to_string();
+    // another record of the skip, after the withdrawal
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let error = post_error(&rig.server, &old).await;
+    assert_eq!(error["code"], "skip_row_paired_elsewhere", "{error}");
+    assert_eq!(error["skipped_rows"], json!([skipped_row()]), "{error}");
+    // the same inline build now is newer than the skip, and is not refused
+    let new = rig.build(inline).await;
+    let new = new["batch_id"].as_str().unwrap().to_string();
+    past_the_transfer_check(&rig, &new).await;
+}
+
+/// A skip of a row that another batch has since posted is refused at send: the
+/// batch would say that the other account carries a transfer this company
+/// already booked.
+#[tokio::test]
+async fn a_batch_that_skips_a_row_another_batch_has_sent_is_refused_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [two_bank_plans(), two_bank_plans()].concat(),
+    );
+    // a batch with a Contra and a skipped row, built and never sent
+    let skipping = rig
+        .build(statement_v2(
+            directory.path(),
+            BANK_A,
+            window(),
+            json!([contra_voucher(booked())]),
+            json!([
+                contra_record(booked(), None),
+                skip_record(BANK_A, skipped_row(), None)
+            ]),
+        ))
+        .await;
+    let skipping = skipping["batch_id"].as_str().unwrap().to_string();
+    // a newer build posts the skipped row, which is allowed, and is sent
+    let posting = rig
+        .build(contra_statement(
+            directory.path(),
+            BANK_A,
+            skipped_row(),
+            None,
+        ))
+        .await;
+    let posting = posting["batch_id"].as_str().unwrap().to_string();
+    mark_sent(directory.path(), &posting);
+    let error = post_error(&rig.server, &skipping).await;
+    assert_eq!(error["code"], "skip_row_already_posted", "{error}");
+    assert_eq!(error["blocking_batch_id"], posting.as_str(), "{error}");
+    assert_eq!(error["skipped_rows"], json!([skipped_row()]), "{error}");
+    let step = error["next_step"].as_str().unwrap();
+    assert!(
+        step.starts_with(
+            "Nothing was sent to Tally, and any approval of this batch is withdrawn. "
+        ),
+        "{step}"
+    );
+    assert!(
+        step.ends_with(" This batch cannot be sent as built: build it again."),
+        "{step}"
+    );
+}
+
+/// The batch being sent is left out of the journal the check reads, whatever its
+/// own latest status says. Were it read with that status, a batch found posted
+/// would retire the skip its own withdrawal names, and the check would refuse
+/// the withdrawal as one of a skip that is not there.
+#[tokio::test]
+async fn a_batch_with_a_found_status_keeps_its_withdrawal_at_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
+        .await;
+    let first = rig.build(withdrawing(directory.path())).await;
+    let id = first["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &id);
+    let mut line = latest(directory.path(), &id);
+    assert_eq!(line.status, "posted_verified");
+    // built after the skip it names, as a withdrawal is
+    line.built_at = "2999-01-01T00:00:00Z".into();
+    let _lock = rig.server.lock_import_admission_shared().unwrap();
+    let refusal = rig
+        .server
+        .transfers_refusal_for_send_while_admitted(&line)
+        .unwrap();
+    assert!(
+        refusal.is_none(),
+        "{:?}",
+        refusal.map(|refusal| refusal.reason())
+    );
 }

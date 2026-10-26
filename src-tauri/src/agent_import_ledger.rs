@@ -1175,24 +1175,41 @@ pub(super) fn rows_held_as_vouchers(
 /// The facts the transfer pairing view takes for one company: the journal
 /// (every record admitted, as for every other read) and the skip-only file,
 /// with a build about to be written, if any, read as the newest record.
+///
+/// `subject` is a batch already in the journal that is being judged again (the
+/// one about to be sent): every record of it is left out, so the journal reads
+/// as it did when that batch was built, and it is given as `candidate`.
 pub(super) fn transfer_facts(
     journal: impl BufRead,
     skips_file: impl BufRead,
     company_guid: &str,
     candidate: Option<statement_facts::Candidate>,
+    subject: Option<&str>,
 ) -> Result<statement_facts::TransferFacts, statement_facts::TransferFactsError> {
     use statement_facts::{BuildLine, Candidate, JournalEvent, TransferFactsError};
     let mut events = Vec::new();
-    scan_records(journal, |record, _| match record {
-        Record::Batch(batch) => events.push(JournalEvent::Build(Box::new(BuildLine::of(&batch)))),
-        Record::Status(update) if update.sets_status() => events.push(JournalEvent::Status {
-            sent: matches!(update.record_type, StatusKind::DispatchIntent),
-            batch_id: update.batch_id,
-            status: update.status,
-        }),
-        Record::Status(_) => {}
+    // The same pass gathers what a recorded rollback covers (#1050), so the
+    // facts never call a batch found that a restore may have emptied. It reads
+    // every record, the subject's too, since a cover depends on positions.
+    let mut rollbacks = RollbackFacts::empty();
+    scan_records(journal, |record, VerificationGeneration(at)| {
+        rollbacks.feed(&record, at);
+        match record {
+            Record::Batch(batch) if Some(batch.batch_id.as_str()) == subject => {}
+            Record::Batch(batch) => {
+                events.push(JournalEvent::Build(Box::new(BuildLine::of(&batch))));
+            }
+            Record::Status(update) if Some(update.batch_id.as_str()) == subject => {}
+            Record::Status(update) if update.sets_status() => events.push(JournalEvent::Status {
+                sent: matches!(update.record_type, StatusKind::DispatchIntent),
+                batch_id: update.batch_id,
+                status: update.status,
+            }),
+            Record::Status(_) => {}
+        }
     })
     .map_err(|code| TransferFactsError::JournalUnreadable { code })?;
+    let covered = rollbacks.covered();
     let mut skip_records = statement_facts::read_skip_records(skips_file)
         .map_err(|code| TransferFactsError::SkipFileUnreadable { code })?;
     match candidate {
@@ -1200,7 +1217,7 @@ pub(super) fn transfer_facts(
         Some(Candidate::SkipOnly(record)) => skip_records.push(*record),
         None => {}
     }
-    statement_facts::build_transfer_facts(events, skip_records, company_guid)
+    statement_facts::build_transfer_facts(events, skip_records, company_guid, &covered)
 }
 
 fn scan_records(
@@ -1562,62 +1579,81 @@ struct RollbackFacts {
 }
 
 impl RollbackFacts {
-    fn scan(reader: impl BufRead) -> Result<Self, String> {
-        let mut facts = Self {
+    fn empty() -> Self {
+        Self {
             places: BTreeMap::new(),
             posts: BTreeMap::new(),
             order: Vec::new(),
             seen: Vec::new(),
             records: 0,
-        };
+        }
+    }
+
+    fn scan(reader: impl BufRead) -> Result<Self, String> {
+        let mut facts = Self::empty();
         scan_records(reader, |record, VerificationGeneration(at)| {
-            facts.records = at + 1;
-            match record {
-                Record::Batch(batch) => {
-                    if !facts.places.contains_key(&batch.batch_id) {
-                        facts.order.push(batch.batch_id.clone());
-                    }
-                    facts.places.insert(
-                        batch.batch_id.clone(),
-                        (batch.company.clone(), batch.endpoint_origin.clone()),
-                    );
-                }
-                Record::Status(update) => {
-                    let post = facts.posts.entry(update.batch_id.clone()).or_default();
-                    match update.record_type {
-                        StatusKind::DispatchIntent => {
-                            post.intent_at = Some(at);
-                            post.pre_post_voucher_mark = update.pre_post_voucher_mark;
-                        }
-                        StatusKind::DispatchResponse => {
-                            if let Some(outcome) = update
-                                .response
-                                .as_ref()
-                                .and_then(|response| response.outcome.as_ref())
-                            {
-                                post.created_at = Some((at, outcome.counters().created));
-                            }
-                        }
-                        StatusKind::PostSpanVerdict => {
-                            if let Some(bound) = &update.bindings {
-                                post.bound_at = Some((at, bound.len() as u64));
-                            }
-                        }
-                        StatusKind::RollbackSeen => {
-                            if let (Some(mark), Some(count)) =
-                                (update.mark_read, update.records_before_read)
-                            {
-                                // Admission bounds the count by the record's position.
-                                let count = usize::try_from(count).unwrap_or(at);
-                                facts.seen.push((update.batch_id.clone(), mark, count));
-                            }
-                        }
-                        StatusKind::VerificationStatus | StatusKind::StopRelease => {}
-                    }
-                }
-            }
+            facts.feed(&record, at);
         })?;
         Ok(facts)
+    }
+
+    /// Take one admitted record, the `at`-th of the journal.
+    fn feed(&mut self, record: &Record, at: usize) {
+        let facts = self;
+        facts.records = at + 1;
+        match record {
+            Record::Batch(batch) => {
+                if !facts.places.contains_key(&batch.batch_id) {
+                    facts.order.push(batch.batch_id.clone());
+                }
+                facts.places.insert(
+                    batch.batch_id.clone(),
+                    (batch.company.clone(), batch.endpoint_origin.clone()),
+                );
+            }
+            Record::Status(update) => {
+                let post = facts.posts.entry(update.batch_id.clone()).or_default();
+                match update.record_type {
+                    StatusKind::DispatchIntent => {
+                        post.intent_at = Some(at);
+                        post.pre_post_voucher_mark = update.pre_post_voucher_mark;
+                    }
+                    StatusKind::DispatchResponse => {
+                        if let Some(outcome) = update
+                            .response
+                            .as_ref()
+                            .and_then(|response| response.outcome.as_ref())
+                        {
+                            post.created_at = Some((at, outcome.counters().created));
+                        }
+                    }
+                    StatusKind::PostSpanVerdict => {
+                        if let Some(bound) = &update.bindings {
+                            post.bound_at = Some((at, bound.len() as u64));
+                        }
+                    }
+                    StatusKind::RollbackSeen => {
+                        if let (Some(mark), Some(count)) =
+                            (update.mark_read, update.records_before_read)
+                        {
+                            // Admission bounds the count by the record's position.
+                            let count = usize::try_from(count).unwrap_or(at);
+                            facts.seen.push((update.batch_id.clone(), mark, count));
+                        }
+                    }
+                    StatusKind::VerificationStatus | StatusKind::StopRelease => {}
+                }
+            }
+        }
+    }
+
+    /// Every batch some recorded rollback covers.
+    fn covered(&self) -> BTreeSet<String> {
+        self.order
+            .iter()
+            .filter(|batch_id| self.cover_of(batch_id).is_some())
+            .cloned()
+            .collect()
     }
 
     /// The record that covers `batch_id`, if any (the lowest mark among them):

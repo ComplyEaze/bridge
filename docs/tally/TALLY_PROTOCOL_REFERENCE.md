@@ -153,6 +153,9 @@ base revision.
 <a id="82f-referencedate-on-the-voucher-fetch--verified-2026-10-07-tallyprime-71-one-synthetic-book"></a>
 
 [8.2f `REFERENCEDATE` on the voucher `FETCH` — **VERIFIED 2026-10-07; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82f-referencedate-on-the-voucher-fetch--verified-2026-10-07-tallyprime-71-one-synthetic-book)
+<a id="82g-cost-centre-allocations-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-one-synthetic-book"></a>
+
+[8.2g Cost-centre allocations on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82g-cost-centre-allocations-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-one-synthetic-book)
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)
@@ -447,6 +450,9 @@ base revision.
 <a id="12a21-tallys-own-profit-and-loss-carries-closing-stock-as-a-line-of-its-own-on-an-integrated-inventory-book"></a>
 
 [12a.21 Tally's own Profit and Loss carries closing stock as a line of its own on an integrated inventory book](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a21-tallys-own-profit-and-loss-carries-closing-stock-as-a-line-of-its-own-on-an-integrated-inventory-book)
+<a id="12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read"></a>
+
+[12a.22 Stock items carry their own dated HSN and GST lists in a masters read; whether a group's or the company's setting reaches them is not read](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

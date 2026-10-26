@@ -167,6 +167,12 @@ const releaseWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/
 if (jobIds(releaseWorkflow).join(",") !== "release-admission,package,attest,publish-preview") {
   failures.push("release-mcpb-preview.yml must have exactly the jobs release-admission, package, attest and publish-preview");
 }
+// The records and nightly run starts its eight shards four at a time: eight at once would hold 8 of the account's 20
+// runner slots for about two hours, and every pull request's checks wait behind them.
+const nightlyWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/tax-audit-mutations-nightly.yml"), "utf8");
+if (jobBlock(nightlyWorkflow, "shard").match(/^ {6}max-parallel: .*$/gm)?.join("\n") !== "      max-parallel: 4") {
+  failures.push("the mutation shards must run four at a time (strategy.max-parallel: 4 in tax-audit-mutations-nightly.yml)");
+}
 // Line-based readers split on \n (and \r\n); a lone \r, U+0085, U+2028 or U+2029 is a line break to other
 // YAML readers but not to them, so neither workflow may contain one.
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {

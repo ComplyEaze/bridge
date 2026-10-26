@@ -21,6 +21,8 @@ This document defines agent-level expectations and review responsibilities for t
   - Migration impact notes if changing sync behavior
   - Security impact notes for Tally/credential changes
 - Each PR must link to one line in [review-checklist.md](./review-checklist.md) as completed before merge.
+- A change a user or integrator can see adds its change-list entry as a file under
+  `docs/changelog/unreleased/` (format in [CONTRIBUTING.md](./CONTRIBUTING.md)), never as lines of `CHANGELOG.md`.
 
 ## Rectification expectations
 

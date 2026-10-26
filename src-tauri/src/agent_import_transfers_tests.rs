@@ -100,11 +100,13 @@ fn facts_of(skips: Vec<SkipFact>, contras: Vec<ContraFact>) -> TransferFacts {
         coverage: coverage(),
         retired_skips: 3,
         held: Vec::new(),
+        restored: BTreeSet::new(),
         contras_not_two_leg: 0,
         contras_without_facts: 0,
         contras_superseded: 0,
         live_skips: BTreeSet::new(),
         skip_mentions: BTreeSet::new(),
+        skip_built: BTreeMap::new(),
     }
 }
 
@@ -189,6 +191,7 @@ fn every_state() -> TransferFacts {
         fact: skip("st-held", "20260104", "100.00"),
         holder: BatchId::new("batch-9"),
         by: HeldBy::UnverifiedBatch,
+        pairs: true,
     }];
     facts
 }
@@ -635,6 +638,7 @@ fn many_open(count: usize) -> TransferSummary {
                 date: date("20260105"),
                 state: OpenState::NotFound,
                 batch: None,
+                restored: false,
             })
             .collect(),
     }
@@ -669,6 +673,80 @@ fn a_budget_cuts_the_open_rows_and_counts_what_it_left_out() {
     assert_eq!(none["open"], json!([]));
     assert_eq!(none["open_omitted"], 30);
     assert!(none["next_steps"]["open_omitted"].is_string());
+}
+
+/// A row that names a batch a recorded rollback covers is marked restored, and
+/// the note that says what that means is in the frame whenever such a row is
+/// open, listed or not, so the budget pays for it (#1050). Of a pair booked
+/// twice, the row naming the restored batch is marked. Nothing is marked,
+/// and there is no note, when no batch is restored.
+#[test]
+fn a_row_naming_a_restored_batch_is_marked_and_the_note_is_paid_for() {
+    let plain = summary_of(&every_state()).render(usize::MAX);
+    assert!(plain["next_steps"].get("restored").is_none());
+    assert!(plain["open"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|row| row.get("restored").is_none()));
+    let mut facts = every_state();
+    facts.restored = ["batch-2", "batch-5", "batch-9"].map(str::to_string).into();
+    let summary = summary_of(&facts);
+    let everything = summary.render(usize::MAX);
+    let marked: BTreeSet<(&str, &str)> = everything["open"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| row.get("restored").is_some())
+        .map(|row| {
+            assert_eq!(row["restored"], true);
+            (
+                row["bridge_txn_id"].as_str().unwrap(),
+                row["batch_id"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        marked,
+        [
+            ("st-unverified", "batch-2"),
+            ("st-held", "batch-9"),
+            ("t6", "batch-5"),
+        ]
+        .into()
+    );
+    assert_eq!(everything["next_steps"]["restored"], RESTORED_NOTE);
+    // with no row listed the note is still there, and a budget that holds the
+    // frame (the note in it) is never exceeded
+    let frame = summary.render(0);
+    assert_eq!(frame["open"], json!([]));
+    assert_eq!(frame["next_steps"]["restored"], RESTORED_NOTE);
+    let (low, high) = (frame.to_string().len() + 64, everything.to_string().len());
+    for available in [low, (low + high) / 2, high - 1] {
+        let section = summary.render(available);
+        assert_eq!(
+            section["next_steps"]["restored"], RESTORED_NOTE,
+            "{available}"
+        );
+        assert!(section.to_string().len() <= available, "{available}");
+    }
+}
+
+/// A withdrawal refused for a row that names a restored batch says what the
+/// marker means after its own step, alone or among other kinds.
+#[test]
+fn a_refusal_naming_a_restored_batch_ends_with_the_note() {
+    for kinds in [
+        BTreeSet::from([Carrier::OtherSideUnverified]),
+        BTreeSet::from([Carrier::OtherSideUnverified, Carrier::Paired]),
+    ] {
+        let plain = Carrier::refusal_step(&kinds);
+        assert_eq!(Carrier::refusal_step_restored(&kinds, false), plain);
+        assert_eq!(
+            Carrier::refusal_step_restored(&kinds, true),
+            format!("{plain} {RESTORED_NOTE}")
+        );
+    }
 }
 
 #[test]
@@ -918,6 +996,7 @@ fn every_sentence_to_follow() -> Vec<String> {
             CHECK_NOT_RUN_STEP,
             CHECK_NOT_RUN_RECORDED_STEP,
             OPEN_OMITTED_STEP,
+            RESTORED_NOTE,
         ]
         .map(str::to_string),
     );
@@ -939,7 +1018,8 @@ fn every_sentence_to_follow() -> Vec<String> {
 /// somewhere in a sentence is not enough.
 #[test]
 fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read() {
-    const READS: [&str; 6] = [
+    const READS: [&str; 7] = [
+        "Check in Tally whether that batch's voucher for the row is there, and tell the person",
         "Check in Tally which rows are transfers",
         "If verify_import found any voucher of a batch named for this row, or refused to read one, or a file of one was imported, do not build the other account's statement again: check in Tally which of their vouchers are there, and no step inside ComplyEaze Bridge frees this row yet",
         "Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not",
@@ -947,12 +1027,14 @@ fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read
         "check in Tally which Contra carries this transfer",
         "if verify_import found any voucher of a batch named for this row, or refused to read one, or a file of one was imported, do not build the other account's statement again: check in Tally which of their vouchers are there, and no step inside ComplyEaze Bridge frees this row yet",
     ];
-    const NEGATIONS_AND_DISCLOSURES: [&str; 11] = [
+    const NEGATIONS_AND_DISCLOSURES: [&str; 13] = [
         "A Contra in a batch not yet verified is not in Tally until that batch is imported and verified",
+        "A row marked restored names a batch whose vouchers a restore that ComplyEaze Bridge recorded may have removed from Tally",
         "A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked",
         "A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet",
         "Build the other account's statement for this row's date again only if every batch named for this row was never sent to Tally, verify_import listed every one of their vouchers as not_found, and the person confirms none of their files was ever imported into Tally",
         "ComplyEaze Bridge does not compare the two, and no step inside ComplyEaze Bridge removes or changes a voucher already in Tally",
+        "Do not enter this transfer in Tally by hand, and never import that batch's file: a later re-post of its rows would book it twice",
         "Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice",
         "If Tally rejected the send of a batch named for this row, building the other account's statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet",
         "If either batch named has not been sent to Tally, do not send it, and do not build or post anything further for this transfer",
@@ -1048,6 +1130,7 @@ fn a_skip_a_posted_voucher_contradicts_is_listed_open_with_the_batch_that_posts_
         fact: skip("st-posted", "20260105", "100.00"),
         holder: BatchId::new("batch-4"),
         by: HeldBy::PostedBatch,
+        pairs: true,
     }];
     let summary = summary_of(&facts);
     let TransferSummary::Computed {
@@ -1193,6 +1276,7 @@ fn a_held_skip_is_judged_without_the_skips_in_the_main_view() {
         fact: skip("st-held", "20260105", "100.00"),
         holder: BatchId::new("batch-9"),
         by: HeldBy::UnverifiedBatch,
+        pairs: true,
     }];
     let alone = held_carrier_view(&facts).unwrap();
     assert!(
@@ -1220,4 +1304,89 @@ fn a_held_skip_is_judged_without_the_skips_in_the_main_view() {
         "{:?}",
         combined.skips
     );
+}
+
+// ---- what a refusal at send says -------------------------------------------------------
+
+/// A batch about to be sent is a saved batch, not a build in progress: its
+/// refusals say nothing was sent, never that a file was not written or that a
+/// build posts or skips a row, and end by saying the statement is built again.
+#[test]
+fn a_refusal_at_send_speaks_of_the_batch_and_not_of_a_build() {
+    let build_wording = [
+        "This build",
+        "this build",
+        "in this build",
+        "No file was written",
+        "nothing was recorded",
+    ];
+    let mut steps = Vec::new();
+    for reason in [
+        "skip_row_already_posted",
+        "skip_row_paired_elsewhere",
+        "withdraw_skip_invalid",
+        "transfer_double_booked",
+    ] {
+        // whatever the build said, the send says its own
+        let refusal = TransferRefusal {
+            reason,
+            detail: json!({}),
+            next_step: format!("{NOTHING_WRITTEN} This build posts a row."),
+        };
+        steps.push((reason, refusal.for_send().into_parts().2));
+    }
+    for kinds in [
+        BTreeSet::from([Carrier::Paired]),
+        BTreeSet::from([Carrier::OtherSideUnverified]),
+        BTreeSet::from([Carrier::MatchedUnconfirmed]),
+        BTreeSet::from([Carrier::Paired, Carrier::OtherSideUnverified]),
+    ] {
+        let refusal = TransferRefusal {
+            reason: "withdraw_skip_paired",
+            detail: json!({}),
+            next_step: Carrier::refusal_step(&kinds),
+        };
+        steps.push(("withdraw_skip_paired", refusal.for_send().into_parts().2));
+    }
+    for (reason, step) in steps {
+        assert!(step.starts_with(NOTHING_SENT), "{reason}: {step}");
+        assert!(step.ends_with(SEND_ENDING), "{reason}: {step}");
+        for wording in build_wording {
+            assert!(!step.contains(wording), "{reason}: {wording}: {step}");
+        }
+    }
+}
+
+/// The one send refusal that does not end by saying the statement is built
+/// again: building it again meets the same unreadable record. It says what the
+/// build's step says about a later release, and that nothing was sent.
+#[test]
+fn the_unreadable_view_refusal_at_send_has_no_build_again_ending() {
+    let build = TransferRefusal {
+        reason: "transfer_view_not_established",
+        detail: json!({}),
+        next_step: TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP.into(),
+    };
+    let step = build.for_send().into_parts().2;
+    assert!(step.starts_with(NOTHING_SENT), "{step}");
+    assert!(!step.contains(SEND_ENDING), "{step}");
+    assert!(!step.contains("build it again"), "{step}");
+    assert!(
+        step.contains("a later release of ComplyEaze Bridge wrote in this folder"),
+        "{step}"
+    );
+    assert!(step.contains("send with that release"), "{step}");
+    assert!(
+        step.contains("report it with the error named here"),
+        "{step}"
+    );
+    // and none of the build's own wording
+    for wording in [
+        "This build",
+        "this build",
+        "No file was written",
+        "nothing was recorded",
+    ] {
+        assert!(!step.contains(wording), "{wording}: {step}");
+    }
 }

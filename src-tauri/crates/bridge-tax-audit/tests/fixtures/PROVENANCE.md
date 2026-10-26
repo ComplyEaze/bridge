@@ -22,7 +22,10 @@ the crate docs), which is never committed.
 
 `synthetic-read/` is a tally-read-v1 directory: `manifest.json` plus twelve parts, one of them
 gzip-stored. Written by `parity/generate_fixture.py`, deterministically (gzip mtime 0);
-`python3 parity/generate_fixture.py tests/fixtures` from the crate root reproduces these bytes.
+`python3 parity/generate_fixture.py tests/fixtures` from the crate root reproduced these bytes. The
+script was deleted when the repository retired its Python tooling (bridge#1810): the synthetic read
+is frozen data, these bytes and the hashes in `synthetic-read/manifest.json` are the record, and the
+last version of the script is in git history at the commit before the deletion.
 Its manifest declares `producer.kind = "synthetic"` and every part `transformation = "derived"`.
 
 The book is built to make each check fire at least once: a Contra voucher and a custom voucher
@@ -269,8 +272,8 @@ uv run -q --with openpyxl --with xlrd --with python-docx --with jsonschema --wit
 once per book (and again at `105b6c37`; see "Engine re-sync" below). `tests/edge_books.rs` builds each book in Rust, runs each named test with its module
 check, compares the whole dump with `compare` -- every field of it, the spec and test versions
 included -- and compares the row order. Every mutation written for this crate is recorded in
-`parity/mutations.json` with its author, and `parity/mutations.py` re-runs them and records each
-verdict in `parity/mutation-results.json`; its docstring states what a verdict rests on and what is
+`parity/mutations.json` with its author, and `parity/mutations.mjs` re-runs them and records each
+verdict in `parity/mutation-results.json`; its header comment states what a verdict rests on and what is
 proven at merge versus nightly. Of 52 hand-written
 mutations of the four modules and the NARRATION parse (32 from an independent reviewer, 20 from the
 author; see the PR), the crate's suite fails on every one, and the edge books alone on 50: the other

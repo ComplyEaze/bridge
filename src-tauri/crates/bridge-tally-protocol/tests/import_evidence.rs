@@ -103,6 +103,31 @@ fn clean_import_success_requires_each_live_evidence_condition_independently() {
 }
 
 #[test]
+fn an_exact_alter_only_or_delete_only_import_is_a_clean_success() {
+    let altered = TallyImportResult {
+        created: 0,
+        altered: 1,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 0,
+        line_error_count: 0,
+        counter_presence: all_counters_reported(),
+    };
+    assert!(altered.is_clean_success_for(0, 1, 0));
+    assert!(!altered.is_clean_success_for(1, 0, 0));
+
+    let deleted = TallyImportResult {
+        altered: 0,
+        deleted: 1,
+        ..altered
+    };
+    assert!(deleted.is_clean_success_for(0, 0, 1));
+    assert!(!deleted.is_clean_success_for(0, 1, 0));
+}
+
+#[test]
 fn captured_success_requires_every_clean_counter_to_be_observed() {
     // Start with an ignored live capture, then remove one counter at a time.
     // A missing counter remains auditably absent; it is never promoted to a

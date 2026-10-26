@@ -54,7 +54,8 @@ What Bridge does today:
   `bridge_mcp`'s own `main` checks for a `--confirm-journal` argument before starting Tokio and,
   if present, calls `agent::run_confirmation()` instead of serving stdio
   (`src-tauri/src/bin/bridge_mcp.rs`, `run_journal_confirmation_child_from_args` in
-  `src-tauri/src/lib.rs`); `--confirm-review`, for the review dialog of #239, works the same way.
+  `src-tauri/src/lib.rs`); `--confirm-review`, for the review dialog of #239, and `--confirm-release`, for the invoice-stop
+  release dialog (#1828), work the same way.
   The post path exists because posting one approved voucher spawns the same
   executable as a child process with that flag (PR #236; today `nonce_bound_dialog` in
   `src-tauri/src/tally/approved_import.rs`). Since #635 the parent does not take the

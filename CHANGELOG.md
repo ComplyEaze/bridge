@@ -48,6 +48,10 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- The three cash-line answers ComplyEaze Bridge cannot build yet (cash paid straight to someone, a deposit from
+  the cash box, unbooked cash sales) no longer say to record the line by hand or to record the sales in Tally
+  first; each keeps its reason and offers `dont_know`, which builds the line to the suspense ledger, marked for
+  the CA to move (part of #1709).
 - On macOS the first line of the approval alert (what each button does) is no longer broken by ComplyEaze Bridge at 100 characters: the alert wraps its own text, so a break of ours was wrapped a second time and left a ragged second row. The Windows box keeps its 100-character lines. The box's size caps are unchanged (part of #1780).
 - The next steps for five situations no longer send a person to enter a voucher in Tally themselves; each now says what
   ComplyEaze Bridge does and that it cannot put the voucher in the book yet: a voucher Tally reported as not
@@ -88,6 +92,21 @@ These changes are in source and not yet in a published build.
   **Do not go back to an earlier release after this one has seen a restore:** an earlier release refuses an import
   journal holding the new record, and stops every build, post and verification until ComplyEaze Bridge is upgraded
   again.
+- The transfer check now treats a batch a recorded restore covers as neither found posted nor verified, whatever
+  its last status (part of #1050). Before, a skipped row such a batch held could be retired, or listed as
+  `posted_against_skip`, for good, and its Contra could pair the other account's skip, although the restore may
+  have removed the voucher. Now the row stays open (`held_elsewhere`, naming the covered batch; a skip the batch
+  had retired is listed so, but a withdrawal is judged as before; a rollback never retires a skip that would
+  otherwise be held), its Contra is an unverified candidate, and its days give no coverage. Every row that names such a batch is marked
+  `"restored": true`, and the section's `next_steps.restored` (and the step of a withdrawal refused for such a
+  row) says that no step inside ComplyEaze Bridge settles it, not to withdraw it or build or amend its rows, to check
+  in Tally and tell the person, and not to enter the transfer by hand or import that batch's file. Nothing else in the journal changes, and no new record is
+  written. Limits: no step inside ComplyEaze Bridge settles such a row, and the note is advice, not a refusal (a
+  withdrawal of the row is refused only when a Contra carries it, and an amendment of the covered batch's lineage
+  is not refused); the covered statement's days stay blocked for the other account's
+  coverage, so skips there stay `not_established` or `matched_unconfirmed`; a voucher that comes back in Tally
+  after the restore is no longer flagged as `posted_against_skip`; the invoice stop and the local data report read
+  the batch's last status as before.
 
 - `voucher_presence` now checks a voucher type declared `manual` against the book's own numbering before it
   reads the window, because a voucher number is an identity only where the book's series for the type says
@@ -189,6 +208,18 @@ These changes are in source and not yet in a published build.
   an empty envelope. Any other window is named as unmeasured, a book whose master mark is over 874 is
   refused before the report is asked for (a stated guess, as for `stock_summary`), and the cost on a large book is not known. Not yet run
   against Tally.
+
+- A ledger name that is an alias of another ledger is now named as one (part of #1688). `validate_masters` and the refusal of a
+  build (`masters_not_exact`) add `alias_of` to a requested name that is, character for character, one alias of exactly one
+  live ledger, naming that ledger as Tally lists it, and say that an operator should confirm it is the ledger meant before
+  the name is replaced; ComplyEaze Bridge still never sends an alias. The check for two ledgers whose names read alike now
+  counts a ledger's aliases too (`through_alias` names the alias). Before, a name that was one ledger's own name and
+  folded equal to another ledger's alias matched the first exactly and could be built and posted; it is now refused as a
+  twin, and so is a batch built or approved before this change that names it, at post or in the queue
+  (`ledger_has_folded_twin`), until the alias or the name is changed in Tally and the batch is built again. A name that is
+  only an alias used to read as missing or near. On Tally's own screen an alias equal to another ledger's name was
+  refused in the cases tried, so such a twin is probably rare (PARTIAL: one company; lowercase not tried). Not yet run
+  against Tally through the built tool.
 
 ## [0.6.0] - 2026-10-16
 

@@ -124,6 +124,8 @@ pub(super) struct OpenRow {
     date: TallyDate,
     state: OpenState,
     batch: Option<String>,
+    /// A batch it names is one a recorded rollback covers (#1050).
+    restored: bool,
 }
 
 /// What the view said, as counts and open rows, before it is cut to a budget.
@@ -184,6 +186,7 @@ impl TransferSummary {
                     id: key.row.as_str().to_string(),
                     date: (*date).clone(),
                     state,
+                    restored: batch.is_some_and(|batch| facts.restored.contains(batch.as_str())),
                     batch: batch.map(|batch| batch.as_str().to_string()),
                 }));
             }
@@ -196,6 +199,7 @@ impl TransferSummary {
                     HeldBy::UnverifiedBatch => OpenState::HeldElsewhere,
                     HeldBy::PostedBatch => OpenState::PostedAgainstSkip,
                 },
+                restored: facts.restored.contains(held.holder.as_str()),
                 batch: Some(held.holder.as_str().to_string()),
             });
         }
@@ -216,6 +220,8 @@ impl TransferSummary {
                         id: this.txn.as_str().to_string(),
                         date: (*date).clone(),
                         state: OpenState::DoubleBooked,
+                        // the row names the other batch, so the marker is its
+                        restored: facts.restored.contains(other.batch.as_str()),
                         batch: Some(other.batch.as_str().to_string()),
                     });
                 }
@@ -249,6 +255,11 @@ impl TransferSummary {
                 .entry(row.state.label())
                 .or_insert_with(|| json!(row.state.step()));
         }
+        // paid for in the frame, like the state steps, whether or not the
+        // marked row is listed; a section cut to its counts drops it with them
+        if open.iter().any(|row| row.restored) {
+            next_steps.insert("restored".into(), json!(RESTORED_NOTE));
+        }
         let frame = json!({
             "state": "computed", "skips_paired": paired, "skips_open": skips_open,
             "open": [], "open_omitted": open.len(), "retired": retired,
@@ -259,13 +270,16 @@ impl TransferSummary {
         let mut room = available.saturating_sub(frame_len);
         let mut rows = Vec::new();
         for row in open {
-            let rendered = match &row.batch {
+            let mut rendered = match &row.batch {
                 Some(batch) => json!({"bridge_txn_id": row.id, "date": row.date,
                     "state": row.state.label(), "batch_id": batch}),
                 None => {
                     json!({"bridge_txn_id": row.id, "date": row.date, "state": row.state.label()})
                 }
             };
+            if row.restored {
+                rendered["restored"] = json!(true);
+            }
             // `,` between rows
             let cost = rendered.to_string().len() + 1;
             if cost > room {
@@ -293,6 +307,9 @@ const CHECK_NOT_RUN_STEP: &str =
     "Not run, or cut to fit: verify again; if it repeats, raise BRIDGE_AGENT_MAX_BYTES.";
 /// A statement of only skipped rows has no batch to verify.
 const CHECK_NOT_RUN_RECORDED_STEP: &str = "The skipped rows are recorded; the transfer check will show on the next build or verification for this company.";
+/// What a row marked restored means, whatever its state (#1050): the batch it
+/// names is one a recorded rollback covers, which no step settles.
+pub(super) const RESTORED_NOTE: &str = "A row marked restored names a batch whose vouchers a restore that ComplyEaze Bridge recorded may have removed from Tally. Whatever the row's state says, that batch stays unverified here even after verify_import, and no step inside ComplyEaze Bridge settles the row: do not name it in withdraw_skips, and do not build or amend its rows. Check in Tally whether that batch's voucher for the row is there, and tell the person. Do not enter this transfer in Tally by hand, and never import that batch's file: a later re-post of its rows would book it twice.";
 const OPEN_OMITTED_STEP: &str =
     "Some open rows are not listed because the response is full. Raise BRIDGE_AGENT_MAX_BYTES to list every open row.";
 
@@ -557,6 +574,17 @@ impl Carrier {
         }
     }
 
+    /// [`Self::refusal_step`], with [`RESTORED_NOTE`] after it when a row it
+    /// refuses names a batch a recorded rollback covers.
+    pub(super) fn refusal_step_restored(kinds: &BTreeSet<Self>, restored: bool) -> String {
+        let step = Self::refusal_step(kinds);
+        if restored {
+            format!("{step} {RESTORED_NOTE}")
+        } else {
+            step
+        }
+    }
+
     /// What to do about withdrawn rows that are refused, by every kind among
     /// them: the rows a list leaves out count too.
     pub(super) fn refusal_step(kinds: &BTreeSet<Self>) -> String {
@@ -596,7 +624,12 @@ fn rows_listed_json(rows: Vec<Value>) -> (Vec<Value>, usize) {
 pub(super) fn held_carrier_view(
     facts: &TransferFacts,
 ) -> Result<TransferView, crate::agent::transfer_pairing::PairingInputError> {
-    let held: Vec<SkipFact> = facts.held.iter().map(|held| held.fact.clone()).collect();
+    let held: Vec<SkipFact> = facts
+        .held
+        .iter()
+        .filter(|held| held.pairs)
+        .map(|held| held.fact.clone())
+        .collect();
     transfer_pairing_view(&held, &facts.contras, &facts.coverage, TRANSFER_K_DAYS)
 }
 
@@ -780,12 +813,20 @@ impl Server {
             .collect();
         if !carried.is_empty() {
             let kinds = carried.iter().map(|&(_, _, carrier)| carrier).collect();
-            let next_step = Carrier::refusal_step(&kinds);
+            // the rows left out count too
+            let restored = carried
+                .iter()
+                .any(|(_, batch, _)| before.restored.contains(batch.as_str()));
+            let next_step = Carrier::refusal_step_restored(&kinds, restored);
             let rows = carried
                 .into_iter()
                 .map(|(row, batch, carrier)| {
-                    json!({"bridge_txn_id": row, "batch_id": batch.as_str(),
-                        "state": carrier.label()})
+                    let mut listed = json!({"bridge_txn_id": row, "batch_id": batch.as_str(),
+                        "state": carrier.label()});
+                    if before.restored.contains(batch.as_str()) {
+                        listed["restored"] = json!(true);
+                    }
+                    listed
                 })
                 .collect();
             let (listed, omitted) = rows_listed_json(rows);

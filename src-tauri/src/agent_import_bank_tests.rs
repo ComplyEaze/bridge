@@ -2824,6 +2824,52 @@ async fn the_masters_of_a_refused_build_are_listed_in_the_order_the_batch_names_
     }
 }
 
+/// #1688: a ledger whose ALIAS folds equal to a named ledger is a twin at the build, the
+/// gate behind a build that names it as an exact match. The alias is added to the captured
+/// catalogue's text (a state Tally's own screen refused in the cases tried), and the
+/// refusal names the ledger that carries the alias. Without the aliases handed to the
+/// build's twin check the same catalogue builds, so this fails if they are dropped.
+#[tokio::test]
+async fn an_alias_that_folds_equal_to_a_named_ledger_refuses_the_build_as_a_twin() {
+    let captured = captured_shape_lab_catalogue();
+    let old = "<NAME>Chem Supplier 4</NAME>";
+    assert_eq!(
+        captured.matches(old).count(),
+        1,
+        "one language list to change"
+    );
+    let aliased = captured.replacen(old, &format!("{old}<NAME>CASH</NAME>"), 1);
+    for redaction in PLAIN_AND_MASKED {
+        let result = shape_lab_refusal(
+            &aliased,
+            json!([one_rupee_journal("txn-a", "Chem Supplier 4")]),
+            redaction,
+        )
+        .await;
+        assert_eq!(result["reason"], "ledger_has_folded_twin", "{result}");
+        assert_eq!(
+            sent_in_order(&result["ledger_twins"], "requested"),
+            as_sent(&["Cash"], redaction),
+            "{result}"
+        );
+        let live = result["ledger_twins"][0]["live_ledgers"]
+            .as_array()
+            .unwrap();
+        assert_eq!(
+            live.len(),
+            2,
+            "the ledger and the one carrying the alias: {result}"
+        );
+        assert_eq!(
+            live.iter()
+                .filter(|ledger| ledger.get("through_alias").is_some())
+                .count(),
+            1,
+            "{result}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn the_twins_of_a_refused_build_are_listed_in_the_order_the_batch_names_them() {
     for redaction in PLAIN_AND_MASKED {

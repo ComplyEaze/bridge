@@ -2186,18 +2186,32 @@ refused as `proposals_legacy` (parse the statement again).
   `not_established` when the view could not be computed or the section was cut
   to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired` and
   `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
-  `batch_id` where one is involved: `not_found`, `ambiguous`,
+  `batch_id` where one is involved: `not_found`, `tally_unchecked`, `ambiguous`,
   `other_side_unverified`, `held_elsewhere`, `posted_against_skip`, `matched_unconfirmed`,
   `reference_differs`, `reversed_same_day`, `not_established`, or
   `double_booked` for a Contra booked from both statements. No amount,
   reference, instrument, party or ledger is returned.
-- **What `not_found` claims.** Only that the other account's statement went
+- **What `not_found` claims.** That the other account's statement went
   through ComplyEaze Bridge, was verified for that day, and holds no Contra of
   the row's day, amount, ledgers and direction that is not already paired, or
-  matched by date, with another row, whatever its reference. A row pairs by an
+  matched by date, with another row, whatever its reference, and that
+  ComplyEaze Bridge read every voucher of that day in Tally and found no Contra
+  between the two accounts. No read of a whole day of Tally exists yet, so no row
+  says `not_found` yet (#1392). A row pairs by an
   equal reference, or by an equal date (k = 0 until two real statements of one
   transfer have been measured), so a Contra the other bank printed on another
   day is not matched.
+- **What `tally_unchecked` claims.** Only the first half of that: the other
+  account's statement holds no such Contra, and whether Tally holds one is not
+  established, because ComplyEaze Bridge did not read every voucher of that day in
+  Tally, so a Contra entered in Tally directly is not in its records. Every row that
+  would be `not_found` is `tally_unchecked` until a whole-day read exists. The
+  assistant reads that day's vouchers for the other account's bank ledger with
+  `vouchers`, compares each entry's `bank_allocations` instrument numbers and
+  narration with the row, tells the person what it found, and keeps the skip; a
+  skip is withdrawn only on the person's confirmation that no entry in Tally carries
+  the transfer (`withdraw_skips`, as for any open row). Reading the day sends its
+  vouchers to the AI provider; `mask_parties` hides the narration, not the amounts.
 - **What `restored` means.** A batch that a restore ComplyEaze Bridge recorded
   covers (see `verify_import`, `book_rolled_back`) is never found posted or
   verified for the transfer check, whatever its last status: a row it holds

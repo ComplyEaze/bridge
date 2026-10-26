@@ -88,6 +88,7 @@ test("the real list puts the write path, credentials and the gate in the full ti
     "src-tauri/src/agent_import_post.rs",
     "src-tauri/src/agent_import_post_tests.rs",
     "src-tauri/src/tally/approved_import.rs",
+    "src-tauri/src/tally/box_fit.rs",
     "src-tauri/crates/bridge-tally-protocol/src/ledger_create.rs",
     "src-tauri/crates/bridge-tally-protocol/src/import_outcome.rs",
     "src-tauri/crates/bridge-tally-protocol/src/xml_text.rs",

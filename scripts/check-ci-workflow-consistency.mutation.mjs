@@ -347,3 +347,13 @@ for (const [name, replacement] of [
   });
 }
 
+// The nightly records run must not hold eight of the account's twenty runner slots at once.
+for (const [name, replacement] of [
+  ["the limit removed", ""],
+  ["the limit raised to eight", "      max-parallel: 8\n"],
+]) {
+  test(`mutation shards: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/tax-audit-mutations-nightly.yml", (text) => text.replace("      max-parallel: 4\n", replacement)),
+      "the mutation shards must run four at a time");
+  });
+}

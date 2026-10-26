@@ -251,3 +251,79 @@ fn a_year_suffix_two_numbers_share_is_no_serial_match() {
     let other = booked("001/2025-26", Some("20251201"), "20251201");
     assert_eq!(compare(&new, &other), InvoiceMatch::Different);
 }
+
+#[test]
+fn a_year_written_into_the_number_does_not_hide_the_running_number() {
+    let same_day = |incoming_raw: &str, booked_raw: &str| {
+        let mut copy = booked(booked_raw, Some("20251201"), "20251203");
+        copy.value = Some(value("100.00"));
+        compare(&incoming(incoming_raw, "20251201"), &copy)
+    };
+    for (new, copy) in [
+        ("001/2025-26", "1"),
+        ("INV/001/25-26", "INV/001"),
+        ("001/FY26", "1"),
+        ("FY/2025-26/001", "001"),
+        ("INV/2025-26/001", "INV/25-26/001"),
+        ("INV/0001/2025", "INV/1"),
+    ] {
+        assert_eq!(
+            same_day(new, copy),
+            InvoiceMatch::PossiblyBooked,
+            "{new} {copy}"
+        );
+    }
+    // Without a second signal it is still another invoice.
+    let mut other_day = booked("1", Some("20251205"), "20251206");
+    other_day.value = Some(value("100.00"));
+    assert_eq!(
+        compare(&incoming("001/2025-26", "20251201"), &other_day),
+        InvoiceMatch::Different
+    );
+    // A number that is only a year keeps the year as its number.
+    let mut next = booked("INV/2026", Some("20251201"), "20251203");
+    next.value = Some(value("11800.00"));
+    assert_eq!(
+        compare(&incoming("INV/2025", "20251201"), &next),
+        InvoiceMatch::Different
+    );
+}
+
+#[test]
+fn a_placeholder_is_never_booked_and_matches_only_with_a_second_signal() {
+    for placeholder in ["NA", "N/A", "Cash", "0", "-0-"] {
+        let new = incoming(placeholder, "20251201");
+        let mut copy = booked(placeholder, Some("20251205"), "20251206");
+        copy.value = Some(value("-500.00"));
+        assert_eq!(
+            compare(&new, &copy),
+            InvoiceMatch::Different,
+            "{placeholder}"
+        );
+        copy.value = Some(value("-11800.00"));
+        assert_eq!(
+            compare(&new, &copy),
+            InvoiceMatch::PossiblyBooked,
+            "{placeholder}"
+        );
+    }
+}
+
+#[test]
+fn every_folded_character_reads_as_its_ascii_form() {
+    for (copied, expected) in [
+        ("A\u{2010}1", "A/1"),
+        ("A\u{2011}1", "A/1"),
+        ("A\u{2012}1", "A/1"),
+        ("A\u{2014}1", "A/1"),
+        ("A_1", "A/1"),
+        ("A\\1", "A/1"),
+        ("\u{FEFF}A1", "A1"),
+        ("A\u{2060}1", "A1"),
+        ("A\u{200C}1\u{200D}", "A1"),
+        ("A\u{0966}\u{096F}", "A09"),
+        ("A\u{FF10}\u{FF19}", "A09"),
+    ] {
+        assert_eq!(reference(copied).exact(), expected, "{copied:?}");
+    }
+}

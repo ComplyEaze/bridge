@@ -16,6 +16,15 @@
 //!   books), on a document type that is not known, or on a loose form of the number, is never
 //!   more than [`InvoiceMatch::PossiblyBooked`], which only a person may release. A loose form
 //!   counts only with a second signal: the same invoice date or the same invoice value.
+//! - A financial year written into a number (`2025-26`, `25/26`, `FY26`, a leading or trailing
+//!   `2025`) is left out of the loose form and the serial, so a copy keyed without it, or with the
+//!   year written another way, is still found.
+//! - A number with no digit but zero (`NA`, `Cash`, `0`) is a placeholder, not a supplier's
+//!   number: it is never [`InvoiceMatch::Booked`], and matches only as a loose form does.
+//! - The characters folded (separators, characters that draw nothing, digits other than ASCII)
+//!   are closed lists: Devanagari and full-width digits only, and the dashes and slashes named
+//!   in `SEPARATORS`. Anything else is kept as it is, so a number differing only there is
+//!   not found as the same.
 use crate::{ExactDecimal, TallyDate};
 
 /// The separators a supplier writes between the parts of a number, folded to one form: the ASCII
@@ -67,8 +76,9 @@ impl SupplierInvoiceRef {
         if exact.is_empty() {
             return Err(SupplierInvoiceRefError::Empty);
         }
-        let loose = loose_form(&exact);
-        let serial = serial_form(&exact);
+        let core = without_year(&exact);
+        let loose = loose_form(&core);
+        let serial = serial_form(&core);
         let strict = raw
             .chars()
             .filter(|ch| !is_invisible(*ch))
@@ -122,6 +132,57 @@ impl SupplierInvoiceRef {
 
     fn is_digits_only(&self) -> bool {
         self.exact.chars().all(|ch| ch.is_ascii_digit())
+    }
+
+    /// No digit but zero: `NA`, `Cash`, `-0-` and the like stand in for a number.
+    fn is_placeholder(&self) -> bool {
+        !self
+            .exact
+            .chars()
+            .any(|ch| ch.is_ascii_digit() && ch != '0')
+    }
+}
+
+/// The exact form without the parts that name a financial year: `FY` with or without its year,
+/// two runs of two or four digits a year apart (`2025/26`, `25/26`, `2025/2026`), and a run of
+/// four digits from 2000 to 2099 at either end. The exact form itself when that leaves no digit,
+/// so `INV/2025` keeps its year as its number.
+fn without_year(exact: &str) -> String {
+    let parts: Vec<&str> = exact.split('/').collect();
+    let year_digits = |part: &str| {
+        (part.len() == 2 || part.len() == 4) && part.chars().all(|ch| ch.is_ascii_digit())
+    };
+    let mut year = vec![false; parts.len()];
+    for (index, part) in parts.iter().enumerate() {
+        if *part == "FY" || part.strip_prefix("FY").is_some_and(year_digits) {
+            year[index] = true;
+        }
+        if let Some(next) = parts.get(index + 1) {
+            if year_digits(part) && year_digits(next) {
+                let first: u32 = part.parse().expect("digits");
+                let second: u32 = next.parse().expect("digits");
+                if (first % 100 + 1) % 100 == second % 100 {
+                    year[index] = true;
+                    year[index + 1] = true;
+                }
+            }
+        }
+        let at_end = index == 0 || index + 1 == parts.len();
+        if at_end && part.len() == 4 && part.starts_with("20") && year_digits(part) {
+            year[index] = true;
+        }
+    }
+    let core = parts
+        .iter()
+        .zip(&year)
+        .filter(|(_, is_year)| !**is_year)
+        .map(|(part, _)| *part)
+        .collect::<Vec<_>>()
+        .join("/");
+    if core.chars().any(|ch| ch.is_ascii_digit()) {
+        core
+    } else {
+        exact.to_string()
     }
 }
 
@@ -281,7 +342,8 @@ pub fn compare(incoming: &IncomingInvoice, booked: &BookedInvoice) -> InvoiceMat
     if !years.contains(&year) {
         return InvoiceMatch::Different;
     }
-    if incoming.reference.exact != booked.reference.exact {
+    // A placeholder in both is no supplier number to be the same on: only a loose match.
+    if incoming.reference.exact != booked.reference.exact || incoming.reference.is_placeholder() {
         let second_signal = booked.invoice_date.as_ref() == Some(&incoming.invoice_date)
             || matches!((&incoming.value, &booked.value),
                 (Some(left), Some(right))

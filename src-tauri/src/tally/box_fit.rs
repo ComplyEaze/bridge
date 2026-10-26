@@ -3,13 +3,14 @@
 //! monitor it opened on (#1832, #1780).
 //!
 //! A Windows message box cannot scroll. Measured in the lab (1920x1080 at 125
-//! percent, work area 1030 high): a box of 48 lines fitted (bottom edge 1023),
-//! one of 60 lines was 1,134 high with its top pinned at 0 and its buttons off
-//! the screen, and Windows neither clipped nor shrank it. A person who can see
-//! only the top of such a box could answer it with `Y` having read none of the
-//! lines below the screen's edge. The caps on a text's lines are a guess about
-//! the screen; this measures the real box when it opens, in the dialog's own
-//! process, and refuses when it is not wholly on the screen.
+//! percent, work area 1030 high): a box of 44 lines fitted, one of 48 lines
+//! was 1,087 high and did not, one of 60 lines was 1,134 high with its top
+//! pinned at 0 and its buttons off the screen, and Windows neither clipped nor
+//! shrank it. A person who can see only the top of such a box could answer it
+//! with `Y` having read none of the lines below the screen's edge. The caps on
+//! a text's lines are a guess about the screen; this measures the real box
+//! when it opens, in the dialog's own process, and refuses when it is not
+//! wholly on the screen.
 //!
 //! Units. The executable's manifest declares no DPI awareness, so Windows
 //! would draw the box DPI-unaware and report its rectangle and its monitor's

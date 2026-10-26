@@ -6,8 +6,8 @@ mod fixtures;
 mod server;
 
 pub use fixtures::{
-    decode, encode, Delivery, Fixture, ProductStatus, ResponseContentEncoding, ResponseFraming,
-    ScenarioPlan, WireEncoding,
+    decode, encode, Delivery, DeliveryGate, Fixture, ProductStatus, ResponseContentEncoding,
+    ResponseFraming, ScenarioPlan, WireEncoding,
 };
 pub use server::{
     NoRequestForPlan, ObservedRequest, RefusedRequest, RequestFault, SequenceSimulator, Simulator,

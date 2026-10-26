@@ -1390,6 +1390,156 @@ async fn terminal_gap_and_warning_sets_survive_commit_pending_crash_resume() {
     assert_eq!(receipt.facts.warning_codes, vec!["adaptive_window_split"]);
 }
 
+/// A batch that holds an observation row of `rejected` status is one the mirror will never commit
+/// (no release writes such a row, so only another writer can have put it there). The refusal is
+/// closed and in-band; the run it leaves must say so and must not offer a resume that cannot work.
+#[tokio::test]
+async fn a_commit_the_mirror_refuses_on_an_invariant_is_refused_again_on_every_resume() {
+    use crate::db::tally_mirror::MirrorError;
+    use crate::sync::coordinator::status_after_error;
+
+    let (pool, mirror, store, mut plan) = setup().await;
+    let one_day = ReadWindow {
+        from_yyyymmdd: "20260701".to_string(),
+        to_yyyymmdd: "20260701".to_string(),
+    };
+    plan.resume_key = "resume-refused-commit".to_string();
+    plan.run_id = "run-refused-commit".to_string();
+    plan.windows = vec![PlannedWindow::deterministic(
+        CapabilityPackId::CoreAccounting,
+        one_day.clone(),
+    )];
+    plan.capability_canary_window = Some(PlannedWindow::deterministic(
+        CapabilityPackId::CoreAccounting,
+        one_day,
+    ));
+    let mut state = DurableSnapshotState::new(&plan, Freshness::NeverVerified).unwrap();
+    store.save(&mut state).await.unwrap();
+    let connector = FakeConnector {
+        batch: Mutex::new(VecDeque::from([Err(TallyError::ReadResponseTooLarge {
+            scope: ReadResponseScope::VoucherWindow,
+        })])),
+        company: plan.company.clone(),
+        requests: Mutex::new(Vec::new()),
+    };
+    // The run's own batch gains a rejected observation as soon as it exists, as a foreign writer
+    // could add one, so the pending commit is built over a batch the mirror will never accept.
+    struct SeedRejectedStore {
+        inner: SqliteSnapshotStateStore,
+        pool: SqlitePool,
+        company_id: String,
+        seeded: AtomicBool,
+    }
+    #[async_trait]
+    impl SnapshotStateStore for SeedRejectedStore {
+        async fn load(
+            &self,
+            resume_key: &str,
+        ) -> Result<Option<DurableSnapshotState>, SnapshotError> {
+            self.inner.load(resume_key).await
+        }
+
+        async fn save(&self, state: &mut DurableSnapshotState) -> Result<(), SnapshotError> {
+            self.inner.save(state).await?;
+            if let Some(batch_id) = state.batch_id.as_deref() {
+                if !self.seeded.swap(true, Ordering::AcqRel) {
+                    let source_record_id = uuid::Uuid::new_v4().to_string();
+                    sqlx::query(
+                        "INSERT INTO tally_source_records(\
+                           id, company_id, object_type, source_guid, identity_confidence, \
+                           first_seen_batch_id, last_seen_batch_id\
+                         ) VALUES (?1, ?2, 'ledger', 'foreign-ledger-guid-refused', 'observed', ?3, ?3)",
+                    )
+                    .bind(&source_record_id)
+                    .bind(&self.company_id)
+                    .bind(batch_id)
+                    .execute(&self.pool)
+                    .await
+                    .map_err(SnapshotError::StateStore)?;
+                    sqlx::query(
+                        "INSERT INTO tally_record_observations(\
+                           id, batch_id, source_record_id, observed_at_unix_ms, raw_source_sha256, \
+                           validation_status, safe_rejection_code\
+                         ) VALUES (?1, ?2, ?3, 2100, ?4, 'rejected', 'synthetic_foreign_rejection')",
+                    )
+                    .bind(uuid::Uuid::new_v4().to_string())
+                    .bind(batch_id)
+                    .bind(&source_record_id)
+                    .bind("a".repeat(64))
+                    .execute(&self.pool)
+                    .await
+                    .map_err(SnapshotError::StateStore)?;
+                }
+            }
+            Ok(())
+        }
+
+        async fn heartbeat(&self, state: &DurableSnapshotState) -> Result<(), SnapshotError> {
+            self.inner.heartbeat(state).await
+        }
+    }
+    let seeding_store = SeedRejectedStore {
+        inner: store.clone(),
+        pool: pool.clone(),
+        company_id: plan.mirror_company_id.clone(),
+        seeded: AtomicBool::new(false),
+    };
+    let first = FullSnapshotEngine::new(&mirror, &seeding_store, &connector)
+        .run(&plan, &AtomicCancellation::default())
+        .await
+        .expect_err("the mirror refuses this batch's commit");
+    assert!(matches!(first, SnapshotError::CommitRefused), "{first:?}");
+    let pending = store.load(&plan.resume_key).await.unwrap().unwrap();
+    assert_eq!(pending.progress.phase, SnapshotPhase::CommitPending);
+
+    for attempt in 1..=2 {
+        // The first attempt is the run's own commit; these are two resumes of it.
+        let error = FullSnapshotEngine::new(&mirror, &store, &connector)
+            .run(&plan, &AtomicCancellation::default())
+            .await
+            .expect_err("the mirror refuses this batch's commit again");
+        assert!(
+            matches!(error, SnapshotError::CommitRefused),
+            "attempt {attempt}: {error:?}"
+        );
+        // Nothing was written: the run is still the pending commit, and nothing went to Tally.
+        let after = store.load(&plan.resume_key).await.unwrap().unwrap();
+        assert_eq!(after.progress.phase, SnapshotPhase::CommitPending);
+        assert_eq!(connector.requests.lock().unwrap().len(), 1);
+        let status = status_after_error(&plan, Some(after), &error);
+        assert_eq!(
+            status.failure_code.as_deref(),
+            Some("snapshot_commit_refused")
+        );
+        assert!(status.requires_resume, "it must not read as an active run");
+        assert!(!status.resume_available, "attempt {attempt}");
+    }
+
+    // Only an invariant of the batch is refused for good; any other commit failure stays a mirror
+    // failure.
+    assert!(matches!(
+        commit_error(MirrorError::NotFound),
+        SnapshotError::Mirror(MirrorError::NotFound)
+    ));
+    assert!(matches!(
+        commit_error(MirrorError::VerificationInvariant),
+        SnapshotError::CommitRefused
+    ));
+
+    // A mirror failure a later resume can get past keeps its own code and its resume.
+    let transient = status_after_error(
+        &plan,
+        Some(pending),
+        &SnapshotError::Mirror(MirrorError::ConcurrentCheckpoint),
+    );
+    assert_eq!(
+        transient.failure_code.as_deref(),
+        Some("snapshot_mirror_failed")
+    );
+    assert!(transient.requires_resume);
+    assert!(transient.resume_available);
+}
+
 #[tokio::test]
 async fn resume_after_split_commit_never_refetches_the_parent() {
     let (_, mirror, store, plan) = setup().await;

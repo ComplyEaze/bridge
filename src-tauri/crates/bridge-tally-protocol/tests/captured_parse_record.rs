@@ -1278,6 +1278,30 @@ const ROWS: &[Row] = &[
         parse: |_, text| masters(NativeMasterKind::StockGroups, text, SHAPE_GUID),
     },
     Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_baseline_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_item_created_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_tieout_b_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, TIEOUT_B_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/masters_units_reads_lab_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_masters(Units)",
@@ -2009,6 +2033,12 @@ const ROWS: &[Row] = &[
         fixture: "tests/fixtures/statement_groups_stock_book_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_group_snapshot(TIEOUT B)",
+        parse: |_, text| groups(text, TIEOUT_B_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/statement_groups_stock_book_72_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(TIEOUT B, 7.2)",
         parse: |_, text| groups(text, TIEOUT_B_GUID),
     },
     // Native voucher and voucher-type collections: tests/native_vouchers.rs,

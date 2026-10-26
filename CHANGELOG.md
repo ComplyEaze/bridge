@@ -36,14 +36,35 @@ These changes are in source and not yet in a published build.
   missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one
   Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not
   measured.
+- A batch built from a bank statement is checked against the company's skipped rows and Contras when `post_import`
+  sends it, as it was when it was built, with the same refusals (`withdraw_skip_paired`,
+  `skip_row_paired_elsewhere`, `skip_row_already_posted`, `withdraw_skip_invalid`, `transfer_double_booked`,
+  `transfer_view_not_established`): before the post (before the dialog, or in the call that redeems an approval) and
+  again under the admission lock. The refusals at send speak of the saved batch: nothing was sent, any approval of it
+  is withdrawn and, except for `transfer_view_not_established`, the batch must be built again. A row the batch withdrew is judged on the
+  withdrawal it recorded (`withdrawn_skips`), whether it was built from a statement or from vouchers given
+  directly, and it counts only if the batch was built after the newest record of that skip: a skip recorded since
+  refuses the batch (part of #1703).
 
 **Changed**
 
+- On macOS the first line of the approval alert (what each button does) is no longer broken by ComplyEaze Bridge at 100 characters: the alert wraps its own text, so a break of ours was wrapped a second time and left a ragged second row. The Windows box keeps its 100-character lines. The box's size caps are unchanged (part of #1780).
 - The next steps for five situations no longer send a person to enter a voucher in Tally themselves; each now says what
   ComplyEaze Bridge does and that it cannot put the voucher in the book yet: a voucher Tally reported as not
   created (and one later not found after that report), a row a rejected batch carried, a statement day that is
   partly posted, the extra row of same-day twins, and the first voucher of a company that has never held one
   (part of #1709).
+- A saved batch built while voucher posting is off now says whether turning on **Allow voucher posting** would give
+  it a route: the build checks the batch as `post_import` would at the batch limit of 50, and the assistant is told
+  to say that, with the setting on (it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge
+  would check the batch again and ask for approval, and may still refuse it; the file import stays the route until
+  then. Every text that offers both routes says to use one only: once the file is imported, do not post the batch,
+  and once the batch is posted, do not import the file (an import after a post is not checked against it). With
+  posting on, a batch `post_import` can take no longer suggests importing its file as well; a batch over 50 is told to
+  be built again in batches of at most 50, and never to import the original file once one of them is posted or
+  imported. The desktop review names the assistant's batch posting for a saved batch it cannot post, says a saved
+  invoice is posted only that way, and no longer suggests choosing a Journal without its number. Wording only otherwise; the file routes for a voucher that carries
+  its own number and for text the approval window cannot show are unchanged (part of #1709).
 - The approval window, and the review window, now open with a line that says what each answer does, before any
   detail (part of #1780). On Windows, whose box takes the keyboard, it reads "Press Y (or click Yes) to post this
   voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer." (a batch says "these N
@@ -142,6 +163,23 @@ These changes are in source and not yet in a published build.
   read declines the figure as `inventory_flags_not_read`). The derived lines must also sum to zero. Measured on one synthetic book; opening stock, a costing
   method, a book that is not integrated and a window spanning two years are not measured.
 
+- `masters` can list a company's stock items (`kind` `stock_items`): each row carries the item's own dated HSN
+  entries (`hsn`) and GST rate entries (`gst`) as Tally sent them, nothing choosing the code or the rate for a date
+  (part of #1233). An empty or missing list is not "no HSN or GST": after a code was keyed on a stock group, the group's four other items still carried empty lists
+  (one book); a GST rate or an HSN code on the company, and whether an item that defers to a coded group inherits its code, were not measured; the group's and the company's setting is not read, and every row says so
+  (`inherited_from_group_or_company: not_read`). A defect in one item's list marks that list `unreadable` with its
+  defect and the read stands; a Tally `ERROR`, markup inside a value or a cut-off list refuses the read. Item names
+  and parents are masked under `mask_parties`, and so are HSN descriptions (a person can edit them); HSN codes and rates are returned as sent. Tally's
+  `GSTINELIGIBLEITC` is returned as sent under `ineligible_itc`: it was Yes where the screen read
+  `Eligible for Input Tax Credit: No` and absent where it read Yes (one item, two rows, PARTIAL), which fits an
+  ineligibility flag; null is neither eligible nor ineligible, and what an absent element means for the tax is
+  not known. On an entry whose source is `As per Company/Stock Group` (the entry Tally adds itself on a first save; a person can also choose that source) a flag Tally sent is withheld:
+  `ineligible_itc` is null and `ineligible_itc_withheld` is `tally_default_entry`, because the Yes seen on such an
+  entry was never compared with the screen; a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is. `ledger_masters` names the same element the same way (#1741). A book is read only up to a master mark of 489 (a limit of 489 refuses, by arithmetic, both client
+  books measured; not tried on them). Measured on one synthetic book of TallyPrime 7.1 Silver (three captures, one item
+  with two dated entries in each list); a state row other than `Any`, slab rates, another release, a larger book
+  and a zero-row stock-item answer are not measured. `stock_summary` is unchanged.
+
 - `negative_stock` (new tool; part of #1358): Tally's own Negative Stock list for a window, as `item`, `quantity`,
   `rate` and `value` per listed stock item, returned as Tally prints them and compared with no other report
   (`checks` says so). Being listed is not a finding that the quantity is below zero, and an empty answer is
@@ -151,6 +189,18 @@ These changes are in source and not yet in a published build.
   an empty envelope. Any other window is named as unmeasured, a book whose master mark is over 874 is
   refused before the report is asked for (a stated guess, as for `stock_summary`), and the cost on a large book is not known. Not yet run
   against Tally.
+
+- A ledger name that is an alias of another ledger is now named as one (part of #1688). `validate_masters` and the refusal of a
+  build (`masters_not_exact`) add `alias_of` to a requested name that is, character for character, one alias of exactly one
+  live ledger, naming that ledger as Tally lists it, and say that an operator should confirm it is the ledger meant before
+  the name is replaced; ComplyEaze Bridge still never sends an alias. The check for two ledgers whose names read alike now
+  counts a ledger's aliases too (`through_alias` names the alias). Before, a name that was one ledger's own name and
+  folded equal to another ledger's alias matched the first exactly and could be built and posted; it is now refused as a
+  twin, and so is a batch built or approved before this change that names it, at post or in the queue
+  (`ledger_has_folded_twin`), until the alias or the name is changed in Tally and the batch is built again. A name that is
+  only an alias used to read as missing or near. On Tally's own screen an alias equal to another ledger's name was
+  refused in the cases tried, so such a twin is probably rare (PARTIAL: one company; lowercase not tried). Not yet run
+  against Tally through the built tool.
 
 ## [0.6.0] - 2026-10-16
 

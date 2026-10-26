@@ -2133,6 +2133,12 @@ posting setting covers both, in the MCPB extension and on the command line (#109
      decision. For every reason,
      render `candidate_count_is_lower_bound` as "at least N", never an exact total.
    - `missing` — no live ledger matched. Bridge never creates masters.
+   - A `missing` or `near_miss` row without `folded_twins` whose name is,
+     character for character, an alias of exactly one live ledger also carries
+     `alias_of`, that ledger's name as Tally lists it. The row is still not
+     bound and Bridge never sends an alias: replace the name with `alias_of`
+     only after an operator confirms that ledger is the one meant, then run
+     `validate_masters` again.
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,
    company date extent, live masters, and local journal integrity,
    repeats the full catalogue to reject intervening changes, then writes `<data_dir>/imports/<batch_id>.xml` and records an append-only

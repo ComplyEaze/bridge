@@ -2977,6 +2977,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
+        "tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/vouchers_agst_ref_reopen_live.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),

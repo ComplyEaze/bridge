@@ -515,6 +515,7 @@ pub(super) fn mark_register_row(mut row: Value) -> Value {
             for entry in entries {
                 mark_entry_party_names(entry);
                 withhold_entry_bank_allocations(entry);
+                withhold_entry_goods_lines(entry);
             }
         }
     }
@@ -531,6 +532,7 @@ fn mark_register_side_item(mut item: Value) -> Value {
         for entry in entries {
             mark_entry_party_names(entry);
             withhold_entry_bank_allocations(entry);
+            withhold_entry_goods_lines(entry);
         }
     }
     if let Some(names) = item

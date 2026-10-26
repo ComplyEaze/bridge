@@ -2086,6 +2086,31 @@ entries (the registers), the key is not there; the parse reads the allocations e
 - Measured on one synthetic book of five Contras keyed by hand (TallyPrime 7.1 Silver); other transaction types, other
   voucher types, a reconciled entry and other releases are not measured. No request changed.
 
+### Goods lines in voucher reads
+
+`vouchers` called with `goods_lines: true` gives each ledger entry of an invoice voucher that carries goods `goods_lines`,
+one per line as Tally sent it (protocol reference §8.2i; #2015). Each line has `stock_item` and four fields,
+`actual_quantity`, `billed_quantity`, `rate` and `amount`, each `{"state": "absent"}`, `{"state": "empty"}` or
+`{"state": "value", "value": "..."}` (trimmed); a quantity or a rate keeps its unit as Tally wrote it (`666.667 Kgs`,
+`30.00/Kgs`). Where Tally split the line by godown and batch, the line has `batches`, each with `godown`, `batch`, both
+quantities and `amount` in the same form. A Purchase line's amount is negative and a Sales line's positive, the sign of
+its ledger entry. Without the argument, and in every other answer that returns a voucher's entries (the registers), the
+key is not there; the parse reads the lines either way.
+
+- **Only invoice vouchers.** Tally sends a goods line under a ledger entry only on an invoice-mode voucher. A Stock
+  Journal answers an empty entry list in this read, and a Delivery Note, Receipt Note, Physical Stock or Manufacturing
+  Journal is not captured, so an entry or a voucher without the key may still have moved stock.
+- **A list that cannot be read whole does not refuse the read.** The entry carries `goods_lines_unreadable` with one
+  reason and no partial list: `goods_line_batch_amounts_differ` (the batch amounts do not add up to the line's),
+  `goods_line_amount_unparsable`, `goods_line_item_missing`, `goods_line_field_duplicated`,
+  `goods_line_text_undecodable`, `goods_lines_too_many` (more than 1,000 lines on an entry or 100 batch rows on a line,
+  bounds chosen, not measured) or `goods_line_shape_unrecognised` (a line or batch list at another depth, or an element
+  inside a field that is read).
+- Item, godown and batch names are masked under `mask_parties`, as the masters tool masks item and godown names.
+- Measured on Sales and Purchase invoices of two synthetic books (TallyPrime 7.1), one of them also on 7.2; a Credit or
+  Debit Note with items, discounts, additional cost, a bill of materials, a foreign-currency line and a voucher typed on
+  Tally's screen are not measured. No request changed.
+
 ## Voucher-file preparation and verification
 
 The MCPB extension exposes `verify_import` by default as a recovery tool (it

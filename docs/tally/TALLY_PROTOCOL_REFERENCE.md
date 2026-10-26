@@ -159,6 +159,9 @@ base revision.
 <a id="82h-bank-allocations-on-a-vouchers-ledger-entry--verified-2026-10-12-tallyprime-71-one-synthetic-book"></a>
 
 [8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-12; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82h-bank-allocations-on-a-vouchers-ledger-entry--verified-2026-10-12-tallyprime-71-one-synthetic-book)
+<a id="82i-goods-lines-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-two-synthetic-books"></a>
+
+[8.2i Goods lines on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, two synthetic books**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82i-goods-lines-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-two-synthetic-books)
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)

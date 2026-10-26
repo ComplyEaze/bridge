@@ -14,6 +14,51 @@ Ok([
             Object {
                 "amount": String("24.00"),
                 "bill_allocations": Array [],
+                "goods_lines": Array [
+                    Object {
+                        "actual_quantity": Object {
+                            "state": String("value"),
+                            "value": String("2 U."),
+                        },
+                        "amount": Object {
+                            "state": String("value"),
+                            "value": String("24.00"),
+                        },
+                        "batches": Array [
+                            Object {
+                                "actual_quantity": Object {
+                                    "state": String("value"),
+                                    "value": String("2 U."),
+                                },
+                                "amount": Object {
+                                    "state": String("value"),
+                                    "value": String("24.00"),
+                                },
+                                "batch": Object {
+                                    "state": String("value"),
+                                    "value": String("Primary Batch"),
+                                },
+                                "billed_quantity": Object {
+                                    "state": String("value"),
+                                    "value": String("2 U."),
+                                },
+                                "godown": Object {
+                                    "state": String("value"),
+                                    "value": String("Main Location"),
+                                },
+                            },
+                        ],
+                        "billed_quantity": Object {
+                            "state": String("value"),
+                            "value": String("2 U."),
+                        },
+                        "rate": Object {
+                            "state": String("value"),
+                            "value": String("12.00/U."),
+                        },
+                        "stock_item": String("Lab Item 11"),
+                    },
+                ],
                 "is_deemed_positive": String("No"),
                 "ledger": String("Lab Sales"),
             },

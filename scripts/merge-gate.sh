@@ -276,7 +276,11 @@ else
   attribution_status=0
   attribution_output=$(printf '%s' "$attribution_input" | node "$script_dir/check-ai-attribution.mjs" 2>"$errfile") || attribution_status=$?
   attribution_refusals=$(printf '%s\n' "$attribution_output" | grep -c '^REFUSE ' || true)
-  attribution_checked=$(printf '%s\n' "$attribution_output" | grep -c '^CHECKED [0-9][0-9]*$' || true)
+  # The check's last line must say how many commits it read, and that number must be the number sent.
+  attribution_expected=$(jq -r '.commits | length' <<<"$attribution_input" 2>/dev/null) || attribution_expected=""
+  attribution_last=$(printf '%s\n' "$attribution_output" | tail -n 1)
+  attribution_checked=0
+  [ -n "$attribution_expected" ] && [ "$attribution_last" = "CHECKED $attribution_expected" ] && attribution_checked=1
   # An answer is a final CHECKED line (the check ran to the end) and an exit status that agrees with the refusals: exit 0 with
   # none, exit 1 with at least one. Anything else (a crash, an old node, a missing module, a replaced file that prints nothing)
   # is not an answer.

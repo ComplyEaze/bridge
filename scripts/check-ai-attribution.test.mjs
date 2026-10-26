@@ -69,6 +69,32 @@ test("markup inside the phrase, invisible marks and more look-alikes do not hide
   }
 });
 
+test("named entities, tags with no space around them, quoted attributes and comments cannot split or hide the line", () => {
+  const hidden = [
+    "Gen&shy;erated with Claude Code", "Gen&ZeroWidthSpace;erated with Claude Code", "Gen&zwnj;erated with Claude Code", "Generated&Tab;with Claude Code", "Generated with Cl&zwj;aude",
+    "Generated with&NewLine;Claude Code", "Generated with &NoBreak;Claude Code", "Generated with<br>Claude Code", "Generated with<br/>Claude Code",
+    "<p>Generated with</p><p>Claude Code</p>", "<td>Generated with</td><td>Claude Code</td>", '<b title="a>b">Gen</b>erated with Claude Code',
+    'Gen<b title="a>b">er</b>ated with Claude Code', "Gen<!-- x -->erated with Claude", "Generated with Cl\u3164aude", "Generated with Cl\u115faude",
+  ];
+  for (const line of hidden) assert.equal(evaluate(input({ body: `A fix.\n${line}\n` })).refusals.length, 1, JSON.stringify(line));
+  for (const trailer of ["Co<!-- -->-authored-by: Claude", "Co-authored-by: Cl&zwj;aude", "Co-authored-by: Opus", "Co-authored-by: Sonnet <x@example.invalid>", "Co-authored-by: Haiku"]) {
+    assert.equal(evaluate(input({ commits: [commit(`Fix\n\n${trailer}\n`)] })).refusals.length, 1, trailer);
+  }
+});
+
+test("names that only sit inside a longer word are not assistants", () => {
+  for (const line of ["Co-authored-by: Affable Person <x@example.invalid>", "Co-authored-by: A Philanthropic Fund", "Co-authored-by: Carlos Codexo", "Co-authored-by: Opusculum Press", "Co-authored-by: Haikuist"]) {
+    assert.deepEqual(evaluate(input({ commits: [commit(`Fix\n\n${line}\n`)] })), { refusals: [], notes: [] }, line);
+  }
+  assert.deepEqual(evaluate(input({ commits: [commit("Fix", SHA, ["affable", "philanthropic@example.invalid", "Opusculum Press"])] })), { refusals: [], notes: [] });
+});
+
+test("pathological markup does not make the match slow", () => {
+  const started = Date.now();
+  evaluate(input({ body: "<a".repeat(40_000) + "\n" + "](".repeat(40_000) + "\n" + '<a "'.repeat(20_000), commits: [commit("<a".repeat(40_000))] }));
+  assert.ok(Date.now() - started < 2000, `took ${Date.now() - started} ms`);
+});
+
 test("a Co-authored-by trailer naming an assistant is refused on a commit that is not accepted, whatever its date", () => {
   for (const name of [`Claude <${AGENT}>`, `claude <${AGENT}>`, "Claude", `Someone <${AGENT}>`, "Anthropic Bot <bot@example.invalid>", "Fable <x@example.invalid>", "Copilot <x@example.invalid>", "Codex", "ChatGPT", "OpenAI Bot <x@example.invalid>"]) {
     for (const eol of ["\n", "\r\n"]) {
@@ -86,6 +112,14 @@ test("an accepted older commit with the same text is reported, not refused, and 
   assert.match(result.notes[0], /accepted older commit, but a squash merge can copy it into the commit on master as a Co-authored-by line/);
   assert.equal(evaluate(input({ commits: [commit(trailer, SHA)], accepted: [SHA.toUpperCase()] })).refusals.length, 0, "a SHA is compared without regard to case");
   assert.equal(evaluate(input({ commits: [commit(trailer, SHA)], accepted: ["b".repeat(40)] })).refusals.length, 1, "another SHA on the list does not help");
+});
+
+test("acceptance is the whole SHA: a list entry that shares only a prefix with the commit does not accept it", () => {
+  const sha = "1234567890abcdef1234567890abcdef12345678";
+  for (const near of [sha.slice(0, 7), sha.slice(0, 12), sha.slice(0, 39) + "9", sha.slice(0, 39)]) {
+    assert.equal(evaluate(input({ commits: [commit(trailer, sha)], accepted: [near] })).refusals.length, 1, near);
+  }
+  assert.equal(evaluate(input({ commits: [commit(trailer, sha)], accepted: [sha] })).refusals.length, 0);
 });
 
 test("a commit is accepted by its SHA and by nothing else: no date, message or position can stand in", () => {

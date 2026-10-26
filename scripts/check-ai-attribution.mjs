@@ -29,7 +29,8 @@ import { fileURLToPath } from "node:url";
 
 // The assistants the rule names: Claude and Anthropic's model family names, and the other assistants that sign commits.
 // Names are matched wherever they sit ("ClaudeBot", "GitHubCopilot"), except that "Claudette" is a person.
-const AGENT = "(?:claude(?!tte)|anthropic|fable|copilot|codex|openai|chatgpt)";
+// "fable", "anthropic" and "codex" must not sit inside a longer word ("affable", "philanthropic").
+const AGENT = "(?:claude(?!tte)|(?<![a-z])anthropic|(?<![a-z])fable(?![a-z])|copilot|(?<![a-z])codex(?![a-z])|openai|chatgpt|(?<![a-z])(?:opus|sonnet|haiku)(?![a-z]))";
 // The generated-with line is the one the assistant adds; a sentence about another vendor's model ("generated with OpenAI") is ordinary text.
 const GENERATED_LINE = /generated\W+(?:with|by|using)\W+(?:an?\W+)?(?:claude(?!tte)|anthropic)/i;
 const CO_AUTHOR_TRAILER = new RegExp(`^[ \\t]*co-authored-by[ \\t]*:[^\\r\\n]*${AGENT}[^\\r\\n]*$`, "im");
@@ -51,22 +52,32 @@ function decodeEntities(text) {
 
 export function normalise(text) {
   // Format characters and combining marks (a joiner, a variation selector, an accent) are invisible or decorative: drop them.
-  const plain = (value) => value.normalize("NFKD").replace(/[\p{Cf}\p{M}]/gu, "").normalize("NFKC");
+  const plain = (value) => value.normalize("NFKD").replace(/[\p{Cf}\p{M}\p{Default_Ignorable_Code_Point}]/gu, "").normalize("NFKC");
   let t = plain(text);
   t = plain(decodeEntities(t));
   t = t.replace(/\p{Pd}/gu, "-").replace(/[\u0370-\u03ff\u0400-\u052f\u1d00-\u1d7f]/g, (c) => LOOKALIKES[c] ?? c);
   return t;
 }
 
-// The signature line is read two ways: with Markdown and HTML punctuation as spaces ("Generated with: **Claude Code**"), and with
-// markup removed so it cannot split a word ("Gen<!-- x -->erated", "Cl*au*de", "Generated with <b>Claude</b> Code").
+// The signature line is read three ways, so that Markdown and HTML cannot split it or hide a word break: (1) with Markdown and HTML
+// punctuation as spaces ("Generated with: **Claude Code**"); (2) with markup and entities deleted ("Gen<!-- x -->erated", "Cl*au*de",
+// "Cl&zwj;aude"); (3) with tags and entities as spaces ("Generated with<br>Claude Code"). A tag is read with quoted attributes ("a>b").
+const TAG = /<\/?[a-z](?:"[^"]*"|'[^']*'|[^"'<>])*>/gi;
+const COMMENT = /<!--[\s\S]*?-->/g;
+const ENTITY = /&[a-z][a-z0-9]*;/gi;
 const generatedLine = (text) => {
   const t = normalise(text);
-  const spaced = t.replace(/[<>*_`~|:()[\]]/g, " ");
-  const joined = t.replace(/<!--[\s\S]*?-->/g, "").replace(/<\/?[a-z][^>]*>/gi, "").replace(/\]\([^)]*\)/g, "").replace(/[*_~`\\]/g, "");
-  return GENERATED_LINE.test(spaced) || GENERATED_LINE.test(joined.replace(/[<>|:()[\]]/g, " "));
+  const spaced = t.replace(ENTITY, " ").replace(/[<>*_`~|:()[\]]/g, " ");
+  const unmarked = t.replace(COMMENT, "").replace(/\]\([^()\n]*\)/g, "").replace(/[*_~`\\]/g, "");
+  const joined = unmarked.replace(TAG, "").replace(ENTITY, "").replace(/[<>|:()[\]]/g, " ");
+  const apart = unmarked.replace(TAG, " ").replace(ENTITY, " ").replace(/[<>|:()[\]]/g, " ");
+  return GENERATED_LINE.test(spaced) || GENERATED_LINE.test(joined) || GENERATED_LINE.test(apart);
 };
-const coAuthorTrailer = (text) => CO_AUTHOR_TRAILER.test(normalise(text));
+// A trailer is read plain and with comments and unknown entities deleted ("Co<!-- -->-authored-by").
+const coAuthorTrailer = (text) => {
+  const t = normalise(text);
+  return CO_AUTHOR_TRAILER.test(t) || CO_AUTHOR_TRAILER.test(t.replace(COMMENT, "").replace(ENTITY, ""));
+};
 
 // What a commit carries that the rule names: a list of short descriptions, empty for a clean commit.
 export function commitFindings(commit) {

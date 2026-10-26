@@ -553,7 +553,8 @@ class MergeGateControls(unittest.TestCase):
     def test_a_check_that_crashes_is_not_a_pass(self):
         # The helper exits 1 with nothing on stdout (a crash, an old node): no BLOCK line, so the gate must say it could not determine.
         copy = self.private_copy("attribution-crash")
-        for source in ("process.exit(1);\n", "process.exit(0);\n", "throw new Error('boom');\n", "console.log('REFUSE x');\nprocess.exit(0);\n", "console.log('NOTE x');\nconsole.log('CHECKED 0');\nprocess.exit(1);\n"):
+        for source in ("process.exit(1);\n", "process.exit(0);\n", "throw new Error('boom');\n", "console.log('REFUSE x');\nprocess.exit(0);\n", "console.log('NOTE x');\nconsole.log('CHECKED 0');\nprocess.exit(1);\n",
+                       "console.log('CHECKED 9');\nprocess.exit(0);\n", "console.log('CHECKED 1');\nconsole.log('NOTE after');\nprocess.exit(0);\n"):
             (copy / "scripts" / "check-ai-attribution.mjs").write_text(source)
             self.git_copy(copy, "add", "-A")
             self.git_copy(copy, "commit", "-q", "-m", "a broken helper")

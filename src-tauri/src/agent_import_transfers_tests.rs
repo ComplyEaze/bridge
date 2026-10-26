@@ -580,6 +580,12 @@ fn each_next_step_says_what_was_decided() {
     ));
     assert!(held.contains("If the batch named does name this row, send it and verify it"));
     assert!(!held.contains(". Do not send"), "{held}");
+    // a send of the batch named is refused only once the skip is live; an
+    // only-built skip lets it through, so both outcomes are named
+    assert!(held.contains(
+        "do not send the batch named or import its file: found posted, either leaves the row as posted_against_skip, and once a build that skips the row has been sent or found posted, or a skip-only record holds the skip, post_import refuses that send as skip_row_paired_elsewhere"
+    ));
+    assert!(!held.contains("sending it gives"), "{held}");
     // and what the route costs
     assert!(held.contains(
         "A batch left unsent blocks the days of its rows for the other account's coverage until it is verified, and no step inside ComplyEaze Bridge clears that"

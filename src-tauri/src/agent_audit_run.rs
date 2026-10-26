@@ -81,6 +81,17 @@ impl Server {
             return Err(GROUPS_OVERLAP.to_string().into());
         }
         let (company, identity, prior) = self.verified_company(guid).await?;
+        // A lab build with lab writes on reads only the lab's target company,
+        // as every lab tool does, so a book is kept only when the run names it.
+        #[cfg(feature = "lab-writes")]
+        let grant = if lab::env_lab_writes_enabled() {
+            Some(
+                lab::admit_audit_read_capture(self, identity.company_guid())
+                    .map_err(|failure| failure.with_prior_evidence(prior.clone()))?,
+            )
+        } else {
+            None
+        };
         let config = self.tally_config();
         let audit = match read_audit_book(
             &self.runtime,
@@ -95,6 +106,15 @@ impl Server {
             Ok(audit) => audit,
             Err(failure) => return Err(ToolFailure::from(failure.code).with_prior_evidence(prior)),
         };
+        // The read the guards admitted above is kept on this computer, for a
+        // real-book parity record; on success the answer is unchanged.
+        #[cfg(feature = "lab-writes")]
+        if let Some(grant) = grant {
+            lab::persist_audit_read(self, grant, &audit.stored).map_err(|code| {
+                ToolFailure::from(code)
+                    .with_prior_evidence(combine_evidence(prior.clone(), audit.evidence.clone()))
+            })?;
+        }
         let evidence = combine_evidence(prior, audit.evidence);
         let dump = run_test(test, &audit.engagement, &audit.book).map_err(|failure| {
             ToolFailure::from(failure.code).with_prior_evidence(evidence.clone())

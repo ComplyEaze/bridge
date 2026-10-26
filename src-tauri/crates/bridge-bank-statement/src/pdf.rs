@@ -234,8 +234,8 @@ fn classify<E>(
     }
 }
 
-/// A character whose scaled font size is below this many points is counted as
-/// tiny. A count threshold only: nothing is refused on it (#1656).
+/// A character whose effective font size (see [`effective_size`]) is below this
+/// many points is counted as tiny. A count threshold only: nothing is refused on it (#1656).
 pub const TINY_POINTS: f64 = 2.0;
 
 /// The classes a document's characters fall into besides drawn and
@@ -250,11 +250,11 @@ pub struct ClassCounts {
     pub invisible_mode: usize,
     /// Characters in the mode that only adds the glyph to the clip.
     pub clip_only_mode: usize,
-    /// Characters whose scaled font size is under [`TINY_POINTS`].
+    /// Characters whose effective font size is under [`TINY_POINTS`].
     pub tiny: usize,
     /// Characters whose box lies wholly outside the page's crop box.
     pub off_page: usize,
-    /// Characters filled opaque white.
+    /// Characters filled white (all three channels 255) with an alpha above 0.
     pub white_fill: usize,
     /// Characters filled with alpha 0.
     pub transparent_fill: usize,
@@ -292,6 +292,17 @@ fn extra_classes(
         }),
         transparent_fill: fill.is_some_and(|(_, _, _, alpha)| alpha == 0),
     }
+}
+
+/// A character's size in points whatever the sign of the font size or of the
+/// text matrix and whatever its rotation: the font size's magnitude times the
+/// length of the matrix's second row `(c, d)`. NaN when the matrix could not be
+/// read, which is never tiny: a flipped, turned or negatively sized 10 pt
+/// character is 10 pt.
+fn effective_size(unscaled: f32, row: Option<(f32, f32)>) -> f64 {
+    row.map_or(f64::NAN, |(c, d)| {
+        f64::from(unscaled).abs() * f64::from(c).hypot(f64::from(d))
+    })
 }
 
 /// The document's own characters, hidden and drawn; generated ones are not
@@ -437,12 +448,19 @@ pub fn extract_pages(
                     origin_top - f64::from(bounds.bottom().value),
                 )
             });
+            let scaled = f64::from(character.scaled_font_size().value);
             let extra = if origin == Origin::Generated {
                 ExtraClasses::default()
             } else {
                 extra_classes(
                     character.render_mode().ok(),
-                    f64::from(character.scaled_font_size().value),
+                    effective_size(
+                        character.unscaled_font_size().value,
+                        character
+                            .matrix()
+                            .ok()
+                            .map(|matrix| (matrix.c(), matrix.d())),
+                    ),
                     bounds,
                     page_size,
                     character
@@ -456,13 +474,13 @@ pub fn extract_pages(
                 // left out, so the word around it goes on
                 continue;
             }
-            glyphs.push(character.loose_bounds().ok().map(|bounds| Glyph {
+            glyphs.push(bounds.map(|(left, right, top, bottom)| Glyph {
                 character: printed_character(character.unicode_char()),
-                left: f64::from(bounds.left().value) - origin_left,
-                right: f64::from(bounds.right().value) - origin_left,
-                top: origin_top - f64::from(bounds.top().value),
-                bottom: origin_top - f64::from(bounds.bottom().value),
-                size: f64::from(character.scaled_font_size().value),
+                left,
+                right,
+                top,
+                bottom,
+                size: scaled,
             }));
         }
         out.push(assemble_words(glyphs));

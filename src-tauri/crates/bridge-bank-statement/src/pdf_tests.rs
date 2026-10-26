@@ -211,6 +211,20 @@ fn a_font_size_under_the_threshold_is_tiny_and_the_threshold_itself_is_not() {
 }
 
 #[test]
+fn the_effective_size_ignores_sign_and_rotation_and_an_unread_matrix_is_not_a_size() {
+    // upright, flipped, turned a quarter, turned the other way: all 10 pt
+    for row in [(0.0, 1.0), (0.0, -1.0), (-1.0, 0.0), (1.0, 0.0)] {
+        assert_eq!(effective_size(10.0, Some(row)), 10.0, "{row:?}");
+    }
+    // a negative font size is its magnitude; a matrix scaled by 2 doubles it
+    assert_eq!(effective_size(-10.0, Some((0.0, 1.0))), 10.0);
+    assert_eq!(effective_size(1.0, Some((0.0, 2.0))), 2.0);
+    // a zero font size is a size of zero (a character PDFium reports at 0 is tiny)
+    assert_eq!(effective_size(0.0, Some((0.0, 1.0))), 0.0);
+    assert!(effective_size(10.0, None).is_nan());
+}
+
+#[test]
 fn a_box_wholly_outside_the_crop_box_is_off_the_page_and_one_touching_it_is_not() {
     let off = |bounds| classes(None, 7.0, Some(bounds), None).off_page;
     // right of, left of, above and below the page

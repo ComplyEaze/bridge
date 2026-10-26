@@ -12,7 +12,7 @@
 //!     --pdfium /path/to/libpdfium.dylib --pdf statement.pdf --password-file statement.password
 //! ```
 //!
-//! The password is read only from a file that must not be readable by group or
+//! The password is read only from a file that, on Unix, must not be readable by group or
 //! others, and no argument is echoed.
 
 use bridge_bank_statement::pdf::{engine, extract_pages};

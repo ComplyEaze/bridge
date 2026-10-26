@@ -128,6 +128,32 @@ fn tiny_text_is_counted() {
 
 #[test]
 #[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn ten_point_text_is_not_tiny_however_it_is_flipped_turned_or_signed() {
+    for (name, extra, length) in [
+        (
+            "flipped",
+            "BT /F1 10 Tf 1 0 0 -1 50 560 Tm (FLIP9) Tj ET",
+            5,
+        ),
+        (
+            "turned",
+            "BT /F1 10 Tf 0 1 -1 0 300 300 Tm (TURN8) Tj ET",
+            5,
+        ),
+        (
+            "negative size",
+            "BT /F1 -10 Tf 50 520 Td (NEGSIZE6) Tj ET",
+            8,
+        ),
+    ] {
+        let run = counts(&format!("{BASE}\n{extra}"));
+        assert_eq!(run.tiny, 0, "{name}: {run:?}");
+        assert_eq!(run.drawn, 6 + length, "{name}: {run:?}");
+    }
+}
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
 fn text_outside_the_page_is_counted() {
     let run = counts(&format!("{BASE}\nBT /F1 10 Tf 700 700 Td (OFF) Tj ET"));
     assert_eq!(run.off_page, 3);
@@ -179,28 +205,36 @@ fn the_words_read_do_not_change_for_any_class_but_render_mode_3() {
         (
             "clip only",
             "q BT /F1 10 Tf 7 Tr 50 660 Td (CLIPPED) Tj ET Q",
-            true,
+            vec!["DRAWN1", "CLIPPED"],
         ),
-        ("tiny", "BT /F1 1 Tf 50 640 Td (TINY) Tj ET", true),
-        ("off page", "BT /F1 10 Tf 700 700 Td (OFF) Tj ET", true),
+        (
+            "tiny",
+            "BT /F1 1 Tf 50 640 Td (TINY) Tj ET",
+            vec!["DRAWN1", "TINY"],
+        ),
+        (
+            "off page",
+            "BT /F1 10 Tf 700 700 Td (OFF) Tj ET",
+            vec!["DRAWN1", "OFF"],
+        ),
         (
             "white",
             "1 1 1 rg BT /F1 10 Tf 50 620 Td (WHITE) Tj ET",
-            true,
+            vec!["DRAWN1", "WHITE"],
         ),
         (
             "transparent",
             "q /GS0 gs BT /F1 10 Tf 50 580 Td (CLEAR) Tj ET Q",
-            true,
+            vec!["DRAWN1", "CLEAR"],
         ),
         (
             "render mode 3",
             "BT /F1 10 Tf 3 Tr 50 680 Td (HIDDEN) Tj ET",
-            false,
+            vec!["DRAWN1"],
         ),
     ] {
         let read = words(&format!("{BASE}\n{extra}"));
         // every class but mode 3 is still read exactly as before (#1656 changes no reading)
-        assert_eq!(read.len() > base.len(), expected, "{name}: {read:?}");
+        assert_eq!(read, expected, "{name}");
     }
 }

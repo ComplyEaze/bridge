@@ -526,7 +526,6 @@ fn record(party: &str, amount: &str) -> StatementRecord {
         bridge_txn_id: "st-x".to_string(),
         cash_movement: None,
         cash_answer: None,
-        cash_group: None,
         direction: Direction::Inflow,
         reversed_same_day: false,
     }

@@ -1344,8 +1344,7 @@ fn the_ledgers_to_validate_are_bounded_and_counted() {
 /// The one row-level exception (owner ruling b1): an open, recognised cash
 /// line's bridge_txn_id, date and amount, and its party as printed (masked
 /// under redaction), leave so a person can answer it. Nothing else of any row
-/// does, and an answered cash line takes no exception. (Beside them an open line carries only
-/// an opaque group number and two counts; see the grouping test.)
+/// does, and an answered cash line takes no exception.
 #[test]
 fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
     use bridge_bank_statement::parse::Row;
@@ -1517,11 +1516,6 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
                 "answers",
                 "bridge_txn_id",
                 "date",
-                // The group of lines that print the same text: an opaque number and two counts
-                // (no text), so one question can cover the group.
-                "group_id",
-                "group_open",
-                "group_size",
                 "movement",
                 "printed_as",
                 "question"
@@ -1817,9 +1811,6 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
         "/cash_questions/*/answers/*/text",
         "/cash_questions/*/bridge_txn_id",
         "/cash_questions/*/date",
-        "/cash_questions/*/group_id",
-        "/cash_questions/*/group_open",
-        "/cash_questions/*/group_size",
         "/cash_questions/*/movement",
         "/cash_questions/*/printed_as",
         "/cash_questions/*/printed_as/{marker}",
@@ -1879,8 +1870,6 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
     assert_eq!(
         numbers,
         [
-            "/cash_questions/*/group_open",
-            "/cash_questions/*/group_size",
             "/cash_questions_omitted",
             "/cash_questions_open",
             "/counterparties/*/rows",
@@ -1908,7 +1897,7 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
         .collect();
     digits.sort();
     // A digit appears only in the caller's echoes, the open cash line's
-    // fields (b1) with its opaque group number, the account's last four digits and the file digest.
+    // fields (b1), the account's last four digits and the file digest.
     let open_id = summary["cash_questions"][0]["bridge_txn_id"]
         .as_str()
         .unwrap()
@@ -1920,7 +1909,6 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
             ("/cash_questions/0/amount", "64.00"),
             ("/cash_questions/0/bridge_txn_id", open_id.as_str()),
             ("/cash_questions/0/date", "2026-08-05"),
-            ("/cash_questions/0/group_id", "g2"),
             ("/reconciled/closing_balance", "9516.00"),
             ("/reconciled/total_credits", "92.00"),
             ("/reconciled/total_debits", "576.00"),
@@ -2453,159 +2441,4 @@ fn a_skipped_rows_ledger_is_listed_to_validate() {
     .map(|name| json!(party_name(name.to_string())))
     .collect();
     assert_eq!(summary["ledgers_to_validate"], json!(expected));
-}
-
-/// Cash lines that print the same text (after case and spacing) are one group the person is
-/// asked about once; an answer to one line is offered to its open siblings, never applied.
-#[test]
-fn cash_lines_with_the_same_printed_text_are_asked_as_one_group_and_a_sibling_answer_is_only_a_suggestion(
-) {
-    use bridge_bank_statement::parse::Row;
-    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
-    let sbi = |date: &str, narration: &str, dr: &str, bal: &str| {
-        Row::from_pairs([
-            ("date", date),
-            ("narr", narration),
-            ("narr_spaced", narration),
-            ("ref", ""),
-            ("ref_spaced", ""),
-            ("dr", dr),
-            ("cr", ""),
-            ("bal", bal),
-        ])
-    };
-    let rows = [
-        sbi(
-            "01Aug2026",
-            "ATM WDL ATM CASH 1234 SYNTHETIC BRANCH",
-            "500.00",
-            "9500.00",
-        ),
-        sbi(
-            "02Aug2026",
-            "ATM WDL ATM CASH 5678 OTHER SYNTHETIC SITE",
-            "200.00",
-            "9300.00",
-        ),
-        sbi(
-            "03Aug2026",
-            "ATM WDL  ATM CASH 1234  SYNTHETIC BRANCH",
-            "300.00",
-            "9000.00",
-        ),
-    ];
-    let parsed_with = |answers: &CashAnswers| {
-        let build = build(
-            &rows,
-            Bank::Sbi,
-            &Mapping::default(),
-            &BuildOptions {
-                bank_ledger: "Synthetic Bank Ledger",
-                suspense_ledger: "Suspense",
-                account_label: "Synthetic SB xx1234",
-                account_number: "00000000001234",
-                date_from: None,
-                date_to: None,
-                cash_answers: answers,
-            },
-        )
-        .unwrap();
-        ParsedStatement {
-            account_number: "00000000001234".into(),
-            statement_rows: rows.len(),
-            closing: bridge_tally_core::ExactDecimal::parse("9000.00").unwrap(),
-            totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
-            check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
-            counterparties: group_counterparties(&build.records).unwrap(),
-            coverage: None,
-            build,
-        }
-    };
-    let mut args = json!({
-        "statement_path": never_opened("statement.pdf"),
-        "password_file": never_opened("statement.password"),
-        "bank": "sbi",
-        "account_label": "Synthetic SB xx1234",
-        "opening_balance": "10,000.00",
-        "closing_balance": "9,000.00",
-        "total_debits": "1,000.00",
-        "total_credits": "0.00",
-        "bank_ledger": "Synthetic Bank Ledger",
-        "suspense_ledger": "Suspense"
-    });
-    let request = OwnedRequest::from_args(&args).unwrap();
-    let open = parsed_with(&request.cash_answers);
-    let summary_open = summary(&request, &open, "statement-x", "0", 200_000);
-    let questions = summary_open["cash_questions"].as_array().unwrap();
-    assert_eq!(questions.len(), 3, "{summary_open}");
-    // Identical text is one group, listed together and ahead of the other group; no suggestion yet.
-    let shape = questions
-        .iter()
-        .map(|question| {
-            (
-                question["date"].as_str().unwrap(),
-                question["group_id"].as_str().unwrap(),
-                question["group_size"].as_u64().unwrap(),
-                question["group_open"].as_u64().unwrap(),
-                question.get("suggestion").is_some(),
-            )
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(
-        shape,
-        [
-            ("2026-08-01", "g1", 2, 2, false),
-            ("2026-08-03", "g1", 2, 2, false),
-            ("2026-08-02", "g2", 1, 1, false),
-        ],
-        "{summary_open}"
-    );
-    // The printed text is never returned, only the opaque group.
-    let text = summary_open.to_string();
-    assert!(
-        !text.contains("SYNTHETIC BRANCH") && !text.contains("OTHER SYNTHETIC SITE"),
-        "{text}"
-    );
-
-    // One line of the group is answered: its open sibling is offered the answer, the other group is not,
-    // and nothing is applied.
-    let first = questions[0]["bridge_txn_id"].as_str().unwrap().to_string();
-    let sibling = questions[1]["bridge_txn_id"].as_str().unwrap().to_string();
-    args["cash_answers"] =
-        json!([{"bridge_txn_id": first, "answer": "owner_use", "ledger": "Drawings"}]);
-    let request = OwnedRequest::from_args(&args).unwrap();
-    let partly = parsed_with(&request.cash_answers);
-    let summary_partly = summary(&request, &partly, "statement-x", "0", 200_000);
-    assert_eq!(summary_partly["cash_questions_open"], 2, "{summary_partly}");
-    let questions = summary_partly["cash_questions"].as_array().unwrap();
-    assert_eq!(questions.len(), 2);
-    assert_eq!(questions[0]["bridge_txn_id"], sibling.as_str());
-    assert_eq!(questions[0]["group_size"], 2);
-    assert_eq!(questions[0]["group_open"], 1);
-    assert_eq!(
-        questions[0]["suggestion"],
-        json!({
-            "answer": "owner_use",
-            "from": first,
-            "applied": false,
-            "answered_lines_agree": true,
-            "note": "An answer already given to a line that printed the same text. Not applied: ask the person whether it holds for this line, and give the answer in cash_answers.",
-        })
-    );
-    assert!(questions[1].get("suggestion").is_none(), "{summary_partly}");
-    // The suggestion applied nothing: the sibling still has no voucher.
-    let sibling_record = partly
-        .build
-        .records
-        .iter()
-        .find(|record| record.bridge_txn_id == sibling)
-        .unwrap();
-    assert_eq!(sibling_record.cash_answer, None);
-    // The group is computed at each parse and is not written to the proposals file.
-    for record in &partly.build.records {
-        assert!(serde_json::to_value(record)
-            .unwrap()
-            .get("cash_group")
-            .is_none());
-    }
 }

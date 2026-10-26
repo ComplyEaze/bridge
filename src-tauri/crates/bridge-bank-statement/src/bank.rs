@@ -336,17 +336,6 @@ impl Bank {
         }
     }
 
-    /// The statement text a cash line is grouped by: the space-joined narration
-    /// where the layout has one, else the narration cell as printed.
-    pub fn cash_text(self, row: &Row) -> String {
-        let spaced = strip(row.get("narr_spaced"));
-        if spaced.is_empty() {
-            strip(row.get(NARRATION)).to_string()
-        } else {
-            spaced.to_string()
-        }
-    }
-
     pub fn party(self, row: &Row) -> String {
         match self {
             Self::Sbi => named_or_unnamed(sbi_party(row)),

@@ -86,17 +86,6 @@ impl CashMovement {
     }
 }
 
-/// The key two cash lines share when their printed statement text is the same
-/// after case and whitespace are folded, and no more: digits, dates and places
-/// are kept, so two lines that differ in any of them are never one group. The
-/// movement is part of the key. A group only lets one question be asked once
-/// for its lines; it applies no answer ([`crate::proposals::Build`] still needs
-/// an answer per line).
-pub fn group_key(movement: CashMovement, text: &str) -> String {
-    let tag = if movement.outward() { 'W' } else { 'D' };
-    format!("{tag}:{}", squash(text).to_uppercase())
-}
-
 /// One answer to a cash line's question.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]

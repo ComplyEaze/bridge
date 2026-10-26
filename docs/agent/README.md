@@ -2161,9 +2161,9 @@ posting setting covers both, in the MCPB extension and on the command line (#109
    ComplyEaze Bridge never reads it back. Every pair is kept until you delete
    it; nothing in ComplyEaze Bridge deletes one. A batch last verified by an earlier build keeps its
    single `<batch>.proof.json`, which no longer changes. It compares the
-   date, voucher type, the voucher number when you supplied one, the narration, the entries and, for a
-   `Payment`, `Receipt` or `Contra`, the effective date (a value Tally leaves out is reported as not observed); it does
-   **not** compare `PARTYLEDGERNAME`, which those files carry — see the limits noted in reference §9.13.
+   date, voucher type, the voucher number when you supplied one, the narration, the entries and, for any
+   voucher but a Journal, the effective date (a value Tally leaves out is reported as not observed); it does
+   **not** compare `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see the limits noted in reference §9.13.
 
 ### Skipped rows and the `transfers` section (#1392)
 
@@ -3343,7 +3343,7 @@ until it has words) and, for a difference, how many lines did not tie (a Tally l
 amount that nothing derived was compared with, a derived line Tally has no counterpart for, and for a
 profit and loss the Cost of Sales heading when it is off the derived cost of sales), says when the
 derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
-`profit_and_loss`, `balance_sheet`, `cash_flow`, `company_features` and `statement_tie_out` carry one, and `post_import` and `verify_import` carry one of
+`profit_and_loss`, `balance_sheet`, `cash_flow` and `company_features` carry one, and `post_import` and `verify_import` carry one of
 another shape (below); the other read tools and the refusals follow.
 
 `post_import` (after a send was read back) and every page of `verify_import` carry a headline that
@@ -3361,7 +3361,7 @@ about the whole batch from a doubt about one row, so the lead says that the vouc
 the batch is not confirmed, and never calls those vouchers confirmed. When some vouchers are not
 confirmed, the lead says that each row says what was found and
 gives a next step where there is one: only five statuses (`bound_not_in_window`, `book_rolled_back`,
-`sent_not_attributed`, `tally_reported_not_created` and `posted_divergent`) carry a `next_step`. Only a batch ComplyEaze Bridge dispatched natively
+`sent_not_attributed`, `tally_reported_not_created`, and `posted_divergent` on an invoice only) carry a `next_step`. Only a batch ComplyEaze Bridge dispatched natively
 (`result.dispatch.state` present and not `not_dispatched`) carries one: a built batch not yet posted, a
 file imported by hand and a refusal before anything was sent carry none, because the batch can still be
 posted.

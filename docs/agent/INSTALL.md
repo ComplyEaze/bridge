@@ -18,7 +18,7 @@ other companies' programs and they change, so a screen of yours may differ a lit
 
 ## At a glance, release 0.6.0
 
-This block describes the published 0.6.0 file. Step 4 below is written for the build after it, which has six settings (the sixth, tax-audit test runs, is not in 0.6.0, whose settings window has five lines).
+This block describes the published 0.6.0 file. Step 4 below is written for the build after it, which has six settings. The sixth, tax-audit test runs, is not in 0.6.0, whose settings window has five lines.
 
 - **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), one ledger's movement, and Tally's own month-wise Sales or Purchase Register for whole months (not tied to the vouchers; read on one synthetic book).
 - **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.

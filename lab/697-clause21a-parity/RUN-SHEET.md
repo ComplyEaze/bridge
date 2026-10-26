@@ -42,11 +42,13 @@ to the company read, `audit_test_run` keeps the read it had the tax-audit crate 
   the tax-audit crate's tree at it (`git rev-parse <commit>:src-tauri/crates/bridge-tax-audit`). #1949 not merged into it = STOP.
 - Built with `cargo build --release --locked --manifest-path src-tauri/Cargo.toml -p bridge --features lab-writes`, toolchain
   1.96.0. Record the exe's path, bytes and sha256 (Get-FileHash).
-- The tools list of that exe lists `audit_test_run`. It need not admit `clause21a_candidates`: the read is the same for every test,
+- The tools list of that exe lists `audit_test_run`. With lab writes on it also lists the lab write tools (`lab_import_masters`, `lab_import_vouchers`): record the list at B0 and call none of them; only the tools the steps name are called. It need not admit `clause21a_candidates`: the read is the same for every test,
   so `cash_44ab` (admitted) captures it.
 
 ## The environment (record each value at B0; nothing else set)
 Run the exe as the stdio server with exactly:
+- `BRIDGE_TERMS_ACCEPTED=true` (the owner allowed the lab to set it on 25 Oct 2026; without it every call refuses `terms_not_accepted`);
+- `BRIDGE_TALLY_HOST=127.0.0.1`;
 - `BRIDGE_AGENT_ENABLE_TAX_AUDIT=true`;
 - `BRIDGE_LAB_WRITES=1`;
 - `BRIDGE_TALLY_PORT=9001` (any other port refuses as `lab_port_not_9001`);

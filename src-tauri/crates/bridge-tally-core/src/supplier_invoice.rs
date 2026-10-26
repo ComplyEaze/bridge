@@ -143,8 +143,9 @@ impl SupplierInvoiceRef {
     }
 }
 
-/// The exact form without the parts that name a financial year: `FY` with or without its year,
-/// two runs of two or four digits a year apart (`2025/26`, `25/26`, `2025/2026`), and a run of
+/// The exact form without the parts that name a financial year: `FY` with or without its year
+/// (`FY26`, `FY25-26`), two runs of two or four digits a year apart (`2025/26`, `25/26`,
+/// `2025/2026`), and a run of
 /// four digits from 2000 to 2099 at either end. The exact form itself when that leaves no digit,
 /// so `INV/2025` keeps its year as its number.
 fn without_year(exact: &str) -> String {
@@ -152,16 +153,22 @@ fn without_year(exact: &str) -> String {
     let year_digits = |part: &str| {
         (part.len() == 2 || part.len() == 4) && part.chars().all(|ch| ch.is_ascii_digit())
     };
+    let a_year_apart = |first: &str, second: &str| {
+        let first: u32 = first.parse().expect("digits");
+        let second: u32 = second.parse().expect("digits");
+        (first % 100 + 1) % 100 == second % 100
+    };
     let mut year = vec![false; parts.len()];
     for (index, part) in parts.iter().enumerate() {
-        if *part == "FY" || part.strip_prefix("FY").is_some_and(year_digits) {
+        let fy_year = part.strip_prefix("FY").filter(|digits| year_digits(digits));
+        if *part == "FY" || fy_year.is_some() {
             year[index] = true;
         }
         if let Some(next) = parts.get(index + 1) {
-            if year_digits(part) && year_digits(next) {
-                let first: u32 = part.parse().expect("digits");
-                let second: u32 = next.parse().expect("digits");
-                if (first % 100 + 1) % 100 == second % 100 {
+            // `FY25-26`: the year after an `FY` part is part of it.
+            let first = fy_year.or_else(|| year_digits(part).then_some(*part));
+            if let Some(first) = first {
+                if year_digits(next) && a_year_apart(first, next) {
                     year[index] = true;
                     year[index + 1] = true;
                 }

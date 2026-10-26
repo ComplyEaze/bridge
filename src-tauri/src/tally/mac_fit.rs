@@ -6,35 +6,43 @@
 //! person who can see only the top of an alert taller than the screen could
 //! answer it having read none of the lines below the screen's edge, among them
 //! its buttons. Unlike a Windows message box, an alert can be measured before
-//! it is shown.
+//! it is shown, and it is measured twice.
 //!
-//! This module builds the alert itself, lays it out (`layout()` gives the
-//! frame the alert then has; nothing is shown yet), compares its size with the
-//! main screen's visible frame, and shows that same object with `runModal`
-//! only if it fits. One that does not fit is never shown: the dialog child
-//! exits [`super::box_fit::DOES_NOT_FIT_EXIT`], which the parent reads as a text too large for
-//! the box, as it does on Windows. One that could not be measured is not shown
-//! either: exit 0 with no token, which the parent reads as unavailable. The
-//! measured alert is the shown alert by construction, so no twin is involved.
+//! Before it is shown: this module builds the alert itself, lays it out
+//! (`layout()` gives the frame the alert then has; nothing is shown yet) and
+//! compares its size with the main screen's visible frame. One that does not
+//! fit is never shown: the dialog child exits
+//! [`super::box_fit::DOES_NOT_FIT_EXIT`], which the parent reads as a text too
+//! large for the box, as it does on Windows. One that could not be measured is
+//! not shown either: exit 0 with no token, which the parent reads as
+//! unavailable.
+//!
+//! After it is shown: the same object runs with `runModal`, and a timer in the
+//! modal run loop compares its frame with the visible frame of the screen it is
+//! really on. A miss ends the run loop and the process, whatever was clicked.
+//! An approval counts only if that check ran at least once and found the alert
+//! wholly inside: an answer before the first check, or a run loop in which the
+//! timer never fires, is not an approval but "unavailable" (exit 0, no token).
+//! A dialog the person drags past an edge ends the same way, read as "too
+//! large"; that is a refusal, never an approval.
 //!
 //! Before this, the dialogs went through `rfd`, which for a dialog with no
 //! parent window shows a system notification panel drawn by another process,
-//! not an `NSAlert`; `rfd` remains the answer on other platforms. Which screen
-//! the alert opens on is taken to be the main screen at that moment; with
-//! several displays only that one is measured. Position is not compared, only
-//! size: AppKit centres an alert that fits inside the visible frame.
+//! not an `NSAlert`; `rfd` remains the answer on other platforms.
 //!
 //! Confidence. VERIFIED here by reading the AppKit bindings: the first button
 //! added is the default (Return) and a button titled "Cancel" takes Escape, so
 //! both are the first button; the second has no key; only response 1001
 //! approves. UNVERIFIED, until the owner runs it at the Mac: that `runModal`
 //! shows the frame `layout()` gave (AppKit documents `layout()` only as laying
-//! out now instead of just before display), that an alert opened by this
-//! background child is in front and visible (it is a modal panel above other
-//! applications' windows, but keyboard focus and a visible, un-hidden panel are
-//! not measured; failing that it fails closed, timing out after 120 s), that
-//! the main screen is the one it opens on, and that a fitting alert is placed
-//! wholly inside the visible frame.
+//! out now instead of just before display), that the timer fires inside
+//! `runModal` in this child (it is added in the common and the modal-panel run
+//! loop modes; if it never fires every approval reads as unavailable and the
+//! dialog is unusable, which fails closed), that an alert opened by this
+//! background child is in front with keyboard focus, that the main screen is
+//! the one it opens on, and that a person who uses Full Keyboard Access can
+//! still approve (the approving button refuses first responder, so Tab and
+//! Space do not reach it; the mouse does).
 #![cfg_attr(all(not(target_os = "macos"), not(test)), allow(dead_code))]
 
 /// What the measurement of one alert came to.
@@ -105,7 +113,8 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     use block2::RcBlock;
     use objc2::MainThreadMarker;
     use objc2_app_kit::{
-        NSAlert, NSAlertStyle, NSApplication, NSApplicationActivationPolicy, NSScreen,
+        NSAlert, NSAlertStyle, NSApplication, NSApplicationActivationPolicy,
+        NSModalPanelRunLoopMode, NSScreen,
     };
     use objc2_foundation::{NSRunLoop, NSRunLoopCommonModes, NSString, NSTimer};
     use std::cell::Cell;
@@ -158,9 +167,11 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     // the visible frame of the screen it is on. A miss, or a frame that cannot
     // be read, ends the run loop and the process, whatever was clicked.
     let missed = Rc::new(Cell::new(None::<i32>));
+    let checked = Rc::new(Cell::new(0_u32));
     let check = {
         let window = window.clone();
         let missed = Rc::clone(&missed);
+        let checked = Rc::clone(&checked);
         RcBlock::new(move |_timer: NonNull<NSTimer>| {
             let placed = window.screen().map(|screen| {
                 let f = window.frame();
@@ -171,7 +182,10 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
                 )
             });
             let exit = match placed {
-                Some(true) => return,
+                Some(true) => {
+                    checked.set(checked.get().saturating_add(1));
+                    return;
+                }
                 Some(false) => super::box_fit::DOES_NOT_FIT_EXIT,
                 None => 0,
             };
@@ -179,10 +193,15 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
             NSApplication::sharedApplication(mtm).stopModalWithCode(-1001);
         })
     };
-    // SAFETY: the block runs on this thread's run loop only, and is dropped
-    // after the timer is invalidated below.
-    let timer = unsafe { NSTimer::timerWithTimeInterval_repeats_block(0.1, true, &check) };
-    unsafe { NSRunLoop::currentRunLoop().addTimer_forMode(&timer, NSRunLoopCommonModes) };
+    // SAFETY: the block runs on this thread's run loop only. The timer keeps
+    // its own copy of it until it is invalidated below, and `check` is not used
+    // again.
+    let timer = unsafe { NSTimer::timerWithTimeInterval_repeats_block(0.05, true, &check) };
+    // SAFETY: as above; the modes are AppKit's own constants.
+    unsafe {
+        NSRunLoop::currentRunLoop().addTimer_forMode(&timer, NSRunLoopCommonModes);
+        NSRunLoop::currentRunLoop().addTimer_forMode(&timer, NSModalPanelRunLoopMode);
+    }
     // Once, as the Windows box is: in front, without taking it back later.
     #[allow(deprecated)]
     app.activateIgnoringOtherApps(true);
@@ -190,6 +209,11 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     timer.invalidate();
     if let Some(exit) = missed.get() {
         std::process::exit(exit);
+    }
+    // Never approved unless the placement check ran and passed at least once (a
+    // decline before the first check is still a decline).
+    if checked.get() == 0 && approves(response) {
+        std::process::exit(0);
     }
     if policy == NSApplicationActivationPolicy::Prohibited {
         app.setActivationPolicy(policy);

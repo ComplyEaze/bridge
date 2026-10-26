@@ -2255,7 +2255,8 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     use block2::RcBlock;
     use objc2::MainThreadMarker;
     use objc2_app_kit::{
-        NSAlert, NSAlertStyle, NSApplication, NSApplicationActivationPolicy, NSScreen,
+        NSAlert, NSAlertStyle, NSApplication, NSApplicationActivationPolicy,
+        NSModalPanelRunLoopMode, NSScreen,
     };
     use objc2_foundation::{NSRunLoop, NSRunLoopCommonModes, NSString, NSTimer};
     use std::cell::Cell;
@@ -2308,9 +2309,11 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     // the visible frame of the screen it is on. A miss, or a frame that cannot
     // be read, ends the run loop and the process, whatever was clicked.
     let missed = Rc::new(Cell::new(None::<i32>));
+    let checked = Rc::new(Cell::new(0_u32));
     let check = {
         let window = window.clone();
         let missed = Rc::clone(&missed);
+        let checked = Rc::clone(&checked);
         RcBlock::new(move |_timer: NonNull<NSTimer>| {
             let placed = window.screen().map(|screen| {
                 let f = window.frame();
@@ -2321,7 +2324,10 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
                 )
             });
             let exit = match placed {
-                Some(true) => return,
+                Some(true) => {
+                    checked.set(checked.get().saturating_add(1));
+                    return;
+                }
                 Some(false) => super::box_fit::DOES_NOT_FIT_EXIT,
                 None => 0,
             };
@@ -2329,10 +2335,15 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
             NSApplication::sharedApplication(mtm).stopModalWithCode(-1001);
         })
     };
-    // SAFETY: the block runs on this thread's run loop only, and is dropped
-    // after the timer is invalidated below.
-    let timer = unsafe { NSTimer::timerWithTimeInterval_repeats_block(0.1, true, &check) };
-    unsafe { NSRunLoop::currentRunLoop().addTimer_forMode(&timer, NSRunLoopCommonModes) };
+    // SAFETY: the block runs on this thread's run loop only. The timer keeps
+    // its own copy of it until it is invalidated below, and `check` is not used
+    // again.
+    let timer = unsafe { NSTimer::timerWithTimeInterval_repeats_block(0.05, true, &check) };
+    // SAFETY: as above; the modes are AppKit's own constants.
+    unsafe {
+        NSRunLoop::currentRunLoop().addTimer_forMode(&timer, NSRunLoopCommonModes);
+        NSRunLoop::currentRunLoop().addTimer_forMode(&timer, NSModalPanelRunLoopMode);
+    }
     // Once, as the Windows box is: in front, without taking it back later.
     #[allow(deprecated)]
     app.activateIgnoringOtherApps(true);
@@ -2340,6 +2351,11 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     timer.invalidate();
     if let Some(exit) = missed.get() {
         std::process::exit(exit);
+    }
+    // Never approved unless the placement check ran and passed at least once (a
+    // decline before the first check is still a decline).
+    if checked.get() == 0 && approves(response) {
+        std::process::exit(0);
     }
     if policy == NSApplicationActivationPolicy::Prohibited {
         app.setActivationPolicy(policy);
@@ -2383,6 +2399,9 @@ fn the_mac_alert_is_shown_only_if_it_fits_and_approved_only_on_its_second_button
         source.replacen("Measured::Unavailable => std::process::exit(0),", "Measured::Unavailable => {}", 1),
         source.replacen("    alert.layout();\n", "", 1),
         source.replacen("    timer.invalidate();\n", "", 1),
+        source.replacen("    if checked.get() == 0 && approves(response) {\n        std::process::exit(0);\n    }\n", "", 1),
+        source.replacen("checked.set(checked.get().saturating_add(1));", "", 1),
+        source.replacen("addTimer_forMode(&timer, NSModalPanelRunLoopMode);", "addTimer_forMode(&timer, NSRunLoopCommonModes);", 1),
         source.replacen("    if let Some(exit) = missed.get() {\n        std::process::exit(exit);\n    }\n", "", 1),
         source.replacen("Some(false) => super::box_fit::DOES_NOT_FIT_EXIT,", "Some(false) => 0,", 1),
         source.replacen("None => 0,", "None => return,", 1),

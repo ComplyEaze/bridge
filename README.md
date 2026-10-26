@@ -62,7 +62,7 @@ update itself, so look for a newer version on the
 - **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
 - **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags, and Tally's Funds Flow, Ratio Analysis and negative-balance reports.
 
-"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.6.0 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
 **Its tools.** In name order; release 0.6.0 installs 28 of them, and `gst_uncertain_vouchers` and `negative_stock` are in source, not yet in a published build. None of them changes your TallyPrime books; `audit_test_run`, in source and not yet in a published build, and off unless its setting is on, does not change them either; with posting on, two more appear, described below the table. Every call adds a receipt line,
 with no figures, to a log on this computer.
@@ -276,7 +276,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   Journal the same way. The published file (`bridge-tally-mcp-v0.6.0-windows-x64.mcpb` SHA-256
   `7bf81f08e058fc7ae00ccc51b3dceec10dc50d45dca8477a0438fd9b5a2852ca`, `bridge_mcp.exe` SHA-256
   `1e41e039fbf3daaf6be5a3c8e2f5e0bd1245a745abc5e78349fd83ce678224c1`) is neither of those: its exe differs from the rehearsal's in
-  77 of 26,503,168 bytes, and we have not run it against a live TallyPrime. What was not run, among others: a batch of Journals, a batch of
+  77 of 26,503,168 bytes, and what we have recorded of it against a live TallyPrime is the probes of 16 October 2026 (#1780) noted above, which ended in one Contra posted and read back. What was not run, among others: a batch of Journals, a batch of
   more than 3, a refused or partly landed post, amendments, the review window, an On Account approval, the retired batch
   variable, the voucher-numbering rows (#724, #1668), `voucher_read_cost` against a real `vouchers` call, the Store-install
   proof of the lock (#1584, #1459), a second monitor, the batch `headline` on a live post, the Import menu, the desktop app,
@@ -294,7 +294,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   that file or read it back, and no real statement has been run.
 
 Not yet run by us in a controlled test: posting with a published package
-against a live TallyPrime; each way of declining in the Windows approval window
+against a live TallyPrime beyond the one Contra of 16 October 2026 (#1780); each way of declining in the Windows approval window
 (one was tried); the tools answering through Claude Desktop on macOS after the
 Terms are accepted (`tally_status` and `list_companies` answered on a CI build
 of 0.4.1, again on a CI build of 0.4.2 and on one Mac on a CI build of 0.5.0); posting on TallyPrime Education; posting on TallyPrime Gold
@@ -496,7 +496,7 @@ it. Before you do, know what it is and is not:
   your Tally, or in conversation inside Claude Desktop. What has been run
   against a real TallyPrime, and on which builds, is
   [listed above](#what-has-been-run-against-a-real-tallyprime); the published
-  0.6.0 package itself has not been run by us against a live TallyPrime; two other builds of 0.6.0, made by
+  0.6.0 package itself has been run by us against a live TallyPrime once, to post one Contra to a synthetic company on 16 October 2026 (#1780); two other builds of 0.6.0, made by
   our checks from the same source, were run against TallyPrime 7.1 Silver on one Windows computer
   (see the 16 October 2026 entry above).
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.

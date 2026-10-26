@@ -2847,7 +2847,7 @@ The posted vouchers are identified by their place in the post's own range of
 Tally AlterIDs (protocol reference §9.15). The dispatch intent records the
 company's voucher mark from the last read before the POST, and the readback
 binds each voucher to the Tally GUID its POST created. Binding needs a clean
-response (`CREATED` equal to the voucher count, and `LASTVCHID`), the mark after
+response (no `STATUS` 0, `CREATED` equal to the voucher count, and `LASTVCHID`), the mark after
 the POST moved by exactly `CREATED`, and the vouchers in that range in the order
 sent with the content sent. If the mark after the POST could not be read, the
 range the clean response implies is used instead. A post whose response was lost

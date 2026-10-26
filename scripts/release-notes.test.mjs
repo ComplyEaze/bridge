@@ -420,15 +420,21 @@ test("the page and the notes list the entries, and a bad entry warns without fai
     const missing = run("unreleased", "--changelog", join(dir, "nowhere", "CHANGELOG.md"));
     assert.equal(missing.status, 1);
     assert.match(missing.stderr, /does not exist/);
-    writeEntries(dir, { "changed/7-odd\nname.md": "- Odd (#7).\n" });
-    const odd = run("page", "--changelog", join(dir, "CHANGELOG.md"), "--out", join(dir, "odd.html"));
-    assert.equal(odd.status, 0);
-    assert.equal(odd.stdout.split("\n").filter((line) => line !== "" && !line.startsWith("::warning::")).length, 0, "a file name cannot start another workflow command");
-    rmSync(join(dir, FRAGMENT_DIRECTORY, "changed", "7-odd\nname.md"));
     rmSync(join(dir, FRAGMENT_DIRECTORY, "changed"), { recursive: true });
     const printed = run("unreleased", "--changelog", join(dir, "CHANGELOG.md"));
     assert.equal(printed.status, 0);
     assert.equal(printed.stdout, "**Added**\n\n- New tool (#5).\n");
+  });
+});
+
+// Windows refuses a line feed in a file name (ENOENT), so there the case cannot exist; it runs everywhere else.
+test("a file name holding a line feed cannot start another workflow command", { skip: process.platform === "win32" && "Windows cannot create a file name that holds a line feed" }, () => {
+  inTemporaryRepository((dir) => {
+    writeFileSync(join(dir, "CHANGELOG.md"), "## [Unreleased]\n\nNext words.\n\n## [1.0.0] - 2026-10-01\n\n- One.\n");
+    writeEntries(dir, { "changed/7-odd\nname.md": "- Odd (#7).\n" });
+    const odd = spawnSync("node", ["scripts/release-notes.mjs", "page", "--changelog", join(dir, "CHANGELOG.md"), "--out", join(dir, "odd.html")], { cwd: root, encoding: "utf8" });
+    assert.equal(odd.status, 0);
+    assert.equal(odd.stdout.split("\n").filter((line) => line !== "" && !line.startsWith("::warning::")).length, 0, "a file name cannot start another workflow command");
   });
 });
 

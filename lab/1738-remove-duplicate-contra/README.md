@@ -6,7 +6,7 @@
 - By import: two ledgers and ten Contras, then five deletes and five cancels.
 - On Tally's own screens: the company's creation, up to three numbering changes of the Contra type, one shut-and-load and one restore.
 
-Licensed TallyPrime 7.1, not Educational mode, a single currency. No ComplyEaze Bridge build is used: every request is sent by curl (owner's ruling of 26 Oct 2026: lab requests by curl are allowed, writes included, to discover shapes that Bridge will then send itself).
+Licensed TallyPrime, not Educational mode, a single currency: the lab PC runs 7.2 since 25 Oct 2026; record the release from Tally's About screen at S0 (the 9.12b and 9.14 measurements cited below were made on 7.1). No ComplyEaze Bridge build is used: every request is sent by curl (owner's ruling of 26 Oct 2026: lab requests by curl are allowed, writes included, to discover shapes that Bridge will then send itself).
 
 LAB-COMMON v3 applies in full: file `lab/626-1038-1050-run-sheets/LAB-COMMON.md` on branch `lab/626-1038-1050-run-sheets`, commit 8c602c15. That means C1 to C11:
 - the request line of C3;
@@ -113,12 +113,13 @@ A save of a type with no vouchers asked nothing on an earlier run. Any other pro
 ## Steps
 
 - **S0.** LAB-COMMON step 0 (C2), with NO company loaded yet: C2 d is replaced by a screenshot showing no company loaded. Check the 19 request hashes and SHA256.txt.
+- **Before S1.** The lab asks the owner in its own chat whether this sheet's writes may begin, and sends nothing and keys nothing until the owner says yes.
 - **S1.** Create THE COMPANY on Tally's screen:
   - name `BRIDGE REMOVE LAB`, books beginning 1 April 2025, base currency INR, nothing else changed from the screen's defaults; accept;
   - screenshot the Gateway showing it loaded alone, and record the Current Period it shows;
   - EXPECT a period that includes 5 and 6 May 2025 (an alteration outside the current period may fail without saying so, implementation guide 3.1a). If not, set the period to 1 April 2025 to 31 March 2026 by the Gateway's Period key, screenshot, and EXPECT that; else STOP;
   - MARKS: record the GUID, the company number (from the company list on screen) and both marks. EXPECT ALTVCHID absent or 0: a new company.
-- **S2.** VTYPES. EXPECT the Contra series `Automatic` and `Auto Retain`. If the sub-method is anything else, set Retain Original Voucher No. on the numbering screen (above), then VTYPES again, and EXPECT `Auto Retain` (else STOP). Then backup BK0.
+- **S2.** Backup BK0 first (C5: before any change after the company's creation). Then VTYPES. EXPECT the Contra series `Automatic` and `Auto Retain`. If the sub-method is anything else, set Retain Original Voucher No. on the numbering screen (above), then VTYPES again, and EXPECT `Auto Retain` (else STOP).
 - **S3.** `s3-ledgers.xml`. EXPECT `CREATED 2` (C4's import rule). MARKS.
 - **S4.** `s4a`, then DAY5; `s4b`, then DAY5; `s4c`, then DAY5 and MARKS. EXPECT `CREATED 2` for each.
   - The final DAY5 holds exactly six rows, numbered 1 to 6 in the order V1 to V6, none cancelled. V6 holds the highest ALTERID, and it equals ALTVCHID.
@@ -152,7 +153,7 @@ A save of a type with no vouchers asked nothing on an earlier run. Any other pro
 ## STOP rules (beyond LAB-COMMON C8 and C9)
 
 - **A dialog:** any dialog, message box or half-entered screen before a request is a STOP before sending it. On the numbering screen, the two confirmations quoted above are answered and nothing else is.
-- **A bad answer:** an import answer that does not parse, has header STATUS 0, or is above 64 KiB is a STOP.
+- **A bad answer:** an import answer that does not parse, has header STATUS 0, or is above 64 KiB is a STOP. Read bounds (C3): MARKS 8,192 bytes; DAY5, DAY6 and VTYPES 1,000,000 bytes each; an answer above its bound is a STOP.
 - **A row that fails its PASS** (L1 to L6) or meets an unexpected effect of its own: a FINDING. Record it whole, take DAY5 and MARKS once, then STOP before the next row and report; the run coordinator decides whether to go on. A row whose voucher is already gone or already cancelled before it is sent is a STOP at once.
 - **A voucher no row names changes:** after recording, STOP. That covers a voucher of the other day, or any voucher in Phase A other than the row's own. In Phase B, numbers of either day's Contras may change (Renumber Vouchers renumbers the type), and that is recorded, not a STOP. An ALTERID or a GUID that changes on a voucher the row does not name is a STOP in Phase B too.
 - **A slow answer:** one that has not finished after five minutes. Do nothing at all: do not cancel it, do not send it again, do not send anything else, do not touch Tally. Report and wait.

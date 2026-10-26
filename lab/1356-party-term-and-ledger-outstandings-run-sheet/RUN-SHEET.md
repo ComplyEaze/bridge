@@ -17,10 +17,14 @@ Capture 3 (the cost on a book of thousands of vouchers) is not here: it needs th
 - **Capture 1:** the `outstandings` detail reads the whole voucher window and keeps each entry by its own ledger. A party read could be narrower only if a `$PartyLedgerName` term loses no allocation of that party. The case it could lose is a voucher whose party ledger is someone else, such as a journal whose second party is this one.
 - **Capture 2:** Tally's native `Ledger Outstandings` report for one party might replace the whole-window read. At most three requests discover its answer; no response grammar is held yet.
 
+**REQUESTS BY CURL (allowed by the owner's decision of 26 Oct 2026 that requests sent by curl, writes included, may be used to discover shapes; this item's requests only read).** `r03` is a candidate for a party-narrowed form of the `outstandings` detail's window read (`render_agent_vouchers` in `src-tauri/src/agent_read_profiles.rs`); the party name would enter it only through a type that refuses any character able to end a TDL literal. `r04` and `r05` are a candidate for a native `Ledger Outstandings` report builder (the Data request removed in #1747). `r02` is the committed class voucher window, used as an instrument: it is not the detail's own window (which has no class computations and fetches `REFERENCEDATE` last). `r01` is the company marks builder (`render_agent_company_high_water`, same file). Before the first send: `python -I check-request-ids.py requests` in this folder; EXPECT `census: ok 3, skipped 2, FAIL 0` (r04 and r05 are report requests of TYPE Data, which define no collection: for each, check by eye that its ID is `Ledger Outstandings` and it defines no `COLLECTION`); anything else = STOP, nothing sent.
+
+**DIALOGS.** Any dialog or message box on Tally's screen that a step does not name = STOP (C7): press no key, send nothing more, screenshot, copy its text, report.
+
 **OWNER steps** are marked [OWNER].
 
 ## Before the sitting
-1. [OWNER] Tally is LICENSED. The keyed date in step 5 is not day 1, 2 or 31. Educational mode = STOP (C1).
+1. [OWNER] Tally is LICENSED. The keyed date in step 5 is not day 1, 2 or 31. Educational mode = STOP (C1). Record the release from Tally's About screen (the lab PC runs 7.2 since 25 Oct 2026).
 2. Check every file here against `SHA256.txt`.
 3. [OWNER] Go-ahead.
 
@@ -29,7 +33,7 @@ Capture 3 (the cost on a book of thousands of vouchers) is not here: it needs th
 | file | what | shape |
 | --- | --- | --- |
 | `requests/r01_marks.request.utf16le.xml` | ALTVCHID, ALTMSTID | committed |
-| `requests/r02_vouchers_fy_unfiltered.request.utf16le.xml` | every voucher, 1 Apr 2025 to 31 Mar 2026, with `ALLLEDGERENTRIES.*` (the window the detail reads) | committed, dates changed |
+| `requests/r02_vouchers_fy_unfiltered.request.utf16le.xml` | every voucher, 1 Apr 2025 to 31 Mar 2026, with `ALLLEDGERENTRIES.*` (the committed class window; see above) | committed, dates changed |
 | `requests/r03_vouchers_fy_party_term.request.utf16le.xml` | r02 with `AND $PartyLedgerName = "Lab Party P1"` added to its filter formula | NEW SHAPE (C3 screenshot after) |
 | `requests/r04_ledger_outstandings_p1_to_20260331.request.utf16le.xml` | `Ledger Outstandings`, Lab Party P1, to 31 Mar 2026, exploded | NEW SHAPE |
 | `requests/r05_ledger_outstandings_p1_to_20250731.request.utf16le.xml` | the same to 31 Jul 2025 | NEW SHAPE |
@@ -43,19 +47,19 @@ r04 and r05 are the request text of the dormant `Ledger Outstandings` probe remo
    2. r05.
    3. r04 again.
 
-   Each is a NEW SHAPE: take a screenshot after each and before anything else. A dialog = C7.
+   Each is a NEW SHAPE: take a screenshot after each and before anything else. A dialog = STOP (C7).
    
    **Oracle:** Tally's own Ledger Outstandings screen for Lab Party P1, "For 31-Mar-26" and then "For 31-Jul-25". Open it under Display > Statements of Accounts > Outstandings > Ledger and screenshot each date. It is a report, not a master or voucher screen, so leave it with Escape. Navigation only; no key that alters anything.
 2. **Capture 1, before any change:** r02, then r03.
-3. Backup **BK1** (C5) into a NEW empty folder `C:\bridge-lab\1356\backups\BK1\`.
+3. Backup **BK1** (C5) into a NEW empty folder `C:\bridge-lab\1356\backups\BK1\`. Then marks **M0′** (r01): a mark that moved across the backup is recorded, not a STOP (C5). [OWNER] Before step 4 the lab asks the owner in its own chat whether to key, and keys nothing until the owner says yes.
 4. **By hand:** create ledger `BRIDGE Party P2` under Sundry Debtors, bill-wise ON, no opening. Screenshot before the accept.
 5. **By hand:** key Journal J1, dated 20-09-2025, with the first line BRIDGE Party P2 so that it becomes the voucher's party:
    - BRIDGE Party P2 Dr 500.00, bill New Ref `J-1`;
    - Lab Party P1 Cr 500.00, bill Agst Ref `INV-1`.
 
-   Screenshot before the accept. Any prompt beyond the bill-wise breakups and the accept = C7.
+   Screenshot before the accept. Any prompt beyond the bill-wise breakups and the accept = STOP (C7).
 6. Marks **M1**. Then r02, then r03 again.
-7. Restore **BK1** (C6). Marks **M2**: EXPECT M2 = M0. Then r02 once more: EXPECT the same vouchers and allocations as step 2's r02.
+7. Restore **BK1** (C6). Marks **M2**: EXPECT M2 = M0′. Then r02 once more: EXPECT the same vouchers and allocations as step 2's r02.
 
 ## EXPECT (recorded; the lab judges nothing but the STOP rules)
 - **Capture 2:**
@@ -79,7 +83,7 @@ r04 and r05 are the request text of the dormant `Ledger Outstandings` probe remo
 
 ## Close and evidence
 - **C10:** Shut Company; no company loaded.
-- **C11:** evidence to a new branch `lab/1356-party-term-and-ledger-outstandings-answers`, after the pre-push scan and [OWNER] yes. It holds:
+- **C11:** evidence to a new branch `lab/1356-party-term-and-ledger-outstandings-answers`, after the pre-push scan and the run coordinator's yes. It holds:
   - every answer, whole, with headers, size and sha256;
   - the allocation tables of capture 1;
   - the bill tables of capture 2, beside the screen's figures typed from the screenshots;

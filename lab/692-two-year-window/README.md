@@ -1,0 +1,32 @@
+# Lab run sheet: Profit and Loss, Balance Sheet and Stock Summary over a window that spans two financial years (#692). SYNTHETIC COMPANY ONLY. Not for merge.
+
+About 40 minutes. `LAB-COMMON.md` in this folder (v3) applies in full; where this sheet and it differ, the stricter holds. One Journal is keyed on Tally's screen and removed by a restore at the end; ComplyEaze Bridge writes nothing, and every read is a call of the build's own tools (no request is sent by curl).
+
+**WHAT IT DECIDES.** `profit_and_loss`, `balance_sheet` and `stock_summary` admit any window, but each says that a window spanning more than one financial year is unmeasured (agent_statements.rs limitations; #692's thread: "windows that span two financial years" not measured). This sheet reads one integrated-inventory book, whose year 2025-26 the tools already establish (lab/72-reads-rd21-b-answers, rows B3, 26 Oct 2026, TallyPrime 7.2), after one voucher is keyed in April 2026, for three windows: the year, April 2026 alone, and 1 April 2025 to 30 April 2026. For each window it records what the tool returns (established, or refused and why) beside Tally's own screen for the same period. A tool result that is established and differs from the screen is a product finding; a refusal is recorded as the answer.
+
+**THE COMPANY.** BRIDGE TIEOUT B, GUID `d64eda55-da7c-4106-a171-3e3cb6cdd331` (in the merge gate's synthetic registry), company number 100040 on 26 Oct, books from 1 April 2025, loaded alone. On 26 Oct its marks read M 218 / V 3. If it is not on the lab PC or `list_companies` shows another GUID: STOP.
+
+**THE BUILD.** Tonight's staged build, master `fd6f7c0d032ec51f9d9de9c80e8bcd33d930ad77` (`bridge_mcp.exe` sha256 `63641231787492201133443cb1a887705c7137f495a9205ffd33c2d0068f7484`), or the build rd21 part B used (master 609776ae; record its exe hash). Both hold #1818 (closing stock from Tally's own line). Hash the exe first and at the end; another hash = STOP. Over stdio, one launch, a new empty `BRIDGE_AGENT_DATA_DIR`, `BRIDGE_TERMS_ACCEPTED=true`; posting, import and redaction unset. MARKS means `ledger_masters` with `company_guid`, `fields` `basic`, first page, no `snapshot_id`: M = `result.snapshot.master_alter_id`, V = `result.snapshot.voucher_alter_id`, `result.snapshot.reused` false. C2 d and C4's MARKS bullet are met by `list_companies` and this read; no raw request is sent.
+
+**WHO KEYS.** The operator, on Tally's screen, after the run coordinator's yes (given before step 3). A screenshot before the accept; after it, Ctrl+Q back to the Gateway of Tally, then MARKS. Expected screens: F2 for the voucher date, Alt+F2 for a report's period. Any other dialog or message = STOP (C7). Never Escape on a voucher screen.
+
+Each tool answer is saved whole with its sha256. "The three reads" of a window means `profit_and_loss`, then `balance_sheet`, with `company_guid`, `from`, `to`; and `stock_summary` with `company_guid` and the window's end as its date (record the arguments the tool's schema asks for). For each answer record `result.state`, any reason or refusal code, `result.closing_stock`, `result.balance_sheet_gate`, `result.tie_out`, and the lines.
+
+## Steps
+0. C2 step 0. `list_companies`: EXPECT exactly BRIDGE TIEOUT B with the GUID above. MARKS: M0, V0 (EXPECT V0 a number).
+1. **The year, before keying (control).** The three reads for 1 April 2025 to 31 March 2026. EXPECT `profit_and_loss` and `balance_sheet` as on 26 Oct (state `observed`, `closing_stock` `applied` with value -2100.00): a difference is reported before anything else.
+2. **BK0.** The run coordinator's yes first. Backup BK0 into a NEW empty folder (C5): name, size, sha256. MARKS: EXPECT M0, V0.
+3. **J1.** One Journal dated 10 April 2026: Dr an Indirect Expenses ledger of this book, Cr a Bank Accounts or Cash-in-Hand ledger of this book (record both names; if the book has no such pair, record its ledger list and STOP), amount 100.00, no stock item, narration `LAB 2Y J1`. If Tally asks to create or open the year 2026-27, record the exact prompt and STOP (the coordinator decides). Accept, then as WHO KEYS says. MARKS: M1, V1 (EXPECT V1 above V0).
+4. **The year again.** The three reads for 1 April 2025 to 31 March 2026: EXPECT the same results as step 1 (J1 is outside the window); any difference is reported field by field.
+5. **April 2026 alone.** The three reads for 1 April 2026 to 30 April 2026. Record.
+6. **The spanning window.** The three reads for 1 April 2025 to 30 April 2026. Record.
+7. **Tally's screen for each window of steps 5 and 6.** Gateway > Profit & Loss A/c, then Balance Sheet, then Stock Summary; set the period with Alt+F2 (record the exact keys and the period Tally shows; if Tally refuses the period or shows a prompt, record it and do not force it). Screenshot each and write down: net profit or loss, the closing-stock line, the totals, and each line the tool returned for that window. Back to the Gateway with Ctrl+Q.
+8. **Compare.** For each window of steps 5 and 6 and each report: the tool's state; if established, each tool line against the screen's line (equal, or the difference); if refused, the code and the screen's figures beside it.
+9. **Restore.** Only on the run coordinator's explicit RESTORE: restore BK0 (C6). `list_companies` as step 0. MARKS: EXPECT M0 and V0, else STOP and report what the book holds. The three reads of step 1 again: EXPECT the same results as step 1.
+10. C10 close.
+
+**PASS** = every answer whole with its sha256, every window's screen recorded, the comparison of step 8 written for each report and window, marks unchanged by every read, the book restored to M0/V0. Whatever the tools give for the spanning window is a result. **FAIL** = a transport failure, a step 4 or step 9 result that differs from step 1 with no explanation, or a book not restored.
+
+**NOT MEASURED:** a book with an opening stock, a costing method that changes value, a non-integrated book, a window spanning three years, a window not starting on 1 April, a book whose second year holds stock movements (J1 holds none), foreign currency.
+
+**EVIDENCE** on a NEW branch `lab/692-two-year-window-answers` (C11), after the pre-push scan and the run coordinator's yes: every tool answer whole with its sha256, the marks answers, the step 7 screen notes, the step 8 comparison, BK0's name, size and sha256, the exe hashes, and a notes file with UTC times. Screenshots and BK0 stay on the lab PC, listed by name, size and sha256.

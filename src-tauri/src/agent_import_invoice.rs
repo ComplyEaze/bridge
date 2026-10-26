@@ -452,9 +452,11 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
             _ => "invoice_sales_ledger_rate_history_unmeasured",
         });
     };
-    if !gst.applicable_from.as_deref().is_some_and(|from| {
-        from.len() == 8 && from.bytes().all(|byte| byte.is_ascii_digit()) && from <= as_of
-    }) {
+    if !gst
+        .applicable_from
+        .as_deref()
+        .is_some_and(|from| TallyDate::parse(from).is_ok() && from <= as_of)
+    {
         return Err("invoice_sales_ledger_rate_not_in_force");
     }
     if gst.unmeasured {

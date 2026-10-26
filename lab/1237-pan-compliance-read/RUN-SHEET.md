@@ -8,10 +8,14 @@ Not for merge. THREE LEDGERS ARE CREATED AND ONE ALTERED on Tally's own screen, 
 - `p01_marks.request.utf16le.xml`: the company marks of BRIDGE PILOT LAB (`Bridge Agent Company High Water`), the same file `lab/1331-scoped-listing-run-sheet` sends.
 - `p02_compliance_listing.request.utf16le.xml`: the compliance listing of BRIDGE PILOT LAB from 1 April to 15 September 2026, byte for byte the request `lab/1342-w18c-answers` sent (`requests/w18c-ledgers-compliance-to-20260915.xml`). The build's own replay test (`src-tauri/src/agent_import_w18_replay_tests.rs`, request `L`) pins its SHA-256 as one the build sends. Its to-date follows the book's last voucher date; a different last date changes only that date, and the PAN does not depend on it.
 
+**REQUESTS BY CURL (allowed by the owner's decision of 26 Oct 2026 that requests sent by curl may be used to discover shapes; both requests only read).** Both are existing builders' requests, used as instruments; no new builder is made from them: `p01` is the company marks builder (`render_agent_company_high_water` in `src-tauri/src/agent_read_profiles.rs`) and `p02` is the request the compliance listing behind `ledger_masters` with `fields=compliance` sends (pinned as request `L` above). Before the first send: `python -I check-request-ids.py requests` in this folder; EXPECT `census: ok 2, skipped 0, FAIL 0`; anything else = STOP, nothing sent. A marks answer's size bound is 8,192 bytes.
+
+**DIALOGS.** Any dialog or message box on Tally's screen that a step does not name = STOP (C7): press no key, send nothing more, screenshot, copy its text, report.
+
 **OWNER steps** are marked [OWNER].
 
 ## Before the sitting
-1. [OWNER] Tally licensed. Educational mode = STOP (C1).
+1. [OWNER] Tally licensed. Educational mode = STOP (C1). Record the release and edition from Tally's About screen (the lab PC runs 7.2 since 25 Oct 2026; step 5's expected label was seen on 7.1).
 2. Check every file here against `SHA256.txt`.
 3. [OWNER] Go-ahead.
 
@@ -20,13 +24,13 @@ Not for merge. THREE LEDGERS ARE CREATED AND ONE ALTERED on Tally's own screen, 
 2. Look at THE COMPANY's ledger list on Tally's screen (Chart of Accounts, Ledgers). If any ledger is named `BRIDGE PAN Party A`, `BRIDGE PAN Party B` or `BRIDGE PAN Party C`: STOP.
 3. `p02` (answer `c0`, size bound 2,000,000 bytes). This is the book before any change.
 4. C5 BACKUP to the new empty folder `C:\bridge-lab\1237-pan\backup`. Record the file, its bytes, its sha256 and the time the Restore list will show.
-5. Create, on Tally's ledger creation screen, a ledger named `BRIDGE PAN Party A` under `Sundry Debtors`. In the field Tally labels for the PAN (on 7.1 expected as `PAN/IT No.`; record the label and the section it sits in exactly), key `ZZZZZ0000Z`. Key nothing else: no GST registration details, no opening balance, no address; leave every other field as Tally shows it. Screenshot the screen before accepting; accept.
+5. [OWNER] Before this step the lab asks the owner in its own chat whether to key the three ledgers, and keys nothing until the owner says yes. Then create, on Tally's ledger creation screen, a ledger named `BRIDGE PAN Party A` under `Sundry Debtors`. In the field Tally labels for the PAN (on 7.1 expected as `PAN/IT No.`; record the label and the section it sits in exactly), key `ZZZZZ0000Z`. Key nothing else: no GST registration details, no opening balance, no address; leave every other field as Tally shows it. Screenshot the screen before accepting; accept.
 6. Create `BRIDGE PAN Party B` under `Sundry Debtors` the same way, with the PAN field left untouched (never keyed). Screenshot before accepting; accept.
 7. Create `BRIDGE PAN Party C` under `Sundry Debtors` the same way, with `ZZZZZ0000Z` in the PAN field. Accept. Then alter `BRIDGE PAN Party C`: go to the PAN field, clear it to blank with Backspace (never Escape, C7), screenshot, accept.
 8. `p01` (answer `m2`). Record ALTVCHID and ALTMSTID. EXPECT ALTVCHID equal to step 1's; record ALTMSTID whatever it is (an expectation of 4 more than step 1, three creates and one alter, is unverified).
 9. `p02` (answer `c1`, size bound 2,000,000 bytes).
 10. `p02` again (answer `c2`). Then `p01` (answer `m3`): EXPECT both marks equal to step 8's.
-11. If a ComplyEaze Bridge build is connected on the lab PC: call `tally_status`, then `ledger_masters` with THE COMPANY's `company_guid`, `fields` = `compliance`, `group` = `Sundry Debtors`. For each of the three ledgers copy, exactly as returned, its row's `compliance.income_tax_number`, `party_gstin`, `party_gstin_status` and `snapshot.master_alter_id`. If no build is connected: skip this step and say so.
+11. If a ComplyEaze Bridge build is connected on the lab PC (the build staged as `w1-2306d86d`, `bridge_mcp.exe` sha256 `92a899a21f904f88cb2d13ce44b1417d5aecaf333caad5230de598bf54d89524`, hashed first; over stdio with `BRIDGE_TALLY_PORT=9001`, a new empty `BRIDGE_AGENT_DATA_DIR`, `BRIDGE_TERMS_ACCEPTED=true`, and posting, import and redaction unset): call `tally_status`, then `ledger_masters` with THE COMPANY's `company_guid`, `fields` = `compliance`, `group` = `Sundry Debtors`. For each of the three ledgers copy, exactly as returned, its row's `compliance.income_tax_number`, `party_gstin`, `party_gstin_status` and `snapshot.master_alter_id`. If no build is connected: skip this step and say so.
 12. C6 RESTORE from step 4's backup. Then `p01` (answer `m4`): EXPECT both marks equal to step 1's (the book back as it was found). Then `p02` (answer `c3`): EXPECT byte-equal to `c0` (`fc /b`, or equal SHA-256); if not, the first differing offset and both sizes.
 13. C10.
 
@@ -50,7 +54,7 @@ For each of `c0`, `c1`, `c2` and `c3`: parse it as XML and list every `LEDGER` r
 
 ## Close and evidence
 - **C10** at the end.
-- **C11:** evidence to a new branch `lab/1237-pan-compliance-answers`, after the pre-push scan and [OWNER] yes, under `lab/1237-pan-compliance-read/answers/`. It holds: every answer, whole, with headers, size, sha256 and its send and answer times; the tables of "Reading the answers"; the step 11 rows as returned (or the skip); the notes; the backup's file name, bytes and sha256 (the backup itself stays on the lab PC). Screenshots stay on the lab PC, listed by name, size and sha256. Commit messages carry no attribution trailer.
+- **C11:** evidence to a new branch `lab/1237-pan-compliance-answers`, after the pre-push scan and the run coordinator's yes, under `lab/1237-pan-compliance-read/answers/`. It holds: every answer, whole, with headers, size, sha256 and its send and answer times; the tables of "Reading the answers"; the step 11 rows as returned (or the skip); the notes; the backup's file name, bytes and sha256 (the backup itself stays on the lab PC). Screenshots stay on the lab PC, listed by name, size and sha256. Commit messages carry no attribution trailer.
 
 ## Report, one message
 The release and edition; the marks of steps 1, 8, 10 and 12; per answer its size, sha256 and row count; the three ledgers' `INCOMETAXNUMBER`, `PARTYGSTIN` and `NAMEONPAN` states in `c1`; the PAN field's label and section from steps 5 to 7; step 11's rows or the skip; the `c1`/`c2` and `c0`/`c3` comparisons; any STOP. A command that errors is reported as an error, never as "absent" or "unchanged".

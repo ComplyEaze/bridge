@@ -894,6 +894,189 @@ pub(super) async fn lab_read_inventory(
 }
 
 // ---------------------------------------------------------------------------
+// The tool: lab_voucher_key_probe (#685)
+// ---------------------------------------------------------------------------
+
+/// The voucher method the probe's day-window formula compares with its key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ProbeTerm {
+    /// A voucher's own GUID: the control, measured to select one voucher
+    /// (protocol reference 9.15).
+    Guid,
+    /// `$RemoteID`: the question is whether it holds the client REMOTEID a
+    /// native post sent, which no read has returned so far (9.3).
+    RemoteId,
+}
+
+impl ProbeTerm {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "guid" => Ok(Self::Guid),
+            "remote_id" => Ok(Self::RemoteId),
+            _ => Err("lab_probe_term_invalid".to_string()),
+        }
+    }
+
+    fn method(self) -> &'static str {
+        match self {
+            Self::Guid => "$GUID",
+            Self::RemoteId => "$RemoteID",
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Guid => "guid",
+            Self::RemoteId => "remote_id",
+        }
+    }
+}
+
+/// A key the probe may compare: a lowercase UUID (the REMOTEID a native post
+/// minted), optionally followed by `-` and eight hex digits (a voucher's GUID:
+/// its company's GUID and its MasterID). The key lands inside a quoted TDL
+/// literal, which XML escaping cannot protect (#861), so it is admitted only
+/// from hex digits and hyphens in those groups (AGENTS.md P7).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ProbeKey(String);
+
+impl ProbeKey {
+    pub(super) fn new(value: &str) -> Result<Self, String> {
+        let groups = value.split('-').collect::<Vec<_>>();
+        let lengths: &[usize] = match groups.len() {
+            5 => &[8, 4, 4, 4, 12],
+            6 => &[8, 4, 4, 4, 12, 8],
+            _ => return Err("lab_probe_key_invalid".to_string()),
+        };
+        let admitted = groups.iter().zip(lengths).all(|(group, &length)| {
+            group.len() == length
+                && group
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        });
+        admitted
+            .then(|| Self(value.to_string()))
+            .ok_or_else(|| "lab_probe_key_invalid".to_string())
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// One day's vouchers whose `term` equals `key`, with the voucher's
+/// `$RemoteID` computed beside its identity, so one answer shows both whether
+/// the filter selected a voucher and what that method holds for it. The
+/// collection's ID is its name, and the day is a `TallyDate`.
+pub(super) fn render_lab_voucher_key_probe(
+    company: &str,
+    day: &bridge_tally_core::TallyDate,
+    term: ProbeTerm,
+    key: &ProbeKey,
+) -> Result<String, String> {
+    let company = ValidatedCompanyName::new(company.to_string())
+        .map_err(|_| "company_name_invalid".to_string())?;
+    let (day, method, key) = (day.as_str(), term.method(), key.as_str());
+    Ok(format!(
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Lab Voucher Key Probe</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{day}</SVFROMDATE><SVTODATE TYPE="Date">{day}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeLabKeyProbe">$Date &gt;= $$Date:"{day}" AND $Date &lt;= $$Date:"{day}" AND {method} = "{key}"</SYSTEM><COLLECTION NAME="Bridge Lab Voucher Key Probe" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERTYPENAME,GUID,MASTERID,ALTERID,ISCANCELLED,ISOPTIONAL</FETCH><COMPUTE>BRIDGEREMOTEID:$RemoteID</COMPUTE><FILTERS>BridgeLabKeyProbe</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+        xml_escape(company.as_str())
+    ))
+}
+
+/// The probe's answer. Only a row with a GUID is counted as a voucher: an
+/// earlier `$RemoteID` probe answered one empty `VOUCHER` whatever it asked,
+/// which must never read as a match (AGENTS.md P5).
+fn key_probe_result(
+    term: ProbeTerm,
+    key: &ProbeKey,
+    day: &bridge_tally_core::TallyDate,
+    rows: &[BTreeMap<String, String>],
+) -> Value {
+    let identified = rows
+        .iter()
+        .filter(|row| row.get("GUID").is_some_and(|guid| !guid.trim().is_empty()))
+        .collect::<Vec<_>>();
+    let vouchers = identified
+        .iter()
+        .take(KEY_PROBE_LISTED)
+        .map(|row| {
+            let remote_id = row.get("BRIDGEREMOTEID").map(|value| value.trim());
+            json!({
+                "guid": optional_field(row, "GUID"),
+                "master_id": optional_field(row, "MASTERID"),
+                "alter_id": optional_field(row, "ALTERID"),
+                "date": optional_field(row, "DATE"),
+                "voucher_type": optional_field(row, "VOUCHERTYPENAME"),
+                "cancelled": optional_field(row, "ISCANCELLED"),
+                "optional": optional_field(row, "ISOPTIONAL"),
+                "remote_id": optional_field(row, "BRIDGEREMOTEID"),
+                "remote_id_equals_key": remote_id
+                    .is_some_and(|remote_id| remote_id.eq_ignore_ascii_case(key.as_str())),
+                "remote_id_equals_guid": remote_id.is_some_and(|remote_id| {
+                    row.get("GUID")
+                        .is_some_and(|guid| guid.trim().eq_ignore_ascii_case(remote_id))
+                }),
+            })
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "term": term.name(),
+        "key": key.as_str(),
+        "date": day.as_str(),
+        "vouchers_with_guid": identified.len(),
+        "rows_without_guid": rows.len() - identified.len(),
+        "vouchers": vouchers,
+        "profile": "lab_voucher_key_probe_v1",
+    })
+}
+
+/// The probe reads only `BRIDGE_LAB_TARGET_GUID`'s company: a request shape
+/// not yet observed is sent to the book the lab set aside for it, never to
+/// another company loaded on the lab's port.
+fn probe_target_admitted(config: &LabGuardConfig, company_guid: &str) -> Result<(), String> {
+    company_guid
+        .trim()
+        .eq_ignore_ascii_case(&config.target_guid)
+        .then_some(())
+        .ok_or_else(|| "lab_probe_company_not_target".to_string())
+}
+
+/// The vouchers a probe answer lists; the count covers them all.
+const KEY_PROBE_LISTED: usize = 20;
+
+pub(super) async fn lab_voucher_key_probe(
+    server: &Server,
+    args: &Value,
+) -> Result<ToolOutcome, ToolFailure> {
+    let guid = required_string(args, "company_guid")?;
+    let day = normalized_date(required_string(args, "date")?)?;
+    let term = ProbeTerm::parse(required_string(args, "term")?)?;
+    let key = ProbeKey::new(required_string(args, "key")?)?;
+    // A read, with the always-on lab preconditions; unlike `lab_read_inventory`
+    // it reads only the lab's target company, since its request is a new shape.
+    let config = require_lab_read_guards(server)?;
+    probe_target_admitted(&config, guid)?;
+    let (company, identity, evidence) = server.verified_company(guid).await?;
+    let request = lab_voucher_key_probe_read(identity.display_name(), &day, term, &key)
+        .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+    let (xml, read_evidence) = lab_post_read(server, &identity, "lab_voucher_key_probe", request)
+        .await
+        .map_err(|failure| failure.with_prior_evidence(evidence.clone()))?;
+    let evidence = combine_evidence(evidence, read_evidence);
+    let rows = parse_lab_master_rows(&xml, "VOUCHER")
+        .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+    Ok(ToolOutcome {
+        payload: json!({
+            "company": company_json(&company, std::slice::from_ref(&company)),
+            "result": key_probe_result(term, &key, &day, &rows),
+        }),
+        evidence,
+        company_guid: Some(guid.to_string()),
+        truncated: false,
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Tests -- synthetic fixtures only (BRIDGE CORPUS GST-style shapes), no
 // client data, and no live Tally connection.
 // ---------------------------------------------------------------------------
@@ -1163,6 +1346,7 @@ mod tests {
             "lab_import_masters",
             "lab_import_vouchers",
             "lab_read_inventory",
+            "lab_voucher_key_probe",
         ] {
             assert_eq!(
                 names.iter().filter(|name| **name == lab).count(),
@@ -1802,5 +1986,124 @@ mod tests {
                 kind.tally_type()
             );
         }
+    }
+
+    /// A native post's REMOTEID and a voucher GUID, from the merge gate's
+    /// synthetic-UUID registry (the second is BRIDGE SHAPE LAB's company GUID
+    /// with a MasterID).
+    const PROBE_REMOTE_ID: &str = "00000000-0000-4000-8000-000000000002";
+    const PROBE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ce";
+
+    fn probe_day() -> bridge_tally_core::TallyDate {
+        bridge_tally_core::TallyDate::parse("20250410".to_string()).unwrap()
+    }
+
+    #[test]
+    fn a_probe_key_is_a_lowercase_uuid_or_a_voucher_guid() {
+        for key in [PROBE_REMOTE_ID, PROBE_GUID] {
+            assert_eq!(ProbeKey::new(key).unwrap().as_str(), key);
+        }
+        for key in [
+            "",
+            "00000000-0000-4000-8000-00000000000",
+            "00000000-0000-4000-8000-0000000000022",
+            "00000000-0000-4000-8000-00000000000A",
+            "00000000-0000-4000-8000-00000000000\"",
+            "00000000-0000-4000-8000-000000000002 ",
+            "00000000000040008000000000000002",
+            "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000c",
+            "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ce-00000001",
+            "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000cg",
+        ] {
+            assert_eq!(
+                ProbeKey::new(key),
+                Err("lab_probe_key_invalid".to_string()),
+                "{key:?}"
+            );
+        }
+        assert_eq!(
+            ProbeTerm::parse("REMOTEID"),
+            Err("lab_probe_term_invalid".to_string())
+        );
+    }
+
+    #[test]
+    fn the_key_probe_request_has_the_term_and_key_as_its_only_variables() {
+        let key = ProbeKey::new(PROBE_REMOTE_ID).unwrap();
+        let request = |term| {
+            render_lab_voucher_key_probe("BRIDGE UPSERT LAB", &probe_day(), term, &key).unwrap()
+        };
+        assert_eq!(
+            request(ProbeTerm::RemoteId),
+            r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Lab Voucher Key Probe</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>BRIDGE UPSERT LAB</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">20250410</SVFROMDATE><SVTODATE TYPE="Date">20250410</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeLabKeyProbe">$Date &gt;= $$Date:"20250410" AND $Date &lt;= $$Date:"20250410" AND $RemoteID = "00000000-0000-4000-8000-000000000002"</SYSTEM><COLLECTION NAME="Bridge Lab Voucher Key Probe" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERTYPENAME,GUID,MASTERID,ALTERID,ISCANCELLED,ISOPTIONAL</FETCH><COMPUTE>BRIDGEREMOTEID:$RemoteID</COMPUTE><FILTERS>BridgeLabKeyProbe</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#
+        );
+        assert_eq!(
+            request(ProbeTerm::Guid),
+            request(ProbeTerm::RemoteId).replace(r#"AND $RemoteID = ""#, r#"AND $GUID = ""#)
+        );
+        for term in [ProbeTerm::Guid, ProbeTerm::RemoteId] {
+            assert!(
+                crate::tally::agent_read_request::AgentReadRequest::parse(request(term)).is_ok()
+            );
+        }
+    }
+
+    #[test]
+    fn a_probe_answer_counts_only_rows_with_a_guid_and_says_what_remote_id_holds() {
+        let answer = |remote_id: &str| {
+            format!(
+                "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+<VOUCHER REMOTEID=\"{PROBE_GUID}\" VCHTYPE=\"Payment\"><DATE>20250410</DATE>\
+<VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><GUID>{PROBE_GUID}</GUID><MASTERID>206</MASTERID>\
+<ALTERID>41</ALTERID><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL>\
+<BRIDGEREMOTEID>{remote_id}</BRIDGEREMOTEID></VOUCHER>\
+<VOUCHER>\r\n</VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
+            )
+        };
+        let key = ProbeKey::new(PROBE_REMOTE_ID).unwrap();
+        let read = |xml: &str| {
+            let rows = parse_lab_master_rows(xml, "VOUCHER").unwrap();
+            key_probe_result(ProbeTerm::RemoteId, &key, &probe_day(), &rows)
+        };
+        // $RemoteID holds the voucher's own GUID: the key is not there
+        let guid = read(&answer(PROBE_GUID));
+        assert_eq!(guid["vouchers_with_guid"], 1);
+        assert_eq!(
+            guid["rows_without_guid"], 1,
+            "the empty row is not a voucher"
+        );
+        assert_eq!(guid["vouchers"][0]["guid"], PROBE_GUID);
+        assert_eq!(guid["vouchers"][0]["master_id"], "206");
+        assert_eq!(guid["vouchers"][0]["remote_id_equals_guid"], true);
+        assert_eq!(guid["vouchers"][0]["remote_id_equals_key"], false);
+        // $RemoteID holds the key a native post sent
+        let sent = read(&answer(PROBE_REMOTE_ID));
+        assert_eq!(sent["vouchers"][0]["remote_id_equals_key"], true);
+        assert_eq!(sent["vouchers"][0]["remote_id_equals_guid"], false);
+        // only an empty row: no voucher, whatever the filter asked
+        let empty = read(
+            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+<VOUCHER></VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>",
+        );
+        assert_eq!(empty["vouchers_with_guid"], 0);
+        assert_eq!(empty["rows_without_guid"], 1);
+        assert_eq!(empty["vouchers"], json!([]));
+        assert_eq!(empty["term"], "remote_id");
+        assert_eq!(empty["key"], PROBE_REMOTE_ID);
+        assert_eq!(empty["date"], "20250410");
+    }
+
+    #[test]
+    fn the_key_probe_reads_only_the_lab_target_company() {
+        let config = LabGuardConfig::from_values(TARGET_GUID, "").unwrap();
+        assert_eq!(probe_target_admitted(&config, TARGET_GUID), Ok(()));
+        assert_eq!(
+            probe_target_admitted(&config, &TARGET_GUID.to_ascii_uppercase()),
+            Ok(())
+        );
+        assert_eq!(
+            probe_target_admitted(&config, DENY_GUID_1),
+            Err("lab_probe_company_not_target".to_string())
+        );
     }
 }

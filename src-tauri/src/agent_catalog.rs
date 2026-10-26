@@ -547,6 +547,8 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
     #[cfg(feature = "lab-writes")]
     names.push("lab_read_inventory");
     #[cfg(feature = "lab-writes")]
+    names.push("lab_voucher_key_probe");
+    #[cfg(feature = "lab-writes")]
     names.push("lab_import_masters");
     #[cfg(feature = "lab-writes")]
     names.push("lab_import_vouchers");
@@ -571,7 +573,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
             .filter(|name| {
                 !matches!(
                     name,
-                    &"lab_read_inventory" | &"lab_import_masters" | &"lab_import_vouchers"
+                    &"lab_read_inventory"
+                        | &"lab_voucher_key_probe"
+                        | &"lab_import_masters"
+                        | &"lab_import_vouchers"
                 ) || lab_tools_env_enabled()
             })
             .map(|name| {
@@ -736,6 +741,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         "LAB-ONLY. Compiled only behind the `lab-writes` feature and refuses unless BRIDGE_LAB_WRITES=1, BRIDGE_TALLY_PORT=9001, and BRIDGE_LAB_TARGET_GUID is set to a well-formed GUID (and BRIDGE_LAB_DENY_GUIDS, unless the target is the only company loaded). This is a read: company_guid selects the company like any other read tool and is verified the same way (`company_identity_not_found`/`company_identity_ambiguous`), independent of the configured lab target -- the stronger loaded-company/deny-list guard applies only to a lab write batch, not a read. Read-only: units, godowns, stock groups and stock items (parent, base unit, opening qty/rate/value, GST/HSN fields as returned, unclassified), plus inventory entries per voucher for a date window. Reuses the same windowing and window_honoured corroboration as `vouchers`. No signed compatibility evidence exists yet for any inventory field on this Tally release/mode -- treat every value as exploratory.",
                         json!({"type":"object","additionalProperties":false,"required":["company_guid","from","to"],"properties":{"company_guid":{"type":"string","minLength":1},"from":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"to":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"offset":{"type":"integer","minimum":0,"default":0},"limit":{"type":"integer","minimum":1}}}),
                     ),
+                    "lab_voucher_key_probe" => (
+                        "LAB-ONLY (#685). Compiled only behind the `lab-writes` feature and refuses unless BRIDGE_LAB_WRITES=1, BRIDGE_TALLY_PORT=9001, and BRIDGE_LAB_TARGET_GUID is set to a well-formed GUID (and BRIDGE_LAB_DENY_GUIDS, unless the target is the only company loaded). A read of the lab target company only (company_guid must be BRIDGE_LAB_TARGET_GUID, else lab_probe_company_not_target), verified like any other read. Reads one day's vouchers whose GUID (term guid) or $RemoteID (term remote_id) equals key, and returns each voucher's GUID, MasterID, ALTERID, date, voucher type, cancelled and optional flags, and the voucher's $RemoteID as Tally computes it, with whether that equals the key or the voucher's own GUID. Only a row with a GUID counts as a voucher (vouchers_with_guid); rows without one are counted apart (rows_without_guid). key is a lowercase UUID, optionally followed by a hyphen and eight hex digits; anything else is refused (lab_probe_key_invalid). It asks whether a voucher's $RemoteID holds the REMOTEID a native post sent, which no read has returned so far: every answer is exploratory, not a qualified claim.",
+                        json!({"type":"object","additionalProperties":false,"required":["company_guid","date","term","key"],"properties":{"company_guid":{"type":"string","minLength":1,"description":"The company to read, from list_companies."},"date":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$","description":"The one day whose vouchers are read."},"term":{"type":"string","enum":["guid","remote_id"],"description":"The voucher method compared with key: guid (the control) or remote_id."},"key":{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(-[0-9a-f]{8})?$","description":"A lowercase UUID, or a voucher GUID (a UUID, a hyphen and eight hex digits)."}}}),
+                    ),
                     _ => (
                         "ComplyEaze Bridge read-only Tally tool",
                         json!({"type":"object", "additionalProperties": false}),
@@ -759,7 +768,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                 if let Some(effect) = effect {
                     tool["annotations"] = effect.annotations();
                 }
-                if name == "lab_read_inventory" {
+                if matches!(name, "lab_read_inventory" | "lab_voucher_key_probe") {
                     tool["annotations"] = json!({"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true});
                 }
                 if matches!(name, "lab_import_masters" | "lab_import_vouchers") {

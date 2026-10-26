@@ -2261,6 +2261,36 @@ const MAC_FIT_MEASURED_ON_ANY: &str = r#"pub(crate) fn measured_on_any(alert: Op
     result
 }"#;
 
+/// `mac_fit::observe`, verbatim (#1832): the window is raised once, at the first check, and only if it is not
+/// the key window, so Return and Escape reach Cancel and a person who moves away afterwards is not pulled back.
+const MAC_FIT_OBSERVE: &str = r#"#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Standing {
+    key_first: Option<bool>,
+    active_first: Option<bool>,
+    key_last: Option<bool>,
+    active_last: Option<bool>,
+    raised: bool,
+}
+
+/// One check of the alert's standing. Returns the standing afterwards and
+/// whether to raise the window now: only at the first check, and only if it is
+/// not the key window, so a person who moves to another window afterwards is
+/// not pulled back (the Windows box is raised once for the same reason).
+pub(crate) fn observe(before: Standing, key: bool, active: bool) -> (Standing, bool) {
+    let first = before.key_first.is_none();
+    let raise = first && !key && !before.raised;
+    (
+        Standing {
+            key_first: before.key_first.or(Some(key)),
+            active_first: before.active_first.or(Some(active)),
+            key_last: Some(key),
+            active_last: Some(active),
+            raised: before.raised || raise,
+        },
+        raise,
+    )
+}"#;
+
 /// `mac_fit::ask`, the macOS dialog, verbatim (#1832). An edit that shows an
 /// alert that did not fit or could not be measured, reads the buttons the
 /// other way round, or measures before layout would show or approve what the
@@ -2268,7 +2298,8 @@ const MAC_FIT_MEASURED_ON_ANY: &str = r#"pub(crate) fn measured_on_any(alert: Op
 const MAC_FIT_ASK: &str = r#"#[cfg(target_os = "macos")]
 pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     use block2::RcBlock;
-    use objc2::MainThreadMarker;
+    use objc2::runtime::NSObjectProtocol;
+    use objc2::{sel, MainThreadMarker};
     use objc2_app_kit::{
         NSAlert, NSAlertStyle, NSApplication, NSApplicationActivationPolicy,
         NSModalPanelRunLoopMode, NSScreen,
@@ -2328,11 +2359,25 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     // be read, ends the run loop and the process, whatever was clicked.
     let missed = Rc::new(Cell::new(None::<i32>));
     let checked = Rc::new(Cell::new(0_u32));
+    let standing = Rc::new(Cell::new(Standing::default()));
     let check = {
         let window = window.clone();
         let missed = Rc::clone(&missed);
         let checked = Rc::clone(&checked);
+        let standing = Rc::clone(&standing);
         RcBlock::new(move |_timer: NonNull<NSTimer>| {
+            // A window that is not key takes no key press, so Return and
+            // Escape would not reach Cancel: raised once, at the first check.
+            let app = NSApplication::sharedApplication(mtm);
+            let (next, raise) = observe(standing.get(), window.isKeyWindow(), app.isActive());
+            standing.set(next);
+            if raise {
+                window.makeKeyAndOrderFront(None);
+                // cooperative activation: macOS 14 and later only
+                if app.respondsToSelector(sel!(activate)) {
+                    app.activate();
+                }
+            }
             let placed = window.screen().map(|screen| {
                 let f = window.frame();
                 let v = screen.visibleFrame();
@@ -2343,7 +2388,11 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
             });
             let exit = match placed {
                 Some(true) => {
-                    checked.set(checked.get().saturating_add(1));
+                    // The check of the tick that raised the window does not
+                    // count: an approval needs a check made after the raise.
+                    if !raise {
+                        checked.set(checked.get().saturating_add(1));
+                    }
                     return;
                 }
                 Some(false) => super::box_fit::DOES_NOT_FIT_EXIT,
@@ -2367,6 +2416,16 @@ pub(crate) fn ask(title: &str, text: &str, positive: &str) -> Option<bool> {
     app.activateIgnoringOtherApps(true);
     let response = alert.runModal();
     timer.invalidate();
+    let seen = standing.get();
+    let _ = writeln!(
+        std::io::stderr(),
+        "box-fit: key first={:?} last={:?} active first={:?} last={:?} raised={}",
+        seen.key_first,
+        seen.key_last,
+        seen.active_first,
+        seen.active_last,
+        seen.raised
+    );
     if let Some(exit) = missed.get() {
         std::process::exit(exit);
     }
@@ -2394,6 +2453,7 @@ fn mac_fit_problems(source: &str) -> Vec<String> {
         ("approves", MAC_FIT_APPROVES),
         ("second button", MAC_FIT_SECOND_BUTTON),
         ("measured on any screen", MAC_FIT_MEASURED_ON_ANY),
+        ("observe", MAC_FIT_OBSERVE),
         ("ask", MAC_FIT_ASK),
         ("ask elsewhere", MAC_FIT_ASK_ELSEWHERE),
     ] {
@@ -2417,6 +2477,13 @@ fn the_mac_alert_is_shown_only_if_it_fits_and_approved_only_on_its_second_button
         source.replacen("Measured::DoesNotFit => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),", "Measured::DoesNotFit => {}", 1),
         source.replacen("Measured::Unavailable => std::process::exit(0),", "Measured::Unavailable => {}", 1),
         source.replacen("    alert.layout();\n", "", 1),
+        // The raise is dropped, made on every check, or made even for a key window.
+        source.replacen("                window.makeKeyAndOrderFront(None);\n", "", 1),
+        source.replacen("            standing.set(next);\n", "", 1),
+        source.replacen("let raise = first && !key && !before.raised;", "let raise = !key;", 1),
+        source.replacen("let raise = first && !key && !before.raised;", "let raise = first && !before.raised;", 1),
+        // The tick that raised the window counts as a placement check.
+        source.replacen("                    if !raise {\n", "                    if true {\n", 1),
         source.replacen("    timer.invalidate();\n", "", 1),
         source.replacen("    if checked.get() == 0 && approves(response) {\n        std::process::exit(0);\n    }\n", "", 1),
         source.replacen("checked.set(checked.get().saturating_add(1));", "", 1),

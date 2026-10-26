@@ -326,8 +326,8 @@ function runSiteSummaryStep(run, { deployments, changeSite }) {
   // Each item is its own page, as `gh api --paginate` prints them with a per-page --jq, so a step
   // that does not collect every page, or does not pass --paginate, fails here.
   const script = `gh() { [ "$1" = api ] && [ "$2" = --paginate ] && [ "$4" = --jq ] || exit 97; case "$3" in
-    repos/example/bridge/deployments\\?environment=github-pages\\&per_page=100) jq -c '.[] | [.]' "${dir}/deployments.json" | while IFS= read -r page; do printf '%s' "$page" | jq -r "$5"; done ;;
-    repos/example/bridge/deployments/*/statuses\\?per_page=100) id="\${3#*/deployments/}"; id="\${id%%/*}"; jq -c '.[] | [.]' "${dir}/statuses-\${id}.json" | { while IFS= read -r page; do printf '%s' "$page" | jq -r "$5" || exit 141; sleep 0.01; done; [ ! -e "${dir}/statuses-\${id}.fail" ] || exit 1; } ;;
+    repos/example/bridge/deployments\\?environment=github-pages\\&per_page=100) jq -c '.[] | [.]' "${dir}/deployments.json" | while IFS= read -r page; do printf '%s' "$page" | jq -r "$5" | tr -d '\\r'; done ;;
+    repos/example/bridge/deployments/*/statuses\\?per_page=100) id="\${3#*/deployments/}"; id="\${id%%/*}"; jq -c '.[] | [.]' "${dir}/statuses-\${id}.json" | { while IFS= read -r page; do printf '%s' "$page" | jq -r "$5" | tr -d '\\r' || exit 141; sleep 0.01; done; [ ! -e "${dir}/statuses-\${id}.fail" ] || exit 1; } ;;
     *) exit 97 ;;
   esac; }\n${run}`;
   const result = spawnSync("bash", ["-c", script], { cwd: work, encoding: "utf8", env: { ...env, REPOSITORY: "example/bridge", RUNNER_TEMP: dir, GITHUB_SHA: second, GITHUB_STEP_SUMMARY: join(dir, "summary.md") } });

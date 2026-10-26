@@ -117,7 +117,10 @@ test("a run whose jobs all did what the scope said passes, selected or not", () 
   passes(run({ native: "true", bundle: "false", tax_audit: "false" }), "native only");
 });
 
-test("a draft-scoped run passes only while its pull request is still a draft, read again when this job runs", () => {
+// The step runs on Linux. Its Node script starts `gh` without a shell, which Windows resolves only to an .exe, so the stand-in
+// below (an extensionless script found through PATH) cannot be started there; the other cases never call `gh`.
+const noWindowsGh = process.platform === "win32" ? "the stand-in gh is an extensionless script, which Windows does not start without a shell; the step runs on Linux" : false;
+test("a draft-scoped run passes only while its pull request is still a draft, read again when this job runs", { skip: noWindowsGh }, () => {
   const draftRun = () => run({ ...NOTHING, draft: "true" });
   passes(draftRun(), "a draft pull request, native, bundle and seam skipped", { live: "true" });
   assert.equal(runRequiredChecks(draftRun()).ghArgs, "api repos/o/r/pulls/7 --jq .draft", "it reads this pull request's draft flag");

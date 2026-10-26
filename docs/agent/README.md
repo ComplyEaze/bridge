@@ -418,8 +418,8 @@ cost collections must carry the `MSTDEPTYPE` Tally printed on every captured ans
 (32 for centres, 16 for categories), or the read is refused as
 `masters_collection_type_unexpected`, so an empty answer that was not resolved to the
 type asked for is not read as "none defined". Under `mask_parties` the names of cost centres and categories, a cost centre's parent
-and a cost centre's category are masked, as godown, stock-group and stock-item names are. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool
-reads those allocations yet.
+and a cost centre's category are masked, as godown, stock-group and stock-item names are. How a voucher's entries were allocated to cost centres is read with the voucher reads
+("Cost-centre allocations in voucher reads" below), not by this tool.
 
 A `stock_items` row carries the item's own dated `hsn` and `gst` lists, each as Tally
 sent it, and `inherited_from_group_or_company: not_read`. Each list is an `observation`:
@@ -697,9 +697,9 @@ inventory, integrated and batch-wise flags from its own request.
 
 The company is bound by the GUID filter and by the row's own name, company number and books-from date,
 which must equal the verified company's; a row for another company, or not exactly one row, refuses the
-read. These arrive as `company_features_read_failed` with a `cause`: `company_features_company_mismatch`,
-`company_features_not_one_row` and `company_features_guid_unsupported` (the GUID cannot be put in the filter),
-and also `company_features_response_invalid` (the answer is not the
+read. These arrive as `company_features_read_failed` with a `cause`: `company_features_company_mismatch`
+and `company_features_not_one_row` (the GUID in the filter is the verified company's, in its parsed
+spelling, so it cannot fail there), and also `company_features_response_invalid` (the answer is not the
 collection shape), `company_features_currency_invalid` (a symbol over 16 characters, or with a
 control character, a bidirectional override or isolate, a zero-width or other invisible format character, or a line or paragraph separator), `company_features_tally_reported_failure`, and the stability codes
 `company_features_changed` and `company_features_extent_changed`. Measured on three synthetic books of one
@@ -1387,7 +1387,8 @@ or vouchers.
   is. Reverse-charge journals, imports and input service distribution get no special treatment.
 - **Tax comes only from the GST duty head on the ledger master.** An entry on a
   ledger with a recognised head is listed in `tax_in_books` as
-  `{ledger, head, raw_head, amount}`. An entry on a Duties & Taxes ledger with
+  `{ledger, head, raw_head, amount}` (each entry also carries what the vouchers read carries on it, among it
+  `cost_centre_allocations`, with the cost-centre and category names masked as `vouchers` masks them). An entry on a Duties & Taxes ledger with
   no GST head is listed in `duties_taxes_entries_without_gst_head` and is never
   assigned one. Its `observation` says which case it is: `not_tax_ledger` is a
   ledger whose own tax type is not GST (usually TDS or another payable), and
@@ -2026,6 +2027,35 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   if it is a placeholder (no name) and its `BILLDATE` is not validated; if it has a
   name, it refuses the read (`bill_allocation_field_missing`).
 
+### Cost-centre allocations in voucher reads
+
+Each ledger entry that carries cost-centre allocations has `cost_centre_allocations`, a list of
+`{"category": ..., "cost_centre": ..., "amount": ...}` as Tally sent them, one row per centre, in Tally's order
+(protocol reference §8.2g). The amount is signed as sent; the rows of one entry are not checked against the entry's
+own amount.
+
+- An entry without allocations has no such key. In the one capture of the read the vouchers tool sends, Tally printed no allocation element for such an entry.
+- **A list that cannot be read whole does not refuse the read.** The entry carries
+  `cost_centre_allocations_unreadable` with one reason, and no partial list; the rest of the response is unchanged.
+  The reasons: `cost_centre_name_missing`, `cost_centre_amount_missing` (an empty amount is never read as zero),
+  `cost_centre_amount_unparsable`, `cost_centre_duplicate` (one centre named twice in one category),
+  `cost_category_missing`, `cost_category_without_centres`, `cost_category_present_but_empty`,
+  `cost_centre_field_duplicated` and `cost_centre_text_undecodable`.
+- Names are carried trimmed; the amount is carried exactly as Tally sent it (an amount with space around it is
+  refused as `cost_centre_amount_unparsable`, as the entry's own amount would be). Under `mask_parties` the category and
+  cost-centre names are masked like a party name (as the masters read masks the same names); the amounts are sent.
+- An empty `CATEGORYALLOCATIONS.LIST` is not read as "no allocations": the entry carries
+  `cost_category_present_but_empty`. No capture of the vouchers read shows an empty container; the empty containers on
+  record are in import-verification reads, whose fetch does not ask for the allocation's fields, and there stood for
+  a real allocation.
+- A repeated child of a category or centre (a list included) reads as `cost_centre_field_duplicated`; no capture
+  shows one.
+- No request changed: the allocations were already in the answers the read asks for, and were dropped.
+- It reaches the readers that return a voucher's entries from this parser: the vouchers read (and its search) and
+  the entries the purchase and sales registers list; each marks the two names the same way, so `mask_parties` masks
+  them in all of them (`changed_since` marks them too, but every call to it is refused before Tally is asked). The presence, bill-trail and summary reads, `verify_import` and
+  `ledger_movement` do not return them (`ledger_movement`'s fetch names three entry fields).
+
 ## Voucher-file preparation and verification
 
 The MCPB extension exposes `verify_import` by default as a recovery tool (it
@@ -2198,6 +2228,18 @@ refused as `proposals_legacy` (parse the statement again).
   equal reference, or by an equal date (k = 0 until two real statements of one
   transfer have been measured), so a Contra the other bank printed on another
   day is not matched.
+- **What `restored` means.** A batch that a restore ComplyEaze Bridge recorded
+  covers (see `verify_import`, `book_rolled_back`) is never found posted or
+  verified for the transfer check, whatever its last status: a row it holds
+  reads `held_elsewhere` naming it, its Contra is an unverified candidate, and
+  its days give no coverage. Every row naming such a batch carries
+  `"restored": true`, and `next_steps.restored` says what that means: no step
+  inside ComplyEaze Bridge settles the row, so do not name it in
+  `withdraw_skips` or build or amend its rows (that is advice: a withdrawal is
+  refused only when a Contra carries the row); check in Tally whether that
+  batch's voucher for it is there and tell the person, and do not enter the
+  transfer by hand or import that batch's file. A rollback never retires a skip
+  that would be held without it.
 - **What `held_elsewhere` and `posted_against_skip` mean.** A skipped row that
   a batch holds as a voucher is not a skip to pair. While no batch holding the
   row is found posted it reads `held_elsewhere`, with the batch to verify. Once
@@ -3261,9 +3303,12 @@ one request. The building blocks:
 - **Extent check.** On a later page of a listing, the two book-extent requests
   that decide whether the held read can be reused, folded with the runtime
   combination (`continued_listing` in `src-tauri/src/agent_ledgers.rs`).
-- **Corroboration.** The window read again, one day wider on each side, with
-  the marks already known, plus a scoped marks read if that window is empty
-  too (`corroborate_empty_voucher_read` in `src-tauri/src/agent_vouchers.rs`).
+- **Corroboration.** On a book large enough to be counted, a census of the
+  window one day wider on each side, with the marks already known (no read of
+  the neighbouring days' vouchers), then the marks read again if the census took
+  several requests, plus a scoped marks read if that window is empty too. A
+  book that fits one request has the window read whole instead
+  (`corroborate_empty_voucher_read` in `src-tauri/src/agent_vouchers.rs`).
 
 These requests are sent but never digested anywhere in a result:
 - the identity-bracket company-list requests around each scoped and runtime read;

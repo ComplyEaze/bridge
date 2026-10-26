@@ -221,6 +221,10 @@ pub struct StatementRecord {
     pub cash_movement: Option<CashMovement>,
     /// The person's answer for a cash line, when given.
     pub cash_answer: Option<CashAnswer>,
+    /// Which group of identical statement text the cash line belongs to, numbered from 1 in
+    /// order of first appearance (see [`crate::cash::group_key`]); `None` for a line that is not
+    /// a cash line. The group is only a way to ask once: it applies no answer.
+    pub cash_group: Option<u32>,
     /// Which way the row moved money on the statement's own account.
     pub direction: Direction,
     /// The statement holds another row, read on the same date, of an equal
@@ -636,6 +640,7 @@ pub fn build(
     let mut window_ids = BTreeSet::new();
     let mut dates = Vec::with_capacity(rows.len());
     let reversed = reversed_same_day(rows, bank);
+    let mut cash_groups: BTreeMap<String, u32> = BTreeMap::new();
     let mut span: Option<(Date, Date)> = None;
     let mut rows_outside_window = 0;
     let mut net_before_window = ExactDecimal::zero();
@@ -718,6 +723,11 @@ pub fn build(
         let transfer_reference = bank.transfer_reference(row);
         let instrument = bank.instrument(row);
         let cash_movement = CashMovement::of_party(&party);
+        let cash_group = cash_movement.map(|movement| {
+            let key = crate::cash::group_key(movement, &bank.cash_text(row));
+            let next = u32::try_from(cash_groups.len() + 1).unwrap_or(u32::MAX);
+            *cash_groups.entry(key).or_insert(next)
+        });
         let answered = options.cash_answers.get(&txn_id);
         let (ledger, voucher_type, cash_answer) = match cash_movement {
             Some(movement) => {
@@ -746,6 +756,7 @@ pub fn build(
                         bridge_txn_id: txn_id,
                         cash_movement,
                         cash_answer: None,
+                        cash_group,
                         direction: Direction::of(outward),
                         reversed_same_day: reversed[index],
                     });
@@ -819,6 +830,7 @@ pub fn build(
                         bridge_txn_id: txn_id,
                         cash_movement: None,
                         cash_answer: None,
+                        cash_group: None,
                         direction: Direction::of(outward),
                         reversed_same_day: reversed[index],
                     });
@@ -938,6 +950,7 @@ pub fn build(
             bridge_txn_id: txn_id,
             cash_movement,
             cash_answer,
+            cash_group,
             direction: Direction::of(outward),
             reversed_same_day: reversed[index],
         });

@@ -7,6 +7,7 @@ use super::super::super::stop::Seen;
 use super::*;
 use crate::agent::agent_import::tests::{sentinel_batch_id, sentinel_uuid};
 use std::sync::Arc;
+use tally_protocol_simulator::DeliveryGate;
 
 const ACK: &str = "acknowledge_post_review";
 
@@ -298,16 +299,20 @@ async fn a_cancelled_release_is_refused_with_no_dialog() {
 /// records the batch verified while the read's last answer is held, so the
 /// release's own read then fails to record (the journal moved under it) and
 /// the stop is found gone. Nothing is asked or recorded, and the result says
-/// so.
+/// so. The last answer is held until that record is written, not for a set
+/// time: with a timer, a slow runner let the record's write still hold the
+/// journal's lock when the release went on, and the release answered
+/// `import_admission_busy` instead.
 #[tokio::test]
 async fn a_release_whose_read_finds_the_stop_gone_asks_nothing() {
     let directory = tempfile::tempdir().unwrap();
     let mut plans = posted_readback();
     let held = plans.len();
+    let gate = DeliveryGate::new();
     let last = plans
         .pop()
         .unwrap()
-        .with_delivery(Delivery::SlowHeaders(Duration::from_secs(1)));
+        .with_delivery(Delivery::Held(gate.clone()));
     plans.push(last);
     let simulator = Arc::new(SequenceSimulator::spawn(with_sentinel(plans)).unwrap());
     let server = Arc::new(server_at(simulator.address(), directory.path()));
@@ -324,6 +329,9 @@ async fn a_release_whose_read_finds_the_stop_gone_asks_nothing() {
             std::thread::sleep(Duration::from_millis(5));
         }
         status(&other, &other_line, "posted_verified");
+        // Only now, with the record written and its lock released, does the
+        // read's last answer go.
+        gate.open();
     });
     let approval = ScriptedApproval::approving();
     let response = release(&server, args(&line), approval.clone()).await;
@@ -978,9 +986,15 @@ fn the_already_posted_texts_send_a_declined_invoice_again_under_its_number() {
     ] {
         assert!(text.contains("under a new bridge_txn_id and the SAME invoice number"));
         assert!(text.contains("Never also tell the user to enter that invoice in Tally by hand"));
-        // The hand-entry advice stays, for any other voucher.
+        // Any other voucher a rejected batch carried has no route yet, and is never
+        // rebuilt to get one (#1709).
         assert!(text.contains("For any other voucher: if Tally rejected that batch"));
+        assert!(text.contains("nothing in ComplyEaze Bridge puts it in the book yet"));
+        assert!(!text.contains("enter the voucher in Tally"));
     }
+    let build = super::super::super::BUILD_TXN_ALREADY_POSTED_NEXT_STEP;
+    assert!(build.contains("never build it again under a new bridge_txn_id to retry it"));
+    assert!(build.contains("cannot build the rest of that day from the statement yet"));
     // The post's text no longer forbids the one rebuild it now advises.
     let post = super::super::TXN_ALREADY_POSTED_NEXT_STEP;
     assert!(post.contains(

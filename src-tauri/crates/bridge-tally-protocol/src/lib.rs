@@ -27,12 +27,11 @@ use sha2::{Digest, Sha256};
 
 /// Admission of the tally-read v1 `company` part (audit_read plan step 3).
 pub mod audit_company_part;
-#[cfg(feature = "bills-native-outstandings-probe")]
-pub mod bills_native_outstandings_probe;
 pub mod currency_composite;
 pub mod group_ancestry;
 pub mod gst_details;
 pub mod gst_registration;
+pub mod hsn_details;
 mod import_outcome;
 pub mod ledger_census;
 /// One ledger `Create` message. Its one caller today is the lab rebuild;
@@ -55,6 +54,7 @@ pub mod native_voucher_type_numbering;
 pub mod outstandings_shared;
 pub mod parent_partition;
 mod standard_ledger_catalog;
+mod stock_tax_details;
 mod text_encoding;
 mod tolerant_xml;
 pub mod xml_read_profiles;

@@ -1017,6 +1017,28 @@ const ROWS: &[Row] = &[
         },
     },
     Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
         fixture: "tests/fixtures/statement_profit_and_loss_stock_book_fy_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_statement(ProfitAndLoss)",
@@ -1149,6 +1171,24 @@ const ROWS: &[Row] = &[
         parser: "parse_native_negative_stock",
         parse: |_, text| typed(parse_native_negative_stock(text)),
     },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_negstock_lab_2_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_negstock_lab_2_to_20250531_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
     // Built-in Funds Flow report: src/native_funds_flow_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_funds_flow_probe_b_fy_live.utf16le.xml",
@@ -1236,6 +1276,30 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_masters(StockGroups)",
         parse: |_, text| masters(NativeMasterKind::StockGroups, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_baseline_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_item_created_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_tieout_b_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, TIEOUT_B_GUID),
     },
     Row {
         fixture: "tests/fixtures/masters_units_reads_lab_live.utf16le.xml",

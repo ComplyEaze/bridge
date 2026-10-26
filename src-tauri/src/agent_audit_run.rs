@@ -31,7 +31,6 @@ const MAX_GROUPS: usize = 20;
 const MAX_GROUP_CHARS: usize = 128;
 
 const REDACTION_UNSUPPORTED: &str = "audit_redaction_unsupported";
-const TEST_NOT_ADMITTED: &str = "audit_test_not_admitted";
 const RESULT_TOO_LARGE: &str = "audit_result_too_large";
 const RESULT_NOT_PROJECTABLE: &str = "audit_result_not_projectable";
 const AUDIT_TEST_REFUSED: &str = "audit_test_refused";
@@ -65,10 +64,10 @@ impl Server {
         if from.as_str() < RULES_YEAR_FROM || to.as_str() > RULES_YEAR_TO {
             return Err(PERIOD_OUTSIDE_RULES.to_string().into());
         }
+        // The tool's schema lists `ADMITTED` as the only values of `test`, so
+        // the catalog has refused any other as `argument_invalid:test` before
+        // this runs.
         let test = required_string(args, "test")?;
-        if !ADMITTED.contains(&test) {
-            return Err(TEST_NOT_ADMITTED.to_string().into());
-        }
         let roles = AuditRoles {
             cash_groups: group_list(args, "cash_groups")?,
             bank_groups: group_list(args, "bank_groups")?,

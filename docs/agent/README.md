@@ -52,7 +52,7 @@ names and bank account numbers to their first two and last two characters (a nam
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
 and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
-GSTIN, IFSC, MSME or Udyam registration numbers or contact details, and the bank statement tool's `account_last4` (the last
+GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes and descriptions or contact details, and the bank statement tool's `account_last4` (the last
 four digits of the statement's account number) is sent under every setting. Set the
 environment variable before launch when that better fits the workflow.
 
@@ -101,6 +101,7 @@ The ordinary default tools, in name order:
 - `local_data_report`
 - `masters`
 - `month_register`
+- `negative_stock`
 - `outstandings`
 - `profit_and_loss`
 - `purchase_register`
@@ -121,7 +122,7 @@ The ordinary default tools, in name order:
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
 release 0.6.0. `audit_test_run` is in the source after release 0.6.0 and is not in a published build yet; it is
-not a default tool: it is listed only when its setting is on (below). `gst_uncertain_vouchers` is in the source after release 0.6.0 and is not in a published build yet. `local_data_report` (also
+not a default tool: it is listed only when its setting is on (below). `gst_uncertain_vouchers` and `negative_stock` are in the source after release 0.6.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -396,12 +397,13 @@ reads. Use `ledger_movement` with narrow dates when voucher detail is needed.
 ### Masters
 
 Use `masters` with `company_guid` and one `kind`: `voucher_types`, `godowns`,
-`units`, `stock_groups`, `cost_centres`, `cost_categories` or `groups`. It lists a company's masters of that
+`units`, `stock_groups`, `stock_items`, `cost_centres`, `cost_categories` or `groups`. It lists a company's masters of that
 kind, for example a voucher type's numbering method (`automatic`, `manual` or
 `default`, as Tally reports it) and its `active` and `optional` flags. Each row
 carries `name`, `guid`, `master_id`, `alter_id` and `parent`; units add
 `decimal_places` and `simple`; cost centres add `category` (always present: a centre without one is refused as `masters_row_field_invalid:category`) and
-cost categories `allocates_revenue`, `allocates_non_revenue` and `affects_stock`.
+cost categories `allocates_revenue`, `allocates_non_revenue` and `affects_stock`;
+stock items add `hsn` and `gst` (below).
 Cost centres and categories are returned whether or not the company's Cost
 Centres setting is on: a book whose setting read No still returned its two
 centres and two categories (one synthetic book), and a book whose setting read Yes
@@ -416,8 +418,44 @@ cost collections must carry the `MSTDEPTYPE` Tally printed on every captured ans
 (32 for centres, 16 for categories), or the read is refused as
 `masters_collection_type_unexpected`, so an empty answer that was not resolved to the
 type asked for is not read as "none defined". Under `mask_parties` the names of cost centres and categories, a cost centre's parent
-and a cost centre's category are masked, as godown and stock-group names are. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool
-reads those allocations yet. A `groups` row carries `name`,
+and a cost centre's category are masked, as godown, stock-group and stock-item names are. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool
+reads those allocations yet.
+
+A `stock_items` row carries the item's own dated `hsn` and `gst` lists, each as Tally
+sent it, and `inherited_from_group_or_company: not_read`. Each list is an `observation`:
+`entries` (sorted by `applicable_from`, every entry as sent; an HSN entry has its
+`hsn_code` as exact text, never trimmed, cut or read as a number, a `description`
+Tally fills from its own list and a `source`; a GST entry has `taxability`, `source`,
+`ineligible_itc` (Tally's `GSTINELIGIBLEITC` as sent: true for Yes, false for No, null when absent, never filled in) and its state rows, each rate
+being `absent`, `empty`, `zero` or a `value` with its `raw` text and `decimal`, never
+merged), `unreadable` with its `defect` (an undated entry, an invalid date, a repeated
+field, two different entries on one date, a rate that is not a plain decimal, a credit
+flag other than Yes or No, a repeated state or duty-head row, or content only of a kind
+not modelled, such as text, a reference or CDATA directly in the list; that list of that item only, and the read and the row stand) or
+`not_observed` (the row had no such list). Nothing chooses the code or the rate for
+a date. An empty list, or `not_observed`, is not a statement that the item has no HSN
+code or no GST rate: after a code was keyed on a stock group, the group's four other items still carried empty
+lists (one synthetic book, one release); a GST rate or an HSN code on the company, and whether an
+item that defers to a coded group inherits its code, were not measured; the group's and the
+company's setting is not read. Tally adds an entry of its own (source `As per Company/Stock Group`,
+no code, no rate, dated the book's first day: 1 April 2025 on the one book measured, no other book's
+date measured, so recognise it by its source) when an item is first saved. `state_name` and
+`valuation_type` carry the reserved-character marker (U+FFFD `#4;`) where Tally sends
+`Any` and `Not Applicable`. On one item `GSTINELIGIBLEITC` was Yes on the entry whose screen
+row read `Eligible for Input Tax Credit: No` and absent on the entry whose screen row read Yes,
+which fits an ineligibility flag (PARTIAL: one book, two rows, screen against wire), so a stock
+item row names it `ineligible_itc`, as `ledger_masters` does. What an
+absent element means for the tax is not known: null is neither eligible nor ineligible. On an entry whose source is `As per Company/Stock Group` (the entry Tally adds itself on a first save; a person can also choose that source) a flag Tally sent is withheld: `ineligible_itc` is null and `ineligible_itc_withheld` is `tally_default_entry`, because the Yes seen on such an entry was never compared with the screen (both screen readings are of rows a person edited or keyed, and a row's origin and its flag cannot be told apart on one item); a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is. A Tally `ERROR` or `LINEERROR`
+anywhere in a list, markup inside a value, or a list cut off refuses the whole read
+(`masters_tally_reported_failure`, `masters_scalar_not_text_only`,
+`masters_xml_invalid_escape`, `masters_row_unterminated`). The collection must carry
+`MSTDEPTYPE` 512 (a choice made like the cost collections', not a measurement: no
+zero-row stock-item answer was captured). Under `mask_parties` item names and parents are
+masked, and so is an HSN description, which Tally fills from its tariff list and a person can edit;
+HSN codes and rates are not names and are returned as sent.
+Measured on one synthetic book of TallyPrime 7.1 Silver (PARTIAL); a state row other than
+`Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured (protocol
+reference §12a.22). A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
 parent that is Tally's reserved root keeps its marker form, as in
 `trial_balance`. Alias names are not returned.
@@ -491,16 +529,16 @@ its read in memory and a later page continues from it while the extent is
 unchanged (`snapshot`, `snapshot_id`, `listing_snapshot_changed`), as
 `trial_balance` does.
 
-Godowns, units, stock groups, cost centres and cost categories are read whole only when the master-alteration
+Godowns, units, stock groups, stock items, cost centres and cost categories are read whole only when the master-alteration
 mark (`ALTMSTID`) times an assumed worst-case row for that kind fits 16 MB. The
 mark counts the masters of every kind, so a book with few of this kind can be
 refused. That admits a mark of at most 1,152 for godowns, 1,168 for units,
-1,160 for stock groups, 1,037 for cost centres and 1,264 for cost categories; a larger book is refused before any collection request
+1,160 for stock groups, 489 for stock items (their row is allowed for several dated entries: a row is refused past 16,344 UTF-16 units, about seven further GST entries of the measured size, against 4,373 measured, whatever its state rows; a limit of 489 refuses, by arithmetic, both client books measured, not tried on them), 1,037 for cost centres and 1,264 for cost categories; a larger book is refused before any collection request
 as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
 `limit_bytes`, and `limit_master_alter_id`, the largest mark this kind would be
 read at). Retrying refuses again. Both stock-heavy client books measured, with
-marks of about 100,000 and 300,000, refuse godowns, units and stock groups (cost
-centres and categories were not tried on them); how common such
+marks of about 100,000 and 300,000, refuse godowns, units and stock groups, and by the same arithmetic stock items (cost
+centres, categories and stock items were not tried on them); how common such
 marks are across live books is unmeasured (protocol reference §12a.12). `voucher_types` and `groups` have no size check
 before the read: voucher types keep the policy of Bridge's other voucher-type
 read (their second, numbering read is likewise sent with no size check), and groups that of the group read `profit_and_loss` and `balance_sheet`
@@ -536,11 +574,11 @@ unverified: absence from it is not evidence that a voucher type is absent from
 the book. The size bound rests on assumed limits (128
 characters a name, four aliases a master) that no capture has measured; a row
 that breaks them refuses the read as `masters_row_exceeds_bound`. No counts or
-hints (the company's `NUM*` fields), stock items or writes are part of this tool.
+hints (the company's `NUM*` fields), stock-item quantities or values (use `stock_summary`) or writes are part of this tool.
 
-Under `mask_parties`, godown, stock-group, cost-centre and cost-category names, their `parent`
+Under `mask_parties`, godown, stock-group, stock-item, cost-centre and cost-category names, their `parent`
 values and a cost centre's `category` are masked like a party name, because a job-work
-godown, a supplier-named stock group or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is a
+godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is a
 fixed marker and is left as it is. Voucher-type, unit and account-group names
 are not masked: they are configuration labels, not counterparties.
 
@@ -694,6 +732,47 @@ empty answer and a book that moved during the read fail the call (`month_registe
 cause). The Journal Register prints a count of vouchers, not amounts, and is not read; the Receipt and
 Payment Registers have not been captured.
 
+### Negative Stock (`negative_stock`)
+
+Use `negative_stock` with `company_guid`, `from` and `to` for Tally's own Negative Stock list: the
+stock items on that list, each as `item`, `quantity`, `rate` and `value`, in Tally's order. `quantity` is
+`{"state": "read", "amount": ..., "unit": ...}` with the sign Tally sent, or `{"state": "empty"}` or
+`{"state": "unread"}` (text that is not `<number> <unit>`); `rate` and `value` are each
+`{"state": "present", "value": ...}` or `{"state": "empty"}` exactly as Tally printed them, and an empty one
+is not zero. The list is Tally's own and no verdict is added: being listed does not make an item negative
+(on one book Tally also listed items of positive quantity whose closing value was a credit), so read each
+quantity. The rule by which Tally lists an item is not established and is not derived here.
+
+It is **not compared with any other report**: `checks` says `list_complete` and
+`quantities_against_stock_summary` are `not_checked`, so an item Tally did not list is not shown to have a
+quantity of zero or more. A non-empty list is `observed`. An empty answer (Tally answers an empty
+envelope) is returned with `state` `not_established` and `reason`
+`negative_stock_empty_answer_is_not_a_finding`: it cannot be told from a report that was not rendered, so it
+never says that no item is negative. `mask_parties` masks each `item` name.
+
+Measured on synthetic TallyPrime 7.1 Silver books (protocol reference §12a.16): a whole financial year listed
+one item at `-3 Nos` with its rate and value; the same book to 31 May listed it at `-5 Nos`, the quantity as at
+the window's end, with the rate and value present and empty; a book with stock items and none short answered
+an empty envelope. A window that does not start on 1 April, or that runs past the following 31 March, is
+named in `unmeasured_in_this_answer` as `window_other_than_from_1_april_within_one_financial_year`. A
+window starting before the book is `negative_stock_before_books`, a reversed window
+`invalid_date_range`, Education mode `negative_stock_education_unqualified`, and a window the read could
+not build a period for `negative_stock_period_not_honoured`.
+
+Small books only. The report has no size check and its cost on a large book is not known, so the read is
+admitted the way `stock_summary` is: the master-alteration mark (`ALTMSTID`) times the same assumed worst-case row
+(18,296 bytes) must fit 16,000,000 bytes, which admits a mark of at most 874. This ceiling is a stated guess, not a
+measurement of this report, and the mark counts masters of every kind. A larger book is refused before any
+report request as `negative_stock_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
+`limit_bytes` and `limit_master_alter_id`), and retrying refuses again. After a read, the row count and the
+response size are checked against the mark and the admitted size, and a breach refuses the whole read as
+`negative_stock_read_failed` with cause `negative_stock_bound_premise_violated`'s reason, unless the closing extent shows the book moved
+(`negative_stock_extent_changed`). The report is one paired read (two requests), never retried. Any other
+refused answer fails the call as `negative_stock_read_failed` with the specific code in `error.cause`
+(for example `negative_stock_item_duplicated`, `negative_stock_amount_invalid`,
+`negative_stock_tally_reported_failure`, `negative_stock_report_unknown`), as does a report that changed between
+the paired reads (`native_negative_stock_changed`). This tool has not yet been run against Tally.
+
 ### GSTR-1 status of one voucher type (`gst_status`)
 
 `gst_status` takes `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD) and `voucher_type_name`, and
@@ -754,7 +833,8 @@ Use `audit_test_run` with `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD),
 two group lists `cash_groups` and `bank_groups` to run one test of ComplyEaze Bridge's tax-audit
 engine on the company's own books. Today `test` can only be `cash_44ab`, the share of cash in the
 books' receipts and payments against the s.44AB(a) limit. A test joins the list only with a real-book
-parity record at a pinned reference commit; a test not on it is refused as `audit_test_not_admitted`.
+parity record at a pinned reference commit; the tool's schema lists only those tests, so any other is refused
+as `argument_invalid:test` before any request.
 The rules the engine holds are those of assessment year 2026-27, so `from` and `to` must lie inside
 1 April 2025 to 31 March 2026; any other period is refused as `audit_period_outside_ay_2026_27` before a
 request, and a part-year inside it is read and judged against the whole year's thresholds.
@@ -1499,10 +1579,18 @@ covers only the identity and marks reads it sent.
   is written, `2026-08-01` or `20260801`), the same voucher-type selector, search and grouping and the
   `ledger` argument exactly as typed on the first page; a differently spelled
   `ledger` is a different question and reads the whole window again.
-- **What a page cannot see.** A change that moves neither mark. The screen
-  actions measured so far each moved a mark (§11c.5, one run each: a voucher
+- **What a page cannot see.** A change that moves neither mark. Each screen
+  action measured on TallyPrime 7.1 moved a mark (§11c.5, one run each: a voucher
   delete moved `ALTVCHID` by 2, a cancel and a save with no change by 1, a
   regroup, an opening change and a ledger create or delete `ALTMSTID` by 1).
+  One run on TallyPrime 7.2 did not (PARTIAL, reported by the lab, §11c.5): opening
+  Tally's GST Annual Computation report showed a prompt that it would update the
+  GST status of 20 vouchers; answered Yes, neither mark moved, and no read of the
+  status was made before and after. If the update did change a status, a
+  held page of a read that carries a voucher's GST status (`gst_status`,
+  `gst_uncertain_vouchers`, and any page with GST fields) could be stale on 7.2 with
+  both marks unchanged. Open until a lab row runs: whether a read through the
+  gateway can cause that update, and whether 7.1 does the same.
   Not shown or not established: the second `ALTVCHID` step seen on marking a
   voucher optional, whether a company feature or configuration change that
   alters export content moves a mark (enabling cost centres moved `ALTMSTID` in
@@ -2223,9 +2311,25 @@ refused as `proposals_legacy` (parse the statement again).
   only for a row that nothing else matches. One dated another day, or with a
   third leg, does not match and does not refuse: verify every batch of the
   other account's statement before naming a row.
+- **At send.** A batch built from a bank statement, or from vouchers given
+  directly that post a statement row or withdraw a skip, is checked against
+  these records when `post_import` sends it as well as when it was built, with
+  the same refusals, before the post (before the dialog, or in the call that
+  redeems an approval) and again under the admission lock. The step of each
+  begins by saying nothing was sent and any approval of the batch is withdrawn,
+  and, except for `transfer_view_not_established` (building it again meets the
+  same unreadable record), ends by saying the batch must be built again. A refusal under the lock carries its code and a step that sends the
+  caller back to `post_import` for the whole reason. The batch is judged as it
+  was built, with its own records left out of the journal, and a row it withdrew is judged on the withdrawal the batch
+  recorded (`withdrawn_skips`), whether it was built from a statement or from
+  vouchers given directly, and counts only if the batch was built after the
+  newest record of that skip: a skip recorded since refuses the batch, and a
+  build naming the row again is newer. A batch that is not about transfers (no statement row, no statement, no
+  withdrawal) is not checked.
 - **Records a release cannot read.** The statement records refuse unknown
   fields, so records written by a later release make this one refuse every
-  build that needs the view (`transfer_view_not_established`); builds that do
+  build that needs the view, and every send of such a batch
+  (`transfer_view_not_established`); builds that do
   not need it go on with `transfers.state: not_established`. A missing
   skip-only file reads as no skip-only records, as a missing import journal
   reads as no batches.
@@ -2708,6 +2812,16 @@ concatenation marks). Other text,
 such as Devanagari or the rupee sign, is admitted, and whether it reads back
 byte for byte is not yet measured: a narration that reads back changed refuses
 that post's binding for good.
+
+A batch whose binding was refused (`post_span_binding` state `refused`) is not closed by anything ComplyEaze
+Bridge offers. A refusal is final for the batch: `verify_import` on it again reads the same unless the book
+changes (a changed book alters the vouchers' statuses, never the refusal), `acknowledge_post_review` reviews only
+a doubt beside vouchers that read back verified, and an amendment of it is unavailable
+(`import_amend_natively_posted`, as for any natively posted batch). The summary of such a post says that it cannot
+be closed or amended; its vouchers are checked in Tally. Its rows stay refused in any other batch
+(`import_txn_already_posted`), and `local_data_report` counts it as `not_settled_binding_refused`.
+A multi-voucher batch whose voucher mark step was not confirmed is a different case: the review of
+`acknowledge_post_review` is kept on this computer and does not change its status.
 
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an

@@ -1229,6 +1229,18 @@ const ROWS: &[Row] = &[
         parser: "admit_audit_company_part(BRIDGE BATCH LAB)",
         parse: |_, text| typed(admit_audit_company_part(text, BATCH_LAB_GUID, "20260401")),
     },
+    Row {
+        fixture: "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-company-object.utf16le.xml",
+        source: Source::Captured,
+        parser: "admit_audit_company_part(BRIDGE PILOT LAB)",
+        parse: |_, text| {
+            typed(admit_audit_company_part(
+                text,
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+                "20260401",
+            ))
+        },
+    },
     // Native masters: src/native_masters_tests.rs (SHAPE LAB and READS LAB);
     // src/agent_voucher_type_class_tests.rs for READS LAB's voucher types, read by production
     // (src/agent_vouchers.rs) as a voucher-type collection.
@@ -2035,6 +2047,12 @@ const ROWS: &[Row] = &[
         parser: "parse_native_group_snapshot(TIEOUT B)",
         parse: |_, text| groups(text, TIEOUT_B_GUID),
     },
+    Row {
+        fixture: "tests/fixtures/statement_groups_stock_book_72_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(TIEOUT B, 7.2)",
+        parse: |_, text| groups(text, TIEOUT_B_GUID),
+    },
     // Native voucher and voucher-type collections: tests/native_vouchers.rs,
     // tests/native_core_regressions.rs; src/tally/canonical_window_tests.rs for the dropped bound.
     Row {
@@ -2463,12 +2481,42 @@ const GST_STATUS_MARKS: &str = "an answer of the company-marks read that opens t
      (src/agent_gst_status.rs) parses it, and the tests of gst_uncertain_vouchers \
      (src/agent_gst_uncertain_tests.rs) serve it and pin what the parse returns; \
      agent/gst-status/PROVENANCE.md says what it is";
+const AUDIT_READ_LIVE: &str = "an answer of the audit read's live sittings on the pilot lab \
+     (697-S0A, 15 Oct 2026; its census, 697-S1, 21 Oct 2026), with no row here: the app crate's audit \
+     read (src/agent_audit_read.rs) and the tax-audit crate parse it, and src/agent_audit_read_tests.rs \
+     (live_pilot_lab) serves it in the reader's order and pins the book admitted from it; \
+     agent/audit-read-pilot-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
+    // The audit read's live answers on the pilot lab (the company object has a row).
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-census.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-groups.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-ledgers.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-trial-balance.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-voucher-types.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-vouchers.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
     (
         "tests/fixtures/builtin_sales_register_probe_b_fy_live.utf16le.xml",
         REGISTER_NOT_RECORDED,

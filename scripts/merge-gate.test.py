@@ -1724,6 +1724,26 @@ class PrivacyScannerFindingsPR335(unittest.TestCase):
                 self.assertEqual(self.privacy.customer_email_count(line), 1)
                 self.assert_blocked(line, "customer email shape")
 
+    def test_an_address_ends_before_any_character_that_cannot_continue_its_domain(self):
+        AT = "@"
+        for line in ("Write to _jane.doe" + AT + "customerdomain.test_ today",
+                     "_jane.doe" + AT + "customerdomain.test_.",
+                     "jane.doe" + AT + "customerdomain.test--",
+                     "jane.doe" + AT + "customerdomain.test-",
+                     "jane.doe" + AT + "customerdomain.test_",
+                     "jane.doe" + AT + "customerdomain.test+x",
+                     "jane.doe" + AT + "customerdomain.test%",
+                     # an address written against an example address
+                     "dev" + AT + "example.com_jane" + AT + "customerdomain.test",
+                     "dev" + AT + "example.com+jane" + AT + "customerdomain.test",
+                     "dev" + AT + "example.com%jane" + AT + "customerdomain.test",
+                     "dev" + AT + "example.com-jane" + AT + "customerdomain.test",
+                     "dev" + AT + "example.com..jane" + AT + "customerdomain.test",
+                     "dev" + AT + "example.com." + AT + "customerdomain.test"):
+            with self.subTest(line=line):
+                self.assertEqual(self.privacy.customer_email_count(line), 1)
+                self.assert_blocked(line, "customer email shape")
+
     def test_a_package_specifier_or_an_example_address_before_a_full_stop_still_does_not_count(self):
         AT = "@"
         for line in ("Bumped vite" + AT + "8.3.3.", "Reviewer contact: dev" + AT + "example.com."):

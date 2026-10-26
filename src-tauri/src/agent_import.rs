@@ -518,37 +518,75 @@ pub(super) struct CashInHandLedger {
 /// A requested name and every live ledger whose stored name folds equal to it
 /// under either of the binding module's folds (`twin_fold_keys`: case, NFC,
 /// dashes, quotes, whitespace including CR and LF, and `/` as a space), when
-/// there are at least two (bridge#626). Tally's import lookup also matches
-/// names loosely (§9.4d), and which of two such ledgers it would post to is
-/// not established, so a build naming either is refused.
+/// there are at least two (bridge#626). A ledger also answers to its aliases,
+/// so one whose alias folds equal to the name is in the family too (#1688).
+/// Tally's import lookup also matches names loosely (§9.4d), and which of two
+/// such ledgers it would post to is not established, so a build naming either
+/// is refused.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FoldedTwins {
     requested: String,
     live: Vec<(String, Option<String>)>,
+    /// For a live ledger in the family only through an alias of it: that alias.
+    through_alias: BTreeMap<String, String>,
 }
 
 /// The requested names that fold equal to two or more live ledgers, in the
-/// order requested. Each lists its live ledgers in catalogue order.
+/// order requested. Each lists its live ledgers in catalogue order. `aliases`
+/// pairs each alias with the row spelling of the ledger that carries it; an
+/// alias is keyed under its ledger, so a ledger whose alias folds equal to its
+/// own name is still one ledger, and a family counts ledgers, not names.
 fn folded_twins<'a>(
     requested: &[String],
     catalogue: impl Iterator<Item = (&'a str, Option<&'a str>)>,
+    aliases: impl Iterator<Item = (&'a str, &'a str)>,
 ) -> Vec<FoldedTwins> {
     let catalogue = catalogue.collect::<Vec<_>>();
     let mut by_key: [BTreeMap<String, Vec<usize>>; 3] = Default::default();
+    let mut by_alias_key: [BTreeMap<String, Vec<(usize, &str)>>; 3] = Default::default();
     for (index, (name, _)) in catalogue.iter().enumerate() {
         for (keys, key) in by_key.iter_mut().zip(twin_fold_keys(name)) {
             keys.entry(key).or_default().push(index);
+        }
+    }
+    // Row names are unique in a catalogue (a repeat is refused when it is
+    // parsed), so an owner's name finds its index once, not once per alias.
+    let index_of = catalogue
+        .iter()
+        .enumerate()
+        .map(|(index, (name, _))| (*name, index))
+        .collect::<BTreeMap<_, _>>();
+    for (owner, alias) in aliases {
+        let Some(&index) = index_of.get(owner) else {
+            continue;
+        };
+        for (keys, key) in by_alias_key.iter_mut().zip(twin_fold_keys(alias)) {
+            keys.entry(key).or_default().push((index, alias));
         }
     }
     requested
         .iter()
         .filter_map(|name| {
             let mut family = BTreeSet::new();
-            for (keys, key) in by_key.iter().zip(twin_fold_keys(name)) {
+            let mut aliased = BTreeMap::new();
+            for ((keys, alias_keys), key) in
+                by_key.iter().zip(&by_alias_key).zip(twin_fold_keys(name))
+            {
                 if let Some(found) = keys.get(&key) {
                     family.extend(found.iter().copied());
                 }
+                if let Some(found) = alias_keys.get(&key) {
+                    for (index, alias) in found {
+                        aliased.entry(*index).or_insert(*alias);
+                    }
+                }
             }
+            let through_alias = aliased
+                .iter()
+                .filter(|(index, _)| !family.contains(*index))
+                .map(|(index, alias)| (catalogue[*index].0.to_string(), alias.to_string()))
+                .collect::<BTreeMap<_, _>>();
+            family.extend(aliased.keys().copied());
             (family.len() > 1).then(|| FoldedTwins {
                 requested: name.clone(),
                 live: family
@@ -558,6 +596,7 @@ fn folded_twins<'a>(
                         (name.to_string(), parent.map(str::to_string))
                     })
                     .collect(),
+                through_alias,
             })
         })
         .collect()
@@ -567,7 +606,13 @@ fn folded_live_ledgers_json(twins: &FoldedTwins) -> Value {
     json!(twins
         .live
         .iter()
-        .map(|(name, parent)| json!({"name": party_name(name.clone()), "parent": parent}))
+        .map(|(name, parent)| {
+            let mut ledger = json!({"name": party_name(name.clone()), "parent": parent});
+            if let Some(alias) = twins.through_alias.get(name) {
+                ledger["through_alias"] = json!(party_name(alias.clone()));
+            }
+            ledger
+        })
         .collect::<Vec<_>>())
 }
 
@@ -578,8 +623,9 @@ fn annotate_folded_twins<'a>(
     report: &mut [Value],
     requested: &[String],
     catalogue: impl Iterator<Item = (&'a str, Option<&'a str>)>,
+    aliases: impl Iterator<Item = (&'a str, &'a str)>,
 ) {
-    let twins = folded_twins(requested, catalogue);
+    let twins = folded_twins(requested, catalogue, aliases);
     for (entry, name) in report.iter_mut().zip(requested) {
         if let Some(found) = twins.iter().find(|twins| &twins.requested == name) {
             entry["folded_twins"] = folded_live_ledgers_json(found);
@@ -590,7 +636,39 @@ fn annotate_folded_twins<'a>(
     }
 }
 
-const FOLDED_TWIN_NEXT_STEP: &str = "No file was written. Each ledger in ledger_twins has at least one other live ledger whose name differs from it only by case, spacing, dashes, slashes or quotes, or a trailing line break. Tally's import also matches names loosely, and which of them it would post to is not established, so ComplyEaze Bridge names none of them. Have an operator rename ledgers in Tally until no two in each group fold equal, then run validate_masters and build again.";
+/// Marks each `missing` or `near_miss` entry whose requested name is, byte for
+/// byte, an alias of exactly one live ledger with `alias_of`: that ledger's row
+/// spelling, the one an exact match and `exact_live_spelling` use (#1688). The
+/// build still refuses the name and no alias is ever sent. An `exact` or
+/// `identifier` entry is left as it is (an identifier that disagrees with an
+/// alias is not settled here), and so is one with `folded_twins`, a name equal
+/// to a live ledger's own spelling, and a name that is an alias of two ledgers.
+fn annotate_alias_of(
+    report: &mut [Value],
+    requested: &[String],
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) {
+    for (entry, name) in report.iter_mut().zip(requested) {
+        if !matches!(entry["match_state"].as_str(), Some("missing" | "near_miss"))
+            || entry.get("folded_twins").is_some()
+            || catalogue.names().any(|live| live == name)
+        {
+            continue;
+        }
+        let mut owners = catalogue
+            .aliases()
+            .filter(|(_, alias)| alias == name)
+            .map(|(owner, _)| owner)
+            .collect::<BTreeSet<_>>();
+        if owners.len() == 1 {
+            if let Some(owner) = owners.pop_first() {
+                entry["alias_of"] = json!(party_name(owner.to_string()));
+            }
+        }
+    }
+}
+
+const FOLDED_TWIN_NEXT_STEP: &str = "No file was written. Each ledger in ledger_twins has at least one other live ledger whose name differs from it only by case, spacing, dashes, slashes or quotes, or a trailing line break. Tally's import also matches names loosely, and which of them it would post to is not established, so ComplyEaze Bridge names none of them. Have an operator rename ledgers in Tally until no two in each group fold equal (a ledger listed with through_alias is in its group only because of an alias of it: change or remove that alias), then run validate_masters and build again.";
 
 /// One ledger name and the GUID it was bound to at build time.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -872,7 +950,13 @@ impl Server {
                     evidence.clone(),
                 ))
             })?;
-        annotate_folded_twins(&mut report, &names, ledger_masters.catalog().parents());
+        annotate_folded_twins(
+            &mut report,
+            &names,
+            ledger_masters.catalog().parents(),
+            ledger_masters.catalog().aliases(),
+        );
+        annotate_alias_of(&mut report, &names, ledger_masters.catalog());
         let hash = sha256_json(&catalogue);
         Ok(ToolOutcome {
             payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"masters": report, "catalogue_evidence_sha256": hash}}),
@@ -4468,7 +4552,9 @@ fn unbindable_masters(
         &mut report,
         requested_names,
         ledger_masters.catalog().parents(),
+        ledger_masters.catalog().aliases(),
     );
+    annotate_alias_of(&mut report, requested_names, ledger_masters.catalog());
     let company_guid = Some(company_guid.to_string());
     if report.iter().any(|value| value["match_state"] != "exact") {
         let report = in_batch_order(
@@ -4491,7 +4577,11 @@ fn unbindable_masters(
         }));
     }
     let twins = in_batch_order(
-        folded_twins(requested_names, ledger_masters.catalog().parents()),
+        folded_twins(
+            requested_names,
+            ledger_masters.catalog().parents(),
+            ledger_masters.catalog().aliases(),
+        ),
         vouchers,
         |twins| twins.requested.as_str(),
     );
@@ -4938,17 +5028,23 @@ fn master_recovery_guidance(report: &[Value]) -> String {
         .iter()
         .any(|master| master.get("folded_twins").is_some())
     {
-        guidance.push("A requested ledger folds equal to another live ledger (folded_twins: the same name apart from case, spacing, dashes, slashes or quotes, or a trailing line break), and which of them Tally's import would post to is not established, so neither is importable; have an operator rename one of them in Tally, then run validate_masters again.");
+        guidance.push("A requested ledger folds equal to another live ledger (folded_twins: the same name apart from case, spacing, dashes, slashes or quotes, or a trailing line break), and which of them Tally's import would post to is not established, so neither is importable; have an operator rename one of them in Tally (a ledger listed with through_alias is in the group only because of an alias of it: change or remove that alias), then run validate_masters again.");
+    }
+    // The name is an alias of a live ledger: the remedy is that ledger's own
+    // spelling, not a new ledger (Tally refuses one named as another's alias)
+    // and not a candidate to select. No alias is sent (#1688).
+    if report.iter().any(|master| master.get("alias_of").is_some()) {
+        guidance.push("A requested name is an alias of a live ledger (alias_of names that ledger as Tally lists it); ComplyEaze Bridge never sends an alias. Have an operator confirm that this is the ledger meant, then replace the name with the spelling in alias_of and run validate_masters again; do not substitute it automatically.");
     }
     if report
         .iter()
-        .any(|master| master["match_state"] == "missing")
+        .any(|master| master["match_state"] == "missing" && master.get("alias_of").is_none())
     {
         guidance.push("For missing ledgers, correct the source spelling or have an operator create the legitimate ledger externally, then run validate_masters again.");
     }
     if report
         .iter()
-        .any(|master| master["match_state"] == "near_miss")
+        .any(|master| master["match_state"] == "near_miss" && master.get("alias_of").is_none())
     {
         guidance.push("For near-misses, have an operator explicitly select the intended ledger and run validate_masters again; do not copy a candidate automatically.");
     }

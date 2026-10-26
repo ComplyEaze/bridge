@@ -835,6 +835,7 @@ impl Server {
             if !folded_twins(
                 &requested_ledger_names(&payload),
                 catalogue_identities.catalog().parents(),
+                catalogue_identities.catalog().aliases(),
             )
             .is_empty()
             {
@@ -2311,7 +2312,7 @@ fn recheck_import_admission(
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
-    if !folded_twins(&named, parents.parents()).is_empty() {
+    if !folded_twins(&named, parents.parents(), parents.aliases()).is_empty() {
         return Err(ApprovedImportAdmissionError::LedgerFoldedTwin.into());
     }
     // A ledger switched to bill-wise since the build would take an entry On
@@ -3124,7 +3125,7 @@ fn invoice_review_preview(
     if review_text.any(has_unreviewable_format_character) {
         return Err("import_review_format_text".into());
     }
-    if !super::invoice::invoice_number_safe(number) {
+    if super::invoice::InvoiceNumber::parse(number).is_none() {
         return Err("import_review_layout_text".into());
     }
     let marks = OnAccountMarks::of(line);

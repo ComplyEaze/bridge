@@ -5324,7 +5324,7 @@ fn a_step_or_count_refusal_names_a_concurrent_change_after_what_to_check() {
         .to_string();
     assert_eq!(
         plain,
-        format!("ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. {line}")
+        format!("ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it. {line}")
     );
     // A mark that moved by less than the post created refuses with the same
     // code, so it reads the same line.

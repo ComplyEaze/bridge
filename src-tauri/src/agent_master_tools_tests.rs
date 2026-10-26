@@ -1463,6 +1463,20 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         false,
         false,
     );
+    row(
+        "approval box unavailable",
+        unanswered("master_approval_unavailable"),
+        "Nothing was sent: the approval box could not be shown, or its answer could not be read. To create the ledger, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
+        false,
+        false,
+    );
+    row(
+        "approval box too large",
+        unanswered("master_review_too_large"),
+        "Nothing was sent: the approval box for this ledger is too large to show whole, either because of the screen it would open on or because the ledger's own text is too long. If the screen is the cause, a larger or less magnified screen may help; then call post_ledger_creates with this batch_id again. If the text is, prepare a new batch with a shorter name.",
+        false,
+        false,
+    );
     // The refusals for a held name.
     let one = BlockingBatch {
         batch_id: "bridge-0001".into(),
@@ -1739,6 +1753,7 @@ fn the_codes_and_fields_the_guide_names_exist_in_the_code() {
         "master_approval_declined",
         "master_approval_unavailable",
         "master_approval_timed_out",
+        "master_review_too_large",
         "verdict_written",
         "verdict_record_error",
         "answer_record_error",

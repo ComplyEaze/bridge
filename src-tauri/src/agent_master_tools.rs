@@ -1389,6 +1389,12 @@ fn master_next_step(code: &str) -> Option<&'static str> {
         "master_approval_declined" => Some(
             "Nothing was sent: the approval was declined. If the ledger should still be created, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
         ),
+        "master_approval_unavailable" => Some(
+            "Nothing was sent: the approval box could not be shown, or its answer could not be read. To create the ledger, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
+        ),
+        "master_review_too_large" => Some(
+            "Nothing was sent: the approval box for this ledger is too large to show whole, either because of the screen it would open on or because the ledger's own text is too long. If the screen is the cause, a larger or less magnified screen may help; then call post_ledger_creates with this batch_id again. If the text is, prepare a new batch with a shorter name.",
+        ),
         "master_pre_image_remove_failed" => Some(
             "Nothing was sent. A working file of ComplyEaze Bridge for this batch could not be removed from its local folder; do not retry this batch. Call prepare_ledger_creates for a new batch.",
         ),

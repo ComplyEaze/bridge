@@ -1281,8 +1281,8 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
     }
 }"#;
 
-/// `box_fit::guarded`, the Windows dialog's fit check, verbatim (#1832). Both
-/// Windows dialogs answer through it, so an edit that lets `Unavailable` or a
+/// `box_fit::guarded`, the Windows dialog's fit check, verbatim (#1832). The three
+/// Windows dialogs (post, review, one ledger) answer through it, so an edit that lets `Unavailable` or a
 /// box that did not fit return a result would approve with no box or a
 /// clipped one.
 const BOX_FIT_GUARDED: &str = r#"#[cfg(windows)]
@@ -1679,7 +1679,7 @@ fn replace_last(source: &str, from: &str, to: &str) -> String {
 }
 
 #[test]
-fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
+fn the_fit_check_that_guards_the_three_windows_dialogs_is_pinned() {
     let source = read("src-tauri/src/tally/box_fit.rs");
     assert_eq!(box_fit_problems(&source), Vec::<String>::new());
     for broken in [

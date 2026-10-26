@@ -18,8 +18,13 @@
 //!   counts only with a second signal: the same invoice date or the same invoice value.
 use crate::{ExactDecimal, TallyDate};
 
-/// The separators a supplier writes between the parts of a number, folded to one form.
-const SEPARATORS: [char; 5] = ['-', '/', '\\', '.', '_'];
+/// The separators a supplier writes between the parts of a number, folded to one form: the ASCII
+/// ones, and the dashes, minus sign and full-width forms a number copied from a PDF or a word
+/// processor carries in their place.
+const SEPARATORS: [char; 13] = [
+    '-', '/', '\\', '.', '_', '\u{2010}', '\u{2011}', '\u{2012}', '\u{2013}', '\u{2014}',
+    '\u{2212}', '\u{FF0D}', '\u{FF0F}',
+];
 /// Rule 46(b): at most sixteen characters.
 const GSTR1_MAX_CHARS: usize = 16;
 
@@ -48,7 +53,7 @@ impl SupplierInvoiceRef {
     pub fn parse(raw: &str) -> Result<Self, SupplierInvoiceRefError> {
         let mut exact = String::new();
         let mut pending_separator = false;
-        for ch in raw.chars() {
+        for ch in raw.chars().filter(|ch| !is_invisible(*ch)).map(ascii_digit) {
             if ch.is_whitespace() || SEPARATORS.contains(&ch) {
                 pending_separator = !exact.is_empty();
                 continue;
@@ -66,7 +71,14 @@ impl SupplierInvoiceRef {
         let serial = serial_form(&exact);
         let strict = raw
             .chars()
-            .filter(|ch| !(ch.is_whitespace() || matches!(ch, '.' | '_' | '\\')))
+            .filter(|ch| !is_invisible(*ch))
+            .map(ascii_digit)
+            .filter_map(|ch| match ch {
+                '-' | '\u{2010}'..='\u{2014}' | '\u{2212}' | '\u{FF0D}' => Some('-'),
+                '/' | '\u{FF0F}' => Some('/'),
+                ch if ch.is_whitespace() || SEPARATORS.contains(&ch) => None,
+                ch => Some(ch),
+            })
             .flat_map(char::to_uppercase)
             .collect();
         Ok(Self {
@@ -98,14 +110,42 @@ impl SupplierInvoiceRef {
                 .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '/')
     }
 
+    /// The same number without separators and leading zeros, or the same serial where one of the
+    /// two is the serial alone (a copy keyed with only the supplier's running number). A serial
+    /// shared by two full numbers is often the year (`001/2025-26`), so it is no match by itself.
     fn loose_equal(&self, other: &Self) -> bool {
+        let serial_alone = self.is_digits_only() || other.is_digits_only();
         self.loose == other.loose
-            || matches!((&self.serial, &other.serial), (Some(left), Some(right)) if left == right)
+            || (serial_alone
+                && matches!((&self.serial, &other.serial), (Some(left), Some(right)) if left == right))
+    }
+
+    fn is_digits_only(&self) -> bool {
+        self.exact.chars().all(|ch| ch.is_ascii_digit())
     }
 }
 
+/// A character that draws nothing (a soft hyphen, a zero-width space or joiner, a byte-order
+/// mark): dropped, so a copied number reads as it was printed.
+fn is_invisible(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{00AD}' | '\u{200B}'..='\u{200D}' | '\u{2060}' | '\u{FEFF}'
+    )
+}
+
+/// A Devanagari or full-width digit as its ASCII digit; any other character as it is.
+fn ascii_digit(ch: char) -> char {
+    let zero = match ch {
+        '\u{0966}'..='\u{096F}' => 0x0966,
+        '\u{FF10}'..='\u{FF19}' => 0xFF10,
+        _ => return ch,
+    };
+    char::from(b'0' + (u32::from(ch) - zero) as u8)
+}
+
 /// The exact form without separators, each run of digits without its leading zeros (`0` for a
-/// run of zeros only).
+/// run of zeros only). A separator ends a run, so `25-26/0001` folds to `25261`.
 fn loose_form(exact: &str) -> String {
     let mut out = String::new();
     let mut digits = String::new();
@@ -116,8 +156,10 @@ fn loose_form(exact: &str) -> String {
             digits.clear();
         }
     };
-    for ch in exact.chars().filter(|ch| *ch != '/') {
-        if ch.is_ascii_digit() {
+    for ch in exact.chars() {
+        if ch == '/' {
+            flush(&mut digits, &mut out);
+        } else if ch.is_ascii_digit() {
             digits.push(ch);
         } else {
             flush(&mut digits, &mut out);

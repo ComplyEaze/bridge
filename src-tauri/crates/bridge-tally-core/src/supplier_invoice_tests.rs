@@ -214,3 +214,40 @@ fn zeros_and_numbers_without_a_trailing_digit_fold_as_expected() {
         "surrounding whitespace is not part of it"
     );
 }
+
+#[test]
+fn leading_zeros_are_dropped_in_every_run_of_digits_not_only_the_last() {
+    let new = incoming("2025/0001/A", "20251201");
+    let copy = booked("2025/1/A", Some("20251201"), "20251203");
+    assert_eq!(compare(&new, &copy), InvoiceMatch::PossiblyBooked);
+    assert_eq!(loose_form(&reference("INV/25-26/0001").exact), "INV25261");
+}
+
+#[test]
+fn a_number_copied_with_typographic_dashes_digits_or_invisible_characters_is_the_same_number() {
+    let new = incoming("INV-12/A", "20251201");
+    for copied in [
+        "INV\u{2013}12/A",
+        "INV\u{2212}12/A",
+        "INV\u{FF0D}12\u{FF0F}A",
+        "INV-1\u{200B}2/A",
+        "INV-\u{00AD}12/A",
+        "INV-\u{FF11}\u{FF12}/A",
+        "INV-\u{0967}\u{0968}/A",
+    ] {
+        assert_eq!(reference(copied).exact(), "INV/12/A", "{copied:?}");
+        assert_eq!(
+            compare(&new, &booked(copied, Some("20251202"), "20251203")),
+            InvoiceMatch::Booked,
+            "{copied:?}"
+        );
+    }
+}
+
+#[test]
+fn a_year_suffix_two_numbers_share_is_no_serial_match() {
+    // Two invoices of one day, numbered within the year's series: the trailing "26" is the year.
+    let new = incoming("002/2025-26", "20251201");
+    let other = booked("001/2025-26", Some("20251201"), "20251201");
+    assert_eq!(compare(&new, &other), InvoiceMatch::Different);
+}

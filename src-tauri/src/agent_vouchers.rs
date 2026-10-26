@@ -131,7 +131,7 @@ impl VoucherPageSnapshot {
         json!({
             "id": self.id,
             "master_alter_id": self.marks.masters,
-            "voucher_alter_id": self.marks.vouchers,
+            "voucher_alter_id": self.marks.reported_vouchers(),
             "read_at": self.read_at,
             "reused": reused,
         })

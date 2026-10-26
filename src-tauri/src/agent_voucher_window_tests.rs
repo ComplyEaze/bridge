@@ -756,18 +756,13 @@ fn an_unobservable_high_water_mark_is_not_read_as_an_empty_book() {
     let guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
     assert_eq!(
         company_marks(&mark_xml(guid, "<ALTVCHID>42</ALTVCHID>"), guid),
-        Ok(CompanyMarks {
-            vouchers: 42,
-            masters: 7
-        })
+        Ok(CompanyMarks::new(Some(42), 7))
     );
-    // Tally omits ALTVCHID for a company that has never held a voucher.
+    // Tally omits ALTVCHID for a company that has never held a voucher: a mark
+    // of 0 for every comparison, recorded as not reported.
     assert_eq!(
         company_marks(&mark_xml(guid, ""), guid),
-        Ok(CompanyMarks {
-            vouchers: 0,
-            masters: 7
-        })
+        Ok(CompanyMarks::new(None, 7))
     );
     assert_eq!(
         company_marks(&mark_xml(guid, "<ALTVCHID>x</ALTVCHID>"), guid),
@@ -874,10 +869,7 @@ fn mark_xml(guid: &str, altvchid: &str) -> String {
 
 /// The marks `mark(value)` serves: the master mark of `mark_xml` is 7.
 fn marks_of(vouchers: u64) -> CompanyMarks {
-    CompanyMarks {
-        vouchers,
-        masters: 7,
-    }
+    CompanyMarks::new(Some(vouchers), 7)
 }
 
 /// A high-water response carrying both marks.

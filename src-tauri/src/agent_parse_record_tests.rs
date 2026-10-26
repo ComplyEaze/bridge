@@ -46,6 +46,8 @@ const REGISTER_LAB: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const OUTSTANDINGS_LAB: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const STOCK_LAB: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
+/// The empty book of the marks capture in `COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md`.
+const HANDIMPORT_LAB: &str = "9b5b6d54-4cdb-4b90-9600-cab45ee70c3a";
 const READS_LAB: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
 /// The import lab of the D3, L1, WA1 and post-span captures (`agent_import_ack_tests.rs`'
 /// `D3_GUID`, `agent_import_span_identity_tests.rs`' `COMPANY_GUID`).
@@ -200,7 +202,7 @@ fn rows() -> Vec<Row> {
     let mut rows = Vec::new();
     // Company high water and marks (`agent_import_ack_tests.rs`,
     // `agent_import_span_identity_tests.rs`, `agent_register_server_tests.rs`; the outstandings,
-    // note-day and stock-lab captures by the company each carries).
+    // note-day, stock-lab and empty-book captures by the company each carries).
     rows.extend(high_water_rows!(
         "agent/d3-batch-company-high-water.utf16le.xml",
         IMPORT_LAB
@@ -248,6 +250,10 @@ fn rows() -> Vec<Row> {
     rows.extend(high_water_rows!(
         "stock-lab-day/stock_lab_taxed_day_company_marks_response.utf16le.xml",
         STOCK_LAB
+    ));
+    rows.extend(high_water_rows!(
+        "company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
+        HANDIMPORT_LAB
     ));
     // Every loaded company's marks (`agent_import_post_location_tests.rs`).
     rows.push(row!(

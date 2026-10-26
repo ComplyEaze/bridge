@@ -680,8 +680,9 @@ impl Server {
                 .post_read_observing_boundary(&identity, company_high_water_read(&company.name))
                 .await?;
             evidence = combine_evidence(evidence.clone(), closing_evidence);
-            let (vouchers, masters) = parse_company_marks(&marks_xml, identity.company_guid())?;
-            let closing = CompanyMarks { vouchers, masters };
+            let (vouchers, masters) =
+                parse_company_marks_as_answered(&marks_xml, identity.company_guid())?;
+            let closing = CompanyMarks::new(vouchers, masters);
             if let Some(code) = window_drift(first.marks, closing) {
                 return Err(code.to_string().into());
             }
@@ -769,17 +770,17 @@ impl Server {
             )
             .await
             .map_err(|error| ToolFailure::from_runtime("party_ledger_master_read_failed", error))?;
-        let marks = CompanyMarks {
-            vouchers: listing
+        let marks = CompanyMarks::new(
+            listing
                 .extent
                 .voucher_alter_id_high_water()
-                .map_or(0, |mark| mark.get()),
-            masters: listing
+                .map(|mark| mark.get()),
+            listing
                 .extent
                 .master_alter_id_high_water()
                 .map(|mark| mark.get())
                 .ok_or_else(|| ToolFailure::from("register_master_mark_unavailable".to_string()))?,
-        };
+        );
         let groups = GroupIndex::build(listing.groups);
         let excluded = listing
             .foreign_currency_ledgers_excluded

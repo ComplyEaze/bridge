@@ -497,10 +497,7 @@ fn masters_read(marks: CompanyMarks, index: MasterIndex) -> RegisterMasters {
     }
 }
 
-const PINNED: CompanyMarks = CompanyMarks {
-    vouchers: 54,
-    masters: 120,
-};
+const PINNED: CompanyMarks = CompanyMarks::new(Some(54), 120);
 
 #[test]
 fn a_window_whose_marks_are_unchanged_is_stable() {

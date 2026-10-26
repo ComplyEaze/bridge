@@ -1485,7 +1485,7 @@ impl Server {
                     (&date_from, &date_to),
                     super::WindowPlanSource::Estimate {
                         known_marks: mark.value.zip(mark.master_value).map(
-                            |(vouchers, masters)| super::CompanyMarks { vouchers, masters },
+                            |(vouchers, masters)| super::CompanyMarks::new(Some(vouchers), masters),
                         ),
                     },
                 )

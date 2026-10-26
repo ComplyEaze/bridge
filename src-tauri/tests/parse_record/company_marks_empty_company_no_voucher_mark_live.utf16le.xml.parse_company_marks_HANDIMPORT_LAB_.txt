@@ -1,0 +1,7 @@
+# fixture: company_marks_empty_company_no_voucher_mark_live.utf16le.xml
+# parser: parse_company_marks(HANDIMPORT_LAB)
+# source: captured
+Ok((
+    0,
+    210,
+))

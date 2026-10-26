@@ -310,10 +310,41 @@ pub(super) const BOOK_TOO_LARGE: &str = "voucher_window_book_too_large";
 /// mark — while every voucher export naming that ledger changed. A read
 /// bracketed on the voucher mark alone returned `complete` across a rename made
 /// between two of its parts.
+///
+/// `vouchers` is the voucher mark every comparison, census and empty-book check
+/// uses, with an answer that omits `ALTVCHID` read as 0. Whether Tally reported
+/// it is kept beside it, so a caller shown the mark is told "no mark" rather
+/// than a 0 Tally never sent (AGENTS.md P3). Two reads of one book answer the
+/// same way, so equality still means "the book did not move".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct CompanyMarks {
     pub(super) vouchers: u64,
     pub(super) masters: u64,
+    pub(super) voucher_mark_reported: bool,
+}
+
+impl CompanyMarks {
+    /// The marks from an answer's voucher mark (`None` when the answer omitted
+    /// it) and its master mark.
+    pub(super) const fn new(vouchers: Option<u64>, masters: u64) -> Self {
+        match vouchers {
+            Some(vouchers) => Self {
+                vouchers,
+                masters,
+                voucher_mark_reported: true,
+            },
+            None => Self {
+                vouchers: 0,
+                masters,
+                voucher_mark_reported: false,
+            },
+        }
+    }
+
+    /// The voucher mark as Tally answered it: `None` when it was not reported.
+    pub(super) fn reported_vouchers(self) -> Option<u64> {
+        self.voucher_mark_reported.then_some(self.vouchers)
+    }
 }
 
 /// What a divided read observed that a replay of it must still hold: the marks
@@ -2467,12 +2498,12 @@ pub(super) fn split_verification_window(
 
 /// The company's marks, with a company that has never held a voucher read as a
 /// voucher mark of zero (Tally omits `ALTVCHID` for it; see
-/// `pre_import_mark_refusal`). A response the marks cannot be read from is
+/// `pre_import_mark_refusal`) and recorded as not reported. A response the marks cannot be read from is
 /// refused with the parser's own code — never read as an empty book, and never
 /// folded into a planning or bracket outcome that would hide which it was.
 pub(super) fn company_marks(xml: &str, company_guid: &str) -> Result<CompanyMarks, String> {
-    parse_company_marks(xml, company_guid)
-        .map(|(vouchers, masters)| CompanyMarks { vouchers, masters })
+    parse_company_marks_as_answered(xml, company_guid)
+        .map(|(vouchers, masters)| CompanyMarks::new(vouchers, masters))
 }
 
 /// Parse a census response into a [`CensusRow`] per voucher.

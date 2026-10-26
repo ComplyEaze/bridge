@@ -263,10 +263,15 @@ fn persist_lab_exchange(
 pub(super) fn admit_audit_read_capture(
     server: &Server,
     company_guid: &str,
-) -> Result<(), ToolFailure> {
+) -> Result<CaptureGrant, ToolFailure> {
     let config = require_lab_read_guards(server)?;
-    capture_target_admitted(&config, company_guid).map_err(ToolFailure::from)
+    capture_target_admitted(&config, company_guid).map_err(ToolFailure::from)?;
+    Ok(CaptureGrant(()))
 }
+
+/// Proof that `admit_audit_read_capture` passed for this call:
+/// `persist_audit_read` takes one, so a read cannot be kept without the guards.
+pub(super) struct CaptureGrant(());
 
 fn capture_target_admitted(config: &LabGuardConfig, company_guid: &str) -> Result<(), String> {
     if company_guid.eq_ignore_ascii_case(&config.target_guid) {
@@ -288,6 +293,7 @@ fn capture_target_admitted(config: &LabGuardConfig, company_guid: &str) -> Resul
 /// lab's own duties, not this code's.
 pub(super) fn persist_audit_read(
     server: &Server,
+    _grant: CaptureGrant,
     stored: &super::audit_read::StoredRead,
 ) -> Result<(), String> {
     let reads = lab_evidence_dir(server)?.join("audit-reads");

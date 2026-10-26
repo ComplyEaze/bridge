@@ -331,9 +331,13 @@ pub(super) fn build(root: &Path, coordination: &[&Path]) -> Report {
             note_not_listed(&mut report, name);
         } else {
             scan_directory(&mut report, name, &dir, class, known, ENTRY_CAP);
+            // Only inside a lab folder that is not a link: a linked lab is
+            // never entered, so neither is anything below it.
+            if name == "lab" {
+                scan_audit_reads(&mut report, &dir.join("audit-reads"));
+            }
         }
     }
-    scan_audit_reads(&mut report, &root.join("lab").join("audit-reads"));
     scan_leases(&mut report, root, coordination);
     report.journal = read_journal(root, || std::thread::sleep(Duration::from_millis(100)));
     report.master_journal =

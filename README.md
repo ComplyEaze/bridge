@@ -276,7 +276,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   Journal the same way. The published file (`bridge-tally-mcp-v0.6.0-windows-x64.mcpb` SHA-256
   `7bf81f08e058fc7ae00ccc51b3dceec10dc50d45dca8477a0438fd9b5a2852ca`, `bridge_mcp.exe` SHA-256
   `1e41e039fbf3daaf6be5a3c8e2f5e0bd1245a745abc5e78349fd83ce678224c1`) is neither of those: its exe differs from the rehearsal's in
-  77 of 26,503,168 bytes, and on a live TallyPrime it was run only in the probes of 16 October 2026 (#1780) noted above: a typed n declined; a typed y approved a post that came too late in the call to be sent; the call made again after that approval expired posted one Contra, read back `posted_verified`. What was not run on any of these builds, among others: a batch of Journals, a batch of
+  77 of 26,503,168 bytes, and on a live TallyPrime it was run only in the probes of 16 October 2026 (#1780) noted above: a typed n declined; a typed y approved a post that came too late in the call to be sent; the call made again 27 minutes later, after that approval had expired, opened a new window; answered with a mouse click on Yes, it posted one Contra, read back `posted_verified`. What was not run on any of these builds, among others: a batch of Journals, a batch of
   more than 3, a refused or partly landed post, amendments, the review window, an On Account approval, the retired batch
   variable, the voucher-numbering rows (#724, #1668), `voucher_read_cost` against a real `vouchers` call, the Store-install
   proof of the lock (#1584, #1459), a second monitor, the batch `headline` on a live post, the Import menu, the desktop app,

@@ -36,7 +36,7 @@ For every request in this part, record the UTC time before the send and after th
 ## Part D: one dense day, then one week (THE COMPANY = BRIDGE CORPUS DENSE, synthetic; STOP if absent)
 The ground truth from 28 September: 82 vouchers on 15 May 2025, every one with a ledger line named exactly `DN Sales`. The corpus runs about 82 vouchers a day and 574 a week.
 1. Load THE COMPANY alone (C1). C2 step 0. Then `d01_marks.request.utf16le.xml`.
-2. `d02_vouchers_20250515.request.utf16le.xml`: the committed window for that day, the ground truth tonight. Size bound 1,000,000 bytes.
+2. `d02_vouchers_20250515.request.utf16le.xml`: the committed window for that day, the ground truth tonight. Size bound 6,000,000 bytes (measured on 26 Oct 2026: this request answered 2,900,742 bytes for the day's 82 vouchers).
 3. GET /status. Then `d03_ledger_vouchers_dn_sales_20250515.request.utf16le.xml`: the candidate for that day. NEW SHAPE on this book: screenshot at once. Size bound 1,000,000 bytes. Then GET /status.
 4. Only if step 3 answered in-band and its row count equals step 2's: GET /status, then `d04_ledger_vouchers_dn_sales_20250512_18.request.utf16le.xml`, the candidate for 12 to 18 May 2025. Size bound 4,000,000 bytes. Then GET /status.
 5. In steps 3 and 4, a dialog, a hang, a non-200 or an answer that does not parse = STOP (C3, C7, C9). No month, no other ledger and no other shape in this item. A STOP leaves the gateway alone, and a gateway that stops answering is for the owner to restart.

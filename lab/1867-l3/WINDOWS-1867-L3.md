@@ -1,0 +1,30 @@
+# Windows item 1867-L3 v1: what `gst_by_counter_ledger` does with the first book that holds registered GSTINs, a duplicate supplier invoice, an optional and a cancelled copy, and a purchase booked as a Journal. (26 Oct 2026.) SYNTHETIC ONLY: THE COMPANY is `BRIDGE GST LEDGER LAB`, the company GS1-L1 created (its GUID as GS1-L1 step 1 recorded it), as items 628-C0 and 628-C0b leave it. READS ONLY: nothing is keyed, altered, imported, posted, backed up or restored. Runs only after item 628-C0b has closed. LAB-COMMON v3 applies in full, except where "Differences" says otherwise; where the two differ, the stricter holds.
+
+Why: issue 1866's tool `gst_by_counter_ledger` (pull request 1867) totals the GST a book records per counter ledger, as the books side of GSTR-9C Table 14. It was measured on fourteen vouchers typed on a book whose company and parties carried no GSTIN. Items 628-C0 and 628-C0b give that same book a company GSTIN, a supplier with a GSTIN, and, in December 2025, a Purchase, a second copy of it (K1), an optional copy (K2), a cancelled copy (K3), the supplier's invoice entered as a Journal (K4) and a Payment to the supplier (K5). This item reads that book with the tool, so the requester learns, from what Tally answers and not from a test the repository wrote: whether a registered GSTIN on the vouchers changes any decision; whether a duplicate copy is totalled twice; whether the optional and the cancelled copies stay out of the totals and are counted; whether the Journal's input tax is attributed to its expense ledger; and whether a year's window over this book is read whole. Nothing here is built on until the requester has read the answers (AGENTS.md P1).
+
+## The build and the calls
+- The `bridge_mcp` program the lab config's line `bridge-lab-gs1` runs (GS1-L1's build of pull request 1867; its sha256 as GS1-L1's go-ahead named; another hash = STOP). Posting and ledger creation stay OFF. Exactly one ComplyEaze Bridge is connected, under that server name; one call at a time, with exactly the arguments the step gives; each answer kept whole by the assistant as a file in the evidence folder (named by step) with its size and sha256; a call in flight is never cancelled, abandoned or repeated.
+- Relayed calls go through `lab/gs1-relay` at `e5dffc2b`, checked against its SHA256.txt and self-tested as its README says, recording into `C:\bridge-lab\1867-l3\relay\` (a new folder): start the relay, set the `bridge-lab-gs1` line's Tally port to 9011 and restart that server; after step 5, Ctrl+C the relay, set the port back to 9001 and restart the server. The relay forwards the requests of `list_companies`, `purchase_register` and `gst_by_counter_ledger` only; a request it refuses = the call fails = STOP, folder kept.
+- MARKS means a direct call (port 9001, no relay) of `ledger_masters` with THE COMPANY's `company_guid` (first page, no `snapshot_id`): record `snapshot.master_alter_id`, `snapshot.voucher_alter_id` and `snapshot.reused` (must read false; true = STOP).
+
+## Differences from LAB-COMMON
+- C2 (d) and C3: the operator sends NO request of its own; every read is a call of ComplyEaze Bridge's own tools.
+- C5 and C6: no backup and no restore: nothing is changed.
+- A tool answer above 1,000,000 bytes = STOP.
+
+## Folders
+Working folder `C:\bridge-lab\1867-l3\`, evidence `C:\bridge-lab\1867-l3\evidence\` (both new).
+
+## Steps
+0. Load THE COMPANY alone by Select Company (C1), then LAB-COMMON step 0 without its MARKS request. EXPECT 628-C0b's close in its notes (no item since has changed THE COMPANY; any other = STOP).
+1. LOOK ONLY, a screenshot each, by Display (never Alter): the Day Book for December 2025. EXPECT the Purchase of 628-C0 step 5 and 628-C0b's K1 to K5 (K2 shown as optional, K3 as cancelled), and nothing else in December; anything else = STOP.
+2. MARKS (direct) -> `ans-1867l3-marks-0.json`.
+3. Relay on (as above). Call `list_companies`. EXPECT THE COMPANY with the GUID GS1-L1 recorded.
+4. Call `gst_by_counter_ledger` with `company_guid`, `from` 2025-12-01, `to` 2025-12-31 -> `ans-1867l3-dec.json`. A refusal is a result: record its code and go on.
+5. Call `gst_by_counter_ledger` with `company_guid`, `from` 2025-04-01, `to` 2026-03-31 -> `ans-1867l3-year.json`. A refusal (on size or otherwise) is a result: record its code and go on. Relay off, port back to 9001, server restarted.
+6. MARKS (direct) -> `ans-1867l3-marks-1.json`. EXPECT both marks equal to step 2's (the calls wrote nothing; any change = FINDING of the first rank, and nothing more is sent). Then LAB-COMMON C10. THE COMPANY is kept as it is, for the issue 628 sequence.
+
+## What is recorded (nothing is judged at the lab)
+- The relay's recording folder whole with `manifest.tsv` and its SHA256 list: every company-marks, book-extent, ledger-listing and voucher-window answer of steps 3 to 5.
+- The tool answers whole, the two MARKS answers, the Day Book screenshots by name, size and sha256 (never pushed), the notes file.
+The requester reads the recorded answers (parsed, never grepped) for, per December voucher: whether it is attributed (to which counter ledger, with which debit-side tax per head) or set aside (under which reason), or counted as optional or cancelled; whether C0's Purchase and K1 are both attributed, so that the same supplier invoice is totalled twice; where K4's input tax lands; and, for the year, the window read's state, size and counts against step 4's month. The lab commits the evidence; the relay's bodies become fixtures only on the requester's fixture specification, once THE COMPANY's GUID is in the merge gate's synthetic-UUID registry (pull request 1940 adds it).

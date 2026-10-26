@@ -13516,8 +13516,8 @@
   "by": "author",
   "what": "book.rs: an item with no opening value counted as one paisa",
   "file": "src/book.rs",
-  "from": "                .map(|m| m.opening_value_paise.unwrap_or(0))",
-  "to": "                .map(|m| m.opening_value_paise.unwrap_or(1))"
+  "from": "                total.checked_add(m.opening_value_paise.unwrap_or(0))",
+  "to": "                total.checked_add(m.opening_value_paise.unwrap_or(1))"
  },
  {
   "id": "OS-6",

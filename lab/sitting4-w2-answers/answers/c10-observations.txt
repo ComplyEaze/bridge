@@ -1,0 +1,7 @@
+2026-10-26T05:00:58Z C10 after Company > Shut; Select Company on screen, no company loaded
+tasklist exit=0
+tally.exe                    29692 Console                    5   2,94,852 K
+netstat 9001 LISTENING count 2:
+TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       29692
+TCP    [::]:9001              [::]:0                 LISTENING       29692
+GET /status curl_exit=0 printed='200 51' body_sha256=655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800

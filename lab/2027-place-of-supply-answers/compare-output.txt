@@ -1,0 +1,18 @@
+﻿v1 VOUCHER rows 4; v2 VOUCHER rows 4
+  Sales no='1' date=20250601 guid=d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0-00000001
+      PLACEOFSUPPLY: present attrs={'TYPE': 'String'} text='Maharashtra'
+      STATENAME: present attrs={'TYPE': 'String'} text='Maharashtra'
+      GSTREGISTRATIONTYPE: present attrs={'TYPE': 'String'} text='Regular'
+  Purchase no='1' date=20250601 guid=d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0-00000002
+      PLACEOFSUPPLY: present attrs={'TYPE': 'String'} text='Maharashtra'
+      STATENAME: present attrs={'TYPE': 'String'} text='Maharashtra'
+      GSTREGISTRATIONTYPE: present attrs={'TYPE': 'String'} text='Regular'
+  Credit Note no='1' date=20250602 guid=d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0-00000003
+      PLACEOFSUPPLY: present attrs={'TYPE': 'String'} text='Maharashtra'
+      STATENAME: present attrs={'TYPE': 'String'} text='Maharashtra'
+      GSTREGISTRATIONTYPE: present attrs={'TYPE': 'String'} text='Regular'
+  Debit Note no='1' date=20250602 guid=d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0-00000004
+      PLACEOFSUPPLY: present attrs={'TYPE': 'String'} text='Maharashtra'
+      STATENAME: present attrs={'TYPE': 'String'} text='Maharashtra'
+      GSTREGISTRATIONTYPE: present attrs={'TYPE': 'String'} text='Regular'
+removed 12 elements from v2; equal after removal: True

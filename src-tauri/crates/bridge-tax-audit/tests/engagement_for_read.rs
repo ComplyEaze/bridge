@@ -24,21 +24,16 @@ fn without_snapshot(text: &str) -> String {
     format!("{}{}", &text[..start], &text[end..])
 }
 
+/// A held-book engagement is a plain `Engagement`: it has no directory field, and `load_book`
+/// takes only a `DirectoryEngagement`, so giving it one does not compile (the `compile_fail`
+/// example on `DirectoryEngagement`). What it shares with the directory engagement is parsed alike.
 #[test]
-fn an_engagement_for_a_held_book_has_no_directory_and_cannot_load_one() {
-    let e = Engagement::from_toml_for_read(&without_snapshot(&synthetic_text())).unwrap();
-    assert!(e.read_dir.as_os_str().is_empty());
-    assert!(!e.allow_unbracketed_read);
-    let err = load_book(&e).unwrap_err();
-    assert!(
-        matches!(
-            err,
-            AuditError::Refused {
-                code: "CFG-no-directory",
-                ..
-            }
-        ),
-        "{err:?}"
+fn an_engagement_for_a_held_book_is_the_shared_configuration_alone() {
+    let held = Engagement::from_toml_for_read(&without_snapshot(&synthetic_text())).unwrap();
+    let dir = common::engagement(&common::fixtures().join("synthetic-read"), false);
+    assert_eq!(
+        (&held.label, &held.assessment_year, &held.cash_groups),
+        (&dir.label, &dir.assessment_year, &dir.cash_groups)
     );
 }
 
@@ -160,13 +155,14 @@ fn a_legacy_creditor_source_set_after_parsing_is_still_refused_where_it_would_be
         no_directory(bridge_tax_audit::trade_creditors(&held, &book).unwrap_err()),
         "trade_creditors"
     );
-    // The same source on a directory engagement is read, and fails only because the file is absent.
+    // A directory engagement reads only the source its own [roles] named, at parse: one set
+    // afterwards is refused the same way, since no engagement holds a path to read it from.
     let mut with_dir = dir.clone();
     with_dir.trade_creditors_source = Some(legacy);
-    assert!(matches!(
-        with_dir.bind(&book).unwrap_err(),
-        AuditError::Config(_)
-    ));
+    assert!(
+        no_directory(with_dir.bind(&book).unwrap_err()),
+        "directory bind"
+    );
 }
 
 #[test]

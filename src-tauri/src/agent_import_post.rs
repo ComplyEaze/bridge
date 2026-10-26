@@ -1858,6 +1858,12 @@ const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of t
 /// before any attempt (#1055).
 const TEXT_REFUSED_MESSAGE: &str = "Nothing was sent. This saved batch has a narration, reference or voucher number that cannot be posted, and a saved batch cannot be changed. Correct the text, build the batch again, then post the new one.";
 
+/// What a caller is told when the approval window for a saved batch was too
+/// large to show whole, by the batch's length or for the screen it would open
+/// on, before any attempt (#1780). The desktop's Journal screen shows the
+/// message alone.
+const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. If the screen is the cause, a larger or less magnified screen may help. If the length is, a batch can be split into parts; a single voucher this long cannot be posted from here.";
+
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };
     payload["result"]["error"]["blocking_batch_id"] = json!(id);
@@ -1894,6 +1900,11 @@ fn reconciliation_failure_payload(
     // have been sent is reconciled, never rebuilt.
     if code == "voucher_text_invalid" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
+    }
+    // The window for the batch was too large to show whole. Asking again does
+    // not shrink it, so the message says what does (#1780).
+    if code == "import_review_too_large" && attempted == Some(false) {
+        payload["result"]["error"]["message"] = json!(REVIEW_TOO_LARGE_MESSAGE);
     }
     // A transfer check refused the batch, and it refuses again on every request
     // until the batch is built again: the desktop is told so, not to review.

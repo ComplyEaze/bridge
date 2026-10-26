@@ -29,6 +29,7 @@ use crate::native_trial_balance::guid_suffix_is_valid;
 use crate::outstandings_shared::COMPANY_EXTENT_V2_FETCH;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
 use crate::xml_text::escape_text as xml_escape;
+use bridge_tally_primitives::company_guid::CompanyGuid;
 use bridge_tally_primitives::{ExactDecimal, TallyDate};
 use quick_xml::{
     events::{BytesStart, Event},
@@ -70,23 +71,13 @@ const _: () = assert!(stock_item_worst_row_bytes() < MASTERS_RESPONSE_BUDGET_BYT
 /// company (§12a.7), so the filter is what makes the response this company's
 /// alone. Of the counts it fetches, only the stock item count is read
 /// ([`NativeStockItemCount`]); the rest stay in the request so that it is
-/// byte-equal to the committed capture. A GUID that could break the formula's
-/// string is refused, not escaped.
-pub fn render_company_inventory_flags_request(
-    company: &str,
-    company_guid: &str,
-) -> Result<String, NativeStockError> {
-    if company_guid.is_empty()
-        || !company_guid
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-    {
-        return Err(NativeStockError::CompanyFlagsGuidUnsupported);
-    }
-    Ok(format!(
+/// byte-equal to the committed capture. The GUID is a [`CompanyGuid`], whose
+/// hex-and-hyphen spelling cannot close the formula's string.
+pub fn render_company_inventory_flags_request(company: &str, company_guid: &CompanyGuid) -> String {
+    format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>BridgeCompanyBookExtentV2</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeCompanyGuidFilter">$GUID = "{company_guid}"</SYSTEM><COLLECTION NAME="BridgeCompanyBookExtentV2" ISMODIFY="No"><TYPE>Company</TYPE><FETCH>{COMPANY_EXTENT_V2_FETCH}, ISINTEGRATED, ISINVENTORYON, ISBATCHWISEON, NUMLEDGERS, NUMGROUPS, NUMSTOCKITEMS, NUMSTOCKCATEGORIES, NUMGODOWNS, NUMUNITS, NUMVOUCHERTYPES</FETCH><FILTERS>BridgeCompanyGuidFilter</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
         company = xml_escape(company),
-    ))
+    )
 }
 
 /// The Stock Summary by report name, in the built-in statements' envelope
@@ -312,7 +303,6 @@ pub enum NativeStockError {
     /// The GUID-filtered Company collection did not return exactly one row, or
     /// its row is not this company's.
     CompanyFlagsNotOneRow,
-    CompanyFlagsGuidUnsupported,
     FlagInvalid(&'static str),
     QuantityUnparseable,
     ValueUnparseable,
@@ -341,7 +331,6 @@ impl NativeStockError {
             Self::DuplicateName => "stock_row_duplicate_name",
             Self::RowExceedsBound => "stock_row_exceeds_bound",
             Self::CompanyFlagsNotOneRow => "company_flags_not_one_row",
-            Self::CompanyFlagsGuidUnsupported => "company_flags_guid_unsupported",
             Self::FlagInvalid(field) => match *field {
                 "is_integrated" => "stock_flag_invalid:is_integrated",
                 "is_inventory_on" => "stock_flag_invalid:is_inventory_on",

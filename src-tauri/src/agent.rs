@@ -219,13 +219,30 @@ fn mark_compliance_party_names(mut compliance: Value) -> Value {
     compliance
 }
 
+/// An entry's ledger and, when it carries cost-centre allocations, the names of their cost
+/// categories and cost centres: a customer-named or job-work cost centre can carry a party's
+/// name, and the masters tool masks the same names under `mask_parties`. Every tool that
+/// returns a voucher's entries marks them through this one function.
+fn mark_entry_party_names(entry: &mut Value) {
+    mark_party_field(entry, "ledger");
+    if let Some(allocations) = entry
+        .get_mut("cost_centre_allocations")
+        .and_then(Value::as_array_mut)
+    {
+        for allocation in allocations {
+            mark_party_field(allocation, "cost_centre");
+            mark_party_field(allocation, "category");
+        }
+    }
+}
+
 fn mark_voucher_party_names(mut voucher: Value) -> Value {
     for field in ["party", "party_ledger_name"] {
         mark_party_field(&mut voucher, field);
     }
     if let Some(entries) = voucher.get_mut("amounts").and_then(Value::as_array_mut) {
         for entry in entries {
-            mark_party_field(entry, "ledger");
+            mark_entry_party_names(entry);
         }
     }
     voucher
@@ -2607,7 +2624,10 @@ impl Server {
         #[cfg(feature = "lab-writes")]
         if matches!(
             name,
-            "lab_read_inventory" | "lab_import_masters" | "lab_import_vouchers"
+            "lab_read_inventory"
+                | "lab_voucher_key_probe"
+                | "lab_import_masters"
+                | "lab_import_vouchers"
         ) {
             lab::require_lab_writes_env()?;
         }
@@ -2674,6 +2694,8 @@ impl Server {
             "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
+            #[cfg(feature = "lab-writes")]
+            "lab_voucher_key_probe" => lab::lab_voucher_key_probe(self, args).await,
             #[cfg(feature = "lab-writes")]
             "lab_import_masters" => lab::lab_import_masters(self, args).await,
             #[cfg(feature = "lab-writes")]
@@ -3098,16 +3120,18 @@ fn window_honoured(rows: &[Value], from: &str, to: &str) -> bool {
     })
 }
 
-fn corroborate_empty_voucher_window(
-    widened_rows: &[Value],
-    from: &str,
-    to: &str,
+/// What the widened read found, as the two facts the corroboration needs: any
+/// voucher on a day inside the window, and any voucher at all in the widened
+/// window. The rows of a data read and the days of a census both give them.
+fn corroborate_empty_by_days(
+    any_in_window: bool,
+    any_in_widened: bool,
     company_high_water: Option<u64>,
 ) -> Result<(bool, Option<&'static str>), String> {
-    if widened_rows.iter().any(|row| row_in_window(row, from, to)) {
+    if any_in_window {
         return Err("window_contradicted".to_string());
     }
-    if !widened_rows.is_empty() {
+    if any_in_widened {
         // Boundary-day rows only prove that this wider read returned *some*
         // data. They provide no independent cardinality for the nonempty
         // response, so they cannot promote the original empty window. The

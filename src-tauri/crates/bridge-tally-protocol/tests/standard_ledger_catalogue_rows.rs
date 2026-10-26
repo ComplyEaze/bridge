@@ -157,6 +157,25 @@ fn a_ledger_whose_stored_name_differs_carries_both_spellings() {
     );
 }
 
+/// The catalogue an import is bound against offers and binds a ledger by its
+/// row spelling, never by its stored name (#1085: slice (b), writing the stored
+/// name, is not built). On the captured book the row spelling `ROUND OFF`
+/// binds, and its stored name `Round Off` is neither offered nor bound. This
+/// pins the binding the build uses, not the build end to end.
+#[test]
+fn the_catalogue_binds_the_row_spelling_and_not_the_stored_name() {
+    let catalog = parse_standard_ledger_catalog_with_identities(
+        &decoded_shape_lab_catalogue(),
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("the shape lab capture parses");
+    assert!(catalog.names().any(|name| name == "ROUND OFF"));
+    assert!(!catalog.names().any(|name| name == "Round Off"));
+    assert!(catalog.bind_selected(["ROUND OFF".to_string()]).is_ok());
+    assert!(catalog.bind_selected(["Round Off".to_string()]).is_err());
+}
+
 /// Edits of the captured `ROUND OFF` row, to its list only. The capture holds
 /// one name there; these are the shapes the parser must still decide.
 fn shape_lab_with_round_off_list(list: &str) -> String {

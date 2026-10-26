@@ -1113,8 +1113,7 @@ impl Server {
                     |queued| {
                         recheck_import_admission(
                             &line,
-                            identity.company_guid(),
-                            &company.name,
+                            &identity,
                             queued.first,
                             queued.second,
                             queued.catalogue,
@@ -2263,8 +2262,7 @@ fn admit_queued_aim(
 #[allow(clippy::too_many_arguments)]
 fn recheck_import_admission(
     line: &ImportLedgerLine,
-    company_guid: &str,
-    company_name: &str,
+    identity: &crate::tally::VerifiedCompanyIdentity,
     first: &str,
     second: &str,
     catalogue: &str,
@@ -2275,6 +2273,7 @@ fn recheck_import_admission(
     invoice: Option<crate::tally::approved_import::QueuedInvoice<'_>>,
     invoice_control: Option<&ledger::NumberControl>,
 ) -> anyhow::Result<()> {
+    let (company_guid, company_name) = (identity.company_guid(), identity.display_name());
     // The ledgers the build found under Cash-in-Hand (#815): a record without
     // them predates the field and has nothing to check again.
     let cash_in_hand = line
@@ -2365,13 +2364,7 @@ fn recheck_import_admission(
             },
         )?;
         super::invoice::admit_queued_invoice(
-            voucher,
-            company_name,
-            company_guid,
-            &catalogue,
-            control,
-            &today,
-            &queued,
+            voucher, identity, &catalogue, control, &today, &queued,
         )?;
     }
     // The binding above compares each ledger's name and GUID, not its parent,

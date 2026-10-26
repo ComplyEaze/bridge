@@ -18,7 +18,7 @@ Why: issue 1709 asks ComplyEaze Bridge to post the first voucher into a company 
 2. OWNER, one master at a time, each with a screenshot before accepting: ledger `SYN FV Rent` under Indirect Expenses; ledger `SYN FV Supplier` under Sundry Creditors (bill-by-bill as the screen offers, no GSTIN). No voucher of any kind is opened or keyed.
 3. Relay on (as above). Call `list_companies`. EXPECT one company, THE COMPANY; record its `company_guid`.
 4. Call `purchase_register` with `company_guid`, `from` 2025-04-01, `to` 2025-04-30. RECORD the answer whole (expected: `state` complete or a refusal; either is a result; a refusal is recorded with its code, not a STOP).
-5. Call `purchase_register` again with the same arguments (the omission's persistence within a session).
+5. Call `purchase_register` again with the same arguments (the omission's persistence within one run of the program).
 6. Shut THE COMPANY (Alt+F3 or the screen's Shut Company), load it again alone, screenshot the Gateway, and call `purchase_register` a third time with the same arguments (persistence across a reload). Relay off (Ctrl+C), port back to 9001, server restarted.
 7. LAB-COMMON C10. THE COMPANY is kept, shut, as it is: its two ledgers and no voucher.
 

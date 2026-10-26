@@ -592,14 +592,21 @@ fn each_next_step_says_what_was_decided() {
     assert!(step(OpenState::NotFound).contains("Do not enter this transfer in Tally by hand"));
     assert!(step(OpenState::NotFound)
         .contains("read every voucher of this date in Tally and found no Contra"));
-    // the unchecked row is kept until the person confirms, and the step does
-    // not tell anyone to withdraw it or to enter it
+    // the unchecked row is kept until the person confirms, the check names what
+    // `vouchers` returns, and the one-side and double-booking warnings stay
     let unchecked = step(OpenState::TallyUnchecked);
     assert!(unchecked.contains("did not read every voucher of this date in Tally"));
+    assert!(unchecked.contains("look for a Contra voucher type with this row's amount"));
+    assert!(unchecked.contains(
+        "a Contra dated another day, or booked against another ledger, is not looked for"
+    ));
     assert!(unchecked.contains("keep the skip"));
+    assert!(unchecked.contains("withdraw the skip on one side only"));
+    assert!(unchecked.contains("would book it twice"));
     assert!(unchecked.contains("withdraw_skips only when the person confirms"));
+    assert!(!unchecked.contains("bank_allocations"));
     assert!(!unchecked.contains("by hand"));
-    assert!(!unchecked.contains("withdraw the skip on exactly one side"));
+    assert!(step(OpenState::NotFound).contains("and only when the person confirms"));
     assert!(step(OpenState::Ambiguous).contains("does not choose"));
     let reversed = step(OpenState::ReversedSameDay);
     assert!(reversed.contains("a reversal and a pair of real transfers look alike"));
@@ -1074,8 +1081,9 @@ fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read
         "check in Tally which Contra carries this transfer",
         "if verify_import found any voucher of a batch named for this row, or refused to read one, or a file of one was imported, do not build the other account's statement again: check in Tally which of their vouchers are there, and no step inside ComplyEaze Bridge frees this row yet",
     ];
-    const NEGATIONS_AND_DISCLOSURES: [&str; 15] = [
+    const NEGATIONS_AND_DISCLOSURES: [&str; 16] = [
         "A Contra in a batch not yet verified is not in Tally until that batch is imported and verified",
+        "Do not book this transfer in Tally another way, and withdraw the skip on one side only: a later post of the other statement would book it twice",
         "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, and ComplyEaze Bridge read every voucher of this date in Tally and found no Contra between the two accounts that could carry it",
         "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, but whether Tally holds one is not established: ComplyEaze Bridge did not read every voucher of this date in Tally, so a Contra entered in Tally directly is not in its records",
         "A row marked restored names a batch whose vouchers a restore that ComplyEaze Bridge recorded may have removed from Tally",

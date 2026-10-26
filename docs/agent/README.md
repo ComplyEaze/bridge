@@ -2206,11 +2206,15 @@ refused as `proposals_legacy` (parse the statement again).
   established, because ComplyEaze Bridge did not read every voucher of that day in
   Tally, so a Contra entered in Tally directly is not in its records. Every row that
   would be `not_found` is `tally_unchecked` until a whole-day read exists. The
-  assistant reads that day's vouchers for the other account's bank ledger with
-  `vouchers`, compares each entry's `bank_allocations` instrument numbers and
-  narration with the row, tells the person what it found, and keeps the skip; a
-  skip is withdrawn only on the person's confirmation that no entry in Tally carries
-  the transfer (`withdraw_skips`, as for any open row). Reading the day sends its
+  assistant reads that day's vouchers with `vouchers`, looks for a Contra voucher
+  type with the row's amount on the bank ledger the other account's statement was
+  built for (and reads its narration where it is not masked), tells the person what it found, and keeps the
+  skip; it does not look for a Contra dated another day or booked against another
+  ledger, and banks often print a transfer a day apart. A skip is withdrawn, on one
+  side only, solely on the person's confirmation that no entry in Tally carries the
+  transfer (`withdraw_skips`, as for any open row), and the step says not to book
+  the transfer in Tally another way, because a later post of the other statement
+  would book it twice. Reading the day sends its
   vouchers to the AI provider; `mask_parties` hides the narration, not the amounts.
 - **What `restored` means.** A batch that a restore ComplyEaze Bridge recorded
   covers (see `verify_import`, `book_rolled_back`) is never found posted or
@@ -2297,8 +2301,9 @@ refused as `proposals_legacy` (parse the statement again).
   date, and the date in its `st-` id) give no coverage for the ledgers it names,
   whatever the batch's status. A skip naming one of those ledgers that a single
   verified Contra matches by date on such a day is `matched_unconfirmed`, never
-  paired. A skip with no candidate is `not_found` only where the other
-  account's windows still hold its day, and otherwise `not_established`;
+  paired. A skip with no candidate is `tally_unchecked` (or `not_found` after a
+  whole-day read of Tally) only where the other account's windows still hold its
+  day, and otherwise `not_established`;
   `reference_differs` and `reversed_same_day` are decided before either. A
   Contra with no statement record inside a statement's own builds blocks the
   same way; another voucher there does not.

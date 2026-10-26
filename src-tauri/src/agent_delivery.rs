@@ -58,17 +58,137 @@ fn receipt_error(structured: &Value) -> Option<Value> {
     Some(kept)
 }
 
+/// A code is one of the three kinds Bridge's own codes are, at most 64 bytes:
+/// a tool code (`vouchers_window_part_failed`), a tool code naming the
+/// argument it refused (`argument_invalid:test`; see [`argument_names`]), or
+/// one of the tax-audit engine's rule codes ([`RULE_CODES`]). Anything else, a
+/// word in capitals or a space included, is not a code.
 fn receipt_code(value: &Value) -> Option<Value> {
     value
         .as_str()
-        .filter(|text| {
-            (1..=64).contains(&text.len())
-                && text
-                    .bytes()
-                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
-        })
+        .filter(|text| (1..=64).contains(&text.len()) && is_code(text))
         .map(|text| json!(text))
 }
+
+fn is_code(text: &str) -> bool {
+    let tool_code = |part: &str| {
+        !part.is_empty()
+            && part
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+    };
+    match text.split_once(':') {
+        Some((code, name)) => tool_code(code) && argument_names().contains(name),
+        None => tool_code(text) || RULE_CODES.contains(&text),
+    }
+}
+
+/// The names a code may carry after its colon: every property, at any depth,
+/// of a registered tool's published schema (the schema `validate_tool_arguments`
+/// refuses an unknown argument by, before any code can name it) and the
+/// summary's `no_placements`. A set, not a shape, because a lower-case party
+/// name or a number written in groups of three has a property name's shape. A
+/// second colon, as in the ledger name `agent_voucher_summary` writes after
+/// its gap code, is in no name.
+fn argument_names() -> &'static std::collections::BTreeSet<String> {
+    static NAMES: std::sync::OnceLock<std::collections::BTreeSet<String>> =
+        std::sync::OnceLock::new();
+    NAMES.get_or_init(|| {
+        let mut names = std::collections::BTreeSet::from(["no_placements".to_string()]);
+        let tools = super::catalog::registered_tool_definitions(true, true);
+        for tool in tools.as_array().into_iter().flatten() {
+            property_names(&tool["inputSchema"], &mut names);
+        }
+        names
+    })
+}
+
+/// The property names at every depth of a schema: a refusal of a nested value
+/// names its own property (`argument_invalid:bridge_txn_id`).
+fn property_names(schema: &Value, names: &mut std::collections::BTreeSet<String>) {
+    match schema {
+        Value::Object(object) => {
+            if let Some(properties) = object.get("properties").and_then(Value::as_object) {
+                names.extend(properties.keys().cloned());
+            }
+            object
+                .values()
+                .for_each(|value| property_names(value, names));
+        }
+        Value::Array(items) => items.iter().for_each(|value| property_names(value, names)),
+        _ => {}
+    }
+}
+
+/// The rule codes the tax-audit engine refuses with: the only codes in
+/// capitals a receipt keeps. A list, not a shape, because any shape that
+/// admits `BIND-GROUP-UNKNOWN` also admits a voucher number or a name written
+/// in capitals. `every_rule_code_the_tax_audit_crate_emits_is_listed` holds it
+/// equal to the codes the engine's sources emit, so a new code fails that test
+/// rather than going missing from a receipt.
+const RULE_CODES: [&str; 61] = [
+    "BIND-BOOK-DUPLICATE-ID",
+    "BIND-COLLISION",
+    "BIND-GROUP-UNKNOWN",
+    "BIND-GUID-UNKNOWN",
+    "BIND-ID-MALFORMED",
+    "BIND-ID-UNUSED",
+    "BIND-MASTERID-MISMATCH",
+    "BIND-MASTERID-UNKNOWN",
+    "BIND-NAME-UNKNOWN",
+    "BIND-NO-MASTERID",
+    "C1-date",
+    "C1-format",
+    "C1-handle",
+    "C1-major",
+    "C1-schema",
+    "C1-size",
+    "C10-education-date",
+    "C11-blank-guid",
+    "C11-repeated-guid",
+    "C2-manifest",
+    "C2-name",
+    "C2-path",
+    "C2-storage",
+    "C2-symlink",
+    "C3-content-hash",
+    "C3-missing",
+    "C3-size",
+    "C3-stored-hash",
+    "C4-dangling",
+    "C4-duplicate-id",
+    "C4-required",
+    "C4-singleton",
+    "C4-status-list",
+    "C4-stock-summary",
+    "C4-vtype-unresolved",
+    "C5-books-from",
+    "C5-client",
+    "C5-identity",
+    "C5-period",
+    "C6-moved",
+    "C6-status",
+    "C6-unbracketed",
+    "C7-coverage",
+    "C7-gap",
+    "C7-overlap",
+    "C7-window",
+    "C8-window",
+    "C9-high-water",
+    "C9-rows",
+    "CFG-legacy-for-read",
+    "CFG-mixed",
+    "CFG-no-directory",
+    "CFG-path",
+    "CFG-snapshot-for-read",
+    "CFG-stock",
+    "CFG-tally-pin",
+    "FX-1",
+    "PARTY-chain-incomplete",
+    "RELATED-table-shape",
+    "RELATED-tag-collision",
+    "SPECIFIED-missing-figure",
+];
 
 fn receipt_date(value: &Value) -> Option<Value> {
     value

@@ -105,58 +105,77 @@ fn strings(value: &Value, out: &mut Vec<String>) {
     }
 }
 
-/// The names the book holds: every group and ledger, and the company.
+/// Each text the part holds between `open` and `close`.
+fn texts_between(text: &str, open: &str, close: &str) -> Vec<String> {
+    text.match_indices(open)
+        .map(|(at, _)| {
+            let start = at + open.len();
+            text[start..start + text[start..].find(close).unwrap()].to_string()
+        })
+        .collect()
+}
+
+/// The names the book holds: every group (a group named only as a parent
+/// included), ledger and voucher type, and the company; and the vouchers' own
+/// numbers, GUIDs and narrations.
 fn book_names() -> Vec<String> {
-    let names_in = |bytes: &[u8], element: &str| {
-        let text = super::super::audit_read::tests::text_of(bytes);
-        let open = format!("<{element} NAME=\"");
-        text.match_indices(&open)
-            .map(|(at, _)| {
-                let start = at + open.len();
-                text[start..start + text[start..].find('"').unwrap()].to_string()
-            })
-            .collect::<Vec<_>>()
-    };
-    let mut names = names_in(
-        include_bytes!(
-            "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/ledgers.xml"
-        ),
-        "LEDGER",
-    );
-    names.extend(names_in(
-        include_bytes!("../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/groups.xml"),
-        "GROUP",
+    let part = |bytes: &[u8]| super::super::audit_read::tests::text_of(bytes);
+    let ledgers = part(include_bytes!(
+        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/ledgers.xml"
     ));
-    names.push(super::super::audit_read::tests::FIXTURE_NAME.to_string());
-    // The XML spells `&` as `&amp;`; the book's name is the unescaped text.
-    let mut names: Vec<String> = names
-        .into_iter()
-        .map(|name| name.replace("&amp;", "&"))
-        .collect();
-    // The vouchers' own numbers, GUIDs and narrations.
-    let vouchers = super::super::audit_read::tests::text_of(include_bytes!(
+    let groups = part(include_bytes!(
+        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/groups.xml"
+    ));
+    let types = part(include_bytes!(
+        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/vouchertypes.xml"
+    ));
+    let vouchers = part(include_bytes!(
         "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/vouchers_h1.xml"
     ));
+    let mut names = texts_between(&ledgers, "<LEDGER NAME=\"", "\"");
+    names.extend(texts_between(&groups, "<GROUP NAME=\"", "\""));
+    names.extend(texts_between(&types, "<VOUCHERTYPE NAME=\"", "\""));
+    // A group named only as a parent (one missing from the masters), never
+    // the root marker every top group's parent is.
+    for text in [&ledgers, &groups] {
+        names.extend(
+            texts_between(text, "<PARENT TYPE=\"String\">", "</PARENT>")
+                .into_iter()
+                .filter(|parent| !parent.starts_with("&#4;")),
+        );
+    }
+    names.push(super::super::audit_read::tests::FIXTURE_NAME.to_string());
     for (open, close) in [
         ("<VOUCHERNUMBER>", "</VOUCHERNUMBER>"),
         ("<GUID>", "</GUID>"),
         ("<NARRATION TYPE=\"String\">", "</NARRATION>"),
     ] {
-        for (at, _) in vouchers.match_indices(open) {
-            let start = at + open.len();
-            names.push(vouchers[start..start + vouchers[start..].find(close).unwrap()].to_string());
-        }
+        names.extend(texts_between(&vouchers, open, close));
+    }
+    // The XML spells `&` as `&amp;`; the book's name is the unescaped text.
+    let mut names: Vec<String> = names
+        .into_iter()
+        .map(|name| name.replace("&amp;", "&"))
+        .collect();
+    names.sort();
+    names.dedup();
+    for parent_only in ["Legacy Holding", "Fixed Assets"] {
+        assert!(
+            names.iter().any(|name| name == parent_only),
+            "{parent_only}"
+        );
     }
     assert!(names.len() > 60, "the book's names were not found");
     names
 }
 
-/// Whether a string of a result is, or holds, a name of the book. A name of
-/// ten characters or more counts anywhere in a string. A shorter one (a
-/// voucher number such as `J/7`, a ledger such as `Round Off`) counts where it
-/// stands whole, with no letter or digit beside it, so `J/7` is found in
+/// Whether a string of a result is, or holds, a name of the book, in any case.
+/// A name of ten characters or more counts anywhere in a string. A shorter one
+/// (a voucher number such as `J/7`, a ledger such as `Round Off`) counts where
+/// it stands whole, with no letter or digit beside it, so `J/7` is found in
 /// "Journal J/7 on 2025-09-30" and `P/1` is not found in `P/10`.
 fn carries(held: &[String], name: &str) -> bool {
+    let name = name.to_lowercase();
     let whole = |text: &str, at: usize| {
         let before = text[..at].chars().next_back();
         let after = text[at + name.len()..].chars().next();
@@ -165,21 +184,24 @@ fn carries(held: &[String], name: &str) -> bool {
             .all(|side| !side.is_some_and(char::is_alphanumeric))
     };
     held.iter().any(|text| {
+        let text = text.to_lowercase();
         text == name
             || if name.len() >= 10 {
-                text.contains(name)
+                text.contains(&name)
             } else {
-                text.match_indices(name).any(|(at, _)| whole(text, at))
+                text.match_indices(&name).any(|(at, _)| whole(&text, at))
             }
     })
 }
 
 /// Whether the result carries a name of the book, where a name in `fixed` is
-/// also a word of the test's own wording and so counts only as a whole string.
+/// also a word of the test's own wording and so counts only as a whole string
+/// (in any case).
 fn carries_any(held: &[String], names: &[String], fixed: &[&str]) -> bool {
     names.iter().any(|name| {
         if fixed.contains(&name.as_str()) {
-            held.iter().any(|text| text == name)
+            held.iter()
+                .any(|text| text.to_lowercase() == name.to_lowercase())
         } else {
             carries(held, name)
         }
@@ -241,12 +263,13 @@ async fn a_completed_run_returns_figures_and_findings_and_no_name_of_the_book() 
 
     // No string of the result is, or holds, a name from the book. The company
     // object beside the result is the user's own company, named on purpose.
-    // `Cash` is the ledger Tally makes in every company, and a word of the
-    // test's own wording ("Cash receipts as a share of ...").
+    // `Cash` (the ledger Tally makes in every company) and `Contra` (one of
+    // its voucher types) are also words of the test's own wording ("Cash
+    // receipts as a share of ...", "Contra vouchers").
     let mut held = Vec::new();
     strings(run, &mut held);
     assert!(
-        !carries_any(&held, &book_names(), &["Cash"]),
+        !carries_any(&held, &book_names(), &["Cash", "Contra"]),
         "the result carries a name of the book"
     );
     // The paired company list (four requests), then ten parts (the window's
@@ -396,20 +419,39 @@ async fn the_clause21a_projection_holds_its_candidates_and_no_name_of_the_book()
 
     let mut names = book_names();
     names.push(penalty.trim_end_matches("</NARRATION>").to_string());
-    // The test's fixed wording names the three P&L primary groups it searches
-    // (`PL_GROUPS` in the crate's `clause21a_candidates`), which every Tally
-    // company holds: they count only as a whole string.
-    let fixed = ["Purchase Accounts", "Direct Expenses", "Indirect Expenses"];
+    // Names Tally gives every company that are also words of the test's fixed
+    // wording count only as a whole string: the three P&L primary groups it
+    // searches (`PL_GROUPS` in the crate's `clause21a_candidates`), the
+    // `Purchase` voucher type ("Purchase Accounts") and the `Cash` ledger
+    // ("the GST cash ledger", and the tool's own limitation on cash groups).
+    let fixed = [
+        "Purchase Accounts",
+        "Direct Expenses",
+        "Indirect Expenses",
+        "Purchase",
+        "Cash",
+    ];
     // The control: the crate's own dump, evidence and all, carries the names
-    // of both candidates' vouchers and ledgers, the short ones only inside
-    // its evidence labels, never as a whole string.
+    // of both candidates' vouchers, voucher types and ledgers, the short ones
+    // only inside its evidence labels, never as a whole string. (No dump of
+    // this cut names a group: the one named only as a parent, Legacy Holding,
+    // is on the name list but in no label.)
     let mut raw = Vec::new();
     strings(&dump, &mut raw);
-    for own in ["Interest to Partners", "Round Off", "J/7", "P/20"] {
+    for own in [
+        "Interest to Partners",
+        "Round Off",
+        "J/7",
+        "P/20",
+        "Journal",
+        "Payment",
+    ] {
         assert!(names.iter().any(|name| name == own), "{own}");
         assert!(carries_any(&raw, &[own.to_string()], &fixed), "{own}");
     }
-    assert!(!raw.iter().any(|text| text == "J/7" || text == "Round Off"));
+    assert!(!raw
+        .iter()
+        .any(|text| ["J/7", "Round Off", "Journal", "Payment"].contains(&text.as_str())));
     let mut held = Vec::new();
     strings(&run, &mut held);
     assert!(
@@ -441,7 +483,8 @@ fn every_committed_clause21a_golden_projects() {
     }
 }
 
-/// `carries` finds a short name only where it stands whole.
+/// `carries` finds a short name only where it stands whole, a longer one
+/// anywhere, and either in any case.
 #[test]
 fn a_short_name_is_carried_only_where_it_stands_whole() {
     let held = |text: &str| vec![text.to_string()];
@@ -449,6 +492,12 @@ fn a_short_name_is_carried_only_where_it_stands_whole() {
     assert!(carries(&held("(J/7)"), "J/7"));
     assert!(!carries(&held("Payment P/10 on 2025-06-10"), "P/1"));
     assert!(!carries(&held("PJ/7"), "J/7"));
+    assert!(carries(&held("journal j/7 on 2025-09-30"), "J/7"));
+    // A name of ten characters or more counts inside a word too.
+    assert!(carries(
+        &held("xInterest to Partnersy"),
+        "Interest to Partners"
+    ));
     assert!(carries(
         &held("Interest to Partners, ₹7,500"),
         "Interest to Partners"

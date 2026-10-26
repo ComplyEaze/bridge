@@ -17,9 +17,9 @@ About 20 minutes. Reads only: eight requests, four per book. ComplyEaze Bridge w
 | `t-c2.utf16le.xml` | the same census with `$AlterID > 0 AND $AlterID <= 5` | BRIDGE TRANSFER LAB |
 | `o-m.utf16le.xml` | company marks | BRIDGE OUTSTANDINGS LAB |
 | `o-c1.utf16le.xml` | census, 20 April 2025 to 30 June 2026, no AlterID filter | BRIDGE OUTSTANDINGS LAB |
-| `o-c2.utf16le.xml` | the same census with `$AlterID > 0 AND $AlterID <= 20` | BRIDGE OUTSTANDINGS LAB |
+| `o-c2.utf16le.xml` | the same census with `$AlterID > 0 AND $AlterID <= 21` (re-rendered 27 Oct for the mark book O then read; only that literal changed) | BRIDGE OUTSTANDINGS LAB |
 
-The spanned files are rendered for the marks these books last showed (5 and 20). A census spanned to any other mark is not what the product would send, so a different mark is a STOP for that book (step 2), never a reason to send `c2` anyway.
+The spanned files are rendered for the marks these books last showed: 5 for book T, and 21 for book O (it read ALTVCHID 21, not 20, on 27 Oct, and `o-c2` was rendered again for 21). A census spanned to any other mark is not what the product would send, so a different mark is a STOP for that book (step 2), never a reason to send `c2` anyway.
 
 **RULES:**
 - **Order:** BRIDGE TRANSFER LAB is read here before item #1231's reconciliation (`lab/1231-bank-reconciliation-run-sheet`): that item sets bank dates on this book and keeps them, which was seen to move a voucher's AlterID, so after it this book's voucher mark is no longer 5.
@@ -32,7 +32,7 @@ The spanned files are rendered for the marks these books last showed (5 and 20).
 
 **STEPS (book T = BRIDGE TRANSFER LAB, then the same for book O = BRIDGE OUTSTANDINGS LAB with the `o-` files)**
 1. Load the book alone; `tally_status` as above.
-2. **Marks before.** Send `t-m.utf16le.xml` (name `t-m1`). Report the company row's `ALTVCHID` and `ALTMSTID` exactly as sent (an absent element is reported as absent). **If `ALTVCHID` is not 5 (book O: not 20), STOP for this book**: report both marks and go to the next book; the spanned request will be rendered again for the mark reported.
+2. **Marks before.** Send `t-m.utf16le.xml` (name `t-m1`). Report the company row's `ALTVCHID` and `ALTMSTID` exactly as sent (an absent element is reported as absent). **If `ALTVCHID` is not 5 (book O: not 21), STOP for this book**: report both marks and go to the next book; the spanned request will be rendered again for the mark reported.
 3. **Census as master sends it.** Send `t-c1.utf16le.xml` (name `t-c1`).
 4. **Census as a span.** Send `t-c2.utf16le.xml` (name `t-c2`).
 5. **Marks after.** Send `t-m.utf16le.xml` again (name `t-m2`). Report both marks. If either differs from step 2, the book changed during the read: report it; the pair is void.

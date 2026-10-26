@@ -359,6 +359,23 @@ test("the Download page and the install guide each carry an at-a-glance block fo
   }
 });
 
+test("the home page carries an at-a-glance block for the manifest's release, with what is not in it", () => {
+  const version = JSON.parse(readFileSync(new URL("../packaging/mcpb/manifest.json", import.meta.url), "utf8")).version;
+  const html = read("index.html");
+  // a version bump fails here until the block is read again against the Download page and its heading moved
+  assert.ok(html.includes(`<h2>At a glance, release ${version}</h2>`), `site/index.html has no "At a glance, release ${version}" block`);
+  const text = visibleText(region(html, 'id="at-a-glance"', "</section>"));
+  for (const needle of ["You can ask", "Partly, with limits", `Not in release ${version}`, "GSTR-2B", "AI provider", "Check any figure you rely on against Tally"]) {
+    assert.ok(text.includes(needle), `the home page's at-a-glance block lacks "${needle}"`);
+  }
+  // the limits the Download page puts on the same claims go with them, so the home page cannot say more than that page
+  const download = visibleText(region(read("download.html"), 'id="at-a-glance"', "</section>"));
+  for (const needle of ["synthetic book", "not tied to the vouchers", "ties to the trial balance", "none has been tried yet", "Funds Flow", "several currencies"]) {
+    assert.ok(text.includes(needle), `the home page's at-a-glance block lacks "${needle}"`);
+    assert.ok(download.includes(needle), `the Download page's at-a-glance block lacks "${needle}", which the home page's block carries`);
+  }
+});
+
 test("the list above the questions tells a person asked to try it out the four things to do first", () => {
   const html = read("faq.html");
   const list = faqText(html.match(/<section class="page-section faq-before">[\s\S]*?<\/section>/)[0]);

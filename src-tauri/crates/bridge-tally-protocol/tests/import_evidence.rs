@@ -656,3 +656,28 @@ fn lastvchid_is_kept_in_records_and_absent_when_unreported() {
         .get("last_vch_id")
         .is_none());
 }
+
+#[test]
+fn import_evidence_accepts_a_response_of_exactly_one_mebibyte_and_refuses_one_byte_more() {
+    // The evidence parser's byte limit, `MAX_IMPORT_RESPONSE_BYTES` in import_outcome.rs.
+    const LIMIT: usize = 1024 * 1024;
+    let response = |len: usize| {
+        let open = "<RESPONSE><CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS>";
+        let close = "</RESPONSE>";
+        format!(
+            "{open}{}{close}",
+            " ".repeat(len - open.len() - close.len())
+        )
+    };
+
+    let at_limit = response(LIMIT);
+    assert_eq!(at_limit.len(), LIMIT);
+    let evidence = parse_import_evidence(&at_limit).expect("a response at the limit parses");
+    assert!(evidence.counters().is_clean_success_for(1, 0, 0));
+
+    let over = response(LIMIT + 1);
+    assert_eq!(over.len(), LIMIT + 1);
+    // The same shape still parses as an outcome, so the refusal below is the size alone.
+    assert!(parse_import_outcome(&over).is_ok());
+    assert!(parse_import_evidence(&over).is_err());
+}

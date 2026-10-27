@@ -1,0 +1,50 @@
+== vch-20250515.xml: VOUCHER rows 1
+VOUCHER Payment DATE 20250515 NUMBER 1 ALTERID  1 NARRATION CK-K1
+  entry[1] CK Expense AMOUNT -1000.00 ISDEEMEDPOSITIVE Yes CATEGORYALLOCATIONS.LIST count 1
+    CATEGORY Primary Cost Category ISDEEMEDPOSITIVE Yes other children []
+      COSTCENTREALLOCATIONS.LIST {"NAME": "CK North", "PAYHEADSORTORDER": "0", "EMPLOYEESORTORDER": "0", "AMOUNT": "-600.00"} list children []
+      COSTCENTREALLOCATIONS.LIST {"NAME": "CK North East", "PAYHEADSORTORDER": "0", "EMPLOYEESORTORDER": "0", "AMOUNT": "-400.00"} list children []
+    other cost elements on the entry: ['COSTTRACKALLOCATIONS.LIST', 'VATWCCONSUMABLESCOST', 'VATWCCOSTOFLAND', 'VATWCESTABLISHMENTCOST']
+  entry[2] CK Bank AMOUNT 1000.00 ISDEEMEDPOSITIVE No CATEGORYALLOCATIONS.LIST count 0
+    other cost elements on the entry: ['COSTTRACKALLOCATIONS.LIST', 'VATWCCONSUMABLESCOST', 'VATWCCOSTOFLAND', 'VATWCESTABLISHMENTCOST']
+== vch-20250516.xml: VOUCHER rows 1
+VOUCHER Journal DATE 20250516 NUMBER 1 ALTERID  2 NARRATION CK-K2
+  entry[1] CK Expense AMOUNT -500.00 ISDEEMEDPOSITIVE Yes CATEGORYALLOCATIONS.LIST count 2
+    CATEGORY Primary Cost Category ISDEEMEDPOSITIVE Yes other children []
+      COSTCENTREALLOCATIONS.LIST {"NAME": "CK South", "PAYHEADSORTORDER": "0", "EMPLOYEESORTORDER": "0", "AMOUNT": "-500.00"} list children []
+    CATEGORY CK Region ISDEEMEDPOSITIVE Yes other children []
+      COSTCENTREALLOCATIONS.LIST {"NAME": "CK Retail", "PAYHEADSORTORDER": "0", "EMPLOYEESORTORDER": "0", "AMOUNT": "-500.00"} list children []
+    other cost elements on the entry: ['COSTTRACKALLOCATIONS.LIST', 'VATWCCONSUMABLESCOST', 'VATWCCOSTOFLAND', 'VATWCESTABLISHMENTCOST']
+  entry[2] CK Bank AMOUNT 500.00 ISDEEMEDPOSITIVE No CATEGORYALLOCATIONS.LIST count 0
+    other cost elements on the entry: ['COSTTRACKALLOCATIONS.LIST', 'VATWCCONSUMABLESCOST', 'VATWCCOSTOFLAND', 'VATWCESTABLISHMENTCOST']
+== cost-centres.xml: COSTCENTRE rows 4
+  NAME CK North PARENT ' Primary' CATEGORY 'Primary Cost Category' GUID present True
+  NAME CK North East PARENT 'CK North' CATEGORY 'Primary Cost Category' GUID present True
+  NAME CK Retail PARENT ' Primary' CATEGORY 'CK Region' GUID present True
+  NAME CK South PARENT ' Primary' CATEGORY 'Primary Cost Category' GUID present True
+== cost-categories.xml: COSTCATEGORY rows 2
+  NAME CK Region children {"AFFECTSSTOCK": "No", "ALLOCATEREVENUE": "Yes", "ALLOCATENONREVENUE": "No", "ALTERID": "209", "MASTERID": "206", "BRIDGECOMPANYGUID": "ddf3a557-704c-4f61-ae8d-46a3380062a1"}
+  NAME Primary Cost Category children {"AFFECTSSTOCK": "No", "ALLOCATEREVENUE": "Yes", "ALLOCATENONREVENUE": "Yes", "ALTERID": "99", "MASTERID": "98", "BRIDGECOMPANYGUID": "ddf3a557-704c-4f61-ae8d-46a3380062a1"}
+== tool 000-list-companies.json isError False
+  {"companies": [{"books_from": "20250401", "company_number": "100088", "guid": "ddf3a557-704c-4f61-ae8d-46a3380062a1", "identity_state": "verified_tuple", "missing_field": null, "name": "BRIDGE COST KEY LAB"}]}
+== tool 001-company-features.json isError False
+  settings {"batch_wise": {"evidence": "compared_with_tally_screen_on_synthetic_books", "value": "no"}, "cost_centres": {"evidence": "compared_with_tally_screen_on_synthetic_books", "value": "yes"}, "gst": {"evidence": "compared_with_tally_screen_on_synthetic_books", "value": "yes"}}
+  state 'observed'
+== tool 002-masters-cost-centres.json isError False
+  state 'observed' total 4 truncated False
+  {"alter_id": 210, "category": "Primary Cost Category", "guid": "ddf3a557-704c-4f61-ae8d-46a3380062a1-000000cf", "master_id": 207, "name": "CK North", "parent": "\ufffd#4; Primary"}
+  {"alter_id": 211, "category": "Primary Cost Category", "guid": "ddf3a557-704c-4f61-ae8d-46a3380062a1-000000d0", "master_id": 208, "name": "CK North East", "parent": "CK North"}
+  {"alter_id": 213, "category": "CK Region", "guid": "ddf3a557-704c-4f61-ae8d-46a3380062a1-000000d2", "master_id": 210, "name": "CK Retail", "parent": "\ufffd#4; Primary"}
+  {"alter_id": 212, "category": "Primary Cost Category", "guid": "ddf3a557-704c-4f61-ae8d-46a3380062a1-000000d1", "master_id": 209, "name": "CK South", "parent": "\ufffd#4; Primary"}
+== tool 003-masters-cost-categories.json isError False
+  state 'observed' total 2 truncated False
+  {"affects_stock": false, "allocates_non_revenue": false, "allocates_revenue": true, "alter_id": 209, "guid": "ddf3a557-704c-4f61-ae8d-46a3380062a1-000000ce", "master_id": 206, "name": "CK Region", "parent": null}
+  {"affects_stock": false, "allocates_non_revenue": true, "allocates_revenue": true, "alter_id": 99, "guid": "ddf3a557-704c-4f61-ae8d-46a3380062a1-00000062", "master_id": 98, "name": "Primary Cost Category", "parent": null}
+== tool 004-vouchers-20250515-16.json isError False
+  state 'complete' total 2 truncated False reason None
+  voucher Payment 20250515 no 1 alter_id 1 narration CK-K1
+    CK Expense -1000.00 {"cost_centre_allocations": [{"amount": "-600.00", "category": "Primary Cost Category", "cost_centre": "CK North"}, {"amount": "-400.00", "category": "Primary Cost Category", "cost_centre": "CK North East"}]}
+    CK Bank 1000.00 {}
+  voucher Journal 20250516 no 1 alter_id 2 narration CK-K2
+    CK Expense -500.00 {"cost_centre_allocations": [{"amount": "-500.00", "category": "Primary Cost Category", "cost_centre": "CK South"}, {"amount": "-500.00", "category": "CK Region", "cost_centre": "CK Retail"}]}
+    CK Bank 500.00 {}

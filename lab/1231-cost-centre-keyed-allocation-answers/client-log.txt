@@ -1,0 +1,9 @@
+2026-10-27T23:06:01Z exe sha256 4c9bace38a82f77471d9b30d88e20ac92d3472a187b744cfeaf15537edf2df44 ok; launch-env.json sha256 45eefa8aff7649fa64b2509356b1ea7151071e68e4507c0907a9749644fdb3e9; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-27T23:06:01Z launched pid 19424; stderr to server-stderr-20261027T230601Z.log
+2026-10-27T23:06:01Z initialized {'name': 'bridge-tally', 'version': '0.6.0'}
+2026-10-27T23:06:35Z 000-list-companies.json tool=list_companies secs=0.251 isError=False error=None saved_sha256=530ebdcc4476cff6c5dbf5da82d3f3b38c56de499e567764343bc73c1760479d
+2026-10-27T23:06:36Z 001-company-features.json tool=company_features secs=0.767 isError=False error=None saved_sha256=03dbe1a84afac84b8300c290ab3337916afc8d69dbaec9d399d8caca90c47472
+2026-10-27T23:06:38Z 002-masters-cost-centres.json tool=masters secs=0.804 isError=False error=None saved_sha256=dfae0579ed43ae4d8ad4ec281aecb548a3ebc42be42aa30b2772dc1b1fd0fe4f
+2026-10-27T23:06:40Z 003-masters-cost-categories.json tool=masters secs=0.690 isError=False error=None saved_sha256=58f9e5f98bf23cb1aae8e9f1589b1da4dcb791873f974ca28c69b66bfa0f106b
+2026-10-27T23:06:42Z 004-vouchers-20250515-16.json tool=vouchers secs=2.094 isError=False error=None saved_sha256=1c416b4bfa30b1e4b3ccc2565ebe62bf6d76523e6920b1ea6cf068a0e5aa798c
+2026-10-27T23:06:53Z session ended; server pid 19424 exit code 0

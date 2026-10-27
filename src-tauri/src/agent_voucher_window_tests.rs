@@ -5439,7 +5439,10 @@ async fn the_snapshot_shows_no_voucher_mark_only_when_tally_sent_none() {
     for (altvchid, shown) in [("", Value::Null), ("<ALTVCHID>0</ALTVCHID>", json!(0))] {
         let mut plans = identity_plans();
         plans.extend(paired(&xml_plan(mark_xml(GUID, altvchid))));
+        // The window, the day-wider read that corroborates an empty window, and the closing marks.
         plans.extend(paired(&xml_plan(empty_collection())));
+        plans.extend(paired(&xml_plan(empty_collection())));
+        plans.extend(paired(&xml_plan(mark_xml(GUID, altvchid))));
         let response = call_vouchers_over(plans).await;
         assert_ne!(response["isError"], true, "{response}");
         let snapshot = page_snapshot(&response);

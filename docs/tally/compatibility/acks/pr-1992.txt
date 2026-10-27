@@ -8,4 +8,3 @@ src-tauri/src/agent_register_tests.rs
 src-tauri/src/agent_voucher_window.rs
 src-tauri/src/agent_vouchers.rs
 reviewer: lamemustafa
-- The `vouchers` snapshot and the audit manifest's `alter_voucher_id` show null, not 0, when Tally's answer carries no voucher mark, which it omits for a company that has never held a voucher; `ledger_masters` already showed null for the same book. A mark Tally sends, 0 included, is shown as sent. The `vouchers` tool text says so. Every comparison of the marks still reads an absent mark as 0 (equality is over the two marks alone), so no read or post decides differently (fixes #1984).

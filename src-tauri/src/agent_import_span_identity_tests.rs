@@ -323,6 +323,34 @@ fn a_post_span_needs_clean_counters_a_lastvchid_and_a_step_equal_to_created() {
     );
 }
 
+/// A wrapped reply that reports `STATUS=0` failed whatever its counters say
+/// (IMPLEMENTATION_GUIDE.md §3.2, I6), so no span is bound from it, with or
+/// without a mark read after the post (#2008).
+#[test]
+fn a_reply_reporting_status_zero_binds_no_span_whatever_its_counters() {
+    let before = PreMark::recorded(1795);
+    let failed = |status: &str| {
+        bridge_tally_protocol::parse_import_outcome(&format!(
+            "<ENVELOPE><HEADER><STATUS>{status}</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>1733</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>"
+        ))
+        .unwrap()
+    };
+    // The same counters under STATUS=1 make a span: only the status differs.
+    assert!(PostSpan::after_clean_post(before, 1805, &failed("1"), 10).is_ok());
+    assert!(matches!(
+        PostSpan::after_clean_post(before, 1805, &failed("0"), 10),
+        Err(BindError::Refused(SpanRefusal::StatusFailure))
+    ));
+    assert_eq!(
+        PostSpan::after_clean_response(before, &failed("0"), 10),
+        Err(SpanRefusal::StatusFailure)
+    );
+    assert_eq!(
+        SpanRefusal::StatusFailure.code(),
+        "span_response_status_failure"
+    );
+}
+
 /// Verification treats an absent `EFFECTIVEDATE` as not observed, so the
 /// binding is decided again by the next read, never refused for good. A real
 /// difference later in the span still refuses: the absence, met first, never
@@ -902,4 +930,68 @@ fn a_read_back_ledger_name_keeps_a_line_break_in_either_spelling() {
             "{spelling}"
         );
     }
+}
+
+/// #1633: only a mark that moved by more than the post created, or a span that
+/// later held another number of vouchers, says another change was made during
+/// the post. The match has no wildcard, so a new refusal must be sorted here.
+#[test]
+fn only_the_step_and_count_refusals_name_a_concurrent_change() {
+    fn names_concurrent_change(refusal: &SpanRefusal) -> bool {
+        match refusal {
+            SpanRefusal::StepNotCreated { .. } | SpanRefusal::SpanCount { .. } => true,
+            // A reply reporting `STATUS=0` says Tally failed the post: it is no
+            // evidence of another change, and the line's "Tally reported
+            // creating each voucher once" would not be true of it (#2008).
+            SpanRefusal::EmptyBatch
+            | SpanRefusal::StatusFailure
+            | SpanRefusal::CountersNotClean
+            | SpanRefusal::CreatedNotCount { .. }
+            | SpanRefusal::LastVchIdAbsent
+            | SpanRefusal::MarkWentBack
+            | SpanRefusal::Position { .. }
+            | SpanRefusal::Content { .. }
+            | SpanRefusal::NotEffective { .. }
+            | SpanRefusal::MasterIdNotInSequence { .. }
+            | SpanRefusal::GuidNotMasterId { .. }
+            | SpanRefusal::IdentityReused { .. } => false,
+        }
+    }
+    let every = [
+        SpanRefusal::EmptyBatch,
+        SpanRefusal::StatusFailure,
+        SpanRefusal::CountersNotClean,
+        SpanRefusal::CreatedNotCount {
+            created: 1,
+            count: 2,
+        },
+        SpanRefusal::LastVchIdAbsent,
+        SpanRefusal::MarkWentBack,
+        SpanRefusal::StepNotCreated {
+            step: 4,
+            created: 1,
+        },
+        SpanRefusal::SpanCount {
+            expected: 1,
+            observed: 2,
+        },
+        SpanRefusal::Position { position: 0 },
+        SpanRefusal::Content {
+            position: 0,
+            fields: vec!["date"],
+        },
+        SpanRefusal::NotEffective { position: 0 },
+        SpanRefusal::MasterIdNotInSequence { position: 0 },
+        SpanRefusal::GuidNotMasterId { position: 0 },
+        SpanRefusal::IdentityReused { position: 0 },
+    ];
+    for refusal in &every {
+        assert_eq!(
+            concurrent_change_line_for(refusal.code()),
+            names_concurrent_change(refusal).then_some(CONCURRENT_CHANGE_LINE),
+            "{}",
+            refusal.code()
+        );
+    }
+    assert_eq!(concurrent_change_line_for("span_unknown_code"), None);
 }

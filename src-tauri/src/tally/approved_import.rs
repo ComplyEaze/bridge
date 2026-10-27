@@ -8,6 +8,20 @@ use std::{io::Read, num::NonZeroUsize, process::Stdio, time::Duration};
 use tokio::io::AsyncWriteExt;
 
 const MAX_PREVIEW_BYTES: usize = 8_000;
+
+tokio::task_local! {
+    /// Whether the post dialog of the task it is scoped to showed a box that did
+    /// not fit the screen (#1832): set by [`note_box_did_not_fit`] when the
+    /// dialog child exits with the status that says so, and read once by that
+    /// task when the dialog ends. Scoped only by [`PendingPostApproval::ask`];
+    /// anywhere else noting it does nothing.
+    static BOX_DID_NOT_FIT: std::cell::Cell<bool>;
+}
+
+/// Record, for the dialog task this runs in, that its box did not fit.
+fn note_box_did_not_fit() {
+    let _ = BOX_DID_NOT_FIT.try_with(|noted| noted.set(true));
+}
 #[cfg(not(windows))]
 const POST_LABEL: &str = "Post voucher";
 /// The review dialog's positive button, as the person sees it. Windows shows
@@ -16,12 +30,18 @@ const POST_LABEL: &str = "Post voucher";
 pub(crate) const REVIEW_BUTTON: &str = "I reviewed it";
 #[cfg(windows)]
 pub(crate) const REVIEW_BUTTON: &str = "Yes";
+/// The invoice-stop release dialog's positive button on a Mac. Windows shows the
+/// same Yes/No/Cancel box as the review.
+#[cfg(not(windows))]
+const RELEASE_BUTTON: &str = "Release the stop";
 /// What the review dialog's subprocess prints, followed by the nonce it was
 /// given, when and only when the person chose the positive button.
 const REVIEW_TOKEN_PREFIX: &str = "bridge-review-acknowledged:";
 /// The same for the post dialog (#635). Distinct from the review's, so a
 /// subprocess in one mode can never answer the other.
 const POST_TOKEN_PREFIX: &str = "bridge-post-approved:";
+/// The same for the invoice-stop release dialog, distinct from both.
+const RELEASE_TOKEN_PREFIX: &str = "bridge-stop-release-acknowledged:";
 
 /// How many vouchers a dialog asks about, so that its title and button say so
 /// (#746). Never zero: a dialog about no voucher approves nothing.
@@ -321,7 +341,8 @@ impl Answered {
 /// A post dialog left open after the MCP call that asked it returned (#725).
 /// It is [`ApprovedImport::confirm`] itself, unchanged, run on its own task so
 /// that the dialog's time limit and its child's exit are observed while no call
-/// is waiting. Dropping this aborts that task, which drops the dialog child:
+/// is waiting. When its box did not fit the screen (#1832) the task also runs
+/// the one note the asking call gave it, before the answer is stamped. Dropping this aborts that task, which drops the dialog child:
 /// `kill_on_drop` closes the dialog, and a token it prints afterwards is never
 /// read, so a late click approves nothing.
 pub(crate) struct PendingPostApproval {
@@ -334,7 +355,8 @@ pub(crate) struct PendingPostApproval {
 impl PendingPostApproval {
     /// Ask the person in a dialog that may outlive the calling call:
     /// [`ApprovedImport::confirm`] with exactly these arguments, on its own
-    /// task. Nothing else can be run there.
+    /// task. Nothing else can be run there but the one note of a box that did
+    /// not fit, which the caller gives and only the dialog task calls.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn ask(
         xml: String,
@@ -346,22 +368,33 @@ impl PendingPostApproval {
         group_collection_request: Option<AgentReadRequest>,
         currency_request: AgentReadRequest,
         company_marks_request: AgentReadRequest,
+        on_box_did_not_fit: Option<Box<dyn FnOnce() + Send>>,
     ) -> Self {
         let answered = std::sync::Arc::new(std::sync::OnceLock::new());
         let stamp = std::sync::Arc::clone(&answered);
         let dialog = async move {
-            let answer = ApprovedImport::confirm(
-                xml,
-                &preview,
-                voucher_dates,
-                verification_request,
-                ledger_catalogue_request,
-                ledger_binding,
-                group_collection_request,
-                currency_request,
-                company_marks_request,
-            )
-            .await;
+            let (answer, too_tall) = BOX_DID_NOT_FIT
+                .scope(std::cell::Cell::new(false), async {
+                    let answer = ApprovedImport::confirm(
+                        xml,
+                        &preview,
+                        voucher_dates,
+                        verification_request,
+                        ledger_catalogue_request,
+                        ledger_binding,
+                        group_collection_request,
+                        currency_request,
+                        company_marks_request,
+                    )
+                    .await;
+                    (answer, BOX_DID_NOT_FIT.with(std::cell::Cell::get))
+                })
+                .await;
+            // Told before the answer is stamped, so a call that reads the
+            // refusal finds the fact already recorded.
+            if let (true, Some(note)) = (too_tall, on_box_did_not_fit) {
+                note();
+            }
             // Stamped before the task ends, never after: a task seen finished
             // with no stamp is one that ended without an answer. A refusal's
             // code is stamped with it, so it can be read without the task.
@@ -507,8 +540,12 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// data-free code, as the read before approval does (bridge#717).
     #[error("group_export_invalid")]
     GroupExportInvalid { cause: Option<&'static str> },
-    /// A bank voucher reached the queue without its group read, or a Journal
-    /// with one: a wiring fault, refused before any request is sent.
+    /// What the queue reads does not fit what the batch calls for: a bank
+    /// voucher without its group read or a Journal with one, an invoice without
+    /// its reads or reads without an invoice, a plan other than the one the
+    /// build carried, or a judge or precheck that still asks for an answer once
+    /// its reads are in. A wiring fault, refused before the POST is sent; the
+    /// queue's own reads may already have been sent.
     #[error("import_post_admission_inconsistent")]
     AdmissionInconsistent,
     /// The snapshot sent last before the POST no longer shows exactly one
@@ -607,8 +644,8 @@ pub(crate) enum UnderLockRefusal {
     #[error("import_txn_already_posted")]
     TxnAlreadyPosted,
     /// The aim snapshot did not yield the target's voucher mark to record with
-    /// the intent. The aim check before it requires exactly one target row, so
-    /// this should not fire; if it does, no dispatch intent is recorded and
+    /// the intent: its target row omits the mark (#1945), or the company's GUID
+    /// is on more than one loaded row. No dispatch intent is recorded and
     /// nothing is sent.
     #[error("post_mark_unrecorded")]
     MarkUnrecorded,
@@ -727,6 +764,10 @@ pub(crate) mod test_seam {
         /// Signalled when a held post dialog opens, so a test waits for that
         /// event rather than polling for it against a clock.
         opened: Arc<tokio::sync::Notify>,
+        /// How many of the next post dialogs show a box that does not fit the
+        /// screen, as the real dialog child would report with its exit status
+        /// (#1832): each is refused as `import_review_too_large` and noted.
+        too_tall: Arc<std::sync::atomic::AtomicUsize>,
     }
 
     impl ScriptedApproval {
@@ -744,6 +785,16 @@ pub(crate) mod test_seam {
                 while_pending: Some(Arc::new(while_pending)),
                 ..Self::new(true)
             }
+        }
+
+        /// Approves, except that the first `times` post dialogs show a box that
+        /// does not fit the screen.
+        pub(crate) fn too_tall_first(times: usize) -> Self {
+            let scripted = Self::new(true);
+            scripted
+                .too_tall
+                .store(times, std::sync::atomic::Ordering::SeqCst);
+            scripted
         }
 
         /// A post dialog that stays open until [`ScriptedApproval::answer`].
@@ -797,6 +848,7 @@ pub(crate) mod test_seam {
                 while_pending: None,
                 held: None,
                 opened: Arc::default(),
+                too_tall: Arc::default(),
             }
         }
 
@@ -861,6 +913,22 @@ pub(crate) mod test_seam {
             }
         };
         std::hint::black_box(SEAM_MARKER);
+        let too_tall = SCRIPTED_APPROVAL
+            .try_with(|scripted| {
+                scripted
+                    .too_tall
+                    .fetch_update(
+                        std::sync::atomic::Ordering::SeqCst,
+                        std::sync::atomic::Ordering::SeqCst,
+                        |left| left.checked_sub(1),
+                    )
+                    .is_ok()
+            })
+            .unwrap_or(false);
+        if too_tall {
+            super::note_box_did_not_fit();
+            return Err("import_review_too_large".into());
+        }
         if decision {
             Ok(())
         } else {
@@ -1104,17 +1172,49 @@ pub(crate) mod test_seam {
             // `ack_review_unavailable`, and would pass a row without reaching
             // the clean-exit-without-token arm it is here to pin.
             let path = standin(directory.path(), exit_code, answer);
-            let result = super::confirm_review_with(&path, ONE, "Review").await;
+            let result =
+                super::confirm_review_with(&path, super::ReviewKind::Review, ONE, "Review").await;
             assert_eq!(result, expected.map_err(str::to_string), "{name}");
             assert_ran_to_its_end(&path, "Review", name);
         }
         // The control: the token for this call's nonce is accepted.
         let echoes_token = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
         assert_eq!(
-            super::confirm_review_with(&echoes_token, ONE, "Review").await,
+            super::confirm_review_with(&echoes_token, super::ReviewKind::Review, ONE, "Review")
+                .await,
             Ok(())
         );
         assert_ran_to_its_end(&echoes_token, "Review", "the control");
+        // A stop release runs its own mode and answers with its own token: the
+        // review's token does not release a stop, and the release's does.
+        let review_token = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
+        assert_eq!(
+            super::confirm_review_with(
+                &review_token,
+                super::ReviewKind::StopRelease,
+                ONE,
+                "Review"
+            )
+            .await,
+            Err("ack_review_unavailable".to_string())
+        );
+        assert_ran_to_its_end(&review_token, "Review", "a review token for a release");
+        let release_token = standin(
+            directory.path(),
+            0,
+            "bridge-stop-release-acknowledged:{NONCE}\n",
+        );
+        assert_eq!(
+            super::confirm_review_with(
+                &release_token,
+                super::ReviewKind::StopRelease,
+                ONE,
+                "Review"
+            )
+            .await,
+            Ok(())
+        );
+        assert_ran_to_its_end(&release_token, "Review", "the release control");
     }
 
     /// The post dialog is answered only by the token echoing this call's
@@ -1218,7 +1318,7 @@ pub(crate) mod test_seam {
             assert_ran_to_its_end(&path, "Post", name);
             let path = standin(directory.path(), status, answer);
             assert_eq!(
-                super::confirm_review_with(&path, ONE, "Review").await,
+                super::confirm_review_with(&path, super::ReviewKind::Review, ONE, "Review").await,
                 Err("ack_review_too_large".to_string()),
                 "review: {name}"
             );
@@ -1269,7 +1369,13 @@ pub(crate) mod test_seam {
         ] {
             let answers = standin(directory.path(), 0, &format!("{prefix}{{NONCE}}\n"));
             let result = if review {
-                super::confirm_review_with(&answers, count(sent), preview).await
+                super::confirm_review_with(
+                    &answers,
+                    super::ReviewKind::Review,
+                    count(sent),
+                    preview,
+                )
+                .await
             } else {
                 super::confirm_with(&answers, count(sent), preview).await
             };
@@ -1309,6 +1415,11 @@ pub(crate) mod test_seam {
             super::review_title(count(50)),
             "ComplyEaze Bridge — record that you reviewed 50 vouchers"
         );
+        // A stop release is titled for what it does, and names no review (#1828).
+        assert_eq!(
+            super::release_title(),
+            "ComplyEaze Bridge — release the invoice stop"
+        );
         // What each window's answer text says, in its own buttons' words (#1780).
         assert_eq!(
             super::answer_text(super::Shown::Post, ONE),
@@ -1327,7 +1438,7 @@ pub(crate) mod test_seam {
         );
         assert_eq!(
             super::answer_text(super::Shown::StopRelease, ONE),
-            "Click \"I reviewed it\" to release the invoice stop for this company, so that \
+            "Click \"Release the stop\" to release the invoice stop for this company, so that \
              ComplyEaze Bridge builds and posts invoices for it again. Click Cancel to cancel. \
              Nothing is released until you answer."
         );
@@ -1539,8 +1650,9 @@ enum Shown {
     StopRelease,
 }
 
-/// The two uses of the review dialog. [`ReviewAcknowledged::confirm`] takes
-/// one, so the invoice-stop release cannot be shown with the review's words.
+/// The two kinds of acknowledgement. [`ReviewAcknowledged::confirm`] takes one,
+/// and each has its own subprocess mode, so the invoice-stop release is never
+/// shown with the review's title or button (#1828).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReviewKind {
     Review,
@@ -1552,6 +1664,15 @@ impl ReviewKind {
         match self {
             Self::Review => Shown::Review,
             Self::StopRelease => Shown::StopRelease,
+        }
+    }
+
+    /// The subprocess mode that shows this dialog, and the token prefix it answers
+    /// with: each kind its own, so its window is titled for what it does.
+    fn child(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Review => ("--confirm-review", REVIEW_TOKEN_PREFIX),
+            Self::StopRelease => ("--confirm-release", RELEASE_TOKEN_PREFIX),
         }
     }
 }
@@ -1601,7 +1722,8 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
     let (yes, nothing) = answer_effect(shown, count);
     let button = match shown {
         Shown::Post => post_words(count).1,
-        Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
+        Shown::Review => REVIEW_BUTTON.to_string(),
+        Shown::StopRelease => RELEASE_BUTTON.to_string(),
     };
     wrapped(
         &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
@@ -1696,8 +1818,8 @@ pub(crate) fn review_text(kind: ReviewKind, count: VoucherCount, preview: &str) 
 }
 
 /// What the dialog shows: the answer text, then the preview. A stop release
-/// keeps its own statement first, because the title of the shared review
-/// dialog names only a review, and puts the answer text under it.
+/// keeps its own statement first, so its first line says what it releases, and
+/// puts the answer text under it.
 fn displayed_text(shown: Shown, count: VoucherCount, preview: &str) -> String {
     let answer = answer_text(shown, count);
     match (shown, preview.split_once("\n\n")) {
@@ -1742,7 +1864,10 @@ async fn confirm_with(
     {
         // A box that did not fit the screen is a refusal whatever else the
         // child printed: the text is too large for this person's screen.
-        Ok(answer) if answer.box_did_not_fit => Err("import_review_too_large".into()),
+        Ok(answer) if answer.box_did_not_fit => {
+            note_box_did_not_fit();
+            Err("import_review_too_large".into())
+        }
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1755,8 +1880,9 @@ async fn confirm_with(
     }
 }
 
-/// The review dialog for a doubted post (#239): its own subprocess mode, so
-/// its title and button never read as approving a post. It is answered by
+/// The review dialog for a doubted post (#239), or the invoice-stop release
+/// dialog (#1828): each its own subprocess mode, so neither title nor button
+/// reads as approving a post, nor one as the other. It is answered by
 /// the token alone, as the post dialog is by the token and a clean exit; a
 /// clean exit without the token is unavailable, as the post dialog's is.
 async fn confirm_review(
@@ -1769,32 +1895,26 @@ async fn confirm_review(
     if !fits_the_box(kind.shown(), count, &shown) {
         return Err("ack_review_too_large".into());
     }
-    confirm_review_with(&executable, count, &shown).await
+    confirm_review_with(&executable, kind, count, &shown).await
 }
 
 async fn confirm_review_with(
     executable: &std::path::Path,
+    kind: ReviewKind,
     count: VoucherCount,
     preview: &str,
 ) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
         return Err("ack_review_too_large".into());
     }
-    match nonce_bound_dialog(
-        executable,
-        "--confirm-review",
-        REVIEW_TOKEN_PREFIX,
-        count,
-        preview,
-    )
-    .await
-    {
+    let (mode, prefix) = kind.child();
+    match nonce_bound_dialog(executable, mode, prefix, count, preview).await {
         Ok(answer) if answer.box_did_not_fit => Err("ack_review_too_large".into()),
         Ok(answer) if answer.token_matched => Ok(()),
         // A person's decline is no token and exit 1: `run_review_confirmation`
-        // returns false. A clean exit without the token is never that; it is
-        // an executable that is not this dialog, such as one ignoring the
-        // flag (#689).
+        // and `run_release_confirmation` return false. A clean exit without
+        // the token is never that; it is an executable that is not this
+        // dialog, such as one ignoring the flag (#689).
         Ok(answer) if answer.exited_cleanly => Err("ack_review_unavailable".into()),
         Ok(_) => Err("ack_review_declined".into()),
         Err(DialogFailure::Unavailable) => Err("ack_review_unavailable".into()),
@@ -1898,6 +2018,17 @@ pub fn run_review_confirmation() -> bool {
     )
 }
 
+/// Entry point for the invoice-stop release dialog's subprocess, under the same
+/// rules: its own window title and token, so a release is never titled a review.
+pub fn run_release_confirmation() -> bool {
+    answer_with_token(
+        RELEASE_TOKEN_PREFIX,
+        show_release_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
 /// Read the parent's nonce line, count line and preview from `input`, show
 /// `dialog` with that count and preview, and
 /// write the token for that nonce to `output` only when it returns true. The
@@ -1972,6 +2103,29 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         == rfd::MessageDialogResult::Custom(REVIEW_BUTTON.into())
 }
 
+/// The invoice-stop release window's title: it releases a stop and reviews no
+/// voucher, so it names neither a review nor a post (#1828).
+#[cfg(not(windows))]
+fn release_title() -> String {
+    "ComplyEaze Bridge — release the invoice stop".into()
+}
+
+/// The invoice-stop release dialog: the acknowledgement dialog with its own
+/// title and button. It posts nothing either.
+#[cfg(not(windows))]
+fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    rfd::MessageDialog::new()
+        .set_title(release_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            RELEASE_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(RELEASE_BUTTON.into())
+}
+
 /// The Windows acknowledgement dialog's title. Its Yes/No/Cancel box has no
 /// custom labels, so the title asks the question, with the count for a batch
 /// (#746).
@@ -2013,6 +2167,41 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
                 // typed for Tally answers it; the parent puts a first line on
                 // its text that says what Y and N do (#1780). No stays the
                 // default button.
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The Windows invoice-stop release box's title, a question as the review's is
+/// (#1828).
+#[cfg(windows)]
+fn release_question() -> String {
+    "ComplyEaze Bridge — release the invoice stop for this company?".into()
+}
+
+/// The Windows invoice-stop release box: the review's box with its own title.
+#[cfg(windows)]
+fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
+        MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = release_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and no parent HWND is borrowed.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost, taking the foreground, with
+                // No as the default button (#1589, #1780).
                 MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
             )
         }

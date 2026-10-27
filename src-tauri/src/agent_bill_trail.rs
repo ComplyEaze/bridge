@@ -835,6 +835,7 @@ impl Server {
         reference: Option<&str>,
         open_bills: &[OpenBillRow],
         unallocated: &[UnallocatedParty],
+        opening: CompanyMarks,
     ) -> Result<(Value, Evidence), ToolFailure> {
         self.outstandings_detail_within(
             identity,
@@ -849,6 +850,7 @@ impl Server {
                 rows: MAX_DETAIL_ROWS,
                 window: WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
             },
+            opening,
         )
         .await
     }
@@ -868,6 +870,7 @@ impl Server {
         open_bills: &[OpenBillRow],
         unallocated: &[UnallocatedParty],
         limits: DetailLimits,
+        opening: CompanyMarks,
     ) -> Result<(Value, Evidence), ToolFailure> {
         let (catalogue, mut evidence) = self
             .read_resolvable_ledgers(identity, &company.name)
@@ -903,14 +906,28 @@ impl Server {
                 &from,
                 as_of,
                 VoucherReadShape::EntryWildcard,
-                WindowPlanSource::Estimate { known_marks: None },
+                WindowPlanSource::Estimate {
+                    known_marks: Some(opening),
+                },
                 limits.window,
                 |xml| parse_agent_rows(xml, identity.company_guid()),
             )
             .await
             .map_err(refused)?;
         evidence = combine_evidence(evidence, read.all_evidence());
+        // `opening` was read before the statement of open bills, which came before the
+        // catalogue: the marks read now must be those, or a ledger was renamed (or the book
+        // otherwise moved) between the reads this detail ties together by name. An undivided
+        // window read reports no marks of its own, so this closing read is the check.
+        let (closing, closing_evidence) = self
+            .read_company_marks_once(identity, &company.name)
+            .await
+            .map_err(|failure| with_evidence(failure, &evidence))?;
+        evidence = combine_evidence(evidence, closing_evidence);
         let late = |failure: ToolFailure| with_evidence(failure, &evidence);
+        if let Some(code) = super::register::window_drift(opening, closing) {
+            return Err(late(ToolFailure::from(code.to_string())));
+        }
         let rows = read.rows;
         let vouchers_read = rows.len();
         let rows = validate_then_filter_voucher_rows(rows, from.as_str(), as_of.as_str(), None)

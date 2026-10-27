@@ -16,6 +16,7 @@ The sheets are `lab/628-c0/WINDOWS-628-C0.md` and `lab/628-c0b/WINDOWS-628-C0B.m
   - **VCHGSTSTATUSISUNCERTAIN Yes, ISINCLUDED No**, ISAPPLICABLE Yes, every other VCHGSTSTATUS flag No.
 
   Both ledger-entry lists hold the same four entries: the party 11800.00 and Purchase - Goods -10000.00, plus the raw tax lines **Input CGST -900.00** and **Input SGST -900.00**, each ISDEEMEDPOSITIVE Yes. The party's bill allocation in this native export carries AMOUNT only, with no NAME or BILLTYPE.
+- **gst_status reports Tally's own flag.** As read from the raw PLPV answer, Tally holds `VCHGSTSTATUSISUNCERTAIN` Yes and `VCHGSTSTATUSISINCLUDED` and `VCHGSTSTATUSISEXCLUDED` No on No. 57 itself. Step 6's `uncertain` is that flag as Tally stores it, read from the voucher, not a judgement ComplyEaze Bridge makes.
 - **Step 8.** The marks are equal before and after the reads (M 228, V 65), and the raw MARKS equal the tool's.
 
 ## 628-C0b: the copies and what each read sees

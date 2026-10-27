@@ -716,7 +716,9 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
   present and not observed, never as no allocations) is not shown in part: the entry carries `cost_centre_allocations_unreadable`
   with a reason and the rest of the response is unchanged. An empty amount is never read as zero.
 - **Not shown.** Several categories on one entry; a centre with a parent; quantities; a foreign-currency amount; an
-  allocation on a book whose Cost Centres setting is Yes; a read of a different voucher type; another release or book;
+  allocation on a book whose Cost Centres setting is Yes; an item invoice (its sales or purchase ledger's entry carries
+  the goods line, §12a.13, and no captured item invoice carries allocations; one beside the goods line is read, one inside it
+  is flagged `cost_centre_allocation_shape_unrecognised`, by test only); a read of a different voucher type; another release or book;
   that the allocations of an entry always add up to its amount (the tool does not check this).
 
 ### 8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**

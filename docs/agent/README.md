@@ -1436,8 +1436,7 @@ or vouchers.
 - **Tax comes only from the GST duty head on the ledger master.** An entry on a
   ledger with a recognised head is listed in `tax_in_books` as
   `{ledger, head, raw_head, amount}` (each entry also carries what the vouchers read carries on it, among it
-  `cost_centre_allocations`, with the cost-centre and category names masked as `vouchers` masks them; allocations on
-  an item invoice's inventory entries are not read, so an entry without the key may still have some). An entry on a Duties & Taxes ledger with
+  `cost_centre_allocations`, with the cost-centre and category names masked as `vouchers` masks them). An entry on a Duties & Taxes ledger with
   no GST head is listed in `duties_taxes_entries_without_gst_head` and is never
   assigned one. Its `observation` says which case it is: `not_tax_ledger` is a
   ledger whose own tax type is not GST (usually TDS or another payable), and
@@ -2084,9 +2083,10 @@ Each ledger entry that carries cost-centre allocations has `cost_centre_allocati
 own amount.
 
 - An entry without allocations has no such key. In the one capture of the read the vouchers tool sends, Tally printed no allocation element for such an entry.
-  No key does not by itself mean none: allocations on an item invoice's inventory entries are not read (the read does
-  not ask for inventory entries), and whether Tally puts such an invoice's ledger allocations under its inventory
-  entries is not captured.
+  On an item invoice the read returns the sales or purchase ledger as a ledger entry with the goods line nested under
+  it (§12a.13 of the protocol reference). An allocation list directly under that entry is read like any other; one
+  inside the goods line is flagged `cost_centre_allocation_shape_unrecognised`. No captured item invoice carries
+  allocations, so where Tally prints them there is not measured.
 - **A list that cannot be read whole does not refuse the read.** The entry carries
   `cost_centre_allocations_unreadable` with one reason, and no partial list; the rest of the response is unchanged.
   The reasons: `cost_centre_name_missing`, `cost_centre_amount_missing` (an empty amount is never read as zero),

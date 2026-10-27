@@ -1150,6 +1150,50 @@ async fn a_folded_twin_refuses_the_post_before_any_approval() {
         .contains("\"dispatch_intent\""));
 }
 
+/// The same refusal for a twin reached through an alias: an unrelated ledger
+/// that now carries the alias `CASH` folds equal to the named `Cash`. The
+/// pre-approval check reads the catalogue's aliases, so the person is never
+/// asked to approve a batch the queue would then refuse. The alias is a
+/// test-local rewrite of the capture, no evidence of Tally behaviour.
+#[tokio::test]
+async fn an_alias_twin_refuses_the_post_before_any_approval() {
+    let aliased = replaced_once(
+        &catalogue(),
+        "<NAME>Bridge Nested Debtor WR4</NAME>",
+        "<NAME>Bridge Nested Debtor WR4</NAME><NAME>CASH</NAME>",
+    );
+    let mut plans = Vec::new();
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(aliased));
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "ledger_has_folded_twin",
+        "{response}"
+    );
+    assert_ne!(result["attempt_recorded"], json!(true), "{response}");
+    assert_eq!(observed.len(), expected, "nothing after the catalogue read");
+    assert!(scripted.previews().is_empty(), "no approval asked");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+}
+
 /// Declined, the post sends nothing past the pre-approval reads and journals
 /// no intent; the approval was asked once.
 #[tokio::test]

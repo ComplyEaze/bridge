@@ -14,7 +14,7 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
-## [0.6.1] - [CUT DATE]
+## [0.6.1] - 2026-10-27
 
 ### In plain words: ComplyEaze Bridge 0.6.1, since 0.6.0 (16 Oct 2026)
 
@@ -427,7 +427,7 @@ These changes are in ComplyEaze Bridge 0.6.1. Most lines name the pull requests 
 - Voucher ranges and direct posts on a book of about 30,000 vouchers (#1029) and a batch post that completes in Tally but whose reply is not kept (#852): not run.
 - Not run on a live TallyPrime for this build, with only captures or tests behind them: `gst_uncertain_vouchers`, `negative_stock`, `negative_ledgers`, `masters` `stock_items`, the closing stock used by `profit_and_loss` and `balance_sheet` (#692), cost-centre allocations in voucher reads (#1231), ledger aliases (#1688), the check of a statement batch when it is sent (#1714), the refusal of a post whose last read shows no voucher mark (#1945), the amendment reference check (#1941) and the invoice-stop window title (#1828).
 
-**Live pass of writes:** not run on this build. [CUT: replace this paragraph with the build, company, date and record of the two blocking rows (one approved batch post on a synthetic company; a bank-statement batch sent and checked against the transfer records) before the dispatch. If either row did not run, the release is held; this paragraph is never published as it stands.]
+**Live pass of writes:** run on 27 October 2026 on the CI package built from commit 67f647e1, the commit this release is cut from, on one synthetic company (BRIDGE NUMBERADM LAB). Two rows ran. (1) One approved batch post, checked for voucher-type numbering (#724): <724 result>. (2) A bank-statement batch sent, and checked against the transfer records (#1714): <R3 result>. The file that ran is the CI package; the published file is built again by the release workflow and is checked after publication against the release's checksum, with no write.
 
 **Known limits**
 

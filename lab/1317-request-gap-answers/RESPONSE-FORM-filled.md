@@ -15,6 +15,6 @@ The lab did the actions itself through its screen tool. t0 is the time Windows r
 | 8b | then Escape back to the Gateway (two Escapes, one second apart) | 21:44:59.536 → 45:00.763, 1.227 s (includes the 1 s pause) | not reached | not run | not run | not run |
 
 Notes (with the time):
-- 21:50:36.494 to 21:50:48.554 (A1): while Tally drew the Dashboard, Windows showed its stand-in for a window that is not responding; the screen tool reported an unidentified application in front and refused the next key. Census request c19, sent at 21:50:37.077, was held 11.508 s (every other A1 request 0.178 to 0.297 s) and answered at 21:50:48.585, 31 ms after the Dashboard's first capture.
+- 21:50:36.494 to 21:50:48.554 (A1): while Tally drew the Dashboard, Windows showed its stand-in for a window that is not responding; the screen tool reported an unidentified application in front and refused the next key. Census request c19, sent at 21:50:37.077, was held 11.508 s (every other A1 request 0.178 to 0.378 s) and answered at 21:50:48.585, 31 ms after the Dashboard's first capture.
 - 21:50:32.165 to 32.345 (A1): the click that was not acted on fell while census request c14 (sent 32.218, held 0.188 s) was being answered.
 - 21:51:06.6: the stop file was created; the driver sent nothing after c34.

@@ -1,6 +1,6 @@
 # Results: #1317 request gap on BRIDGE CORPUS DENSE, TallyPrime 7.2 Silver, 27 Oct 2026 (UTC)
 
-The sheet is `lab/1317-request-gap-run-sheet/RUN-SHEET.md` at 5167f849604b55d606874d68150007b7150e7c1a (SHA256.txt 47 of 47 equal; census ok 41; `driver.ps1` parsed with 0 errors and read in full). The company is BRIDGE CORPUS DENSE, number 100012, GUID d45bc1b0-e5e3-4261-b3b2-cce3915f42d3, voucher mark 29,900. **The row ended after run A1. B1, A2 and B2 were not run**, so the 250 ms question is not answered here.
+The sheet is `lab/1317-request-gap-run-sheet/RUN-SHEET.md` at 5167f849604b55d606874d68150007b7150e7c1a (SHA256.txt 47 of 47 equal; census ok 41; `driver.ps1` parsed with 0 errors and read in full). The company is BRIDGE CORPUS DENSE, number 100012, GUID d45bc1b0-e5e3-4261-b3b2-cce3915f42d3, voucher mark 29,900. **The row ended after run A1, by the decision taken at the stop: end the row with the evidence as it stands (the other choice was to redo A1 with keyboard-only navigation). B1, A2 and B2 were not run**, so the 250 ms question is not answered here.
 
 ## FINDING (verified once)
 **Under the 500 ms request cadence, one click was not acted on, and the next screen, the Dashboard (not on the form), took 12.06 s to draw while Windows showed Tally as not responding.**
@@ -14,7 +14,7 @@ The sheet is `lab/1317-request-gap-run-sheet/RUN-SHEET.md` at 5167f849604b55d606
 While the Dashboard was being drawn:
 - Windows put up its stand-in for a not-responding window.
 - **Census request c19, sent at 21:50:37.077, was held 11.508 s** and answered at 21:50:48.585, 31 ms after the Dashboard's first capture.
-- Every other A1 request was held 0.178 to 0.297 s.
+- Every other A1 request was held 0.178 to 0.378 s (the largest c26 0.378, c12 0.325 and c02 0.306).
 
 The Dashboard is not a listed screen, so the run was stopped there. The stop file was created at 21:51:06.6, and the driver sent nothing after c34.
 

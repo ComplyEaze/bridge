@@ -1,0 +1,6 @@
+2026-10-27T12:14Z release mcp-v0.6.1 read (gh release view): published 2026-10-27T12:10:25Z, not draft, not prerelease; Windows assets .mcpb 15,060,419 B, .sha256 107 B, .smoke.json 710 B, .provenance.json 352 B; downloaded into a new empty folder.
+2026-10-27T12:14Z .mcpb sha256 7812d8ad7b0ff6a07eac20828dfedaef4d50104bd5d679db3fc03c26e784c47a = the .sha256 file = the provenance sha256 = the smoke archive_sha256.
+2026-10-27T12:14Z unpacked into a new folder (9 entries, no absolute or parent paths): bridge_mcp.exe sha256 bdd428e4806bdbf70925956f90d410df48a0470b1a2f78c746c4c18088471d8d (= smoke binary_sha256); manifest.json version 0.6.1.
+2026-10-27T12:15:02Z launch over stdio (exe checked; Terms true; writes, import, max bytes, redaction unset); initialize bridge-tally 0.6.1.
+2026-10-27T12:15Z tools/list 29 tools, audit_test_run absent; tally_status TallyPrime 7.2 silver, not Educational; list_companies one company (BRIDGE NESTED STOCK LAB, synthetic); ledger_masters complete, marks 219 / 2.
+2026-10-27T12:15:27Z server stopped, code 0; exe sha256 bdd428e4 after the run; error stream 0 bytes.

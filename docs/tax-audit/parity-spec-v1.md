@@ -444,3 +444,12 @@ Any future change to this algorithm must be made in both engines in the same cha
 between them breaks silently. §7 does not compare ids directly — a stable id is a downstream
 consumer's contract, not a `TestResult` field — but a hashed prose field or a figure/finding's
 identity keyed off this id will still diverge if the two engines disagree on how it is computed.
+
+## 12. Source of truth and declared divergences (ruling of 26 October 2026)
+
+The maintainers ruled on 26 October 2026 that this crate is the source of truth for the tax-audit
+tests. A change to a test's behaviour no longer waits for the reference to change first; §10's route
+is for porting a test, not for changing one already ported. Every change to an existing output is a
+declared divergence, never a quiet change: it has its own invented test book (a unit test on typed
+inputs, or an edge book), and the test's provenance note records it under a "Declared behaviour
+difference" heading, naming that book.

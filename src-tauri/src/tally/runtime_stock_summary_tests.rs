@@ -256,7 +256,7 @@ fn sent_requests() -> [String; 3] {
     let company = ValidatedCompanyName::new(name.as_str()).unwrap();
     let range = ValidatedDateRange::new("20250401", "20260331").unwrap();
     [
-        render_company_inventory_flags_request(&name, GUID).unwrap(),
+        render_company_inventory_flags_request(&name, &crate::tally::test_company_guid(GUID)),
         ReadOnlyProfile::AuditStockItemsV1 {
             company: &company,
             period: &range,

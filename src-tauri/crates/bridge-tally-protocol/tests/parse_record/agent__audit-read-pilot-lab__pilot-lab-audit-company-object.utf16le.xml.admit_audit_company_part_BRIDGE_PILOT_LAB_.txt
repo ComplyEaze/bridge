@@ -1,0 +1,11 @@
+# fixture: tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-company-object.utf16le.xml
+# parser: admit_audit_company_part(BRIDGE PILOT LAB)
+# source: captured
+Ok(AuditCompanyPart {
+    name: "BRIDGE PILOT LAB",
+    guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+    books_from_yyyymmdd: "20260401",
+    is_integrated: Some(
+        "Yes",
+    ),
+})

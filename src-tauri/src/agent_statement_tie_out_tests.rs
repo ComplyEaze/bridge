@@ -1735,6 +1735,10 @@ async fn a_company_that_is_not_loaded_is_refused_whatever_the_file_says() {
             response["structuredContent"]["result"]["error"]["code"],
             "company_identity_not_found"
         );
+        let remediation = response["structuredContent"]["result"]["error"]["remediation"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(remediation.contains("list_companies"), "{response}");
     }
 }
 

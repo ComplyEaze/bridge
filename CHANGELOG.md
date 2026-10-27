@@ -12,8 +12,6 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-These changes are in source and not yet in a published build.
-
 ## [0.6.1] - 2026-10-27
 
 ### In plain words: ComplyEaze Bridge 0.6.1, since 0.6.0 (16 Oct 2026)

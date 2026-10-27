@@ -424,3 +424,71 @@ fn an_allocation_list_at_a_depth_the_reader_does_not_take_is_flagged_not_silent(
     );
     assert_unreadable(&nested, "cost_centre_allocation_shape_unrecognised");
 }
+
+/// An item invoice from the live sales-day capture (protocol reference §12a.13): the sales
+/// ledger's entry holds the goods line (`INVENTORYALLOCATIONS.LIST`) as a child, and the
+/// capture has no `ALLINVENTORYENTRIES.LIST`, which the read does not fetch. No captured
+/// item invoice carries cost-centre allocations, so the cost-centre capture's own category
+/// block is put at the two places Tally could print one, and what the read does with each
+/// is pinned: beside the goods line it is read and returned; inside it, it is flagged.
+#[test]
+fn on_an_item_invoice_an_allocation_beside_the_goods_line_is_read_and_one_inside_it_is_flagged() {
+    const INVOICE_COMPANY_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
+    const GOODS_LINE: &str = "<INVENTORYALLOCATIONS.LIST>";
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/sales-day/register_window_taxed_sales_day_live.utf16le.xml"
+    );
+    let invoice = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    assert_eq!(
+        invoice.matches(GOODS_LINE).count(),
+        1,
+        "one goods line to place beside"
+    );
+    let (from, to) = first_category_block(&captured());
+    let block = captured()[from..to].to_string();
+    let entries = |xml: &str| {
+        let rows = parse_agent_rows(xml, INVOICE_COMPANY_GUID).expect("the read still succeeds");
+        assert_eq!(rows.len(), 1);
+        rows[0]["amounts"].as_array().unwrap().clone()
+    };
+
+    // As captured: four entries, and the sales ledger's carries no allocation key of either kind.
+    let plain = entries(&invoice);
+    assert_eq!(plain.len(), 4);
+    assert_eq!(plain[1]["ledger"], "Lab Sales");
+    for entry in &plain {
+        assert!(entry.get(COSTCENTRE_FIELD).is_none() && entry.get(UNREADABLE_FIELD).is_none());
+    }
+
+    // Beside the goods line, a child of the sales ledger's entry: read and returned like any other.
+    let beside = entries(&invoice.replacen(GOODS_LINE, &format!("{block}{GOODS_LINE}"), 1));
+    assert_eq!(
+        beside[1][COSTCENTRE_FIELD],
+        json!([
+            {"category": "Business Line", "cost_centre": "Trading", "amount": "-600.00"},
+            {"category": "Business Line", "cost_centre": "Assembly", "amount": "-400.00"},
+        ])
+    );
+    assert!(beside[1].get(UNREADABLE_FIELD).is_none());
+
+    // Inside the goods line: not read, and not silent either.
+    let inside = entries(&invoice.replacen(GOODS_LINE, &format!("{GOODS_LINE}{block}"), 1));
+    assert_eq!(
+        inside[1][UNREADABLE_FIELD],
+        "cost_centre_allocation_shape_unrecognised"
+    );
+    assert!(inside[1].get(COSTCENTRE_FIELD).is_none());
+
+    // Either way the other entries are as captured.
+    for entries in [&beside, &inside] {
+        for at in [0, 2, 3] {
+            assert_eq!(entries[at], plain[at], "entry {at}");
+        }
+    }
+}

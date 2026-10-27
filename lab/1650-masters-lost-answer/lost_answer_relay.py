@@ -7,8 +7,8 @@ Run:  python -I lost_answer_relay.py --listen-port 9011 --record DIR --company N
 
 It listens on 127.0.0.1 only and forwards to 127.0.0.1:9001 only (fixed, not an argument). It writes no request of its
 own: every byte it sends to Tally is a byte ComplyEaze Bridge sent it. A request is forwarded byte for byte, with the
-client's own Content-Type lines (Tally picks its answer's encoding from them), and its answer is returned byte for byte,
-except in the one case below. The relay adds only Host and, on a POST, Content-Length, to what it sends to Tally, and
+client's own Content-Type lines (Tally picks its answer's encoding from them), and the body of its answer is returned byte for
+byte (the relay's own reply adds Server and Date headers and recomputes Content-Length), except in the one case below. The relay adds only Host and, on a POST, Content-Length, to what it sends to Tally, and
 answers its client with Connection: close, one request to a connection. Requests to Tally are made one at a time; a
 request to Tally has no time limit (an abandoned request can leave the gateway stuck).
 
@@ -215,7 +215,7 @@ def make_handler(state):
                     connection.endheaders(request if method == "POST" else None)
                     answer = connection.getresponse()
                     return answer.status, answer.getheaders(), answer.read()
-                except (OSError, http.client.HTTPException):
+                except (OSError, ValueError, http.client.HTTPException):
                     return None
                 finally:
                     connection.close()
@@ -236,7 +236,7 @@ def make_handler(state):
             got = self.exchange("POST", request)
             if got is None:
                 state.recorder.write("POST", self.path, "forward_failed", request, 502, [], b"", False)
-                state.recorder.event("the create could not reach Tally; nothing was sent")
+                state.recorder.event("the create could not be completed with Tally; it may have been sent")
                 return self.reply(502, [("Content-Type", "text/plain; charset=utf-8")], b"the relay could not reach Tally")
             status, headers, body = got
             index = state.recorder.write("POST", self.path, "forwarded_answer_withheld", request, status, headers,

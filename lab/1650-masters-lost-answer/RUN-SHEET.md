@@ -46,7 +46,7 @@ Exactly one ComplyEaze Bridge with ledger creation on may be running; record the
 
 ## Before the sitting
 1. Check every file here against `SHA256.txt` (`Get-FileHash -Algorithm SHA256 FILE`).
-2. `python -I lost_answer_relay.py --self-test`: EXPECT exactly `self-test: ok (6 forwarded unchanged, 1 answer withheld, 10 refused, none of the refused reached Tally)` and exit code 0. Anything else = do not use the relay.
+2. `python -I lost_answer_relay.py --self-test`: EXPECT exactly `self-test: ok (6 forwarded unchanged, 1 answer withheld, 15 refused, none of the refused reached Tally)` and exit code 0. Anything else = do not use the relay.
 3. Read the relay's header against the match rule: it forwards a request unchanged unless it is an import, and an import only if it is the create.
 
 ## Row L: the relay
@@ -67,6 +67,7 @@ Exactly one ComplyEaze Bridge with ledger creation on may be running; record the
    - The answer must NOT carry `posted_verified`. If it does, record it whole: it is the finding of the row (an answer reached ComplyEaze Bridge that the relay was meant to withhold); STOP.
    - Record the relay's lines: `create matched` (with its two sha256 values), the manifest line `forwarded_answer_withheld` (Tally's real answer: its size and sha256, and `answer_returned` no), and, when the hold ends, the `held connection ended` line (who closed it, and how long after the create was sent).
    - If the box does not open, or the first call answers before any box, record it whole and STOP (nothing was sent).
+   - If the relay's `events.txt` says the create "could not be completed" (a `forward_failed` line, and the client got a 502 answer instead of silence), the create may have reached Tally: record it whole and STOP; do not call `post_ledger_creates` again; `ledger_masters` shows whether the ledger is present.
 6. Screenshot of the whole Tally window (C3). Take no other action in Tally.
 7. **The next call, at once.** One Tally (rule 5). `post_ledger_creates` with B1's `batch_id` again. This is not posting it again: the journal shows a send, and the call is meant to read and send nothing. EXPECT no box. The tool reads the book back and sends nothing; with no answer of Tally's on file it cannot verify the create, so EXPECT `state` `reconciliation_required` (never `posted_verified`) and a `next_step` that says there is nothing to create and to compare the ledger by eye. Record the answer whole: `state`, `attempt_recorded`, `dispatch` (`state` and `resent`), `verification`, `note`, `next_step`, any `alert`, and the `journal` fields when it carries them. A box opens: click **No**, record it, and STOP. The relay's manifest must show no further import line.
 8. `ledger_masters`: M1 and the ledger rows. RECORD whether `LAns Suspense` is present (Tally ran the create, so it is expected present), its GUID and ALTERID, and whether M1 = M0′ + 1. Every other row unchanged.

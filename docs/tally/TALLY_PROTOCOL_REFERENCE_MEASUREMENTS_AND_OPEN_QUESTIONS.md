@@ -1564,9 +1564,10 @@ tool now refuses a ledger's opening bills before any request, #1508). **Not meas
 opening bill with a credit sign; more than one opening bill; narrowing by `reference`; the three captures of #1356 that are
 still open (a party term against an unfiltered control, a per-ledger or per-bill native report, the cost on a large book).
 
-**What the tie-out does not prove.** The voucher read and the bills reports are two reads whose
-extents are not compared, so a voucher posted between them usually breaks a bill's tie, but two
-changes that compensate, or allocations that net to zero, can still tie. An unadjusted `tied`
+**What the tie-out does not prove.** The detail reads the company's two change marks before the
+bills and again after the voucher window and refuses when they moved (`voucher_window_changed_during_read`), so a
+voucher posted between the reads is a refusal and not a broken tie; a change that moves neither mark is not seen (one
+letter-case-only ledger rename moved neither, in one book), and allocations that net to zero can still tie. An unadjusted `tied`
 means the on-account sum equals the residual, not that the residual's composition is proven. One
 unadjusted tie-out is captured whole (the on-account debtor above); the other residuals in the
 tests are typed from the seeded vouchers, not captured ledger rows. A ledger the snapshot lists no residual for is reported as

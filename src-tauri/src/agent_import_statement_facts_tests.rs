@@ -313,6 +313,32 @@ impl Journal {
             before,
         ))
     }
+    /// A recorded rollback seen by `build`'s own verification at `mark`, after
+    /// every record so far.
+    fn restored_at(self, build: &Build, mark: u64) -> Self {
+        let before = self.0.lines().count() as u64;
+        self.push(&ledger::StatusRecord::rollback_seen(
+            &build.line(),
+            mark,
+            before,
+        ))
+    }
+    /// The post's recorded answer: one voucher created, under `STATUS` `status`.
+    fn answered(self, build: &Build, status: &str) -> Self {
+        let outcome = bridge_tally_protocol::parse_import_outcome(&format!(
+            "<ENVELOPE><HEADER><STATUS>{status}</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>11</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>"
+        ))
+        .unwrap();
+        self.push(&ledger::StatusRecord::response(
+            &build.line(),
+            ledger::DispatchResponse {
+                request_sha256: "c".repeat(64),
+                response_sha256: "d".repeat(64),
+                bytes: 1,
+                outcome: Some(outcome),
+            },
+        ))
+    }
     fn read(&self) -> Result<TransferFacts, TransferFactsError> {
         self.read_with("", company())
     }
@@ -904,6 +930,30 @@ fn a_skip_a_restored_batch_would_retire_stays_held_by_it() {
         );
         assert!(matches!(found.held[0].by, HeldBy::UnverifiedBatch));
         assert_eq!(found.restored, [batch_id(81)].into());
+    }
+}
+
+/// A batch is marked restored only where its post had proved a floor above the
+/// mark the rollback read: an answer that reported `STATUS=0` proves none of
+/// its vouchers landed, so a mark at the pre-POST mark covers the same post
+/// under `STATUS=1` and not under `STATUS=0` (#2035).
+#[test]
+fn a_status_zero_answer_leaves_its_batch_out_of_the_restored_marker() {
+    let posted = build(98).placed().voucher(payment(&st(6), "500.00"));
+    for (status, restored) in [("1", true), ("0", false)] {
+        let found = Journal::default()
+            .batch(&posted)
+            .sent_natively(&posted)
+            .answered(&posted, status)
+            .restored_at(&posted, 10)
+            .read()
+            .unwrap();
+        assert_eq!(
+            found.restored.contains(&batch_id(98)),
+            restored,
+            "STATUS={status}: {:?}",
+            found.restored
+        );
     }
 }
 

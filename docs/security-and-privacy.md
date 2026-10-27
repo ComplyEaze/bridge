@@ -115,7 +115,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     names and their parents, the category a cost centre belongs to,
     and three fields of a ledger's details: the name on the PAN, the bank account
     holder's name and the bank details; from the release that includes #1490 (not
-    0.6.0 or earlier) also the name a mailing address is printed under and the
+    0.6.1 or earlier) also the name a mailing address is printed under and the
     address itself (each line of the mailing address, and the flat address field).
     A party's PIN code, state and country, which `ledger_masters` returns with
     `fields=compliance`, are not masked under any mode. A name of four characters or fewer is

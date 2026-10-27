@@ -1935,21 +1935,23 @@ fn verify_observed_company_tuple_from_companies(
     })
 }
 
-/// What the party/ledger master read asks Tally for: the export shows each party's dated
+/// What the party/ledger master export asks Tally for: it shows each party's dated
 /// mailing details, so its request names them (bridge#1490). A grouping-decision save
-/// reads through the same function and so sends the same request.
+/// uses none of them and sends the standard request.
 const PARTY_LEDGER_MASTER_EXPORT_READ: crate::tally::connection::ComplianceRead =
     crate::tally::connection::ComplianceRead::WithMailingDetails;
 
 /// The verified company and its party/ledger master, read through the one
 /// sized path: company tuple check, currency admission, then the paired
 /// source. The export and a grouping-decision save both read through here.
-/// `chosen` is the balance date the CA typed, or the host's date when none.
+/// `chosen` is the balance date the CA typed, or the host's date when none;
+/// `read` is what the caller's request asks Tally for.
 pub(crate) async fn fetch_verified_party_ledger_master(
     runtime: &TallyRuntime,
     config: TallyConfig,
     selected_company: &SelectedCompanyIdentity,
     chosen: Option<TallyDate>,
+    read: crate::tally::connection::ComplianceRead,
 ) -> Result<(VerifiedCompanyIdentity, PartyLedgerMasterWorkbook), TallyCommandError> {
     let identity = verify_observed_company_tuple(runtime, &config, selected_company).await?;
     // The classified read admits a book with several Currency masters when
@@ -1968,7 +1970,7 @@ pub(crate) async fn fetch_verified_party_ledger_master(
             &identity,
             currency_assertion,
             basis,
-            PARTY_LEDGER_MASTER_EXPORT_READ,
+            read,
         )
         .await
         .map_err(party_ledger_master_runtime_command_error)?;
@@ -2030,6 +2032,7 @@ async fn export_party_ledger_master_once(
         request.config,
         &request.selected_company,
         request.as_of_yyyymmdd,
+        PARTY_LEDGER_MASTER_EXPORT_READ,
     )
     .await?;
     let year = party_ledger_master_year(&workbook)?;

@@ -372,8 +372,8 @@ test("the home page carries an at-a-glance block for the manifest's release, wit
   const squash = (value) => value.replace(/\s+/g, " ");
   const download = squash(visibleText(region(read("download.html"), 'id="at-a-glance"', "</section>")));
   const home = squash(text);
-  for (const needle of ["synthetic book", "not tied to the vouchers", "ties to the trial balance", "none has been tried yet", "Funds Flow", "several currencies",
-    "cannot build onto a Cash-in-Hand ledger", "has not yet been run on a real bank statement", "we have not yet run the published 0.6.0 file against TallyPrime"]) {
+  for (const needle of ["synthetic book", "not tied to the vouchers", "ties to the trial balance", "closes every gap", "Funds Flow", "several currencies",
+    "cannot build onto a Cash-in-Hand ledger", "has not yet been run on a real bank statement", `we have not yet run the published ${version} file against TallyPrime`]) {
     assert.ok(home.includes(needle), `the home page's at-a-glance block lacks "${needle}"`);
     assert.ok(download.includes(needle), `the Download page's at-a-glance block lacks "${needle}", which the home page's block carries`);
   }

@@ -45,6 +45,7 @@ Replaces  Heads come from ls-remote at 15:55 IST, and every head is the full SHA
 | 17 | **#1039 G1 row A** (rows B/C STOP on Silver: they need Gold and a second client) | lab/1039-live-rows @ 85cb14b74bfa10c96bf885a1febc6addc03762e0 | BRIDGE CONCUR LAB (new) | CUT (its build line's first choice, now filled), else FD6, else 609; posting ON | G1: RULES "the owner answers the approval window by mouse"; A2 "(owner approves)"; A3 "OWNER STEP" (edit narration); B1, B2, AFTER "OWNER STEP"; README "owner steps marked" |
 | 18 | **#683 X1 forex digit grouping** | lab/sitting3b-run-sheets @ dbf5b2d9fa059afdee8ab67e6795b19507f13167 | BRIDGE FOREXGROUP LAB (new) | W1-2306, posting OFF | X1: "KEYING (OWNER STEPS ...)", steps 1, 3, 4, 5, AFTER "OWNER STEP"; README "marks every screen action as an OWNER STEP". Steps 3-5 STAY: see Row notes, row 18 |
 | 19 | **#1713 O1 abandoned ledger create, LAST** (holds the gateway about 4 h) | lab/1713-abandoned-ledger-create @ f86d4f1a3b34c18b44a38223ef6c7c83cb2b7e06 | BRIDGE ABANDON LAB (new) | none (scripts, curl writes) | README lines 10, 134, 230: "the owner's yes ... recorded in notes.txt before S1" |
+| 21 | **#1039 refusal reproduction** (one refused span binding on the Silver book; runs straight after row 17's G1 row A, before row 19) | lab/1039-refusal-row @ 08bb7491d9eef797d9975fdca46630ff1b71cbb1 | BRIDGE CONCUR LAB (row 17's company, as row A left it) | the build row 17 ran on | R1-1039-refusal.md and README: the steps marked [OWNER] follow WHO ACTS above. See Row notes, row 21 |
 
 ## Not runnable, so not in the order
 - lab/1738-remove-duplicate-contra 7bb106f1: its cancel/delete rows are P7-blocked until there is a candidate cancel/delete builder (contributor issue draft , for the coordinator to file Wednesday).
@@ -87,3 +88,9 @@ None of these 0.7.0 sheets toggles a setting only to isolate a variable. Rows 7 
 7. **Between runs**, at least two minutes with no request and the screen at the Gateway. This replaces "the owner back at the Gateway".
 8. **Evidence.** The filled form, with B0 and the four runs, each cell's numbers and R. The screenshot times stay in `notes.txt`, and the screenshots stay on the lab PC, listed by name, size and sha256.
 9. **Reading it (for the requester, not the lab).** The screen counts as responsive at 250 ms if no B run has an F, and the B runs' L count is not above the A runs'.
+
+**Row 21, #1039 refusal reproduction: runs after row 17's G1 row A, on the same company and build.**
+- The sheet is `lab/1039-refusal-row` at 08bb7491d9eef797d9975fdca46630ff1b71cbb1 (one row, `R1-1039-refusal.md`). It starts only after row 17's step A4 is recorded. If row 17 did not run, or THE COMPANY of row 17 is not on the PC, the row does not run and nothing is created in its place.
+- Deviation D1 of the sheet (sends made while one unsaved voucher sits on Tally's screen) has the run coordinator's recorded yes, in the coordinator's log of 28 Oct 2026. The lab records in `notes.txt`: "D1 used with the run coordinator's recorded yes of 28 Oct".
+- The sheet defers row 17's AFTER restore and its C10 until the #1039 dialog row has finished: the refused batch, its data folder and the book are that row's input. The lab does not restore or shut row 17's company after row A; it does so only when the run coordinator says RESTORE, after the dialog row.
+- Row 19 (the #1713 row) stays last: the gateway is held for about four hours there.

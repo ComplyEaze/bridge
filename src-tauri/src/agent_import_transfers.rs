@@ -61,6 +61,7 @@ pub(super) fn take_withdraw_skips(args: &mut Value) -> Result<BTreeSet<String>, 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum OpenState {
     NotFound,
+    TallyUnchecked,
     Ambiguous,
     OtherSideUnverified,
     NotEstablished,
@@ -76,6 +77,7 @@ impl OpenState {
     pub(super) fn label(self) -> &'static str {
         match self {
             Self::NotFound => "not_found",
+            Self::TallyUnchecked => "tally_unchecked",
             Self::Ambiguous => "ambiguous",
             Self::OtherSideUnverified => "other_side_unverified",
             Self::NotEstablished => "not_established",
@@ -92,7 +94,8 @@ impl OpenState {
     pub(super) fn step(self) -> &'static str {
         match self {
             Self::OtherSideUnverified => "The other account's Contra for this row is in the batch named, which is not verified yet. Run verify_import on every batch named for this row; do not post this row. Build the other account's statement for this row's date again only if every batch named for this row was never sent to Tally, verify_import listed every one of their vouchers as not_found, and the person confirms none of their files was ever imported into Tally; then post the new build, verify it, and never import an old batch's file. If verify_import found any voucher of a batch named for this row, or refused to read one, or a file of one was imported, do not build the other account's statement again: check in Tally which of their vouchers are there, and no step inside ComplyEaze Bridge frees this row yet. If Tally rejected the send of a batch named for this row, building the other account's statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet.",
-            Self::NotFound => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day; a Contra dated another day is not looked for. If no batch of that statement covers this date, build it. If that statement skipped this row too, withdraw the skip on exactly one side. Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice.",
+            Self::TallyUnchecked => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, but whether Tally holds one is not established: ComplyEaze Bridge did not read every voucher of this date in Tally, so a Contra entered in Tally directly is not in its records. Read the vouchers of this date with the vouchers tool and look for a voucher of the Contra voucher class, or of any other type such as a Journal or Payment, that carries this row's amount on the bank ledger the other account's statement was built for, and read its narration where it was not dropped; a voucher dated another day, or booked against another ledger, is not looked for, a transfer may print on different days, and a masked ledger name can read like another, so compare amounts and dates too. Tell the person what you found and keep the skip. Do not book this transfer in Tally another way, and withdraw the skip on one side only: a later post of the other statement would book it twice. Name the row in withdraw_skips only when the person confirms that no entry in Tally carries this transfer.",
+            Self::NotFound => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, and ComplyEaze Bridge read every voucher of this date in Tally and found no Contra between the two accounts that could carry it; a Contra dated another day, or booked against another ledger, is not looked for. If no batch of that statement covers this date, build it. If that statement skipped this row too, withdraw the skip on exactly one side, and only when the person confirms. Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice.",
             Self::Ambiguous => "Each batch named holds a Contra that could carry this row: more than one Contra could, or the one that could is also claimed by another row or booked twice. ComplyEaze Bridge does not choose; check in Tally which Contra carries this transfer. A Contra in a batch not yet verified is not in Tally until that batch is imported and verified.",
             Self::ReversedSameDay => "This row, or the other account's matching row, has an equal amount going the other way the same day on its own statement, so a reversal and a pair of real transfers look alike. Where a batch is named, it holds a Contra that could carry this row. Check in Tally which rows are transfers. Name the row in withdraw_skips only when the person confirms the other account's statement does not carry it.",
             Self::MatchedUnconfirmed => "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is.",
@@ -158,6 +161,7 @@ impl TransferSummary {
                     continue;
                 }
                 SkipState::NotFound => (OpenState::NotFound, [None].into()),
+                SkipState::TallyUnchecked => (OpenState::TallyUnchecked, [None].into()),
                 SkipState::Ambiguous { candidates } => {
                     (OpenState::Ambiguous, batches_holding(candidates))
                 }
@@ -811,7 +815,9 @@ impl Server {
                             .filter(|candidate| !verified.contains(candidate))
                             .map(|candidate| (&candidate.batch, Carrier::OtherSideUnverified))
                             .collect(),
-                        SkipState::NotFound | SkipState::NotEstablished => Vec::new(),
+                        SkipState::NotFound
+                        | SkipState::TallyUnchecked
+                        | SkipState::NotEstablished => Vec::new(),
                     })
                     .collect();
                 carriers

@@ -2,7 +2,7 @@
 //! and reference here is synthetic.
 use super::*;
 use crate::agent::transfer_pairing::{
-    transfer_pairing_view, BatchStatus, Direction, PairRound, Side, SkipState,
+    transfer_pairing_view_with, BatchStatus, Direction, PairRound, Side, SkipState, TallyDays,
 };
 use std::io::Cursor;
 
@@ -414,7 +414,11 @@ fn transfer_journal() -> Journal {
 #[test]
 fn facts_from_a_journal_give_a_pair_by_reference_in_the_view() {
     let facts = transfer_journal().read().unwrap();
-    let view = transfer_pairing_view(&facts.skips, &facts.contras, &facts.coverage, 0).unwrap();
+    // every skip's own day counts as read whole, so that these tests keep asking
+    // what the statements' records say; a read of Tally is asked in the pairing tests
+    let tally = TallyDays::clean_for(&facts.skips);
+    let view = transfer_pairing_view_with(&facts.skips, &facts.contras, &facts.coverage, &tally, 0)
+        .unwrap();
     assert_eq!(
         view.skips.get(&key(B1, 1)),
         Some(&SkipState::Paired {
@@ -1308,7 +1312,9 @@ fn state_given(rest: Journal, skips_file: &str) -> SkipState {
         rest.0
     ));
     let found = journal.read_with(skips_file, company()).unwrap();
-    let view = transfer_pairing_view(&found.skips, &found.contras, &found.coverage, 0).unwrap();
+    let tally = TallyDays::clean_for(&found.skips);
+    let view = transfer_pairing_view_with(&found.skips, &found.contras, &found.coverage, &tally, 0)
+        .unwrap();
     view.skips[&key(B1, 1)].clone()
 }
 

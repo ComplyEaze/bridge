@@ -2123,9 +2123,14 @@ fn each_doubt_about_a_sales_ledgers_rate_has_its_own_code() {
         with(&|r| r.gst_rows[0].applicable_from = None),
         Err("invoice_sales_ledger_rate_not_in_force")
     );
-    // The date it starts is digits: text that sorts before them is no date.
+    // The date it starts is a calendar day: text that sorts before one is no date.
     assert_eq!(
         with(&|r| r.gst_rows[0].applicable_from = Some("!!!!!!!!".into())),
+        Err("invoice_sales_ledger_rate_not_in_force")
+    );
+    // Eight digits that name no calendar day are no date either (#2009).
+    assert_eq!(
+        with(&|r| r.gst_rows[0].applicable_from = Some("20251340".into())),
         Err("invoice_sales_ledger_rate_not_in_force")
     );
     // A row that starts on the invoice date is in force on it.

@@ -123,8 +123,8 @@ The ordinary default tools, in name order:
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
-release 0.6.0. `audit_test_run` is in the source after release 0.6.0 and is not in a published build yet; it is
-not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger`, `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` are in the source after release 0.6.0 and are not in a published build yet. `local_data_report` (also
+release 0.6.0. `audit_test_run`, `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` were added in release 0.6.1; `audit_test_run` is
+not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` is in the source after release 0.6.1 and is not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -2234,6 +2234,12 @@ posting setting covers both, in the MCPB extension and on the command line (#109
      decision. For every reason,
      render `candidate_count_is_lower_bound` as "at least N", never an exact total.
    - `missing` — no live ledger matched. Bridge never creates masters.
+   - A `missing` or `near_miss` row without `folded_twins` whose name is,
+     character for character, an alias of exactly one live ledger also carries
+     `alias_of`, that ledger's name as Tally lists it. The row is still not
+     bound and Bridge never sends an alias: replace the name with `alias_of`
+     only after an operator confirms that ledger is the one meant, then run
+     `validate_masters` again.
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,
    company date extent, live masters, and local journal integrity,
    repeats the full catalogue to reject intervening changes, then writes `<data_dir>/imports/<batch_id>.xml` and records an append-only
@@ -2390,8 +2396,10 @@ refused as `proposals_legacy` (parse the statement again).
   that were built apart are reported once both are sent and one is found
   posted. A skip may be withdrawn whether or not its statement was ever sent,
   so a statement parsed again with the row posted is built again naming the row
-  in `withdraw_skips`, and the batch built first is not sent: sending it
-  instead gives `posted_against_skip`. The answer of the build that names the
+  in `withdraw_skips`, and the batch built first is neither sent nor imported:
+  sent or imported and found posted, it leaves the row `posted_against_skip`,
+  and once the skip is live `post_import` refuses that send as
+  `skip_row_paired_elsewhere`. The answer of the build that names the
   row lists it as `held_elsewhere` with its own batch, which is the one to send
   and verify. The batch left unsent blocks the days of its rows for the other
   account's coverage until it is verified, and no step inside ComplyEaze Bridge

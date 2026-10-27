@@ -134,3 +134,27 @@ fn maximum_unicode_text_is_preserved_by_import_rendering() {
     );
     assert_eq!(reference.unwrap(), "🧾".repeat(2000));
 }
+
+/// The texts an assistant reads before it calls say what #1688 added: `validate_masters` names
+/// `alias_of` and that it is not a binding, and the ledger field says the twin check counts
+/// aliases and names `through_alias`.
+#[test]
+fn the_ledger_texts_name_alias_of_and_the_alias_twin() {
+    let tools = crate::agent::catalog::registered_tool_definitions(true, true);
+    let validate = tools
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|tool| tool["name"] == "validate_masters")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("validate_masters is in the catalogue");
+    assert!(validate.contains("also carries `alias_of`"));
+    assert!(validate.contains("the row is still not bound and no alias is ever sent"));
+    let schema = voucher_input_schema();
+    let ledger = schema["properties"]["vouchers"]["items"]["properties"]["entries"]["items"]
+        ["properties"]["ledger"]["description"]
+        .as_str()
+        .expect("the ledger field has a description");
+    assert!(ledger.contains("or to one of its aliases"));
+    assert!(ledger.contains("through_alias"));
+}

@@ -3,8 +3,8 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Release 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) was
-published after the pull requests named here; this page was not read again at that tag. Six
+page was not read again at it, except as said below). Releases 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) and 0.6.1 (tag `mcp-v0.6.1`, 27 October 2026) were
+published after the pull requests named here; this page was not read again at either tag. Six
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
@@ -135,7 +135,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
-  - A tax-audit test run (`audit_test_run`, in source and not yet in a published build) sends the AI
+  - A tax-audit test run (`audit_test_run`, added in release 0.6.1 and listed only when its setting is on) sends the AI
     provider the test's figures and findings: amounts in paise, figure and finding ids, the test's
     fixed wording, and the code and count of any failed book check. It names no ledger, group,
     party or voucher, and it is refused while `mask_parties` or `drop_narration` is on, because
@@ -177,8 +177,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       shortened under `mask_parties`; the flags are not names. In the answers
       captured they carry no amounts and no narrations. How a voucher was
       allocated to a cost centre is not returned in 0.5.0, 0.5.1 and 0.6.0 (Tally's
-      answer to the vouchers read carries it, and those releases drop it); in
-      source and not yet in a published build, the voucher reads return it (see
+      answer to the vouchers read carries it, and those releases drop it); from
+      release 0.6.1 the voucher reads return it (see
       "What the reads added since 0.5.0 send").
     - The list of bill-wise ledgers waiting for your approval sends each
       ledger's name (shortened under `mask_parties`), the date, voucher type,
@@ -236,10 +236,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       amounts to the assistant. `mask_parties` shortens the party names in
       it and does not shorten the amounts. It holds no narrations and no
       ledger entries of the voucher.
-    - Cost-centre allocations of a voucher's ledger entries (in source and not
-      yet in a published build): each entry that carries them sends, for each
-      allocation, the name of its cost category, the name of its cost centre and
-      the amount. The reads that return a voucher's entries carry them: the
+    - Cost-centre allocations of a voucher's ledger entries (added in release
+      0.6.1): each entry that carries them sends, for each allocation, the name
+      of its cost category, the name of its cost centre and the amount. The reads that return a voucher's entries carry them: the
       vouchers read and its search, and the entries the purchase and sales
       registers list. The two names are shortened under
       `mask_parties`, like the cost centre and cost category lists; the amount

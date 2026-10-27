@@ -122,8 +122,8 @@ The ordinary default tools, in name order:
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
-release 0.6.0. `audit_test_run` is in the source after release 0.6.0 and is not in a published build yet; it is
-not a default tool: it is listed only when its setting is on (below). `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` are in the source after release 0.6.0 and are not in a published build yet. `local_data_report` (also
+release 0.6.0. `audit_test_run`, `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` were added in release 0.6.1; `audit_test_run` is
+not a default tool: it is listed only when its setting is on (below). `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -2075,6 +2075,17 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   if it is a placeholder (no name) and its `BILLDATE` is not validated; if it has a
   name, it refuses the read (`bill_allocation_field_missing`).
 
+### The `party` field of a voucher row
+
+`party` is the voucher's `PARTYLEDGERNAME` as Tally answered it, and the parse takes that one element and no
+other. For a Sales or Purchase voucher it names the customer or supplier. On a Receipt, Payment or Contra Tally can
+answer the bank or cash ledger instead. On TallyPrime 7.1 it did for a Receipt and a Payment that ComplyEaze Bridge
+imported with the party in `PARTYLEDGERNAME`, and a Contra imported without the element came back with its debit
+bank ledger ([reference §9.13](../tally/TALLY_PROTOCOL_REFERENCE.md), the scoped correction of 2026-09-17).
+Committed captures of a synthetic book's Payments carry the bank on some rows and the party on others. So the
+counterparty of a Receipt, Payment or Contra is read from the voucher's `amounts`, not from `party`. `verify_import`
+does not compare the field for a Receipt, Payment or Contra.
+
 ### Cost-centre allocations in voucher reads
 
 Each ledger entry that carries cost-centre allocations has `cost_centre_allocations`, a list of
@@ -2187,6 +2198,12 @@ posting setting covers both, in the MCPB extension and on the command line (#109
      decision. For every reason,
      render `candidate_count_is_lower_bound` as "at least N", never an exact total.
    - `missing` — no live ledger matched. Bridge never creates masters.
+   - A `missing` or `near_miss` row without `folded_twins` whose name is,
+     character for character, an alias of exactly one live ledger also carries
+     `alias_of`, that ledger's name as Tally lists it. The row is still not
+     bound and Bridge never sends an alias: replace the name with `alias_of`
+     only after an operator confirms that ledger is the one meant, then run
+     `validate_masters` again.
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,
    company date extent, live masters, and local journal integrity,
    repeats the full catalogue to reject intervening changes, then writes `<data_dir>/imports/<batch_id>.xml` and records an append-only
@@ -2270,18 +2287,39 @@ refused as `proposals_legacy` (parse the statement again).
   `not_established` when the view could not be computed or the section was cut
   to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired` and
   `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
-  `batch_id` where one is involved: `not_found`, `ambiguous`,
+  `batch_id` where one is involved: `not_found`, `tally_unchecked`, `ambiguous`,
   `other_side_unverified`, `held_elsewhere`, `posted_against_skip`, `matched_unconfirmed`,
   `reference_differs`, `reversed_same_day`, `not_established`, or
   `double_booked` for a Contra booked from both statements. No amount,
   reference, instrument, party or ledger is returned.
-- **What `not_found` claims.** Only that the other account's statement went
+- **What `not_found` claims.** That the other account's statement went
   through ComplyEaze Bridge, was verified for that day, and holds no Contra of
   the row's day, amount, ledgers and direction that is not already paired, or
-  matched by date, with another row, whatever its reference. A row pairs by an
+  matched by date, with another row, whatever its reference, and that
+  ComplyEaze Bridge read every voucher of that day in Tally and found no Contra
+  between the two accounts. No read of a whole day of Tally exists yet, so no row
+  says `not_found` yet (#1392). A row pairs by an
   equal reference, or by an equal date (k = 0 until two real statements of one
   transfer have been measured), so a Contra the other bank printed on another
   day is not matched.
+- **What `tally_unchecked` claims.** Only the first half of that: the other
+  account's statement holds no such Contra, and whether Tally holds one is not
+  established, because ComplyEaze Bridge did not read every voucher of that day in
+  Tally, so a Contra entered in Tally directly is not in its records. Every row that
+  would be `not_found` is `tally_unchecked` until a whole-day read exists. The
+  assistant reads that day's vouchers with `vouchers` and looks for a voucher of
+  the Contra voucher class, or of any other type such as a Journal or Payment,
+  that carries the row's amount on the bank ledger the other account's statement
+  was built for (and reads its narration where it was not dropped). It tells the
+  person what it found, and keeps the skip; it does not look for a voucher dated
+  another day or booked against another ledger, a transfer may print on different
+  days, and a masked ledger name can read like another, so it compares amounts and
+  dates too. A skip is withdrawn, on one side only, solely on the person's
+  confirmation that no entry in Tally carries the transfer (`withdraw_skips`, as
+  for any open row), and the step says not to book the transfer in Tally another
+  way, because a later post of the other statement would book it twice. Reading
+  the day sends its vouchers to the AI provider: `mask_parties` shortens party and
+  ledger names, `drop_narration` drops narrations, and neither hides amounts.
 - **What `restored` means.** A batch that a restore ComplyEaze Bridge recorded
   covers (see `verify_import`, `book_rolled_back`) is never found posted or
   verified for the transfer check, whatever its last status: a row it holds
@@ -2322,8 +2360,10 @@ refused as `proposals_legacy` (parse the statement again).
   that were built apart are reported once both are sent and one is found
   posted. A skip may be withdrawn whether or not its statement was ever sent,
   so a statement parsed again with the row posted is built again naming the row
-  in `withdraw_skips`, and the batch built first is not sent: sending it
-  instead gives `posted_against_skip`. The answer of the build that names the
+  in `withdraw_skips`, and the batch built first is neither sent nor imported:
+  sent or imported and found posted, it leaves the row `posted_against_skip`,
+  and once the skip is live `post_import` refuses that send as
+  `skip_row_paired_elsewhere`. The answer of the build that names the
   row lists it as `held_elsewhere` with its own batch, which is the one to send
   and verify. The batch left unsent blocks the days of its rows for the other
   account's coverage until it is verified, and no step inside ComplyEaze Bridge
@@ -2372,8 +2412,9 @@ refused as `proposals_legacy` (parse the statement again).
   date, and the date in its `st-` id) give no coverage for the ledgers it names,
   whatever the batch's status. A skip naming one of those ledgers that a single
   verified Contra matches by date on such a day is `matched_unconfirmed`, never
-  paired. A skip with no candidate is `not_found` only where the other
-  account's windows still hold its day, and otherwise `not_established`;
+  paired. A skip with no candidate is `tally_unchecked` (or `not_found` after a
+  whole-day read of Tally) only where the other account's windows still hold its
+  day, and otherwise `not_established`;
   `reference_differs` and `reversed_same_day` are decided before either. A
   Contra with no statement record inside a statement's own builds blocks the
   same way; another voucher there does not.
@@ -3637,9 +3678,16 @@ the response size refusal (`agent_response_too_large`) instead. A reference neit
 nor Tally's report know for the party is refused (`bill_reference_not_found`). The detail ignores
 `direction`, `top`, `offset` and `limit`; `window.company_vouchers_read` counts the company's
 vouchers in the window, not the party's. A named bill's window never starts before the books.
-The vouchers and the bills reports are two reads whose extents are not compared: a voucher posted
-between them usually shows as `trail_does_not_tie`, but two changes that compensate, or
-allocations that net to zero, can still read `tied`. Measured on one synthetic book only
+The company's two change marks are read before the statement of open bills and again after the
+voucher window, and a detail whose marks moved between them is refused as
+`voucher_window_changed_during_read` (a voucher entered or saved, a ledger renamed, or a report
+that raises a mark; an export raised the voucher mark by 3 once): the bills, the ledger catalogue
+and the vouchers are tied by the party's spelling, so a rename between those reads would have
+tied different ledgers. It reads the marks twice and the window reads none of its own, so it costs one marks read more than before,
+and any edit in Tally during the call refuses it, so run it again once. A change that moves
+neither mark is not seen: one letter-case-only rename of a ledger moved neither (reference,
+the walk-in ledger's spelling), so that rename can still answer as a finding. Allocations that net
+to zero can still read `tied`. The three reads are not otherwise compared. Measured on one synthetic book only
 (reference 12a.14); a second synthetic book (captures of 9 October 2026) also showed an `as_of`
 earlier than the last voucher, a post-dated voucher and an advance later adjusted by an invoice
 reading as Tally's own screen does, bill for bill. Not measured: a client book, an opening bill with

@@ -760,6 +760,15 @@ fn a_read_refused_for_the_company_identity_names_that_cause_and_the_next_step() 
     }
 }
 
+/// A read for a company that is not among those open is refused as
+/// `company_identity_not_found`, and the refusal says what to do about it.
+#[test]
+fn a_company_identity_not_found_names_the_next_step() {
+    let step = remediation_for("company_identity_not_found", None).expect("a next step");
+    assert!(step.contains("list_companies"), "{step}");
+    assert!(step.contains("open it in Tally"), "{step}");
+}
+
 #[test]
 fn ledger_master_fields_reject_unknown_schema_values() {
     assert_eq!(
@@ -784,7 +793,14 @@ fn ledger_movement_schema_exposes_offset_and_limit() {
 
 #[test]
 fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
-    let known_parties = ["Customer One", "Supplier Two", "PAN Holder", "Entry Ledger"];
+    let known_parties = [
+        "Customer One",
+        "Supplier Two",
+        "PAN Holder",
+        "Entry Ledger",
+        "Cost Centre One",
+        "Cost Category One",
+    ];
     let samples = [
         (
             "balance_sheet",
@@ -814,6 +830,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "masters",
             json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
+        ),
+        (
+            "negative_ledgers",
+            json!({"result":{"ledgers":[{"ledger":party_name("Customer One"),"side":"credit","amount":"10.00"}]}}),
         ),
         (
             "negative_stock",
@@ -878,7 +898,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "vouchers",
             mark_voucher_party_names(
-                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger"}]}),
+                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger","cost_centre_allocations":[{"category":"Cost Category One","cost_centre":"Cost Centre One","amount":"-1.00"}]}]}),
             ),
         ),
     ];
@@ -959,17 +979,41 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             }),
         ));
     }
+    // `lab_read_purchase_identity` returns no name beyond the company: a difference names the voucher's GUID and
+    // the field, never its values (they stay in the exchange the lab keeps).
+    #[cfg(feature = "lab-writes")]
+    if registered.contains("lab_read_purchase_identity") {
+        lab_samples.push((
+            "lab_read_purchase_identity",
+            json!({
+                "agent": {"rows": 2, "response_chars": 120_000, "response_chars_per_row": 60_000, "window_honoured": true},
+                "narrow": {"rows": 2, "response_chars": 16_000, "response_chars_per_row": 8_000, "window_honoured": true},
+                "differences": {
+                    "total": 1,
+                    "listed": [{"guid": "synthetic-guid-00000001", "field": "party"}],
+                    "listed_truncated": false,
+                },
+                "inconclusive": false,
+            }),
+        ));
+    }
     // The two lab import tools stay without a sample, on purpose. Their results carry names as
     // plain strings that no marking reaches: the masters and vouchers the caller itself sent (as
     // `Kind:Name` strings and `ledger_line[<name>]`, a ledger's name among them) and names read
     // back from the target book. A sample would show a name that the walk cannot mask. The tools write only to a target admitted by `admit_lab_target`,
     // whose guard today is a deny list of other companies (#972); a client's ledger names could
     // appear unmasked only if that guard failed. Marking those names is a separate change.
+    // `lab_voucher_key_probe` (#685) returns no name a walk could mark: identifiers, a date,
+    // the voucher type's name and two flags, so it has no sample either.
     #[cfg(feature = "lab-writes")]
     without_a_sample.extend(
-        ["lab_import_masters", "lab_import_vouchers"]
-            .into_iter()
-            .filter(|name| registered.contains(*name)),
+        [
+            "lab_import_masters",
+            "lab_import_vouchers",
+            "lab_voucher_key_probe",
+        ]
+        .into_iter()
+        .filter(|name| registered.contains(*name)),
     );
     let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
     assert_eq!(
@@ -2340,32 +2384,41 @@ fn a_tool_date_that_is_not_a_tally_date_is_refused_at_the_boundary() {
 
 #[test]
 fn empty_voucher_window_corroboration_handles_all_three_control_branches() {
+    // what a widened read found: a voucher inside the window, one anywhere in the widened window
     assert_eq!(
-        corroborate_empty_voucher_window(
-            &[json!({"date":"20260831"}), json!({"date":"20260903"})],
-            "20260901",
-            "20260902",
-            None,
-        ),
+        corroborate_empty_by_days(false, true, None),
         Ok((true, Some("empty_window_wider_read_nonempty")))
     );
     assert_eq!(
-        corroborate_empty_voucher_window(
-            &[json!({"date":"20260901"})],
-            "20260901",
-            "20260902",
-            None,
-        ),
+        corroborate_empty_by_days(true, true, None),
         Err("window_contradicted".to_string())
     );
     assert_eq!(
-        corroborate_empty_voucher_window(&[], "20260901", "20260902", Some(0)),
+        corroborate_empty_by_days(false, false, Some(0)),
         Ok((false, Some("company_has_no_vouchers")))
     );
     assert_eq!(
-        corroborate_empty_voucher_window(&[], "20260901", "20260902", Some(1)),
+        corroborate_empty_by_days(false, false, Some(1)),
         Ok((true, Some("empty_uncorroborated")))
     );
+    // nothing found and no mark to decide on
+    assert_eq!(
+        corroborate_empty_by_days(false, false, None),
+        Err("voucher_checkpoint_invalid".to_string())
+    );
+    // the rows of a data read are in the window by their own day, ends included
+    for (date, inside) in [
+        ("20260831", false),
+        ("20260901", true),
+        ("20260902", true),
+        ("20260903", false),
+    ] {
+        assert_eq!(
+            row_in_window(&json!({"date": date}), "20260901", "20260902"),
+            inside,
+            "{date}"
+        );
+    }
 }
 
 #[tokio::test]

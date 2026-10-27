@@ -1,0 +1,53 @@
+# fixture: voucher_cost_centre_allocations_shape_lab_live.utf16le.xml
+# parser: parse_agent_rows(SHAPE_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(23),
+        "amounts": Array [
+            Object {
+                "amount": String("-1000.00"),
+                "bill_allocations": Array [],
+                "cost_centre_allocations": Array [
+                    Object {
+                        "amount": String("-600.00"),
+                        "category": String("Business Line"),
+                        "cost_centre": String("Trading"),
+                    },
+                    Object {
+                        "amount": String("-400.00"),
+                        "category": String("Business Line"),
+                        "cost_centre": String("Assembly"),
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Power Charges"),
+            },
+            Object {
+                "amount": String("1000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1000.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Chem Supplier 3"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250605"),
+        "guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000017"),
+        "is_invoice": Bool(false),
+        "master_id": String("23"),
+        "narration": String("SHAPELAB-C9-costcentre"),
+        "optional": Bool(false),
+        "party": String("Chem Supplier 3"),
+        "post_dated": Bool(false),
+        "voucher_number": String("3"),
+        "voucher_type": String("Journal"),
+    },
+])

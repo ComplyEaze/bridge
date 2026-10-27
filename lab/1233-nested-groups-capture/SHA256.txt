@@ -1,7 +1,7 @@
 # sha256  bytes  file
 dbd1ec276034954ab8be2d4a51b09c877ca9ce4fe65c0cb94571b7f0bbd427d7  61  .gitattributes
 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
-02cf09faac9444f12cf8fd3e1f5266750bf130f5de2668b5180d69bd7be5154a  16776  README.md
+39fbb4d507a44249777444b8c0e43acfa2cb6e19673271c34c675d8c0dd96d8b  20252  README.md
 8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py
 7c6770b2e18f146fd69c71d4f381bde63833366da99d69a0d54ef8e304d01b07  1272  requests/n1-stock-items-fy.utf16le.xml
 d7d0b8c17f3c93f2f656baf3ec51cc1d37aabd601d4677632465aa4e7810c3f0  772  requests/n2-stock-summary-report-fy.utf16le.xml

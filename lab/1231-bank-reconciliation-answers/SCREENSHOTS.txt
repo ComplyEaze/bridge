@@ -1,0 +1,14 @@
+# Screen captures of this sitting: name, bytes, sha256. They stay on the lab PC; none is in this folder.
+s0-no-company.png 72692 0e7c522ba827fd920b3d0f3d69f47be453305e831447e82eb5a7785272a512bf
+s0-gateway.png 42819 a7392abf93967cc540a115041d6220d4859cb74964d1502a9038fb8a7c793276
+bk0-before-accept.png 47898 0abfdf99feead69ea4efd57f5c50f05333071d6c21750bb87db387ec649a4e9a
+s2-brs-summary-before.png 31290 3029b275c42c8faa4e0a1d5cd1a25577ad1071b2a9ee997dbd5ad79a5b5a3962
+s2-stop-auto-recon-prompt.png 44573 bff7fcb64da247e479863e8855a85225a852a4eda5dcb4d910377a16a6247765
+s2-manual-recon-before.png 35491 c211b2cf9fd9475061fb4dd3c66af8676e3edf0a20133ace008dc092ba0bbe5e
+s2-manual-recon-before-accept.png 36426 782aaf44f6e4ce029c349adbe0b9c8ebb1866a6ed47c6f28dd53ee976b30c611
+s2-brs-summary-after.png 31290 3029b275c42c8faa4e0a1d5cd1a25577ad1071b2a9ee997dbd5ad79a5b5a3962
+s4-stop-error-bank-date.png 34870 3fad4bbe83ebb0fff614a59e2f5d2cf04d49d8c72c5403e21c96efa334f8d794
+c10-no-company.png 72704 8902f660828549b28924d540e043754b976fabc339e94fdfe1bb3ee1ff7bd9da
+
+# Backup (stays on the lab PC): name, bytes, sha256.
+BK0 TDBK1800_100051.001 28076 25fdc1e373403ad0ec0f35e728d2d8ee4a67aa970f5459398013e02b3ef60de6

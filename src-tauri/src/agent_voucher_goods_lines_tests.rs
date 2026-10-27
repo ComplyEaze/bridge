@@ -283,6 +283,27 @@ fn more_batch_rows_than_the_read_keeps_are_reported_not_truncated() {
 }
 
 #[test]
+fn a_thousand_lines_read_whole_and_one_more_is_reported_not_truncated() {
+    let xml = captured();
+    let open = "<INVENTORYALLOCATIONS.LIST>";
+    let close = "</INVENTORYALLOCATIONS.LIST>";
+    let start = xml.find(open).unwrap();
+    let end = xml[start..].find(close).unwrap() + start + close.len();
+    let with_lines = |count: usize| {
+        format!(
+            "{}{}{}",
+            &xml[..start],
+            xml[start..end].repeat(count),
+            &xml[end..]
+        )
+    };
+    let rows = parse(&with_lines(1000));
+    let (v, e) = goods_entry(&rows);
+    assert_eq!(rows[v]["amounts"][e][FIELD].as_array().unwrap().len(), 1000);
+    assert_unreadable(&with_lines(1001), "goods_lines_too_many");
+}
+
+#[test]
 fn an_escaped_or_cdata_name_reads_whole() {
     let rows = parse(&changed(
         "<STOCKITEMNAME>Hydrochloric Acid 33pc</STOCKITEMNAME>",

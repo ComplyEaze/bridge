@@ -2156,7 +2156,7 @@ quantities and `amount` in the same form. A Purchase line's amount is negative a
 its ledger entry. Without the argument, and in every other answer that returns a voucher's entries (the registers), the
 key is not there; the parse reads the lines either way.
 
-- **Only invoice vouchers.** Tally sends a goods line under a ledger entry only on an invoice-mode voucher. A Stock
+- **Invoice vouchers.** In the captures Tally sent a goods line under a ledger entry only on an invoice-mode voucher; the read does not test the voucher's invoice flag and shows the lines of any entry that carries them. A Stock
   Journal answers an empty entry list in this read, and a Delivery Note, Receipt Note, Physical Stock or Manufacturing
   Journal is not captured, so an entry or a voucher without the key may still have moved stock.
 - **A list that cannot be read whole does not refuse the read.** The entry carries `goods_lines_unreadable` with one

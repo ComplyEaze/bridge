@@ -1,0 +1,5 @@
+# Screen captures of this sitting (other than the timer's, listed in timing/): name, bytes, sha256. They stay on the lab PC; none is in this folder.
+s0-no-company.png 72692 0e7c522ba827fd920b3d0f3d69f47be453305e831447e82eb5a7785272a512bf
+s0-gateway.png 43732 5fe4550b86dfe60047668acbf74fc49eb70dfa6816d5ceaa1549badd5c73ef8c
+a1-stop-dashboard.png 72875 5e8ebc37a5d8a2ed2d3d8632c27174f1cfebddfd3cc855316bae2208e3ff06e8
+c10-no-company.png 72692 0e7c522ba827fd920b3d0f3d69f47be453305e831447e82eb5a7785272a512bf

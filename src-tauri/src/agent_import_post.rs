@@ -1,6 +1,6 @@
 //! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra);
 //! subsequent calls only reconcile its identity.
-use super::approval::{self, ApprovalBinding, Begin, Joined};
+use super::approval::{self, ApprovalBinding, Begin, Joined, PreviewForm};
 use super::*;
 use crate::agent::evidence_from_runtime_read;
 use crate::tally::approved_import::{
@@ -665,7 +665,7 @@ impl Server {
             }
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
-            let redeeming = match scope {
+            let (redeeming, form) = match scope {
                 // Never built by the flow: only an agent's Join hands on a
                 // redeem, and a second pass keeps its scope. The types allow
                 // this pair, and the desktop's post asks through its own
@@ -674,16 +674,15 @@ impl Server {
                 PostScope::JournalOnly if redeem_only => {
                     return Err("import_approval_revoked".to_string().into())
                 }
-                PostScope::JournalOnly => false,
+                PostScope::JournalOnly => (false, PreviewForm::Listed),
                 // Re-entered to redeem what its Join found: only that
                 // approval lets it go on, and it never asks (#725 slice 2.0).
                 PostScope::Vouchers if redeem_only => {
-                    self.post_approvals.begin_redeem(batch_id)?;
-                    true
+                    (true, self.post_approvals.begin_redeem(batch_id)?)
                 }
                 PostScope::Vouchers => match self.post_approvals.begin(batch_id) {
-                    Begin::Ask => false,
-                    Begin::Redeem => true,
+                    Begin::Ask(form) => (false, form),
+                    Begin::Redeem(form) => (true, form),
                     Begin::Busy(code) => return Err(code.to_string().into()),
                     Begin::Refused(code) => return Err(code.into()),
                     Begin::Waiting => {
@@ -774,7 +773,10 @@ impl Server {
                 send_transfer_refusal = Some((detail, step));
                 return Err(code.to_string().into());
             }
-            let preview = review_preview_for(&line, &self.settings.endpoint, scope)?;
+            let ShownPreview {
+                text: preview,
+                lists_vouchers: preview_lists_vouchers,
+            } = review_preview_for_form(&line, &self.settings.endpoint, scope, form)?;
             // Number matching precedence is not qualified for native Create.
             // Previously dispatched numbered batches remain reconcilable above.
             // Also admits, on this read's measurement, the whole-window request
@@ -997,7 +999,7 @@ impl Server {
                 PostScope::Vouchers => {
                     // What the person is shown, and what it is about: an
                     // approval is redeemed only for exactly this (#725).
-                    let binding = ApprovalBinding::new(&line, &preview, &ledger_binding);
+                    let binding = ApprovalBinding::new(&line, &preview, &ledger_binding, form);
                     if !redeeming {
                         let asked = PendingPostApproval::ask(
                             xml,
@@ -1009,6 +1011,13 @@ impl Server {
                             group_collection_request,
                             currency_request,
                             company_marks_request.clone(),
+                            // A batch's box with the voucher lines that does
+                            // not fit the screen is noted, so its next ask
+                            // shows the totals (#1832). Nothing else is: not
+                            // a totals box, nor a listed ask whose text
+                            // already stood in for the voucher lines.
+                            (form == PreviewForm::Listed && preview_lists_vouchers)
+                                .then(|| self.post_approvals.note_listed_did_not_fit(batch_id)),
                         );
                         match wait_for_answer(asked, call_budget(call_started)).await {
                             Waited::Cancelled => {
@@ -1861,7 +1870,7 @@ const TEXT_REFUSED_MESSAGE: &str = "Nothing was sent. This saved batch has a nar
 /// large to show whole, by the batch's length or for the screen it would open
 /// on, before any attempt (#1780). The desktop's Journal screen shows the
 /// message alone.
-const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. If the screen is the cause, a larger or less magnified screen may help. If the length is, a batch can be split into parts; a single voucher this long cannot be posted from here.";
+const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. A larger or less magnified screen may help. If the window listed the batch's vouchers one line each, asking again soon shows its totals only, which is smaller. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
 
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };
@@ -1900,8 +1909,9 @@ fn reconciliation_failure_payload(
     if code == "voucher_text_invalid" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
     }
-    // The window for the batch was too large to show whole. Asking again does
-    // not shrink it, so the message says what does (#1780).
+    // The window for the batch was too large to show whole. Asking again soon
+    // shows a window that listed the vouchers as totals only (#1832), and does
+    // not shrink any other, so the message says what does.
     if code == "import_review_too_large" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(REVIEW_TOO_LARGE_MESSAGE);
     }
@@ -2924,6 +2934,41 @@ pub(super) fn review_preview_for(
     }
 }
 
+/// [`review_preview_for`] in the form an ask shows (#1832). The desktop's post
+/// shows one Journal and has no other form.
+pub(super) fn review_preview_for_form(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+    scope: PostScope,
+    form: PreviewForm,
+) -> Result<ShownPreview, String> {
+    match scope {
+        PostScope::JournalOnly => {
+            admit_fresh_saved_voucher(line, endpoint).map(|text| ShownPreview {
+                text,
+                lists_vouchers: false,
+            })
+        }
+        PostScope::Vouchers => {
+            review_text(line, endpoint, &agent_post_timing_lines(), form).map(|shown| {
+                let lists_vouchers = shown.lists_vouchers();
+                ShownPreview {
+                    text: shown.into_string(),
+                    lists_vouchers,
+                }
+            })
+        }
+    }
+}
+
+/// A preview and whether it lists the batch's vouchers one line each: what the
+/// box shows, so that a box that did not fit is noted only when it listed them
+/// (#1832).
+pub(super) struct ShownPreview {
+    pub(super) text: String,
+    pub(super) lists_vouchers: bool,
+}
+
 /// The preview an agent's post shows: the voucher or batch, and when it is
 /// posted, all inside the dialog's caps.
 pub(super) fn agent_review_preview(
@@ -2951,20 +2996,30 @@ fn review_preview_with(
     endpoint: &super::super::TallyEndpointConfig,
     footer: &[String],
 ) -> Result<String, String> {
-    review_text(line, endpoint, footer).map(ReviewText::into_string)
+    review_preview_with_form(line, endpoint, footer, PreviewForm::Listed)
+}
+
+fn review_preview_with_form(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+    footer: &[String],
+    form: PreviewForm,
+) -> Result<String, String> {
+    review_text(line, endpoint, footer, form).map(ReviewText::into_string)
 }
 
 fn review_text(
     line: &ImportLedgerLine,
     endpoint: &super::super::TallyEndpointConfig,
     footer: &[String],
+    form: PreviewForm,
 ) -> Result<ReviewText, String> {
     let company = line.company.as_ref().ok_or("import_post_company_missing")?;
     let origin =
         super::super::canonical_loopback_origin(endpoint).map_err(|_| "host_setting_invalid")?;
     let (debit, credit) = totals(&line.vouchers)?;
     if line.vouchers.len() > 1 {
-        return batch_review_text(line, company, &origin, &debit, &credit, footer);
+        return batch_review_text(line, company, &origin, &debit, &credit, footer, form);
     }
     let voucher = &line.vouchers[0];
     if voucher.voucher_type.is_invoice() {
@@ -3531,6 +3586,7 @@ fn batch_review_text(
     debit: &ExactDecimal,
     credit: &ExactDecimal,
     footer: &[String],
+    form: PreviewForm,
 ) -> Result<ReviewText, String> {
     let names = admit_review_text(
         [company.name.as_str()],
@@ -3669,22 +3725,28 @@ fn batch_review_text(
     let reason = if line.vouchers.len() > BATCH_REVIEW_MAX_VOUCHER_LINES {
         VOUCHER_LINES_OVER_LIMIT
     } else if let Some(vouchers) = voucher_review_lines(&line.vouchers, !legend.is_empty())? {
-        let listed = whole(
-            [
-                if legend.is_empty() {
-                    VOUCHER_LINES_HEADING
-                } else {
-                    VOUCHER_LINES_HEADING_MARKED
-                },
-                VOUCHER_LINES_NARRATION_HEADING,
-            ]
-            .map(str::to_string)
-            .into_iter()
-            .chain(vouchers)
-            .collect(),
-        );
-        if fits(&listed) {
-            return marks.seal(line, listed.join("\n"));
+        // The totals form skips the listed attempt, and keeps every refusal
+        // before it: over the voucher limit, and lines that cannot be shown.
+        if form == PreviewForm::Listed {
+            let listed = whole(
+                [
+                    if legend.is_empty() {
+                        VOUCHER_LINES_HEADING
+                    } else {
+                        VOUCHER_LINES_HEADING_MARKED
+                    },
+                    VOUCHER_LINES_NARRATION_HEADING,
+                ]
+                .map(str::to_string)
+                .into_iter()
+                .chain(vouchers)
+                .collect(),
+            );
+            if fits(&listed) {
+                return marks
+                    .seal(line, listed.join("\n"))
+                    .map(ReviewText::listing_vouchers);
+            }
         }
         VOUCHER_LINES_DO_NOT_FIT
     } else {

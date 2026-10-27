@@ -1,0 +1,14 @@
+2026-10-27T08:49Z R0: TRANSFER PAIR LAB shut; BK1b hashed (equal); Restore from BK1b over 100078 (Accept, Replace); BRIDGE NUMBERADM LAB loaded alone, "No Vouchers Entered".
+2026-10-27T09:01Z server launched 09:01:32 (exe 6f520338, 0.6.0). tools/list (000) 33; list_companies (001) one company; tally_status (002) 7.2 silver, not Educational; marks (003) M 207, V null; vouchers FY (004) none.
+2026-10-27T09:04Z R0: ledgers BRIDGE Num Customer (Sundry Debtors, bill-by-bill No) and BRIDGE Lab Bank (Bank Accounts) created on Tally's screen; marks (005) M 209, V null.
+2026-10-27T09:05Z step 1: list_companies (006), tally_status (007), marks (008) M0 209 V0 null, voucher types (009) Receipt automatic / auto_retain / not_prevented.
+2026-10-27T09:05Z step 1b: build (010) empty_book_first_import; marks (011) V null; vouchers April (012) none; egress_log (013, 014).
+2026-10-27T09:07Z step 2: Receipts keyed on Tally's screen: No. 1 dated 20 Apr 2025, No. 2 dated 25 Apr 2025, each 1.00 BRIDGE Num Customer to BRIDGE Lab Bank (bank allocation defaults).
+2026-10-27T09:10Z step 4: marks (015) B 2; vouchers April (016) the before table; build (017) bridge-4e2976c3-...; post (018) pending; approval window up 09:10:53, captured 09:10:56; post (019) posted_verified, target_only, 2 to 3.
+2026-10-27T09:12Z step 5: verify (020) posted_verified, bound, from pre_post_mark 2 to 3; egress_log (021); vouchers April (022) the after table; tally_status (023); marks (024) M1 209 V1 3.
+2026-10-27T09:13Z Tally showed the Create list after the post, nothing entered; closed with Escape.
+2026-10-27T09:14Z step 6: Receipt type altered to Manual on Tally's screen; prompts "Changing the method of voucher numbering ... Continue?" (Yes) and "Are you sure you want to update the voucher numbers of existing vouchers?" (Y: Accept Master & Update Vouchers); saved screen Manual; left with Ctrl+Q.
+2026-10-27T09:17Z step 7: marks (025) M 211 V 3; vouchers April (026) the three with empty numbers, AlterIDs 3, 1, 2; voucher types (027) Receipt manual. Baseline V1' 3 taken here. Tally's Day Book for 25 Apr 2025 shows the Receipt with an empty Vch No.
+2026-10-27T09:19Z step 8: build (028) refused import_voucher_numbering_not_automatic, Receipt observed manual; marks (029) V 3; vouchers April (030) the same three; egress_log (031).
+2026-10-27T09:21Z step 9: Receipt type set back to Automatic with Retain Original Voucher No. (the same two prompts, Y); voucher types (032) automatic / auto_retain; tally_status (033); marks (034) M2 213 V2 3; vouchers April (035) numbers 3, 1, 2 again, AlterIDs unchanged.
+2026-10-27T09:24Z AFTER: book shut; BK1b hashed (equal); Restore (Accept, Replace); loaded alone, "No Vouchers Entered". list_companies (036); marks (037) M 207 V null; vouchers FY (038) none. Server stopped 09:24:33 code 0.

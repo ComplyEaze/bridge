@@ -1,0 +1,24 @@
+2026-10-27T12:33Z sheet 006c2cd2, SHA256.txt 3 of 3 equal; exe 63641231 before the first call.
+2026-10-27T12:33:33Z step 0: no company loaded; one tally.exe owns 9001; GET /status 200. BRIDGE TIEOUT B (100040) loaded alone from Select Company by arrows (list period 1-Apr-25 to 31-Mar-26). Gateway: current period 1-Apr-25 to 31-Mar-26, current date Sunday, 1-Jun-2025, last entry 1-Jun-25.
+2026-10-27T12:35:43Z server launched once (exe 63641231, 0.6.0, port 9001; posting, import and redaction unset).
+2026-10-27T12:35:50Z list_companies (000): exactly BRIDGE TIEOUT B, GUID d64eda55-da7c-4106-a171-3e3cb6cdd331, 100040, verified_tuple.
+2026-10-27T12:36Z four requests whose quotes were lost before queueing were refused by the lab client's own check; nothing was sent; queued again.
+2026-10-27T12:36:10Z marks (001): M0 218, V0 3, reused false.
+2026-10-27T12:36Z step 1, 1-Apr-2025..31-Mar-2026: profit_and_loss (002) observed, net 0, closing stock applied -2100.00; balance_sheet (003) observed, carried 0; stock_summary as of 20260331 (004) value_total_matched, -2100.00.
+2026-10-27T12:40Z step 2: BK0 into a new empty folder, BRIDGE TIEOUT B alone, End of List: TDBK1800_100040.001, 34,632 B, sha256 7846fad660eb23cb70f511669b813aa7cc87db9523f8b09101d3ac89e9dfa577. Marks (005) 218 / 3.
+2026-10-27T12:41Z step 3 J0: Journal No. 1, F2 date 20-3-2026. Journal's ledger list did not offer Lab Bank or Cash; Show More (arrows) listed them. Lab Bank Dr 250: Tally opened its Bank Allocations sub-screen (Cheque/DD 250.00, Inst No. blank, Inst Date 20-Mar-26, Bank Name blank); held, then Tally's Bank Allocations sub-screen, defaults accepted.
+2026-10-27T12:53Z J0 completed: Cr Lab Freight 250, narration "LAB 2Y J0" (first typing dropped the spaces; cleared and typed again), accepted 18:23 IST, no dialog. Gateway current date became Friday, 20-Mar-2026 (the voucher's F2 date); period unchanged. Marks (006) 218 / 4.
+2026-10-27T12:54Z J1: Journal No. 2, F2 date 10-4-2026: Tally's Error "Oops! Date cannot be above the current period (20-Mar-26)". No 2026-27 prompt. Held.
+2026-10-27T12:55Z to key J1: the date box set back to 20-3-2026 and the blank voucher left by Ctrl+Q; Gateway Change Period To 31-3-2026 -> 31-3-2027 (marks 007: 218 / 4); Change Current Date -> 10-4-2026 (marks 008: 218 / 4).
+2026-10-27T12:58Z J1: Journal No. 1 of the new year, 10-Apr-26: Dr Lab Freight 100, Cr Lab Bank 100 (Show More), Tally's Bank Allocations sub-screen, defaults accepted (Cheque 100.00, Cheque range Not Applicable, Inst No. blank, Inst Date 10-Apr-26), narration "LAB 2Y J1", accepted 18:29 IST, no dialog. Marks (009) M1 218, V1 5.
+2026-10-27T13:00Z set back: current date 1-6-2025, period To 31-3-2026. Gateway 1-Apr-25 to 31-Mar-26, Sunday, 1-Jun-2025, last entry 10-Apr-26. Marks (010) 218 / 5.
+2026-10-27T13:01Z step 4 (011-013): profit_and_loss observed, net 250; balance_sheet observed, carried 250; stock_summary value_total_matched -2100.00. Screens for the year: Nett Profit 250.00; Balance Sheet Profit & Loss A/c 250.00, totals 53,250.00.
+2026-10-27T13:02Z step 5, 1-Apr-2026..30-Apr-2026 (014-015): not_established, tally_balance_sheet_differs; closing stock declined opening_stock_not_shown_empty.
+2026-10-27T13:02Z step 6, 1-Apr-2025..30-Apr-2026 (016-017): observed, net 150, carried 150; stock_summary as of 20260430 (018) refused stock_summary_as_of_not_measured, no request sent.
+2026-10-27T13:03Z step 7: report periods set by F2 inside each report; Tally took each without a prompt. April 2026: Nett Loss 100.00, Opening and Closing Stock 2,100.00; Balance Sheet Profit & Loss A/c 150.00 (opening 250.00, current (-)100.00), totals 53,150.00. Spanning: Nett Profit 150.00; Balance Sheet Profit & Loss A/c 150.00, totals 53,150.00.
+2026-10-27T13:05Z step 8: comparison-step8.txt.
+2026-10-27T13:06Z marks (019) 218 / 5; BK0 hashed again, equal.
+2026-10-27T13:07Z step 9: company shut; BK0 restored (Accept, then Replace on "Company data folder (100040) already exists"). Select Company's list now gives 100040 the period 1-Apr-25 to 31-Mar-27. Loaded alone: Gateway 1-Apr-25 to 31-Mar-26, Sunday, 1-Jun-2025, last entry 1-Jun-25.
+2026-10-27T13:08Z list_companies (020) as step 0; marks (021) 218 / 3; 022-024 equal to 002-004 except read_at, evidence and snapshot.
+2026-10-27T13:09:05Z step 10: server stopped, code 0; exe 63641231 at the end; company shut, no company loaded.
+2026-10-27T13:09:51Z close: 9001 owned by the same tally.exe as at step 0; GET /status 200. A second tally.exe was running, started 12:43:31Z, when the lab's screen-control tool was asked to bring TallyPrime forward while another window held the foreground; it never owned 9001 and showed its own Gateway with the demo company loaded. Every read and every keyed screen of this row is the 9001 instance's. It is left running.

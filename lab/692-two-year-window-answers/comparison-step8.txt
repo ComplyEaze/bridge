@@ -1,0 +1,39 @@
+Step 8 comparison: BRIDGE TIEOUT B, tool answers (answers\NNN) against Tally's own screens. Signs: the tool sends debit as negative; the screen shows absolute values on each side.
+
+WINDOW 1-Apr-2025 to 31-Mar-2026 (step 4; answers 011, 012; screens s4-screen-pl-year, s4-screen-bs-year)
+profit_and_loss (011): state observed.
+  gross_result established 500         | screen Gross Profit 500.00                 : equal
+  net_result established 250           | screen Nett Profit 250.00                  : equal
+  closing_stock applied -2100.00       | screen Closing Stock 2,100.00              : equal
+  Sales Accounts 1400.00 matched       | screen 1,400.00                            : equal
+  Purchase Accounts -3000.00 matched   | screen 3,000.00                            : equal
+  Indirect Expenses -250.00 matched    | screen 250.00                              : equal
+  Opening Stock tally empty            | screen blank                               : equal
+balance_sheet (012): state observed.
+  carried established 250              | screen Profit & Loss A/c 250.00 (Opening blank, Current Period 250.00): equal
+  Profit & Loss A/c ledger closing 0.00 (reported; the carried figure adds the P&L ledgers)
+  Capital 50000.00, Current Liabilities 3000.00, Current Assets -53250.00 | screen 50,000.00, 3,000.00, 53,250.00 : equal
+  closing_stock applied -2100.00       | screen (P&L) 2,100.00                      : equal
+
+WINDOW 1-Apr-2026 to 30-Apr-2026 (step 5; answers 014, 015; screens s7-screen-pl-apr26, s7-screen-bs-apr26)
+profit_and_loss (014): state not_established, reason tally_balance_sheet_differs; gross and net not_established (lines [Current Assets]); closing_stock declined, why opening_stock_not_shown_empty.
+  Screen: Opening Stock 2,100.00; Closing Stock 2,100.00; Indirect Expenses 100.00; Nett Loss 100.00; Total 100.00.
+  The tool reads Tally's Opening Stock 2,100.00 (tally_sub) and declines the closing stock; its derived Current Assets -51050 differs from Tally's -53150.00 by 2,100.00 (the stock), so no result is given. Indirect Expenses -100.00 matched (screen 100.00).
+balance_sheet (015): not_established, tally_balance_sheet_differs; carried not_established; Profit & Loss A/c ledger closing 250.00.
+  Screen: Profit & Loss A/c 150.00 (Opening Balance 250.00, Current Period (-)100.00); Current Assets 53,150.00; Capital 50,000.00; Current Liabilities 3,000.00. Tool gate: Profit & Loss A/c 150.00 matched, Capital and Current Liabilities matched, Current Assets differs (as above).
+  The refusal is the answer; no established figure differs from the screen. As PREDICTED in the sheet.
+
+WINDOW 1-Apr-2025 to 30-Apr-2026, spanning 31 March (step 6; answers 016, 017; screens s7-screen-pl-span, s7-screen-bs-span)
+profit_and_loss (016): state observed.
+  gross_result established 500         | screen Gross Profit 500.00                 : equal
+  net_result established 150           | screen Nett Profit 150.00                  : equal
+  closing_stock applied -2100.00       | screen Closing Stock 2,100.00              : equal
+  Sales 1400.00, Purchases -3000.00 matched | screen 1,400.00, 3,000.00             : equal
+  Indirect Expenses -350.00 matched (2 ledger amounts) | screen 350.00            : equal
+balance_sheet (017): state observed.
+  carried established 150              | screen Profit & Loss A/c 150.00 (Opening blank, Current Period 150.00): equal
+  Profit & Loss A/c ledger closing 0.00 (250.00 in the April-alone window)
+  Capital, Current Liabilities, Current Assets -53150.00 matched | screen 50,000.00, 3,000.00, 53,150.00 : equal
+2025-26's +250.00 is carried ONCE: 150 = +250 (J0 year) - 100 (J1 April); not twice (400) and not dropped (-100).
+
+stock_summary: as_of 20260331 (004, 013) value_total_matched -2100.00; as_of 20260430 (018) refused stock_summary_as_of_not_measured, no request sent.

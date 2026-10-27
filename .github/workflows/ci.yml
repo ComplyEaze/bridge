@@ -26,10 +26,21 @@ on:
     - cron: '17 3 * * *'
 
 concurrency:
-  # A pull request's newer push supersedes its older run. Every other run (a
-  # master push, a manual dispatch) gets a group of its own, so none is
-  # cancelled mid-run or dropped while pending behind another.
-  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  # A pull request's newer push supersedes its older run. Master pushes share one group
+  # and never cancel a run that has started: a push whose run is still waiting for the
+  # group is replaced by the next push's run (GitHub keeps one pending run per group), so
+  # a burst of merges runs the tip and the run in progress, not every commit at once
+  # (each of them holds two macOS jobs and the merge queue waits behind them). The tip
+  # always runs, but after the run in progress finishes: master pushes no longer run side
+  # by side. A replaced commit gets no push run of its own, and two checks that read a
+  # push's before..after range then skip it: the push-mode acknowledgement check
+  # (scripts/check-surface-ack.mjs; every commit that landed through the merge queue was
+  # checked in merge_group mode first) and the Cargo, toolchain and workflow triggers that
+  # force a full run (scripts/master-push-reuse.mjs). The daily run covers neither: it
+  # checks the acknowledgement files only and runs both systems for every job. Every other
+  # run (the merge queue, a scheduled or manual run) gets a group of its own, so none is
+  # cancelled or dropped.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.event_name == 'push' && 'master-push' || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -817,7 +828,7 @@ jobs:
     permissions:
       contents: read
       actions: write
-    # Master runs overlap, and prunes must not run at once. queue: max keeps every
+    # Master runs can overlap (a push and the daily run), and prunes must not run at once. queue: max keeps every
     # waiting prune instead of cancelling the older one, so a cancelled prune
     # means a real cancellation or a timeout, and required-checks fails on it.
     concurrency:

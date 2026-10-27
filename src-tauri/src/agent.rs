@@ -9,7 +9,9 @@ use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 
 #[path = "agent_import.rs"]
 mod agent_import;
-pub use crate::tally::approved_import::{run_confirmation, run_review_confirmation};
+pub use crate::tally::approved_import::{
+    run_confirmation, run_release_confirmation, run_review_confirmation,
+};
 pub(crate) use agent_import::desktop_journal_review as desktop_journal;
 
 // LAB-ONLY additive surface (audit-sprint 2026-09-14, Phase 3). Compiled only
@@ -57,6 +59,8 @@ mod headline;
 mod ledger_candidates;
 #[path = "agent_month_register.rs"]
 mod month_register;
+#[path = "agent_negative_ledgers.rs"]
+mod negative_ledgers;
 #[path = "agent_negative_stock.rs"]
 mod negative_stock;
 use ledger_candidates::{
@@ -1007,6 +1011,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
             .downcast_ref::<bridge_tally_protocol::native_month_register::NativeMonthRegisterError>()
         {
             return Some(register.code());
+        }
+        if let Some(negative_ledgers) = cause
+            .downcast_ref::<bridge_tally_protocol::native_negative_ledgers::NativeNegativeLedgersError>()
+        {
+            return Some(negative_ledgers.code());
         }
         if let Some(check) =
             cause.downcast_ref::<crate::reports::cash_flow::CashFlowCheckError>()
@@ -2054,6 +2063,10 @@ impl ToolFailure {
         }) {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::NegativeLedgersReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
         }) {
             error.safe_code()
@@ -2662,6 +2675,7 @@ impl Server {
         if matches!(
             name,
             "lab_read_inventory"
+                | "lab_read_purchase_identity"
                 | "lab_voucher_key_probe"
                 | "lab_import_masters"
                 | "lab_import_vouchers"
@@ -2700,6 +2714,7 @@ impl Server {
             "local_data_report" => self.local_data_report().map_err(Into::into),
             "masters" => self.masters(args).await,
             "month_register" => self.month_register(args).await,
+            "negative_ledgers" => self.negative_ledgers(args).await,
             "negative_stock" => self.negative_stock(args).await,
             "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
@@ -2731,6 +2746,8 @@ impl Server {
             "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
+            #[cfg(feature = "lab-writes")]
+            "lab_read_purchase_identity" => lab::lab_read_purchase_identity(self, args).await,
             #[cfg(feature = "lab-writes")]
             "lab_voucher_key_probe" => lab::lab_voucher_key_probe(self, args).await,
             #[cfg(feature = "lab-writes")]

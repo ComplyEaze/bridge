@@ -17,6 +17,11 @@
 //! batch's next call, which does not ask the person again: for as long as an
 //! approval would be kept, at most `MAX_KEPT_REFUSALS` at once, and not across
 //! a withdrawal of the batch or a restart.
+//!
+//! A batch whose box with the voucher lines did not fit the screen (#1832) is
+//! refused as before, and remembered in the same way: its next ask shows the
+//! totals only, as an ordinary ask of that text. Nothing is shown twice in one
+//! call, and no call chooses the form.
 use super::post::NativePostRequest;
 use super::{sha256_hex, write_private, ImportCompanyTuple, ImportLedgerLine};
 use crate::tally::approved_import::{
@@ -112,6 +117,7 @@ fn call_withdrawn() -> bool {
 /// refused: the approval covered something else.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct ApprovalBinding {
+    form: PreviewForm,
     batch_sha256: String,
     endpoint_origin: Option<String>,
     company: Option<ImportCompanyTuple>,
@@ -125,8 +131,10 @@ impl ApprovalBinding {
         line: &ImportLedgerLine,
         preview: &str,
         ledgers: &StandardLedgerCatalogBinding,
+        form: PreviewForm,
     ) -> Self {
         Self {
+            form,
             batch_sha256: line.sha256.clone(),
             endpoint_origin: line.endpoint_origin.clone(),
             company: line.company.clone(),
@@ -160,16 +168,34 @@ enum Held {
     Redeeming { id: Uuid, answered: Answered },
 }
 
+/// Which text of a batch an ask shows. Only [`PostApprovals::begin`] makes
+/// [`PreviewForm::TotalsOnly`]: a batch whose box with the voucher lines did
+/// not fit the screen, asked again. It never applies to one voucher.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PreviewForm {
+    /// The voucher lines, when they fit the dialog's caps, else the totals.
+    Listed,
+    /// The totals only, the text a batch gets when its voucher lines do not fit.
+    TotalsOnly,
+}
+
+/// A batch whose box with the voucher lines did not fit the screen, and when
+/// it was seen not to: kept as long as an approval would be.
+struct ListedDidNotFit {
+    batch_id: String,
+    seen: Answered,
+}
+
 /// What a `post_import` call finds held for its batch.
 pub(super) enum Begin {
-    /// Nothing held: check the batch and ask.
-    Ask,
+    /// Nothing held: check the batch and ask, showing this form.
+    Ask(PreviewForm),
     /// A dialog for this batch is open and this call may wait on it.
     Join(PendingPostApproval),
     /// Another call is already waiting on this batch's dialog.
     Waiting,
-    /// This batch is approved: check it afresh and redeem.
-    Redeem,
+    /// This batch is approved, bound to this form: check it afresh and redeem.
+    Redeem(PreviewForm),
     /// Something else is held; refused with this code.
     Busy(&'static str),
     /// This batch's dialog ended in a refusal no call has read: returned now.
@@ -247,6 +273,11 @@ pub(in crate::agent) struct PostApprovals {
     /// the person again (#725). They block no other batch. Locked only while
     /// `held` is.
     refusals: Mutex<std::collections::VecDeque<KeptRefusal>>,
+    /// Batches whose listed box did not fit the screen, one per batch, oldest
+    /// first, noted from the dialog's own task (#1832). The note takes only
+    /// this lock; `begin` and `revoke` take it while they hold `held`, never
+    /// the other way round.
+    listed_did_not_fit: std::sync::Arc<Mutex<std::collections::VecDeque<ListedDidNotFit>>>,
     ttl: Duration,
     measured_post: Duration,
     measured_redeem: Duration,
@@ -258,6 +289,7 @@ impl PostApprovals {
             imports: data_dir.join("imports"),
             held: Mutex::new(None),
             refusals: Mutex::new(std::collections::VecDeque::new()),
+            listed_did_not_fit: std::sync::Arc::default(),
             ttl: APPROVAL_TTL,
             measured_post: MEASURED_POST,
             measured_redeem: MEASURED_REDEEM,
@@ -351,6 +383,43 @@ impl PostApprovals {
         refusals
     }
 
+    /// The batches whose listed box did not fit, those still in their time.
+    fn listed_did_not_fit(
+        &self,
+    ) -> std::sync::MutexGuard<'_, std::collections::VecDeque<ListedDidNotFit>> {
+        let mut facts = self
+            .listed_did_not_fit
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        facts.retain(|fact| !self.expired(&fact.seen));
+        facts
+    }
+
+    /// What the dialog task of an ask of `batch_id`'s listed form calls if its
+    /// box did not fit the screen: the batch's next ask shows the totals. Given
+    /// only for a batch asked in its listed form; the totals form has none.
+    pub(super) fn note_listed_did_not_fit(&self, batch_id: &str) -> Box<dyn FnOnce() + Send> {
+        let facts = std::sync::Arc::clone(&self.listed_did_not_fit);
+        let batch_id = batch_id.to_string();
+        Box::new(move || {
+            let mut facts = facts
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            facts.retain(|fact| fact.batch_id != batch_id);
+            facts.push_back(ListedDidNotFit {
+                batch_id,
+                seen: Answered {
+                    approved: false,
+                    at: std::time::Instant::now(),
+                    at_wall: SystemTime::now(),
+                },
+            });
+            while facts.len() > MAX_KEPT_REFUSALS {
+                facts.pop_front();
+            }
+        })
+    }
+
     /// Keep `batch_id`'s refusal, given at `answered`, for its next call, in
     /// place of any earlier one. One already past its time is not kept, so it
     /// never pushes a live one out.
@@ -427,7 +496,7 @@ impl PostApprovals {
     /// 2.0). Only this batch's approval, still in its time, lets it go on:
     /// anything else is refused, and nothing is asked, so such a call can
     /// never show a second dialog.
-    pub(super) fn begin_redeem(&self, batch_id: &str) -> Result<(), String> {
+    pub(super) fn begin_redeem(&self, batch_id: &str) -> Result<PreviewForm, String> {
         let mut slot = self.slot();
         let expired = matches!(
             slot.as_ref(),
@@ -439,11 +508,27 @@ impl PostApprovals {
             return Err("import_approval_expired".into());
         }
         match slot.as_ref() {
-            Some((held_batch, Held::Approved { .. })) if held_batch == batch_id => Ok(()),
+            Some((held_batch, Held::Approved { binding, .. })) if held_batch == batch_id => {
+                Ok(binding.form)
+            }
             Some((held_batch, Held::Redeeming { .. })) if held_batch == batch_id => {
                 Err("import_approval_in_use".into())
             }
             _ => Err("import_approval_revoked".into()),
+        }
+    }
+
+    /// The form an ask of `batch_id` shows: the totals only when its listed
+    /// box did not fit the screen and that is still remembered.
+    fn form_to_ask(&self, batch_id: &str) -> PreviewForm {
+        if self
+            .listed_did_not_fit()
+            .iter()
+            .any(|fact| fact.batch_id == batch_id)
+        {
+            PreviewForm::TotalsOnly
+        } else {
+            PreviewForm::Listed
         }
     }
 
@@ -456,7 +541,7 @@ impl PostApprovals {
             return Begin::Refused(code);
         }
         let Some((held_batch, held)) = slot.as_mut() else {
-            return Begin::Ask;
+            return Begin::Ask(self.form_to_ask(batch_id));
         };
         if *held_batch != batch_id {
             return Begin::Busy("post_approval_busy");
@@ -466,7 +551,7 @@ impl PostApprovals {
                 Some(dialog) => Begin::Join(dialog),
                 None => Begin::Waiting,
             },
-            Held::Approved { .. } => Begin::Redeem,
+            Held::Approved { binding, .. } => Begin::Redeem(binding.form),
             Held::Redeeming { .. } => Begin::Busy("import_approval_in_use"),
         }
     }
@@ -697,6 +782,8 @@ impl PostApprovals {
     pub(in crate::agent) fn revoke(&self, batch_id: &str, reason: &str) {
         let mut slot = self.slot();
         self.refusals().retain(|kept| kept.batch_id != batch_id);
+        self.listed_did_not_fit()
+            .retain(|fact| fact.batch_id != batch_id);
         if slot
             .as_ref()
             .is_some_and(|(held_batch, _)| held_batch == batch_id)

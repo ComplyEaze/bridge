@@ -1,13 +1,13 @@
 use sha2::{Digest, Sha256};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{ConnectOptions, Executor, SqliteConnection, SqlitePool};
+use sqlx::{ConnectOptions, Connection, Executor, SqliteConnection, SqlitePool};
 use std::fs::{File, OpenOptions};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
 use zeroize::Zeroizing;
 
-const MIRROR_KEY_BYTES: usize = 32;
+pub(crate) const MIRROR_KEY_BYTES: usize = 32;
 const KEYRING_SERVICE: &str = "com.complyeaze.bridge.tally-mirror";
 const KEYRING_ACCOUNT_PREFIX: &str = "database-key-v1";
 
@@ -101,25 +101,112 @@ pub struct MirrorInitializationLock {
     _file: File,
 }
 
-pub fn lock_mirror_initialization(
-    database_path: &Path,
-) -> anyhow::Result<MirrorInitializationLock> {
+fn mirror_initialization_lock_file(database_path: &Path) -> anyhow::Result<File> {
     let file_name = database_path
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("The Tally mirror path has no file name"))?;
     let mut lock_name = file_name.to_os_string();
     lock_name.push(".init.lock");
     let lock_path = database_path.with_file_name(lock_name);
-    let file = OpenOptions::new()
+    OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(false)
         .open(lock_path)
-        .map_err(|_| anyhow::anyhow!("The Tally mirror initialization lock could not be opened"))?;
+        .map_err(|_| anyhow::anyhow!("The Tally mirror initialization lock could not be opened"))
+}
+
+pub fn lock_mirror_initialization(
+    database_path: &Path,
+) -> anyhow::Result<MirrorInitializationLock> {
+    let file = mirror_initialization_lock_file(database_path)?;
     file.lock()
         .map_err(|_| anyhow::anyhow!("The Tally mirror is being initialized by another process"))?;
     Ok(MirrorInitializationLock { _file: file })
+}
+
+/// The initialization lock, refusing at once instead of waiting: a reset must not queue behind
+/// an opener (or hold one up) while it decides.
+pub(crate) fn try_lock_mirror_initialization(
+    database_path: &Path,
+) -> Result<MirrorInitializationLock, MirrorUseLockError> {
+    let file = mirror_initialization_lock_file(database_path)
+        .map_err(|_| MirrorUseLockError::Unavailable)?;
+    match file.try_lock() {
+        Ok(()) => Ok(MirrorInitializationLock { _file: file }),
+        Err(std::fs::TryLockError::WouldBlock) => Err(MirrorUseLockError::Held),
+        Err(std::fs::TryLockError::Error(_)) => Err(MirrorUseLockError::Unavailable),
+    }
+}
+
+/// The locks an opener of the mirror takes, in this order: the initialization lock (waits for
+/// another opener to finish), then the shared use lock, which refuses at once while a reset holds
+/// the mirror. The use lock is kept for as long as the mirror stays open.
+pub fn lock_for_open(
+    database_path: &Path,
+) -> anyhow::Result<(MirrorInitializationLock, MirrorUseLock)> {
+    let initialization = lock_mirror_initialization(database_path)?;
+    let in_use = lock_mirror_in_use(database_path)?;
+    Ok((initialization, in_use))
+}
+
+/// Held by an open mirror for its whole life, and taken exclusively by a reset, so a reset cannot
+/// run while any handle in any process (this one included: each lock is on its own open file)
+/// has the mirror open. It is a different file from the initialization lock, which is held only
+/// while a mirror is being opened.
+#[derive(Debug)]
+pub struct MirrorUseLock {
+    _file: File,
+}
+
+/// Why the use lock could not be taken.
+#[derive(Debug, thiserror::Error)]
+pub enum MirrorUseLockError {
+    /// Another handle holds it in the way that excludes this one: the mirror is open elsewhere
+    /// (for an exclusive request), or a reset is running (for a shared one).
+    #[error("The Tally mirror is in use or being reset")]
+    Held,
+    #[error("The Tally mirror use lock could not be opened")]
+    Unavailable,
+}
+
+fn mirror_use_lock_file(database_path: &Path) -> Result<File, MirrorUseLockError> {
+    let file_name = database_path
+        .file_name()
+        .ok_or(MirrorUseLockError::Unavailable)?;
+    let mut lock_name = file_name.to_os_string();
+    lock_name.push(".use.lock");
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(database_path.with_file_name(lock_name))
+        .map_err(|_| MirrorUseLockError::Unavailable)
+}
+
+/// The shared lock an open mirror holds. Refuses at once, without waiting, while a reset has it.
+pub fn lock_mirror_in_use(database_path: &Path) -> Result<MirrorUseLock, MirrorUseLockError> {
+    let file = mirror_use_lock_file(database_path)?;
+    match file.try_lock_shared() {
+        Ok(()) => Ok(MirrorUseLock { _file: file }),
+        Err(std::fs::TryLockError::WouldBlock) => Err(MirrorUseLockError::Held),
+        Err(std::fs::TryLockError::Error(_)) => Err(MirrorUseLockError::Unavailable),
+    }
+}
+
+/// The exclusive lock a reset takes. Refuses at once, without waiting, while any handle has the
+/// mirror open.
+pub(crate) fn lock_mirror_exclusively(
+    database_path: &Path,
+) -> Result<MirrorUseLock, MirrorUseLockError> {
+    let file = mirror_use_lock_file(database_path)?;
+    match file.try_lock() {
+        Ok(()) => Ok(MirrorUseLock { _file: file }),
+        Err(std::fs::TryLockError::WouldBlock) => Err(MirrorUseLockError::Held),
+        Err(std::fs::TryLockError::Error(_)) => Err(MirrorUseLockError::Unavailable),
+    }
 }
 
 pub struct ResolvedMirrorKey {
@@ -246,6 +333,36 @@ pub async fn connect_encrypted(
     }
     drop(connection);
     Ok(pool)
+}
+
+/// Whether `key` opens the existing database: one connection, configured and checked as
+/// [`connect_encrypted`] does, and closed before this returns, on success and on failure alike.
+///
+/// A failed attempt through `connect_encrypted` leaves its connection to SQLx to drop, and SQLx
+/// ends the connection's worker thread without waiting for it. A caller that goes on to delete the
+/// database's files straight away can then find the write-ahead log still open (a sharing violation
+/// on Windows), and a process that exits at that moment races the thread's last calls into the
+/// crypto library (a crash after a passing test on macOS). `Connection::close` waits for the
+/// worker, so neither can happen here. The database is never created.
+pub(crate) async fn probe_encrypted_key(
+    database_path: &Path,
+    key: Zeroizing<Vec<u8>>,
+) -> anyhow::Result<()> {
+    validate_key(&key)?;
+    let mut connection = SqliteConnectOptions::new()
+        .filename(database_path)
+        .create_if_missing(false)
+        .disable_statement_logging()
+        .connect()
+        .await
+        .map_err(encrypted_open_error)?;
+    let checked = match configure_encrypted_connection(&mut connection, &key).await {
+        Ok(()) => validate_encrypted_connection(&mut connection).await,
+        Err(error) => Err(encrypted_open_error(error)),
+    };
+    // The attempt's answer is the result; a close that fails changes nothing about it.
+    let _ = connection.close().await;
+    checked.map_err(Into::into)
 }
 
 async fn configure_encrypted_connection(

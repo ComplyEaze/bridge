@@ -721,6 +721,7 @@ fn dialog_mode_problems(lib: &str) -> Vec<String> {
         "Some(\"--confirm-journal\") => agent::run_confirmation as fn() -> bool,",
         "Some(\"--confirm-review\") => agent::run_review_confirmation,",
         "Some(\"--confirm-masters\") => agent::run_masters_confirmation,",
+        "Some(\"--confirm-release\") => agent::run_release_confirmation,",
     ] {
         if lib.matches(arm).count() != 1 {
             problems.push(format!("expected exactly one `{arm}`"));
@@ -733,6 +734,12 @@ fn dialog_mode_problems(lib: &str) -> Vec<String> {
 fn each_dialog_mode_runs_its_own_dialog() {
     let lib = read("src-tauri/src/lib.rs");
     assert_eq!(dialog_mode_problems(&lib), Vec::<String>::new());
+    let release_as_review = lib.replace(
+        "agent::run_release_confirmation,",
+        "agent::run_review_confirmation,",
+    );
+    assert_ne!(release_as_review, lib);
+    assert!(!dialog_mode_problems(&release_as_review).is_empty());
     let swapped = lib
         .replace("agent::run_confirmation as fn() -> bool,", "SWAP,")
         .replace(
@@ -857,6 +864,16 @@ const MASTERS_ENTRY: &str = "pub fn run_masters_confirmation() -> bool {
     )
 }";
 
+/// The release child's whole entry point, as [`POST_ENTRY`] (#1828).
+const RELEASE_ENTRY: &str = "pub fn run_release_confirmation() -> bool {
+    answer_with_token(
+        RELEASE_TOKEN_PREFIX,
+        show_release_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}";
+
 /// Each dialog subprocess entry point answers with its own token, after its
 /// own dialog, from the real stdin to the real stdout (#635, #687). The
 /// parent approves a post only on the post token, so pairing that token with
@@ -870,13 +887,13 @@ const MASTERS_ENTRY: &str = "pub fn run_masters_confirmation() -> bool {
 /// rename; the lib.rs mode arms, pinned above, are still the only way in.
 fn dialog_token_problems(source: &str) -> Vec<String> {
     let mut problems = Vec::new();
-    for entry in [POST_ENTRY, REVIEW_ENTRY, MASTERS_ENTRY] {
+    for entry in [POST_ENTRY, REVIEW_ENTRY, RELEASE_ENTRY, MASTERS_ENTRY] {
         if source.matches(entry).count() != 1 {
             problems.push(format!("expected exactly one `{entry}`"));
         }
     }
-    if source.matches("answer_with_token(").count() != 4 {
-        problems.push("expected the three entry points and the definition only".into());
+    if source.matches("answer_with_token(").count() != 5 {
+        problems.push("expected the four entry points and the definition only".into());
     }
     problems
 }
@@ -904,6 +921,17 @@ fn each_dialog_answers_with_its_own_token() {
         source.replace(POST_ENTRY, &POST_ENTRY.replace("show_review,", "show_review_acknowledgement,")),
         source.replace(POST_ENTRY, &post_as_review),
         source.replace(REVIEW_ENTRY, &review_as_post),
+        source.replace(
+            RELEASE_ENTRY,
+            &RELEASE_ENTRY.replace("RELEASE_TOKEN_PREFIX", "REVIEW_TOKEN_PREFIX"),
+        ),
+        source.replace(
+            RELEASE_ENTRY,
+            &RELEASE_ENTRY.replace(
+                "show_release_acknowledgement,",
+                "show_review_acknowledgement,",
+            ),
+        ),
         source.replace(POST_ENTRY, &POST_ENTRY.replace("show_review,", "|_, _| true,")),
         source.replace(POST_ENTRY, &POST_ENTRY.replace("std::io::stdin()", "&b\"\"[..]")),
         swapped,
@@ -931,12 +959,12 @@ fn each_dialog_answers_with_its_own_token() {
 
 /// Where a click becomes the answer (#687). No test can open a real window,
 /// and the parent's tests replace the child with a stand-in (#702). So the
-/// four native dialog functions, `confirm` and `confirm_review`, and the two
-/// functions that decide from the child's answer (`confirm_with`,
-/// `confirm_review_with`) are pinned here verbatim, with the button labels
-/// and the functions that word each title and the post button (#746). On
-/// Windows the post dialog's title and its first line (#1780) are the only
-/// text that says what Yes does.
+/// six native dialog functions (the post, review and release dialog on each
+/// platform), `confirm` and `confirm_review`, and the two functions that decide
+/// from the child's answer (`confirm_with`, `confirm_review_with`) are pinned
+/// here verbatim, with the button labels and the functions that word each
+/// title and the post button (#746). On Windows the post dialog's title and its
+/// first line (#1780) are the only text that says what Yes does.
 /// The file's `cfg` attributes are counted as well: a platform or test split
 /// anywhere in it, such as a `#[cfg(windows)]` twin of a pinned function,
 /// must change this gate. This pins text, not the platform's behaviour.
@@ -1127,6 +1155,70 @@ fn review_question(count: VoucherCount) -> String {
     }
 }"#;
 
+/// The invoice-stop release window's own title and Windows question (#1828):
+/// neither may name a review or a post.
+const RELEASE_TITLE: &str = r#"#[cfg(not(windows))]
+fn release_title() -> String {
+    "ComplyEaze Bridge — release the invoice stop".into()
+}"#;
+
+const RELEASE_QUESTION: &str = r#"#[cfg(windows)]
+fn release_question() -> String {
+    "ComplyEaze Bridge — release the invoice stop for this company?".into()
+}"#;
+
+/// The invoice-stop release dialogs (#1828), pinned as the review's are.
+const RELEASE_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
+fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    rfd::MessageDialog::new()
+        .set_title(release_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            RELEASE_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(RELEASE_BUTTON.into())
+}"#;
+
+const RELEASE_ACK_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
+fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
+        MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = release_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and no parent HWND is borrowed.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost, taking the foreground, with
+                // No as the default button (#1589, #1780).
+                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            )
+        }
+    });
+    answer == IDYES
+}"#;
+
+/// Which subprocess mode and token each kind of acknowledgement uses (#1828):
+/// a release shown in the review's mode would be titled a review again, and one
+/// answered with the review's token could be answered by the review dialog.
+const REVIEW_KIND_CHILD: &str = r#"    fn child(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Review => ("--confirm-review", REVIEW_TOKEN_PREFIX),
+            Self::StopRelease => ("--confirm-release", RELEASE_TOKEN_PREFIX),
+        }
+    }"#;
+
 const POST_QUESTION: &str = r#"#[cfg(windows)]
 fn post_question(count: VoucherCount) -> String {
     match count.batch() {
@@ -1167,7 +1259,8 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
     let (yes, nothing) = answer_effect(shown, count);
     let button = match shown {
         Shown::Post => post_words(count).1,
-        Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
+        Shown::Review => REVIEW_BUTTON.to_string(),
+        Shown::StopRelease => RELEASE_BUTTON.to_string(),
         Shown::Masters => MASTERS_BUTTON.to_string(),
     };
     wrapped(
@@ -1232,7 +1325,10 @@ const CONFIRM_WITH: &str = r#"async fn confirm_with(
     {
         // A box that did not fit the screen is a refusal whatever else the
         // child printed: the text is too large for this person's screen.
-        Ok(answer) if answer.box_did_not_fit => Err("import_review_too_large".into()),
+        Ok(answer) if answer.box_did_not_fit => {
+            note_box_did_not_fit();
+            Err("import_review_too_large".into())
+        }
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1247,27 +1343,21 @@ const CONFIRM_WITH: &str = r#"async fn confirm_with(
 
 const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
     executable: &std::path::Path,
+    kind: ReviewKind,
     count: VoucherCount,
     preview: &str,
 ) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
         return Err("ack_review_too_large".into());
     }
-    match nonce_bound_dialog(
-        executable,
-        "--confirm-review",
-        REVIEW_TOKEN_PREFIX,
-        count,
-        preview,
-    )
-    .await
-    {
+    let (mode, prefix) = kind.child();
+    match nonce_bound_dialog(executable, mode, prefix, count, preview).await {
         Ok(answer) if answer.box_did_not_fit => Err("ack_review_too_large".into()),
         Ok(answer) if answer.token_matched => Ok(()),
         // A person's decline is no token and exit 1: `run_review_confirmation`
-        // returns false. A clean exit without the token is never that; it is
-        // an executable that is not this dialog, such as one ignoring the
-        // flag (#689).
+        // and `run_release_confirmation` return false. A clean exit without
+        // the token is never that; it is an executable that is not this
+        // dialog, such as one ignoring the flag (#689).
         Ok(answer) if answer.exited_cleanly => Err("ack_review_unavailable".into()),
         Ok(_) => Err("ack_review_declined".into()),
         Err(DialogFailure::Unavailable) => Err("ack_review_unavailable".into()),
@@ -1750,7 +1840,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 28] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 38] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -1791,7 +1881,7 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 28] = [
     if !fits_the_box(kind.shown(), count, &shown) {
         return Err(\"ack_review_too_large\".into());
     }
-    confirm_review_with(&executable, count, &shown).await
+    confirm_review_with(&executable, kind, count, &shown).await
 }",
         1,
     ),
@@ -1829,6 +1919,29 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 28] = [
         1,
     ),
     (CONFIRM_MASTERS_WITH, 1),
+    ("const RELEASE_BUTTON: &str = \"Release the stop\";", 1),
+    // Each token's value, so no two modes can share one (#1828).
+    (
+        "const REVIEW_TOKEN_PREFIX: &str = \"bridge-review-acknowledged:\";",
+        1,
+    ),
+    (
+        "const POST_TOKEN_PREFIX: &str = \"bridge-post-approved:\";",
+        1,
+    ),
+    (
+        "const RELEASE_TOKEN_PREFIX: &str = \"bridge-stop-release-acknowledged:\";",
+        1,
+    ),
+    (
+        "const MASTERS_TOKEN_PREFIX: &str = \"bridge-create-ledger:\";",
+        1,
+    ),
+    (RELEASE_TITLE, 1),
+    (RELEASE_QUESTION, 1),
+    (RELEASE_ACK_DIALOG, 1),
+    (RELEASE_ACK_DIALOG_WINDOWS, 1),
+    (REVIEW_KIND_CHILD, 1),
 ];
 
 /// Every `cfg` in approved_import.rs, by form. The last entry counts the
@@ -1845,10 +1958,11 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     ("#[cfg(unix)]", 0),
     // The one-ledger dialog added one Windows dialog, one non-Windows dialog
     // and the non-Windows button; #1780's follow-up, the Mac one-line answer
-    // text test.
-    ("#[cfg(windows)]", 8),
-    ("#[cfg(not(windows))]", 11),
-    ("cfg", 33),
+    // text test. #1828: the release window's question and box on Windows, and
+    // its title, dialog and button on a Mac.
+    ("#[cfg(windows)]", 10),
+    ("#[cfg(not(windows))]", 14),
+    ("cfg", 38),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -1927,10 +2041,13 @@ fn each_dialog_answers_only_on_its_positive_button() {
         // The parent stops reading a box that did not fit as a refusal, or
         // the dialog stops measuring its box (#1832).
         source.replacen(
-            "        Ok(answer) if answer.box_did_not_fit => Err(\"import_review_too_large\".into()),\n",
+            "        Ok(answer) if answer.box_did_not_fit => {\n            note_box_did_not_fit();\n            Err(\"import_review_too_large\".into())\n        }\n",
             "",
             1,
         ),
+        // The box that did not fit is refused but no longer noted for the
+        // batch's next ask (#1832).
+        source.replacen("            note_box_did_not_fit();\n", "", 1),
         source.replacen(
             "        Ok(answer) if answer.box_did_not_fit => Err(\"ack_review_too_large\".into()),\n",
             "",
@@ -1951,7 +2068,7 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen(
-            "confirm_review_with(&executable, count, &shown).await\n}",
+            "confirm_review_with(&executable, kind, count, &shown).await\n}",
             "let _ = (executable, count, shown);\n    Ok(())\n}",
             1,
         ),
@@ -2103,9 +2220,11 @@ fn each_dialog_answers_only_on_its_positive_button() {
             &CONFIRM_WITH.replacen("\"--confirm-journal\"", "\"--confirm-masters\"", 1),
             1,
         ),
+        // The review's mode now comes from the kind's table, not from the
+        // function, so the review is sent to the one-ledger mode there.
         source.replacen(
-            CONFIRM_REVIEW_WITH,
-            &CONFIRM_REVIEW_WITH.replacen("\"--confirm-review\"", "\"--confirm-masters\"", 1),
+            "Self::Review => (\"--confirm-review\", REVIEW_TOKEN_PREFIX),",
+            "Self::Review => (\"--confirm-masters\", REVIEW_TOKEN_PREFIX),",
             1,
         ),
         // The one-ledger dialogs discard their answer: they still compute the
@@ -2154,6 +2273,43 @@ fn each_dialog_answers_only_on_its_positive_button() {
         source.replacen(
             REVIEW_ACK_DIALOG_WINDOWS,
             &discard_answer(REVIEW_ACK_DIALOG_WINDOWS),
+            1,
+        ),
+        // The release dialogs discard their answer (#1828).
+        source.replacen(RELEASE_ACK_DIALOG, &discard_answer(RELEASE_ACK_DIALOG), 1),
+        source.replacen(
+            RELEASE_ACK_DIALOG_WINDOWS,
+            &discard_answer(RELEASE_ACK_DIALOG_WINDOWS),
+            1,
+        ),
+        // A release reads as the decline, is titled a review, or is shown in the
+        // review's mode or answered with its token (#1828).
+        source.replacen("\"Release the stop\"", "\"Cancel\"", 1),
+        source.replacen(
+            "\"ComplyEaze Bridge — release the invoice stop\".into()",
+            "\"ComplyEaze Bridge — record that you reviewed one voucher\".into()",
+            1,
+        ),
+        source.replacen(
+            "Self::StopRelease => (\"--confirm-release\", RELEASE_TOKEN_PREFIX),",
+            "Self::StopRelease => (\"--confirm-review\", REVIEW_TOKEN_PREFIX),",
+            1,
+        ),
+        // Two modes share a token, the Windows release box asks the review's
+        // question, or loses its default No (#1828).
+        source.replacen(
+            "\"bridge-review-acknowledged:\"",
+            "\"bridge-stop-release-acknowledged:\"",
+            1,
+        ),
+        source.replacen(
+            "\"ComplyEaze Bridge — release the invoice stop for this company?\".into()",
+            "\"ComplyEaze Bridge — record that you reviewed this voucher?\".into()",
+            1,
+        ),
+        source.replacen(
+            RELEASE_ACK_DIALOG_WINDOWS,
+            &RELEASE_ACK_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
             1,
         ),
     ] {
@@ -2403,4 +2559,121 @@ fn every_shipped_build_runs_the_seam_scan() {
     assert!(read(".github/workflows/release-mcpb-preview.yml").contains(
         "node scripts/check-no-test-seam.mjs src-tauri/target/release/${{ matrix.binary }}"
     ));
+}
+
+/// Problems with who may make the totals form of a post's preview (#1832): a
+/// batch is shown it only after its box with the voucher lines did not fit the
+/// screen, and only the approvals holder remembers that, so no other module
+/// names it. `others` is every other source file of the crate that is not a
+/// test file, as (name, text).
+fn totals_form_problems(post: &str, approval: &str, others: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (name, text) in others {
+        if text.contains("TotalsOnly") {
+            problems.push(format!("{name} must not name PreviewForm::TotalsOnly"));
+        }
+    }
+    let made =
+        "            PreviewForm::TotalsOnly\n        } else {\n            PreviewForm::Listed";
+    if approval.matches(made).count() != 1 {
+        problems.push("expected the one place that makes PreviewForm::TotalsOnly".into());
+    }
+    // Its variant, its doc comment and its one maker: no `Self::TotalsOnly`,
+    // no glob import, no second maker.
+    if approval.matches("TotalsOnly").count() != 3 || approval.contains("PreviewForm::*") {
+        problems
+            .push("TotalsOnly is named in its definition, its doc and its one maker only".into());
+    }
+    // The note that remembers a batch is given only to a dialog asking the
+    // listed form of a batch, so the totals form can never note itself.
+    let given = "(form == PreviewForm::Listed && preview_lists_vouchers)\n                                .then(|| self.post_approvals.note_listed_did_not_fit(batch_id)),";
+    if post.matches(given).count() != 1 {
+        problems.push("the note must be given only for a batch's listed form".into());
+    }
+    problems
+}
+
+/// Every non-test source file of the crate but the approvals holder and the
+/// post path, as (path, text).
+fn other_sources() -> Vec<(String, String)> {
+    let mut found = Vec::new();
+    let mut directories = vec![repo().join("src-tauri/src")];
+    while let Some(directory) = directories.pop() {
+        for entry in fs::read_dir(&directory).expect("src-tauri/src is readable") {
+            let path = entry.expect("a directory entry").path();
+            if path.is_dir() {
+                directories.push(path);
+                continue;
+            }
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            let is_rust = name.ends_with(".rs");
+            let is_test =
+                name.ends_with("_tests.rs") || name.contains("_tests_") || name == "tests.rs";
+            if is_rust && !is_test && name != "agent_import_approval.rs" {
+                let text = fs::read_to_string(&path).expect("a readable source file");
+                found.push((path.display().to_string(), text));
+            }
+        }
+    }
+    found
+}
+
+#[test]
+fn only_the_approvals_holder_makes_the_totals_form() {
+    let post = read("src-tauri/src/agent_import_post.rs");
+    let approval = read("src-tauri/src/agent_import_approval.rs");
+    let others = other_sources();
+    assert!(
+        others.len() > 50,
+        "the scan reads the crate: {}",
+        others.len()
+    );
+    assert_eq!(
+        totals_form_problems(&post, &approval, &others),
+        Vec::<String>::new()
+    );
+    // The check itself: each way of widening it is caught.
+    let mut named_elsewhere = others.clone();
+    named_elsewhere[0]
+        .1
+        .push_str("\nconst X: u8 = 0; // PreviewForm::TotalsOnly\n");
+    for (broken_post, broken_approval, broken_others) in [
+        (post.clone(), approval.clone(), named_elsewhere),
+        (
+            post.clone(),
+            format!("{approval}\nconst Y: PreviewForm = PreviewForm::TotalsOnly;\n"),
+            others.clone(),
+        ),
+        (
+            post.clone(),
+            format!("{approval}\nuse PreviewForm::*;\n"),
+            others.clone(),
+        ),
+        (
+            post.replace(
+                "(form == PreviewForm::Listed && preview_lists_vouchers)",
+                "(preview_lists_vouchers)",
+            ),
+            approval.clone(),
+            others.clone(),
+        ),
+        (
+            post.replace(
+                "(form == PreviewForm::Listed && preview_lists_vouchers)",
+                "(form == PreviewForm::Listed)",
+            ),
+            approval.clone(),
+            others.clone(),
+        ),
+        (
+            post.replace(
+                ".then(|| self.post_approvals.note_listed_did_not_fit(batch_id)),",
+                ".then(|| Box::new(|| {}) as Box<dyn FnOnce() + Send>),",
+            ),
+            approval.clone(),
+            others.clone(),
+        ),
+    ] {
+        assert!(!totals_form_problems(&broken_post, &broken_approval, &broken_others).is_empty());
+    }
 }

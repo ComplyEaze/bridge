@@ -652,7 +652,7 @@ impl Server {
                 .begin_agent_approval(&target, redeem_only, call_started, &accumulated)
                 .await?
             {
-                Ok(redeeming) => redeeming,
+                Ok((redeeming, _form)) => redeeming,
                 Err(step) => return Ok(step),
             };
             let (company, identity, identity_evidence) = self.verified_company(&guid).await?;

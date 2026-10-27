@@ -37,6 +37,21 @@ fn a_paged_masters_result_is_trimmed_with_a_cursor_and_an_unpaged_one_is_not() {
 }
 
 #[test]
+fn a_paged_ledgers_result_is_trimmed_with_a_cursor_and_an_unpaged_one_is_not() {
+    let mut paged = json!({"result":{"offset":0,"next_offset":null,
+        "ledgers":[{"ledger":"A"},{"ledger":"B"},{"ledger":"C"}]}});
+    assert!(truncate_response_items(&mut paged).expect("trims a ledgers page"));
+    assert_eq!(paged["result"]["ledgers"].as_array().unwrap().len(), 2);
+    assert_eq!(paged["result"]["next_offset"], 2);
+    // negative_ledgers keys `ledgers` with no `offset`: a cursor into it would
+    // resume nothing, so it is not trimmed.
+    let mut unpaged = json!({"result":{"ledgers":[{"ledger":"A"},{"ledger":"B"}]}});
+    assert!(!truncate_response_items(&mut unpaged).expect("no page shape"));
+    assert_eq!(unpaged["result"]["ledgers"].as_array().unwrap().len(), 2);
+    assert!(unpaged["result"].get("next_offset").is_none());
+}
+
+#[test]
 fn a_paged_items_result_is_trimmed_with_a_cursor_and_an_unpaged_one_is_not() {
     // gst_status pages `items` by `offset`; gst_uncertain_vouchers returns `items` whole,
     // with counts and a line that cover the whole window, and takes no offset: a cursor into

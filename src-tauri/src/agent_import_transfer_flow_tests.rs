@@ -2478,7 +2478,7 @@ async fn a_withdrawn_row_the_other_statement_now_carries_is_refused_when_the_bat
         "{step}"
     );
     assert!(
-        step.ends_with(" This batch cannot be sent as built: build it again."),
+        step.ends_with(" This batch cannot be sent as built: build this statement again with the rows in paired_rows still skipped, not named in withdraw_skips."),
         "{step}"
     );
     // nothing was written: no intent, no status

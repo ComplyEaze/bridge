@@ -1382,8 +1382,7 @@ fn a_journal_recording_a_cash_in_hand_ledger_is_refused_by_the_queue() {
     let recheck = |catalogue: &str| {
         recheck_import_admission(
             &line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             catalogue,
@@ -1465,8 +1464,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     let recheck = |catalogue: &str| {
         recheck_import_admission(
             &line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             catalogue,
@@ -1569,8 +1567,7 @@ fn an_alias_that_folds_equal_to_a_named_ledger_refuses_the_batch_in_the_queue() 
     let recheck = |catalogue: &str| {
         recheck_import_admission(
             &line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             catalogue,
@@ -1673,8 +1670,7 @@ fn a_named_ledger_switched_to_bill_wise_since_the_build_is_refused_by_the_queue(
     let recheck = |line: &ImportLedgerLine, catalogue: &str| {
         recheck_import_admission(
             line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             catalogue,
@@ -1763,8 +1759,7 @@ fn a_record_without_cash_in_hand_ledgers_is_refused_by_the_queue() {
     // Every read it is handed is empty: the refusal comes before any of them.
     let error = recheck_import_admission(
         &line,
-        company_guid,
-        "WR2 Unicode Lab",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
         "",
         "",
         "",
@@ -1823,8 +1818,7 @@ fn a_record_without_bill_wise_approvals_is_refused_by_the_queue() {
     .unwrap();
     let error = recheck_import_admission(
         &line,
-        company_guid,
-        "WR2 Unicode Lab",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
         "",
         "",
         "",
@@ -1913,8 +1907,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     .unwrap();
     let error = recheck_import_admission(
         &line,
-        company_guid,
-        "WR2 Unicode Lab",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
         &captured,
         &captured,
         &catalogue,
@@ -1940,8 +1933,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     }
     recheck_import_admission(
         &absent,
-        company_guid,
-        "WR2 Unicode Lab",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
         &captured,
         &captured,
         &catalogue,
@@ -1967,8 +1959,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     let twinned = catalogue.replace("WR2 Sales", "Cash&#13;&#10;");
     let error = recheck_import_admission(
         &absent,
-        company_guid,
-        "WR2 Unicode Lab",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
         &captured,
         &captured,
         &twinned,
@@ -2004,8 +1995,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     let recheck = |line: &ImportLedgerLine, groups: Option<&str>| {
         recheck_import_admission(
             line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             &catalogue,
@@ -4215,8 +4205,7 @@ fn the_queued_bill_wise_recheck_exempts_an_invoices_new_ref_party_and_nobody_els
         .unwrap();
         recheck_import_admission(
             line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             &catalogue,
@@ -5170,18 +5159,27 @@ fn the_approval_binding_covers_the_on_account_record() {
     let (mut line, endpoint) = batch();
     let ledgers = captured_binding(&["Cash"]);
     let plain = agent_review_preview(&line, &endpoint).unwrap();
-    let before = ApprovalBinding::new(&line, &plain, &ledgers);
+    let before = ApprovalBinding::new(&line, &plain, &ledgers, PreviewForm::Listed);
     approve_on_account(&mut line, &["Expense"]);
     let marked = agent_review_preview(&line, &endpoint).unwrap();
-    assert_ne!(ApprovalBinding::new(&line, &marked, &ledgers), before);
-    assert_eq!(ApprovalBinding::new(&line, &plain, &ledgers), before);
+    assert_ne!(
+        ApprovalBinding::new(&line, &marked, &ledgers, PreviewForm::Listed),
+        before
+    );
+    assert_eq!(
+        ApprovalBinding::new(&line, &plain, &ledgers, PreviewForm::Listed),
+        before
+    );
 
     let (mut batch_line, endpoint) = batch_of_every_type();
     let plain = agent_review_preview(&batch_line, &endpoint).unwrap();
-    let before = ApprovalBinding::new(&batch_line, &plain, &ledgers);
+    let before = ApprovalBinding::new(&batch_line, &plain, &ledgers, PreviewForm::Listed);
     approve_on_account(&mut batch_line, &["Party A"]);
     let marked = agent_review_preview(&batch_line, &endpoint).unwrap();
-    assert_ne!(ApprovalBinding::new(&batch_line, &marked, &ledgers), before);
+    assert_ne!(
+        ApprovalBinding::new(&batch_line, &marked, &ledgers, PreviewForm::Listed),
+        before
+    );
 }
 
 /// The mark is part of the line the caps measure: a marked entry line of 100
@@ -5610,8 +5608,10 @@ fn the_voucher_recheck_given_a_masters_admission_refuses_and_aims_nothing() {
             company_marks: "",
         },
         &line,
-        "00000000-0000-4000-8000-000000000002",
-        "Synthetic Accounts",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture(
+            "Synthetic Accounts",
+            "00000000-0000-4000-8000-000000000002",
+        ),
         &aimed,
         InvoiceIdentity::ByNumber,
         None,
@@ -5783,8 +5783,7 @@ fn the_queue_recognises_an_invoice_by_its_number_and_by_its_figures_beside_an_un
         .unwrap();
         recheck_import_admission(
             &line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             &catalogue,

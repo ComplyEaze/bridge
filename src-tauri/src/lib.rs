@@ -113,6 +113,7 @@ pub fn run_journal_confirmation_child_from_args(
         Some("--confirm-journal") => agent::run_confirmation as fn() -> bool,
         Some("--confirm-review") => agent::run_review_confirmation,
         Some("--confirm-masters") => agent::run_masters_confirmation,
+        Some("--confirm-release") => agent::run_release_confirmation,
         _ => return None,
     };
     if args.next().is_some() {

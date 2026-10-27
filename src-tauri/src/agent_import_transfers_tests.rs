@@ -1350,7 +1350,14 @@ fn a_refusal_at_send_speaks_of_the_batch_and_not_of_a_build() {
     }
     for (reason, step) in steps {
         assert!(step.starts_with(NOTHING_SENT), "{reason}: {step}");
-        assert!(step.ends_with(SEND_ENDING), "{reason}: {step}");
+        // a refused withdrawal names the build it means, since its carrier
+        // steps may speak of building the other account's statement
+        let ending = if reason == "withdraw_skip_paired" {
+            "This batch cannot be sent as built: build this statement again with the rows in paired_rows still skipped, not named in withdraw_skips."
+        } else {
+            SEND_ENDING
+        };
+        assert!(step.ends_with(ending), "{reason}: {step}");
         for wording in build_wording {
             assert!(!step.contains(wording), "{reason}: {wording}: {step}");
         }

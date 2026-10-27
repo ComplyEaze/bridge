@@ -833,6 +833,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
         ),
         (
+            "negative_ledgers",
+            json!({"result":{"ledgers":[{"ledger":party_name("Customer One"),"side":"credit","amount":"10.00"}]}}),
+        ),
+        (
             "negative_stock",
             json!({"result":{"listed_items":[{"item":party_name("Stock Item One"),"quantity":{"state":"read","amount":"-3","unit":"Nos"},"rate":{"state":"present","value":"120.00"},"value":{"state":"present","value":"360.00"}}]}}),
         ),
@@ -979,6 +983,24 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
                     }],
                     "offset": 0,
                 },
+            }),
+        ));
+    }
+    // `lab_read_purchase_identity` returns no name beyond the company: a difference names the voucher's GUID and
+    // the field, never its values (they stay in the exchange the lab keeps).
+    #[cfg(feature = "lab-writes")]
+    if registered.contains("lab_read_purchase_identity") {
+        lab_samples.push((
+            "lab_read_purchase_identity",
+            json!({
+                "agent": {"rows": 2, "response_chars": 120_000, "response_chars_per_row": 60_000, "window_honoured": true},
+                "narrow": {"rows": 2, "response_chars": 16_000, "response_chars_per_row": 8_000, "window_honoured": true},
+                "differences": {
+                    "total": 1,
+                    "listed": [{"guid": "synthetic-guid-00000001", "field": "party"}],
+                    "listed_truncated": false,
+                },
+                "inconclusive": false,
             }),
         ));
     }

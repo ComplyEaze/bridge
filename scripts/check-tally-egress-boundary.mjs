@@ -344,7 +344,7 @@ function directDependents(manifestPath, packageName, edges = ALL_EDGES) {
   // (workspace or path) dependencies -- `cargo tree`'s `{p}` format appends
   // that path for anything not resolved from a registry. A third-party
   // crate that happens to also depend on `packageName` directly (e.g.
-  // hyper-util and hyper-rustls both depend on hyper directly, same as
+  // hyper-util depends on hyper directly, same as
   // reqwest does) has no such path and is not what this gate is asking
   // about: it cares which crates *we* wrote declare the dependency, not
   // reqwest's own internal transport plumbing.
@@ -363,7 +363,7 @@ function directDependents(manifestPath, packageName, edges = ALL_EDGES) {
 // Network crates such as these sit in the lockfiles under reqwest and tokio, so the deny-list
 // below cannot refuse them; no first-party crate may depend on one directly, since each is a way
 // to open a connection that names no linted method. The list is not exhaustive.
-const LOWER_LEVEL_NETWORK = { h2: [], "hyper-util": [], socket2: [], mio: [], "tower-service": [], tower: [] };
+const LOWER_LEVEL_NETWORK = { "hyper-util": [], socket2: [], mio: [], "tower-service": [], tower: [] };
 
 //
 // `expected` is read over every edge kind; `shipped` over normal and build edges

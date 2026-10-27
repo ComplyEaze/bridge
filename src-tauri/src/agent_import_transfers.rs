@@ -395,6 +395,9 @@ pub(super) const TRANSFER_VIEW_REFUSED_MESSAGE: &str = "Nothing was sent. Comply
 const NOTHING_SENT: &str =
     "Nothing was sent to Tally, and any approval of this batch is withdrawn.";
 const SEND_ENDING: &str = "This batch cannot be sent as built: build it again.";
+/// The ending of a withdrawal refused at send: the steps before it may speak
+/// of building the other account's statement, so this one names its own build.
+const SEND_ENDING_KEEP_SKIPPED: &str = "This batch cannot be sent as built: build this statement again with the rows in paired_rows still skipped, not named in withdraw_skips.";
 const TRANSFER_VIEW_NOT_ESTABLISHED_SEND_STEP: &str = "Nothing was sent to Tally, and any approval of this batch is withdrawn. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this batch books a transfer twice. error, check and record_id name what failed, without any value from the record. ComplyEaze Bridge runs the same checks before it writes those records, so this comes from a defect in it, or from records a later release of ComplyEaze Bridge wrote in this folder: if a later release has been used here, send with that release; otherwise report it with the error named here. No batch of this company that posts a statement row can be sent until it is fixed, as it already blocks every build that needs the view.";
 /// What a refusal under the admission lock says: the reason is its code alone.
 pub(super) const TRANSFERS_CHANGED_UNDER_LOCK_STEP: &str = "The transfer records changed after this batch was checked and before it was sent; nothing was sent and any approval of this batch is withdrawn. Call post_import again: it gives the whole reason before asking.";
@@ -407,8 +410,8 @@ impl TransferRefusal {
     /// The same refusal for a batch about to be sent: one function maps every
     /// build step, so the two cannot drift. Every one but
     /// `transfer_view_not_established` ends by saying the statement must be built
-    /// again; that one has no such ending, because building it again meets the
-    /// same unreadable record.
+    /// again (a refused withdrawal, with its rows still skipped); that one has no
+    /// such ending, because building it again meets the same unreadable record.
     pub(super) fn for_send(self) -> Self {
         let next_step = if self.reason == "transfer_view_not_established" {
             TRANSFER_VIEW_NOT_ESTABLISHED_SEND_STEP.to_string()
@@ -421,7 +424,12 @@ impl TransferRefusal {
                     .unwrap_or(&self.next_step)
                     .trim()
             });
-            format!("{NOTHING_SENT} {middle} {SEND_ENDING}")
+            let ending = if self.reason == "withdraw_skip_paired" {
+                SEND_ENDING_KEEP_SKIPPED
+            } else {
+                SEND_ENDING
+            };
+            format!("{NOTHING_SENT} {middle} {ending}")
         };
         Self { next_step, ..self }
     }

@@ -153,6 +153,9 @@ base revision.
 <a id="82f-referencedate-on-the-voucher-fetch--verified-2026-10-07-tallyprime-71-one-synthetic-book"></a>
 
 [8.2f `REFERENCEDATE` on the voucher `FETCH` — **VERIFIED 2026-10-07; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82f-referencedate-on-the-voucher-fetch--verified-2026-10-07-tallyprime-71-one-synthetic-book)
+<a id="82g-cost-centre-allocations-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-one-synthetic-book"></a>
+
+[8.2g Cost-centre allocations on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82g-cost-centre-allocations-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-one-synthetic-book)
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)

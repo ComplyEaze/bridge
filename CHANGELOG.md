@@ -110,6 +110,11 @@ These changes are in ComplyEaze Bridge 0.6.1. Most lines name the pull requests 
   directly, and it counts only if the batch was built after the newest record of that skip: a skip recorded since
   refuses the batch (part of #1703).
 
+- When a batch that names skipped rows in `withdraw_skips` is refused at send as `withdraw_skip_paired`, its next
+  step now ends by saying which build to make: this statement again, with the rows in `paired_rows` still skipped
+  and not named in `withdraw_skips`, instead of a bare "build it again" after steps that may speak of the other
+  account's statement (#1714).
+
 - A company restored from a backup after a native post is remembered once it is seen (part of #1050). When
   `verify_import` reads the company's voucher mark below the floor a natively posted batch had proved (a mark Tally
   omits twice counts as a company holding no voucher), the import journal records it, a second restore too, and from then on no natively posted batch of that company at that Tally
@@ -190,8 +195,8 @@ These changes are in ComplyEaze Bridge 0.6.1. Most lines name the pull requests 
   reads the books (it first asks Tally which companies are loaded); before, it read the whole book first and refused afterwards. The refusal's code is
   unchanged and it still may not be retried. Books that begin inside the period (a first year) still read (fixes #1934).
 
-- When a row is refused as already posted and `verify_import` reports the blocking batch `book_rolled_back` (a
-  backup was restored over the book), the refusal's next step now says that ComplyEaze Bridge cannot write the row
+- When a row is refused as already posted and `verify_import` reports the blocking batch `book_rolled_back` (the
+  company's voucher mark was seen below that batch's), the refusal's next step now says that ComplyEaze Bridge cannot write the row
   again and cannot tell whether its voucher is gone, and to tell the user (#1038).
 
 - On Windows, the approval box for a post, a review and a stop release is now measured when it opens. A box that is not
@@ -337,7 +342,7 @@ These changes are in ComplyEaze Bridge 0.6.1. Most lines name the pull requests 
 - The receipt of a failed call now keeps the error code of a tax-audit refusal (a rule code such as
   `BIND-GROUP-UNKNOWN`) and of a refused argument (`argument_invalid:test`). Before, only lower-case tool codes were kept,
   so those two kinds of refusal left a receipt with no error. A code is kept only if it is one of three kinds (a
-  lower-case tool code, or one of two closed lists) and is at most 64 bytes; anything else is still dropped (fixes #1916, #1923).
+  lower-case tool code, or one of two closed lists) and is at most 64 bytes; anything else is still dropped. The rule codes are the 61 tax-audit codes, and an argument name is kept only when one of the registered tools publishes it (fixes #1916, #1923).
 
 - The entry for a change that is not yet in a published build is now one file under `docs/changelog/unreleased/`
   (a folder each for added, changed and removed), not lines added to `CHANGELOG.md`, so two changes no longer
@@ -360,8 +365,9 @@ These changes are in ComplyEaze Bridge 0.6.1. Most lines name the pull requests 
   vouchers are read, a refusal that came from reading them (a part that failed or was not admitted, a part
   Education cannot serve, a read plan that could not be made or went over its allowance, a disagreement between
   the count and the read) no longer happens. A count of several requests can still be refused when it passes
-  its own allowance. A book that fits one request is read as before. The request counts come from test doubles,
-  not from a live Tally.
+  its own allowance. A book that fits one request is read as before. One live run on TallyPrime 7.2 gave the same answers and
+  the request counts the test doubles predict, except one window of a book counted in several requests whose
+  neighbouring day held vouchers, which sent fewer requests than predicted (#1999).
 
 - A read for a company that is not among those open in Tally, refused as `company_identity_not_found`, now carries
   a next step: call `list_companies`, use an ID it returns, and ask the user to open the company in Tally if it is
@@ -416,7 +422,8 @@ These changes are in ComplyEaze Bridge 0.6.1. Most lines name the pull requests 
 - `voucher_read_cost` (#1465): run once on the published 0.6.0 build (the code is unchanged since) on one synthetic company with a voucher mark of 68. The preview said one census read for `vouchers` and none for `ledger_movement` and `verify_import`, with a floor of 0 seconds; its own requests were identity, marks and status reads only. One `vouchers` call over a one-day window (11 vouchers) came back `complete` with one census request, equal to the preview's. The floor formula was not exercised (one census read gives a floor of 0). The refusal above a voucher mark of 2,097,152 was not measured (no book that size).
 - Approval window size (#1780, #1832, #1879): run on one Windows screen only (1920x1080 at 125 percent, one monitor); see "What works differently" for the box sizes shown and refused. Not run: Windows at 1366x768 or at 100 or 150 percent, a second monitor, a moved box. Not run on a Mac against this build. A capture of the Mac alert on 23 October, before #1854 (a 1512x982-point screen) showed the one-voucher worst-case box fitting and the 43-line batch box not fitting and not scrolling; this build was not measured on a Mac.
 - The first line of the approval window (#1832): not run, so the line has not been seen above Tally.
-- Reads on TallyPrime 7.2 (`ineligible_itc` #1741, voucher numbering check #1704, the not-loaded cause #1787): not run. The 0.6.1 reads were measured on TallyPrime 7.1; the lab now runs 7.2.
+- Empty-window count (#1240, #1999): one live run on TallyPrime 7.2 gave the same answers and the request counts the test doubles predict, except one window of a book counted in several requests whose neighbouring day held vouchers, which sent fewer requests than predicted. No other read was run on 7.2.
+- Reads on TallyPrime 7.2 (`ineligible_itc` #1741, voucher numbering check #1704, the not-loaded cause #1787): not run. The 0.6.1 reads were measured on TallyPrime 7.1, apart from the empty-window count above; the lab now runs 7.2.
 - `audit_test_run` (#1733): not run against a live TallyPrime in this build, replayed from the engine's synthetic book only.
 - `statement_tie_out` (#1211): not run.
 - Voucher-type numbering (#724) and a restore remembered after a native post (#1814): not run live. Not covered: Gold, Receipt and Contra under Manual, a type that already held numbered vouchers.
@@ -429,7 +436,7 @@ These changes are in ComplyEaze Bridge 0.6.1. Most lines name the pull requests 
 
 **Known limits**
 
-- **Not run on a live TallyPrime for this build (unless the lines above say otherwise):** anything that writes to Tally, including a batch of Journals, a batch near 50, a post Tally refused or that landed partly, amendments, the review acknowledgement window (no voucher raised a doubt), a post that needs an On Account approval (a bill-wise party; the build refuses one as designed) and an import file taken to Tally's Import menu; Sales invoice posting and ledger creation (not offered); the desktop app and its Terms of Use window (unit, component and browser tests only; the packaged app was not run); Gold; macOS; any Windows or Tally release other than Windows 10 with TallyPrime 7.1 Silver (7.2 is in the lab, but the reads listed above have not run on it); a second monitor. The earlier live passes and the 0.6.0 package check are recorded in the 0.6.0 section below, and say nothing about the file in this release.
+- **Not run on a live TallyPrime for this build (unless the lines above say otherwise):** anything that writes to Tally, including a batch of Journals, a batch near 50, a post Tally refused or that landed partly, amendments, the review acknowledgement window (no voucher raised a doubt), a post that needs an On Account approval (a bill-wise party; the build refuses one as designed) and an import file taken to Tally's Import menu; Sales invoice posting and ledger creation (not offered); the desktop app and its Terms of Use window (unit, component and browser tests only; the packaged app was not run); Gold; macOS; any Windows or Tally release other than Windows 10 with TallyPrime 7.1 Silver (7.2 is in the lab, and one read, the empty-window count, ran on it; the other reads listed above have not); a second monitor. The earlier live passes and the 0.6.0 package check are recorded in the 0.6.0 section below, and say nothing about the file in this release.
 - **The file tested is not the file that will be tagged.** Each live row names the build it ran on: `voucher_read_cost` on the published 0.6.0 build, the window fit on a CI build of #1879; the write pass is owed on the CI package of the commit the release is cut from. The release workflow builds `bridge_mcp` again on its own, with a plain release build of that binary, where the CI package takes it from the Tauri build; the two files are the same source but not byte-identical, and no build is claimed to be reproducible. The published file is checked after publication against the release's checksum, with no write.
 - **Approval window fit.** Measured on one Windows screen (1920x1080 at 125 percent). On other screens a window can be refused as too large, or fit, where it was not measured; on a Mac the alert's size is not checked and a batch window can be taller than the screen (#1780).
 - The `headline` of a batch post has not been seen on a live Tally post (#1090, #1532).

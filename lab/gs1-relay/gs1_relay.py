@@ -92,8 +92,10 @@ ALLOWED_FUNCTIONS = frozenset({"$$Date", "$$IsContra", "$$IsCreditNote", "$$IsDe
                                "$$IsPayment", "$$IsPurchase", "$$IsReceipt", "$$IsSales", "$$LicenseInfo",
                                "$$SysName"})
 MAX_BODY = 1024 * 1024
-# Every date in a forwarded request must be a real date in this range (the sitting's books, FY 2025-26, and the next).
-FIRST_DATE, LAST_DATE = "20250401", "20270331"
+# Every date in a forwarded request must be a real date in this range: the sitting's books, FY 2025-26, and the next,
+# from the day before they begin, because an empty window is corroborated by reading it again widened by one day on
+# each side, so a window that starts on 1 April 2025 is read from 31 March.
+FIRST_DATE, LAST_DATE = "20250331", "20270331"
 # A whole request (headers and body) must arrive within this many seconds of the connection opening.
 CLIENT_DEADLINE_SECONDS = 60
 
@@ -507,6 +509,10 @@ def self_test():
     assert "REFERENCEDATE" not in old_window and "<COMPUTE>" in old_window, "the older window template changed"
     assert ",PARTYGSTIN,REFERENCEDATE</FETCH><COMPUTE>" in class_window, "the class window template changed"
     assert ",PARTYGSTIN,REFERENCEDATE</FETCH><FILTERS>" in entry_window, "the entry window template changed"
+    # The corroboration read of an empty window that starts on the day the books begin: 31 March to 1 May 2025.
+    edge_parts = re.split(r"(?<![0-9])[0-9]{8}(?![0-9])", real("reference_date_entry_window_request.utf16le.xml"))
+    assert len(edge_parts) == 5, "the entry window template changed"
+    edge_window = "".join(part + day for part, day in zip(edge_parts, ["20250331", "20250501"] * 2 + [""]))
     # Each forwarded request must reach the target with the client's own Content-Type lines and no other header but
     # Host (and Content-Length on a POST), and its answer must be the one the target gives that Content-Type.
     cases = [
@@ -520,6 +526,7 @@ def self_test():
         ("POST", "/", b"\xff\xfe" + old_window.encode("utf-16-le"), "text/xml; charset=utf-16"),
         ("POST", "/", b"\xff\xfe" + class_window.encode("utf-16-le"), "text/xml; charset=utf-16"),
         ("POST", "/", b"\xff\xfe" + entry_window.encode("utf-16-le"), "text/xml; charset=utf-16"),
+        ("POST", "/", b"\xff\xfe" + edge_window.encode("utf-16-le"), "text/xml; charset=utf-16"),
     ]
     for index, (method, path, body, content_type) in enumerate(cases):
         sent = [] if content_type is None else [content_type]
@@ -565,6 +572,7 @@ def self_test():
         ("a span slot with other logic", census.replace(" AND $AlterID &gt; 120 AND $AlterID &lt;= 182", " OR 1=1")),
         ("a date that is not a date", census.replace("20251101", "20251301")),
         ("a date out of range", census.replace("20251101", "19000101")),
+        ("the day before the first allowed day", edge_window.replace("20250331", "20250330")),
         ("dates reversed", census.replace("20251130", "20251001")),
         ("formula dates not the window", census.replace('$$Date:"20251101"', '$$Date:"20251102"')),
     ]

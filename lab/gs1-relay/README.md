@@ -31,7 +31,7 @@ builders' renders of the empty-window and divided-window reads) found each one a
 
 ## Before the sitting
 1. Check every file against `SHA256.txt` (`Get-FileHash -Algorithm SHA256 FILE`).
-2. `python -I gs1_relay.py --self-test`. EXPECT `self-test: ok (10 forwarded, 41 refused, none of the refused reached
+2. `python -I gs1_relay.py --self-test`. EXPECT `self-test: ok (11 forwarded, 42 refused, none of the refused reached
    the target)` and exit 0; anything else = do not use the relay.
 
 ## Running it (steps 6 to 8 of GS1-L1)

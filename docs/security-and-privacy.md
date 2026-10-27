@@ -117,8 +117,15 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     holder's name and the bank details; from the release that includes #1490 (not
     0.6.1 or earlier) also the name a mailing address is printed under and the
     address itself (each line of the mailing address, and the flat address field).
-    A party's PIN code, state and country, which `ledger_masters` returns with
-    `fields=compliance`, are not masked under any mode. A name of four characters or fewer is
+    A line is shortened to its first two and last two characters, so a house number
+    or a town at either end of a line can stay readable. The mailing address is read
+    from Tally only when the assistant asks for it (`include_mailing_details` on
+    `ledger_masters` with `fields=compliance`); without that argument,
+    `ledger_masters` does not read it. A party's PIN code, state and country, which
+    `ledger_masters` returns with `fields=compliance` (the older fields always, and
+    the mailing entry's when asked for), are not masked under any mode: for a party
+    that is an individual, such as a proprietor, they can point to the locality of a
+    home address. A name of four characters or fewer is
     replaced by “…”. The spelling a ledger's vouchers carry, which is returned
     beside its name when the two differ, is left out. It does not mask amounts, company names, the names of
     groups in a group total (shown as the book has them), a ledger's parent

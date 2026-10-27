@@ -381,18 +381,18 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED: u64 = 
 /// which most ledgers hold two or more entries could exceed the 16 MB response
 /// budget while still admitted. UNVERIFIED until measured on more books; it is
 /// not a bound. The shared [`COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED`] is
-/// for reads without the details. That capture's request did not name
-/// `LEDMAILINGDETAILS.LIST` (#1490), which this read now names: this figure is
-/// 8,000 plus the 950 bytes the mailing details add to a populated party row,
-/// not a measurement of the two together.
-const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_950;
+/// for reads without the details.
+const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_000;
 
 /// What a compliance master read asks Tally for. [`Self::Standard`] is the
-/// request every reader that does not use a party's mailing address sends (the
-/// registers). [`Self::WithMailingDetails`] also names each ledger's dated
-/// mailing details, as `ledger_masters` and the party/ledger master workbook do.
-/// [`Self::WithGstDetails`] names both that and each ledger's dated GST details.
-/// Each is sized by its own per-ledger estimate wherever the standard one would be.
+/// production request, and every caller other than a `ledger_masters` call that
+/// asked for the dated mailing or GST details and the party/ledger master
+/// workbook passes it. [`Self::WithMailingDetails`] names each ledger's dated
+/// mailing details (`include_mailing_details`, and the workbook, which shows the
+/// entry in force). [`Self::WithGstDetails`] names each ledger's dated GST
+/// details. They are not combined: the request naming both has not been captured
+/// live, so `ledger_masters` refuses the two flags together. Each is sized by its
+/// own per-ledger estimate wherever the standard one would be.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComplianceRead {
     Standard,
@@ -518,13 +518,13 @@ const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 /// split, because a group cannot be read in pieces by `$Parent`. That figure is
 /// the budget over the read's per-ledger constant, not a measurement: 4,266
 /// ledgers for a [`ComplianceRead::Standard`] read, 3,404 for a
-/// [`ComplianceRead::WithMailingDetails`] one and 1,787 for a
+/// [`ComplianceRead::WithMailingDetails`] one and 2,000 for a
 /// [`ComplianceRead::WithGstDetails`] one.
 ///
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
 /// the serial requests one call may spend (four per part), not a measured
 /// limit. It admits about 51,000 ledgers (about 40,800 with the mailing
-/// details, about 21,400 with the GST details), far past what the mark bound
+/// details, about 24,000 with the GST details), far past what the mark bound
 /// admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
 

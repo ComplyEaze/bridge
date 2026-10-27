@@ -1197,6 +1197,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "`include_gst_details` adds each ledger's dated GST rate details, which only \
              fields=compliance reads. Pass fields=compliance, or drop `include_gst_details`.",
         ),
+        "ledger_masters_mailing_details_requires_compliance" => Some(
+            "`include_mailing_details` adds each ledger's dated mailing details (address \
+             lines, PIN code, state, country), which only fields=compliance reads. Pass \
+             fields=compliance, or drop `include_mailing_details`.",
+        ),
+        "ledger_masters_mailing_details_with_gst_details_not_captured" => Some(
+            "`include_mailing_details` and `include_gst_details` were both asked for. The \
+             request that names both has not been captured from a real Tally, so ComplyEaze \
+             Bridge does not send it. Ask for one of them, then the other in a second call.",
+        ),
         // A cause, reached through `ledger_export_invalid` (#675).
         "foreign_currency_ledger_balance" => Some(
             "A ledger in this company holds its opening balance in a foreign currency, which \

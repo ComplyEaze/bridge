@@ -262,10 +262,11 @@ pub fn render_party_ledger_master_request(
 }
 
 /// The party-master request that also names each ledger's dated mailing details
-/// (`LEDMAILINGDETAILS.LIST`, bridge#1490): the one `ledger_masters` and the
-/// party/ledger master workbook send. Its answer holds a longer element on every
-/// row, so it has its own size estimate; the readers that never use the mailing
-/// details keep [`render_party_ledger_master_request`].
+/// (`LEDMAILINGDETAILS.LIST`, bridge#1490): the one `ledger_masters` sends when
+/// asked for them (`include_mailing_details`) and the party/ledger master
+/// workbook sends. Its answer holds a longer element on every row, so it has its
+/// own size estimate; the readers that never use the mailing details keep
+/// [`render_party_ledger_master_request`].
 pub fn render_party_ledger_master_request_with_mailing_details(
     company: &str,
     period: &NativeLedgerExportPeriod,
@@ -275,24 +276,22 @@ pub fn render_party_ledger_master_request_with_mailing_details(
 
 /// What [`render_party_ledger_master_request_with_gst_details`] appends to the
 /// compliance read's `FETCH`: the dated GST details, and the three ledger
-/// fields the GST-details capture also named. Those three
+/// fields the captured request also named. Those three
 /// (`RATEOFTAXCALCULATION`, `ROUNDINGMETHOD`, `ROUNDINGLIMIT`) are fetched only
-/// to keep this request close to the one that was captured; the parser skips
-/// them.
+/// to keep this request the one that was captured; the parser skips them.
 const GST_DETAILS_FETCH_SUFFIX: &str =
     ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
 
 /// The compliance master read with each ledger's `GSTDETAILS.LIST` named in its
-/// `FETCH`, after the mailing details. The captured request behind
-/// `ledger_gst_details_live.utf16le.xml` named no `LEDMAILINGDETAILS.LIST`, so
-/// this request (with both) has not been captured live. Sent only when the
-/// caller asks for the details; it differs from
-/// [`render_party_ledger_master_request_with_mailing_details`] by the suffix.
+/// `FETCH`: the request whose answer is the fixture
+/// `ledger_gst_details_live.utf16le.xml`. Sent only when the caller asks for the
+/// details; the production compliance request
+/// ([`render_party_ledger_master_request`]) is unchanged.
 pub fn render_party_ledger_master_request_with_gst_details(
     company: &str,
     period: &NativeLedgerExportPeriod,
 ) -> String {
-    render_party_ledger_master(company, period, None, true, GST_DETAILS_FETCH_SUFFIX)
+    render_party_ledger_master(company, period, None, false, GST_DETAILS_FETCH_SUFFIX)
 }
 
 /// The compliance master read restricted to the ledgers under one
@@ -325,7 +324,7 @@ pub fn render_party_ledger_master_request_for_parents_with_gst_details(
     period: &NativeLedgerExportPeriod,
     part: &ParentPart,
 ) -> String {
-    render_party_ledger_master(company, period, Some(part), true, GST_DETAILS_FETCH_SUFFIX)
+    render_party_ledger_master(company, period, Some(part), false, GST_DETAILS_FETCH_SUFFIX)
 }
 
 fn render_party_ledger_master(

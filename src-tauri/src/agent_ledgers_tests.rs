@@ -69,7 +69,7 @@ fn party_ledger_master_request_fetches_tax_type_and_gst_duty_head() {
     let request = render_party_ledger_master_request("BRIDGE GST RECON LAB", &period);
     assert!(request.contains("TAXTYPE, GSTDUTYHEAD"));
     assert!(request.contains(", LEDGSTREGDETAILS.LIST</FETCH>"));
-    // `ledger_masters` and the workbook send the one that also names the dated mailing details.
+    // The read that also names the dated mailing details (`include_mailing_details`, the workbook).
     let with_mailing =
         render_party_ledger_master_request_with_mailing_details("BRIDGE GST RECON LAB", &period);
     assert!(with_mailing.contains(", LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST</FETCH>"));
@@ -321,7 +321,7 @@ fn a_live_capture_backs_sgst_utgst_as_a_recognised_head() {
     assert_eq!(
         sha256_hex(render_party_ledger_master_request("BRIDGE GST RECON LAB", &period).as_bytes()),
         "f700339d10d4bdc845f7ab4af482e407fc03d9901a7eaebdf34feb86f8d7ea68",
-        "the fixture answers the party-master request that does not name the mailing details"
+        "the fixture answers exactly the request ledger_masters sends"
     );
     let parsed = parse_native_party_ledger_master_records_with_evidence(
         &captured_live_ledger_masters_with_sgst_utgst(),
@@ -420,7 +420,7 @@ fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
     assert_eq!(
         sha256_hex(render_party_ledger_master_request("BRIDGE READS LAB", &period).as_bytes()),
         "c2f9f8e9fefab44077b222402254a2be3dfd9a9690d4e577efbae99d531c819c",
-        "the fixture answers the party-master request that does not name the mailing details"
+        "the fixture answers exactly the request ledger_masters sends"
     );
     let bytes = include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-gst-registrations.utf16le.xml"
@@ -499,21 +499,6 @@ fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
     );
 }
 
-/// A `compliance` object without its `mailing_details` key. The goldens below were
-/// produced before that key existed (bridge#1490) and are not regenerated: they
-/// hold every other key byte for byte. The key itself is asserted on its own:
-/// each object names it, and a response that did not name the list says
-/// `not_observed`.
-fn without_mailing_details(mut compliance: Value) -> Value {
-    let object = compliance.as_object_mut().expect("a compliance object");
-    assert_eq!(
-        object.remove("mailing_details"),
-        Some(json!({"observation": "not_observed"})),
-        "these captures' requests did not name LEDMAILINGDETAILS.LIST"
-    );
-    compliance
-}
-
 /// bridge#1520, over populated values: the live registration-history capture,
 /// whose rows hold dated registrations, serialised through the helper equals
 /// the golden that the expression the row used before `gst_details` existed
@@ -540,8 +525,7 @@ fn populated_compliance_objects_are_byte_for_byte_the_ones_built_before_gst_deta
     let compliance = parsed
         .records
         .into_iter()
-        .map(|row| compliance_json(row.record.fields, false))
-        .map(without_mailing_details)
+        .map(|row| compliance_json(row.record.fields, false, false))
         .collect::<Vec<_>>();
     assert!(!compliance.is_empty());
     assert!(compliance.iter().all(|value| value.is_object()));
@@ -1868,9 +1852,9 @@ mod through_the_tool {
         )
         .await;
         let admitted_plans = marked_compliance_plans(
-            3_404,
+            4_266,
             vec![masters(), balances(), groups()],
-            Some(extent_with_master_mark(3_404)),
+            Some(extent_with_master_mark(4_266)),
         );
         let (admitted, _) = call(
             admitted_plans,
@@ -2729,7 +2713,7 @@ mod through_the_tool {
     /// the same three reads in the same order, and the same rows.
     #[tokio::test]
     async fn a_book_whose_master_mark_is_at_the_bound_reads_as_before() {
-        let mark = 16_000_000 / 4_700;
+        let mark = 16_000_000 / 3_750;
         let plans = marked_compliance_plans(
             mark,
             vec![masters(), balances(), groups()],
@@ -3132,7 +3116,7 @@ mod through_the_tool {
         .await;
         let compliance = items(&response)
             .iter()
-            .map(|row| without_mailing_details(row["compliance"].clone()))
+            .map(|row| &row["compliance"])
             .collect::<Vec<_>>();
         assert!(!compliance.is_empty());
         assert!(compliance.iter().all(|value| value.is_object()));
@@ -3177,7 +3161,7 @@ mod through_the_tool {
         assert!(!response.to_string().contains("gst_details"));
     }
 
-    /// bridge#1490, over the live answer to the request this tool sends: each
+    /// bridge#1490, over the live answer to the request this tool sends when asked for them: each
     /// row's `compliance.mailing_details` carries the dated mailing entry the
     /// flat address fields leave empty. The probe party's entry is the one
     /// measured; a ledger with no address is an observed empty list.
@@ -3187,7 +3171,7 @@ mod through_the_tool {
         let balances = balances_matching(&masters);
         let (response, _) = call(
             compliance_plans(masters, balances),
-            json!({"company_guid":GUID,"fields":"compliance"}),
+            json!({"company_guid":GUID,"fields":"compliance","include_mailing_details":true}),
         )
         .await;
         let rows = items(&response);
@@ -3243,7 +3227,7 @@ mod through_the_tool {
                 },
             ..bridge_tally_protocol::PartyLedgerMasterFields::default()
         };
-        let compliance = compliance_json(fields, false);
+        let compliance = compliance_json(fields, false, true);
         let entry = |value: &Value| value["mailing_details"]["entries"][0].clone();
         assert_eq!(
             entry(&compliance)["mailing_name"],
@@ -3295,7 +3279,7 @@ mod through_the_tool {
         };
         let masked = |fields| {
             crate::agent::redact_value(
-                compliance_json(fields, false),
+                compliance_json(fields, false, true),
                 crate::agent::Redaction::MaskParties,
             )
         };
@@ -3338,6 +3322,7 @@ mod through_the_tool {
                     lines.iter().map(|line| line.to_string()).collect(),
                 ),
                 false,
+                true,
             ),
             crate::agent::Redaction::None,
         );
@@ -4893,8 +4878,8 @@ mod through_the_tool {
             compliance_master_ledgers_per_read, parent_partition_limits, ComplianceRead,
         };
         use bridge_tally_protocol::native_outstandings::{
+            render_party_ledger_master_request_for_parents,
             render_party_ledger_master_request_for_parents_with_gst_details,
-            render_party_ledger_master_request_for_parents_with_mailing_details,
             render_party_ledger_master_request_with_gst_details,
         };
         use bridge_tally_protocol::parent_partition::{
@@ -5018,17 +5003,15 @@ mod through_the_tool {
         fn master_reads_sent(observed: &[ObservedRequest], parts: &[ParentPart]) -> usize {
             let period = harness_period();
             let mut requests = vec![
-                render_party_ledger_master_request_with_mailing_details(HARNESS_COMPANY, &period),
+                render_party_ledger_master_request(HARNESS_COMPANY, &period),
                 render_party_ledger_master_request_with_gst_details(HARNESS_COMPANY, &period),
             ];
             for part in parts {
-                requests.push(
-                    render_party_ledger_master_request_for_parents_with_mailing_details(
-                        HARNESS_COMPANY,
-                        &period,
-                        part,
-                    ),
-                );
+                requests.push(render_party_ledger_master_request_for_parents(
+                    HARNESS_COMPANY,
+                    &period,
+                    part,
+                ));
                 requests.push(
                     render_party_ledger_master_request_for_parents_with_gst_details(
                         HARNESS_COMPANY,
@@ -5100,10 +5083,7 @@ mod through_the_tool {
                 assert_eq!(
                     sent(
                         &observed,
-                        &render_party_ledger_master_request_with_mailing_details(
-                            HARNESS_COMPANY,
-                            &period
-                        )
+                        &render_party_ledger_master_request(HARNESS_COMPANY, &period)
                     ),
                     2,
                     "the production compliance request, read as a pair: {flag:?}"
@@ -5164,10 +5144,7 @@ mod through_the_tool {
             assert_eq!(
                 sent(
                     &observed,
-                    &render_party_ledger_master_request_with_mailing_details(
-                        HARNESS_COMPANY,
-                        &period
-                    )
+                    &render_party_ledger_master_request(HARNESS_COMPANY, &period)
                 ),
                 0,
                 "the production request is not also sent"
@@ -5264,7 +5241,7 @@ mod through_the_tool {
                 "says nothing either way",
                 "14-ledger lab book of TallyPrime 7.1 Silver",
                 "not yet run through this tool on a live Tally",
-                "admitted at 8,950 bytes a ledger instead of 4,700",
+                "admitted at 8,000 bytes a ledger instead of 3,750",
                 "not a measured ratio",
             ] {
                 assert!(limitations.contains(words), "{words}: {limitations}");
@@ -5556,7 +5533,7 @@ mod through_the_tool {
                     let balances = balances_matching(&masters);
                     call_observed(
                         compliance_plans(masters, balances),
-                        compliance_args(None),
+                        json!({"company_guid":GUID,"fields":"compliance","include_mailing_details":true}),
                         redaction,
                         200_000,
                     )
@@ -5612,6 +5589,109 @@ mod through_the_tool {
                 masked["compliance"]["address"],
                 json!(crate::agent::mask(flat))
             );
+        }
+
+        /// bridge#1490: the dated mailing details are read only when asked for. Without
+        /// `include_mailing_details` (absent or false) the master read is the production
+        /// request, byte for byte, and no row carries a `mailing_details` key; with it the
+        /// read names the list and every row carries the key.
+        #[tokio::test]
+        async fn the_mailing_details_are_read_and_returned_only_when_asked_for() {
+            let period = harness_period();
+            for flag in [None, Some(false)] {
+                let args = match flag {
+                    None => json!({"company_guid":GUID,"fields":"compliance"}),
+                    Some(flag) => {
+                        json!({"company_guid":GUID,"fields":"compliance","include_mailing_details":flag})
+                    }
+                };
+                let plans = compliance_plans(masters(), balances());
+                let total = plans.len();
+                let (response, observed) =
+                    call_observed(plans, args, Redaction::None, 200_000).await;
+                assert_eq!(observed.len(), total, "{flag:?}");
+                assert_eq!(
+                    sent(
+                        &observed,
+                        &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                    ),
+                    2,
+                    "the production request, read as a pair: {flag:?}"
+                );
+                assert_eq!(
+                    sent(
+                        &observed,
+                        &render_party_ledger_master_request_with_mailing_details(
+                            HARNESS_COMPANY,
+                            &period
+                        )
+                    ),
+                    0,
+                    "{flag:?}"
+                );
+                for row in items(&response) {
+                    let compliance = row["compliance"].as_object().unwrap();
+                    assert!(
+                        !compliance.contains_key("mailing_details"),
+                        "{flag:?}: {row}"
+                    );
+                    assert!(compliance.contains_key("gst_registrations"), "{row}");
+                }
+            }
+            let masters = mailing_masters();
+            let balances = balances_matching(&masters);
+            let (response, observed) = call_observed(
+                compliance_plans(masters, balances),
+                json!({"company_guid":GUID,"fields":"compliance","include_mailing_details":true}),
+                Redaction::None,
+                200_000,
+            )
+            .await;
+            assert_eq!(
+                sent(
+                    &observed,
+                    &render_party_ledger_master_request_with_mailing_details(
+                        HARNESS_COMPANY,
+                        &period
+                    )
+                ),
+                2,
+                "the request that names the mailing details, read as a pair"
+            );
+            for row in items(&response) {
+                assert!(row["compliance"].get("mailing_details").is_some(), "{row}");
+            }
+            let lead = &response["structuredContent"]["result"]["limitations"];
+            assert!(
+                lead.to_string()
+                    .contains("admitted at 4,700 bytes a ledger"),
+                "{lead}"
+            );
+        }
+
+        /// bridge#1490: the flag is refused with any other `fields`, and together with
+        /// `include_gst_details`, before any read.
+        #[tokio::test]
+        async fn the_mailing_details_flag_is_refused_where_it_cannot_be_served() {
+            for (args, code) in [
+                (
+                    json!({"company_guid":GUID,"include_mailing_details":true}),
+                    "ledger_masters_mailing_details_requires_compliance",
+                ),
+                (
+                    json!({"company_guid":GUID,"fields":"compliance","include_mailing_details":true,"include_gst_details":true}),
+                    "ledger_masters_mailing_details_with_gst_details_not_captured",
+                ),
+                (
+                    json!({"company_guid":GUID,"fields":"compliance","include_mailing_details":"yes"}),
+                    "argument_invalid:include_mailing_details",
+                ),
+            ] {
+                let (response, observed) =
+                    call_observed(Vec::new(), args, Redaction::None, 200_000).await;
+                assert!(observed.is_empty(), "{code}: no read is sent");
+                assert!(response.to_string().contains(code), "{code}: {response}");
+            }
         }
 
         // -- admission: the details read is sized by its own estimate --------
@@ -5684,7 +5764,7 @@ mod through_the_tool {
         /// either read counts the book first.
         #[test]
         fn the_books_chosen_for_the_boundary_tests_sit_between_the_two_limits() {
-            let standard = compliance_master_ledgers_per_read(ComplianceRead::WithMailingDetails);
+            let standard = compliance_master_ledgers_per_read(ComplianceRead::Standard);
             let with = compliance_master_ledgers_per_read(ComplianceRead::WithGstDetails);
             assert!(with < standard);
             assert!(std::hint::black_box(MARK) > standard);
@@ -5712,10 +5792,7 @@ mod through_the_tool {
             assert_eq!(
                 sent(
                     &observed,
-                    &render_party_ledger_master_request_with_mailing_details(
-                        HARNESS_COMPANY,
-                        &period
-                    )
+                    &render_party_ledger_master_request(HARNESS_COMPANY, &period)
                 ),
                 2
             );
@@ -5751,7 +5828,7 @@ mod through_the_tool {
                 assert_eq!(
                     sent(
                         &observed,
-                        &render_party_ledger_master_request_for_parents_with_mailing_details(
+                        &render_party_ledger_master_request_for_parents(
                             HARNESS_COMPANY,
                             &period,
                             part

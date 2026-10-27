@@ -815,12 +815,12 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   that did not name it. By ledger row (UTF-16 bytes, counted by structure): the one party that holds an address grew
   from 3,010 to 3,958 (its mailing element is 934 bytes), and each of the other seven rows by 122 (an empty element is
   108 bytes). A second entry per party is not measured. Bridge's per-ledger budget for a read that names the list is
-  4,700 bytes against 3,750 for one that does not (UNVERIFIED: no populated book has been read).
+  4,700 bytes against 3,750 for one that does not (UNVERIFIED: no populated book has been read). `ledger_masters` sends it only when asked (`include_mailing_details`, refused with `include_gst_details` because the request naming both has not been captured).
 - **Not shown.** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
   sends them, is not measured: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), a party with two
   mailing rows, an entry with no `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers.
 
-Bridge reads the list into a dated history (`compliance.mailing_details` of `ledger_masters`, and the mailing columns of
+Bridge reads the list into a dated history (`compliance.mailing_details` of `ledger_masters` with `include_mailing_details`, and the mailing columns of
 the party/ledger master workbook) and leaves the flat fields as returned. A response that carries no such element is
 reported as not observed, which is not the same as an empty history.
 

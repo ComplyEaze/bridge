@@ -1742,7 +1742,7 @@ fn a_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     // UNVERIFIED: decided against one capture (a margin above 5,394).
     assert_eq!(
         super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED,
-        8_950
+        8_000
     );
     assert!(
         std::hint::black_box(super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED)
@@ -1810,7 +1810,7 @@ fn a_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     assert!(!super::compliance_estimate_unverified(with + 1, WithGstDetails).fits);
 }
 
-/// The read that names the mailing details (`ledger_masters`, the workbook) is
+/// The read that names the mailing details (`include_mailing_details`, the workbook) is
 /// sized by its own estimate, above the shared one the registers keep and below
 /// the GST details read's; the limits are the constants' own quotients (#1490).
 #[test]
@@ -1825,7 +1825,7 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     let details = super::compliance_master_ledgers_per_read(WithGstDetails);
     assert_eq!(
         (standard, mailing, details),
-        (4_266, 3_404, 1_787),
+        (4_266, 3_404, 2_000),
         "the registers keep their limit; the others are the budget over their own estimates"
     );
     // A mark the registers admit is counted first when the mailing details are named.

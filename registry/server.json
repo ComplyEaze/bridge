@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ComplyEaze/bridge-tally",
   "title": "ComplyEaze Bridge",
-  "description": "Reads books; proposes vouchers from bank statement PDFs; posting off by default.",
+  "description": "Reads books; proposes vouchers from four Indian banks' statement PDFs; posting off by default.",
   "version": "0.6.1",
   "websiteUrl": "https://bridge.complyeaze.com",
   "repository": {

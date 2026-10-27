@@ -793,7 +793,14 @@ fn ledger_movement_schema_exposes_offset_and_limit() {
 
 #[test]
 fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
-    let known_parties = ["Customer One", "Supplier Two", "PAN Holder", "Entry Ledger"];
+    let known_parties = [
+        "Customer One",
+        "Supplier Two",
+        "PAN Holder",
+        "Entry Ledger",
+        "Cost Centre One",
+        "Cost Category One",
+    ];
     let samples = [
         (
             "balance_sheet",
@@ -827,6 +834,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "masters",
             json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
+        ),
+        (
+            "negative_ledgers",
+            json!({"result":{"ledgers":[{"ledger":party_name("Customer One"),"side":"credit","amount":"10.00"}]}}),
         ),
         (
             "negative_stock",
@@ -891,7 +902,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "vouchers",
             mark_voucher_party_names(
-                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger"}]}),
+                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger","cost_centre_allocations":[{"category":"Cost Category One","cost_centre":"Cost Centre One","amount":"-1.00"}]}]}),
             ),
         ),
     ];
@@ -972,17 +983,41 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             }),
         ));
     }
+    // `lab_read_purchase_identity` returns no name beyond the company: a difference names the voucher's GUID and
+    // the field, never its values (they stay in the exchange the lab keeps).
+    #[cfg(feature = "lab-writes")]
+    if registered.contains("lab_read_purchase_identity") {
+        lab_samples.push((
+            "lab_read_purchase_identity",
+            json!({
+                "agent": {"rows": 2, "response_chars": 120_000, "response_chars_per_row": 60_000, "window_honoured": true},
+                "narrow": {"rows": 2, "response_chars": 16_000, "response_chars_per_row": 8_000, "window_honoured": true},
+                "differences": {
+                    "total": 1,
+                    "listed": [{"guid": "synthetic-guid-00000001", "field": "party"}],
+                    "listed_truncated": false,
+                },
+                "inconclusive": false,
+            }),
+        ));
+    }
     // The two lab import tools stay without a sample, on purpose. Their results carry names as
     // plain strings that no marking reaches: the masters and vouchers the caller itself sent (as
     // `Kind:Name` strings and `ledger_line[<name>]`, a ledger's name among them) and names read
     // back from the target book. A sample would show a name that the walk cannot mask. The tools write only to a target admitted by `admit_lab_target`,
     // whose guard today is a deny list of other companies (#972); a client's ledger names could
     // appear unmasked only if that guard failed. Marking those names is a separate change.
+    // `lab_voucher_key_probe` (#685) returns no name a walk could mark: identifiers, a date,
+    // the voucher type's name and two flags, so it has no sample either.
     #[cfg(feature = "lab-writes")]
     without_a_sample.extend(
-        ["lab_import_masters", "lab_import_vouchers"]
-            .into_iter()
-            .filter(|name| registered.contains(*name)),
+        [
+            "lab_import_masters",
+            "lab_import_vouchers",
+            "lab_voucher_key_probe",
+        ]
+        .into_iter()
+        .filter(|name| registered.contains(*name)),
     );
     let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
     assert_eq!(

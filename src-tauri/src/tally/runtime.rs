@@ -63,6 +63,10 @@ mod company_features_tests;
 mod month_register;
 pub(crate) use month_register::MonthRegisterReadError;
 
+#[path = "runtime_negative_ledgers.rs"]
+mod negative_ledgers;
+pub(crate) use negative_ledgers::NegativeLedgersReadError;
+
 #[path = "runtime_stock_summary.rs"]
 mod stock_summary;
 pub(crate) use stock_summary::StockSummaryReadError;

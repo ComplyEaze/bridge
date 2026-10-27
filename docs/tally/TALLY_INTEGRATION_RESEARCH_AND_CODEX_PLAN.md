@@ -139,8 +139,9 @@ Bridge should implement those only where they serve the Tally workflow. Its uniq
 
 > **Implementation note (2026-07-14):** This section records the baseline that
 > motivated the plan. Several P0/P1 items have since been implemented in the
-> working tree. The adjacent [support matrix](./support-matrix.md) is the
-> authoritative, evidence-scoped implementation status; roadmap text is never
+> working tree. The protocol reference (`TALLY_PROTOCOL_REFERENCE.md`) is the
+> authoritative, evidence-scoped record of observed behaviour (the generated support
+> matrix was removed, #1745); roadmap text is never
 > a support claim.
 
 ### 3.1 What is already good
@@ -649,7 +650,7 @@ Each PR must follow `AGENTS.md`, the repository review checklist, rollback/migra
 #### Deliverables
 
 - `docs/tally/README.md`
-- `docs/tally/support-matrix.md`
+- `docs/tally/support-matrix.md` (removed, #1745)
 - `docs/tally/privacy-model.md`
 - `docs/adr/00x-tally-transport-negotiation.md`
 - `docs/adr/00x-tally-company-identity.md`

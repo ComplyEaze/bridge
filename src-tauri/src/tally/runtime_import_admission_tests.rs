@@ -785,3 +785,68 @@ fn a_wire_refused_pre_intent_read_stays_the_wire_refusal() {
     assert!(typed.chain().any(|cause| cause.is::<Unconfirmed>()));
     assert_eq!(crate::endpoint_wire::wire_refusal(&typed), None);
 }
+
+/// The desktop app posts nothing until the Terms of Use are accepted: `post_approved_import` stops
+/// at the gate in `session()` before the admission recheck, the intent or any request, and after
+/// acceptance the same call gets as far as the connection (a port nothing listens on).
+#[tokio::test]
+async fn a_post_is_refused_before_the_terms_are_accepted_and_goes_on_after() {
+    use crate::agent::terms::TERMS_VERSION;
+    use crate::desktop_terms::DesktopTerms;
+
+    async fn post_error(runtime: &TallyRuntime, touched: &Arc<AtomicBool>) -> anyhow::Error {
+        let companies = captured_companies();
+        let (recheck, dispatch) = (touched.clone(), touched.clone());
+        runtime
+            .post_approved_import(
+                TallyConfig {
+                    host: "127.0.0.1".into(),
+                    port: 9,
+                },
+                &identity(&companies),
+                approved_import(&companies, "20260901"),
+                move |_: QueuedAdmission<'_>| {
+                    recheck.store(true, Ordering::Release);
+                    Ok(())
+                },
+                move || {
+                    dispatch.store(true, Ordering::Release);
+                    Ok(())
+                },
+            )
+            .await
+            .expect_err("nothing listens on the discard port")
+    }
+
+    let directory = tempfile::tempdir().unwrap();
+    let terms = Arc::new(DesktopTerms::new(directory.path().to_path_buf()));
+    let runtime = TallyRuntime::desktop(Arc::clone(&terms));
+    let touched = Arc::new(AtomicBool::new(false));
+
+    let refused = post_error(&runtime, &touched).await;
+    assert_eq!(
+        refused
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<TermsRefusal>())
+            .map(|refusal| refusal.code),
+        Some("terms_not_accepted"),
+        "{refused:#}"
+    );
+    assert!(
+        !touched.load(Ordering::Acquire),
+        "a refusal precedes the recheck and the dispatch"
+    );
+    assert!(
+        !directory.path().join("terms-acceptance.jsonl").exists(),
+        "a refusal records nothing"
+    );
+
+    terms.accept(TERMS_VERSION).unwrap();
+    let past_the_gate = post_error(&runtime, &touched).await;
+    assert!(
+        !past_the_gate
+            .chain()
+            .any(|cause| cause.is::<TermsRefusal>()),
+        "{past_the_gate:#}"
+    );
+}

@@ -27,7 +27,7 @@ const everyJob = [...FAMILIES.native, ...FAMILIES.bundle];
 const ranEverything = jobsOf([...ALWAYS, ...everyJob, "Tax-audit mutation records", "Required checks"].map((name) => job(name)));
 const skippedHeavyJobs = jobsOf([
   ...ALWAYS.map((name) => job(name)),
-  ...["Native checks (${{ matrix.os }})", "Bundle smoke (${{ matrix.os }})",
+  ...["Native checks (${{ matrix.os }}, shard ${{ matrix.shard }} of 2)", "Bundle smoke (${{ matrix.os }})",
     "Tax-audit mutation records", "Seam positive control (${{ matrix.os }})"].map((name) => job(name, "skipped")),
   job("Required checks"),
 ]);
@@ -153,7 +153,7 @@ for (const [name, failWith] of [
 
 test("a lockfile, manifest, toolchain, CI workflow or CI action change runs everything without asking the API", async () => {
   for (const file of [
-    "src-tauri/Cargo.lock", "Cargo.toml", "src-tauri/crates/bridge-tally-core/Cargo.toml", "tools/Cargo.lock",
+    "src-tauri/Cargo.lock", "Cargo.toml", "src-tauri/crates/bridge-tally-core/Cargo.toml",
     "rust-toolchain.toml", "rust-toolchain", "scripts/master-push-reuse.mjs", ".cargo/config.toml", "src-tauri/.cargo/config.toml",
     "src-tauri/tauri.conf.json", ".github/workflows/ci.yml", ".github/actions/setup-windows-native/action.yml",
   ]) {
@@ -290,14 +290,16 @@ test("the family job names are exactly ci.yml's native, bundle-smoke and seam-co
   };
   const expand = (job) => {
     const text = block(job);
-    const label = /^    name: (.+) \(\$\{\{ matrix\.os \}\}\)$/m.exec(text)?.[1];
+    const label = /^    name: (.+) \(\$\{\{ matrix\.os \}\}(?:, shard \$\{\{ matrix\.shard \}\} of 2)?\)$/m.exec(text)?.[1];
+    // A job with a `shard: [1, 2]` row (the native job) reports one job per system and shard.
+    const sharded = /^        shard: \[1, 2\]$/m.test(text);
     // The queue and a push run every system; a pull request may run fewer (the macOS bundle and seam jobs
     // skip it), so the list that matters here is the one for events other than a pull request.
     const osLine = /^        os: (.+)$/m.exec(text)?.[1] ?? "";
     const lists = osLine.startsWith("[") ? [osLine.slice(1, -1)] : [...osLine.matchAll(/'\[([^\]]+)\]'/g)].map((match) => match[1]);
     const systems = lists.at(-1)?.split(",").map((entry) => entry.trim().replaceAll('"', ""));
     assert.ok(label && systems?.length, `${job} has a matrix name and an os list`);
-    return systems.map((system) => `${label} (${system})`);
+    return systems.flatMap((system) => sharded ? [1, 2].map((shard) => `${label} (${system}, shard ${shard} of 2)`) : [`${label} (${system})`]);
   };
   assert.deepEqual(FAMILIES.native, expand("native"));
   assert.deepEqual(FAMILIES.bundle, [...expand("bundle-smoke"), ...expand("seam-control")]);

@@ -1,6 +1,6 @@
 # `builtin_cash_flow_*`, `builtin_negative_ledgers_*`, `builtin_unknown_report_*` — provenance
 
-Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analysis, Negative Stock and Negative Ledgers reports, and of its answer to a report name it does not have, requested by report name (protocol reference §12a.1's envelope). Every response file is a live capture, never hand-written. Only Cash Flow, Funds Flow, Negative Stock, the empty Negative Ledgers answer and the unknown-name refusal are read by a parser and its tests; the Sales Register and Ratio Analysis files are kept as the evidence for protocol reference §12a.16, and no code reads them yet.
+Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analysis, Negative Stock and Negative Ledgers reports, and of its answer to a report name it does not have, requested by report name (protocol reference §12a.1's envelope). Every response file is a live capture, never hand-written. Only Cash Flow, Funds Flow, Negative Stock, the Negative Ledgers answers (empty, and with two ledgers) and the unknown-name refusal are read by a parser and its tests; the Sales Register and Ratio Analysis files are kept as the evidence for protocol reference §12a.16, and no code reads them yet.
 
 ## Provenance
 
@@ -12,7 +12,7 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 - **What the captures show:**
   - Cash Flow: no `HEADER` or `STATUS`, and one `DSPPERIOD` (a month name, **no year**) followed by one `DSPACCINFO` (`DSPDRAMT/DSPDRAMTA`, `DSPCRAMT/DSPCRAMTA`, `DSPCLAMT/DSPCLAMTA`) per month: 12 for the year, 3 for April to June, 1 for June. A month with no activity is a present row with empty amounts. A debit is negative. The year's request sent twice gave byte-identical answers (not kept twice).
   - **The Cash Flow rows tie to the native trial balance on this book, inflows only:** for each window the sum of the months' `DSPDRAMTA` equalled the sum of the debits of the ledgers under Cash-in-Hand and Bank Accounts read by `trial_balance` for the same window (17,975,981.22 for the year, 7,263,013.22 for April to June, 5,472,348.20 for June); no credit existed to compare, so the credit column is untested. The trial balance responses themselves are not kept.
-  - Negative Ledgers: an empty `<ENVELOPE>` on a book that holds no negative-signed ledger. This is **inconclusive**: an empty envelope cannot be told from a report that was not rendered (§12a.11). Its row shape is unseen.
+  - Negative Ledgers: an empty `<ENVELOPE>` on a book that holds no negative-signed ledger. This is **inconclusive**: an empty envelope cannot be told from a report that was not rendered (§12a.11). Its row shape was unseen on that date (seen on 2026-10-09: see the last section).
   - An unknown report name: `STATUS` 0 and a `LINEERROR` "Could not find Report '<name>'!", HTTP 200, no dialog. (§12a.1 measured a bare `RESPONSE` "Unknown Request" on another build.)
 - **Not established (as of 2026-10-06; the 2026-10-07 captures below add credits, a month with both columns and a Bank OD ledger):** any outflow, a contra, Bank OD, a month with both an inflow and an outflow, a window that is not whole months, a multi-currency book, optional or post-dated vouchers, Education mode, and any book other than this one.
 
@@ -28,6 +28,8 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 | `builtin_negative_ledgers_probe_b_fy_empty_live.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | Negative Ledgers, empty envelope (inconclusive) |
 | `builtin_unknown_report_refusal_live.utf16le.xml` | 448 | `010d3144c2483d9147bb576a3b88314ff0d6434645bcbea5822bfcaa8ef43dc6` | Tally's refusal of that name |
 | `builtin_unknown_report_request.utf16le.xml` | 798 | `232ba9c3a753133eb24912a803d63d79ad1fd22aa6b45cd54717a1e1a73ca7ae` | request, a report name Tally does not have |
+| `builtin_negative_ledgers_bridge_lab_win_fy_live.utf16le.xml` | 1018 | `b838c49fe1d4a80876ba63f74e6c975e781deb201e7b455b4098545e05d16d5d` | Negative Ledgers, 2026-04-01 to 2027-03-31, two ledgers listed (see the section at the end) |
+| `builtin_negative_ledgers_bridge_lab_win_fy_request.utf16le.xml` | 772 | `301671dafe3802202b24515a62c90001658b86089c41cba48ce4098f9287ce68` | request, Negative Ledgers, 2026-04-01 to 2027-03-31, company `Bridge Lab Win 0.5.1` |
 | `builtin_funds_flow_fy_request.utf16le.xml` | 764 | `e4aab2996d71aafdbb7df82ca8fb99dce8440f53d007cab61766d6c8d272c883` | request, Funds Flow, 2025-04-01 to 2026-03-31 |
 | `builtin_funds_flow_probe_b_fy_live.utf16le.xml` | 6196 | `fd328be1820b65d9e9e3a501b88a7bce823f16c387a531bc8486bf5dd829ad4d` | Funds Flow, 12 month rows, the only Funds Flow window captured (read by `native_funds_flow`) |
 | `builtin_negative_stock_shape_lab_fy_live.utf16le.xml` | 2392 | `de7e67b5d1ef8d86a85179f1814333e91cba7bd07938d02bc3b0bdb22b4f7031` | Negative Stock, 5 items (read by `native_negative_stock`) |
@@ -67,3 +69,45 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 | `builtin_sales_register_pilot_lab_fy_live.utf16le.xml` | 5562 | `03208b50260350059a55ac7db39acfa4662da89dc35fb357f06443196ad15861` | Sales Register, 12 month rows, two with amounts (read by `native_month_register`) |
 | `builtin_purchase_register_pilot_lab_fy_request.utf16le.xml` | 766 | `84998b3748069d070f6d900427554e7131bfebe48592e7d1bb00418016364fb1` | request, Purchase Register, 2026-04-01 to 2027-03-31, on the pilot lab |
 | `builtin_purchase_register_pilot_lab_fy_live.utf16le.xml` | 5550 | `dc3d8d424786913b6560e1bffa2217b3b03f307afb30e625b36c77de9bde45c5` | Purchase Register, 12 month rows, one with a month amount (read by `native_month_register`) |
+
+## `builtin_negative_ledgers_bridge_lab_win_fy_*`: the first non-empty Negative Ledgers answer
+
+- **Host / gateway:** TallyPrime **Silver (licensed)**, 7.1, Windows 10 Home Single Language 22H2, a lab instance; one request at a time, attended, `GET /status` after it answered HTTP 200 (51 bytes).
+- **Date and book:** 2026-10-09, the synthetic company `Bridge Lab Win 0.5.1` (the only company loaded; voucher mark 13 before and after), window 2026-04-01 to 2027-03-31.
+- **Sender:** a script run by an outside contributor, not `bridge_mcp`: the committed `builtin_negative_ledgers_fy_request` envelope with exactly three values changed (company and the two dates), UTF-16LE with a BOM, `Content-Type: text/xml; charset=utf-16`, one request, no retry. A test asserts that `render_native_negative_ledgers_request` produces these request bytes.
+- **Answer:** 1,018 bytes, BOM-less UTF-16LE, `RESPSTATUS: 1`, the bytes as received. Two entries, each a `DSPACCNAME`/`DSPDISPNAME` then a `DSPACCINFO` with `DSPCLDRAMT/DSPCLDRAMTA` and `DSPCLCRAMT/DSPCLCRAMTA`: a creditor listed with a **debit** closing, carried as a negative `DSPCLDRAMTA` (`-2500.50`, the credit column empty), and a debtor with a **credit** closing, a positive `DSPCLCRAMTA` (`10000.00`, the debit column empty). The display fields are empty. A second request returned the same bytes (sha256 `b838c49f...` as above), reported by the contributor and not kept.
+- **Checked against Tally's own screen and the trial balance of the same window, by the contributor, on this one book:** both entries matched the Negative Ledgers screen and the trial balance. A ledger under Suspense A/c with a credit balance (93,700.50) is **not** listed, on the screen and in the answer alike: it is not a general rule, the book is one book.
+- **Not established:** why Tally lists a ledger (the rule behind the list), a window that is not a whole financial year, a book with GST, stock or several currencies, a large book (cost and size), optional or post-dated vouchers, any other release.
+
+## `builtin_negative_ledgers_shape_lab_fy_*`: a Negative Ledgers answer of eleven ledgers (2026-10-21)
+
+- **Host / gateway:** TallyPrime **Silver (licensed)**, 7.1, Windows, a lab instance, `education_mode=false`; one request at a time, curl, no retry, HTTP 200.
+- **Book:** the synthetic company `BRIDGE SHAPE LAB` (loaded alone for the reads of this group), window 2025-04-01 to 2026-03-31. Its request is the committed Negative Ledgers envelope with only the company and the dates changed (UTF-16LE with a BOM); a test asserts that `render_native_negative_ledgers_request` produces it.
+- **Answer:** 5,236 bytes in 0.12 s, BOM-less UTF-16LE as received (the lab's send log records sha256 `2945267f...`, equal to this file's). Eleven entries in the row shape of the first capture: `Bank of Baroda CA` with a credit closing; `Capital A/c`, `HDFC CC`, `Working Capital Loan` and the four Duties & Taxes ledgers `Cess`, `CGST`, `IGST` and `State Tax` with debit closings (negative `DSPCLDRAMTA`); and three `Shape Buyer` debtors with credit closings. Every entry has exactly one column filled, a debit negative and a credit positive, as in §12a.16's sign rule.
+- **Not checked against:** Tally's screen or this book's trial balance (neither was read in this sitting), so whether each listed ledger sits on the side opposite its group, and whether a ledger Tally did not list sits on its usual side, is not established by this capture.
+- **Not established:** why Tally lists a ledger, a window that is not a whole financial year, the cost on a large book, another release.
+
+| file | bytes | sha256 | content |
+| --- | ---: | --- | --- |
+| `builtin_negative_ledgers_shape_lab_fy_request.utf16le.xml` | 764 | `8b54a2bfa6e5c330bc86264124f4aaf316f01046e54bfaa98aff86ffaa1ede28` | request, Negative Ledgers, 2025-04-01 to 2026-03-31, on the shape lab |
+| `builtin_negative_ledgers_shape_lab_fy_live.utf16le.xml` | 5236 | `2945267f32e168ceb55a32bc569d5d6c862644870b7ccb3cb008858ed64b4f4c` | Negative Ledgers, eleven ledgers on both sides |
+
+## Added 2026-10-21: Negative Stock on a book with a short item, to a mid-year date, and on a book with none
+
+- **Date and instance:** 2026-10-21, TallyPrime 7.1 Silver on Windows, attended, one request at a time, HTTP 200 on every answer. Responses are BOM-less UTF-16LE exactly as received; the requests are UTF-16LE with a BOM.
+- **Sender:** a lab script (not `bridge_mcp`) sending the request texts tabled below, which are the committed Negative Stock request with only the company and, for one, the end date changed (a test asserts equality with `render_native_negative_stock_request`).
+- **Books:** `BRIDGE NEGSTOCK LAB 2` (synthetic; books from 2025-04-01, inventory on and integrated with accounts, unit Nos, two items with no opening stock; a sale of 5 Nos of `Lab Short Item` on 2025-05-10, a purchase of 10 Nos of `Lab Plain Item` on 2025-05-15 and a purchase of 2 Nos of `Lab Short Item` on 2025-06-20, all raw imports) and `BRIDGE TIEOUT C` (synthetic, read only). A company of a similar name, `BRIDGE NEGSTOCK LAB`, also exists on that instance: a read must not be bound by name alone.
+- **What the captures show:**
+  - 2025-04-01 to 2026-03-31 on `BRIDGE NEGSTOCK LAB 2`: one item row, `Lab Short Item`, closing quantity `-3 Nos`, rate `120.00`, amount `360.00` (positive). Tally's plain Stock Summary for the same window (answer kept by the lab, not committed) printed the same item as `-3 Nos`, `120.00`, `360.00`, and `Lab Plain Item` as `10 Nos`, `100.00`, `-1000.00`; the latter was not listed here.
+  - 2025-04-01 to 2025-05-31 on the same book: one row, the same item, `-5 Nos`, with the rate and the amount present and empty. The quantity is as at the window's end, not the book's.
+  - 2025-04-01 to 2026-03-31 on `BRIDGE TIEOUT C` (which holds stock items and no short one): exactly `<ENVELOPE></ENVELOPE>`, 46 bytes, the same bytes as the empty Negative Ledgers answer. An empty envelope cannot be told from a report that was not rendered (§12a.11), so it is read as not established, never as "no item is negative".
+- **Not established:** that an empty answer means no item is below zero, what Tally lists beyond these books (§12a.16), a batch-wise or multi-godown book, a window crossing a financial year, the cost of the report on a large book, any other release.
+
+| file | bytes | sha256 | content |
+| --- | ---: | --- | --- |
+| `builtin_negative_stock_negstock_lab_2_fy_request.utf16le.xml` | 770 | `4e29535d9d740e7ed89fbecad799c47f3ce0d35a59ad62b5830ae6366a12623e` | request, Negative Stock, 2025-04-01 to 2026-03-31 |
+| `builtin_negative_stock_negstock_lab_2_fy_live.utf16le.xml` | 514 | `0b6fdf155016e065f669dff7e221108789c52d1900528c443f66ad608b1fc20e` | Negative Stock, one item at `-3 Nos` (read by `native_negative_stock`) |
+| `builtin_negative_stock_negstock_lab_2_to_20250531_request.utf16le.xml` | 770 | `5e6811cef1ce108f736c17b420e6ae6ac42362f230161a54705d71640371b0d4` | request, Negative Stock, 2025-04-01 to 2025-05-31 |
+| `builtin_negative_stock_negstock_lab_2_to_20250531_live.utf16le.xml` | 490 | `720cd2f5ecb09138b675d399df3dcca90fafb416a0709738d391ad44161a65c2` | Negative Stock to 31 May, one item at `-5 Nos`, rate and amount empty |
+| `builtin_negative_stock_tieout_c_fy_request.utf16le.xml` | 758 | `6f9ed321654680017caaf3f49fbaa88f3491f9d283ba768579474c95d7017495` | request, Negative Stock, 2025-04-01 to 2026-03-31, on a book with no short item |
+| `builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | Negative Stock, an empty envelope |

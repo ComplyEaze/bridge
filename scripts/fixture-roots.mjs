@@ -27,10 +27,8 @@ export const FIXTURE_ROOTS = [
   "src-tauri/crates/bridge-tax-audit/tests/fixtures",
   "src-tauri/crates/bridge-tally-protocol/tests/fixtures",
   "src-tauri/crates/tally-protocol-simulator/fixtures",
-  "docs/tally/compatibility/fixtures",
   "scripts/fixtures",
   "scripts/testdata",
-  "tools/bridge-tally-compatibility/tests/fixtures",
 ];
 
 // Roots whose provenance rows keep basename matching: a bare name there may

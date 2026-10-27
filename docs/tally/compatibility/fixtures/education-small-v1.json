@@ -1,9 +1,0 @@
-{
-  "schema_version": 1,
-  "fixture_id": "education-small-v1",
-  "dataset_tier": "synthetic_small",
-  "company_marker": "BRIDGE-PR14-SYNTHETIC-019f605f-e6cf-77b2-ac95-31722887a911",
-  "ledger_sentinel": "BRIDGE-LEDGER-019f605f-e6cf-77b2-ac95-31722887a911",
-  "minimum_ledger_count": 1,
-  "maximum_ledger_count": 100
-}

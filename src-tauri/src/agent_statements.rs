@@ -1,6 +1,6 @@
 //! Thin MCP presentation of the shared statement read (#692).
 use super::*;
-use crate::reports::statements::{Established, TieOut};
+use crate::reports::statements::{ClosingStockUse, Established, TieOut, CLOSING_STOCK_SOURCE};
 use bridge_tally_protocol::native_statement_reports::NativeStatementKind;
 
 /// Unclassified ledgers returned in full up to this many; the count is always
@@ -89,13 +89,16 @@ impl Server {
                 )],
             ),
         };
-        let statement_basis = headline::StatementBasis::new(
+        let mut statement_basis = headline::StatementBasis::new(
             statement_kind,
             trial_balance.from.clone(),
             trial_balance.to.clone(),
             parts,
             derived.profit_and_loss_tie.is_some(),
         );
+        if matches!(derived.closing_stock, ClosingStockUse::Applied { .. }) {
+            statement_basis = statement_basis.with_closing_stock_from_tally();
+        }
         // One decision: the lines are withheld exactly when the headline says so.
         let lines = (!statement_basis.lines_withheld()).then_some(lines);
         let outcome = match kind {
@@ -117,6 +120,11 @@ impl Server {
                 })
             })
             .collect::<Vec<_>>();
+        // A balance sheet shows how Tally's Profit and Loss compared only when a
+        // closing stock was considered: offered, and the statement not refused
+        // for another reason first (then `closing_stock` is null as well).
+        let show_profit_and_loss_tie = kind == NativeStatementKind::ProfitAndLoss
+            || !matches!(derived.closing_stock, ClosingStockUse::NotApplicable);
         let mut result = json!({
                     "state": top_level(outcome).0,
                     "basis": "tally_native_trial_balance_classified_by_reserved_primary_group",
@@ -127,15 +135,16 @@ impl Server {
                     "unclassified": unclassified,
                     "unclassified_total": unclassified_total,
                     "stock_ledger_count": derived.stock_ledger_count,
+                    "closing_stock": closing_stock_json(&derived.closing_stock),
                     "balance_sheet_gate": tie_json(&derived.balance_sheet_tie),
-                    "tie_out": derived.profit_and_loss_tie.as_ref().map(tie_json),
+                    "tie_out": show_profit_and_loss_tie.then(|| derived.profit_and_loss_tie.as_ref().map(tie_json)).flatten(),
                     "verification": "stable_paired_sources_with_company_mode_and_extent_guards",
                     "limitations": [
                         "Each line sums the Trial Balance amounts Tally returned under one reserved primary group, and counts the empty amounts it left out",
                         "A ledger under a user-created primary group, or with an incomplete group chain, is listed in unclassified; while any carries an amount, no result is established",
-                        "Closing stock is not derived: with a Stock-in-Hand balance no result is established",
+                        "Closing stock is not derived: with a Stock-in-Hand balance no result is established. Tally's own Less: Closing Stock is used, and shown in closing_stock, only as the description says (one integrated book, no opening stock); a costing method, opening stock, a window spanning two years and any other book are not measured",
                         "lines is null while this tool's result is not established, so a derived line is never shown as the statement; balance_sheet_gate and tie_out then show how each of Tally's own lines compared",
-                        "Every result is established only if Tally's own Balance Sheet for the window ties line for line (balance_sheet_gate); gross and net also need Tally's own Profit and Loss to tie (tie_out), with one heading, Cost of Sales, allowed while it equals the derived cost of sales; a book with stock items is expected to refuse, and no inventory book has been measured",
+                        "Every result is established only if Tally's own Balance Sheet for the window ties line for line (balance_sheet_gate); gross and net also need Tally's own Profit and Loss to tie (tie_out), with one heading, Cost of Sales, allowed while it equals the derived cost of sales; with stock items it refuses unless Tally's own closing stock is used, as closing_stock says (one integrated book measured)",
                         "A book with more than one currency master is refused before the Trial Balance is read",
                         "A Tally line the derivation has no counterpart for, such as a heading with an amount or a difference in opening balances, refuses the results rather than being guessed at",
                         "Tally's own statements carry no company identity; they are bound only by the company, mode and book-extent checks around the read",
@@ -189,6 +198,21 @@ fn established_json(result: &Established) -> Value {
         Established::Established { value } => json!({"state": "established", "value": value}),
         Established::NotEstablished { reason, lines } => json!({
             "state": "not_established", "reason": reason.as_str(),
+            "lines": lines.iter().cloned().map(party_name).collect::<Vec<_>>(),
+        }),
+    }
+}
+
+/// Whether Tally's own closing stock was used, as a line of its own that names
+/// its source; null when Tally's Profit and Loss offered none.
+fn closing_stock_json(use_of: &ClosingStockUse) -> Value {
+    match use_of {
+        ClosingStockUse::NotApplicable => Value::Null,
+        ClosingStockUse::Applied { value } => {
+            json!({"state": "applied", "value": value, "source": CLOSING_STOCK_SOURCE})
+        }
+        ClosingStockUse::Declined { why, lines } => json!({
+            "state": "declined", "why": why.as_str(),
             "lines": lines.iter().cloned().map(party_name).collect::<Vec<_>>(),
         }),
     }

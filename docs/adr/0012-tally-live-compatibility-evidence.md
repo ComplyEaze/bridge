@@ -1,7 +1,9 @@
 # ADR 0012: Tally live compatibility evidence
 
-- Status: accepted
+- Status: accepted; implementation removed 2026-10-15 (#1745)
 - Date: 2026-07-15
+
+**Amended 2026-10-15 (#1745):** the `tools/` Cargo workspace this text refers to (the compatibility crate, the live-read controller and the read transport) was removed after the owner's decision on #609. The text below is kept as written. No claim matrix, receipt or attestation tooling remains; live evidence is recorded in the lab items' reports and the protocol reference.
 
 ## Context
 

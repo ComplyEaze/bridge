@@ -1884,7 +1884,10 @@ fn an_invoice_is_built_alone_and_never_amended() {
 
 #[test]
 fn the_financial_year_runs_from_april_to_march() {
-    let year = |date: &str| financial_year_window(date).unwrap();
+    let year = |date: &str| {
+        let (from, to) = financial_year_window(date).unwrap();
+        (from.as_str().to_string(), to.as_str().to_string())
+    };
     assert_eq!(
         year("20260331"),
         ("20250401".to_string(), "20260331".to_string())
@@ -2120,9 +2123,14 @@ fn each_doubt_about_a_sales_ledgers_rate_has_its_own_code() {
         with(&|r| r.gst_rows[0].applicable_from = None),
         Err("invoice_sales_ledger_rate_not_in_force")
     );
-    // The date it starts is digits: text that sorts before them is no date.
+    // The date it starts is a calendar day: text that sorts before one is no date.
     assert_eq!(
         with(&|r| r.gst_rows[0].applicable_from = Some("!!!!!!!!".into())),
+        Err("invoice_sales_ledger_rate_not_in_force")
+    );
+    // Eight digits that name no calendar day are no date either (#2009).
+    assert_eq!(
+        with(&|r| r.gst_rows[0].applicable_from = Some("20251340".into())),
         Err("invoice_sales_ledger_rate_not_in_force")
     );
     // A row that starts on the invoice date is in force on it.
@@ -3010,4 +3018,16 @@ fn a_resolved_code_is_warned_about_and_an_unresolved_one_refused() {
         )
     );
     assert_eq!(warnings.len(), 1);
+}
+
+/// The divergent invoice's next step must not promise that saving the invoice again repairs it:
+/// a save changes the voucher's AlterID, and what a verification reads after one is not
+/// established (voucher writes reference, section 9.16).
+#[test]
+fn the_divergent_next_step_does_not_promise_a_resave_repairs_the_invoice() {
+    let text = crate::agent::agent_import::verification::INVOICE_DIVERGENT_NEXT_STEP;
+    assert!(!text.contains("then open the invoice and save it again"));
+    assert!(text.contains("changes the invoice's AlterID"));
+    assert!(text.contains("has not been established"));
+    assert!(text.ends_with("Do not post it again."));
 }

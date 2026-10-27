@@ -299,6 +299,7 @@ impl Settings {
             redaction: Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::On,
+            audit_enabled: false,
         })
     }
 }

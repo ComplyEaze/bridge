@@ -1,10 +1,9 @@
 # Licensed-lab qualification checklist
 
 What to verify, per Tally version, on the rented licensed TallyPrime lab VM
-(plan §NOW item 4; playbook Phases 3–5). Every row that completes produces a
-signed compatibility-matrix receipt for the exact
-(product, release, mode, platform, transport, operation) tuple — see
-[compatibility/README.md](./compatibility/README.md). Nothing here may be
+(plan §NOW item 4; playbook Phases 3–5). Every row that completes is recorded, with its
+answers, for the exact (product, release, mode, platform, transport, operation)
+tuple in the lab item's report (the signed-receipt tooling was removed, #1745). Nothing here may be
 answered from folklore, blogs, or the Education instance; Edu results are
 recorded as education-mode cells only.
 

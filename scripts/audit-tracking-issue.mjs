@@ -72,11 +72,9 @@ export function findingsFromReport(report) {
   return [...findings.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
-// Bridge has two Rust lockfiles, the app's (`src-tauri/Cargo.lock`) and the
-// tools workspace's (`tools/Cargo.lock`), and one tracking issue. RUSTSEC-2026-0285
-// is why both are audited: the app lockfile was moved to a patched `rustls`
-// while the tools lockfile stayed on a vulnerable one, and an audit of only the
-// first reported nothing. `cargo audit --json` does not name the lockfile it
+// Reports can come from more than one Rust lockfile (the app's is `src-tauri/Cargo.lock`; there was
+// a second, the tools workspace's, until #1745 removed it), and arrive for one tracking issue.
+// `cargo audit --json` does not name the lockfile it
 // read, so each report arrives paired with the lockfile it came from.
 //
 // Ids stay exactly what `findingsFromReport` produces. The same advisory in both

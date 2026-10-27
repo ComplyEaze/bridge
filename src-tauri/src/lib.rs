@@ -6,6 +6,7 @@ pub(crate) mod client_group_label_migration;
 pub(crate) mod client_groups;
 pub(crate) mod commands;
 pub(crate) mod db;
+pub(crate) mod desktop_terms;
 pub(crate) mod endpoint_coordination;
 pub(crate) mod endpoint_wire;
 pub(crate) mod exported_files;
@@ -42,6 +43,8 @@ use tokio::sync::OnceCell;
 pub(crate) struct LazyTallyMirror {
     app_data_directory: PathBuf,
     repository: OnceCell<db::tally_mirror::TallyMirrorRepository>,
+    /// Held for as long as the mirror is open, so a reset cannot delete it from under this handle.
+    use_lock: OnceCell<db::encrypted::MirrorUseLock>,
 }
 
 impl LazyTallyMirror {
@@ -49,6 +52,7 @@ impl LazyTallyMirror {
         Self {
             app_data_directory,
             repository: OnceCell::new(),
+            use_lock: OnceCell::new(),
         }
     }
 
@@ -70,13 +74,16 @@ impl LazyTallyMirror {
                 }
 
                 let database_path = self.app_data_directory.join("tally-mirror-v1.db");
-                let _initialization_lock =
-                    db::encrypted::lock_mirror_initialization(&database_path)?;
+                // The shared use lock is taken here, before the key is resolved, so a reset that
+                // holds the mirror refuses this open at once instead of racing it.
+                let (_initialization_lock, use_lock) =
+                    db::encrypted::lock_for_open(&database_path)?;
                 let key_store = db::OsMirrorKeyStore::for_database(&database_path);
                 let resolved_key = db::resolve_mirror_key(&database_path, &key_store)?;
                 let pool = db::connect_encrypted(&database_path, resolved_key.key).await?;
                 let repository = db::tally_mirror::TallyMirrorRepository::new(pool);
                 repository.migrate().await?;
+                let _ = self.use_lock.set(use_lock);
                 Ok(repository)
             })
             .await
@@ -89,6 +96,7 @@ pub fn run_journal_confirmation_child_from_args(
     let confirmed = match args.next().as_deref() {
         Some("--confirm-journal") => agent::run_confirmation as fn() -> bool,
         Some("--confirm-review") => agent::run_review_confirmation,
+        Some("--confirm-release") => agent::run_release_confirmation,
         _ => return None,
     };
     if args.next().is_some() {
@@ -101,7 +109,6 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
     tracing_subscriber::fmt::init();
 
     let builder = tauri::Builder::default()
-        .manage(tally::TallyRuntime::default())
         .manage(exported_files::ExportedFiles::default())
         .manage(source_draft::SourceDraftStore::default())
         .manage(source_draft::SourceDraftLifecycleGuard::default())
@@ -112,6 +119,12 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
         .manage(sync::coordinator::SnapshotCoordinator::default())
         .setup(|app| {
             let app_data_directory = app.path().app_data_dir()?;
+            // The runtime is built here, with the app's terms record, so it never exists without
+            // its gate (bridge#1106).
+            let terms =
+                std::sync::Arc::new(desktop_terms::DesktopTerms::new(app_data_directory.clone()));
+            app.manage(std::sync::Arc::clone(&terms));
+            app.manage(tally::TallyRuntime::desktop(terms));
             app.manage(LazyTallyMirror::new(app_data_directory));
             #[cfg(target_os = "macos")]
             install_macos_cocoa_termination_guard(app.handle())?;
@@ -138,6 +151,8 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
 
     let app = builder
         .invoke_handler(tauri::generate_handler![
+            commands::terms::desktop_terms_status,
+            commands::terms::desktop_accept_terms,
             commands::probe_tally,
             commands::bootstrap_direct_tally_company,
             commands::save_tally_setup,
@@ -148,6 +163,8 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
             commands::reveal_exported_file,
             commands::export_outstandings_working_paper,
             commands::export_party_ledger_master,
+            commands::grouping_decisions::record_grouping_decisions,
+            commands::grouping_decisions::grouping_decision_history,
             commands::trial_balance::fetch_tally_trial_balance,
             commands::trial_balance::export_tally_trial_balance,
             commands::trial_balance::query_tally_trial_balance_capture_parent,

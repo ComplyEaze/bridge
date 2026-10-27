@@ -16,8 +16,11 @@ reviewer posts. Prose before the line, a line with spaces around it or a token a
 
 The document may carry `carried`, {"head": H, "base": B}, which only the gate sets, after proving that the pull request's own diff is
 byte-identical (apart from index lines and the text after the hunk numbers) at H and B and at the current head and merge base: a MERGE-VERDICT CLEAN line that names exactly that pair then stands
-as if it named the current pair. It carries the CLEAN line only; MERGE-ADVERSARY RECOMMEND must name the current pair. The result's
-`candidate_clean` names the pair of the newest standing-but-for-its-pair CLEAN line, which is what the gate asks about.
+as if it named the current pair. The newest MERGE-ADVERSARY RECOMMEND line then stands too, under the same proof, but only when
+the CLEAN line was carried and the RECOMMEND line names exactly the same older pair (not any other pair), is the newest of its kind,
+is unambiguous and is not voided, judged exactly as the carried CLEAN line is. A RECOMMEND line that names the current pair stands on
+its own, as ever. The result's `candidate_clean` names the pair of the newest standing-but-for-its-pair CLEAN line, which is what the
+gate asks about; `recommend_carried` says whether the RECOMMEND line stands by the carry.
 
 The document may carry `tier`. Only the exact string "one" (the review tier scripts/review-tier.mjs computes from the changed
 paths) lets the MERGE-ADVERSARY RECOMMEND line be absent: a pull request of the one tier stands on MERGE-VERDICT CLEAN alone. Any
@@ -233,6 +236,8 @@ def evaluate(doc):
             and all(isinstance(carried[k], str) and re.fullmatch(r"[0-9a-f]{40}", carried[k]) for k in carried)):
         carried_pair = (carried["head"], carried["base"])
     candidate_clean = None
+    clean_carried = False
+    recommend_carried = False
     stands = {}
     for name, found in positives.items():
         newest = max(found, key=lambda entry: entry[0]) if found else None
@@ -244,7 +249,14 @@ def evaluate(doc):
         elif name == "clean" and newest is not None and not ambiguous and carried_pair is not None and newest[1] == carried_pair \
                 and (newest_void is None or newest[0] > newest_void):
             stands[name] = True
+            clean_carried = True
             reasons.append("the newest owner MERGE-VERDICT CLEAN line names an older head and merge base and is carried: the gate proved the pull request's own patch unchanged")
+        elif name == "recommend" and clean_carried and newest is not None and not ambiguous and newest[1] == carried_pair \
+                and (newest_void is None or newest[0] > newest_void):
+            # the same pair, the same proof, the same voids as the carried CLEAN line; a RECOMMEND line for any other older pair falls through
+            stands[name] = True
+            recommend_carried = True
+            reasons.append("the newest owner MERGE-ADVERSARY RECOMMEND line names the same older head and merge base as the carried CLEAN line and is carried too: the gate proved the pull request's own patch unchanged")
         elif newest is None or ambiguous or newest[1] != (head, base):
             if name == "clean" and newest is not None and not ambiguous and (newest_void is None or newest[0] > newest_void):
                 candidate_clean = {"head": newest[1][0], "base": newest[1][1]}
@@ -262,7 +274,7 @@ def evaluate(doc):
         status = "block"
     else:
         status = "pass"
-    return {"status": status, "clean": stands["clean"], "recommend": stands["recommend"], "recommend_required": recommend_required, "candidate_clean": candidate_clean,
+    return {"status": status, "clean": stands["clean"], "recommend": stands["recommend"], "recommend_required": recommend_required, "recommend_carried": recommend_carried, "candidate_clean": candidate_clean,
             "reasons": reasons, "refusals": sorted(set(refusals)), "unreadable": unreadable}
 
 

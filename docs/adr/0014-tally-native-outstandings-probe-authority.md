@@ -1,5 +1,7 @@
 # ADR 0014: Native outstandings probe has observation-only authority
 
+**Amended 2026-10-15 (#1745):** the probe (the protocol crate's `bills-native-outstandings-probe` feature and module, and the `tools/` crates that ran and recorded it) was removed after the owner's decision on #609. The text below is kept as written; there is no probe left to which its authority applies.
+
 ## Status
 
 Accepted for an isolated, consent-gated qualification runner. Production

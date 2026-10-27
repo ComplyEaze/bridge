@@ -143,7 +143,7 @@ where
             }
             "ping" => Ok(json!({})),
             _ if !initialized => Err("initialize_required".to_string()),
-            "tools/list" => Ok(json!({"tools": catalog::tool_definitions(server.settings.import_enabled, server.settings.posting.enabled())})),
+            "tools/list" => Ok(json!({"tools": catalog::listed_tool_definitions(server.settings.import_enabled, server.settings.posting.enabled(), server.settings.audit_enabled)})),
             "tools/call" => match params.get("name").and_then(Value::as_str) {
                 Some(name) => {
                 let arguments = params

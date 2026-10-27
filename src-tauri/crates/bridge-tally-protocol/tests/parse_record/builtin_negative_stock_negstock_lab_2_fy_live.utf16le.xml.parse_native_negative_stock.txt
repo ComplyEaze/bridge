@@ -1,0 +1,28 @@
+# fixture: tests/fixtures/builtin_negative_stock_negstock_lab_2_fy_live.utf16le.xml
+# parser: parse_native_negative_stock
+# source: captured
+Ok(NativeNegativeStockListing {
+    items: [
+        NativeListedStockItem {
+            name: "Lab Short Item",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "-3",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            rate: Present(
+                ExactDecimal(
+                    "120.00",
+                ),
+            ),
+            value: Present(
+                ExactDecimal(
+                    "360.00",
+                ),
+            ),
+        },
+    ],
+})

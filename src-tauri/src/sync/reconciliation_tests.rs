@@ -5,7 +5,6 @@ use bridge_tally_core::{
 };
 
 use super::*;
-use serde_json::json;
 
 fn source_identity() -> SourceIdentity {
     SourceIdentity {
@@ -94,7 +93,6 @@ fn canonicalize_test(
             source_identity: &source_identity(),
             query_profile: &query_profile(),
             filters_sha256: &filters_sha256(),
-            external_references: &ExternalReferenceCatalog::Unavailable,
             window_id: "window-1",
             requested_window: &window(),
         },
@@ -179,27 +177,6 @@ fn complete_core_record_evidence() -> Vec<SourceRecordEvidence> {
     .collect()
 }
 
-fn canonicalize_typed(
-    pack: CapabilityPackId,
-    batch: PackBatch,
-    external_references: ExternalReferenceCatalog,
-) -> CanonicalWindow {
-    canonicalize_window(
-        &CanonicalWindowContext {
-            requested_pack: pack,
-            schema_version: PackSchemaVersion { major: 1, minor: 0 },
-            source_identity: &source_identity(),
-            query_profile: &CanonicalText::parse("typed-pack-v1").unwrap(),
-            filters_sha256: &filters_sha256(),
-            external_references: &external_references,
-            window_id: "window-1",
-            requested_window: &window(),
-        },
-        &CanonicalPackWindow::without_source_count_evidence(batch),
-    )
-    .unwrap()
-}
-
 fn input(evidence: WindowEvidence) -> ReconciliationInput {
     ReconciliationInput {
         batch_id: "batch-1".to_string(),
@@ -246,7 +223,6 @@ fn mirror_input_preserves_identity_kind_raw_hash_and_alter_id() {
             source_identity: &source_identity(),
             query_profile: &query_profile(),
             filters_sha256: &filters_sha256(),
-            external_references: &ExternalReferenceCatalog::Unavailable,
             window_id: "window-1",
             requested_window: &window(),
         },
@@ -299,7 +275,6 @@ fn missing_or_mismatched_record_provenance_never_reaches_staging_as_fabricated_d
             source_identity: &source_identity(),
             query_profile: &query_profile(),
             filters_sha256: &filters_sha256(),
-            external_references: &ExternalReferenceCatalog::Unavailable,
             window_id: "window-1",
             requested_window: &window(),
         },
@@ -318,9 +293,7 @@ fn missing_or_mismatched_record_provenance_never_reaches_staging_as_fabricated_d
 #[test]
 fn exact_decimal_reconciliation_detects_imbalance_without_float_math() {
     let mut batch = balanced_batch(false);
-    let PackBatch::CoreAccounting(core) = &mut batch else {
-        unreachable!()
-    };
+    let PackBatch::CoreAccounting(core) = &mut batch;
     core.ledger_entries[0].amount = ExactDecimal::parse("-99.999").unwrap();
     let canonical = canonicalize_test(batch, None);
     assert!(canonical
@@ -341,9 +314,7 @@ fn exact_decimal_reconciliation_detects_imbalance_without_float_math() {
 #[test]
 fn tally_polarity_is_independently_reconciled_from_signed_amounts() {
     let mut batch = balanced_batch(false);
-    let PackBatch::CoreAccounting(core) = &mut batch else {
-        unreachable!()
-    };
+    let PackBatch::CoreAccounting(core) = &mut batch;
     // Invert the WHOLE voucher, not one entry of it. Since bridge#392 a
     // single disagreeing entry is contextual polarity, not a mismatch --
     // it is what an ordinary round-off leg looks like and it fired 111
@@ -373,9 +344,7 @@ fn tally_polarity_is_independently_reconciled_from_signed_amounts() {
 #[test]
 fn cancelled_empty_voucher_is_not_a_false_missing_entry_failure() {
     let mut batch = balanced_batch(false);
-    let PackBatch::CoreAccounting(core) = &mut batch else {
-        unreachable!()
-    };
+    let PackBatch::CoreAccounting(core) = &mut batch;
     core.vouchers[0].cancelled = true;
     core.ledger_entries.clear();
     let canonical = canonicalize_test(batch, None);
@@ -393,9 +362,7 @@ fn cancelled_empty_voucher_is_not_a_false_missing_entry_failure() {
 #[test]
 fn unknown_non_cancelled_empty_voucher_applicability_is_a_proof_gap() {
     let mut batch = balanced_batch(false);
-    let PackBatch::CoreAccounting(core) = &mut batch else {
-        unreachable!()
-    };
+    let PackBatch::CoreAccounting(core) = &mut batch;
     core.ledger_entries.clear();
     let canonical = canonicalize_test(batch, None);
     let decision = build_reconciliation(input(canonical.evidence)).unwrap();
@@ -411,9 +378,7 @@ fn unknown_non_cancelled_empty_voucher_applicability_is_a_proof_gap() {
 #[test]
 fn zero_amount_polarity_unavailability_prevents_checkpoint() {
     let mut batch = balanced_batch(false);
-    let PackBatch::CoreAccounting(core) = &mut batch else {
-        unreachable!()
-    };
+    let PackBatch::CoreAccounting(core) = &mut batch;
     core.ledger_entries[0].amount = ExactDecimal::parse("-0.00").unwrap();
     core.ledger_entries[1].amount = ExactDecimal::parse("0").unwrap();
     let canonical = canonicalize_test(batch, None);
@@ -554,7 +519,6 @@ fn complete_count_once_covers_global_scope_without_per_window_repetition() {
             source_identity: &source_identity(),
             query_profile: &query_profile(),
             filters_sha256: &filters_sha256(),
-            external_references: &ExternalReferenceCatalog::Unavailable,
             window_id: "window-2",
             requested_window: &second_window,
         },
@@ -689,7 +653,6 @@ fn source_count_scope_fingerprint_mismatch_is_rejected_before_staging() {
             source_identity: &source_identity(),
             query_profile: &query_profile(),
             filters_sha256: &filters_sha256(),
-            external_references: &ExternalReferenceCatalog::Unavailable,
             window_id: "window-1",
             requested_window: &window(),
         },
@@ -703,165 +666,6 @@ fn source_count_scope_fingerprint_mismatch_is_rejected_before_staging() {
         result,
         Err(ReconciliationError::SourceCountScopeMismatch)
     ));
-}
-
-#[test]
-fn typed_packs_preserve_exact_values_and_enforce_reference_integrity() {
-    let references = ExternalReferenceCatalog::Complete {
-        company_ids: BTreeSet::from(["company-guid".to_string()]),
-        voucher_ids: BTreeSet::from(["voucher:1".to_string(), "voucher:2".to_string()]),
-        ledger_ids: BTreeSet::from(["ledger:customer".to_string()]),
-    };
-    let tax = bridge_tally_core::IndiaTaxBatch {
-        tax_registrations: vec![serde_json::from_value(json!({
-            "source_id": "tax-registration:1",
-            "owner_kind": "ledger",
-            "owner_source_id": "ledger:customer",
-            "registration_type": "regular",
-            "gstin": "27ABCDE1234F1Z5"
-        }))
-        .unwrap()],
-        voucher_taxes: vec![serde_json::from_value(json!({
-            "source_id": "voucher-tax:1",
-            "voucher_source_id": "voucher:1",
-            "place_of_supply": "27",
-            "assessable_value": "1000.00",
-            "tax_component": "igst",
-            "tax_rate": "18.00",
-            // Deliberately not assessable*rate/100: no rounding/formula profile exists.
-            "tax_amount": "179.99"
-        }))
-        .unwrap()],
-    };
-    let tax_window = canonicalize_typed(
-        CapabilityPackId::IndiaTax,
-        PackBatch::IndiaTax(tax),
-        references.clone(),
-    );
-    assert_eq!(tax_window.observations.len(), 2);
-    assert!(tax_window.evidence.mismatches.is_empty());
-    assert_eq!(
-        tax_window.observations[1]
-            .exact_decimals
-            .get("tax_amount")
-            .map(String::as_str),
-        Some("179.99")
-    );
-
-    let bills: bridge_tally_core::BillsAndPaymentsBatch = serde_json::from_value(json!({
-        "parties": [{
-            "source_identity": {
-                "bridge_source_lineage": "bridge-source:test",
-                "company_guid": "company-guid:test",
-                "observed_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-            },
-            "party_ledger_source_id": "ledger:customer",
-            "report_as_of_yyyymmdd": "20260731",
-            "direction": "receivable",
-            "bill_wise_state": "enabled_observed",
-            "allocation_coverage": "observed_complete_scope",
-            "outstanding_coverage": "observed_complete_scope",
-            "fetch_bracket": "stable_observed",
-            "query_profile": "bills-confidence-v1",
-            "source_scope_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "source_reported_allocation_count": 1,
-            "source_reported_outstanding_count": 1,
-            "allocations": [{
-                "source_id": "bill:1",
-                "identity_basis": "parent_ordinal",
-                "origin": {
-                    "origin": "voucher",
-                    "voucher_source_id": "voucher:1",
-                    "party_entry_source_id": "entry:party-1"
-                },
-                "reference": {
-                    "kind": "new_reference",
-                    "name": "INV-1",
-                    "raw_kind": null
-                },
-                "bill_date_yyyymmdd": "20260701",
-                "effective_date_yyyymmdd": null,
-                "due_date_yyyymmdd": "20260731",
-                "due_date_evidence": "explicit",
-                "amount": "-1180.00",
-                "observed_polarity": "debit",
-                "currency_basis": {
-                    "basis": "company_base",
-                    "currency": "company-base"
-                }
-            }],
-            "outstanding": [{
-                "source_id": "outstanding:1",
-                "identity_basis": "parent_ordinal",
-                "origin": {
-                    "origin": "voucher",
-                    "voucher_source_id": "voucher:1"
-                },
-                "reference": {
-                    "kind": "new_reference",
-                    "name": "INV-1",
-                    "raw_kind": null
-                },
-                "bill_date_yyyymmdd": "20260701",
-                "effective_date_yyyymmdd": null,
-                "due_date_yyyymmdd": "20260731",
-                "due_date_evidence": "explicit",
-                "opening_amount": "-1180.00",
-                "pending_amount": "-1180.00",
-                "observed_polarity": "debit",
-                "source_reported_overdue_days": 0,
-                "currency_basis": {
-                    "basis": "company_base",
-                    "currency": "company-base"
-                }
-            }]
-        }]
-    }))
-    .unwrap();
-    let bills_window = canonicalize_typed(
-        CapabilityPackId::BillsAndPayments,
-        PackBatch::BillsAndPayments(bills),
-        references.clone(),
-    );
-    assert_eq!(bills_window.observations.len(), 3);
-    assert!(bills_window.evidence.mismatches.is_empty());
-
-    let inventory: bridge_tally_core::InventoryBatch = serde_json::from_value(json!({
-        "stock_items": [{
-            "source_id": "item:1",
-            "name": "Synthetic Item",
-            "base_unit": "nos"
-        }],
-        "godowns": [{
-            "source_id": "godown:1",
-            "name": "Synthetic Location"
-        }],
-        "inventory_entries": [{
-            "source_id": "inventory:1",
-            "voucher_source_id": "voucher:1",
-            "stock_item_source_id": "missing-item",
-            "godown_source_id": "godown:1",
-            "quantity": "2.000",
-            "rate": "500.00",
-            "amount": "999.99"
-        }]
-    }))
-    .unwrap();
-    let inventory_window = canonicalize_typed(
-        CapabilityPackId::Inventory,
-        PackBatch::Inventory(inventory),
-        references,
-    );
-    assert!(inventory_window
-        .evidence
-        .mismatches
-        .iter()
-        .any(|mismatch| mismatch.safe_reason_code == "stock_item_reference_missing"));
-    assert!(!inventory_window
-        .evidence
-        .mismatches
-        .iter()
-        .any(|mismatch| mismatch.safe_reason_code.contains("amount")));
 }
 
 fn passing_report_tie_out(evidence: &WindowEvidence) -> ReportTieOutEvidence {

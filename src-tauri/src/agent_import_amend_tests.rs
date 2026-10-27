@@ -270,6 +270,59 @@ fn a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership() 
     );
 }
 
+/// #1941: an amendment never changes a reference, against any build of the
+/// lineage: added, changed or removed, alone or beside another correction.
+/// An equal reference, set or not, is admitted with a corrected amount.
+#[test]
+fn a_proposal_may_not_change_a_reference_against_any_build() {
+    let with_reference = |id, amends, amount: &str, reference: Option<&str>| {
+        let mut line = build(id, amends, amount, "20260901");
+        line.vouchers[0].reference = reference.map(str::to_string);
+        line.sha256 = sha256_hex(
+            render_import_xml(
+                "Synthetic Accounts",
+                &line.vouchers,
+                line.identity_batch_id(),
+            )
+            .as_bytes(),
+        );
+        line
+    };
+    let changed = "import_amend_voucher_reference_changed";
+    // the original wrote REF-1
+    let original = with_reference(ORIGINAL, None, "12.50", Some("REF-1"));
+    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
+    for reference in [Some("REF-2"), None] {
+        let proposal = with_reference(AMENDMENT, None, "20.00", reference).vouchers;
+        assert_eq!(
+            lineage.admit_proposal(&proposal).err().unwrap(),
+            changed,
+            "{reference:?}"
+        );
+    }
+    let same = with_reference(AMENDMENT, None, "20.00", Some("REF-1")).vouchers;
+    assert_eq!(lineage.admit_proposal(&same), Ok(()));
+    // the original wrote none
+    let plain = build(ORIGINAL, None, "12.50", "20260901");
+    let lineage = lineage_of(&journal(&[&plain]), ORIGINAL).unwrap();
+    let added = with_reference(AMENDMENT, None, "12.50", Some("REF-1")).vouchers;
+    assert_eq!(lineage.admit_proposal(&added).err().unwrap(), changed);
+    let none = build(AMENDMENT, None, "20.00", "20260901").vouchers;
+    assert_eq!(lineage.admit_proposal(&none), Ok(()));
+    // only an older build differs (a lineage an earlier release let diverge):
+    // still refused, whichever build the book matches
+    let first = with_reference(AMENDMENT, Some(ORIGINAL), "15.00", Some("REF-2"));
+    let lineage = lineage_of(&journal(&[&original, &first]), ORIGINAL).unwrap();
+    for reference in ["REF-1", "REF-2"] {
+        let proposal = with_reference(UNRELATED, None, "18.00", Some(reference)).vouchers;
+        assert_eq!(
+            lineage.admit_proposal(&proposal).err().unwrap(),
+            changed,
+            "{reference}"
+        );
+    }
+}
+
 #[test]
 fn the_window_holds_where_a_voucher_is_and_where_the_amendment_moves_it() {
     let original = build(ORIGINAL, None, "12.50", "20260910");
@@ -530,6 +583,7 @@ async fn an_unknown_amendment_target_is_refused_before_any_tally_read() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let mut input = serde_json::to_value(payload()).unwrap();
     input["amends_batch_id"] = json!(ORIGINAL);
@@ -557,6 +611,7 @@ fn simulated_server(directory: &std::path::Path, port: u16) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     })
 }
 
@@ -796,8 +851,8 @@ fn the_amendment_admission_module_stays_pinned() {
     // check-surface-ack.mjs reads the branch history and requires a `removed-pin:` line for it
     // (#1006); one that existed at the base is a removed pin, which merge-gate.sh blocks
     // without a `removed-pin:` line.
-    // This module decides what an import file may overwrite; its reason sits
-    // beside MAX_SURFACE_FILES.
+    // This module decides what an import file may overwrite; its reason is recorded in the
+    // module documentation of bridge-tally-core's compatibility_surface_stays_whole test.
     let surface: Value = serde_json::from_str(include_str!(
         "../../docs/tally/compatibility/compatibility-surface.json"
     ))
@@ -1051,7 +1106,8 @@ fn baselines(pairs: &[(&str, u64)]) -> amend::VerifiedBaselines {
 
 /// An amendment built but never imported, differing only in a field the read
 /// does not carry, matches the book too; it has no verification of its own and
-/// must not hide the build that was verified (#239).
+/// must not hide the build that was verified (#239). Since #1941 a build can no
+/// longer differ in its reference; a lineage an earlier release built can.
 #[test]
 fn an_unimported_amendment_does_not_hide_the_verified_build() {
     let original = build(ORIGINAL, None, "12.50", "20260901");
@@ -1106,6 +1162,7 @@ fn a_second_amendment_is_decided_by_the_first_amendments_verification() {
 /// A reference-only amendment, imported and verified: the book matches both
 /// builds' compared fields, and only the amendment's record equals the book's
 /// ALTERID. The equal record admits it, whichever build comes first (#239).
+/// Only an earlier release could build one (#1941 refuses a reference change).
 #[test]
 fn the_build_whose_record_equals_the_book_admits_even_when_not_first() {
     let original = build(ORIGINAL, None, "12.50", "20260901");
@@ -1307,4 +1364,49 @@ async fn an_amendment_of_a_posted_batch_is_not_a_second_post_of_its_row() {
     assert!(result.get("error").is_none(), "{result}");
     assert_eq!(result["amendment"]["identity_batch_id"], original.as_str());
     simulator.finish().unwrap();
+}
+
+/// #685: the build's own voucher mark keeps an amendment that was not imported
+/// from reading verified, even when its file changes nothing the read compares
+/// (here the content is equal to the book's), and its verification then records
+/// no baseline. Once imported, the upsert has moved the voucher's ALTERID past
+/// the mark, so it reads verified and that ALTERID becomes the baseline. The
+/// mark is the company's as the build read it, at or above every voucher's
+/// ALTERID: 50 here, with the voucher at 40 before the import and 51 after.
+#[test]
+fn an_amendment_reads_verified_only_above_the_build_mark() {
+    let amendment: ImportLedgerLine = {
+        let mut line =
+            serde_json::to_value(build(AMENDMENT, Some(ORIGINAL), "12.50", "20260901")).unwrap();
+        line["pre_import_mark"]["value"] = json!(50);
+        serde_json::from_value(line).unwrap()
+    };
+    let verify = |row: ReadVoucher| {
+        verification::verify_batch(
+            &amendment,
+            &ImportReadSource::admit(vec![row]).unwrap(),
+            verification::Attribution::Tag,
+        )
+        .unwrap()
+    };
+    let mut baseline = amend::VerifiedBaseline::default();
+    // not imported: the book holds the voucher at ALTERID 40, below the mark
+    let not_imported = verify(book_row(&amendment));
+    assert_eq!(
+        not_imported["counts"]["posted_verified"], 0,
+        "{not_imported}"
+    );
+    assert_eq!(not_imported["vouchers"][0]["status"], "not_attributable");
+    assert_eq!(
+        not_imported["vouchers"][0]["reason"],
+        "tag_precedes_pre_import_voucher_mark"
+    );
+    assert!(!amend::record_first_verified(&mut baseline, &not_imported));
+    // imported: the same voucher, its ALTERID moved past the mark
+    let mut altered = book_row(&amendment);
+    altered.alter_id = Some(51);
+    let imported = verify(altered);
+    assert_eq!(imported["counts"]["posted_verified"], 1, "{imported}");
+    assert!(amend::record_first_verified(&mut baseline, &imported));
+    assert_eq!(baseline.vouchers["txn-001"], 51);
 }

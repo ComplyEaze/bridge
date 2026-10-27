@@ -30,7 +30,6 @@ async function scan(fields) {
   const root = await mkdtemp(join(tmpdir(), ".request-builder-hazards-"));
   try {
     await mkdir(join(root, "src-tauri/src"), { recursive: true });
-    await mkdir(join(root, "tools"), { recursive: true });
     await writeFile(join(root, FILE), builders(fields));
     try {
       execFileSync("node", [GATE, "--root", root], { encoding: "utf8", stdio: "pipe" });
@@ -102,7 +101,6 @@ test("a formula reference passes with any declared TYPE; an amount needs TYPE Am
 async function scanTree(files) {
   const root = await mkdtemp(join(tmpdir(), ".request-builder-hazards-"));
   try {
-    await mkdir(join(root, "tools"), { recursive: true });
     for (const [path, text] of Object.entries(files)) {
       await mkdir(join(root, path.split("/").slice(0, -1).join("/")), { recursive: true });
       await writeFile(join(root, path), text);

@@ -560,12 +560,7 @@ impl TallyConnector for RuntimeTallyConnector {
 }
 
 fn core_canary_capability(window: &CanonicalPackWindow) -> CapabilityEvidence {
-    let PackBatch::CoreAccounting(_) = &window.batch else {
-        return observed_core_capability(
-            CapabilityState::Unknown,
-            "sealed_profile_executed_unexpected_pack",
-        );
-    };
+    let PackBatch::CoreAccounting(_) = &window.batch;
     // A successful extraction proves that every sealed export parsed and matched the pinned
     // company. Returned rows cannot prove that optional fields work when absent, nor that a field
     // observed in this particular date window is supported generally. Keep one stable, truthful

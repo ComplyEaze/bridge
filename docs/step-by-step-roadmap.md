@@ -24,8 +24,8 @@
 
 The active Tally roadmap is the
 [research and Codex execution plan](./tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md).
-Its public support claims are constrained by the
-[evidence matrix](./tally/support-matrix.md). Current implementation work is
+Its public support claims are constrained by the live evidence
+recorded in the [protocol reference](./tally/TALLY_PROTOCOL_REFERENCE.md). Current implementation work is
 ordered as follows:
 
 Capability Passport profile v2 now exposes and stores provenance-bearing

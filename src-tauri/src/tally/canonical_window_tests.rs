@@ -264,9 +264,7 @@ fn assess_flags(
         voucher_with_entry_flags(cash_flag, sales_flag),
     )
     .expect("a disagreeing flag is observed data, not a build failure");
-    let PackBatch::CoreAccounting(batch) = &window.batch else {
-        panic!("expected a core accounting pack")
-    };
+    let PackBatch::CoreAccounting(batch) = &window.batch;
     // The persisted polarity is still Tally's flag, not a value derived
     // from the amount. bridge#392 turned on keeping it that way.
     assert_eq!(batch.ledger_entries[1].amount.as_str(), "100.00");
@@ -401,9 +399,7 @@ fn marker_prefixed_real_master_name_resolves_by_its_raw_name() {
 
     let window = build_core_window(&context(), groups, ledgers, voucher_types, vouchers)
         .expect("a real marker-prefixed master name must resolve by its exact raw text");
-    let PackBatch::CoreAccounting(batch) = window.batch else {
-        panic!("wrong pack");
-    };
+    let PackBatch::CoreAccounting(batch) = window.batch;
     let child = batch
         .groups
         .iter()
@@ -422,9 +418,7 @@ fn canonicalizes_all_core_records_with_exact_reference_and_provenance_binding() 
     // Bridge-defined export shapes, which issue #1570 deletes.
     let window = valid_window_with_source_reported_counts();
     window.validate_record_evidence_binding().unwrap();
-    let PackBatch::CoreAccounting(batch) = &window.batch else {
-        panic!("wrong pack")
-    };
+    let PackBatch::CoreAccounting(batch) = &window.batch;
     assert_eq!(
         (
             batch.groups.len(),
@@ -495,9 +489,7 @@ fn nested_entry_totals_remain_local_and_are_never_claimed_as_source_reported() {
     // Source-reported counts are set explicitly: that branch is reached only by the
     // Bridge-defined export shapes, which issue #1570 deletes.
     let window = valid_window_with_source_reported_counts();
-    let PackBatch::CoreAccounting(batch) = &window.batch else {
-        panic!("wrong pack")
-    };
+    let PackBatch::CoreAccounting(batch) = &window.batch;
 
     assert_eq!(batch.ledger_entries.len(), 2);
     assert_eq!(
@@ -532,9 +524,7 @@ fn native_shaped_exports_give_a_window_with_no_source_reported_counts() {
 #[test]
 fn derived_entry_ids_are_deterministic_but_never_claim_native_identity() {
     fn entry_ids(window: &CanonicalPackWindow) -> Vec<String> {
-        let PackBatch::CoreAccounting(batch) = &window.batch else {
-            panic!("wrong pack")
-        };
+        let PackBatch::CoreAccounting(batch) = &window.batch;
         batch
             .ledger_entries
             .iter()
@@ -635,9 +625,7 @@ fn foreign_master_name_with_c1_control_is_retained_and_diagnosed_verbatim() {
 
     let window = build_core_window(&context(), groups(), ledgers, voucher_types(), vouchers)
         .expect("foreign text must not reject an otherwise valid company window");
-    let PackBatch::CoreAccounting(batch) = window.batch else {
-        panic!("wrong pack");
-    };
+    let PackBatch::CoreAccounting(batch) = window.batch;
     assert_eq!(batch.ledgers[0].name, mojibake);
     assert_eq!(batch.foreign_master_text_diagnostics.len(), 1);
     assert_eq!(
@@ -729,9 +717,7 @@ fn padded_ledger_name_and_its_ledgername_reference_resolve_together() {
     let window = build_core_window(&context(), groups, ledgers, voucher_types, vouchers).expect(
         "a ledger name and its LEDGERNAME reference carry identical padding and must resolve",
     );
-    let PackBatch::CoreAccounting(batch) = window.batch else {
-        panic!("wrong pack");
-    };
+    let PackBatch::CoreAccounting(batch) = window.batch;
     // The resolved name must retain its exact original bytes, not a trimmed copy.
     assert_eq!(batch.ledgers[0].name, padded_ledger_name);
     assert_eq!(batch.ledger_entries.len(), 1);
@@ -757,9 +743,7 @@ fn padded_group_name_and_a_sibling_groups_parent_reference_resolve_together() {
     let window = build_core_window(&context(), groups, ledgers, voucher_types, vouchers).expect(
         "a group name and a sibling group's PARENT reference carry identical padding and must resolve",
     );
-    let PackBatch::CoreAccounting(batch) = window.batch else {
-        panic!("wrong pack");
-    };
+    let PackBatch::CoreAccounting(batch) = window.batch;
     let parent_group = batch
         .groups
         .iter()
@@ -789,9 +773,7 @@ fn padded_voucher_type_name_and_its_vouchertypename_reference_resolve_together()
     let window = build_core_window(&context(), groups, ledgers, voucher_types, vouchers).expect(
         "a voucher type name and its VOUCHERTYPENAME reference carry identical padding and must resolve",
     );
-    let PackBatch::CoreAccounting(batch) = window.batch else {
-        panic!("wrong pack");
-    };
+    let PackBatch::CoreAccounting(batch) = window.batch;
     // The resolved name must retain its exact original bytes, not a trimmed copy.
     assert_eq!(batch.voucher_types[0].name, padded_voucher_type_name);
     assert_eq!(

@@ -99,6 +99,7 @@ fn contended_post_returns_without_waiting_or_recording_a_dispatch() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        audit_enabled: false,
     });
     server.append_import_ledger(&line).unwrap();
     let journal = directory.path().join("agent-import-ledger.jsonl");
@@ -813,6 +814,7 @@ fn endpoint_lease_contention_keeps_negative_post_and_cancellation_results_uncert
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        audit_enabled: false,
     });
     server.append_import_ledger_while_admitted(&line).unwrap();
     let args = json!({"batch_id":&line.batch_id,"company_guid":&line.company_guid});
@@ -922,6 +924,7 @@ async fn received_response_survives_an_injected_response_journal_failure() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        audit_enabled: false,
     });
     server.append_import_ledger(&line).unwrap();
     let admission = server.lock_import_admission().unwrap();
@@ -1376,8 +1379,7 @@ fn a_journal_recording_a_cash_in_hand_ledger_is_refused_by_the_queue() {
     let recheck = |catalogue: &str| {
         recheck_import_admission(
             &line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             catalogue,
@@ -1459,8 +1461,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     let recheck = |catalogue: &str| {
         recheck_import_admission(
             &line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             catalogue,
@@ -1487,9 +1488,115 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         company_guid,
     )
     .unwrap();
-    assert!(!super::super::folded_twins(&requested, twinned_parents.parents()).is_empty());
+    assert!(!super::super::folded_twins(
+        &requested,
+        twinned_parents.parents(),
+        twinned_parents.aliases()
+    )
+    .is_empty());
     // In the queue, the recheck reads every voucher's ledgers again.
     let error = recheck(&twinned).expect_err("a twin of voucher 2's ledger must refuse the batch");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+    ));
+}
+
+/// #1688: a ledger whose ALIAS folds equal to a named ledger is a twin too, and
+/// the queue's recheck after approval refuses the batch for it. The alias is added to the
+/// captured catalogue's text (a state Tally's own screen refused in the cases
+/// tried, so the capture cannot hold one). Without the aliases handed to the
+/// check, the same catalogue shows no twin, so the queue's call site is pinned.
+/// The check before approval (`agent_import_post.rs`, the post's own twin
+/// check) has no test of its own through its caller.
+#[test]
+fn an_alias_that_folds_equal_to_a_named_ledger_refuses_the_batch_in_the_queue() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    ));
+    let catalogue = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    ));
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
+    let single_currency = captured_currencies(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    // Built from parts: a batch id here is a fixed shape of a synthetic batch, not a value to scan.
+    let batch_id = format!("bridge-{:08}-{:04}-4000-8000-{:012}", 0, 0, 626);
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":batch_id,
+        "identity_scheme":"batch_v1", "company_guid":company_guid,
+        "txn_ids":["ALIAS-1"],
+        "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[], "on_account_approved":[],
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+        "vouchers":[
+            {"bridge_txn_id":"ALIAS-1","date":"20260907","voucher_type":"Journal",
+             "narration":"first","reference":null,"voucher_number":null,
+             "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"5.00","side":"Dr"},
+                {"ledger":"Cash","amount":"5.00","side":"Cr"}]}]
+    }))
+    .unwrap();
+    let payload = ImportPayload {
+        company_guid: company_guid.into(),
+        vouchers: line.vouchers.clone(),
+        amends_batch_id: None,
+    };
+    let requested = requested_ledger_names(&payload);
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(requested.clone())
+    .unwrap();
+    let recheck = |catalogue: &str| {
+        recheck_import_admission(
+            &line,
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
+            &captured,
+            &captured,
+            catalogue,
+            None,
+            &single_currency,
+            &ledger_binding,
+            InvoiceIdentity::ByNumber,
+            None,
+            None,
+        )
+    };
+    recheck(&catalogue).expect("no alias, so the queued batch is admitted");
+    let aliased = catalogue.replacen(
+        "<NAME>WR2 Sales</NAME>",
+        "<NAME>WR2 Sales</NAME><NAME>CASH</NAME>",
+        1,
+    );
+    assert_ne!(aliased, catalogue, "the alias was added");
+    let parsed = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &aliased,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap();
+    assert_eq!(parsed.aliases().count(), 1, "the one alias was read");
+    assert!(
+        super::super::folded_twins(&requested, parsed.parents(), std::iter::empty()).is_empty(),
+        "without its aliases the catalogue shows no twin"
+    );
+    assert!(!super::super::folded_twins(&requested, parsed.parents(), parsed.aliases()).is_empty());
+    let error =
+        recheck(&aliased).expect_err("an alias twin of a named ledger must refuse the batch");
     assert!(matches!(
         error.downcast_ref::<ApprovedImportAdmissionError>(),
         Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
@@ -1560,8 +1667,7 @@ fn a_named_ledger_switched_to_bill_wise_since_the_build_is_refused_by_the_queue(
     let recheck = |line: &ImportLedgerLine, catalogue: &str| {
         recheck_import_admission(
             line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             catalogue,
@@ -1650,8 +1756,7 @@ fn a_record_without_cash_in_hand_ledgers_is_refused_by_the_queue() {
     // Every read it is handed is empty: the refusal comes before any of them.
     let error = recheck_import_admission(
         &line,
-        company_guid,
-        "WR2 Unicode Lab",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
         "",
         "",
         "",
@@ -1710,8 +1815,7 @@ fn a_record_without_bill_wise_approvals_is_refused_by_the_queue() {
     .unwrap();
     let error = recheck_import_admission(
         &line,
-        company_guid,
-        "WR2 Unicode Lab",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
         "",
         "",
         "",
@@ -1800,8 +1904,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     .unwrap();
     let error = recheck_import_admission(
         &line,
-        company_guid,
-        "WR2 Unicode Lab",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
         &captured,
         &captured,
         &catalogue,
@@ -1827,8 +1930,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     }
     recheck_import_admission(
         &absent,
-        company_guid,
-        "WR2 Unicode Lab",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
         &captured,
         &captured,
         &catalogue,
@@ -1854,8 +1956,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     let twinned = catalogue.replace("WR2 Sales", "Cash&#13;&#10;");
     let error = recheck_import_admission(
         &absent,
-        company_guid,
-        "WR2 Unicode Lab",
+        &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
         &captured,
         &captured,
         &twinned,
@@ -1891,8 +1992,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     let recheck = |line: &ImportLedgerLine, groups: Option<&str>| {
         recheck_import_admission(
             line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             &catalogue,
@@ -1973,6 +2073,7 @@ async fn a_saved_xml_file_that_differs_from_the_record_is_refused_before_tally()
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        audit_enabled: false,
     });
     server.append_import_ledger(&line).unwrap();
     let path = server
@@ -3792,6 +3893,7 @@ fn records_server(directory: &std::path::Path) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        audit_enabled: false,
     })
 }
 
@@ -4098,8 +4200,7 @@ fn the_queued_bill_wise_recheck_exempts_an_invoices_new_ref_party_and_nobody_els
         .unwrap();
         recheck_import_admission(
             line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             &catalogue,
@@ -5053,18 +5154,27 @@ fn the_approval_binding_covers_the_on_account_record() {
     let (mut line, endpoint) = batch();
     let ledgers = captured_binding(&["Cash"]);
     let plain = agent_review_preview(&line, &endpoint).unwrap();
-    let before = ApprovalBinding::new(&line, &plain, &ledgers);
+    let before = ApprovalBinding::new(&line, &plain, &ledgers, PreviewForm::Listed);
     approve_on_account(&mut line, &["Expense"]);
     let marked = agent_review_preview(&line, &endpoint).unwrap();
-    assert_ne!(ApprovalBinding::new(&line, &marked, &ledgers), before);
-    assert_eq!(ApprovalBinding::new(&line, &plain, &ledgers), before);
+    assert_ne!(
+        ApprovalBinding::new(&line, &marked, &ledgers, PreviewForm::Listed),
+        before
+    );
+    assert_eq!(
+        ApprovalBinding::new(&line, &plain, &ledgers, PreviewForm::Listed),
+        before
+    );
 
     let (mut batch_line, endpoint) = batch_of_every_type();
     let plain = agent_review_preview(&batch_line, &endpoint).unwrap();
-    let before = ApprovalBinding::new(&batch_line, &plain, &ledgers);
+    let before = ApprovalBinding::new(&batch_line, &plain, &ledgers, PreviewForm::Listed);
     approve_on_account(&mut batch_line, &["Party A"]);
     let marked = agent_review_preview(&batch_line, &endpoint).unwrap();
-    assert_ne!(ApprovalBinding::new(&batch_line, &marked, &ledgers), before);
+    assert_ne!(
+        ApprovalBinding::new(&batch_line, &marked, &ledgers, PreviewForm::Listed),
+        before
+    );
 }
 
 /// The mark is part of the line the caps measure: a marked entry line of 100
@@ -5502,8 +5612,7 @@ fn the_queue_recognises_an_invoice_by_its_number_and_by_its_figures_beside_an_un
         .unwrap();
         recheck_import_admission(
             &line,
-            company_guid,
-            "WR2 Unicode Lab",
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
             &captured,
             &captured,
             &catalogue,

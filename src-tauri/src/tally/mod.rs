@@ -1,5 +1,6 @@
 pub(crate) mod agent_read_request;
 pub(crate) mod approved_import;
+mod box_fit;
 pub mod connection;
 pub mod connector;
 pub mod runtime;
@@ -125,6 +126,11 @@ impl VerifiedCompanyIdentity {
 
     pub(crate) fn company_guid(&self) -> &str {
         self.company_guid.as_str()
+    }
+
+    /// The GUID as its parsed type, for a builder that puts it in a formula.
+    pub(crate) fn company_guid_value(&self) -> &bridge_tally_core::company_guid::CompanyGuid {
+        &self.company_guid
     }
 
     pub(crate) fn company_number(&self) -> &str {

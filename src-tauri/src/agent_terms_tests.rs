@@ -17,6 +17,7 @@ fn settings(data_dir: &Path) -> Settings {
         redaction: Redaction::None,
         import_enabled: true,
         posting: Posting::On,
+        audit_enabled: false,
     }
 }
 

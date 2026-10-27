@@ -16,13 +16,13 @@ the Backup & Restore submenu were not part of that check. The Mac keys are writt
 ourselves. On a Mac, the question in Step 6 ("Which company is open in Tally?") has not been run by us. These are
 other companies' programs and they change, so a screen of yours may differ a little.
 
-## At a glance, release 0.6.0
+## At a glance, release 0.6.1
 
-- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), one ledger's movement, and Tally's own month-wise Sales or Purchase Register for whole months (not tied to the vouchers; read on one synthetic book).
-- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
-- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags, and Tally's Funds Flow, Ratio Analysis and negative-balance reports.
+- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), one ledger's movement, Tally's own month-wise Sales or Purchase Register for whole months (not tied to the vouchers; read on one synthetic book), Tally's own Negative Stock and Negative Ledgers lists for a window (being listed is not a finding; synthetic books only), and the vouchers of one type that Tally marks Uncertain in its GSTR-1 (a Sales type, measured on one synthetic book).
+- **Partly:** profit and loss and the balance sheet (a book with stock items is read only when Tally's own closing stock closes every gap, measured on one synthetic book; a book with several currencies is refused); closing stock value at 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
+- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags (one test, the cash share of receipts and payments against the s.44AB(a) limit, is off by default and not yet run against a live TallyPrime), and Tally's Funds Flow and Ratio Analysis reports.
 
-"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.6.0 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; the program inside the published Windows x64 0.6.1 file (checked against its `.sha256` file) has had one read-only run against a live TallyPrime 7.2 Silver, on one Windows computer on 27 October 2026, started directly by our test client rather than installed in Claude Desktop (it reported version 0.6.1, read Tally's status, the company list and the ledger masters of one synthetic company; nothing was posted); the macOS file has not been run against TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
 ## Before you start
 
@@ -33,6 +33,12 @@ other companies' programs and they change, so a screen of yours may differ a lit
 - **Claude Desktop.** This is the Claude program you install on your computer; Claude in a web browser will not work
   for this. Get it from <https://claude.com/download>, install it, and sign in to your Claude account. In one test on
   Windows, a Claude account with no paid plan worked; we make no claim about other plans.
+
+**On Windows, ComplyEaze Bridge also needs Microsoft's Visual C++ Redistributable (x64).** Many programs install it,
+so you may already have it. If you do not have it, or are not sure, download and run Microsoft's installer for the
+latest supported x64 version, `vc_redist.x64.exe`, from <https://aka.ms/vc14/vc_redist.x64.exe>
+([Microsoft's page](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) lists it), before Step 3.
+Installing the latest version updates an older one. We have not measured what Claude Desktop shows when it is missing.
 
 **Three things to know:**
 
@@ -151,10 +157,10 @@ computer cannot confirm who made it. Keep the file only if you got it from the p
 
 ## Step 4. Fill in the settings
 
-A settings window opens with five lines. If none opens, open Settings, then Extensions, click ComplyEaze Bridge, then
+A settings window opens with six lines. If none opens, open Settings, then Extensions, click ComplyEaze Bridge, then
 **Configure**. Go from top to bottom.
 
-![The five settings, drawn as a diagram: the Terms line ticked, Tally host localhost, Tally port 9000, Response redaction none, Allow voucher posting switched off.](./img/install-settings.svg)
+![The first five settings, drawn as a diagram: the Terms line ticked, Tally host localhost, Tally port 9000, Response redaction none, Allow voucher posting switched off. The sixth, Allow tax-audit test runs, is not drawn; leave it off.](./img/install-settings.svg)
 
 | Line | What to do | What it is |
 | --- | --- | --- |
@@ -163,6 +169,7 @@ A settings window opens with five lines. If none opens, open Settings, then Exte
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
 | **Response redaction** | Do not change it. It says `none`. | A way to limit what ComplyEaze Bridge sends to the AI provider. Choose one value. The other two are `mask_parties` (shortens party and ledger names, and the bank account details read from a ledger, to their first two and last two characters; some names are not shortened, and narrations are not changed) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Neither hides, among other things: amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details and references, or the last four digits of a bank statement's account number. [Security and privacy](../security-and-privacy.md) lists the rest. |
 | **Allow voucher posting, one voucher or a batch of up to 50** | Leave it **off**. | Lets Claude make entries in Tally: one voucher, or a saved batch of up to 50, each post only after you approve it in a separate window. |
+| **Allow tax-audit test runs (audit_test_run)** | Leave it **off** unless you want to try a tax-audit test. | Lets Claude run one tax-audit test (today the cash share of receipts and payments against the s.44AB(a) limit) on a company's books for a period inside FY 2025-26. It reads every voucher of the period and writes nothing to Tally; its figures go to your AI provider like any read. It is refused while **Response redaction** is anything but `none`. |
 
 Click **Save**.
 
@@ -198,7 +205,7 @@ which failed with the same error; after Claude Desktop was quit and reopened the
 | --- | --- |
 | Claude says the Terms of Use are not accepted | Go back to Step 4, tick the first line, click Save, then do Step 5. |
 | Claude says it cannot reach Tally | Check that TallyPrime is open with a company open. Do the browser check in Step 1 again (on a Mac, in Safari on the Mac itself). Check that the Tally port in Step 4 is the same number. |
-| Claude does not seem to know about Tally at all | Open Settings, then Extensions. Check that ComplyEaze Bridge is listed and switched on. Then do Step 5. In a new chat, **Connectors** also shows whether it is connected. If you updated to 0.5.0 from 0.4.2, see "Remove or update it". |
+| Claude does not seem to know about Tally at all | Open Settings, then Extensions. Check that ComplyEaze Bridge is listed and switched on. Then do Step 5. In a new chat, **Connectors** also shows whether it is connected. On Windows, also check that Microsoft's Visual C++ Redistributable (x64) is installed (see "Before you start"). If you updated to 0.5.0 from 0.4.2, see "Remove or update it". |
 | The settings window did not open in Step 4, or you want to change a setting | Open Settings, then Extensions. Click ComplyEaze Bridge, then **Configure**. |
 
 Still stuck? See [Help](#help).
@@ -290,10 +297,11 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 
 - **Checking the download.** Releases are on [GitHub Releases](https://github.com/ComplyEaze/bridge/releases), the
   newest first. Each archive has a same-named `.sha256` file and a small provenance record on its release, so an
-  organization can identify the downloaded bytes and the source commit. Run `certutil -hashfile <file> SHA256` on
-  Windows or `shasum -a 256 <file>` on a Mac, in the folder that holds the file (a command window opens in your home
-  folder, so `cd Downloads` first), and compare the 64-character code it prints with the code at the start of the
-  `.sha256` file.
+  organization can identify the downloaded bytes and the source commit. Run `certutil -hashfile "<file>" SHA256` on
+  Windows or `shasum -a 256 "<file>"` on a Mac, in the folder that holds the file (a command window opens in your
+  home folder, so `cd Downloads` first), with the file's name in place of `<file>`, brackets included, and keep the quotes (a file
+  downloaded twice can get a name with "(1)" in it, which needs them). Compare the 64-character code it prints with the code
+  at the start of the `.sha256` file (open that file in Notepad or TextEdit).
 - **Build attestation.** From 0.4.0 each archive also has a build attestation, which `gh attestation verify` can
   check. It says which workflow run and commit produced those bytes. It is not a code signature, no client checks it
   yet, and it does not show that the code is safe.

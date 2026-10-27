@@ -12,10 +12,26 @@ const LIVE: &[u8] =
     include_bytes!("../tests/fixtures/builtin_negative_stock_shape_lab_fy_live.utf16le.xml");
 const REQUEST: &[u8] =
     include_bytes!("../tests/fixtures/builtin_negative_stock_shape_lab_fy_request.utf16le.xml");
-/// A stand-in: the Negative Ledgers answer of another book, which is an empty envelope. No empty
-/// Negative Stock answer is captured.
+/// Negative Stock on a book with stock items and no negative item for the window: an empty envelope
+/// (21 Oct 2026; the same 46 bytes as the Negative Ledgers empty answer).
 const EMPTY_ENVELOPE: &[u8] =
-    include_bytes!("../tests/fixtures/builtin_negative_ledgers_probe_b_fy_empty_live.utf16le.xml");
+    include_bytes!("../tests/fixtures/builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml");
+const EMPTY_ENVELOPE_REQUEST: &[u8] =
+    include_bytes!("../tests/fixtures/builtin_negative_stock_tieout_c_fy_request.utf16le.xml");
+/// A book whose one listed item sold before it was bought: one row, a negative quantity with a rate
+/// and a value (21 Oct 2026).
+const SHORT_FY: &[u8] =
+    include_bytes!("../tests/fixtures/builtin_negative_stock_negstock_lab_2_fy_live.utf16le.xml");
+const SHORT_FY_REQUEST: &[u8] = include_bytes!(
+    "../tests/fixtures/builtin_negative_stock_negstock_lab_2_fy_request.utf16le.xml"
+);
+/// The same book to 31 May: the item's quantity as at that date, with rate and value both empty.
+const SHORT_TO_MAY: &[u8] = include_bytes!(
+    "../tests/fixtures/builtin_negative_stock_negstock_lab_2_to_20250531_live.utf16le.xml"
+);
+const SHORT_TO_MAY_REQUEST: &[u8] = include_bytes!(
+    "../tests/fixtures/builtin_negative_stock_negstock_lab_2_to_20250531_request.utf16le.xml"
+);
 /// Tally's refusal of an unknown report name on 7.1: a failure signal, not a bare `RESPONSE`. The
 /// bare `RESPONSE` read as `UnknownReport` below is a typed string; no capture of it is committed.
 const UNKNOWN_REPORT: &[u8] =
@@ -112,6 +128,55 @@ fn a_value_that_is_a_credit_is_a_positive_amount_as_tally_sent_it() {
     // another company.
     let parsed = parse_native_negative_stock(&live()).unwrap();
     assert_eq!(parsed.items[3].value, present("5000.00"));
+}
+
+fn request_for(company: &str, from: &str, to: &str) -> String {
+    let period = NativeLedgerSnapshotPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse(from).unwrap(),
+        TallyDate::parse(to).unwrap(),
+    )
+    .unwrap();
+    render_native_negative_stock_request(company, &period)
+}
+
+#[test]
+fn the_requests_of_the_three_further_captures_are_byte_equal_to_their_committed_bytes() {
+    for (bytes, company, to) in [
+        (SHORT_FY_REQUEST, "BRIDGE NEGSTOCK LAB 2", "20260331"),
+        (SHORT_TO_MAY_REQUEST, "BRIDGE NEGSTOCK LAB 2", "20250531"),
+        (EMPTY_ENVELOPE_REQUEST, "BRIDGE TIEOUT C", "20260331"),
+    ] {
+        assert_eq!(
+            request_for(company, "20250401", to),
+            decode_xml_bytes(bytes).unwrap()
+        );
+    }
+}
+
+#[test]
+fn an_item_sold_before_it_was_bought_is_listed_with_a_negative_quantity_a_rate_and_a_credit_value()
+{
+    let parsed = parse_native_negative_stock(&response(SHORT_FY)).unwrap();
+    assert_eq!(parsed.items.len(), 1);
+    let item = &parsed.items[0];
+    assert_eq!(item.name, "Lab Short Item");
+    let quantity = item.quantity.read().expect("a quantity was read");
+    assert_eq!(quantity.amount.as_str(), "-3");
+    assert_eq!(quantity.unit, "Nos");
+    assert_eq!(item.rate, present("120.00"));
+    assert_eq!(item.value, present("360.00"));
+}
+
+#[test]
+fn to_the_middle_of_the_year_the_quantity_is_as_at_that_date_and_rate_and_value_are_empty_not_zero()
+{
+    let parsed = parse_native_negative_stock(&response(SHORT_TO_MAY)).unwrap();
+    assert_eq!(parsed.items.len(), 1);
+    let item = &parsed.items[0];
+    assert_eq!(item.quantity.read().unwrap().amount.as_str(), "-5");
+    assert_eq!(item.rate, NativeStatementAmount::Empty);
+    assert_eq!(item.value, NativeStatementAmount::Empty);
 }
 
 #[test]

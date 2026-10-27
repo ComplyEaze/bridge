@@ -778,6 +778,8 @@ pub(crate) enum PairedReadValidationError {
     NativeStatement,
     #[error("Tally's own Cash Flow changed between paired reads")]
     NativeCashFlow,
+    #[error("Tally's own Negative Ledgers changed between paired reads")]
+    NativeNegativeLedgers,
     #[error("Tally's Company collection changed between paired reads")]
     CompanyFeatures,
     #[error("Tally company book changed during the company features read")]
@@ -803,6 +805,14 @@ pub(crate) enum PairedReadValidationError {
     MonthRegister,
     #[error("Tally company book changed during the month-wise register read")]
     MonthRegisterExtent,
+    #[error("Tally's own Negative Stock changed between paired reads")]
+    NativeNegativeStock,
+    #[error("Tally company book changed during the Negative Stock read")]
+    NegativeStockExtent,
+    /// The company's inventory flags, read beside a statement that offers
+    /// Tally's own closing stock.
+    #[error("Tally company inventory flags changed between paired reads beside a statement")]
+    StatementInventoryFlags,
 }
 
 impl PairedReadValidationError {
@@ -822,6 +832,7 @@ impl PairedReadValidationError {
             Self::CompanyCurrencyName => "company_currency_name_changed",
             Self::NativeStatement => "native_statement_changed",
             Self::NativeCashFlow => "native_cash_flow_changed",
+            Self::NativeNegativeLedgers => "native_negative_ledgers_changed",
             Self::CompanyFeatures => "company_features_changed",
             Self::CompanyFeaturesExtent => "company_features_extent_changed",
             Self::CurrencyExtent => "currency_extent_changed",
@@ -833,6 +844,9 @@ impl PairedReadValidationError {
             Self::MonthRegisterExtent => "month_register_extent_changed",
             Self::StockSummaryCollection => "stock_summary_collection_changed",
             Self::StockSummaryExtent => "stock_summary_extent_changed",
+            Self::NativeNegativeStock => "native_negative_stock_changed",
+            Self::NegativeStockExtent => "negative_stock_extent_changed",
+            Self::StatementInventoryFlags => "statement_inventory_flags_changed",
         }
     }
 }

@@ -278,13 +278,13 @@ the content is complete and correct.
 2. **Refuse empty-vs-empty.** If both sides report zero figures, that is itself a failure
    regardless of anything else being equal. An empty result must never look like success.
 3. **Structure of each side**, a check this crate's `compare` adds and the reference's own
-   `tae/parity/compare.py` does not make. Each side is checked for unknown keys (in the dump, a
+   comparison tool does not make. Each side is checked for unknown keys (in the dump, a
    figure, a finding or an evidence ref) and for a figure or finding id that appears more than
    once (`src/compare.rs:165-197`, called at `:346-347`); the reference's tool ignores unknown keys
    and keeps one of two entries that share an id. These findings are collected with the rest and
    do not stop the comparison.
 4. **`spec_version`, `test_id`, `test_version` and `rules_version` equality.** The reference
-   implementation's own `tae/parity/compare.py` checks `test_id` and `rules_version` only; this
+   implementation's own comparison tool checks `test_id` and `rules_version` only; this
    crate's `compare` also checks the two versions, so a port that bumps a test's version (or
    writes another spec version) without the reference doing the same is reported, not passed.
 5. **Minimum figure count**, per test id. In this crate's `compare` the floor is held per test in
@@ -444,3 +444,12 @@ Any future change to this algorithm must be made in both engines in the same cha
 between them breaks silently. §7 does not compare ids directly — a stable id is a downstream
 consumer's contract, not a `TestResult` field — but a hashed prose field or a figure/finding's
 identity keyed off this id will still diverge if the two engines disagree on how it is computed.
+
+## 12. Source of truth and declared divergences (ruling of 26 October 2026)
+
+The maintainers ruled on 26 October 2026 that this crate is the source of truth for the tax-audit
+tests. A change to a test's behaviour no longer waits for the reference to change first; §10's route
+is for porting a test, not for changing one already ported. Every change to an existing output is a
+declared divergence, never a quiet change: it has its own invented test book (a unit test on typed
+inputs, or an edge book), and the test's provenance note records it under a "Declared behaviour
+difference" heading, naming that book.

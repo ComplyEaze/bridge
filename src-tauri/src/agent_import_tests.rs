@@ -78,6 +78,7 @@ async fn batch_total_overflow_is_refused_before_dispatch_or_persistence() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let mut input = payload();
     for entry in input
@@ -114,6 +115,7 @@ async fn a_narration_that_would_read_back_rewritten_is_refused_at_build() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let mut input = payload();
     input.vouchers[0].narration = Some("Paid \u{fffd}#5; settled".into());
@@ -145,6 +147,7 @@ async fn a_batch_with_several_defects_reports_the_validation_defect_before_the_n
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let build = |input: &ImportPayload<String>| {
         let args = serde_json::to_value(input).unwrap();
@@ -430,6 +433,7 @@ fn external_import_ledger_read_refuses_busy_admission_without_waiting() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     };
     let server = Server::new(settings.clone());
     let append_admission = server
@@ -468,6 +472,7 @@ fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     };
     let server = Server::new(settings.clone());
     let initial = ImportLedgerLine {
@@ -593,6 +598,7 @@ fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -729,6 +735,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -1102,6 +1109,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let input = admitted_payload();
     let line = ImportLedgerLine {
@@ -2286,6 +2294,7 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -2958,6 +2967,7 @@ async fn import_bounds_distinct_ledger_names_before_tally_without_reducing_vouch
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let response = server
         .call_tool_response("build_import_xml", serde_json::to_value(unique).unwrap())
@@ -3224,12 +3234,16 @@ fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Resul
 
 #[tokio::test]
 async fn built_batch_guidance_matches_the_saved_native_admission() {
-    // Posting on admits a batch of 2 under the same setting (#1090).
+    // Posting on admits a batch of 2 under the same setting (#1090). With
+    // posting off the build still asks at the batch cap, so a batch of 2 is
+    // one the setting would give a route, not a one-voucher refusal.
     for (writes_enabled, voucher_count, numbered, native) in [
         (true, 1, false, true),
         (true, 2, false, true),
         (true, 1, true, false),
         (false, 1, false, false),
+        (false, 2, false, false),
+        (false, 1, true, false),
     ] {
         let simulator = SequenceSimulator::spawn(whole_build(build_numbering_plans(&[])))
             .expect("captured build plan");
@@ -3245,6 +3259,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::from_enabled(writes_enabled),
+            audit_enabled: false,
         });
         let mut input = captured_catalogue_payload();
         input.vouchers.truncate(voucher_count);
@@ -3258,16 +3273,36 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
         let result = &built.payload["result"];
         assert_eq!(result["voucher_count"], voucher_count);
         let next_step = result["next_step"].as_str().unwrap();
+        let first = result["warnings"][0].as_str().unwrap();
+        // Posting off and a batch the setting would admit: the user is told,
+        // and nothing says it will be posted from this chat.
+        let would_post = !writes_enabled && !numbered;
         assert_eq!(next_step.starts_with("Call post_import"), native);
         assert_eq!(
-            next_step.starts_with("Confirm the loaded company matches this batch"),
-            !native
+            next_step.starts_with("Tell the user that this connection cannot post."),
+            would_post,
+            "{next_step}"
         );
+        assert_eq!(
+            next_step.starts_with("Confirm the loaded company matches this batch"),
+            !native && !would_post,
+            "{next_step}"
+        );
+        if would_post {
+            assert!(
+                next_step.contains("Until then: confirm the loaded company matches this batch"),
+                "{next_step}"
+            );
+        }
         if writes_enabled {
-            assert!(result["warnings"][0]
-                .as_str()
-                .unwrap()
-                .contains("do not call post_import"));
+            assert!(first.contains("do not call post_import"), "{first}");
+        } else {
+            assert!(first.contains("Voucher posting is off"), "{first}");
+            assert_eq!(first.contains("would still refuse"), numbered, "{first}");
+            assert!(
+                !first.contains("import_post_requires_one_voucher"),
+                "{first}"
+            );
         }
         // The company-identity warning is unconditional: present for this
         // Journal-only batch exactly as it would be for a bank one.
@@ -3365,6 +3400,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::On,
+            audit_enabled: false,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(input).unwrap())
@@ -3374,7 +3410,10 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
         let first = result["warnings"][0].as_str().unwrap();
         let batch_id = result["batch_id"].as_str().unwrap();
         match refusal {
-            None => assert!(first.contains("call post_import; it requires"), "{first}"),
+            None => assert!(
+                first.contains("call post_import; the local user approves it"),
+                "{first}"
+            ),
             Some(code) => {
                 assert!(
                     first.contains(&format!("refuse it as {code} (")),
@@ -3407,8 +3446,8 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
     }
 }
 
-/// The count rule in the warning is the batch cap: the build asks only while
-/// posting is on, and posting on admits a batch (#866, #1090).
+/// The count rule in the warning is the batch cap: the build asks at the cap
+/// whether posting is on or off, and posting on admits a batch (#866, #1090).
 #[test]
 fn refusal_reason_states_the_current_voucher_limit() {
     let on = native_post_refusal_reason("import_post_requires_one_voucher");
@@ -3720,6 +3759,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -3852,6 +3892,7 @@ fn line_error_text_does_not_count_against_a_pages_never_cut_part() {
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         })
     };
     let page = json!({"items": [], "dispatch": {"response": {"outcome": {
@@ -3897,6 +3938,7 @@ async fn a_hand_imported_batchs_alter_id_delta_is_measured_from_its_build_mark()
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -3940,6 +3982,7 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         })
     };
     let server = server_with(200_000);
@@ -4092,6 +4135,7 @@ async fn a_later_page_of_a_dispatched_batch_states_the_headline_of_the_first() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -4244,6 +4288,7 @@ async fn verify_saved_batch_after_dispatch(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -4322,6 +4367,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -4482,6 +4528,7 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -4596,6 +4643,7 @@ async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        audit_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -4789,17 +4837,27 @@ fn a_name_folding_equal_to_two_live_ledgers_is_reported_whichever_it_names() {
         ),
     ] {
         assert_eq!(
-            folded_twins(&[requested.to_string()], catalogue.iter().copied()),
+            folded_twins(
+                &[requested.to_string()],
+                catalogue.iter().copied(),
+                std::iter::empty()
+            ),
             [FoldedTwins {
                 requested: requested.to_string(),
                 live,
+                through_alias: Default::default(),
             }],
             "{requested:?}"
         );
     }
     for alone in ["Other", "ACME Traders"] {
         assert!(
-            folded_twins(&[alone.to_string()], catalogue.iter().copied()).is_empty(),
+            folded_twins(
+                &[alone.to_string()],
+                catalogue.iter().copied(),
+                std::iter::empty()
+            )
+            .is_empty(),
             "{alone}"
         );
     }
@@ -4821,6 +4879,7 @@ fn a_folded_twin_marks_the_report_unimportable_with_its_own_remedy() {
             ("Other", None),
         ]
         .into_iter(),
+        std::iter::empty(),
     );
     assert_eq!(report[0]["importable"], false);
     assert_eq!(report[0]["folded_twins"][0]["parent"], "Sundry Creditors");
@@ -4844,10 +4903,257 @@ fn a_twin_needing_both_folds_is_still_found() {
     // the line break or a non-ASCII case. The composite key does.
     for (requested, other) in [("Rent/Office\r\n", "RENT OFFICE"), ("Café/Bar", "CAFÉ BAR")] {
         let catalogue = [(requested, None), (other, None)];
-        let twins = folded_twins(&[requested.to_string()], catalogue.iter().copied());
+        let twins = folded_twins(
+            &[requested.to_string()],
+            catalogue.iter().copied(),
+            std::iter::empty(),
+        );
         assert_eq!(twins.len(), 1, "{requested:?}");
         assert_eq!(twins[0].live.len(), 2, "{requested:?}");
     }
+}
+
+// ---- Aliases (#1688) ------------------------------------------------------------------------------
+//
+// No alias twin can be made on Tally's screen (it refuses an alias equal to another ledger's name), so these
+// states are constructed: tuples for the twin check, and the committed shape-lab ledger capture with a row's
+// language list edited for the report. None of it is a capture.
+
+fn twins_with_aliases(
+    requested: &str,
+    catalogue: &[(&str, Option<&str>)],
+    aliases: &[(&str, &str)],
+) -> Vec<FoldedTwins> {
+    folded_twins(
+        &[requested.to_string()],
+        catalogue.iter().copied(),
+        aliases.iter().copied(),
+    )
+}
+
+#[test]
+fn an_alias_that_folds_equal_to_another_ledger_makes_the_two_a_twin() {
+    let catalogue = [("ACME", Some("Sundry Debtors")), ("Other", None)];
+    for requested in ["ACME", "acme", "Acme Co"] {
+        let aliases: &[(&str, &str)] = if requested == "Acme Co" {
+            &[("ACME", "Acme-Co"), ("Other", "ACME CO")]
+        } else {
+            &[("Other", "Acme")]
+        };
+        let found = twins_with_aliases(requested, &catalogue, aliases);
+        if requested == "Acme Co" {
+            // Two aliases, no ledger named like the request: still two ledgers.
+            assert_eq!(found.len(), 1, "{requested}");
+            assert_eq!(found[0].live.len(), 2, "{requested}");
+            assert_eq!(found[0].through_alias.len(), 2, "{requested}");
+        } else {
+            assert_eq!(found.len(), 1, "{requested}");
+            assert_eq!(
+                found[0].live,
+                [
+                    ("ACME".to_string(), Some("Sundry Debtors".to_string())),
+                    ("Other".to_string(), None)
+                ],
+                "{requested}"
+            );
+            assert_eq!(
+                found[0].through_alias,
+                BTreeMap::from([("Other".to_string(), "Acme".to_string())]),
+                "only the ledger reached through its alias says so: {requested}"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_alias_that_folds_equal_to_its_own_ledger_is_one_ledger_not_a_twin() {
+    let catalogue = [("ACME", None), ("Other", None)];
+    assert!(twins_with_aliases("ACME", &catalogue, &[("ACME", "acme")]).is_empty());
+    assert!(twins_with_aliases("acme", &catalogue, &[("ACME", "Acme")]).is_empty());
+}
+
+#[test]
+fn a_name_that_is_only_one_ledgers_alias_is_no_twin() {
+    let catalogue = [("ACME", None), ("Other", None)];
+    assert!(twins_with_aliases("Acme Trading", &catalogue, &[("ACME", "Acme Trading")]).is_empty());
+}
+
+#[test]
+fn an_alias_shared_by_two_ledgers_makes_them_a_twin() {
+    let catalogue = [("ACME", None), ("Other", None)];
+    let found = twins_with_aliases(
+        "Shared",
+        &catalogue,
+        &[("ACME", "Shared"), ("Other", "SHARED")],
+    );
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].live.len(), 2);
+    assert_eq!(found[0].through_alias.len(), 2);
+}
+
+#[test]
+fn a_twin_found_through_an_alias_is_reported_with_that_alias_and_still_unimportable() {
+    let names = ["ACME".to_string()];
+    let catalogue = ["ACME", "Other"].map(str::to_string);
+    let mut report =
+        requested_master_report(&requested_masters(&names).unwrap(), &catalogue).unwrap();
+    annotate_folded_twins(
+        &mut report,
+        &names,
+        [("ACME", None), ("Other", None)].into_iter(),
+        [("Other", "acme")].into_iter(),
+    );
+    assert_eq!(report[0]["importable"], false);
+    let twins = report[0]["folded_twins"].as_array().unwrap();
+    assert!(twins[0].get("through_alias").is_none());
+    assert_eq!(
+        twins[1]["through_alias"][super::super::PARTY_NAME_MARKER].as_str(),
+        Some("acme")
+    );
+    let guidance = master_recovery_guidance(&report);
+    assert!(guidance.contains("through_alias"), "{guidance}");
+}
+
+const SHAPE_LAB_COMPANY: &str = "BRIDGE SHAPE LAB";
+const SHAPE_LAB_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+
+/// The shape-lab ledger capture with the language list of the named rows
+/// replaced by `NAME`s: the first the row's own name, then the aliases.
+fn shape_lab_catalogue_with_aliases(
+    aliased: &[(&str, &[&str])],
+) -> bridge_tally_protocol::StandardLedgerCatalog {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-ledger-catalogue.utf16le.xml"
+    );
+    let mut xml = bridge_tally_protocol::decode_tally_xml_response_bytes_limited(
+        bytes,
+        "text/xml; charset=utf-16",
+        bridge_tally_protocol::ExpectedTallyTextEncoding::Utf16Le,
+        bytes.len(),
+    )
+    .expect("captured response decodes")
+    .text;
+    for (row, aliases) in aliased {
+        let start = xml
+            .find(&format!("<LEDGER NAME=\"{row}\""))
+            .expect("the capture holds the row");
+        let from = start + xml[start..].find("<LANGUAGENAME.LIST>").expect("a list");
+        let to = start + xml[start..].find("</LEDGER>").expect("a row end");
+        let names = std::iter::once(row)
+            .chain(aliases.iter())
+            .map(|name| format!("<NAME>{name}</NAME>"))
+            .collect::<String>();
+        let list = format!(
+            "<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\">{names}</NAME.LIST><LANGUAGEID>0</LANGUAGEID></LANGUAGENAME.LIST>"
+        );
+        xml = format!("{}{list}{}", &xml[..from], &xml[to..]);
+    }
+    bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+        &xml,
+        SHAPE_LAB_COMPANY,
+        SHAPE_LAB_GUID,
+    )
+    .expect("the edited capture parses")
+}
+
+fn alias_report(
+    requested: &[&str],
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) -> Vec<Value> {
+    let names = requested
+        .iter()
+        .map(|name| name.to_string())
+        .collect::<Vec<_>>();
+    let live = catalogue.names().map(str::to_string).collect::<Vec<_>>();
+    let mut report = masters_for_names(&names, &live).unwrap();
+    annotate_folded_twins(
+        &mut report,
+        &names,
+        catalogue.parents(),
+        catalogue.aliases(),
+    );
+    annotate_alias_of(&mut report, &names, catalogue);
+    report
+}
+
+fn alias_of(entry: &Value) -> Option<&str> {
+    entry["alias_of"][super::super::PARTY_NAME_MARKER].as_str()
+}
+
+#[test]
+fn a_name_that_is_one_ledgers_alias_says_which_ledger_and_is_still_not_exact() {
+    let catalogue = shape_lab_catalogue_with_aliases(&[("Cash", &["Till Cash"])]);
+    let report = alias_report(&["Till Cash", "Cash", "No Such Ledger"], &catalogue);
+    assert_eq!(alias_of(&report[0]), Some("Cash"));
+    assert_ne!(report[0]["match_state"], "exact", "an alias is never sent");
+    assert!(report[0].get("importable").is_none());
+    assert!(
+        alias_of(&report[1]).is_none(),
+        "the ledger's own spelling is exact"
+    );
+    assert_eq!(report[1]["match_state"], "exact");
+    assert!(alias_of(&report[2]).is_none());
+    let guidance = master_recovery_guidance(&report);
+    assert!(guidance.contains("alias_of"), "{guidance}");
+}
+
+#[test]
+fn alias_of_is_by_exact_bytes_never_by_a_fold() {
+    let catalogue = shape_lab_catalogue_with_aliases(&[("Cash", &["Till Cash"])]);
+    for near in ["till cash", "Till  Cash", "Till Cash\r\n"] {
+        let report = alias_report(&[near], &catalogue);
+        assert!(alias_of(&report[0]).is_none(), "{near:?}");
+    }
+}
+
+#[test]
+fn a_name_that_is_an_alias_of_two_ledgers_names_neither() {
+    let names = shape_lab_catalogue_with_aliases(&[])
+        .names()
+        .filter(|name| *name != "ROUND OFF")
+        .take(2)
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let catalogue = shape_lab_catalogue_with_aliases(&[
+        (names[0].as_str(), &["Shared Alias"]),
+        (names[1].as_str(), &["Shared Alias"]),
+    ]);
+    let report = alias_report(&["Shared Alias"], &catalogue);
+    assert!(alias_of(&report[0]).is_none());
+    assert!(
+        report[0].get("folded_twins").is_some(),
+        "two ledgers answer to it: a twin"
+    );
+}
+
+#[test]
+fn a_twin_report_is_not_given_an_alias_of() {
+    // The requested name is byte-equal to the alias and folds equal to another
+    // ledger's own name ("ROUND OFF"): it is a twin, and a twin is never
+    // given an `alias_of` (which ledger it reaches is not established).
+    let catalogue = shape_lab_catalogue_with_aliases(&[("Cash", &["Round Off"])]);
+    let report = alias_report(&["Round Off"], &catalogue);
+    assert!(report[0].get("folded_twins").is_some());
+    assert!(alias_of(&report[0]).is_none());
+}
+
+#[test]
+fn an_alias_entry_gets_its_own_remedy_and_not_the_create_or_select_lines() {
+    let catalogue = shape_lab_catalogue_with_aliases(&[("Cash", &["Till Cash"])]);
+    let report = alias_report(&["Till Cash"], &catalogue);
+    let guidance = master_recovery_guidance(&report);
+    assert!(
+        guidance.contains("is an alias of a live ledger"),
+        "{guidance}"
+    );
+    assert!(
+        !guidance.contains("create the legitimate ledger"),
+        "{guidance}"
+    );
+    assert!(!guidance.contains("explicitly select"), "{guidance}");
+    // Another missing name still gets the lines an alias entry must not.
+    let report = alias_report(&["Till Cash", "No Such Ledger"], &catalogue);
+    assert!(master_recovery_guidance(&report).contains("create the legitimate ledger"));
 }
 
 /// The decoded, unescaped text of the first element named `tag` in `xml`.
@@ -5123,6 +5429,7 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
             redaction,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            audit_enabled: false,
         })
     };
     let masked = server_with(super::super::Redaction::MaskParties);
@@ -5245,7 +5552,7 @@ fn the_first_verification_page_masks_ledger_names_under_mask_parties() {
 /// `refused` line unchanged (#1108).
 #[test]
 fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_not_created() {
-    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.";
     let rejected =
         "Tally reported that this post created none of its vouchers: follow each voucher's next step.";
     let summary = |statuses: &[&str]| {
@@ -5274,9 +5581,9 @@ fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_n
 /// refused binding reads so.
 #[test]
 fn a_refused_binding_says_the_book_holds_vouchers_of_the_same_content() {
-    let every = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.";
-    let some = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.";
-    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+    let every = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.";
+    let some = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.";
+    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it.";
     // A row is its status, or a content match with whether it counts in the
     // accounts.
     let summary = |state: &str, rows: &[Value]| {
@@ -5478,6 +5785,7 @@ fn numbering_server(directory: &std::path::Path, port: u16) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        audit_enabled: false,
     })
 }
 
@@ -5861,5 +6169,124 @@ async fn a_blank_voucher_number_is_refused_before_the_numbering_read() {
         };
         assert_eq!(failure.code, code, "{blank:?}");
         assert_eq!(written_files(directory.path()), 0, "{blank:?}");
+    }
+}
+
+/// The batch limit at the build: 50 vouchers are a route with posting on and a pointer to the
+/// setting with it off; 51 are refused either way with the rebuild route, which forbids importing
+/// this file once a rebuilt batch is posted. Every text that offers two routes warns both ways.
+#[tokio::test]
+async fn the_build_names_the_route_at_the_batch_limit_and_never_both_routes() {
+    let limit = ledger::MAX_BATCH_POST_VOUCHERS;
+    for (writes_enabled, voucher_count) in [
+        (true, limit),
+        (true, limit + 1),
+        (false, limit),
+        (false, limit + 1),
+    ] {
+        let simulator = SequenceSimulator::spawn(whole_build(build_numbering_plans(&[])))
+            .expect("captured build plan");
+        let directory = tempfile::tempdir().unwrap();
+        let server = Server::new(crate::agent::Settings {
+            endpoint: TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().into(),
+            max_rows: 10,
+            max_bytes: 400_000,
+            redaction: crate::agent::Redaction::None,
+            import_enabled: true,
+            posting: crate::agent::Posting::from_enabled(writes_enabled),
+            audit_enabled: false,
+        });
+        let mut input = captured_catalogue_payload();
+        input.vouchers.truncate(1);
+        while input.vouchers.len() < voucher_count {
+            let mut extra = input.vouchers[0].clone();
+            extra.bridge_txn_id = format!("txn-extra-{}", input.vouchers.len());
+            input.vouchers.push(extra);
+        }
+        let built = server
+            .build_import_xml(&serde_json::to_value(input).unwrap())
+            .await
+            .unwrap();
+        let result = &built.payload["result"];
+        assert_eq!(result["voucher_count"], voucher_count);
+        let first = result["warnings"][0].as_str().unwrap();
+        let next_step = result["next_step"].as_str().unwrap();
+        let over = voucher_count > limit;
+        assert_eq!(
+            first.contains("as import_post_batch_too_large ("),
+            over,
+            "{writes_enabled} {voucher_count}: {first}"
+        );
+        if over {
+            assert!(
+                first.contains("build it again in batches of at most 50 vouchers"),
+                "{first}"
+            );
+            assert!(
+                first.contains(
+                    "Once any of those batches is posted or imported, never import this file"
+                ),
+                "{first}"
+            );
+            assert!(!first.contains("is posted, never import"), "{first}");
+            assert_eq!(
+                first.contains("once Allow voucher posting is on"),
+                !writes_enabled,
+                "{first}"
+            );
+            assert!(next_step.starts_with("Confirm the loaded company matches this batch"));
+        } else if writes_enabled {
+            assert!(next_step.starts_with("Call post_import"), "{next_step}");
+            assert!(
+                first.contains("an import after a post is not checked against it"),
+                "{first}"
+            );
+            assert!(
+                first.contains(
+                    "If this file was already imported in Tally, do not call post_import"
+                ),
+                "{first}"
+            );
+        } else {
+            assert!(next_step.starts_with("Tell the user that this connection cannot post."));
+            for text in [first, next_step] {
+                assert!(
+                    text.contains("once this batch is posted, do not import this file"),
+                    "{text}"
+                );
+                assert!(
+                    text.contains("once this file is imported, do not post this batch"),
+                    "{text}"
+                );
+            }
+        }
+        drop(simulator);
+    }
+}
+
+#[test]
+fn the_rebuild_route_is_offered_only_for_a_batch_over_the_limit() {
+    let on = native_post_route("import_post_batch_too_large", true);
+    assert!(
+        on.starts_with(" To post it with ComplyEaze Bridge, build it again"),
+        "{on}"
+    );
+    assert!(on.ends_with(" Otherwise import"), "{on}");
+    let off = native_post_route("import_post_batch_too_large", false);
+    assert!(
+        off.starts_with(" To post it with ComplyEaze Bridge once Allow voucher posting is on,"),
+        "{off}"
+    );
+    for code in [
+        "import_post_numbered_journal_unsupported",
+        "import_review_layout_text",
+        "import_post_requires_one_voucher",
+    ] {
+        assert_eq!(native_post_route(code, true), " Import", "{code}");
+        assert_eq!(native_post_route(code, false), " Import", "{code}");
     }
 }

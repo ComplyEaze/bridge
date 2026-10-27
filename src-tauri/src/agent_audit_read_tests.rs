@@ -18,7 +18,7 @@ use tally_protocol_simulator::{
 
 /// The synthetic read's own company GUID, read from its marks part: every part of that read names
 /// it, so the replay's company must carry the same value.
-fn fixture_guid() -> &'static str {
+pub(in crate::agent) fn fixture_guid() -> &'static str {
     static GUID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     GUID.get_or_init(|| {
         let marks = text_of(include_bytes!(
@@ -33,10 +33,10 @@ fn fixture_guid() -> &'static str {
             .to_string()
     })
 }
-const FIXTURE_NAME: &str = "Lakeview Hardware Demo";
+pub(in crate::agent) const FIXTURE_NAME: &str = "Lakeview Hardware Demo";
 
 /// A fixture part as text: UTF-16LE parts are decoded, UTF-8 ones kept.
-fn text_of(bytes: &[u8]) -> String {
+pub(in crate::agent) fn text_of(bytes: &[u8]) -> String {
     let bytes = bytes.strip_prefix(&[0xFF, 0xFE]).unwrap_or(bytes);
     if bytes.get(1) == Some(&0) {
         String::from_utf16(
@@ -51,13 +51,13 @@ fn text_of(bytes: &[u8]) -> String {
     }
 }
 
-fn plan(xml: String) -> ScenarioPlan {
+pub(in crate::agent) fn plan(xml: String) -> ScenarioPlan {
     ScenarioPlan::new(Fixture::SyntheticXml(xml))
         .with_encoding(WireEncoding::Utf16Le)
         .with_framing(ResponseFraming::ContentLength)
 }
 
-fn companies_xml(guid: &str) -> String {
+pub(in crate::agent) fn companies_xml(guid: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO>\
          <COMPANY>0</COMPANY></CMPINFO></DESC><DATA><COLLECTION>\
@@ -70,7 +70,7 @@ fn companies_xml(guid: &str) -> String {
     )
 }
 
-fn identity() -> VerifiedCompanyIdentity {
+pub(in crate::agent) fn identity() -> VerifiedCompanyIdentity {
     let companies =
         bridge_tally_protocol::parse_companies_from_collection(&companies_xml(fixture_guid()))
             .unwrap();
@@ -116,15 +116,15 @@ fn period_vouchers() -> String {
     ))
 }
 
-struct Replay {
-    marks_before: String,
-    company: String,
-    marks_in_window: (String, String),
+pub(in crate::agent) struct Replay {
+    pub(in crate::agent) marks_before: String,
+    pub(in crate::agent) company: String,
+    pub(in crate::agent) marks_in_window: (String, String),
     /// The window's census. The census parser takes only each voucher's DATE,
     /// ALTERID and GUID, so the voucher part itself serves as the census of
     /// the same vouchers.
-    census: String,
-    vouchers: String,
+    pub(in crate::agent) census: String,
+    pub(in crate::agent) vouchers: String,
 }
 
 impl Replay {
@@ -141,7 +141,52 @@ impl Replay {
         }
     }
 
-    fn plans(&self) -> Vec<ScenarioPlan> {
+    /// The same book cut to its first thirty vouchers, numbered 1 to 30 with a
+    /// voucher mark of 30: small enough that the production window limits read
+    /// it as one request, so the tool can be run end to end.
+    pub(in crate::agent) fn small() -> Self {
+        Self::cut(0..30)
+    }
+
+    /// The same book cut to the vouchers at `range` (from 0, in the part's
+    /// order), renumbered from 1 with a voucher mark of their count. Thirty are
+    /// read as one request under the production window limits; all 43 are not.
+    pub(in crate::agent) fn cut(range: std::ops::Range<usize>) -> Self {
+        let count = range.len();
+        let whole = period_vouchers();
+        let first = whole.find("<VOUCHER ").unwrap();
+        let blocks: Vec<&str> = whole[first..]
+            .split_inclusive("</VOUCHER>")
+            .filter(|block| block.contains("<VOUCHER "))
+            .skip(range.start)
+            .take(count)
+            .collect();
+        assert_eq!(blocks.len(), count);
+        let tail = whole.rfind("</VOUCHER>").unwrap() + "</VOUCHER>".len();
+        let mut vouchers = whole[..first].to_string();
+        for (index, block) in blocks.iter().enumerate() {
+            let at = block.find("<ALTERID").unwrap();
+            let end = at + block[at..].find("</ALTERID>").unwrap() + "</ALTERID>".len();
+            vouchers.push_str(&block[..at]);
+            vouchers.push_str(&format!(
+                "<ALTERID TYPE=\"Number\"> {}</ALTERID>",
+                index + 1
+            ));
+            vouchers.push_str(&block[end..]);
+        }
+        vouchers.push_str(&whole[tail..]);
+        let mut replay = Self::clean();
+        let marks = replay
+            .marks_before
+            .replace("> 153<", &format!("> {count}<"));
+        replay.marks_before = marks.clone();
+        replay.marks_in_window = (marks.clone(), marks);
+        replay.census = vouchers.clone();
+        replay.vouchers = vouchers;
+        replay
+    }
+
+    pub(in crate::agent) fn plans(&self) -> Vec<ScenarioPlan> {
         [
             self.marks_before.clone(),
             self.company.clone(),
@@ -190,7 +235,7 @@ fn roles() -> AuditRoles {
     }
 }
 
-async fn read_replay(
+pub(in crate::agent) async fn read_replay(
     replay: &Replay,
 ) -> (Result<AuditBook, AuditReadFailure>, Vec<ObservedRequest>) {
     let simulator = SequenceSimulator::spawn(replay.plans()).unwrap();
@@ -336,6 +381,52 @@ async fn the_book_holds_what_the_crates_own_fixture_holds_of_the_same_bytes() {
     assert_eq!(guids(&audit.book), guids(&theirs)[..43]);
 }
 
+/// A lab build writes the admitted read as the directory `Read::open` reads,
+/// and that directory loads the same book. The same read is not written twice,
+/// and a part path that would leave the read's folder is refused.
+#[cfg(feature = "lab-writes")]
+#[tokio::test]
+async fn a_lab_build_writes_the_admitted_read_as_a_directory_that_loads_the_same_book() {
+    let audit = read_replay(&Replay::clean()).await.0.unwrap();
+    let scratch = tempfile::tempdir().unwrap();
+    let reads = scratch.path().join("audit-reads");
+    crate::local_files::directory::ensure_private_directory(&reads).unwrap();
+    super::super::lab::write_audit_read(&reads, &audit.stored).unwrap();
+
+    let opened = Read::open(&reads.join(&audit.stored.manifest_sha256)).unwrap();
+    opened
+        .check(
+            &audit.engagement.period,
+            audit.engagement.allow_unbracketed_read,
+            audit.engagement.company_pin.as_ref(),
+        )
+        .unwrap();
+    let book = bridge_tax_audit::book::load_book(&opened, identity().display_name()).unwrap();
+    assert_eq!(
+        cash_dump(&audit.engagement, &book),
+        cash_dump(&audit.engagement, &audit.book)
+    );
+
+    assert_eq!(
+        super::super::lab::write_audit_read(&reads, &audit.stored),
+        Err("lab_audit_read_exists".to_string())
+    );
+    let escaping = StoredRead {
+        read_id: "r".to_string(),
+        company_guid: fixture_guid().to_string(),
+        manifest: b"{}".to_vec(),
+        manifest_sha256: "e".repeat(64),
+        blobs: [("parts/../escape.xml".to_string(), b"x".to_vec())].into(),
+    };
+    assert_eq!(
+        super::super::lab::write_audit_read(&reads, &escaping),
+        Err("lab_evidence_write_failed".to_string())
+    );
+    // Refused before anything is written: not even the read's folder.
+    assert!(!reads.join("e".repeat(64)).exists());
+    assert!(!reads.join("escape.xml").exists());
+}
+
 /// A book that has never held a voucher gets no census, so nothing outside the
 /// data says its window is whole: refused rather than run as an empty book.
 #[tokio::test]
@@ -367,6 +458,31 @@ async fn a_company_object_of_another_company_is_refused_by_code() {
         failure,
         AuditReadFailure::new("audit_company_part_guid_mismatch", false)
     );
+}
+
+/// Books that begin after the period ends are refused by C5's own code before
+/// the read sends a request, not after the whole read.
+#[tokio::test]
+async fn books_that_begin_after_the_period_are_refused_before_any_request() {
+    let simulator = SequenceSimulator::spawn(Replay::clean().plans()).unwrap();
+    let config = TallyConfig {
+        host: simulator.address().ip().to_string(),
+        port: simulator.address().port(),
+    };
+    let book = read_audit_book(
+        &TallyRuntime::default(),
+        &config,
+        &identity(),
+        (&date("20240401"), &date("20250331")),
+        &roles(),
+        one_request_window(),
+    )
+    .await;
+    assert_eq!(
+        failure_of(book),
+        AuditReadFailure::new("C5-books-from", false)
+    );
+    assert_eq!(simulator.received(), 0);
 }
 
 #[tokio::test]
@@ -565,4 +681,129 @@ fn group_names_that_need_escaping_reach_the_engagement_whole() {
         engagement.company_pin.unwrap().guid,
         fixture_guid().to_string()
     );
+}
+
+/// The audit read over live answers: every part as a licensed TallyPrime 7.1 Silver served it for
+/// the synthetic company BRIDGE PILOT LAB, 1 April 2026 to 31 March 2027 (lab items 697-S0A and
+/// 697-S1; the bytes and their provenance are in the protocol crate's
+/// `tests/fixtures/agent/audit-read-pilot-lab/PROVENANCE.md`).
+mod live_pilot_lab {
+    use super::*;
+
+    const FIXTURES: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/crates/bridge-tally-protocol/tests/fixtures/agent/"
+    );
+    const GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+
+    fn bytes(name: &str) -> Vec<u8> {
+        std::fs::read(format!("{FIXTURES}{name}")).unwrap()
+    }
+
+    fn part(name: &str) -> String {
+        text_of(&bytes(&format!(
+            "audit-read-pilot-lab/pilot-lab-audit-{name}.utf16le.xml"
+        )))
+    }
+
+    /// The loaded companies (one) and the marks, as the same Tally answered them in both
+    /// sittings: the two answers are byte-identical to fixtures already committed.
+    fn companies() -> String {
+        text_of(&bytes("pilot-lab/pilot-lab-company-extent.utf16le.xml"))
+    }
+
+    fn marks() -> String {
+        text_of(&bytes(
+            "gst-status/pilot-lab-gst-uncertain-august-marks.utf16le.xml",
+        ))
+    }
+
+    fn identity() -> VerifiedCompanyIdentity {
+        let companies =
+            bridge_tally_protocol::parse_companies_from_collection(&companies()).unwrap();
+        let observed = &companies[0];
+        assert_eq!(observed.guid.as_deref(), Some(GUID));
+        VerifiedCompanyIdentity::from_observed_companies(
+            observed.name.clone(),
+            crate::tally::test_company_guid(GUID),
+            observed.company_number.clone().unwrap(),
+            observed.books_from.clone().unwrap(),
+            &companies,
+        )
+        .unwrap()
+    }
+
+    /// The reader's parts in the order it asks for them, each named by its fixture
+    /// (`None` for the marks, whose request is not one of these fixtures).
+    const PARTS: [Option<&str>; 10] = [
+        None,
+        Some("company-object"),
+        Some("groups"),
+        Some("ledgers"),
+        Some("trial-balance"),
+        Some("voucher-types"),
+        None,
+        Some("census"),
+        Some("vouchers"),
+        None,
+    ];
+
+    async fn read() -> (Result<AuditBook, AuditReadFailure>, Vec<ObservedRequest>) {
+        let plans = PARTS
+            .iter()
+            .flat_map(|name| {
+                let body = name.map_or_else(marks, part);
+                [plan(companies()), plan(body), plan(companies())]
+            })
+            .collect();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let config = TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        };
+        let book = read_audit_book(
+            &TallyRuntime::default(),
+            &config,
+            &identity(),
+            (&date("20260401"), &date("20270331")),
+            &roles(),
+            one_request_window(),
+        )
+        .await;
+        (book, simulator.finish().unwrap_or_default())
+    }
+
+    #[tokio::test]
+    async fn every_part_a_live_tally_served_is_admitted_whole() {
+        let (book, observed) = read().await;
+        let audit = book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        assert_eq!(audit.book.company_guid, GUID);
+        // The counts the lab recorded from the same answers (697-S0A, 697-S1).
+        assert_eq!(audit.book.vouchers.len(), 41);
+        assert_eq!(audit.book.ledgers.len(), 18);
+        assert_eq!(audit.book.groups.len(), 29);
+        assert_eq!(audit.book.tb.len(), 18);
+        assert_eq!(observed.len(), 30);
+    }
+
+    /// The answers prove something about today's reader only while it still sends the
+    /// requests they answered: each part's request is byte for byte the one the lab sent.
+    #[tokio::test]
+    async fn each_part_request_is_byte_for_byte_the_one_sent_live() {
+        let (book, observed) = read().await;
+        book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        for (index, name) in PARTS.iter().enumerate() {
+            let Some(name) = name else { continue };
+            let sent = &observed[index * 3 + 1].request_body;
+            let live = bytes(&format!(
+                "audit-read-pilot-lab/pilot-lab-audit-{name}.request.utf16le.xml"
+            ));
+            assert!(
+                *sent == live,
+                "the {name} request differs from the one sent live:\n{}\n{}",
+                text_of(sent),
+                text_of(&live)
+            );
+        }
+    }
 }

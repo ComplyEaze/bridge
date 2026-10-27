@@ -9,7 +9,9 @@ use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 
 #[path = "agent_import.rs"]
 mod agent_import;
-pub use crate::tally::approved_import::{run_confirmation, run_review_confirmation};
+pub use crate::tally::approved_import::{
+    run_confirmation, run_release_confirmation, run_review_confirmation,
+};
 pub(crate) use agent_import::desktop_journal_review as desktop_journal;
 
 // LAB-ONLY additive surface (audit-sprint 2026-09-14, Phase 3). Compiled only
@@ -57,6 +59,10 @@ mod headline;
 mod ledger_candidates;
 #[path = "agent_month_register.rs"]
 mod month_register;
+#[path = "agent_negative_ledgers.rs"]
+mod negative_ledgers;
+#[path = "agent_negative_stock.rs"]
+mod negative_stock;
 use ledger_candidates::{
     ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
     CatalogueLedger,
@@ -117,6 +123,8 @@ mod read_profiles;
 use read_profiles::*;
 #[path = "agent_audit_read.rs"]
 mod audit_read;
+#[path = "agent_audit_run.rs"]
+mod audit_run;
 #[path = "agent_read_cost.rs"]
 mod read_cost;
 #[path = "agent_read_cost_preview.rs"]
@@ -134,7 +142,7 @@ use movement_math::*;
 mod egress;
 use egress::{append_egress_line, read_egress_tail};
 #[path = "agent_terms.rs"]
-mod terms;
+pub(crate) mod terms;
 
 use crate::tally::runtime::RuntimeReadEvidence;
 use crate::tally::{
@@ -248,13 +256,30 @@ fn mark_compliance_party_names(mut compliance: Value) -> Value {
     compliance
 }
 
+/// An entry's ledger and, when it carries cost-centre allocations, the names of their cost
+/// categories and cost centres: a customer-named or job-work cost centre can carry a party's
+/// name, and the masters tool masks the same names under `mask_parties`. Every tool that
+/// returns a voucher's entries marks them through this one function.
+fn mark_entry_party_names(entry: &mut Value) {
+    mark_party_field(entry, "ledger");
+    if let Some(allocations) = entry
+        .get_mut("cost_centre_allocations")
+        .and_then(Value::as_array_mut)
+    {
+        for allocation in allocations {
+            mark_party_field(allocation, "cost_centre");
+            mark_party_field(allocation, "category");
+        }
+    }
+}
+
 fn mark_voucher_party_names(mut voucher: Value) -> Value {
     for field in ["party", "party_ledger_name"] {
         mark_party_field(&mut voucher, field);
     }
     if let Some(entries) = voucher.get_mut("amounts").and_then(Value::as_array_mut) {
         for entry in entries {
-            mark_party_field(entry, "ledger");
+            mark_entry_party_names(entry);
         }
     }
     voucher
@@ -330,6 +355,9 @@ struct Settings {
     redaction: Redaction,
     import_enabled: bool,
     posting: Posting,
+    /// Whether the tax-audit tool (`audit_test_run`) is listed and callable. Off by default:
+    /// the extension's setting turns it on.
+    audit_enabled: bool,
 }
 
 /// Whether this server may post to Tally. One setting governs every post: one
@@ -415,6 +443,7 @@ impl Settings {
             redaction,
             import_enabled: enabled_setting("BRIDGE_AGENT_ENABLE_IMPORT")? || writes_enabled,
             posting,
+            audit_enabled: audit_from_env(process_variable)?,
         })
     }
 }
@@ -456,6 +485,30 @@ const RETIRED_BATCH_POST_SETTING: &str = "BRIDGE_AGENT_ENABLE_BATCH_POST";
 fn posting_setting(value: Option<&str>) -> Result<bool, String> {
     match value {
         Some("" | POSTING_PLACEHOLDER) => Ok(false),
+        other => boolean_setting(other),
+    }
+}
+
+/// The extension's tax-audit setting, named after the version of what it offers, as the posting
+/// one is. A test ties the key and its placeholder to `packaging/mcpb/manifest.json`.
+#[cfg(test)]
+pub(super) const AUDIT_SETTING_KEY: &str = "enable_tax_audit_2026_10";
+const AUDIT_PLACEHOLDER: &str = "${user_config.enable_tax_audit_2026_10}";
+/// The environment variable the setting is mapped to.
+pub(super) const AUDIT_SETTING_VARIABLE: &str = "BRIDGE_AGENT_ENABLE_TAX_AUDIT";
+
+/// The tax-audit setting, read through `var` as [`posting_from_env`] reads posting: absent,
+/// empty or the unresolved placeholder is off; anything but a plain boolean fails loud.
+fn audit_from_env(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<bool, String> {
+    let value = var(AUDIT_SETTING_VARIABLE)
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| "boolean_setting_invalid".to_string())
+        })
+        .transpose()?;
+    match value.as_deref() {
+        Some("" | AUDIT_PLACEHOLDER) => Ok(false),
         other => boolean_setting(other),
     }
 }
@@ -754,6 +807,20 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 limit_master_alter_id: *limit_master_alter_id,
             });
         }
+        if let Some(crate::tally::runtime::NegativeStockReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
@@ -916,6 +983,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(reason);
         }
+        if let Some(negative_stock) = cause
+            .downcast_ref::<bridge_tally_protocol::native_negative_stock::NativeNegativeStockError>()
+        {
+            return Some(negative_stock.code());
+        }
+        if let Some(crate::tally::runtime::NegativeStockReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        {
+            return Some(reason);
+        }
         if let Some(statement) = cause
             .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
         {
@@ -930,6 +1007,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
             .downcast_ref::<bridge_tally_protocol::native_month_register::NativeMonthRegisterError>()
         {
             return Some(register.code());
+        }
+        if let Some(negative_ledgers) = cause
+            .downcast_ref::<bridge_tally_protocol::native_negative_ledgers::NativeNegativeLedgersError>()
+        {
+            return Some(negative_ledgers.code());
         }
         if let Some(check) =
             cause.downcast_ref::<crate::reports::cash_flow::CashFlowCheckError>()
@@ -987,15 +1069,34 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// Deliberately sparse. A code without a documented, concrete next step returns
 /// `None` and its refusal keeps the general message, because filler guidance is
 /// worse than none: it reads as authoritative while sending the caller nowhere.
-/// This never softens a refusal — it only says what to do about one.
+/// This never softens a refusal — it only says what to do about one. A few codes
+/// state a cause with no step instead, among them `empty_book_first_import`: no step
+/// inside ComplyEaze Bridge exists for it yet, and it must not send anyone to enter a
+/// voucher another way (#1709).
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "voucher_mark_contradiction" => Some(
+            "Tally gave this company's voucher mark earlier in this check and then twice without it, \
+             so this check recorded nothing and did not settle the post. Run the same call again \
+             once. If it is refused again, ask the person whether the company's books are being \
+             restored or replaced in Tally.",
+        ),
         "company_identity_absent_or_ambiguous" | "company_identity_not_matched" => Some(
             "Tally did not confirm the selected company as exactly one loaded company, so nothing \
              was returned. The company may not be loaded in Tally, may have been renamed since \
              list_companies, or Tally may list it more than once. Ask the user to open the company \
              in Tally, then call list_companies again and repeat the request with the \
              company_guid it returns.",
+        ),
+        // The company list Tally returned held no company with the GUID given (or, after a read
+        // began, none with the identity it began on). The 7.2 read regression passed the GUID of a
+        // company that was not open and got this code with no step.
+        "company_identity_not_found" => Some(
+            "The company list Tally returned held no company with this company_guid, so nothing \
+             from its books was returned. The company may not be open in Tally, or may have been \
+             closed while the read ran. Call list_companies and use a company_guid it returns; if \
+             the company the user named is not listed, ask the user to open it in Tally, then call \
+             list_companies again before repeating the request.",
         ),
         "setting_retired" => Some(
             "BRIDGE_AGENT_ENABLE_BATCH_POST was retired: batch posting now follows the posting \
@@ -1026,9 +1127,8 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
-             mark and ComplyEaze Bridge has no \"before\" to attribute an import against. Record one \
-             voucher in this company by another route and confirm it in Tally, then build \
-             this batch again.",
+             mark and ComplyEaze Bridge has no \"before\" to attribute an import against, so it \
+             cannot build or post the first voucher into this company yet. Nothing was sent to Tally.",
         ),
         // A cause, reached through `ledger_export_invalid` (#714) and
         // `ledger_movement_read_failed` (#716).
@@ -1130,6 +1230,15 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              worst-case stock-item row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
              so no request for stock items was sent. The mark counts masters of every kind, so \
              a company with few stock items may be refused. A larger book refuses; retrying \
+             this call refuses again.",
+        ),
+        // The Negative Stock read's own size refusal (`size` carries the mark).
+        "negative_stock_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
+             so Tally's Negative Stock was not requested. The mark counts masters of every \
+             kind, so a company with few stock items may be refused, and the ceiling is a \
+             stated guess, not a measurement of this report. A larger book refuses; retrying \
              this call refuses again.",
         ),
         // The stock summary read whose rows differ from Tally's own item count
@@ -1950,6 +2059,14 @@ impl ToolFailure {
         }) {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::NegativeLedgersReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
         }) {
             error.safe_code()
@@ -2059,7 +2176,7 @@ impl Server {
         let post_approvals = Arc::new(agent_import::PostApprovals::new(&settings.data_dir));
         Self {
             settings,
-            runtime: TallyRuntime::default(),
+            runtime: TallyRuntime::ungated(),
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
             voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
@@ -2547,16 +2664,24 @@ impl Server {
         if name == "post_import" && self.settings.posting == Posting::RetiredSettingPresent {
             return Err("setting_retired".to_string().into());
         }
+        if name == "audit_test_run" && !self.settings.audit_enabled {
+            return Err("audit_tool_disabled".to_string().into());
+        }
         #[cfg(feature = "lab-writes")]
         if matches!(
             name,
-            "lab_read_inventory" | "lab_import_masters" | "lab_import_vouchers"
+            "lab_read_inventory"
+                | "lab_read_purchase_identity"
+                | "lab_voucher_key_probe"
+                | "lab_import_masters"
+                | "lab_import_vouchers"
         ) {
             lab::require_lab_writes_env()?;
         }
         validate_tool_arguments(name, args)?;
         match name {
             "acknowledge_post_review" => self.acknowledge_post_review(args).await,
+            "audit_test_run" => self.audit_test_run(args).await,
             "balance_sheet" => self.balance_sheet(args).await,
             "build_import_xml" => {
                 self.import_enabled()?;
@@ -2585,6 +2710,8 @@ impl Server {
             "local_data_report" => self.local_data_report().map_err(Into::into),
             "masters" => self.masters(args).await,
             "month_register" => self.month_register(args).await,
+            "negative_ledgers" => self.negative_ledgers(args).await,
+            "negative_stock" => self.negative_stock(args).await,
             "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;
@@ -2615,6 +2742,10 @@ impl Server {
             "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
+            #[cfg(feature = "lab-writes")]
+            "lab_read_purchase_identity" => lab::lab_read_purchase_identity(self, args).await,
+            #[cfg(feature = "lab-writes")]
+            "lab_voucher_key_probe" => lab::lab_voucher_key_probe(self, args).await,
             #[cfg(feature = "lab-writes")]
             "lab_import_masters" => lab::lab_import_masters(self, args).await,
             #[cfg(feature = "lab-writes")]
@@ -2752,6 +2883,7 @@ pub(crate) async fn desktop_selected_vouchers(
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         },
         runtime.clone(),
     );
@@ -3038,16 +3170,18 @@ fn window_honoured(rows: &[Value], from: &str, to: &str) -> bool {
     })
 }
 
-fn corroborate_empty_voucher_window(
-    widened_rows: &[Value],
-    from: &str,
-    to: &str,
+/// What the widened read found, as the two facts the corroboration needs: any
+/// voucher on a day inside the window, and any voucher at all in the widened
+/// window. The rows of a data read and the days of a census both give them.
+fn corroborate_empty_by_days(
+    any_in_window: bool,
+    any_in_widened: bool,
     company_high_water: Option<u64>,
 ) -> Result<(bool, Option<&'static str>), String> {
-    if widened_rows.iter().any(|row| row_in_window(row, from, to)) {
+    if any_in_window {
         return Err("window_contradicted".to_string());
     }
-    if !widened_rows.is_empty() {
+    if any_in_widened {
         // Boundary-day rows only prove that this wider read returned *some*
         // data. They provide no independent cardinality for the nonempty
         // response, so they cannot promote the original empty window. The

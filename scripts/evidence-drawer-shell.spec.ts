@@ -14,6 +14,7 @@ test("the mounted shell makes its background inert while the evidence drawer sta
   await page.addInitScript((company) => {
     window.__TAURI_INTERNALS__ = {
       invoke: async (command: string) => {
+        if (command === "desktop_terms_status") return { terms_version: "2026-10.1", state: "accepted", accepted: true };
         if (command === "tally_persisted_company_profiles") {
           return { profiles: [company], total_profiles: 1, limit: 100, truncated: false };
         }
@@ -68,6 +69,7 @@ async function openLostResume(page: Page, discoverWorker: boolean) {
     window.__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: unknown) => {
         calls.push({ command, args });
+        if (command === "desktop_terms_status") return { terms_version: "2026-10.1", state: "accepted", accepted: true };
         if (command === "tally_persisted_company_profiles") {
           return { profiles: [company], total_profiles: 1, limit: 100, truncated: false };
         }

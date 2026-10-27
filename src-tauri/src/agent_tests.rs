@@ -159,6 +159,7 @@ fn settings(address: std::net::SocketAddr, data_dir: PathBuf) -> Settings {
         redaction: Redaction::MaskParties,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     }
 }
 
@@ -455,7 +456,7 @@ fn an_empty_book_refusal_carries_its_remediation_through_the_real_payload() {
         error["remediation"]
             .as_str()
             .expect("remediation attached to the refusal payload")
-            .contains("Record one voucher in this company by another route"),
+            .contains("cannot build or post the first voucher into this company yet"),
         "{error}"
     );
     assert_eq!(response.value["isError"], true);
@@ -528,12 +529,19 @@ async fn every_date_refusal_names_the_dates_it_accepts() {
 
 #[test]
 fn remediation_is_present_only_where_a_concrete_next_step_exists() {
-    let guidance = refusal_remediation("empty_book_first_import").expect("empty book guidance");
+    let guidance = refusal_remediation("statement_password_file_permissions").expect("a next step");
     // The guidance must name the action to take, not restate the refusal.
+    assert!(guidance.contains("(chmod 600)"), "{guidance}");
+    // An exception: a company that has never held a voucher has no step ComplyEaze Bridge
+    // can offer yet, so its guidance states the cause and sends no one to enter a voucher another
+    // way (#1709).
+    let empty = refusal_remediation("empty_book_first_import").expect("empty book guidance");
     assert!(
-        guidance.contains("Record one voucher in this company by another route"),
-        "{guidance}"
+        empty.contains("cannot build or post the first voucher into this company yet"),
+        "{empty}"
     );
+    assert!(empty.contains("Nothing was sent to Tally"), "{empty}");
+    assert!(!empty.contains("another route"), "{empty}");
     // Sparse by design. A code with no documented step gets None rather than
     // filler, because guidance that reads as authoritative and sends the caller
     // nowhere is worse than the general message.
@@ -752,6 +760,15 @@ fn a_read_refused_for_the_company_identity_names_that_cause_and_the_next_step() 
     }
 }
 
+/// A read for a company that is not among those open is refused as
+/// `company_identity_not_found`, and the refusal says what to do about it.
+#[test]
+fn a_company_identity_not_found_names_the_next_step() {
+    let step = remediation_for("company_identity_not_found", None).expect("a next step");
+    assert!(step.contains("list_companies"), "{step}");
+    assert!(step.contains("open it in Tally"), "{step}");
+}
+
 #[test]
 fn ledger_master_fields_reject_unknown_schema_values() {
     assert_eq!(
@@ -782,6 +799,8 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "PAN Holder",
         "Entry Ledger",
         "Mailing Firm",
+        "Cost Centre One",
+        "Cost Category One",
     ];
     let samples = [
         (
@@ -812,6 +831,14 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "masters",
             json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
+        ),
+        (
+            "negative_ledgers",
+            json!({"result":{"ledgers":[{"ledger":party_name("Customer One"),"side":"credit","amount":"10.00"}]}}),
+        ),
+        (
+            "negative_stock",
+            json!({"result":{"listed_items":[{"item":party_name("Stock Item One"),"quantity":{"state":"read","amount":"-3","unit":"Nos"},"rate":{"state":"present","value":"120.00"},"value":{"state":"present","value":"360.00"}}]}}),
         ),
         (
             "outstandings",
@@ -872,7 +899,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "vouchers",
             mark_voucher_party_names(
-                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger"}]}),
+                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger","cost_centre_allocations":[{"category":"Cost Category One","cost_centre":"Cost Centre One","amount":"-1.00"}]}]}),
             ),
         ),
     ];
@@ -889,10 +916,14 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // months, amounts and the report's name; `statement_tie_out` returns two
     // dates, three signed gaps and fixed sentences, and never a ledger name;
     // `voucher_read_cost` returns only a voucher mark, counts, seconds and
-    // constant text, and the company's own name.
+    // constant text, and the company's own name; `audit_test_run` returns only
+    // figure and finding ids, numbers, the admitted test's fixed wording and the
+    // codes and counts of failed book checks (its own test replays a book and
+    // looks for every group, ledger and company name in the result).
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut without_a_sample = vec![
         "acknowledge_post_review",
+        "audit_test_run",
         "cash_flow",
         "company_features",
         "gst_status",
@@ -917,11 +948,9 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // item names and the voucher's party). The sample is built in this test like the others, so it
     // tests the walk, not the tool.
     //
-    // Known gap, lab-only (#999): the same names come back UNMARKED where they appear as another
-    // field: a stock item's `parent` and `base_unit`, and a voucher entry's `stock_item` and
-    // `godown` and a batch's `godown`. Under `MaskParties` a unit masked in `units` stays in the
-    // clear as a `base_unit`. The sample's values for those fields are not party-like, so the walk
-    // cannot see it. Marking them is a separate change.
+    // The names a stock item's `parent` and `base_unit`, a voucher entry's `stock_item` and `godown`
+    // and a batch's `godown` carry are marked too (#999), so the sample uses party-like values for
+    // them: a unit masked in `units` is masked as a `base_unit`, and the walk would see it if not.
     #[allow(unused_mut)] // only pushed to when the `lab-writes` feature is compiled in
     let mut lab_samples: Vec<(&str, Value)> = Vec::new();
     #[cfg(feature = "lab-writes")]
@@ -932,16 +961,40 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
                 "units": [{"name": party_name("Customer One"), "decimal_places": "3"}],
                 "stock_items": [{
                     "name": party_name("Supplier Two"),
-                    "parent": "Primary",
+                    "parent": party_name("Customer One"),
+                    "base_unit": party_name("Entry Ledger"),
                     "hsn_code": "2836",
                 }],
                 "vouchers": {
                     "items": [{
                         "party": party_name("Customer One"),
-                        "inventory_entries": [{"stock_item": "Widget", "amount": "-8000.00"}],
+                        "inventory_entries": [{
+                            "stock_item": party_name("Supplier Two"),
+                            "godown": party_name("PAN Holder"),
+                            "amount": "-8000.00",
+                            "batch_allocations": [{"godown": party_name("Entry Ledger")}],
+                        }],
                     }],
                     "offset": 0,
                 },
+            }),
+        ));
+    }
+    // `lab_read_purchase_identity` returns no name beyond the company: a difference names the voucher's GUID and
+    // the field, never its values (they stay in the exchange the lab keeps).
+    #[cfg(feature = "lab-writes")]
+    if registered.contains("lab_read_purchase_identity") {
+        lab_samples.push((
+            "lab_read_purchase_identity",
+            json!({
+                "agent": {"rows": 2, "response_chars": 120_000, "response_chars_per_row": 60_000, "window_honoured": true},
+                "narrow": {"rows": 2, "response_chars": 16_000, "response_chars_per_row": 8_000, "window_honoured": true},
+                "differences": {
+                    "total": 1,
+                    "listed": [{"guid": "synthetic-guid-00000001", "field": "party"}],
+                    "listed_truncated": false,
+                },
+                "inconclusive": false,
             }),
         ));
     }
@@ -951,11 +1004,17 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // back from the target book. A sample would show a name that the walk cannot mask. The tools write only to a target admitted by `admit_lab_target`,
     // whose guard today is a deny list of other companies (#972); a client's ledger names could
     // appear unmasked only if that guard failed. Marking those names is a separate change.
+    // `lab_voucher_key_probe` (#685) returns no name a walk could mark: identifiers, a date,
+    // the voucher type's name and two flags, so it has no sample either.
     #[cfg(feature = "lab-writes")]
     without_a_sample.extend(
-        ["lab_import_masters", "lab_import_vouchers"]
-            .into_iter()
-            .filter(|name| registered.contains(*name)),
+        [
+            "lab_import_masters",
+            "lab_import_vouchers",
+            "lab_voucher_key_probe",
+        ]
+        .into_iter()
+        .filter(|name| registered.contains(*name)),
     );
     let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
     assert_eq!(
@@ -1053,6 +1112,7 @@ async fn malformed_tool_name_is_in_band_and_the_same_session_serves_the_next_req
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -1106,6 +1166,7 @@ async fn egress_receipt_uses_the_final_jsonrpc_replacement_when_only_the_envelop
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     };
     let unframed = Server::new(base_settings.clone())
         .call_tool("voucher_schema", json!({}))
@@ -1191,6 +1252,7 @@ async fn tools_call_notifications_are_refused_and_receipted_without_dispatch() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -1251,6 +1313,7 @@ async fn pagination_rejects_present_invalid_values_in_helpers_and_row_tools() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server.call_tool("egress_log", json!({"limit": "10"})).await;
     assert_eq!(
@@ -1504,6 +1567,7 @@ async fn stored_evidence_records_have_individual_timestamps_and_durations() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     server.call_tool("voucher_schema", json!({})).await;
     tokio::time::sleep(std::time::Duration::from_millis(1)).await;
@@ -1622,6 +1686,41 @@ fn the_posting_setting_reads_an_absent_empty_or_unresolved_value_as_off() {
             "{bad:?} must still fail at settings admission"
         );
     }
+}
+
+/// The tax-audit setting: absent, empty or the unresolved placeholder is off, a plain boolean is
+/// read, anything else fails loud; and the manifest maps exactly this key, off by default.
+#[test]
+fn the_tax_audit_setting_is_off_unless_turned_on_and_is_the_manifests_own() {
+    let read = |value: Option<&str>| {
+        audit_from_env(|name| {
+            assert_eq!(name, AUDIT_SETTING_VARIABLE);
+            value.map(std::ffi::OsString::from)
+        })
+    };
+    assert_eq!(read(None), Ok(false));
+    assert_eq!(read(Some("")), Ok(false));
+    assert_eq!(read(Some(AUDIT_PLACEHOLDER)), Ok(false));
+    assert_eq!(read(Some("false")), Ok(false));
+    assert_eq!(read(Some("true")), Ok(true));
+    assert_eq!(read(Some("1")), Ok(true));
+    assert_eq!(
+        read(Some("yes")),
+        Err("boolean_setting_invalid".to_string())
+    );
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    assert_eq!(
+        manifest["server"]["mcp_config"]["env"][AUDIT_SETTING_VARIABLE].as_str(),
+        Some(AUDIT_PLACEHOLDER)
+    );
+    assert_eq!(
+        AUDIT_PLACEHOLDER,
+        format!("${{user_config.{AUDIT_SETTING_KEY}}}")
+    );
+    let setting = &manifest["user_config"][AUDIT_SETTING_KEY];
+    assert_eq!(setting["type"], "boolean");
+    assert_eq!(setting["default"], false);
 }
 
 /// The placeholder the server tolerates is the one the manifest passes for the
@@ -2065,6 +2164,7 @@ async fn imports_are_hidden_and_refused_without_explicit_live_evidence_opt_in() 
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let response = server.call_tool("build_import_xml", json!({})).await;
     assert_eq!(
@@ -2091,6 +2191,7 @@ async fn a_batch_mixing_a_journal_with_a_bank_voucher_says_how_to_split_it() {
         redaction: Redaction::None,
         import_enabled: true,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let mixed = json!({"company_guid":"00000000-0000-4000-8000-000000000001","vouchers":[
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Journal","entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Income","amount":"12.50","side":"Cr"}]},
@@ -2284,32 +2385,41 @@ fn a_tool_date_that_is_not_a_tally_date_is_refused_at_the_boundary() {
 
 #[test]
 fn empty_voucher_window_corroboration_handles_all_three_control_branches() {
+    // what a widened read found: a voucher inside the window, one anywhere in the widened window
     assert_eq!(
-        corroborate_empty_voucher_window(
-            &[json!({"date":"20260831"}), json!({"date":"20260903"})],
-            "20260901",
-            "20260902",
-            None,
-        ),
+        corroborate_empty_by_days(false, true, None),
         Ok((true, Some("empty_window_wider_read_nonempty")))
     );
     assert_eq!(
-        corroborate_empty_voucher_window(
-            &[json!({"date":"20260901"})],
-            "20260901",
-            "20260902",
-            None,
-        ),
+        corroborate_empty_by_days(true, true, None),
         Err("window_contradicted".to_string())
     );
     assert_eq!(
-        corroborate_empty_voucher_window(&[], "20260901", "20260902", Some(0)),
+        corroborate_empty_by_days(false, false, Some(0)),
         Ok((false, Some("company_has_no_vouchers")))
     );
     assert_eq!(
-        corroborate_empty_voucher_window(&[], "20260901", "20260902", Some(1)),
+        corroborate_empty_by_days(false, false, Some(1)),
         Ok((true, Some("empty_uncorroborated")))
     );
+    // nothing found and no mark to decide on
+    assert_eq!(
+        corroborate_empty_by_days(false, false, None),
+        Err("voucher_checkpoint_invalid".to_string())
+    );
+    // the rows of a data read are in the window by their own day, ends included
+    for (date, inside) in [
+        ("20260831", false),
+        ("20260901", true),
+        ("20260902", true),
+        ("20260903", false),
+    ] {
+        assert_eq!(
+            row_in_window(&json!({"date": date}), "20260901", "20260902"),
+            inside,
+            "{date}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -2358,6 +2468,7 @@ async fn simulator_company_read_records_evidence_while_down_endpoint_is_typed() 
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     let down_response = down.call_tool("tally_status", json!({})).await;
     assert!(down_response["structuredContent"]["result"]["error"]["code"].is_string());
@@ -2688,6 +2799,7 @@ fn evidence_reads_disclose_requested_limits_and_permanent_retention_eviction() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        audit_enabled: false,
     });
     assert!(!server.read_evidence(&json!({"limit":1})).unwrap().truncated);
     let record = |index: usize| Evidence {
@@ -2750,6 +2862,7 @@ async fn diagnostic_history_reads_honor_the_configured_global_row_cap() {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            audit_enabled: false,
         });
         for index in 0..3 {
             server.record_evidence(Evidence {

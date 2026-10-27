@@ -4,10 +4,7 @@
 //! `SVCURRENTCOMPANY` element decodes to the raw name, byte for byte.
 //!
 //! One table-driven test over the renderer families, instead of a
-//! near-duplicate escaping test in every renderer file. The qualification-only Bills probe may
-//! not be referenced outside its own module (the live-read boundary gate), so
-//! its escaping stays tested there
-//! (`dynamic_values_are_escaped_and_cannot_inject_requests_or_variables`).
+//! near-duplicate escaping test in every renderer file.
 
 use quick_xml::events::Event;
 
@@ -89,8 +86,13 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         ),
         (
             "native_stock_summary::render_company_inventory_flags_request",
-            render_company_inventory_flags_request(NAME, "3a6bd6e1-b835-4bff-89dd-8a6af138c346")
+            render_company_inventory_flags_request(
+                NAME,
+                &bridge_tally_primitives::company_guid::CompanyGuid::parse(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+                )
                 .unwrap(),
+            ),
         ),
         (
             "native_stock_summary::render_native_stock_summary_request",

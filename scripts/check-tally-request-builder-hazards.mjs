@@ -30,7 +30,7 @@ const amountMethod = /(?:Balance|Amount|Opening|Closing|Totals?|Debit|Credit|Val
 const ATTRIBUTES = String.raw`((?:#\[[^\]]*\]\s*)*)(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*`;
 
 const actual = new Set();
-const sources = ["src-tauri", "tools"].flatMap((sourceRoot) => rustFiles(resolve(repositoryRoot, sourceRoot)));
+const sources = ["src-tauri"].flatMap((sourceRoot) => rustFiles(resolve(repositoryRoot, sourceRoot)));
 // A file reached only through a test-only module declaration is test code, by
 // its #[cfg(test)] attribute rather than by its name (#837).
 const quarantined = testOnlyFiles(sources);

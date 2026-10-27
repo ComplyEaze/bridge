@@ -1887,13 +1887,13 @@ async fn migration_is_versioned_and_idempotent() {
     .expect("count mirror tables");
     let migration_count = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM tally_schema_migrations \
-         WHERE version IN (2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27)",
+         WHERE version IN (2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28)",
     )
     .fetch_one(&repository.pool)
     .await
     .expect("count migration marker");
     assert_eq!(table_count, 6);
-    assert_eq!(migration_count, 24);
+    assert_eq!(migration_count, 25);
     assert_eq!(
         sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM tally_schema_migrations WHERE version = 7",
@@ -3112,6 +3112,32 @@ async fn batch_identity_remains_composite_across_capability_packs() {
         .await
         .expect("same run may carry a distinct pack batch");
     assert_ne!(core, tax);
+}
+
+#[tokio::test]
+async fn a_batch_range_that_names_no_calendar_day_is_refused() {
+    let (repository, snapshot, company) = seeded_repository().await;
+    for (from, to) in [("20251340", "20251340"), ("20250229", "20250301")] {
+        let refused = repository
+            .begin_batch(BeginBatchInput {
+                run_id: "impossible-date-run".to_string(),
+                capability_snapshot_id: snapshot.id.clone(),
+                company_id: company.id.clone(),
+                pack_id: "india_tax".to_string(),
+                pack_schema_major: 1,
+                pack_schema_minor: 0,
+                source_transport: "xml_http".to_string(),
+                source_release: None,
+                requested_from_yyyymmdd: Some(from.to_string()),
+                requested_to_yyyymmdd: Some(to.to_string()),
+                started_at_unix_ms: 2_000,
+            })
+            .await;
+        assert!(
+            matches!(refused, Err(MirrorError::InvalidInput("date_range"))),
+            "{from}..{to}: {refused:?}"
+        );
+    }
 }
 
 #[tokio::test]

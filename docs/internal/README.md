@@ -3,7 +3,7 @@
 Working documents that guided earlier development. They are kept for history
 and are not user documentation or support claims. Current behaviour is in the
 [README](../../README.md), [the agent docs](../agent/README.md) and the
-[Tally support matrix](../tally/support-matrix.md).
+[protocol reference](../tally/TALLY_PROTOCOL_REFERENCE.md).
 
 - [PRODUCT.md](./PRODUCT.md): the product register used when designing the
   desktop screens.

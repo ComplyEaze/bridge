@@ -4,20 +4,14 @@
 //! Each part is one [`fetch_audit_part`] (single, identity-bracketed, kept byte
 //! for byte), the vouchers come from the sealing window reader, and the company
 //! marks are read before the first part and again by the window after the last.
-//! Nothing is written to disk. The crate then does what it does for a directory:
+//! Nothing is written to disk (a lab build may keep an admitted read: see
+//! `lab::persist_audit_read`). The crate then does what it does for a directory:
 //! `Read::open_from` (C1-C4, every blob re-hashed), `Read::check` (pin, period,
 //! bracket, windows) and `book::load_book` (C5, C8, C9, C11). A read it refuses
 //! is refused by its rule code; no detail, which can hold a ledger name, leaves
 //! this module.
 //!
 //! [`fetch_audit_part`]: crate::tally::runtime::TallyRuntime::fetch_audit_part
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "called by the audit_test_run tool, the next change"
-    )
-)]
 use super::voucher_window::{
     company_marks, AuditWindowFailure, AuditWindowReader, CompanyMarks, RetainedWindowRead,
     VoucherReadShape, WindowReadKind, WindowReadLimits, WINDOW_CHANGED_DURING_READ,
@@ -61,10 +55,27 @@ pub(super) struct AuditRoles {
     pub(super) bank_groups: Vec<String>,
 }
 
-/// A book the crate admitted, with the engagement it was admitted under.
+/// A book the crate admitted, with the engagement it was admitted under and
+/// the requests and responses it rests on.
 pub(super) struct AuditBook {
     pub(super) engagement: Engagement,
     pub(super) book: Book,
+    pub(super) evidence: Evidence,
+    /// The admitted read's stored bytes, kept only in a lab build, which can
+    /// write them out for a real-book parity record (`lab::persist_audit_read`).
+    #[cfg(feature = "lab-writes")]
+    pub(super) stored: StoredRead,
+}
+
+/// An admitted read as the crate opened it: its manifest, the manifest's
+/// sha256 and each part's bytes by their manifest path (`parts/<name>`).
+#[cfg(feature = "lab-writes")]
+pub(super) struct StoredRead {
+    pub(super) read_id: String,
+    pub(super) company_guid: String,
+    pub(super) manifest: Vec<u8>,
+    pub(super) manifest_sha256: String,
+    pub(super) blobs: std::collections::BTreeMap<String, Vec<u8>>,
 }
 
 /// Why the read was not made or not admitted: a code and whether the same read
@@ -368,6 +379,12 @@ pub(super) async fn read_audit_book(
     limits: WindowReadLimits,
 ) -> Result<AuditBook, AuditReadFailure> {
     let engagement = Engagement::from_toml_for_read(&engagement_toml(identity, period, roles)?)?;
+    // C5 refuses a company whose books begin after the period ends. The verified
+    // identity already holds that date, and the company part must match it, so
+    // the same refusal comes before any request rather than after the whole read.
+    if identity.books_from_yyyymmdd() > period.1.as_str() {
+        return Err(refused("C5-books-from"));
+    }
     let (parts, marks) = collect_parts(runtime, config, identity, period, limits).await?;
     let (store, read_id, manifest_sha256) = memory_read(identity, period, marks, &parts)?;
     let admitted = Read::open_from(&store, &read_id, &manifest_sha256)?;
@@ -377,7 +394,36 @@ pub(super) async fn read_audit_book(
         engagement.company_pin.as_ref(),
     )?;
     let book = bridge_tax_audit::book::load_book(&admitted, identity.display_name())?;
-    Ok(AuditBook { engagement, book })
+    Ok(AuditBook {
+        engagement,
+        book,
+        evidence: evidence_of(&parts),
+        #[cfg(feature = "lab-writes")]
+        stored: StoredRead {
+            read_id,
+            company_guid: identity.company_guid().to_string(),
+            manifest: store.manifest,
+            manifest_sha256,
+            blobs: store.blobs,
+        },
+    })
+}
+
+/// Every part's request and response, folded in the order they were read.
+fn evidence_of(parts: &[Collected]) -> Evidence {
+    parts
+        .iter()
+        .map(|part| Evidence {
+            request_sha256: part.request_sha256.clone(),
+            response_sha256: sha256_hex(&part.bytes),
+            bytes: part.bytes.len(),
+            state: "complete",
+            read_at: None,
+            duration_ms: None,
+            reason_code: None,
+        })
+        .reduce(combine_evidence)
+        .expect("a read has parts")
 }
 
 /// Every part of the read, in order, and the marks it opened and closed on.
@@ -577,4 +623,4 @@ fn collect_window(
 
 #[cfg(test)]
 #[path = "agent_audit_read_tests.rs"]
-mod tests;
+pub(in crate::agent) mod tests;

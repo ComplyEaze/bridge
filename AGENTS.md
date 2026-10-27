@@ -21,6 +21,8 @@ This document defines agent-level expectations and review responsibilities for t
   - Migration impact notes if changing sync behavior
   - Security impact notes for Tally/credential changes
 - Each PR must link to one line in [review-checklist.md](./review-checklist.md) as completed before merge.
+- A change a user or integrator can see adds its change-list entry as a file under
+  `docs/changelog/unreleased/` (format in [CONTRIBUTING.md](./CONTRIBUTING.md)), never as lines of `CHANGELOG.md`.
 
 ## Rectification expectations
 
@@ -169,6 +171,23 @@ program, not only by a person watching a screen.
 Manual voucher numbering is preferred over automatic for the same reason: identical failure,
 but one silently duplicates a client's voucher and the other cleanly rejects.
 
+The same reasoning bounds what Bridge sends, and so does safety: a request that any input can
+shape is an injection path into the user's books. Bridge talks to Tally only through the
+XML/HTTP gateway Tally publishes for third-party applications; any other route, including ODBC,
+JSONEX or a TDL companion, needs its own reviewed decision under ADR 0001. It never edits
+Tally's data files or drives its UI. Every request comes from a request builder in Bridge's own
+code, merged through a reviewed pull request, that fixes the request type, the report or
+collection, the fetch list and any TDL. Values from a model, a user, a document or a Tally
+response are data: each is escaped once as XML text and, where it lands inside a TDL formula or
+`$$` function argument, admitted only through a type, or a check at the builder's entry, that
+refuses every character able to end that literal (a closed alphabet where one fits). No such
+value chooses the request type, report, collection, fetch list or TDL; those are fixed in code
+or picked from a closed set. Bridge never forwards raw XML, TDL or SQL written by a model, a
+prompt or a document. A new shape starts as a candidate builder, reviewed like any other and
+sent only through the one dispatch path (P8) to a lab book; it joins the shapes a release may
+send only after that observation (P1). Request builders and records that predate this rule are
+listed in a tracking issue and brought under it as they are next changed.
+
 ### P8. Architecture: layered, with dependencies pointing inward
 
 Keep the existing crate layering intent, and enforce it:
@@ -213,4 +232,13 @@ behaviour, the comment cites the reference section rather than restating it.
 - Never merge a PR that introduces destructive DB migrations without rollback notes.
 - Never relicense or add third-party code or assets without documented authority
   and preservation of applicable copyright, license, and attribution notices.
+- Where publishing a Tally hazard's detail would let someone harm a user or a Tally instance,
+  public text (code comments, documentation, commit messages, issues and pull requests) states
+  the rule, the limit it justifies and the type or check that enforces it, never the triggering
+  request, payload or sequence of events. That detail goes only through the private channel in
+  `SECURITY.md`. When unsure whether something meets this test, withhold it and let the
+  maintainers decide. Ordinary request and response behaviour, captured fixtures and root-cause
+  notes stay public (P1, P9, rectification); where they meet, this test decides what is
+  withheld. This applies to text written from this rule on; text already in the tree is
+  reviewed separately.
 - If you discover policy drift from this file, open an explicit PR to rectify before feature work.

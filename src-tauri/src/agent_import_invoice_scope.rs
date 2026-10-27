@@ -88,7 +88,11 @@ impl InvoiceLedgerScope {
                     matches!(parent, ParentObservation::Named(text) if parents.contains(text))
                 })
                 .copied(),
-            crate::tally::connection::parent_partition_limits(crate::tally::connection::ComplianceRead::Standard),
+            // The rates request asks for GST details, so the part is sized as a read WITH them (#1513):
+            // on the smaller Standard estimate a part at its cap would be over the response budget.
+            crate::tally::connection::parent_partition_limits(
+                crate::tally::connection::ComplianceRead::WithGstDetails,
+            ),
         )
         .map_err(|error| match error {
             ParentPartitionError::ParentOverBudget { .. }

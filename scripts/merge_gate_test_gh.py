@@ -23,10 +23,12 @@ BEHIND_MERGE_BASE = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 DIGEST = "a" * 64
 # git blob ids of lab captures, as the files API reports them in "sha": LAB_BLOB is the one the manifest tests list, LAB_BLOB_OFF
 # differs from it in the last character only.
-LAB_BLOB = "3b18e512dba79e4c8300dd08aeb37f8e728b8dad"
-LAB_BLOB_OFF = "3b18e512dba79e4c8300dd08aeb37f8e728b8dae"
-# the bytes the fake serves for LAB_BLOB; the manifest tests record their size and sha256
+LAB_BLOB = "1e0627036228d2a3032c1d66e96b9e997bea34af"
+LAB_BLOB_OFF = "1e0627036228d2a3032c1d66e96b9e997bea34ae"
+# the bytes the fake serves for LAB_BLOB (LAB_BLOB is their git blob id); the manifest tests record their size and sha256.
+# OTHER_LAB_BYTES are served for LAB_BLOB in one scenario: an answer whose bytes are not that blob.
 LAB_BYTES = b"lab capture bytes\n"
+OTHER_LAB_BYTES = b"other capture bytes\n"
 OTHER_BLOB = "9f2b1c4e7a6d03581e4c2b7a9d0f3e5c6b8a1d24"
 SURFACE_PATH = "docs/tally/compatibility/compatibility-surface.json"
 ACK_DIR = "docs/tally/compatibility/acks"
@@ -217,6 +219,7 @@ def with_ack(s, text, status="added"):
 
 
 def state():
+    global scenario  # a carry-rec-* scenario continues as the scenario it names
     s = {
         "title": "Safe merge gate control",
         "body": DEFAULT_BODY,
@@ -247,6 +250,7 @@ def state():
         "pages_fail": set(),
         "commits": [dict(DEFAULT_COMMIT)],
         "carry": None,                   # {"old": diff served for the older pair, "new": diff for the current pair, "fail": bool}
+        "carry_json": None,              # {"old": compare JSON for the older pair, "new": for the current pair, "fail": bool}
     }
 
     if scenario == "surface-fetch-fail":
@@ -273,6 +277,15 @@ def state():
         # The owner's CLEAN line names an OLDER head and merge base; the gate may carry it when the pull request's own added and
         # removed lines (merge base...head) are byte-identical at both. The compare answers below are the two diffs.
         s["owner_items"] = [owner_comment("MERGE-VERDICT CLEAN head=" + OLD_HEAD + " base=" + OLD_BASE, T1)]
+        # "carry-rec-<scenario>[-other-pair|-retracted|-newer-current]" is that scenario with the owner's RECOMMEND line for the same
+        # older pair too (or for another pair, retracted after, or followed by a RECOMMEND for the current pair)
+        rec = None
+        if scenario.startswith("carry-rec-"):
+            rec = scenario[len("carry-rec-"):]
+            rec_flag = next((f for f in ("other-pair", "retracted", "newer-current") if rec.endswith("-" + f)), None)
+            if rec_flag:
+                rec = rec[:-len(rec_flag) - 1]
+            scenario = "carry-" + rec
         set_changes(s, ("modified", "docs/x.md"))
         # Only the index line differs between the two: the pull request's own change is the same, in the same place.
         old = CARRY_DIFF.replace("index 1111111..2222222", "index 3333333..4444444")
@@ -297,6 +310,104 @@ def state():
             # the picture is one of the pull request's files, so the file list agrees; only the binary-diff guard can refuse
             set_changes(s, ("modified", "docs/x.md"), ("modified", "docs/x.png"))
             old = new = CARRY_DIFF + "diff --git a/docs/x.png b/docs/x.png\nindex 1111111..2222222 100644\nBinary files a/docs/x.png and b/docs/x.png differ\n"
+        elif scenario in ("carry-fullpath", "carry-fullpath-patch-differs"):
+            # a change of the full tier (a write-path file) whose own patch is the same at both pairs, or differs
+            path = "src-tauri/src/agent_lab_new.rs"
+            set_changes(s, ("modified", path))
+            old = old.replace("docs/x.md", path)
+            new = CARRY_DIFF.replace("docs/x.md", path)
+            if scenario.endswith("patch-differs"):
+                new = new.replace("+changed", "+changed differently")
+        elif scenario.startswith("carry-listed-binary"):
+            # The pull request also adds docs/new.png (LAB_BLOB, which the lab-capture manifest tests list). The compare diffs hide its
+            # bytes, so the gate reads the full blob id of each range from the compare JSON (old_json and new_json below).
+            name = "docs/new.png"
+            # a binary is never of the one tier (no rule classifies it), so the full tier also needs the RECOMMEND line, at the current pair
+            if rec is None:
+                s["owner_items"] = s["owner_items"] + [owner_comment(VERDICT_RECOMMEND, T2)]
+            renamed = scenario in ("carry-listed-binary-renamed", "carry-listed-binary-renamed-json-added")
+            # a listed binary that is MODIFIED (not added): the diff then has no `new file mode` line and its base blob is only in the
+            # stripped `index` line; "-modified" has other base blobs in the two ranges, "-modified-same-base" the same one
+            modified = scenario.startswith("carry-listed-binary-modified")
+            patch_body = scenario == "carry-listed-binary-patch-body"
+            source = "docs/old.png" if renamed else name
+            record = {"filename": name, "status": "renamed" if renamed else ("modified" if modified else "added"), "additions": 0, "deletions": 0}
+            if renamed:
+                record["previous_filename"] = source
+            record["sha"] = LAB_BLOB
+            privacy = f"diff --git a/{source} b/{name}\n" + (
+                f"similarity index 90%\nrename from {source}\nrename to {name}\nindex 1111111..2222222 100644\n" if renamed
+                else "index 1111111..2222222 100644\n" if modified
+                else "new file mode 100644\nindex 0000000..1111111\n") + "GIT binary patch\nliteral 3\nQwerty\n"
+            set_changes(s, ("modified", "docs/x.md"))
+            s["files"] = [record] + s["files"]
+            s["diff"] = privacy + s["diff"]
+            extra_old = extra_new = ""
+            if scenario == "carry-listed-binary-extra-in-compare":
+                # docs/y.bin is a text change to the privacy scan (no binary to attest) but a binary section in both compare diffs, and
+                # its REST blob is the one the compare JSON gives: only "the binary paths are exactly the exempted ones" is left to refuse
+                s["files"].append({"filename": "docs/y.bin", "status": "modified", "additions": 1, "deletions": 1, "sha": "c" * 40})
+                s["diff"] += modified_diff("docs/y.bin")
+                extra_old = extra_new = "diff --git a/docs/y.bin b/docs/y.bin\nindex 1111111..2222222 100644\nBinary files a/docs/y.bin and b/docs/y.bin differ\n"
+            elif scenario == "carry-listed-binary-and-unlisted":
+                # docs/extra.bin is a second, UNLISTED binary of the pull request in REST and in the privacy diff, but a text section in the
+                # compare diffs: only "every binary was exempted" (binary_count) is left to refuse (the owner's attestation is passed)
+                s["files"].append({"filename": "docs/extra.bin", "status": "added", "additions": 0, "deletions": 0, "sha": OTHER_BLOB})
+                s["diff"] += ("diff --git a/docs/extra.bin b/docs/extra.bin\nnew file mode 100644\nindex 0000000..1111111\n"
+                              "GIT binary patch\nliteral 3\nQwerty\n")
+                extra_old = extra_new = added_diff("docs/extra.bin", "x\n")
+            s["changed_files_expected"] = len(s["files"])
+
+            def binary_section(index, body):
+                head = f"diff --git a/{source} b/{name}\n"
+                if renamed:
+                    head += f"similarity index 90%\nrename from {source}\nrename to {name}\n"
+                elif not modified:
+                    head += "new file mode 100644\n"
+                return head + f"index {index}\n" + body
+
+            marker = (f"Binary files a/{source} and b/{name} differ\n" if renamed or modified else f"Binary files /dev/null and b/{name} differ\n")
+            old_body, new_body = (marker, marker)
+            if patch_body:
+                old_body, new_body = ("GIT binary patch\nliteral 5\nAbcdef\n\n", "GIT binary patch\nliteral 3\nQwerty\n\n")
+            old_index, new_index = ("3333333..4444444", "0000000..1111111")
+            if modified:
+                old_index, new_index = ("5555555..1111111", "5555555..1111111" if scenario.endswith("same-base") else "6666666..1111111")
+            old = binary_section(old_index, old_body) + CARRY_DIFF.replace("index 1111111..2222222", "index 3333333..4444444") + extra_old
+            new = binary_section(new_index, new_body) + CARRY_DIFF + extra_new
+            binary_status = {"carry-listed-binary-json-modified": "modified", "carry-listed-binary-renamed-json-added": "added"}.get(scenario, record["status"])
+            old_json_files = [{"filename": name, "sha": LAB_BLOB, "status": binary_status}, {"filename": "docs/x.md", "sha": "a" * 40, "status": "modified"}]
+            if scenario == "carry-listed-binary-extra-in-compare":
+                old_json_files.append({"filename": "docs/y.bin", "sha": "c" * 40, "status": "added"})
+            elif scenario == "carry-listed-binary-and-unlisted":
+                old_json_files.append({"filename": "docs/extra.bin", "sha": OTHER_BLOB, "status": "added"})
+            new_json_files = [dict(f) for f in old_json_files]
+            if scenario == "carry-listed-binary-json-differs-from-files":
+                # the same blob in both ranges, but not the one the files API gave (and the manifest check verified)
+                old_json_files[0]["sha"] = new_json_files[0]["sha"] = OTHER_BLOB
+            elif scenario == "carry-listed-binary-blob-differs":
+                old_json_files[0]["sha"] = OTHER_BLOB
+            elif scenario == "carry-listed-binary-path-missing":
+                old_json_files = old_json_files[1:]
+            elif scenario == "carry-listed-binary-path-missing-new":
+                new_json_files = new_json_files[1:]
+            elif scenario == "carry-listed-binary-path-twice":
+                old_json_files.append(dict(old_json_files[0]))
+            elif scenario == "carry-listed-binary-uppercase-sha":
+                old_json_files[0]["sha"] = LAB_BLOB.upper()
+            elif scenario == "carry-listed-binary-short-sha":
+                new_json_files[0]["sha"] = LAB_BLOB[:7]
+            elif scenario == "carry-listed-binary-truncated":
+                # GitHub stops at 300 files: the list is then not proven to hold every file
+                old_json_files += [{"filename": f"pad/{i}.txt", "sha": "b" * 40, "status": "added"} for i in range(298)]
+                new_json_files += [{"filename": f"pad/{i}.txt", "sha": "b" * 40, "status": "added"} for i in range(298)]
+            elif scenario == "carry-listed-binary-299-files":
+                old_json_files += [{"filename": f"pad/{i}.txt", "sha": "b" * 40, "status": "added"} for i in range(297)]
+                new_json_files += [{"filename": f"pad/{i}.txt", "sha": "b" * 40, "status": "added"} for i in range(297)]
+            elif scenario == "carry-listed-binary-no-files-list":
+                old_json_files = None
+            s["carry_json"] = {"old": None if old_json_files is None else {"files": old_json_files}, "new": {"files": new_json_files},
+                               "fail": scenario == "carry-listed-binary-json-fails"}
         elif scenario == "carry-empty-diff":
             old = new = ""
         elif scenario == "carry-duplicate-file-sections":
@@ -309,6 +420,13 @@ def state():
         s["carry"] = {"old": old, "new": new, "fail": scenario == "carry-compare-fails"}
         if scenario == "carry-same-patch-write-path":
             set_changes(s, ("added", "src-tauri/src/agent_lab_new.rs", "x"))
+        if rec is not None:
+            other = OLD_HEAD if rec_flag != "other-pair" else "7" * 40
+            s["owner_items"] = s["owner_items"] + [owner_comment("MERGE-ADVERSARY RECOMMEND head=" + other + " base=" + OLD_BASE, T2)]
+            if rec_flag == "retracted":
+                s["owner_items"] = s["owner_items"] + [owner_comment("MERGE-ADVERSARY RETRACT head=" + OLD_HEAD + " base=" + OLD_BASE, T3)]
+            elif rec_flag == "newer-current":
+                s["owner_items"] = s["owner_items"] + [owner_comment(VERDICT_RECOMMEND, T3)]
 
     elif scenario == "verdict-for-another-base":
         s["owner_items"] = [owner_comment(VERDICT_CLEAN.replace(BASE_TIP, "c" * 40), T1), owner_comment(VERDICT_RECOMMEND.replace(BASE_TIP, "c" * 40), T2)]
@@ -1054,7 +1172,8 @@ def state():
     elif scenario in {"binary-missing-attestation", "binary-with-attestation", "binary-no-rest-sha", "binary-malformed-rest-sha",
                       "binary-one-char-off", "binary-other-path", "binary-listed-and-unlisted", "binary-removed", "binary-renamed",
                       "binary-and-manifest-edit", "binary-body-pointer", "binary-blob-fails", "binary-blob-malformed",
-                      "binary-blob-not-base64", "binary-blob-size-field-differs", "binary-numeric-path", "binary-numeric-path-lookalike"}:
+                      "binary-blob-not-base64", "binary-blob-size-field-differs", "binary-blob-not-that-blob", "binary-numeric-path",
+                      "binary-numeric-path-lookalike"}:
         def binary_file(name, sha, status="added", previous=None):
             record = {"filename": name, "status": status, "additions": 0, "deletions": 0}
             if sha is not None:
@@ -1245,6 +1364,8 @@ elif args and args[0] == "api":
             emit({"encoding": "utf-8", "content": LAB_BYTES.decode(), "size": len(LAB_BYTES)})
         elif scenario == "binary-blob-size-field-differs":
             emit({"encoding": "base64", "content": encoded, "size": len(LAB_BYTES) + 1})
+        elif scenario == "binary-blob-not-that-blob":
+            emit({"sha": LAB_BLOB, "encoding": "base64", "content": base64.encodebytes(OTHER_LAB_BYTES).decode(), "size": len(OTHER_LAB_BYTES)})
         else:
             emit({"sha": LAB_BLOB, "encoding": "base64", "content": encoded, "size": len(LAB_BYTES)})
     elif "/compare/" in joined and "vnd.github.diff" in joined:
@@ -1259,6 +1380,20 @@ elif args and args[0] == "api":
             emit(carry["new"])
         else:
             fail("unknown compare diff fixture: " + spec)
+    elif "/compare/" in joined and "--jq" not in joined:
+        # the compare JSON of the verdict carry: the full blob id of each file, for the same two ranges as the diffs
+        carry_json = S["carry_json"]
+        if carry_json is None or carry_json["fail"]:
+            fail("controlled compare JSON failure")
+        spec = next(a for a in args if "/compare/" in a).split("/compare/")[1]
+        merge_base = BEHIND_MERGE_BASE if S["surface_merge_base"] is not None else BASE_TIP
+        if spec == OLD_BASE + "..." + OLD_HEAD:
+            document = carry_json["old"]
+        elif spec == merge_base + "..." + HEAD:
+            document = carry_json["new"]
+        else:
+            fail("unknown compare JSON fixture: " + spec)
+        emit(document if document is not None else {"status": "ahead"})
     elif "/compare/" in joined:
         if S["merge_base_fail"]:
             fail("controlled merge-base failure")

@@ -27,6 +27,7 @@ use bridge_tally_protocol::native_company_features::{parse_company_features, Exp
 use bridge_tally_protocol::native_funds_flow::parse_native_funds_flow;
 use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
 use bridge_tally_protocol::native_month_register::parse_native_month_register;
+use bridge_tally_protocol::native_negative_ledgers::parse_native_negative_ledgers;
 use bridge_tally_protocol::native_negative_stock::parse_native_negative_stock;
 use bridge_tally_protocol::native_outstandings::{
     parse_company_currency, parse_company_currency_name,
@@ -288,6 +289,7 @@ const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
 const MAILING_LAB_GUID: &str = "8e34483e-2bd3-472b-ae37-c4b197e8c15a";
+const TIEOUT_B_GUID: &str = "d64eda55-da7c-4106-a171-3e3cb6cdd331";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
 const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.utf16le.xml";
@@ -1004,6 +1006,57 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    // The inventory book of #692 (BRIDGE TIEOUT B): src/reports/statements_tests.rs.
+    Row {
+        fixture: "tests/fixtures/statement_balance_sheet_stock_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(BalanceSheet)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::BalanceSheet,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_stock_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_stock_book_oct_mar_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_stock_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_trial_balance_stock_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, TIEOUT_B_GUID)),
+    },
     // Native trial balances: src/native_trial_balance/tests.rs; src/reports/statements_tests.rs for
     // the statement captures; the FOREX plain request (FOREX_601D_CAPTURE_PROVENANCE.md) by the
     // FOREX company of the same unit tests.
@@ -1113,9 +1166,46 @@ const ROWS: &[Row] = &[
         parser: "parse_native_cash_flow(20250401..20260331)",
         parse: |_, text| cash_flow(text, "20250401", "20260331"),
     },
+    // Built-in Negative Ledgers report: src/native_negative_ledgers_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_negative_ledgers_bridge_lab_win_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_ledgers",
+        parse: |_, text| typed(parse_native_negative_ledgers(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_ledgers_probe_b_fy_empty_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_ledgers",
+        parse: |_, text| typed(parse_native_negative_ledgers(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_ledgers_shape_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_ledgers",
+        parse: |_, text| typed(parse_native_negative_ledgers(text)),
+    },
     // Built-in Negative Stock report: src/native_negative_stock_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_negative_stock_shape_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_negstock_lab_2_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_negstock_lab_2_to_20250531_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_negative_stock",
         parse: |_, text| typed(parse_native_negative_stock(text)),
@@ -1159,6 +1249,18 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "admit_audit_company_part(BRIDGE BATCH LAB)",
         parse: |_, text| typed(admit_audit_company_part(text, BATCH_LAB_GUID, "20260401")),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-company-object.utf16le.xml",
+        source: Source::Captured,
+        parser: "admit_audit_company_part(BRIDGE PILOT LAB)",
+        parse: |_, text| {
+            typed(admit_audit_company_part(
+                text,
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+                "20260401",
+            ))
+        },
     },
     // Native masters: src/native_masters_tests.rs (SHAPE LAB and READS LAB);
     // src/agent_voucher_type_class_tests.rs for READS LAB's voucher types, read by production
@@ -1209,6 +1311,30 @@ const ROWS: &[Row] = &[
         parse: |_, text| masters(NativeMasterKind::StockGroups, text, SHAPE_GUID),
     },
     Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_baseline_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_item_created_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_tieout_b_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, TIEOUT_B_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/masters_units_reads_lab_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_masters(Units)",
@@ -1249,6 +1375,12 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_stock_summary_report",
         parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/company_inventory_flags_stock_book_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_inventory_flags",
+        parse: |_, text| typed(parse_company_inventory_flags(text, TIEOUT_B_GUID)),
     },
     Row {
         fixture: "tests/fixtures/company_inventory_flags_shape_lab_live.utf16le.xml",
@@ -1942,6 +2074,18 @@ const ROWS: &[Row] = &[
         parser: "parse_native_group_snapshot(CORPUS DENSE)",
         parse: |_, text| groups(text, "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3"),
     },
+    Row {
+        fixture: "tests/fixtures/statement_groups_stock_book_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(TIEOUT B)",
+        parse: |_, text| groups(text, TIEOUT_B_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/statement_groups_stock_book_72_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(TIEOUT B, 7.2)",
+        parse: |_, text| groups(text, TIEOUT_B_GUID),
+    },
     // Native voucher and voucher-type collections: tests/native_vouchers.rs,
     // tests/native_core_regressions.rs; src/tally/canonical_window_tests.rs for the dropped bound.
     Row {
@@ -2370,12 +2514,42 @@ const GST_STATUS_MARKS: &str = "an answer of the company-marks read that opens t
      (src/agent_gst_status.rs) parses it, and the tests of gst_uncertain_vouchers \
      (src/agent_gst_uncertain_tests.rs) serve it and pin what the parse returns; \
      agent/gst-status/PROVENANCE.md says what it is";
+const AUDIT_READ_LIVE: &str = "an answer of the audit read's live sittings on the pilot lab \
+     (697-S0A, 15 Oct 2026; its census, 697-S1, 21 Oct 2026), with no row here: the app crate's audit \
+     read (src/agent_audit_read.rs) and the tax-audit crate parse it, and src/agent_audit_read_tests.rs \
+     (live_pilot_lab) serves it in the reader's order and pins the book admitted from it; \
+     agent/audit-read-pilot-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
+    // The audit read's live answers on the pilot lab (the company object has a row).
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-census.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-groups.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-ledgers.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-trial-balance.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-voucher-types.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-vouchers.utf16le.xml",
+        AUDIT_READ_LIVE,
+    ),
     (
         "tests/fixtures/builtin_sales_register_probe_b_fy_live.utf16le.xml",
         REGISTER_NOT_RECORDED,
@@ -2825,6 +2999,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     // Voucher exports captured for the removed voucher-scan parser.
     (
         "tests/fixtures/unit_a_optional_voucher_live.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/voucher_cost_centre_allocations_shape_lab_live.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

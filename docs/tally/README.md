@@ -6,11 +6,8 @@ capability from assumption, and a completed request from a verified snapshot.
 
 ## Public contracts
 
-- [Support matrix](./support-matrix.md) records what is implemented, what has
-  been observed on a real Tally host, and what remains planned.
-- [Executable compatibility matrix](./compatibility/compatibility-matrix.json)
-  enumerates exact claim cells and fails closed when positive claims lack
-  current reviewed evidence.
+- The [protocol reference](./TALLY_PROTOCOL_REFERENCE.md) records what has been
+  observed on a real Tally host, with a confidence marker on each finding.
 - [Privacy model](./privacy-model.md) defines what may be retained or included
   in diagnostics.
 - [2026H2 improvement plan](./IMPROVEMENT_PLAN_2026H2.md) is the current
@@ -21,7 +18,7 @@ capability from assumption, and a completed request from a verified snapshot.
   loop; [Execution log](./EXECUTION_LOG.md) and [Backlog](./BACKLOG.md) are its
   working files.
 - [Licensed-lab qualification checklist](./LICENSED_LAB_QUALIFICATION_CHECKLIST.md)
-  enumerates the per-version probes that must produce compatibility receipts.
+  enumerates the per-version probes whose answers are to be recorded.
 - [Research and execution plan](./TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md)
   contains the original source research, product model, threat analysis, and
   staged implementation plan (superseded in part — see its header note).
@@ -220,14 +217,10 @@ mode is tested as Education mode; Bridge does not bypass its restrictions.
 
 The simulator and fixture rules live in
 [`src-tauri/crates/tally-protocol-simulator`](../../src-tauri/crates/tally-protocol-simulator/README.md).
-The separate live-observation DTO and release gate live in
-[`tools/bridge-tally-compatibility`](../../tools/bridge-tally-compatibility/README.md).
-That crate performs no network requests. The separate
-[`bridge-tally-live-read`](../../tools/bridge-tally-live-read/README.md)
-controller requires a reviewed synthetic fixture and two interactive
-confirmations, and exposes only byte-identical sealed production read profiles.
-See the [Education runbook](./compatibility/live-education-runbook.md). No
-receipt should be manufactured by hand.
+Live observations are made by lab items: request files sent with curl to a
+synthetic lab company, the answers kept byte for byte and replayed through the
+reader (see the protocol reference). The signed-receipt tooling that once stood
+beside them was removed (#1745).
 
 Do not advertise a capability from a descriptor or roadmap item. A capability
 becomes supported only when the exact release, mode, transport, query profile,

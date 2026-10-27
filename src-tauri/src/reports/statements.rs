@@ -16,8 +16,10 @@
 //!   not derivable from the Trial Balance;
 //! - Tally's own Balance Sheet for the same window does not tie, line for
 //!   line, to the derived one. This is the gate for what the Trial Balance
-//!   cannot see as at `to`, such as stock valued from stock items (expected,
-//!   not yet measured on an inventory book).
+//!   cannot see as at `to`, such as stock valued from stock items. One
+//!   integrated inventory book has been measured; there Tally's own closing
+//!   stock, if it closes every gap at once, is used (see
+//!   [`TallyClosingStock`]).
 //!
 //! Gross and net are the window's movement, which the Balance Sheet does not
 //! pin: stock held at `from` and gone by `to` could pass it. So where Tally's
@@ -29,6 +31,7 @@ use bridge_tally_protocol::{
     group_ancestry::{AncestryGap, GroupIndex},
     is_tally_reserved_root,
     native_statement_reports::{NativeStatement, NativeStatementAmount, NativeStatementKind},
+    native_stock_summary::{NativeFlag, NativeInventoryFlags},
     native_trial_balance::{NativeTrialBalanceAmount, NativeTrialBalanceRow},
     TallyNamedMaster,
 };
@@ -210,6 +213,185 @@ pub struct DerivedStatements {
     /// Tally's own Profit and Loss against the derived lines, where supplied:
     /// the gate for gross and net.
     pub profit_and_loss_tie: Option<TieOut>,
+    /// Whether Tally's own closing-stock figure was used, and if it was
+    /// offered and declined, why.
+    pub closing_stock: ClosingStockUse,
+}
+
+/// The name of Tally's closing-stock line in its own Profit and Loss, spelled
+/// byte for byte as captured on an integrated inventory book (protocol
+/// reference §12a.11). Any other spelling, or a language other than English,
+/// is not this line and the figure is not offered.
+const CLOSING_STOCK_LINE: &str = "Less: Closing Stock";
+const OPENING_STOCK_LINE: &str = "Opening Stock";
+/// On that book Tally names the purchase line so; on a book without stock it
+/// is the group's own name.
+const STOCK_PURCHASE_LINE: &str = "Add: Purchase Accounts";
+const CLOSING_STOCK_USED: &str = "tally_closing_stock_used";
+/// Where the figure came from, as the result names it.
+pub const CLOSING_STOCK_SOURCE: &str = "tally_profit_and_loss_less_closing_stock";
+
+/// Tally's own closing-stock figure, a debit (negative), read from the
+/// `Less: Closing Stock` line of its Profit and Loss. It cannot be built from
+/// anything else, and only from a statement whose shape is the one captured:
+/// one such line with the amount in its sub column alone, an `Opening
+/// Stock` line shown empty (a book with opening stock is not measured) and the
+/// `Cost of Sales :` heading present once.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TallyClosingStock {
+    amount: ExactDecimal,
+}
+
+impl TallyClosingStock {
+    /// `Ok(None)` when the statement offers no such figure (no line, or an
+    /// empty or zero one): nothing changes. `Err` when it offers one that is
+    /// not as captured.
+    pub fn from_profit_and_loss(
+        statement: &NativeStatement,
+    ) -> Result<Option<Self>, ClosingStockDeclined> {
+        if statement.kind != NativeStatementKind::ProfitAndLoss {
+            return Ok(None);
+        }
+        let mut closing = statement
+            .lines
+            .iter()
+            .filter(|line| line.name == CLOSING_STOCK_LINE);
+        let Some(line) = closing.next() else {
+            return Ok(None);
+        };
+        if closing.next().is_some() {
+            return Err(ClosingStockDeclined::ShapeNotAsSeen);
+        }
+        let amount = match (&line.sub, &line.main) {
+            (NativeStatementAmount::Empty, NativeStatementAmount::Empty) => return Ok(None),
+            (NativeStatementAmount::Present(amount), NativeStatementAmount::Empty) => amount,
+            _ => return Err(ClosingStockDeclined::ShapeNotAsSeen),
+        };
+        if amount.is_zero() {
+            return Ok(None);
+        }
+        if !amount.is_negative() {
+            return Err(ClosingStockDeclined::NotADebit);
+        }
+        let mut opening = statement
+            .lines
+            .iter()
+            .filter(|line| line.name == OPENING_STOCK_LINE);
+        let shown_empty = matches!(
+            (opening.next(), opening.next()),
+            (Some(line), None)
+                if line.sub == NativeStatementAmount::Empty
+                    && line.main == NativeStatementAmount::Empty
+        );
+        if !shown_empty {
+            return Err(ClosingStockDeclined::OpeningStockNotShownEmpty);
+        }
+        // The heading the figure is checked against must be there to check.
+        if statement
+            .lines
+            .iter()
+            .filter(|line| line.name == COST_OF_SALES_HEADING)
+            .count()
+            != 1
+        {
+            return Err(ClosingStockDeclined::ShapeNotAsSeen);
+        }
+        Ok(Some(Self {
+            amount: amount.clone(),
+        }))
+    }
+}
+
+/// The company's inventory shown, by Tally's own flags, as on and integrated
+/// with the accounts. Only `ISINTEGRATED` and `ISINVENTORYON` both `Yes`
+/// builds it; what the flags were during the window is not read.
+#[derive(Debug, Clone, Copy)]
+pub struct IntegratedInventory(());
+
+impl IntegratedInventory {
+    pub fn from_flags(flags: &NativeInventoryFlags) -> InventoryFlags {
+        if flags.integrated == NativeFlag::Yes && flags.inventory_on == NativeFlag::Yes {
+            InventoryFlags::Integrated(Self(()))
+        } else {
+            InventoryFlags::NotShownIntegrated
+        }
+    }
+}
+
+/// What the company's own flags showed. `NotRead` is a flags read that was not
+/// made or did not succeed (a transport error, an unstable pair, an answer
+/// that is not this company's), which is not the same as flags that say no.
+#[derive(Debug, Clone, Copy)]
+pub enum InventoryFlags {
+    Integrated(IntegratedInventory),
+    NotShownIntegrated,
+    NotRead,
+}
+
+/// Why Tally's closing-stock figure was offered and not used. A refusal keeps
+/// the result it always had.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClosingStockDeclined {
+    /// More than one such line, or the amount is not in the sub column alone.
+    ShapeNotAsSeen,
+    /// A credit: negative stock, not measured.
+    NotADebit,
+    /// The `Opening Stock` line is missing, repeated or carries an amount.
+    OpeningStockNotShownEmpty,
+    /// The book's flags were read and do not show inventory on and integrated.
+    BookNotShownIntegrated,
+    /// The book's flags could not be read.
+    InventoryFlagsNotRead,
+    /// The derived Balance Sheet lines, with the figure, do not sum to zero:
+    /// the Trial Balance does not balance (Tally's `Difference in opening
+    /// balances` is a line this book's Balance Sheet export does not carry).
+    BalanceSheetDoesNotBalance,
+    /// With the figure, a line of Tally's Balance Sheet or Profit and Loss
+    /// still does not tie.
+    DoesNotCloseEveryGap,
+}
+
+impl ClosingStockDeclined {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ShapeNotAsSeen => "shape_not_as_seen",
+            Self::NotADebit => "not_a_debit",
+            Self::OpeningStockNotShownEmpty => "opening_stock_not_shown_empty",
+            Self::BookNotShownIntegrated => "book_not_shown_integrated",
+            Self::InventoryFlagsNotRead => "inventory_flags_not_read",
+            Self::BalanceSheetDoesNotBalance => "balance_sheet_does_not_balance",
+            Self::DoesNotCloseEveryGap => "does_not_close_every_gap",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum ClosingStockUse {
+    /// Tally's Profit and Loss offered no closing stock, or the statement was
+    /// refused for another reason first.
+    NotApplicable,
+    /// Tally's own figure closed every gap at once and the results are
+    /// established with it, shown as a line of its own.
+    Applied { value: ExactDecimal },
+    /// Offered and not used; the results are those of a book without it.
+    Declined {
+        why: ClosingStockDeclined,
+        /// The lines that still did not tie, for `DoesNotCloseEveryGap`.
+        lines: Vec<String>,
+    },
+}
+
+/// One evaluation of the gates, with or without Tally's closing stock.
+struct Evaluated {
+    gross_result: Established,
+    net_result: Established,
+    balance_sheet_profit_and_loss: Established,
+    balance_sheet_tie: TieOut,
+    profit_and_loss_tie: Option<TieOut>,
+    /// Every Balance Sheet and Profit and Loss line that did not tie.
+    unmet: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -259,6 +441,7 @@ pub fn derive_statements(
     groups: &[TallyNamedMaster],
     tally_balance_sheet: &NativeStatement,
     tally_profit_and_loss: Option<&NativeStatement>,
+    inventory: InventoryFlags,
 ) -> Result<DerivedStatements, StatementsError> {
     if tally_balance_sheet.kind != NativeStatementKind::BalanceSheet {
         return Err(StatementsError::GateNotABalanceSheet);
@@ -396,6 +579,7 @@ pub fn derive_statements(
     };
     let gross = sum_of(&|name| TRADING_PRIMARY_GROUPS.contains(&name))?;
     let net = sum_of(&|_| true)?;
+    let cost_of_sales = sum_of(&|name| COST_OF_SALES_GROUPS.contains(&name))?;
     let carried = match &profit_and_loss_ledger {
         None => Established::blocked(NotEstablishedReason::ProfitAndLossLedgerNotReturned),
         Some(ledger) => {
@@ -405,48 +589,149 @@ pub fn derive_statements(
         }
     };
 
-    // The gate compares the candidate figures before any is established.
-    let balance_sheet_tie = tie_lines(
-        &balance_sheet,
-        profit_and_loss_ledger
+    // The gate compares the candidate figures before any is established. With
+    // Tally's own closing stock supplied, every figure it enters is moved by
+    // that one amount first (a debit is negative): Current Assets and the
+    // carried line, the trading result and the cost of sales.
+    let evaluate = |stock: Option<&TallyClosingStock>| -> Result<Evaluated, StatementsError> {
+        let moved = |value: &ExactDecimal| -> Result<ExactDecimal, StatementsError> {
+            match stock {
+                None => Ok(value.clone()),
+                Some(stock) => value
+                    .checked_subtract(&stock.amount)
+                    .map_err(|_| StatementsError::Arithmetic),
+            }
+        };
+        let carried = match &carried {
+            Established::Established { value } => Established::Established {
+                value: moved(value)?,
+            },
+            other => other.clone(),
+        };
+        let balance_sheet_tie = tie_lines(
+            &balance_sheet,
+            profit_and_loss_ledger
+                .as_ref()
+                .map(|ledger| (ledger.name.as_str(), &carried)),
+            tally_balance_sheet,
+            stock,
+        )?;
+        let failures = gate_failures(&balance_sheet_tie);
+        let gated = |value: ExactDecimal| match blocked {
+            Some(reason) => Established::blocked(reason),
+            None if !failures.is_empty() => Established::NotEstablished {
+                reason: NotEstablishedReason::TallyBalanceSheetDiffers,
+                lines: failures.clone(),
+            },
+            None => Established::Established { value },
+        };
+        // Gross and net are gated on Tally's own Profit and Loss too, where supplied.
+        let cost_of_sales = moved(&cost_of_sales)?;
+        let profit_and_loss_tie = tally_profit_and_loss
+            .map(|tally| tie_lines(&profit_and_loss, None, tally, stock))
+            .transpose()?;
+        let profit_and_loss_failures = profit_and_loss_tie
             .as_ref()
-            .map(|ledger| (ledger.name.as_str(), &carried)),
-        tally_balance_sheet,
-    );
-    let failures = gate_failures(&balance_sheet_tie);
-    let gated = |value: ExactDecimal| match blocked {
-        Some(reason) => Established::blocked(reason),
-        None if !failures.is_empty() => Established::NotEstablished {
-            reason: NotEstablishedReason::TallyBalanceSheetDiffers,
-            lines: failures.clone(),
-        },
-        None => Established::Established { value },
+            .map(|tie| profit_and_loss_gate_failures(tie, &cost_of_sales, stock.is_some()))
+            .unwrap_or_default();
+        let movement_gated = |value: ExactDecimal| match gated(value) {
+            Established::Established { .. } if !profit_and_loss_failures.is_empty() => {
+                Established::NotEstablished {
+                    reason: NotEstablishedReason::TallyProfitAndLossDiffers,
+                    lines: profit_and_loss_failures.clone(),
+                }
+            }
+            result => result,
+        };
+        let gross_result = movement_gated(moved(&gross)?);
+        let net_result = movement_gated(moved(&net)?);
+        let balance_sheet_profit_and_loss = match carried {
+            Established::Established { value } => gated(value),
+            blocked_carried => match blocked {
+                Some(reason) => Established::blocked(reason),
+                None => blocked_carried,
+            },
+        };
+        let mut unmet = failures;
+        unmet.extend(profit_and_loss_failures);
+        Ok(Evaluated {
+            gross_result,
+            net_result,
+            balance_sheet_profit_and_loss,
+            balance_sheet_tie,
+            profit_and_loss_tie,
+            unmet,
+        })
     };
-    // Gross and net are gated on Tally's own Profit and Loss too, where supplied.
-    let cost_of_sales = sum_of(&|name| COST_OF_SALES_GROUPS.contains(&name))?;
-    let profit_and_loss_tie =
-        tally_profit_and_loss.map(|tally| tie_lines(&profit_and_loss, None, tally));
-    let profit_and_loss_failures = profit_and_loss_tie
-        .as_ref()
-        .map(|tie| profit_and_loss_gate_failures(tie, &cost_of_sales))
-        .unwrap_or_default();
-    let movement_gated = |value: ExactDecimal| match gated(value) {
-        Established::Established { .. } if !profit_and_loss_failures.is_empty() => {
-            Established::NotEstablished {
-                reason: NotEstablishedReason::TallyProfitAndLossDiffers,
-                lines: profit_and_loss_failures.clone(),
+
+    // Tally's own closing stock is considered only for a statement nothing
+    // else blocks, so every refusal that exists today keeps its reason.
+    let candidate = match (blocked, tally_profit_and_loss) {
+        (None, Some(tally)) => TallyClosingStock::from_profit_and_loss(tally),
+        _ => Ok(None),
+    };
+    let (evaluated, closing_stock) = match candidate {
+        Ok(None) => (evaluate(None)?, ClosingStockUse::NotApplicable),
+        Err(why) => (
+            evaluate(None)?,
+            ClosingStockUse::Declined {
+                why,
+                lines: Vec::new(),
+            },
+        ),
+        Ok(Some(_)) if !matches!(inventory, InventoryFlags::Integrated(_)) => (
+            evaluate(None)?,
+            ClosingStockUse::Declined {
+                why: match inventory {
+                    InventoryFlags::NotRead => ClosingStockDeclined::InventoryFlagsNotRead,
+                    _ => ClosingStockDeclined::BookNotShownIntegrated,
+                },
+                lines: Vec::new(),
+            },
+        ),
+        Ok(Some(stock)) => {
+            let with_stock = evaluate(Some(&stock))?;
+            // The figure moves Current Assets and the carried line by opposite
+            // amounts, so a book whose derived lines balanced before still does.
+            // A Trial Balance that does not balance leaves Tally's `Difference in
+            // opening balances` out of this book's Balance Sheet export, and the
+            // statement would not balance.
+            let balanced = {
+                let mut total = StatementSum::new();
+                for line in &balance_sheet {
+                    total.merge(&line.amount)?;
+                }
+                match &carried {
+                    Established::Established { value } => total
+                        .sum
+                        .checked_add(value)
+                        .map_err(|_| StatementsError::Arithmetic)?
+                        .is_zero(),
+                    _ => false,
+                }
+            };
+            if with_stock.unmet.is_empty() && !balanced {
+                (
+                    evaluate(None)?,
+                    ClosingStockUse::Declined {
+                        why: ClosingStockDeclined::BalanceSheetDoesNotBalance,
+                        lines: Vec::new(),
+                    },
+                )
+            } else if with_stock.unmet.is_empty() {
+                let value = stock.amount.clone();
+                (with_stock, ClosingStockUse::Applied { value })
+            } else {
+                // A declined read is today's result, byte for byte.
+                (
+                    evaluate(None)?,
+                    ClosingStockUse::Declined {
+                        why: ClosingStockDeclined::DoesNotCloseEveryGap,
+                        lines: with_stock.unmet,
+                    },
+                )
             }
         }
-        result => result,
-    };
-    let gross_result = movement_gated(gross);
-    let net_result = movement_gated(net);
-    let balance_sheet_profit_and_loss = match carried {
-        Established::Established { value } => gated(value),
-        blocked_carried => match blocked {
-            Some(reason) => Established::blocked(reason),
-            None => blocked_carried,
-        },
     };
 
     Ok(DerivedStatements {
@@ -455,11 +740,12 @@ pub fn derive_statements(
         profit_and_loss_ledger,
         unclassified,
         stock_ledger_count,
-        gross_result,
-        net_result,
-        balance_sheet_profit_and_loss,
-        balance_sheet_tie,
-        profit_and_loss_tie,
+        gross_result: evaluated.gross_result,
+        net_result: evaluated.net_result,
+        balance_sheet_profit_and_loss: evaluated.balance_sheet_profit_and_loss,
+        balance_sheet_tie: evaluated.balance_sheet_tie,
+        profit_and_loss_tie: evaluated.profit_and_loss_tie,
+        closing_stock,
     })
 }
 
@@ -496,11 +782,20 @@ const COST_OF_SALES_GROUPS: [&str; 2] = ["Purchase Accounts", "Direct Expenses"]
 /// ties over a zero one (#1070). A stock line (Opening or Closing Stock) is
 /// uncompared and refuses, and stock also moves the heading off the derived
 /// cost of sales.
-fn profit_and_loss_gate_failures(tie: &TieOut, cost_of_sales: &ExactDecimal) -> Vec<String> {
+fn profit_and_loss_gate_failures(
+    tie: &TieOut,
+    cost_of_sales: &ExactDecimal,
+    closing_stock_used: bool,
+) -> Vec<String> {
     let mut failures: Vec<String> = tie
         .lines
         .iter()
         .filter(|line| match &line.status {
+            TieStatus::NotCompared { reason }
+                if closing_stock_used && *reason == CLOSING_STOCK_USED =>
+            {
+                false
+            }
             TieStatus::Matched | TieStatus::MatchedEmptyAsZero => false,
             TieStatus::Differs { .. } => true,
             TieStatus::NotCompared { .. } if line.name == COST_OF_SALES_HEADING => !matches!(
@@ -619,40 +914,63 @@ pub struct TieOut {
     pub derived_only: Vec<String>,
 }
 
+/// Ties each of Tally's own lines to the derived one it names. With Tally's
+/// closing stock supplied, a Balance Sheet's Current Assets are compared with
+/// the derived group plus that amount, a Profit and Loss's `Add: Purchase
+/// Accounts` is the Purchase Accounts group, and the closing-stock line itself
+/// is not compared: it is the amount the others were moved by.
 fn tie_lines(
     lines: &[PrimaryGroupLine],
     carried: Option<(&str, &Established)>,
     builtin: &NativeStatement,
-) -> TieOut {
+    stock: Option<&TallyClosingStock>,
+) -> Result<TieOut, StatementsError> {
+    let is_profit_and_loss = builtin.kind == NativeStatementKind::ProfitAndLoss;
     let mut named = Vec::new();
-    let tie_lines = builtin
-        .lines
-        .iter()
-        .map(|line| {
-            let status =
-                if let Some(group) = lines.iter().find(|group| group.display_name == line.name) {
-                    named.push(group.display_name.as_str());
-                    compare(&line.sub, &line.main, &group.amount.sum)
-                } else if let Some((_, result)) = carried.filter(|(name, _)| *name == line.name) {
-                    match result {
-                        Established::Established { value } => compare(&line.sub, &line.main, value),
-                        Established::NotEstablished { reason, .. } => TieStatus::NotCompared {
-                            reason: reason.as_str(),
-                        },
-                    }
-                } else {
-                    TieStatus::NotCompared {
-                        reason: "no_derived_line_of_that_name",
-                    }
-                };
-            TieLine {
-                name: line.name.clone(),
-                tally_sub: line.sub.clone(),
-                tally_main: line.main.clone(),
-                status,
+    let mut tie_lines = Vec::new();
+    for line in &builtin.lines {
+        let status = if stock.is_some() && is_profit_and_loss && line.name == CLOSING_STOCK_LINE {
+            TieStatus::NotCompared {
+                reason: CLOSING_STOCK_USED,
             }
-        })
-        .collect();
+        } else if let Some(group) = lines.iter().find(|group| {
+            group.display_name == line.name
+                || (stock.is_some()
+                    && is_profit_and_loss
+                    && line.name == STOCK_PURCHASE_LINE
+                    && group.reserved_name == "Purchase Accounts")
+        }) {
+            named.push(group.display_name.as_str());
+            let derived = match stock {
+                Some(stock) if !is_profit_and_loss && group.reserved_name == "Current Assets" => {
+                    group
+                        .amount
+                        .sum
+                        .checked_add(&stock.amount)
+                        .map_err(|_| StatementsError::Arithmetic)?
+                }
+                _ => group.amount.sum.clone(),
+            };
+            compare(&line.sub, &line.main, &derived)
+        } else if let Some((_, result)) = carried.filter(|(name, _)| *name == line.name) {
+            match result {
+                Established::Established { value } => compare(&line.sub, &line.main, value),
+                Established::NotEstablished { reason, .. } => TieStatus::NotCompared {
+                    reason: reason.as_str(),
+                },
+            }
+        } else {
+            TieStatus::NotCompared {
+                reason: "no_derived_line_of_that_name",
+            }
+        };
+        tie_lines.push(TieLine {
+            name: line.name.clone(),
+            tally_sub: line.sub.clone(),
+            tally_main: line.main.clone(),
+            status,
+        });
+    }
     let derived_only = lines
         .iter()
         .filter(|group| {
@@ -660,10 +978,10 @@ fn tie_lines(
         })
         .map(|group| group.display_name.clone())
         .collect();
-    TieOut {
+    Ok(TieOut {
         lines: tie_lines,
         derived_only,
-    }
+    })
 }
 
 fn compare(

@@ -22,6 +22,10 @@
 //! hand-set `true` names no version, so it also opens the gate for a later terms version. `Server::new` (tests and the desktop app's local
 //! views, which never dispatch an MCP tool) stays open; only `Server::for_mcp`, which
 //! `run_stdio` uses, builds a server that answers an MCP client.
+//!
+//! The desktop app has its own acceptance (`desktop_terms.rs`, bridge#1106): the same record file
+//! in the app's own data folder, a line with `source` `desktop_app`. A line counts only for the
+//! source that wrote it, so an acceptance made in the extension does not open the app.
 use super::egress::{append_egress_line, read_egress_tail};
 use chrono::{SecondsFormat, Utc};
 use serde_json::{json, Value};
@@ -31,15 +35,17 @@ use std::path::Path;
 /// named after it (`accept_terms_2026_10_1`: `-` and `.` become `_`), so new terms mean a new
 /// setting and a new prompt: an old "true" cannot stand for terms that changed. A test pins the
 /// manifest to this constant.
-pub(super) const TERMS_VERSION: &str = "2026-10.1";
+pub(crate) const TERMS_VERSION: &str = "2026-10.1";
 /// The environment variable the manifest maps the accept-terms setting to.
 pub(super) const TERMS_ENV: &str = "BRIDGE_TERMS_ACCEPTED";
 const RECORD_FILE: &str = "terms-acceptance.jsonl";
+/// The `source` of a record line written when the MCP server starts with the setting on.
+const MCP_SOURCE: &str = "setting";
 /// The record file holds a line per terms version; this bounds the tail read.
 const RECORD_SCAN_LINES: usize = 64;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum TermsState {
+pub(crate) enum TermsState {
     NotAccepted,
     /// Accepted, but the acceptance could not be recorded locally.
     RecordUnavailable,
@@ -47,7 +53,7 @@ pub(super) enum TermsState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum TermsGate {
+pub(crate) enum TermsGate {
     /// Tests and the desktop app's local views: no MCP client, so nothing to accept.
     NotRequired,
     /// The MCP stdio server.
@@ -61,14 +67,14 @@ impl TermsGate {
         if !matches!(setting, Some("true" | "1")) {
             return Self::Required(TermsState::NotAccepted);
         }
-        match record_acceptance(data_dir) {
+        match record_acceptance(data_dir, MCP_SOURCE) {
             Ok(()) => Self::Required(TermsState::Accepted),
             Err(_) => Self::Required(TermsState::RecordUnavailable),
         }
     }
 
     /// The refusal code every tool call returns, or `None` when calls may proceed.
-    pub(super) fn refusal(self) -> Option<&'static str> {
+    pub(crate) fn refusal(self) -> Option<&'static str> {
         match self {
             Self::NotRequired | Self::Required(TermsState::Accepted) => None,
             Self::Required(TermsState::NotAccepted) => Some("terms_not_accepted"),
@@ -77,25 +83,32 @@ impl TermsGate {
     }
 }
 
-/// Appends the acceptance of [`TERMS_VERSION`] once. A version already recorded is not recorded
-/// again.
-fn record_acceptance(data_dir: &Path) -> Result<(), String> {
+/// Whether the record holds a line that accepts [`TERMS_VERSION`] from `source`. A missing file is
+/// "not accepted"; an unreadable one (or a torn last line) is an error, and the caller refuses.
+pub(crate) fn acceptance_recorded(data_dir: &Path, source: &str) -> Result<bool, String> {
     let path = data_dir.join(RECORD_FILE);
     let tail = read_egress_tail(&path, RECORD_SCAN_LINES)?;
-    let already = tail.records.iter().any(|line| {
+    Ok(tail.records.iter().any(|line| {
         serde_json::from_str::<Value>(line)
             .ok()
-            .is_some_and(|record| record["terms_version"] == TERMS_VERSION)
-    });
-    if already {
+            .is_some_and(|record| {
+                record["terms_version"] == TERMS_VERSION && record["source"] == source
+            })
+    }))
+}
+
+/// Appends the acceptance of [`TERMS_VERSION`] from `source` once. A version already recorded for
+/// that source is not recorded again.
+pub(crate) fn record_acceptance(data_dir: &Path, source: &str) -> Result<(), String> {
+    if acceptance_recorded(data_dir, source)? {
         return Ok(());
     }
     let record = json!({
         "terms_version": TERMS_VERSION,
         "accepted_at": Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
-        "source": "setting",
+        "source": source,
     });
-    append_egress_line(&path, &record.to_string())
+    append_egress_line(&data_dir.join(RECORD_FILE), &record.to_string())
 }
 
 #[cfg(test)]

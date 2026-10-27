@@ -12,8 +12,8 @@ use std::{
 use bridge_tally_core::ExactDecimal;
 use quick_xml::{events::Event, Reader};
 use tally_protocol_simulator::{
-    decode, Delivery, Fixture, ProductStatus, RefusedRequest, RequestFault, ScenarioPlan,
-    SequenceSimulator, Simulator, WireEncoding, MAX_SEQUENCE_REQUESTS,
+    decode, Delivery, DeliveryGate, Fixture, ProductStatus, RefusedRequest, RequestFault,
+    ScenarioPlan, SequenceSimulator, Simulator, WireEncoding, MAX_SEQUENCE_REQUESTS,
 };
 
 fn request(simulator: Simulator, method: &str, path: &str) -> (Vec<u8>, bool) {
@@ -682,4 +682,50 @@ fn a_body_larger_than_the_socket_buffer_arrives_whole_to_a_slow_reader() {
     assert_eq!(decode(body).expect("decode body"), xml);
     let observed = simulator.finish().expect("finish sequence simulator");
     assert!(!observed[0].client_stopped_reading_response);
+}
+
+/// A held response is sent only once the test opens its gate: until then the
+/// client reads nothing, and after it the whole response arrives.
+#[test]
+fn a_held_response_waits_for_its_gate() {
+    let gate = DeliveryGate::new();
+    let simulator = SequenceSimulator::spawn(vec![
+        ScenarioPlan::new(Fixture::ExportStatusOne).with_delivery(Delivery::Held(gate.clone()))
+    ])
+    .unwrap();
+    let mut stream = TcpStream::connect(simulator.address()).unwrap();
+    stream
+        .write_all(b"POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n")
+        .unwrap();
+    let waiting = Instant::now();
+    while simulator.received() == 0 {
+        assert!(
+            waiting.elapsed() < Duration::from_secs(5),
+            "the simulator never read the request"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    stream
+        .set_read_timeout(Some(Duration::from_millis(300)))
+        .unwrap();
+    let mut early = [0_u8; 1];
+    let read = stream.read(&mut early);
+    assert!(
+        read.as_ref().is_err_and(|error| matches!(
+            error.kind(),
+            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+        )),
+        "nothing before the gate opens: {read:?}"
+    );
+    gate.open();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).unwrap();
+    assert!(response.starts_with(b"HTTP/1.1 200 OK\r\n"));
+    let observed = simulator.finish().unwrap();
+    assert_eq!(observed.len(), 1);
+    assert!(observed[0].request_processed);
+    assert!(!observed[0].cancelled);
 }

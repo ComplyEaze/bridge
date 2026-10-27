@@ -129,6 +129,7 @@ test("every host manifest launches its bundled binary and maps user settings to 
       BRIDGE_AGENT_REDACTION: "${user_config.redaction}",
       BRIDGE_AGENT_ENABLE_IMPORT: "true",
       BRIDGE_AGENT_ENABLE_WRITES: "${user_config.enable_posting_2026_10}",
+      BRIDGE_AGENT_ENABLE_TAX_AUDIT: "${user_config.enable_tax_audit_2026_10}",
     });
     for (const resource of resources) await writeFile(join(stage, resource), "packaging fixture");
     await assert.rejects(() => verifyMcpbStage(stage), /missing binary/);

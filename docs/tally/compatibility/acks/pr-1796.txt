@@ -1,0 +1,6 @@
+src-tauri/crates/bridge-tally-core/src/lib.rs
+src-tauri/crates/bridge-tally-core/src/pack_models.rs
+src-tauri/src/sync/reconciliation.rs
+src-tauri/src/sync/snapshot.rs
+src-tauri/src/tally/connector.rs
+reviewer: lamemustafa

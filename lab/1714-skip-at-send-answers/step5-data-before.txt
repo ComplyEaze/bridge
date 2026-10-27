@@ -1,0 +1,12 @@
+2026-10-27T09:37:27Z data folder before the step 5 post
+agent-egress.jsonl  65092  2f54a48015f177c79edb01f09afd6618f6901a2b92e66b4a6bb6c7a117a14b44
+agent-import-admission.lock  0  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+agent-import-ledger.jsonl  1358  9f4e5918d2e655146e8dc1dbd0be7147d7df709c705a937e08ce3280b6700fed
+agent-import-statement-skips.jsonl  563  73526f3a4d64a769d6524e2f4695e8c200d988600cadc456801ab02f3345288d
+terms-acceptance.jsonl  90  febc09e488ce288692119f6db7be5fae535a9e6ecf1fd733a0b2f81e4920a021
+bank-statements\statement-4f05c618-13cc-444e-8c9e-03bbaa524ba1.json  1754  1c4463d71c419f3559576c486493059b57ec6af0df36c69f6541123fc35d6ea3
+bank-statements\statement-69bb7785-0035-4570-a750-ce6a0a2ac6b2.json  1290  7d9ac092836d84bbc5cce5baa08ce1e212e53a2d5d26ea9b97286eccdd0b493f
+bank-statements\statement-8be6ab48-df18-4163-adf8-43cf82956ed2.json  1816  6d3f3c708378d2ef6ba2265b90607ec926ab8d241e1c74d89fb20013dfdb56b6
+bank-statements\statement-c15c2266-f657-4569-ac8a-85be8ef8dc54.json  1816  760d8f23abebd2bd8ae3a69c2cb7a83f0754e9903509cb9ebd19a99d34db20e3
+bank-statements\statement-e619f78c-1547-416d-9dd3-4cf907743481.json  2916  9be07dd33e13ec10c2742684d9664cb54ddfec40695c34175764fe3f64a49b27
+imports\bridge-6acfcebd-5a43-40cd-a009-c78bf6a7ffd0.xml  1129  bb36742c631948f4f5e49d2e2d2b7b848c334af274b6e5446f4fd88e38c38185

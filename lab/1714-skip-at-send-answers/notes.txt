@@ -1,0 +1,12 @@
+2026-10-27T09:27Z step 0: BRIDGE TIE OUT LAB 3 (100065) loaded alone; current date 10-Oct-2026; one tally.exe owns 9001; GET /status 200; four idle bridge_mcp.exe of the desktop app's Bridge entries running (left running; no call through them).
+2026-10-27T09:28:51Z server launched (exe 6f520338, 0.6.0). tools/list (000) 33; list_companies (001) one company; marks (002) M0 210, V0 8; ledger_movement Union Bank (003) -10000.00 / -11800; voucher types (004) Payment and Receipt automatic / auto_retain.
+2026-10-27T09:31Z step 0.6: BK1 by Tally's Backup screen into a new empty folder: TDBK1800_100065.001, 32,143 B, 8a1cca5c; marks (005) 210 / 8.
+2026-10-27T09:33Z step 1: ledger BRIDGE Bank B created (Bank Accounts, no opening balance); marks (006) M1 211, V1 8.
+2026-10-27T09:34Z step 2: parse September (007) 2 rows, 0 cash questions; one-day parses 1 to 30 September (008-037): 3 Sep GREEN FIELD LTD (Payment) and 30 Sep SILVER OAK MUTUAL (Receipt) qualify; every other day statement_empty_selection.
+2026-10-27T09:36Z step 3: parse D (038); build (039) voucher_count 1, A = bridge-6acfcebd-....
+2026-10-27T09:36Z step 4: parse D with GREEN FIELD LTD mapped skip to BRIDGE Bank B (040) vouchers 0, skipped 1; build (041) skips_recorded, held_elsewhere on A, R = st-20260903-3f9e7c8865e24e69.
+2026-10-27T09:37Z step 5: data folder listed (step5-data-before.txt); marks (042) V5a 8; post A (043) skip_row_paired_elsewhere in 0.17 s, no approval window, attempt_recorded false; marks (044) V 8; data folder listed (step5-data-after.txt): journal and skips files unchanged; egress_log (045); vouchers 3 Sep (046) none.
+2026-10-27T09:39Z step 6: parse D2 (047); build (048) B = bridge-6bfbf95d-...; marks (049) V6a 8; post B (050) pending; approval window up 09:39:52, captured 09:39:54; post B (051) pending; post B (052) import_approval_timed_out, attempt_recorded false; marks (053) V 8; vouchers 30 Sep (054) none. Control post not completed: the approval window timed out unanswered. B not sent again.
+2026-10-27T10:13Z restore: company shut; BK1 hashed (equal); Restore from BK1 (Accept, Replace); loaded alone, current date 10-Oct-2026. list_companies (055) one company; marks (056) M 210, V 8, 5 ledgers, no BRIDGE Bank B; ledger_movement Union Bank (057) -10000.00 / -11800.
+2026-10-27T10:15:41Z server stopped, code 0; exe sha256 6f520338 at the end.
+2026-10-27T10:16Z close: company shut, no company loaded; one tally.exe owns 9001; GET /status 200.

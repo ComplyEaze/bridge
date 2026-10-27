@@ -2,6 +2,7 @@ use super::*;
 use crate::text_encoding::{
     decode_tally_xml_response_bytes_limited, decode_xml_bytes, ExpectedTallyTextEncoding,
 };
+use bridge_tally_primitives::company_guid::CompanyGuid;
 
 const SHAPE_LIVE: &[u8] =
     include_bytes!("../tests/fixtures/company_features_shape_lab_live.utf16le.xml");
@@ -59,25 +60,27 @@ fn flag(name: &str, value: &str) -> String {
 #[test]
 fn the_request_is_byte_equal_to_each_committed_capture() {
     assert_eq!(
-        render_company_features_request("BRIDGE SHAPE LAB", SHAPE_GUID).unwrap(),
+        render_company_features_request("BRIDGE SHAPE LAB", &guid(SHAPE_GUID)),
         decode_xml_bytes(SHAPE_REQUEST).unwrap()
     );
     assert_eq!(
-        render_company_features_request("BRIDGE CORPUS FOREX", FOREX_GUID).unwrap(),
+        render_company_features_request("BRIDGE CORPUS FOREX", &guid(FOREX_GUID)),
         decode_xml_bytes(FOREX_REQUEST).unwrap()
     );
 }
 
+fn guid(spelling: &str) -> CompanyGuid {
+    CompanyGuid::parse(spelling).expect("captured GUID is the strict spelling")
+}
+
+/// The builder takes a `CompanyGuid`, so a spelling that could break the
+/// filter's string never becomes one; the name is escaped.
 #[test]
-fn a_guid_that_could_break_the_filter_is_refused_and_a_name_is_escaped() {
+fn a_guid_that_could_break_the_filter_cannot_be_built_and_a_name_is_escaped() {
     for bad in ["", "a\" or 1=1 or \"", "3a6bd6e1 b835", "x;y"] {
-        assert_eq!(
-            render_company_features_request("X", bad),
-            Err(NativeCompanyFeaturesError::GuidUnsupported),
-            "{bad:?}"
-        );
+        assert!(CompanyGuid::parse(bad).is_err(), "{bad:?}");
     }
-    let request = render_company_features_request("A & B <C>", SHAPE_GUID).unwrap();
+    let request = render_company_features_request("A & B <C>", &guid(SHAPE_GUID));
     assert!(request.contains("<SVCURRENTCOMPANY>A &amp; B &lt;C&gt;</SVCURRENTCOMPANY>"));
 }
 
@@ -400,7 +403,6 @@ fn every_error_has_its_own_stable_code_and_the_cause_names_where() {
             NativeCompanyFeaturesError::SettingInvalid("gst").code(),
             NativeCompanyFeaturesError::SettingInvalid("batch_wise").code(),
             NativeCompanyFeaturesError::CurrencyInvalid.code(),
-            NativeCompanyFeaturesError::GuidUnsupported.code(),
         ],
         [
             "company_features_tally_reported_failure",
@@ -411,7 +413,6 @@ fn every_error_has_its_own_stable_code_and_the_cause_names_where() {
             "company_features_setting_invalid:gst",
             "company_features_setting_invalid:batch_wise",
             "company_features_currency_invalid",
-            "company_features_guid_unsupported",
         ]
     );
     assert_eq!(

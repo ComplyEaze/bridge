@@ -1,8 +1,11 @@
 //! Voucher parse for the local MCP adapter.
 use super::*;
 
+#[path = "agent_voucher_cost_centres.rs"]
+mod cost_centres;
 #[path = "agent_voucher_scalars.rs"]
 mod scalars;
+use cost_centres::CostCentreCollector;
 pub(super) use scalars::*;
 
 /// Shares the native collection boundary used by the protocol crate: CMPINFO
@@ -35,6 +38,21 @@ impl NativeCollectionScope {
         self.path.len() == 7
             && self.path[..5] == ["ENVELOPE", "BODY", "DATA", "COLLECTION", "VOUCHER"]
             && self.path[5] == "ALLLEDGERENTRIES.LIST"
+    }
+    /// The path below the current `ALLLEDGERENTRIES.LIST`, including the element being
+    /// read; `None` outside a ledger entry.
+    pub(super) fn entry_tail(&self) -> Option<&[String]> {
+        (self.path.len() >= 6
+            && self.path[..5] == ["ENVELOPE", "BODY", "DATA", "COLLECTION", "VOUCHER"]
+            && self.path[5] == "ALLLEDGERENTRIES.LIST")
+            .then(|| &self.path[6..])
+    }
+    /// Whether the element being read lies inside a `CATEGORYALLOCATIONS.LIST`.
+    pub(super) fn in_cost_centres(&self) -> bool {
+        self.entry_tail().is_some_and(|tail| {
+            tail.first()
+                .is_some_and(|c| c == "CATEGORYALLOCATIONS.LIST")
+        })
     }
     pub(super) fn bill_allocation(&self) -> bool {
         self.path.len() == 7
@@ -291,6 +309,7 @@ fn parse_voucher_rows(
     let mut allocation: Option<BTreeMap<String, String>> = None;
     let mut entries = Vec::<Value>::new();
     let mut allocations = Vec::<Value>::new();
+    let mut cost = CostCentreCollector::default();
     let mut current_tag = String::new();
     let mut scope = NativeCollectionScope::default();
     // Set by a composite amount under `CompositePolicy::Withhold`, per voucher.
@@ -325,6 +344,10 @@ fn parse_voucher_rows(
                 if tag == "ALLLEDGERENTRIES.LIST" && scope.row("VOUCHER") {
                     entry = Some(BTreeMap::new());
                     allocations.clear();
+                    cost.reset();
+                }
+                if let Some(tail) = scope.entry_tail() {
+                    cost.start(tail, &tag);
                 }
                 if tag == "BILLALLOCATIONS.LIST" && scope.child("VOUCHER", "ALLLEDGERENTRIES.LIST")
                 {
@@ -344,6 +367,14 @@ fn parse_voucher_rows(
                 current_tag = tag;
             }
             Ok(quick_xml::events::Event::Text(text)) => {
+                if scope.in_cost_centres() {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => {
+                            cost.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => cost.undecodable(),
+                    }
+                }
                 if let Some(row) = allocation
                     .as_mut()
                     .filter(|_| scope.bill_allocation_field())
@@ -357,6 +388,9 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::CData(text)) => {
                 let value = text.to_string();
+                if scope.in_cost_centres() {
+                    cost.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value);
+                }
                 if let Some(row) = allocation
                     .as_mut()
                     .filter(|_| scope.bill_allocation_field())
@@ -369,6 +403,14 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::GeneralRef(reference)) => {
+                if scope.in_cost_centres() {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => {
+                            cost.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => cost.undecodable(),
+                    }
+                }
                 if let Some(row) = allocation
                     .as_mut()
                     .filter(|_| scope.bill_allocation_field())
@@ -382,6 +424,9 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::End(event)) => {
                 let end = event.name().as_ref().to_ascii_uppercase();
+                if let Some(tail) = scope.entry_tail() {
+                    cost.end(tail);
+                }
                 if scope.bill_allocation() {
                     if let Some(allocation_row) = allocation.take().filter(|row| !row.is_empty()) {
                         // Tally emits an amount-only container for a ledger entry with no
@@ -524,6 +569,18 @@ fn parse_voucher_rows(
                             "is_deemed_positive": if is_deemed_positive { "Yes" } else { "No" },
                             "bill_allocations": std::mem::take(&mut allocations),
                         });
+                        // A cost-centre list that cannot be read whole is not shown in
+                        // part and does not refuse the read: the entry says why.
+                        match cost.finish() {
+                            Ok(rows) if rows.is_empty() => {}
+                            Ok(rows) => {
+                                parsed_entry["cost_centre_allocations"] = Value::Array(rows)
+                            }
+                            Err(problem) => {
+                                parsed_entry["cost_centre_allocations_unreadable"] =
+                                    json!(problem.reason());
+                            }
+                        }
                         if parsed_amount.as_ref().is_some_and(|parsed| {
                             !tally_entry_polarity_agrees(parsed, is_deemed_positive)
                         }) {
@@ -700,9 +757,15 @@ fn parse_voucher_rows(
                     entry.as_mut(),
                     allocation.as_mut(),
                 )?;
+                if let Some(tail) = scope.entry_tail() {
+                    cost.start(tail, &name);
+                }
                 scope.start(name.clone());
                 if scope.repeated_collection {
                     return Err("agent_read_protocol_invalid".into());
+                }
+                if let Some(tail) = scope.entry_tail() {
+                    cost.end(tail);
                 }
                 scope.end(&name)?;
             }
@@ -871,3 +934,7 @@ pub(super) fn window_with_composite_vouchers(count: usize) -> String {
 #[cfg(test)]
 #[path = "agent_voucher_parse_tests.rs"]
 mod boundary_tests;
+
+#[cfg(test)]
+#[path = "agent_voucher_cost_centres_tests.rs"]
+mod cost_centre_tests;

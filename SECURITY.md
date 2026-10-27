@@ -5,7 +5,7 @@
 | Version | Security status |
 | --- | --- |
 | `master` | Development branch; a fix, if made, lands here first |
-| <!-- managed:latest-preview -->[`mcp-v0.6.0`](https://github.com/ComplyEaze/bridge/releases/latest) (16 October 2026)<!-- /managed:latest-preview -->, the latest published release | Receives security fixes, as a new release, if we make one |
+| <!-- managed:latest-preview -->[`mcp-v0.6.1`](https://github.com/ComplyEaze/bridge/releases/latest) (27 October 2026)<!-- /managed:latest-preview -->, the latest published release | Receives security fixes, as a new release, if we make one |
 | Earlier releases | Not supported; install the latest release |
 
 ComplyEaze Bridge is published as extension archives (`.mcpb`) on GitHub
@@ -26,7 +26,9 @@ will be in a new release; we are not obliged to make one.
 
 - [GHSA-vm5g-r3p7-wxx7](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7):
   the bank statement tool opened file paths that name a network location on
-  Windows. It affects 0.3.0 and 0.4.0 and is fixed in 0.4.1.
+  Windows. It affects 0.3.0 and 0.4.0. Release 0.4.1 refuses the network
+  forms it recognises from the text of the path; some network locations are not
+  recognised that way, and the security and privacy page says which kinds.
 
 ## Reporting a vulnerability
 

@@ -13,7 +13,7 @@ that you import in TallyPrime yourself. What Claude reads from your books goes t
 the chat. You can ask about the trial balance, outstanding receivables and
 payables with ageing, ledger movement and vouchers, the purchase and sales
 registers, the stock summary, and the Profit and Loss and Balance Sheet (a book
-with stock items is expected to be refused for these two). It checks ledger
+with stock items is read only when Tally's own closing stock closes every gap). It checks ledger
 names before you post, and prepares Journal, Payment, Receipt and Contra
 vouchers as an import file that you review and import into TallyPrime yourself.
 Posting is off by default in a new install, so as installed it never posts to
@@ -56,21 +56,21 @@ update itself, so look for a newer version on the
 - "Show the trial balance for 1 April to 31 March."
 - "Check these ledger names against the book before I post: …"
 
-**At a glance, release 0.6.0.**
+**At a glance, release 0.6.1.**
 
-- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), one ledger's movement, and Tally's own month-wise Sales or Purchase Register for whole months (not tied to the vouchers; read on one synthetic book).
-- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
-- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags, and Tally's Funds Flow, Ratio Analysis and negative-balance reports.
+- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), one ledger's movement, Tally's own month-wise Sales or Purchase Register for whole months (not tied to the vouchers; read on one synthetic book), Tally's own Negative Stock and Negative Ledgers lists for a window (being listed is not a finding; synthetic books only), and the vouchers of one type that Tally marks Uncertain in its GSTR-1 (a Sales type, measured on one synthetic book).
+- **Partly:** profit and loss and the balance sheet (a book with stock items is read only when Tally's own closing stock closes every gap, measured on one synthetic book; a book with several currencies is refused); closing stock value at 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
+- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags (one test, the cash share of receipts and payments against the s.44AB(a) limit, is off by default and not yet run against a live TallyPrime), and Tally's Funds Flow and Ratio Analysis reports.
 
-"You can ask" means it answered on the books and builds we ran it on; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.6.1 file against a live TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
-**Its tools.** In name order; release 0.6.0 installs 28 of them, and `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` are in source, not yet in a published build. None of them changes your TallyPrime books; `audit_test_run`, in source and not yet in a published build, and off unless its setting is on, does not change them either; with posting on, two more appear, described below the table. Every call adds a receipt line,
+**Its tools.** In name order; release 0.6.1 installs 32 of them, 31 offered by default (`audit_test_run` appears only when its setting is on). None of them changes your TallyPrime books; with posting on, two more appear, described below the table. Every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
 | --- | --- | --- |
 | `audit_test_run` | Off by default (setting **Allow tax-audit test runs**). One tax-audit test run on the company's own books for a date range, today only the cash share of receipts and payments against the s.44AB(a) limit: figure and finding ids with their values, confidence and clauses, and the count of any failed book check; no ledger name, no voucher, and refused while a redaction setting is on. You name the cash and bank groups; the period must lie in 2025-26. Books only, not a tax opinion | Nothing |
-| `balance_sheet` | The Balance Sheet for a date range, by primary group, from TallyPrime’s Trial Balance (a book with stock items is expected to be refused) | Nothing |
+| `balance_sheet` | The Balance Sheet for a date range, by primary group, from TallyPrime’s Trial Balance (a book with stock items is read only when Tally’s own closing stock closes every gap) | Nothing |
 | `build_import_xml` | Checks a Journal, Payment, Receipt or Contra batch and writes an import file | An import file and a ledger record on this computer |
 | `cash_flow` | Tally’s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, returned only after its net total matches the trial balance; the split into months is Tally’s own and is not checked (not a cash flow statement under AS 3) | Nothing |
 | `company_features` | Three settings the company’s record in Tally holds today (cost centres, GST and batch-wise stock; each yes, no or not reported) and the currency symbol; no ledger, voucher, amount or narration. Each of the three settings equalled Tally’s F11 screen on three synthetic books, not on this company; a setting changed inside a sitting has not been measured | Nothing |
@@ -87,7 +87,7 @@ with no figures, to a log on this computer.
 | `negative_stock` | Tally’s own Negative Stock list for a window, each item with its quantity, rate and value as Tally prints them, compared with no other report; being listed is not a finding, and an empty answer is not one either | Nothing |
 | `outstandings` | Receivables and payables with ageing, the top parties and the open bills | Nothing |
 | `parse_bank_statement` | Reads a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda statement PDF and proposes Payment, Receipt and Contra vouchers | A private proposals file on this computer |
-| `profit_and_loss` | The Profit and Loss for a date range, by primary group (a book with stock items is expected to be refused) | Nothing |
+| `profit_and_loss` | The Profit and Loss for a date range, by primary group (a book with stock items is read only when Tally’s own closing stock closes every gap) | Nothing |
 | `purchase_register` | Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
 | `sales_register` | Sales and Credit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
@@ -678,4 +678,4 @@ Tally and TallyPrime are trade marks of Tally Solutions Pvt. Ltd. ComplyEaze
 Bridge is independent and is not affiliated with or endorsed by Tally
 Solutions; it uses these names only to describe compatibility.
 The historical `v0.1.0` release remains under the MIT license shipped with
-that tag; current development source is version `0.6.0` under Apache-2.0.
+that tag; current development source is version `0.6.1` under Apache-2.0.

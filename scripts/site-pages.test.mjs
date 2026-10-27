@@ -261,7 +261,7 @@ test("the questions page keeps the claims that tell a reader what ComplyEaze Bri
     "None of these files is encrypted",
     "not yet code-signed",
     "Not run yet: the package of the latest release against a live TallyPrime",
-    "book with stock items is expected to be refused",
+    "book with stock items is read only when",
     "Intel Macs are not supported",
     "has not set a price for ComplyEaze Bridge and does not sell licences to it",
     "through ComplyEaze Bridge, ComplyEaze does not receive it (sections 4 to 6 of the Privacy Policy)",
@@ -286,7 +286,7 @@ test("the jobs table gives one of four answers per row, links each row to its an
   // a verdict stronger than the answer under it would teach a reader to distrust the page
   const asks = faqText(html.match(/id="what-can-i-ask"[\s\S]*?<\/details>/)[0]);
   for (const { job, word } of rows.filter((row) => /stock items|Profit/.test(row.job))) assert.equal(word, "Partly", `${job}`);
-  assert.match(asks, /book with stock items is expected to be refused/);
+  assert.match(asks, /book with stock items is read only when/);
 });
 
 // A page that says it was checked against a release must say the manifest's release: a version bump fails here
@@ -305,7 +305,7 @@ test("every page that carries a 'Checked against release' stamp carries the mani
 // The page lists what the stamped release installs. The catalog in the source is ahead of the release while a version is being
 // built: the tools it serves that no published build installs are named here, keyed by the release the page is stamped for. When the
 // stamp moves to the release that publishes them the entry is gone, so the page must list them, and until then the page must not.
-const inSourceNotPublished = { "0.6.0": ["audit_test_run", "gst_uncertain_vouchers", "negative_ledgers", "negative_stock"] };
+const inSourceNotPublished = {};
 test("the capabilities page names the tools the source's catalog serves, less those in no published build of the stamped release", () => {
   const source = readFileSync(new URL("../src-tauri/src/agent_catalog.rs", import.meta.url), "utf8");
   const names = region(source, "REGISTERED_TOOL_NAMES: &[&str] = &[", "];");
@@ -372,8 +372,8 @@ test("the home page carries an at-a-glance block for the manifest's release, wit
   const squash = (value) => value.replace(/\s+/g, " ");
   const download = squash(visibleText(region(read("download.html"), 'id="at-a-glance"', "</section>")));
   const home = squash(text);
-  for (const needle of ["synthetic book", "not tied to the vouchers", "ties to the trial balance", "none has been tried yet", "Funds Flow", "several currencies",
-    "cannot build onto a Cash-in-Hand ledger", "has not yet been run on a real bank statement", "we have not yet run the published 0.6.0 file against TallyPrime"]) {
+  for (const needle of ["synthetic book", "not tied to the vouchers", "ties to the trial balance", "closes every gap", "Funds Flow", "several currencies",
+    "cannot build onto a Cash-in-Hand ledger", "has not yet been run on a real bank statement", `we have not yet run the published ${version} file against TallyPrime`]) {
     assert.ok(home.includes(needle), `the home page's at-a-glance block lacks "${needle}"`);
     assert.ok(download.includes(needle), `the Download page's at-a-glance block lacks "${needle}", which the home page's block carries`);
   }

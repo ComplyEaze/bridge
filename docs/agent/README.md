@@ -2907,8 +2907,8 @@ fails the check, to be run again.
 From then on no native post of the same company (name, GUID, company number
 and books-from date) at the same Tally address reads `posted_verified` if it
 was sent before that check read the journal and the vouchers it had proved by
-then (its binding, else Tally's answer unless it reported `STATUS` 0, else its mark before the post) put it
-above the mark read:
+then (its binding, else Tally's answer unless it reported `STATUS` 0, else
+its mark before the post) put it above the mark read:
 `post_span_binding` is then `book_rolled_back` with `mark_read` and `seen_by`
 (the batch whose check saw it), its vouchers read as matching content, not as
 its own, and the plain line says to check them in Tally. The check still sees a

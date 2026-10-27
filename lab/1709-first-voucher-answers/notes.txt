@@ -1,0 +1,9 @@
+2026-10-27T10:42Z step 0: one tally.exe owns 9001; GET /status 200; no company loaded; Select Company's list holds no BRIDGE FIRST VOUCHER LAB. About: Release 7.2 (Latest), Silver Rental.
+2026-10-27T10:45Z step 1: Create Company from Select Company's list: BRIDGE FIRST VOUCHER LAB, financial year and books from 1-Apr-25, no password, other fields as offered; screenshot before accepting; Features screen accepted unchanged; loaded alone, "No Vouchers Entered"; company number 100085.
+2026-10-27T10:46Z step 2: ledger SYN FV Rent under Indirect Expenses; ledger SYN FV Supplier under Sundry Creditors (bill-by-bill Yes as offered, no GSTIN); a screenshot before each accept; no voucher screen opened.
+2026-10-27T10:48Z recorder files checked (21 of 21); self-test ok (10 forwarded, 41 refused, none reached the target); recorder started on 9011, recording to recorder/.
+2026-10-27T10:49:29Z step 3: server launched (exe bf8cdf82, 0.6.0, port 9011); list_companies (000) exactly the company, GUID f88ff11c-6fa1-4a73-8228-ab1c8c72ad4a; recorder lines 1-4 forwarded.
+2026-10-27T10:50Z the step 4 request file was malformed; the client stopped on reading it before sending anything (no recorder line); relaunched 10:52:34 with the same exe, settings, data folder and recorder.
+2026-10-27T10:52:40Z step 4: purchase_register 2025-04-01..30 (001) agent_runtime_read_failed (http_status_failure). Recorder lines 5-101 forwarded; line 102 Bridge Agent Vouchers 20250331..20250501 refused, date_out_of_range, 403. Steps 5 and 6 not run.
+2026-10-27T10:54:10Z server stopped, code 0; exe bf8cdf82 at the end. Recorder stopped; 9011 closed.
+2026-10-27T10:59Z close: company shut, no company loaded; one tally.exe owns 9001; GET /status 200.

@@ -895,7 +895,6 @@ fn the_covered_text_names_the_dated_mailing_details() {
     assert!(text.contains("read the Mailing columns at the right"));
 }
 
-
 #[test]
 fn decisions_recorded_under_another_book_are_said_and_the_sheet_is_not_final() {
     use crate::reports::schedule_iii::DecisionSet;

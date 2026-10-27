@@ -1965,13 +1965,7 @@ pub(crate) async fn fetch_verified_party_ledger_master(
         .into_compliance_assertion();
     let basis = party_ledger_master_balance_basis(chosen, host_today)?;
     let source = runtime
-        .fetch_party_ledger_master_source(
-            config,
-            &identity,
-            currency_assertion,
-            basis,
-            read,
-        )
+        .fetch_party_ledger_master_source(config, &identity, currency_assertion, basis, read)
         .await
         .map_err(party_ledger_master_runtime_command_error)?;
     party_ledger_master_withheld(

@@ -1,0 +1,15 @@
+2026-10-27T18:40:20Z exe sha256 4c9bace38a82f77471d9b30d88e20ac92d3472a187b744cfeaf15537edf2df44 ok; launch-env.json sha256 2a3bdd087e8d52c8deb560aef602112ff9b8d0f7c7ceda112700574be901fa6b; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-27T18:40:20Z launched pid 15048; stderr to server-stderr-20261027T184020Z.log
+2026-10-27T18:40:20Z initialized {'name': 'bridge-tally', 'version': '0.6.0'}
+2026-10-27T18:40:35Z 000-list_companies.json tool=list_companies secs=0.095 isError=False error=None saved_sha256=593744d3669c4332e085c098c36eabd2ad5d87ff6a89b51ea4a39dcef6d2094b
+2026-10-27T18:40:40Z 001-m0.json tool=ledger_masters secs=1.701 isError=False error=None saved_sha256=f8b3e58e28d8a513e2b8aaa689d85552a41dac5ae573ced1a287921f541be6cb
+2026-10-27T18:42:34Z 002-mb.json tool=ledger_masters secs=1.686 isError=False error=None saved_sha256=607faf4bfbd12ca6ada2c2643b58b08a768d8cbc9ecde7b44f2e9635a3d15846
+2026-10-27T18:45:07Z 003-m1.json tool=ledger_masters secs=1.906 isError=False error=None saved_sha256=b671b5dc47ff41857feb60d82e8bc8786dfbc3dd9b8566bbbe8dd4d47f99f6e4
+2026-10-27T18:46:52Z 004-m2.json tool=ledger_masters secs=1.913 isError=False error=None saved_sha256=a01370e53e92cc9f477893e795a5424de2f51b190e50043334d173b4922872af
+2026-10-27T18:48:13Z 005-m3.json tool=ledger_masters secs=1.691 isError=False error=None saved_sha256=034b2fac63da55e23765331cea4e1c0f179d33b8c72bf3b2d0bc8bffe093021e
+2026-10-27T18:49:37Z 006-m4.json tool=ledger_masters secs=1.664 isError=False error=None saved_sha256=913ca894e356f5bad436b5201d095a50e0f58e624a57875e5f3f2ee7bca78010
+2026-10-27T18:51:14Z 007-m5.json tool=ledger_masters secs=1.695 isError=False error=None saved_sha256=d95f912795cb5545841171430de97531cc6e967da999a2168b9427eaed11e593
+2026-10-27T18:51:19Z 008-m5b.json tool=ledger_masters secs=1.666 isError=False error=None saved_sha256=3b820d775fad8fd550b2756558f63f14603cacc5d61a505744f5b5ca9aad1937
+2026-10-27T18:53:27Z 009-list-after-restore.json tool=list_companies secs=0.115 isError=False error=None saved_sha256=54d28901c4366ba04219c0047fff725bd2a6748470df64b9e7dd85ec6dfc9ef7
+2026-10-27T18:53:32Z 010-m6.json tool=ledger_masters secs=1.729 isError=False error=None saved_sha256=d81f56699de07cc7594693e2e36514c2c6cffbaa399572c38be646eeeb426e05
+2026-10-27T18:53:44Z session ended; server pid 15048 exit code 0

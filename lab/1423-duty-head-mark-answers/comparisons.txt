@@ -1,0 +1,35 @@
+== m0 vs mb
+m0: M 292 V 112 T 45 | mb: M 292 V 112 T 45
+rows differing: 0
+== m0 vs m1
+m0: M 292 V 112 T 45 | m1: M 293 V 112 T 46
+  LAB Duty Probe: only in m1
+rows differing: 1
+== m1 vs m2
+m1: M 293 V 112 T 46 | m2: M 294 V 112 T 46
+  LAB Duty Probe.compliance: {"address": "", "email": null, "gst_duty_head": {"head": "cgst", "observation": "recognized", "raw": "CGST"}, "gst_pin_code": "", "gst_registrations": {"entries": [], "observation": "entries"}, "ifsc_code": null, "income_tax_number": null, "msme_registration_number": null, "phone": null, "pin_code": "", "state": null, "tax_type": "GST", "udyam_registration_number": ""} -> {"address": "", "email": null, "gst_duty_head": {"head": "sgst_utgst", "observation": "recognized", "raw": "SGST/UTGST"}, "gst_pin_code": "", "gst_registrations": {"entries": [], "observation": "entries"}, "ifsc_code": null, "income_tax_number": null, "msme_registration_number": null, "phone": null, "pin_code": "", "state": null, "tax_type": "GST", "udyam_registration_number": ""}
+rows differing: 1
+== m2 vs m3
+m2: M 294 V 112 T 46 | m3: M 295 V 112 T 46
+  LAB Duty Probe.compliance: {"address": "", "email": null, "gst_duty_head": {"head": "sgst_utgst", "observation": "recognized", "raw": "SGST/UTGST"}, "gst_pin_code": "", "gst_registrations": {"entries": [], "observation": "entries"}, "ifsc_code": null, "income_tax_number": null, "msme_registration_number": null, "phone": null, "pin_code": "", "state": null, "tax_type": "GST", "udyam_registration_number": ""} -> {"address": "", "email": null, "gst_duty_head": {"head": "cgst", "observation": "recognized", "raw": "CGST"}, "gst_pin_code": "", "gst_registrations": {"entries": [], "observation": "entries"}, "ifsc_code": null, "income_tax_number": null, "msme_registration_number": null, "phone": null, "pin_code": "", "state": null, "tax_type": "GST", "udyam_registration_number": ""}
+rows differing: 1
+== m1 vs m3
+m1: M 293 V 112 T 46 | m3: M 295 V 112 T 46
+rows differing: 0
+== m3 vs m4
+m3: M 295 V 112 T 46 | m4: M 296 V 112 T 46
+  LAB Duty Probe.compliance: {"address": "", "email": null, "gst_duty_head": {"head": "cgst", "observation": "recognized", "raw": "CGST"}, "gst_pin_code": "", "gst_registrations": {"entries": [], "observation": "entries"}, "ifsc_code": null, "income_tax_number": null, "msme_registration_number": null, "phone": null, "pin_code": "", "state": null, "tax_type": "GST", "udyam_registration_number": ""} -> {"address": "", "email": null, "gst_duty_head": {"observation": "not_tax_ledger", "tax_type": "Others"}, "gst_pin_code": "", "gst_registrations": {"entries": [], "observation": "entries"}, "ifsc_code": null, "income_tax_number": null, "msme_registration_number": null, "phone": null, "pin_code": "", "state": null, "tax_type": "Others", "udyam_registration_number": ""}
+rows differing: 1
+== m4 vs m5
+m4: M 296 V 112 T 46 | m5: M 297 V 112 T 46
+  LAB Duty Probe.compliance: {"address": "", "email": null, "gst_duty_head": {"observation": "not_tax_ledger", "tax_type": "Others"}, "gst_pin_code": "", "gst_registrations": {"entries": [], "observation": "entries"}, "ifsc_code": null, "income_tax_number": null, "msme_registration_number": null, "phone": null, "pin_code": "", "state": null, "tax_type": "Others", "udyam_registration_number": ""} -> {"address": "", "email": null, "gst_duty_head": {"head": "cgst", "observation": "recognized", "raw": "CGST"}, "gst_pin_code": "", "gst_registrations": {"entries": [], "observation": "entries"}, "ifsc_code": null, "income_tax_number": null, "msme_registration_number": null, "phone": null, "pin_code": "", "state": null, "tax_type": "GST", "udyam_registration_number": ""}
+rows differing: 1
+== m1 vs m5
+m1: M 293 V 112 T 46 | m5: M 297 V 112 T 46
+rows differing: 0
+== m5 vs m5b
+m5: M 297 V 112 T 46 | m5b: M 297 V 112 T 46
+rows differing: 0
+== m0 vs m6
+m0: M 292 V 112 T 45 | m6: M 292 V 112 T 45
+rows differing: 0

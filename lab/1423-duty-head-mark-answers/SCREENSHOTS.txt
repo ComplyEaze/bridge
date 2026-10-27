@@ -1,0 +1,12 @@
+# Screen captures of this sitting: name, bytes, sha256. They stay on the lab PC; none is in this folder.
+s0-start.png 72692 0e7c522ba827fd920b3d0f3d69f47be453305e831447e82eb5a7785272a512bf
+bk0-before-accept.png 48324 893bc8f8e4088f9917da23d4612d2fa880c9d7d6daae3f3886e6c2168fdff35a
+c-type-of-duty.png 42789 94dfb8f1add3cfc365eb45dcf8ba3f4f73f3f32b702151b59eb4ec9d78b8d8d8
+c-tax-types.png 40692 e91bb4b05853c43ce714054cf1f58dd8e056b561e252fa07cbc5ba4661eba213
+c-before-accept.png 38820 86f3a9023840ea10606e6ecb1b6c6c3336949662dfee3aa1ad8f20aafb7b74e1
+d1-before-accept.png 38999 8777af0a706e02c0add57b3fed6524b92a4f75ee880b90c13ec041b623686289
+d2-before-accept.png 38828 2a3d1d7a69c84b9b9bf04e67db6b0ebe3a727f87ff0ca78ea67b6688ff30109c
+d3-before-accept.png 38794 57c8c1462dd823d51f8451fe411fe2ee46b524ab4dcead3b71a8362f7ce8641d
+d4-before-accept.png 38828 2a3d1d7a69c84b9b9bf04e67db6b0ebe3a727f87ff0ca78ea67b6688ff30109c
+r-before-accept.png 34856 0356747123ffe64d73528559d021652697055b6722ce0688cd76b95ca9e6fe8e
+c10-no-company.png 72692 0e7c522ba827fd920b3d0f3d69f47be453305e831447e82eb5a7785272a512bf

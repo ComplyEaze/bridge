@@ -243,12 +243,13 @@ fn not_established(reason: NotEstablishedReason, lines: usize) -> PartOutcome {
     }
 }
 
-const EVERY_REASON: [NotEstablishedReason; 5] = [
+const EVERY_REASON: [NotEstablishedReason; 6] = [
     NotEstablishedReason::UnclassifiedLedgerCarriesAnAmount,
     NotEstablishedReason::ClosingStockNotDerivableFromTrialBalance,
     NotEstablishedReason::ProfitAndLossLedgerNotReturned,
     NotEstablishedReason::TallyBalanceSheetDiffers,
     NotEstablishedReason::TallyProfitAndLossDiffers,
+    NotEstablishedReason::TallyBalanceSheetDoesNotBalance,
 ];
 
 /// Every reason a statement can be not established is in its own words, and
@@ -376,6 +377,7 @@ fn each_reason_has_its_own_words() {
             "Tally did not return its Profit & Loss A/c ledger",
             "Tally's own Balance Sheet differs from the derived lines",
             "Tally's own Profit and Loss differs from the derived lines",
+            "Tally's own Balance Sheet does not balance",
         ]
     );
 }
@@ -904,4 +906,57 @@ fn restating_the_rows_of_a_response_leaves_a_batch_headline_as_it_was() {
     let mut response = json!({"headline": headline, "result": {"items": [1]}});
     restate_rows(&mut response, 0);
     assert_eq!(response["headline"], before);
+}
+
+/// Tally's own Balance Sheet export leaves out its Difference in opening
+/// balances line (#2063): when its sides differ the lead says both totals,
+/// whatever the reason a part is not established, and gives the next step once.
+#[test]
+fn a_balance_sheet_whose_sides_differ_says_both_totals_in_the_lead() {
+    for reason in [
+        NotEstablishedReason::TallyBalanceSheetDiffers,
+        NotEstablishedReason::TallyBalanceSheetDoesNotBalance,
+    ] {
+        let headline = StatementBasis::new(
+            StatementKind::BalanceSheet,
+            date("20260401"),
+            date("20260902"),
+            vec![(
+                StatementPart::BalanceSheetProfitAndLoss,
+                not_established(reason, 0),
+            )],
+            false,
+        )
+        .with_tally_balance_sheet_sides("4846.67", "4946.67")
+        .headline(&company());
+        assert!(
+            headline.lead.contains(
+                "Tally's own Balance Sheet export does not balance (its credit lines add to 4846.67 and its debit lines to 4946.67)"
+            ),
+            "{}",
+            headline.lead
+        );
+        assert_eq!(
+            headline
+                .lead
+                .matches("Difference in opening balances")
+                .count(),
+            2,
+            "the sentence and the next step, once each: {}",
+            headline.lead
+        );
+    }
+    let balanced = statement(
+        StatementKind::BalanceSheet,
+        vec![(
+            StatementPart::BalanceSheetProfitAndLoss,
+            not_established(NotEstablishedReason::TallyBalanceSheetDiffers, 1),
+        )],
+        false,
+    );
+    assert!(
+        !balanced.lead.contains("export does not balance"),
+        "{}",
+        balanced.lead
+    );
 }

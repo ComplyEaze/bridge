@@ -1,0 +1,152 @@
+# fixture: tests/fixtures/statement_trial_balance_opening_difference_fy_live.utf16le.xml
+# parser: parse_native_trial_balance
+# source: captured
+Ok(NativeTrialBalance {
+    rows: [
+        NativeTrialBalanceRow {
+            name: "Cash",
+            guid: "6a9518b2-a88c-417c-a700-40243f9d9119-0000001f",
+            parent: Returned(
+                "Cash-in-Hand",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: PresentEmpty,
+        },
+        NativeTrialBalanceRow {
+            name: "Customer",
+            guid: "6a9518b2-a88c-417c-a700-40243f9d9119-000000cf",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-2850.00",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-2850.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Lab Capital",
+            guid: "6a9518b2-a88c-417c-a700-40243f9d9119-000000ce",
+            parent: Returned(
+                "Capital Account",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "1000.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "1000.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Profit & Loss A/c",
+            guid: "6a9518b2-a88c-417c-a700-40243f9d9119-0000001e",
+            parent: Returned(
+                "�#4; Primary",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Purchases",
+            guid: "6a9518b2-a88c-417c-a700-40243f9d9119-000000d2",
+            parent: Returned(
+                "Purchase Accounts",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-2600.00",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-2600.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Sales",
+            guid: "6a9518b2-a88c-417c-a700-40243f9d9119-000000d1",
+            parent: Returned(
+                "Sales Accounts",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: Present(
+                ExactDecimal(
+                    "2850.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "2850.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Supplier",
+            guid: "6a9518b2-a88c-417c-a700-40243f9d9119-000000d0",
+            parent: Returned(
+                "Sundry Creditors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: Present(
+                ExactDecimal(
+                    "2600.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "2600.00",
+                ),
+            ),
+        },
+    ],
+})

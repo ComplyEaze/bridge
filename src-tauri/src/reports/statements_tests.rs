@@ -204,9 +204,20 @@ fn an_opening_only_book_keeps_its_opening_difference_visible() {
         ("Profit & Loss A/c", "", ""),
         ("Current Assets", "", "-262833.50"),
     ]);
-    // A synthetic statement that ties. Tally would likely add a difference in
-    // opening balances line for this book, which the gate would refuse.
+    // A synthetic statement whose lines tie one by one. Tally's own export
+    // leaves out its Difference in opening balances line (measured once, #2063),
+    // so its sides differ here by 49,833.50 and no result is established.
     let derived = derive(report, &tally);
+    assert_every_result(
+        &derived,
+        &Established::NotEstablished {
+            reason: NotEstablishedReason::TallyBalanceSheetDoesNotBalance,
+            lines: Vec::new(),
+        },
+    );
+    let sides = derived.tally_balance_sheet_sides.as_ref().unwrap();
+    assert!(sides.credits.numeric_eq(&decimal("213000.00")));
+    assert!(sides.debits.numeric_eq(&decimal("262833.50")));
 
     assert!(derived
         .profit_and_loss
@@ -239,19 +250,22 @@ fn an_opening_only_book_keeps_its_opening_difference_visible() {
         })
         .unwrap();
     assert!(net.numeric_eq(&decimal("-49833.50")));
-    assert_established(&derived.net_result, "0");
 }
 
 #[test]
 fn a_p_and_l_line_is_the_window_movement_not_the_closing() {
     // Synthetic mutation: the sales ledger opens at 100.00, so its closing
-    // (4127.00) and its movement (4027.00) differ.
+    // (4127.00) and its movement (4027.00) differ; a debtor opens and closes
+    // 100.00 lower, so the Trial Balance still balances.
     let mut report = known_lab();
     let sales = row(&mut report, "Ageing Sales");
     sales.opening = NativeTrialBalanceAmount::Present(decimal("100.00"));
     sales.closing = NativeTrialBalanceAmount::Present(decimal("4127.00"));
+    let debtor = row(&mut report, "Ageing Customer A");
+    debtor.opening = NativeTrialBalanceAmount::Present(decimal("-7100.00"));
+    debtor.closing = NativeTrialBalanceAmount::Present(decimal("-7377.00"));
     let tally = balance_sheet(&[
-        ("Current Assets", "", "-11027.00"),
+        ("Current Assets", "", "-11127.00"),
         ("Profit & Loss A/c", "", "11127.00"),
     ]);
     let derived = derive(report, &tally);
@@ -1366,4 +1380,147 @@ fn a_book_whose_trial_balance_does_not_balance_does_not_use_the_figure() {
         declined(&derived),
         ClosingStockDeclined::BalanceSheetDoesNotBalance
     );
+}
+
+// A Balance Sheet export that does not balance (#2063). The three sources are the captures of
+// `BRIDGE TIEOUT D` after one stock item's opening value was raised by 100.00 (TallyPrime 7.2,
+// 27 Oct 2026): Tally's own screen shows a `Difference in opening balances` of 100.00, and the
+// export has no line for it. The group tree is TIEOUT B's (the default tree every company has),
+// as in the tests above that cross companies.
+
+const OPENING_DIFFERENCE_GUID: &str = "6a9518b2-a88c-417c-a700-40243f9d9119";
+
+fn opening_difference() -> (NativeTrialBalance, NativeStatement, NativeStatement) {
+    (
+        parse_native_trial_balance(
+            &utf16(include_bytes!(
+                "../../crates/bridge-tally-protocol/tests/fixtures/statement_trial_balance_opening_difference_fy_live.utf16le.xml"
+            )),
+            OPENING_DIFFERENCE_GUID,
+        )
+        .unwrap(),
+        parse_native_statement(
+            NativeStatementKind::BalanceSheet,
+            &utf16(include_bytes!(
+                "../../crates/bridge-tally-protocol/tests/fixtures/statement_balance_sheet_opening_difference_fy_live.utf16le.xml"
+            )),
+        )
+        .unwrap(),
+        parse_native_statement(
+            NativeStatementKind::ProfitAndLoss,
+            &utf16(include_bytes!(
+                "../../crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_difference_fy_live.utf16le.xml"
+            )),
+        )
+        .unwrap(),
+    )
+}
+
+#[test]
+fn the_captured_export_that_leaves_out_the_opening_difference_says_its_sides_and_establishes_nothing(
+) {
+    let (report, balance_sheet, profit_and_loss) = opening_difference();
+    let (_, groups, _, _) = TIEOUT_B.parts();
+    let derived = derive_statements(
+        &admitted(report),
+        &groups,
+        &balance_sheet,
+        Some(&profit_and_loss),
+        integrated(),
+    )
+    .unwrap();
+    let sides = derived.tally_balance_sheet_sides.as_ref().unwrap();
+    assert!(sides.credits.numeric_eq(&decimal("4846.67")));
+    assert!(sides.debits.numeric_eq(&decimal("4946.67")));
+    for result in [
+        &derived.gross_result,
+        &derived.net_result,
+        &derived.balance_sheet_profit_and_loss,
+    ] {
+        assert!(
+            matches!(result, Established::NotEstablished { .. }),
+            "{result:?}"
+        );
+    }
+}
+
+#[test]
+fn a_balance_sheet_that_balances_has_no_sides_to_report() {
+    // Every captured Balance Sheet of a balanced book, and the synthetic ones that tie.
+    for capture in [&READS_LAB, &TIEOUT_B] {
+        let (report, groups, balance_sheet, _) = capture.parts();
+        let derived = derive_statements(
+            &admitted(report),
+            &groups,
+            &balance_sheet,
+            None,
+            InventoryFlags::NotRead,
+        )
+        .unwrap();
+        assert_eq!(derived.tally_balance_sheet_sides, None);
+    }
+    assert_eq!(
+        derive(known_lab(), &known_lab_balance_sheet()).tally_balance_sheet_sides,
+        None
+    );
+}
+
+#[test]
+fn the_sides_are_each_lines_amount_by_sign_and_one_paisa_is_a_difference() {
+    let sides =
+        |lines: &[(&str, &str, &str)]| BalanceSheetSides::of(&balance_sheet(lines)).unwrap();
+    // An empty line is no side; an amount in the sub column alone counts, as the gate
+    // reads it; with both columns present the main column stands for the line.
+    assert_eq!(
+        sides(&[
+            ("A", "", "100.00"),
+            ("B", "", ""),
+            ("C", "-30.00", ""),
+            ("D", "", "-70.00"),
+        ]),
+        None
+    );
+    assert_eq!(
+        sides(&[("A", "", "100.00"), ("E", "-1.00", "-100.00")]),
+        None
+    );
+    let sub_only = sides(&[("A", "", "100.00"), ("C", "-5.00", "")]).unwrap();
+    assert!(sub_only.credits.numeric_eq(&decimal("100.00")));
+    assert!(sub_only.debits.numeric_eq(&decimal("5.00")));
+    let differing = sides(&[("A", "", "100.00"), ("D", "", "-100.01")]).unwrap();
+    assert!(differing.credits.numeric_eq(&decimal("100.00")));
+    assert!(differing.debits.numeric_eq(&decimal("100.01")));
+}
+
+/// The sides come last: a Profit and Loss that differs from Tally's keeps its own reason
+/// for gross and net, and the Balance Sheet's carried line, which that statement does not
+/// gate, takes the new one.
+#[test]
+fn a_profit_and_loss_that_differs_keeps_its_reason_beside_unbalanced_sides() {
+    let report = parse_native_trial_balance(OPENING_YEAR, OPENING_YEAR_GUID).unwrap();
+    let tally = balance_sheet(&[
+        ("Capital Account", "", "125000.00"),
+        ("Current Liabilities", "", "88000.00"),
+        ("Profit & Loss A/c", "", ""),
+        ("Current Assets", "", "-262833.50"),
+    ]);
+    let derived = derive_statements(
+        &admitted(report),
+        &groups(),
+        &tally,
+        Some(&profit_and_loss(&[("Sales Accounts", "", "1.00")])),
+        InventoryFlags::NotRead,
+    )
+    .unwrap();
+    let expected = Established::NotEstablished {
+        reason: NotEstablishedReason::TallyProfitAndLossDiffers,
+        lines: vec!["Sales Accounts".to_string()],
+    };
+    assert_eq!(derived.gross_result, expected);
+    assert_eq!(derived.net_result, expected);
+    assert_eq!(
+        derived.balance_sheet_profit_and_loss,
+        blocked(NotEstablishedReason::TallyBalanceSheetDoesNotBalance)
+    );
+    assert!(derived.tally_balance_sheet_sides.is_some());
 }

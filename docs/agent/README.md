@@ -2157,8 +2157,12 @@ its ledger entry. Without the argument, and in every other answer that returns a
 key is not there; the parse reads the lines either way.
 
 - **Invoice vouchers.** In the captures Tally sent a goods line under a ledger entry only on an invoice-mode voucher; the read does not test the voucher's invoice flag and shows the lines of any entry that carries them. A Stock
-  Journal answers an empty entry list in this read, and a Delivery Note, Receipt Note, Physical Stock or Manufacturing
+  Journal answered an empty entry list in the one read of it (TallyPrime 7.2; that answer is not committed, and no
+  committed capture holds a Stock Journal), and a Delivery Note, Receipt Note, Physical Stock or Manufacturing
   Journal is not captured, so an entry or a voucher without the key may still have moved stock.
+- **Held pages.** The goods lines are parsed on every voucher read, so they count toward the 64 MiB of a held window
+  (see "What is held" above) whether or not the argument is given: a window rich in goods lines may not be held, and a
+  later page then reads it again.
 - **A list that cannot be read whole does not refuse the read.** The entry carries `goods_lines_unreadable` with one
   reason and no partial list: `goods_line_batch_amounts_differ` (the batch amounts do not add up to the line's),
   `goods_line_amount_unparsable`, `goods_line_item_missing`, `goods_line_field_duplicated`,

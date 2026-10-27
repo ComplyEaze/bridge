@@ -1460,7 +1460,7 @@ struct NativePost {
     intent_at: Option<usize>,
     pre_post_voucher_mark: Option<u64>,
     /// Where its answer with a parsed outcome was recorded, and the vouchers
-    /// that answer counted created.
+    /// that answer proves landed ([`landed_count`]).
     created_at: Option<(usize, u64)>,
     /// Where its binding was recorded, and how many vouchers it bound.
     bound_at: Option<(usize, u64)>,

@@ -826,11 +826,13 @@ fn journaled_batch_answered(
     (server, line)
 }
 
-/// A recorded answer that reported `STATUS=0` proves no voucher landed
-/// (#2035): a check that reads the company's mark where it stood before the
-/// post, with no mark read after it, does not read the book as rolled back.
-#[test]
-fn a_status_zero_answer_does_not_read_an_unchanged_book_as_rolled_back() {
+/// The decision on the captured post answered `STATUS=0` with `CREATED` 10, by
+/// a check that reads the company's mark where it stood before the post, with
+/// no mark read after it; `bound`, when given, stands in for the journal's
+/// verdict. Returns the decision and the pre-POST mark.
+fn status_zero_decision(
+    bound: Option<Vec<PostedVoucherIdentity>>,
+) -> (super::super::PostSpanDecision, u64) {
     let failed = bridge_tally_protocol::parse_import_outcome(
         "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>1805</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>",
     )
@@ -846,6 +848,7 @@ fn a_status_zero_answer_does_not_read_an_unchanged_book_as_rolled_back() {
         .latest_import_snapshot(&line.batch_id)
         .unwrap()
         .unwrap();
+    assert_eq!(snapshot.span_verdict, None);
     let response = snapshot.response.expect("the post's recorded response");
     let before = snapshot
         .pre_post_voucher_mark
@@ -853,17 +856,49 @@ fn a_status_zero_answer_does_not_read_an_unchanged_book_as_rolled_back() {
     let decision = server.decide_post_span(
         &line,
         PreMark::recorded(before),
-        snapshot.span_verdict,
+        bound.map(super::super::ledger::PostSpanVerdict::Bound),
         Some(&response),
         &span_read(),
         None,
         before,
         snapshot.generation,
     );
-    assert_ne!(
-        decision.report["state"], "book_rolled_back",
-        "{}",
-        decision.report
+    (decision, before)
+}
+
+/// A recorded answer that reported `STATUS=0` proves no voucher landed
+/// (#2035): the book is not read as rolled back, and the binding refuses the
+/// answer (#2008).
+#[test]
+fn a_status_zero_answer_does_not_read_an_unchanged_book_as_rolled_back() {
+    let (decision, _) = status_zero_decision(None);
+    assert!(!decision.rolled_back, "{}", decision.report);
+    assert_eq!(
+        decision.report,
+        json!({"state": "refused", "code": SpanRefusal::StatusFailure.code()})
+    );
+}
+
+/// The vouchers a post bound outrank its answer in the floor, as in the
+/// journal's own floor: the same mark reads as rolled back when the post is
+/// bound, whatever its answer's status (#2035). No build since #2008 binds
+/// from such an answer; the verdict stands in for one journaled earlier.
+#[test]
+fn a_bound_post_keeps_its_floor_whatever_its_answers_status() {
+    let bound = bind(
+        &span(),
+        COMPANY_GUID,
+        &sent(),
+        &span_read(),
+        &BTreeSet::new(),
+    )
+    .unwrap();
+    assert_eq!(bound.len(), 10);
+    let (decision, before) = status_zero_decision(Some(bound));
+    assert!(decision.rolled_back, "{}", decision.report);
+    assert_eq!(
+        decision.report,
+        json!({"state": "book_rolled_back", "current_mark": before, "expected_at_least": before + 10})
     );
 }
 

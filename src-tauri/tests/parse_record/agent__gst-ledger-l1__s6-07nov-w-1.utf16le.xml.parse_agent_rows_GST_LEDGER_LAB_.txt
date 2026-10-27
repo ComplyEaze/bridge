@@ -1,0 +1,64 @@
+# fixture: agent/gst-ledger-l1/s6-07nov-w-1.utf16le.xml
+# parser: parse_agent_rows(GST_LEDGER_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(5),
+        "amounts": Array [
+            Object {
+                "amount": String("11800.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("11800.00"),
+                        "bill_date": String("20251107"),
+                        "bill_type": String("New Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("V7"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SYN GS1 Supplier"),
+            },
+            Object {
+                "amount": String("-5000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("GS1 Rent"),
+            },
+            Object {
+                "amount": String("-5000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("GS1 Professional Fees"),
+            },
+            Object {
+                "amount": String("-900.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Input CGST"),
+            },
+            Object {
+                "amount": String("-900.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Input SGST"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20251107"),
+        "guid": String("aae372c5-a894-491c-8843-5532e43d2d2f-00000005"),
+        "is_invoice": Bool(false),
+        "master_id": String("5"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("SYN GS1 Supplier"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Purchase"),
+        "voucher_number": String("4"),
+        "voucher_type": String("Purchase"),
+        "voucher_type_guid": String("aae372c5-a894-491c-8843-5532e43d2d2f-0000002e"),
+        "voucher_type_reserved_name": String("Purchase"),
+    },
+])

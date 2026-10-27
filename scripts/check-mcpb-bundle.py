@@ -23,6 +23,7 @@ DEFAULT_TOOLS = {
     "cash_flow",
     "company_features",
     "egress_log",
+    "gst_by_counter_ledger",
     "gst_status",
     "gst_uncertain_vouchers",
     "ledger_masters",

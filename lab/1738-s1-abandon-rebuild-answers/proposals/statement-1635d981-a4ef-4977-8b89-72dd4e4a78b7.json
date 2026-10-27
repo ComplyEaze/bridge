@@ -1,0 +1,64 @@
+{
+  "account_last4": "0202",
+  "bank": "ubi",
+  "bank_ledger": "TLab Bank B",
+  "controls": {
+    "closing_balance": "65700.00",
+    "opening_balance": "50000.00",
+    "total_credits": null,
+    "total_debits": null
+  },
+  "coverage": {
+    "from": "2026-08-04",
+    "to": "2026-08-04"
+  },
+  "created_at": "2026-10-27T19:47:41.720Z",
+  "proposals_id": "statement-1635d981-a4ef-4977-8b89-72dd4e4a78b7",
+  "records": [
+    {
+      "amount": "5000.00",
+      "bridge_txn_id": "st-20260803-0fcb7d01dc845e9b",
+      "cash_answer": null,
+      "cash_movement": null,
+      "date": "2026-08-03",
+      "direction": "inflow",
+      "disposition": "skipped",
+      "instrument": "T0000201",
+      "ledger": "TLab Bank A",
+      "party": "TLAB BANK A",
+      "reference": "600000000101",
+      "reversed_same_day": false,
+      "row": 1,
+      "suspense": false
+    },
+    {
+      "amount": "2000.00",
+      "bridge_txn_id": "st-20260804-4e99611638192dc1",
+      "cash_answer": null,
+      "cash_movement": null,
+      "date": "2026-08-04",
+      "direction": "inflow",
+      "disposition": "skipped",
+      "instrument": "T0000202",
+      "ledger": "TLab Bank A",
+      "party": "TLAB BANK A",
+      "reference": null,
+      "reversed_same_day": false,
+      "row": 2,
+      "suspense": false
+    }
+  ],
+  "schema": "bridge.bank_statement.proposals.v2",
+  "statement_sha256": "1d0840356b18c0e83d31a4f5958914dc415cc6b82609e1a0cc3378bf255c545c",
+  "suspense_ledger": "TLab Suspense",
+  "vouchers": [],
+  "window": {
+    "first_row_date": "2026-08-03",
+    "last_row_date": "2026-08-09",
+    "tie_out": {
+      "reason": "window_not_whole_calendar_months",
+      "state": "not_established"
+    },
+    "whole_statement": false
+  }
+}

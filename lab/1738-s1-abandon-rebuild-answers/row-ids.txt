@@ -1,0 +1,24 @@
+# Row ids: each proposals file's records[] (bridge_txn_id, date, amount, direction), beside ROWS.md at 9318b08d (an older build's parser).
+
+p1 (A, 3-4 Aug): statement-17393f25-b656-4791-9eea-bf3bb920126c, answer sha256 a2eb2dcc770b165b040d489a5c52bd7bde367900c7283ce20fb1602e8d15de72, rows_in_window 2, vouchers 2, skipped 0
+  st-20260803-0c23821e3874220e  2026-08-03  5000.00  outflow  ROWS.md: E1 A (equal)
+  st-20260804-b1d36f58182d117c  2026-08-04  2000.00  outflow  ROWS.md: E2 A (equal)
+
+p2 (B, 3-4 Aug): statement-adad6a13-b028-498f-9d8f-f2fad3a85fec, answer sha256 45340c1a15bfba14a5496b8279caffbe19acb58ab46902bd85583a80716cf466, rows_in_window 2, vouchers 0, skipped 2
+  st-20260803-0fcb7d01dc845e9b  2026-08-03  5000.00  inflow  ROWS.md: E1 B (equal)
+  st-20260804-4e99611638192dc1  2026-08-04  2000.00  inflow  ROWS.md: E2 B (equal)
+
+p3 (A, 3-4 Aug): statement-fa8903a5-d573-4441-a6e8-c62281b44006, answer sha256 dde8eb9cc09d1539df62310bdf712db97dfa4b3c42c53de18ec37f70558c3888, rows_in_window 2, vouchers 2, skipped 0
+  st-20260803-0c23821e3874220e  2026-08-03  5000.00  outflow  ROWS.md: E1 A (equal)
+  st-20260804-b1d36f58182d117c  2026-08-04  2000.00  outflow  ROWS.md: E2 A (equal)
+
+p5 (B, 3-4 Aug): statement-1635d981-a4ef-4977-8b89-72dd4e4a78b7, answer sha256 975ff1119c4b9f8d999eaade2b866b53dc363a6123a1a28d545f050c03ab4c0a, rows_in_window 2, vouchers 0, skipped 2
+  st-20260803-0fcb7d01dc845e9b  2026-08-03  5000.00  inflow  ROWS.md: E1 B (equal)
+  st-20260804-4e99611638192dc1  2026-08-04  2000.00  inflow  ROWS.md: E2 B (equal)
+
+p7 (A, 1-31 Aug): statement-b204fbf1-9278-45fa-9025-8c16403a1479, answer sha256 b0738428eac48bfa36d8270fac183e5011b70fa9dd79b7b3c755b8b7418fdaee, rows_in_window 5, vouchers 5, skipped 0
+  st-20260803-0c23821e3874220e  2026-08-03  5000.00  outflow  ROWS.md: E1 A (equal)
+  st-20260804-b1d36f58182d117c  2026-08-04  2000.00  outflow  ROWS.md: E2 A (equal)
+  st-20260805-a35a3b583d2111c6  2026-08-05  3000.00  outflow  ROWS.md: E3a A (equal)
+  st-20260807-b97250acef5bfd19  2026-08-07  3000.00  outflow  ROWS.md: E3b A (equal)
+  st-20260808-bebafe334684fa71  2026-08-08  1000.00  outflow  ROWS.md: E7 A (equal)

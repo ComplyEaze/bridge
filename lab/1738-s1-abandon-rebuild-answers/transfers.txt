@@ -1,0 +1,136 @@
+# The transfers section of each answer named, verbatim (JSON, one per step). Taken from tool-answers/.
+
+## step 1: 008-x1.json (build X1)
+{
+ "next_steps": {},
+ "open": [],
+ "open_omitted": 0,
+ "retired": 0,
+ "skips_open": 0,
+ "skips_paired": 0,
+ "state": "computed"
+}
+
+## step 2: 011-s1.json (build B (s1), only X1 exists)
+{
+ "next_steps": {
+  "other_side_unverified": "The other account's Contra for this row is in the batch named, which is not verified yet. Run verify_import on every batch named for this row; do not post this row. Build the other account's statement for this row's date again only if every batch named for this row was never sent to Tally, verify_import listed every one of their vouchers as not_found, and the person confirms none of their files was ever imported into Tally; then post the new build, verify it, and never import an old batch's file. If verify_import found any voucher of a batch named for this row, or refused to read one, or a file of one was imported, do not build the other account's statement again: check in Tally which of their vouchers are there, and no step inside ComplyEaze Bridge frees this row yet. If Tally rejected the send of a batch named for this row, building the other account's statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet."
+ },
+ "open": [
+  {
+   "batch_id": "bridge-19aef23b-adde-4c37-8249-58d91b8df811",
+   "bridge_txn_id": "st-20260803-0fcb7d01dc845e9b",
+   "date": "20260803",
+   "state": "other_side_unverified"
+  },
+  {
+   "batch_id": "bridge-19aef23b-adde-4c37-8249-58d91b8df811",
+   "bridge_txn_id": "st-20260804-4e99611638192dc1",
+   "date": "20260804",
+   "state": "other_side_unverified"
+  }
+ ],
+ "open_omitted": 0,
+ "retired": 0,
+ "skips_open": 2,
+ "skips_paired": 0,
+ "state": "computed"
+}
+
+## step 3: 013-x2.json (build X2)
+{
+ "next_steps": {
+  "ambiguous": "Each batch named holds a Contra that could carry this row: more than one Contra could, or the one that could is also claimed by another row or booked twice. ComplyEaze Bridge does not choose; check in Tally which Contra carries this transfer. A Contra in a batch not yet verified is not in Tally until that batch is imported and verified."
+ },
+ "open": [
+  {
+   "batch_id": "bridge-19aef23b-adde-4c37-8249-58d91b8df811",
+   "bridge_txn_id": "st-20260803-0fcb7d01dc845e9b",
+   "date": "20260803",
+   "state": "ambiguous"
+  },
+  {
+   "batch_id": "bridge-21332db7-304c-488e-858f-8ed0803fb3fc",
+   "bridge_txn_id": "st-20260803-0fcb7d01dc845e9b",
+   "date": "20260803",
+   "state": "ambiguous"
+  },
+  {
+   "batch_id": "bridge-19aef23b-adde-4c37-8249-58d91b8df811",
+   "bridge_txn_id": "st-20260804-4e99611638192dc1",
+   "date": "20260804",
+   "state": "ambiguous"
+  },
+  {
+   "batch_id": "bridge-21332db7-304c-488e-858f-8ed0803fb3fc",
+   "bridge_txn_id": "st-20260804-4e99611638192dc1",
+   "date": "20260804",
+   "state": "ambiguous"
+  }
+ ],
+ "open_omitted": 0,
+ "retired": 0,
+ "skips_open": 2,
+ "skips_paired": 0,
+ "state": "computed"
+}
+
+## step 4: 016-x2-verify.json (verify_import X2, page 1)
+{
+ "next_steps": {
+  "matched_unconfirmed": "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is."
+ },
+ "open": [
+  {
+   "batch_id": "bridge-21332db7-304c-488e-858f-8ed0803fb3fc",
+   "bridge_txn_id": "st-20260804-4e99611638192dc1",
+   "date": "20260804",
+   "state": "matched_unconfirmed"
+  }
+ ],
+ "open_omitted": 0,
+ "retired": 0,
+ "skips_open": 1,
+ "skips_paired": 1,
+ "state": "computed"
+}
+
+## step 5: 020-s2.json (build B (s2), after X2)
+{
+ "next_steps": {
+  "matched_unconfirmed": "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is."
+ },
+ "open": [
+  {
+   "batch_id": "bridge-21332db7-304c-488e-858f-8ed0803fb3fc",
+   "bridge_txn_id": "st-20260804-4e99611638192dc1",
+   "date": "20260804",
+   "state": "matched_unconfirmed"
+  }
+ ],
+ "open_omitted": 0,
+ "retired": 0,
+ "skips_open": 1,
+ "skips_paired": 1,
+ "state": "computed"
+}
+
+## step 6: 021-x1-verify.json (verify_import X1, page 1)
+{
+ "next_steps": {
+  "matched_unconfirmed": "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is."
+ },
+ "open": [
+  {
+   "batch_id": "bridge-21332db7-304c-488e-858f-8ed0803fb3fc",
+   "bridge_txn_id": "st-20260804-4e99611638192dc1",
+   "date": "20260804",
+   "state": "matched_unconfirmed"
+  }
+ ],
+ "open_omitted": 0,
+ "retired": 0,
+ "skips_open": 1,
+ "skips_paired": 1,
+ "state": "computed"
+}

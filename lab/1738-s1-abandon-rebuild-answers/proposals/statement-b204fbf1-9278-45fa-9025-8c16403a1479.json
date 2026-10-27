@@ -1,0 +1,217 @@
+{
+  "account_last4": "0101",
+  "bank": "ubi",
+  "bank_ledger": "TLab Bank A",
+  "controls": {
+    "closing_balance": "86000.00",
+    "opening_balance": "100000.00",
+    "total_credits": null,
+    "total_debits": null
+  },
+  "coverage": {
+    "from": "2026-08-04",
+    "to": "2026-08-07"
+  },
+  "created_at": "2026-10-27T19:48:08.985Z",
+  "proposals_id": "statement-b204fbf1-9278-45fa-9025-8c16403a1479",
+  "records": [
+    {
+      "amount": "5000.00",
+      "bridge_txn_id": "st-20260803-0c23821e3874220e",
+      "cash_answer": null,
+      "cash_movement": null,
+      "date": "2026-08-03",
+      "direction": "outflow",
+      "disposition": {
+        "voucher": "Contra"
+      },
+      "instrument": "T0000101",
+      "ledger": "TLab Bank B",
+      "party": "TLAB BANK B",
+      "reference": "600000000101",
+      "reversed_same_day": false,
+      "row": 1,
+      "suspense": false
+    },
+    {
+      "amount": "2000.00",
+      "bridge_txn_id": "st-20260804-b1d36f58182d117c",
+      "cash_answer": null,
+      "cash_movement": null,
+      "date": "2026-08-04",
+      "direction": "outflow",
+      "disposition": {
+        "voucher": "Contra"
+      },
+      "instrument": "T0000102",
+      "ledger": "TLab Bank B",
+      "party": "TLAB BANK B",
+      "reference": null,
+      "reversed_same_day": false,
+      "row": 2,
+      "suspense": false
+    },
+    {
+      "amount": "3000.00",
+      "bridge_txn_id": "st-20260805-a35a3b583d2111c6",
+      "cash_answer": null,
+      "cash_movement": null,
+      "date": "2026-08-05",
+      "direction": "outflow",
+      "disposition": {
+        "voucher": "Contra"
+      },
+      "instrument": "T0000103",
+      "ledger": "TLab Bank B",
+      "party": "TLAB BANK B",
+      "reference": "600000000103",
+      "reversed_same_day": false,
+      "row": 3,
+      "suspense": false
+    },
+    {
+      "amount": "3000.00",
+      "bridge_txn_id": "st-20260807-b97250acef5bfd19",
+      "cash_answer": null,
+      "cash_movement": null,
+      "date": "2026-08-07",
+      "direction": "outflow",
+      "disposition": {
+        "voucher": "Contra"
+      },
+      "instrument": "T0000104",
+      "ledger": "TLab Bank B",
+      "party": "TLAB BANK B",
+      "reference": "600000000104",
+      "reversed_same_day": false,
+      "row": 4,
+      "suspense": false
+    },
+    {
+      "amount": "1000.00",
+      "bridge_txn_id": "st-20260808-bebafe334684fa71",
+      "cash_answer": null,
+      "cash_movement": null,
+      "date": "2026-08-08",
+      "direction": "outflow",
+      "disposition": {
+        "voucher": "Contra"
+      },
+      "instrument": "T0000106",
+      "ledger": "TLab Bank B",
+      "party": "TLAB BANK B",
+      "reference": null,
+      "reversed_same_day": false,
+      "row": 5,
+      "suspense": false
+    }
+  ],
+  "schema": "bridge.bank_statement.proposals.v2",
+  "statement_sha256": "7d9eaa0994b704b61324f69bd38d1c090b181b0d3b5a92715ac4c1835dd27fac",
+  "suspense_ledger": "TLab Suspense",
+  "vouchers": [
+    {
+      "bridge_txn_id": "st-20260803-0c23821e3874220e",
+      "date": "2026-08-03",
+      "entries": [
+        {
+          "amount": "5000.00",
+          "ledger": "TLab Bank B",
+          "side": "Dr"
+        },
+        {
+          "amount": "5000.00",
+          "ledger": "TLab Bank A",
+          "side": "Cr"
+        }
+      ],
+      "narration": "IMPS 600000000101 to TLab Bank B | TLab A xx0101 | 03-Aug-2026 | Statement party: TLAB BANK B",
+      "voucher_type": "Contra"
+    },
+    {
+      "bridge_txn_id": "st-20260804-b1d36f58182d117c",
+      "date": "2026-08-04",
+      "entries": [
+        {
+          "amount": "2000.00",
+          "ledger": "TLab Bank B",
+          "side": "Dr"
+        },
+        {
+          "amount": "2000.00",
+          "ledger": "TLab Bank A",
+          "side": "Cr"
+        }
+      ],
+      "narration": "CLG T0000102 to TLab Bank B | TLab A xx0101 | 04-Aug-2026 | Statement party: TLAB BANK B",
+      "voucher_type": "Contra"
+    },
+    {
+      "bridge_txn_id": "st-20260805-a35a3b583d2111c6",
+      "date": "2026-08-05",
+      "entries": [
+        {
+          "amount": "3000.00",
+          "ledger": "TLab Bank B",
+          "side": "Dr"
+        },
+        {
+          "amount": "3000.00",
+          "ledger": "TLab Bank A",
+          "side": "Cr"
+        }
+      ],
+      "narration": "IMPS 600000000103 to TLab Bank B | TLab A xx0101 | 05-Aug-2026 | Statement party: TLAB BANK B",
+      "voucher_type": "Contra"
+    },
+    {
+      "bridge_txn_id": "st-20260807-b97250acef5bfd19",
+      "date": "2026-08-07",
+      "entries": [
+        {
+          "amount": "3000.00",
+          "ledger": "TLab Bank B",
+          "side": "Dr"
+        },
+        {
+          "amount": "3000.00",
+          "ledger": "TLab Bank A",
+          "side": "Cr"
+        }
+      ],
+      "narration": "IMPS 600000000104 to TLab Bank B | TLab A xx0101 | 07-Aug-2026 | Statement party: TLAB BANK B",
+      "voucher_type": "Contra"
+    },
+    {
+      "bridge_txn_id": "st-20260808-bebafe334684fa71",
+      "date": "2026-08-08",
+      "entries": [
+        {
+          "amount": "1000.00",
+          "ledger": "TLab Bank B",
+          "side": "Dr"
+        },
+        {
+          "amount": "1000.00",
+          "ledger": "TLab Bank A",
+          "side": "Cr"
+        }
+      ],
+      "narration": "CLG T0000106 to TLab Bank B | TLab A xx0101 | 08-Aug-2026 | Statement party: TLAB BANK B",
+      "voucher_type": "Contra"
+    }
+  ],
+  "window": {
+    "first_row_date": "2026-08-03",
+    "last_row_date": "2026-08-08",
+    "tie_out": {
+      "basis": "statement_rows_by_transaction_date",
+      "closing_balance": "86000.00",
+      "first_date": "2026-08-03",
+      "last_date": "2026-08-08",
+      "opening_balance": "100000.00",
+      "state": "established"
+    },
+    "whole_statement": true
+  }
+}

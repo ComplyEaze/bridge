@@ -2066,7 +2066,7 @@ impl Server {
             let window_voucher_mark = observed_read
                 .witness
                 .as_ref()
-                .map(|witness| witness.marks.vouchers);
+                .map(|witness| witness.marks.vouchers());
             let corroboration_proof = match super::SecondRead::of(
                 observed_read.reads,
                 observed_read.witness,

@@ -5142,6 +5142,22 @@ async fn whole_counted_window() -> Vec<Value> {
     page_items_of(&response)
 }
 
+/// #1984: the snapshot of a book whose marks answer omits `ALTVCHID` shows no voucher mark,
+/// not a 0 Tally never sent, while a mark Tally sent as 0 is shown as 0.
+#[tokio::test]
+async fn the_snapshot_shows_no_voucher_mark_only_when_tally_sent_none() {
+    for (altvchid, shown) in [("", Value::Null), ("<ALTVCHID>0</ALTVCHID>", json!(0))] {
+        let mut plans = identity_plans();
+        plans.extend(paired(&xml_plan(mark_xml(GUID, altvchid))));
+        plans.extend(paired(&xml_plan(empty_collection())));
+        let response = call_vouchers_over(plans).await;
+        assert_ne!(response["isError"], true, "{response}");
+        let snapshot = page_snapshot(&response);
+        assert_eq!(snapshot["voucher_alter_id"], shown, "{snapshot}");
+        assert_eq!(snapshot["master_alter_id"], 7, "{snapshot}");
+    }
+}
+
 #[tokio::test]
 async fn a_later_page_is_served_from_the_first_pages_read() {
     let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());

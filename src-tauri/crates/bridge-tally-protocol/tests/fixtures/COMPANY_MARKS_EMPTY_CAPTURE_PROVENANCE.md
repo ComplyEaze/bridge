@@ -26,6 +26,11 @@ What it shows (verified): the row carries `ALTMSTID 210` and **no `ALTVCHID` ele
 `LASTVOUCHERDATE` is reported (`20250401`, the books-from date). The `CMPINFO` counters describe the
 current company, not the collection, and no parser reads them.
 
-Not established: the same answer from any other TallyPrime release, or from the
-`Bridge Agent Company High Water` request the voucher reads send (that request fetches the same two
-marks from the same `Company` object; it was not captured on this book).
+Not committed here: an answer to the `Bridge Agent Company High Water` request the voucher reads
+send (that request fetches the same two marks from the same `Company` object). The same lab record
+(`lab/sitting4-w2-answers` at `9ed022285`) shows it answering the same way on this book, through two
+tool calls: `answers/s2-build_import_xml.json` was refused `empty_book_first_import`, which the code
+returns only when that request's answer carries no `ALTVCHID`, and `answers/s1-vouchers.json` reports
+`company_has_no_vouchers` with `voucher_alter_id` 0 (the value this change shows as null).
+
+Not established: the same answer from any other TallyPrime release.

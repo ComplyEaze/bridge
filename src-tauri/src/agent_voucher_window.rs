@@ -311,41 +311,55 @@ pub(super) const BOOK_TOO_LARGE: &str = "voucher_window_book_too_large";
 /// bracketed on the voucher mark alone returned `complete` across a rename made
 /// between two of its parts.
 ///
-/// `vouchers` is the voucher mark every comparison, census and empty-book check
-/// uses, with an answer that omits `ALTVCHID` read as 0. Whether Tally reported
-/// it is kept beside it, so a caller shown the mark is told "no mark" rather
-/// than a 0 Tally never sent (AGENTS.md P3). Two reads of one book answer the
-/// same way, so equality still means "the book did not move".
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The voucher mark is what every comparison, census and empty-book check uses,
+/// with an answer that omits `ALTVCHID` read as 0 ([`CompanyMarks::vouchers`]).
+/// Whether Tally reported it is kept beside it ([`CompanyMarks::reported_vouchers`]),
+/// so a caller shown the mark is told "no mark" rather than a 0 Tally never sent
+/// (AGENTS.md P3). Equality is over the two marks alone, so a mark Tally omitted in
+/// one read and sent as 0 in another is the same book, as it was before the flag
+/// existed: no bracket, drift check or held-page reuse decides differently.
+#[derive(Clone, Copy, Debug)]
 pub(super) struct CompanyMarks {
-    pub(super) vouchers: u64,
-    pub(super) masters: u64,
-    pub(super) voucher_mark_reported: bool,
+    voucher_mark: Option<u64>,
+    master_mark: u64,
 }
 
 impl CompanyMarks {
     /// The marks from an answer's voucher mark (`None` when the answer omitted
     /// it) and its master mark.
     pub(super) const fn new(vouchers: Option<u64>, masters: u64) -> Self {
-        match vouchers {
-            Some(vouchers) => Self {
-                vouchers,
-                masters,
-                voucher_mark_reported: true,
-            },
-            None => Self {
-                vouchers: 0,
-                masters,
-                voucher_mark_reported: false,
-            },
+        Self {
+            voucher_mark: vouchers,
+            master_mark: masters,
         }
     }
 
+    /// The voucher mark every comparison uses: 0 when the answer omitted it.
+    pub(super) const fn vouchers(self) -> u64 {
+        match self.voucher_mark {
+            Some(mark) => mark,
+            None => 0,
+        }
+    }
+
+    /// The master mark.
+    pub(super) const fn masters(self) -> u64 {
+        self.master_mark
+    }
+
     /// The voucher mark as Tally answered it: `None` when it was not reported.
-    pub(super) fn reported_vouchers(self) -> Option<u64> {
-        self.voucher_mark_reported.then_some(self.vouchers)
+    pub(super) const fn reported_vouchers(self) -> Option<u64> {
+        self.voucher_mark
     }
 }
+
+impl PartialEq for CompanyMarks {
+    fn eq(&self, other: &Self) -> bool {
+        self.vouchers() == other.vouchers() && self.masters() == other.masters()
+    }
+}
+
+impl Eq for CompanyMarks {}
 
 /// What a divided read observed that a replay of it must still hold: the marks
 /// it opened and closed on (equal, or it would have been refused), and the
@@ -1742,7 +1756,7 @@ where
             match witness {
                 Some(witness) => {
                     opening = Some(witness.marks);
-                    ceiling = witness.marks.vouchers.max(
+                    ceiling = witness.marks.vouchers().max(
                         witness
                             .census
                             .as_ref()
@@ -1788,7 +1802,7 @@ where
                 } => {
                     if let Some(counted) = &counted {
                         ceiling = marks
-                            .map_or(0, |marks| marks.vouchers)
+                            .map_or(0, |marks| marks.vouchers())
                             .max(counted.max_alter_id());
                     }
                     census = counted;
@@ -1803,7 +1817,7 @@ where
                     marks,
                 } => {
                     ceiling = marks
-                        .map_or(0, |marks| marks.vouchers)
+                        .map_or(0, |marks| marks.vouchers())
                         .max(counted.max_alter_id());
                     let plan = plan_window_reads(
                         first,
@@ -2096,7 +2110,7 @@ async fn estimate_window_volume<R: WindowReader>(
         None => read_marks(reader, identity, company, preflight, boundary).await?,
     };
     *observed_marks = Some(marks);
-    let high_water = marks.vouchers;
+    let high_water = marks.vouchers();
     // Every voucher carries a distinct AlterID no greater than the high-water
     // mark (§10), so the book — and therefore any window of it — holds at
     // most `high_water` vouchers. A mark of zero is a company that has never

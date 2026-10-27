@@ -1694,7 +1694,8 @@ no census and no voucher request) and says, for `vouchers`, `ledger_movement` an
 each, the most census reads one call of it will send on this book (a read can be refused before its census
 ends).
 
-- `voucher_mark` is the mark that read saw. `per_call` has one entry per tool: `state: counted` with
+- `voucher_mark` is the mark that read saw, null when Tally's answer carried none (a company that has
+  never held a voucher; the census cost is then that of a mark of 0). `per_call` has one entry per tool: `state: counted` with
   `census_reads` and `floor_seconds`, or `state: refused_by_allowance` with `code:
   voucher_window_book_too_large` and `limit_census_reads` (a mark above 2,097,152, the refusal the read
   itself makes, from the same function; no floor is given for a read that sends no census).

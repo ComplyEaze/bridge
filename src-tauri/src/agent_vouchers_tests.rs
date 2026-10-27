@@ -93,9 +93,9 @@ fn described(marks: CompanyMarks) -> Value {
 fn an_empty_book_has_no_voucher_mark_to_describe() {
     let marks = company_marks(&empty_book_marks_answer(), EMPTY_BOOK_GUID).unwrap();
     // Every comparison still reads the absent mark as 0; only what is shown changes.
-    assert_eq!(marks.vouchers, 0);
-    assert!(!marks.voucher_mark_reported);
-    assert_eq!(marks.masters, 210);
+    assert_eq!(marks.vouchers(), 0);
+    assert_eq!(marks.reported_vouchers(), None);
+    assert_eq!(marks.masters(), 210);
     let snapshot = described(marks);
     assert_eq!(snapshot["voucher_alter_id"], Value::Null, "{snapshot}");
     assert_eq!(snapshot["master_alter_id"], 210, "{snapshot}");
@@ -113,8 +113,21 @@ fn a_voucher_mark_of_zero_that_tally_sends_is_described_as_zero() {
     );
     assert_ne!(edited, answer);
     let marks = company_marks(&edited, EMPTY_BOOK_GUID).unwrap();
-    assert_eq!(marks, CompanyMarks::new(Some(0), 210));
+    assert_eq!(marks.reported_vouchers(), Some(0));
+    assert_eq!(marks.vouchers(), 0);
     let snapshot = described(marks);
     assert_eq!(snapshot["voucher_alter_id"], 0, "{snapshot}");
     assert_eq!(snapshot["master_alter_id"], 210, "{snapshot}");
+}
+
+#[test]
+fn a_voucher_mark_omitted_in_one_read_and_sent_as_zero_in_another_is_the_same_book() {
+    // The two reads of one book may disagree only on whether Tally sent the mark. Equality,
+    // and so every bracket and held-page check, is over the two marks alone.
+    let omitted = CompanyMarks::new(None, 210);
+    let zero = CompanyMarks::new(Some(0), 210);
+    assert_eq!(omitted, zero);
+    assert_ne!(omitted.reported_vouchers(), zero.reported_vouchers());
+    assert_ne!(omitted, CompanyMarks::new(Some(1), 210));
+    assert_ne!(omitted, CompanyMarks::new(None, 211));
 }

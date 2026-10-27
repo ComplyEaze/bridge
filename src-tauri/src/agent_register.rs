@@ -555,9 +555,9 @@ fn window_drift(pinned: CompanyMarks, closing: CompanyMarks) -> Option<&'static 
 /// decides a classification, and under the same marks. A voucher mark that moved is the
 /// window's problem, not the masters'.
 fn masters_drifted(first: &RegisterMasters, second: &RegisterMasters) -> Option<&'static str> {
-    if second.marks.vouchers != first.marks.vouchers {
+    if second.marks.vouchers() != first.marks.vouchers() {
         Some("voucher_window_changed_during_read")
-    } else if second.index != first.index || second.marks.masters != first.marks.masters {
+    } else if second.index != first.index || second.marks.masters() != first.marks.masters() {
         Some("ledger_snapshot_drifted")
     } else {
         None

@@ -255,6 +255,13 @@ fn rows() -> Vec<Row> {
         "company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
         HANDIMPORT_LAB
     ));
+    // The same capture as the window reads parse it: the voucher mark kept as answered, so a
+    // mark Tally omitted (`None`) is recorded apart from one it sent as 0.
+    rows.push(row!(
+        "company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
+        "parse_company_marks_as_answered(HANDIMPORT_LAB)",
+        |_, t| coded(parse_company_marks_as_answered(t, HANDIMPORT_LAB))
+    ));
     // Every loaded company's marks (`agent_import_post_location_tests.rs`).
     rows.push(row!(
         "agent/native-company-book-extents.utf16le.xml",

@@ -37,6 +37,8 @@ The CK Bank entry carries none.
 - `cost_centres`: total 4, with the same names, categories and the CK North East parent CK North.
 - `cost_categories`: total 2, with the same allocate flags.
 
+**6. FINDING: the masters read renders the root parent as U+FFFD followed by `#4; Primary`.** For the three top-level centres (CK North, CK South, CK Retail) Tally's raw answer holds PARENT `&#4; Primary`, and `masters` (kind `cost_centres`) returns `parent` as the replacement character U+FFFD followed by `#4; Primary` (`answers/002-masters-cost-centres.json`). CK North East's parent reads `CK North` in both.
+
 ## Observed on the screen (7.2)
 - **The ledger screen has no cost-centre field, but the voucher still allocates.** Ledger Creation for CK Expense under Indirect Expenses showed no "Cost centres are applicable" field, nor one under any other name. The ledger was saved as offered. On the Payment, its Dr line still opened "Cost Centre Allocations", and that screen offered a second category on one entry.
 - **The masters list.** Cost Category appears in Create's List of Masters only after Show More. Choosing it asked "Primary Cost Category exists by default ... alter Primary Cost Category or create a new Cost Category?" (Create New was chosen).

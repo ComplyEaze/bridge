@@ -1,0 +1,5 @@
+# Screen captures of this sitting: name, bytes, sha256. They stay on the lab PC; none is in this folder.
+l3-s0-no-company.png 72692 0e7c522ba827fd920b3d0f3d69f47be453305e831447e82eb5a7785272a512bf
+l3-s0-gateway.png 43653 c45855309fbbfe468ddeb00c684494e43c2389f852051f83b1fb93ca0cd720a2
+l3-s1-daybook-dec.png 37736 b256d1cdc507b9facfcd16670ece397be96432054f20b2ba6ded500e7d4df7f8
+l3-c10-no-company.png 72704 8902f660828549b28924d540e043754b976fabc339e94fdfe1bb3ee1ff7bd9da

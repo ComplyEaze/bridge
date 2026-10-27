@@ -1,0 +1,8 @@
+Restore plan, the same for R1 (before X2), R2 (before X3), R3 (before X4), R4 (before X5) and R5 (after X5).
+Source folder: the BK3 folder of this sitting, holding one file.
+File: TDBK1800_100075.001, 29,493 B, sha256 b297593b6a4d27d6be466771c65d303f92dc0e70ab9c3a0a0cd21800d676bf1a, backup time 27-10-2026 22:28 local (the Restore list shows 27-Oct-26 (10:28 pm)).
+Company: BRIDGE TIEOUT D, number 100075.
+Restore Data Path: Tally's data folder.
+Prompts expected: "Accept ?" = Yes; "Company data folder (100075) already exists ... Skip ... Replace ..." = Replace. Any other prompt: press no key, screenshot, report.
+Before each: BK3 rehashed against the sha256 above, and its folder checked to hold that one file; the company's own data folder listed.
+After: the company's data folder listed again; BRIDGE TIEOUT D loaded alone; year Profit and Loss Closing Stock 2,040.00, Balance Sheet Current Assets 4,890.00, marks 4 / 213 (equal to S), else report before the next step.

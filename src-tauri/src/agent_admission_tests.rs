@@ -818,6 +818,27 @@ fn the_vouchers_description_names_the_bill_date_and_credit_period_of_an_allocati
     );
 }
 
+/// What `party` is on a Receipt, Payment or Contra: Tally's own value, which can be the bank or cash
+/// ledger (protocol reference §9.13), so the description sends the reader to `amounts` for the
+/// counterparty.
+#[test]
+fn the_vouchers_description_says_what_party_is_on_a_receipt() {
+    let definitions = registered_tool_definitions(true, true);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "vouchers"))
+        .expect("vouchers tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    for needle in [
+        "A row's `party` is Tally's own PARTYLEDGERNAME for the voucher",
+        "can name the bank or cash ledger",
+        "read the counterparty from `amounts`, not from `party`",
+    ] {
+        assert!(description.contains(needle), "missing: {needle}");
+    }
+}
+
 /// The `vouchers` description states the master-mark limit of the group summaries as the code has it, and
 /// calls it provisional: the number in the text is the constant's, written with its thousands separator.
 #[test]

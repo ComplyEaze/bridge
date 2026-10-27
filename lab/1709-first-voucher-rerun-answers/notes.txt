@@ -1,0 +1,9 @@
+2026-10-27T12:24Z recorder at 300ea3c3 checked (21 of 21 equal; recorder script 34,437 B, 40a9c57c; FIRST_DATE 20250331); self-test "self-test: ok (11 forwarded, 42 refused, none of the refused reached the target)", exit 0. Sheet 882a2aae, 3 of 3 equal.
+2026-10-27T12:26:39Z R0: no company loaded; one tally.exe owns 9001; GET /status 200; exe bf8cdf82. Select Company's list holds BRIDGE FIRST VOUCHER LAB (100085); loaded alone; Gateway "No Vouchers Entered". About: Release 7.2 (Latest).
+2026-10-27T12:27Z recorder started on 9011 into a new folder.
+2026-10-27T12:27:37Z server launched (exe bf8cdf82, 0.6.0, port 9011). R3 list_companies (000): one company, GUID f88ff11c-6fa1-4a73-8228-ab1c8c72ad4a.
+2026-10-27T12:27:53Z R4 purchase_register 2025-04-01..30 (001): complete, total 0, vouchers_observed 0; recorder lines 102 and 104 (20250331..20250501) forwarded, 200.
+2026-10-27T12:28:24Z R5 the same (002): complete, total 0.
+2026-10-27T12:29Z R6: company shut (Company > Shut) and loaded again alone; Gateway "No Vouchers Entered"; the same call (003): complete, total 0.
+2026-10-27T12:29:39Z server stopped, code 0; exe bf8cdf82 at the end; recorder stopped; 9011 closed; recording 328 lines, none refused.
+2026-10-27T12:30Z R7: company shut; no company loaded; one tally.exe owns 9001; GET /status 200. The company is kept as it is.

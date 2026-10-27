@@ -539,10 +539,7 @@ fn masters_read_again_must_match_in_classification_and_marks() {
     assert_eq!(
         masters_drifted(
             &first,
-            &masters_read(
-                CompanyMarks::new(Some(54), 121),
-                captured_index()
-            )
+            &masters_read(CompanyMarks::new(Some(54), 121), captured_index())
         ),
         Some("ledger_snapshot_drifted")
     );
@@ -562,10 +559,7 @@ fn masters_read_again_must_match_in_classification_and_marks() {
     assert_eq!(
         masters_drifted(
             &first,
-            &masters_read(
-                CompanyMarks::new(Some(55), 120),
-                captured_index()
-            )
+            &masters_read(CompanyMarks::new(Some(55), 120), captured_index())
         ),
         Some("voucher_window_changed_during_read")
     );

@@ -2162,7 +2162,7 @@ pub(super) async fn count_window_only<R: WindowReader>(
     };
     let mut closing = None;
     if let Some(opened) = opening {
-        let spans = census_spans(opened.vouchers, limits.census_capacity())
+        let spans = census_spans(opened.vouchers(), limits.census_capacity())
             .map_or(usize::MAX, Iterator::count);
         if spans > 1 {
             let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)

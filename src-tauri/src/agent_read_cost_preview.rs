@@ -181,7 +181,7 @@ impl Server {
             "result": {
                 "state": "observed",
                 "basis": "voucher_mark_read_by_this_call",
-                "voucher_mark": marks.reported_vouchers(),
+                "voucher_mark": marks.vouchers(),
                 "per_call": per_tool,
                 "request_spacing_ms": SPACING_MS,
                 "measured": measured(),

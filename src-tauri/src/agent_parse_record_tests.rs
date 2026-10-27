@@ -25,8 +25,8 @@ use sha2::{Digest, Sha256};
 
 use super::{
     parse_agent_rows, parse_agent_rows_withholding, parse_all_company_marks,
-    parse_company_high_water, parse_company_marks, parse_import_verification_rows,
-    parse_voucher_census,
+    parse_company_high_water, parse_company_marks, parse_company_marks_as_answered,
+    parse_import_verification_rows, parse_voucher_census,
 };
 use crate::source_draft_xml::parse_source_xml;
 

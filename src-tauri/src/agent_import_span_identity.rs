@@ -58,6 +58,8 @@ pub(super) struct PostedVoucherIdentity {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum SpanRefusal {
     EmptyBatch,
+    /// The reply reported `STATUS=0`, which fails whatever the counters say.
+    StatusFailure,
     CountersNotClean,
     CreatedNotCount {
         created: u64,
@@ -100,6 +102,7 @@ impl SpanRefusal {
     pub(super) fn code(&self) -> &'static str {
         match self {
             Self::EmptyBatch => "span_empty_batch",
+            Self::StatusFailure => "span_response_status_failure",
             Self::CountersNotClean => "span_counters_not_clean",
             Self::CreatedNotCount { .. } => "span_created_not_count",
             Self::LastVchIdAbsent => "span_lastvchid_absent",
@@ -190,6 +193,10 @@ fn clean_create(
     if count == 0 {
         return Err(SpanRefusal::EmptyBatch);
     }
+    if outcome.application_status() == bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    {
+        return Err(SpanRefusal::StatusFailure);
+    }
     let counters = outcome.counters();
     if !counters.counter_presence.all_reported()
         || counters.altered != 0
@@ -244,10 +251,11 @@ impl PostSpan {
         })
     }
 
-    /// The span of a clean POST of `count` vouchers. Refused unless every one
-    /// of the seven counters was reported, `CREATED == count`, every other
-    /// counter is zero with no `LINEERROR`, `LASTVCHID` was reported, and the
-    /// target's voucher mark moved by exactly `CREATED`.
+    /// The span of a clean POST of `count` vouchers. Refused unless the reply
+    /// did not report `STATUS=0`, every one of the seven counters was
+    /// reported, `CREATED == count`, every other counter is zero with no
+    /// `LINEERROR`, `LASTVCHID` was reported, and the target's voucher mark
+    /// moved by exactly `CREATED`.
     pub(super) fn after_clean_post(
         before: PreMark,
         after_mark: u64,

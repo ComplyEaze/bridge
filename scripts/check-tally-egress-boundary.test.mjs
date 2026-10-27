@@ -66,7 +66,6 @@ const todayTrees = (root) => {
   };
   // The lower-level network crates, as printed on 2026-09-28: no first-party dependent in either workspace.
   for (const [workspace, reqwest] of [["src-tauri", "reqwest v0.13.5"]]) {
-    EVERY_EDGE[`${workspace}.h2`] = ["h2 v0.4.16", "hyper v1.11.0", reqwest];
     EVERY_EDGE[`${workspace}.hyper-util`] = ["hyper-util v0.1.20", "hyper-rustls v0.27.9", reqwest];
     EVERY_EDGE[`${workspace}.socket2`] = ["socket2 v0.6.5", "hyper-util v0.1.20", "tokio v1.53.1"];
     EVERY_EDGE[`${workspace}.mio`] = ["mio v1.2.2", "tokio v1.53.1"];
@@ -84,7 +83,7 @@ const TODAY = todayTrees(root);
 const APP_LINE = `bridge v0.2.0 (${root}/src-tauri)`;
 const TRANSPORT_LINE = `bridge-tally-transport v0.1.0 (${root}/src-tauri/crates/bridge-tally-transport)`;
 const EVERY_CALL = ["src-tauri"].flatMap((workspace) =>
-  ["reqwest", "hyper", "h2", "hyper-util", "socket2", "mio", "tower-service", "tower"].flatMap((name) => [
+  ["reqwest", "hyper", "hyper-util", "socket2", "mio", "tower-service", "tower"].flatMap((name) => [
     `${workspace}.${name}.all`,
     `${workspace}.${name}.shipped`,
   ]),

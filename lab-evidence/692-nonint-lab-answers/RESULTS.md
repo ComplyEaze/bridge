@@ -21,7 +21,7 @@ All five reads returned HTTP 200 and the marks were byte-equal before and after:
 | Stock Summary (n-r5) | Lab Gadget 12 Nos at 100.00 = **1,200.00** | Lab Gadget 12 Nos, 100.00, 1,200.00 |
 
 - **Opening Stock and Less: Closing Stock lines.** The Profit and Loss answer has both. Their figures come from the Stock-in-Hand ledger: opening 1,000.00, closing 1,400.00 from the ledger's Closing Balance field. They do not come from the item, whose value is 1,200.00. The answer and the screen agree.
-- **The `Closing Stock` ledger in the ledger collection.** It is present, but its `TBALCLOSING` reads -1000.00, its opening value. The 1,400.00 entered in its Closing Balance field does not reach that field; the 400.00 difference appears only as `DEBITTOTALS` -400.00. A reader that takes TBALCLOSING as the Stock-in-Hand closing value would get 1,000.00 where the statements use 1,400.00.
+- **FINDING: the `Closing Stock` ledger in the ledger collection.** It is present, but its `TBALCLOSING` reads -1000.00, its opening value. The 1,400.00 entered in its Closing Balance field does not reach that field; the 400.00 difference appears only as `DEBITTOTALS` -400.00. A reader that takes TBALCLOSING as the Stock-in-Hand closing value would get 1,000.00 where the statements use 1,400.00.
 - **The Balance Sheet answer balances:** 1,000 + 1,200 + 800 = 3,000.
 - **Stock Summary against the Stock-in-Hand ledger.** The Stock Summary closing value (1,200.00) does **not** equal the Stock-in-Hand ledger's closing (1,400.00). With integration off, the item and the ledger are kept apart. This is the case the request asked to capture.
 

@@ -4536,15 +4536,13 @@ fn validate_optional_token(value: Option<&str>) -> Result<(), MirrorError> {
 fn validate_date_range(from: Option<&str>, to: Option<&str>) -> Result<(), MirrorError> {
     match (from, to) {
         (None, None) => Ok(()),
-        (Some(from), Some(to)) if valid_yyyymmdd(from) && valid_yyyymmdd(to) && from <= to => {
+        (Some(from), Some(to))
+            if TallyDate::parse(from).is_ok() && TallyDate::parse(to).is_ok() && from <= to =>
+        {
             Ok(())
         }
         _ => Err(MirrorError::InvalidInput("date_range")),
     }
-}
-
-fn valid_yyyymmdd(value: &str) -> bool {
-    value.len() == 8 && value.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 fn parse_run_outcome(value: &str) -> Result<RunOutcome, MirrorError> {

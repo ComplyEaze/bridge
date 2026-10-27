@@ -1,0 +1,117 @@
+# 1650 lost answer (#1650, Part of #690, #2003 and #1713): a ledger create whose answer never reaches ComplyEaze Bridge, and a post refused because Tally was busy, measured with the built tools
+
+Not for merge. Evidence only: it does not block the 0.7.0 tag. Part 1 (row L) needs a relay that sits between ComplyEaze Bridge and Tally; part 2 (row B) needs the busy gateway of row 19's company. The fault hooks that lose an answer exist only in test builds (`agent_master_ledger.rs`, `#[cfg(test)]`), so a built `bridge_mcp.exe` cannot be told to lose one; this row loses it from outside, as the tracking issue for 0.7.0 describes ("a loopback relay in front of Tally, set through the Tally port setting, or a busy gateway, with a throwaway data folder"). `SHA256.txt` lists every file here with its bytes; check it before step 0.
+
+## What this row asks
+
+A one-ledger create goes out through the approval box. Tally runs it. Its answer is then lost. What does ComplyEaze Bridge tell the caller, and what does it do next?
+1. **Row L (the relay).** The create is sent once. The relay passes it to Tally, records Tally's real answer, and returns nothing to ComplyEaze Bridge, which gives up at its 20-second limit. Record: what the post call answers and when; what a later call to the same batch answers, at once and ten minutes later; whether the ledger is in the book; whether anything is sent twice; whether any answer says `posted_verified`; whether any `next_step` instructs the caller to create the ledger by hand (some say not to); and whether a second batch for the same name is held back.
+2. **Row B (the busy gateway).** A long read holds Tally when the box is answered. ComplyEaze Bridge reads Tally many times before the create: a call that redeems the click first reads the company list and the ledger and group indexes, then the queue reads the product and mode, the companies, the all-company marks and the two indexes twice each, ending with the marks read that aims the create, and the create goes out within milliseconds of that last read. So a busy gateway at the click holds the first of those reads, not the create: row B records what that refusal is, that nothing was sent, and that the same batch can then be posted again.
+
+Neither row proves a lost answer is settled, and neither is expected to pass or fail: each records what was observed.
+
+## Rules and company
+`LAB-COMMON.md` in this folder applies in full. It is v3, a byte copy from `lab/626-1038-1050-run-sheets` at 8c602c15, sha256 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6.
+
+**Who acts.** As the lab order's WHO ACTS section sets out, on the owner's standing word of 27 Oct 2026: the lab does every step here on synthetic companies, including the company creation, the launch settings, the tool calls and the clicks on the approval box, and records each as the lab order's WHO ACTS section directs (LAB-COMMON C11's rule on names applies to what is pushed). The run coordinator's word, where this sheet asks for it (the evidence push), still comes from the run coordinator.
+
+**Companies and names.** Row L: THE COMPANY is `BRIDGE LOSTANS LAB`, new; the ledger is `LAns Suspense`, kind `suspense` (under Suspense A/c). Row B: THE COMPANY is `BRIDGE ABANDON LAB` as row 19 left it; the ledger is `LAns Busy Suspense`. If THE COMPANY of row L exists on the PC already, STOP and report it. No ledger, alias or group of the company may carry the ledger's name, or one that differs from it only in case, spaces or symbols, before the create.
+
+Differences from LAB-COMMON, the stricter rule holding everywhere else:
+1. **Tool calls only.** Every read and write of the books is a call of ComplyEaze Bridge's built tool, one at a time. The only requests the operator sends to Tally are LAB-COMMON's `GET /status` checks and, in row B, the one BUSY read of step B2 (the file `requests/busy-year.xml` of branch `lab/1713-abandoned-ledger-create`, checked against that branch's `SHA256.txt` first). C2 step 0 runs WITHOUT its MARKS request.
+2. **Marks.** `tally_status` carries no marks. M (ALTMSTID) and V (ALTVCHID) are read with `ledger_masters` (first page, no `snapshot_id`): `snapshot.master_alter_id` and `snapshot.voucher_alter_id`; record the whole answer and `snapshot.reused`, which must read false.
+3. **Backup.** One backup, BK1, of THE COMPANY before the first ledger write (C5), into a new empty folder, `C:\bridge-lab\1650lost\l\backups\bk1\` (row L) or `C:\bridge-lab\1650lost\b\backups\bk1\` (row B). No restore is planned: the companies are kept, shut, at the end.
+4. **Grant.** Row L: the creation of THE COMPANY on Tally's screen; one ledger created by ComplyEaze Bridge, through the relay; nothing else written. Row B: one ledger created by ComplyEaze Bridge, after the busy read; nothing else written. The relay passes only Export reads and the one create (see its header), so no other write can pass it.
+5. **One Tally.** Immediately before every `post_ledger_creates` call: the process list shows exactly one `tally.exe`, and it is the process that owns port 9001 (`Get-NetTCPConnection -LocalPort 9001 -State Listen` gives its process id). Record both. A second `tally.exe`, or 9001 owned by another process = STOP before the call.
+6. **Click only while a box can be open.** On this build the box opens on top of every window and takes the keyboard focus, so a key typed anywhere on the PC can answer it. From each `post_ledger_creates` call until its answer arrives, and from a box opening until it closes, any screen-control tool on the PC only takes screenshots and clicks: it types no key and brings no window forward (bringing TallyPrime forward once started a second `tally.exe`, 27 Oct 2026). The shell tool that runs the relay, `Start-Process` and the tool calls is not a key on the screen and is allowed. The box's buttons are Yes, No and Cancel; No is the default; it closes by itself 120 seconds after it opens, with nothing sent.
+7. **Throwaway data folders.** Each row uses its own new, empty `BRIDGE_AGENT_DATA_DIR`: `C:\bridge-lab\1650lost\l\data` (row L) and `C:\bridge-lab\1650lost\b\data` (row B). The masters journal must carry from the prepare to the posts within a row, and no name held by one row may reach the other.
+
+Licensed mode only; Education mode = STOP.
+
+## Build
+`bridge_mcp.exe` of the 0.7.0 cut build, which must hold #1650: its `tools/list` names `prepare_ledger_creates` and `post_ledger_creates` (absent = STOP). The run coordinator names the cut's commit, CI run, artifact and exe sha256 in the lab order. Until the cut exists, the CI package of #1650's head `239896f827b64d42490ebb59c4177fcf6fe4430e` stands in for it: Bridge CI run 40512095961, artifact 12737059797 `unsigned-bundle-smoke-windows-latest` (it expires on 3 Nov 2026); record the exe's sha256 and EXPECT it equal to the package's smoke file `binary_sha256` (different = STOP). The row records which of the two it ran on.
+
+Hash the exe before the first call and after the last: another sha256 = STOP. Record its `initialize` version and `tools/list` whole.
+
+Run it over stdio with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TERMS_ACCEPTED=true` (allowed for the lab on 25 Oct 2026), `BRIDGE_AGENT_REDACTION` unset, `BRIDGE_AGENT_ENABLE_WRITES=true` and `BRIDGE_AGENT_ENABLE_MASTER_WRITES=true` (set by the lab, recorded, and removed at the last step of each row), `BRIDGE_AGENT_ENABLE_BATCH_POST` absent, and:
+- row L: `BRIDGE_TALLY_PORT=9011` (the relay) and the row's data folder;
+- row B: `BRIDGE_TALLY_PORT=9001` and the row's data folder.
+
+Exactly one ComplyEaze Bridge with ledger creation on may be running; record the process list.
+
+## Files
+- `lost_answer_relay.py`: the relay of row L. Python standard library only. Read its header for the match rule, what it forwards and what it refuses. It listens on 127.0.0.1 only and forwards to 127.0.0.1:9001 only; every byte it sends to Tally is a byte ComplyEaze Bridge sent it. It withholds the answer to the one create it matches, holds the connection silent for 45 seconds (ComplyEaze Bridge gives up at 20), and answers 403 to every import but that one and to a second copy of it.
+- `templates/suspense_create_request.utf16le.xml`: the request ComplyEaze Bridge renders for a Suspense ledger (`SUSPENSE_GOLDEN`, `src-tauri/src/tally/ledger_create_item_tests.rs`), which the relay compares with what it receives. It is a comparison, not a request: the relay never sends it.
+- `LAB-COMMON.md`, `.gitattributes`, `SHA256.txt`.
+
+## Before the sitting
+1. Check every file here against `SHA256.txt` (`Get-FileHash -Algorithm SHA256 FILE`).
+2. `python -I lost_answer_relay.py --self-test`: EXPECT exactly `self-test: ok (6 forwarded unchanged, 1 answer withheld, 10 refused, none of the refused reached Tally)` and exit code 0. Anything else = do not use the relay.
+3. Read the relay's header against the match rule: it forwards a request unchanged unless it is an import, and an import only if it is the create.
+
+## Row L: the relay
+
+0. LAB-COMMON step 0 as C2 sets it out, except its steps that need a company (the MARKS read and the company check), which do not apply before THE COMPANY exists. Tally's About screen: record the release (7.2 expected). EXPECT no company of THE COMPANY's name in Select Company's list. Hash the exe. Record the process list.
+1. Create Company `BRIDGE LOSTANS LAB`: financial year and books beginning 1-4-2025, no password, every other field as the screen offers; if the Features screen opens, accept it unchanged and record every value it shows. Screenshot before accepting. Load it alone. Start the relay now, in its own console, from a PowerShell prompt in this folder (one run per recording folder, which must be new):
+
+   ```
+   Start-Process cmd.exe -WorkingDirectory <the folder holding these files, as an absolute path> -ArgumentList '/k','python -I lost_answer_relay.py --listen-port 9011 --record C:\bridge-lab\1650lost\l\relay --company "BRIDGE LOSTANS LAB" --ledger-name "LAns Suspense" --hold-seconds 45'
+   ```
+
+   (`cmd /k` keeps the console open, so an error stays on screen; the double quotes survive because the command line after `/k` starts with `python`.) The relay's company and ledger name must match the names ComplyEaze Bridge will send byte for byte, or the create is refused by the relay after its intent is recorded (step 4 checks this).
+   EXPECT the console's first line `relay: 127.0.0.1:9011 -> 127.0.0.1:9001, recording into C:\bridge-lab\1650lost\l\relay; withholds the answer to the create of 'LAns Suspense' in 'BRIDGE LOSTANS LAB' for 45 s; Ctrl+C to stop`. Start ComplyEaze Bridge with the settings above. `list_companies`: EXPECT exactly THE COMPANY with `identity_state` `verified_tuple`; record its `guid` and the company number. `tally_status`: release, licence, Education mode. `ledger_masters`: M0, V0 and the ledger rows (EXPECT no `LAns Suspense`).
+2. Backup BK1 (C5): name, size and sha256. `ledger_masters`: M0′ (a mark that moved across the backup is recorded, not a STOP). Every later comparison is against M0′.
+3. `prepare_ledger_creates` with `company_guid` and `ledger` = `{"name": "LAns Suspense", "kind": "suspense"}`: batch B1. EXPECT a `batch_id` and a `preview` of nine lines naming THE COMPANY and the ledger. Record the answer whole. Then the same call again with the same ledger: batch B2. EXPECT a second `batch_id`; if the tool refuses a second batch for a name an open batch holds, record the refusal whole and go on without B2. `ledger_masters`: EXPECT M = M0′.
+4. `tally_status`, then `GET /status` straight to 9001: record both. Check the names: `list_companies`'s name for THE COMPANY and the company line of step 3's preview must read `BRIDGE LOSTANS LAB`, and the ledger line `LAns Suspense`, exactly as in the relay's first line (any difference = STOP before step 5, and start the relay again with the names the tool shows). The relay's `manifest.tsv` must show only `forwarded` lines so far, every answer returned (`answer_returned` yes).
+5. **The create.** One Tally (rule 5). `post_ledger_creates` with B1's `batch_id`, UTC time noted. The call reads Tally, then a box titled `ComplyEaze Bridge — create one ledger?` opens (rule 6 from now on); take a screenshot of the whole box. EXPECT the call to answer `approval.state` `pending` about 40 seconds after it started, with `retry_after_s` 15 (the tool's own flow). Do not click before that answer. Then click **Yes** (screen tool, a click only), note the UTC time, and call `post_ledger_creates` again with the same `batch_id` after `retry_after_s` has passed (counted from the pending answer). This second call is the one that sends. Read the relay's `events.txt` and `manifest.tsv` with a short call, not by keys. EXPECT the second call to answer 20 to 30 seconds after it started (a few seconds of reads, then ComplyEaze Bridge's 20-second limit on the create), with a failure answer, not a result: `error.message` saying the create may have been sent, `attempt_recorded` true, `dispatch` `{state: reconciliation_required, resent: false}`, and an `error.next_step`. Record its start and end in UTC and the answer whole.
+   - The answer must NOT carry `posted_verified`. If it does, record it whole: it is the finding of the row (an answer reached ComplyEaze Bridge that the relay was meant to withhold); STOP.
+   - Record the relay's lines: `create matched` (with its two sha256 values), the manifest line `forwarded_answer_withheld` (Tally's real answer: its size and sha256, and `answer_returned` no), and, when the hold ends, the `held connection ended` line (who closed it, and how long after the create was sent).
+   - If the box does not open, or the first call answers before any box, record it whole and STOP (nothing was sent).
+6. Screenshot of the whole Tally window (C3). Take no other action in Tally.
+7. **The next call, at once.** One Tally (rule 5). `post_ledger_creates` with B1's `batch_id` again. This is not posting it again: the journal shows a send, and the call is meant to read and send nothing. EXPECT no box. The tool reads the book back and sends nothing; with no answer of Tally's on file it cannot verify the create, so EXPECT `state` `reconciliation_required` (never `posted_verified`) and a `next_step` that says there is nothing to create and to compare the ledger by eye. Record the answer whole: `state`, `attempt_recorded`, `dispatch` (`state` and `resent`), `verification`, `note`, `next_step`, any `alert`, and the `journal` fields when it carries them. A box opens: click **No**, record it, and STOP. The relay's manifest must show no further import line.
+8. `ledger_masters`: M1 and the ledger rows. RECORD whether `LAns Suspense` is present (Tally ran the create, so it is expected present), its GUID and ALTERID, and whether M1 = M0′ + 1. Every other row unchanged.
+9. **The second batch.** (Skip if step 3 made no B2.) One Tally. `post_ledger_creates` with B2's `batch_id`. EXPECT a refusal before any box: the name is already in the book (the name check runs before the person is asked), so no box opens and nothing is sent. Record the answer whole, its `code` above all. A box opens: click **No**, record it, and STOP. The relay's manifest must show no new import line; a `refused:second_create` line is the finding of the row, not a risk to the book (the relay refused it).
+10. **Ten minutes later** (UTC noted at step 7; do nothing at the PC meanwhile). One Tally. `post_ledger_creates` with B1's `batch_id`: record the answer whole, as step 7. Also `ledger_masters` once more: M. EXPECT the same as step 7 (a read-back that cannot verify is not a verdict that settles the batch). Does the answer differ from step 7's? This is the "never settles" question (#2003): record it either way.
+11. `egress_log`: record it whole (each call's `response_prepared` line).
+12. Stop the relay (Ctrl+C in its console; nothing else is running in it). Record its last manifest line. Close ComplyEaze Bridge, remove the two write settings, set `BRIDGE_TALLY_PORT` back to 9001. LAB-COMMON C10: shut THE COMPANY; it is kept as it is. Hash the exe.
+
+STOP RULES (row L): C7 and C8; any dialog before a call; a box other than the one named; two such boxes at once; a `manifest.tsv` line whose verdict is `refused:` other than the ones step 9 names, or a `forward_failed`; `master_approval_timed_out`; a second `tally.exe` (rule 5); the relay's console ending; a post call with no answer 120 s after it started (C9: leave everything as it is and report); a mark that moves outside the steps that change it. Do not call `post_ledger_creates` for B1 more often than steps 5, 7 and 10 say, and never key the ledger by hand.
+
+## Row B: the busy gateway at the click
+
+Runs only after row 19's evidence is pushed, in THE COMPANY of that row as it left it (loaded alone), so that no one else holds the gateway. It needs row 19's M1: BUSY alone took D seconds, and the row runs only if D is at least 60 s (below that, a refusal cannot be placed: record "not run, D below 60 s"). A BUSY read is hundreds of megabytes: disk space at least 2 × M1's size + 1 GB before B2.
+
+B0. LAB-COMMON step 0 with THE COMPANY of row B loaded alone. Hash the exe. Process list. ComplyEaze Bridge started with the row's settings. `list_companies`: record its `guid`. `ledger_masters`: M0, V0. Backup BK1 (C5), then `ledger_masters`: M0′.
+B1. `prepare_ledger_creates`, ledger `{"name": "LAns Busy Suspense", "kind": "suspense"}`: batch BB. Record whole. `ledger_masters`: EXPECT M = M0′.
+B2. One Tally (rule 5). `post_ledger_creates` with BB's `batch_id`. The call reads Tally, the box opens, screenshot of the whole box; the call answers `pending` about 40 seconds after it started, with `retry_after_s` 15. Do not click before that answer. Then, noting UTC after each:
+   1. wait until `retry_after_s` (15 s, counted from the pending answer) is nearly over; then start BUSY with the shell tool: `Start-Process` of C3's curl line sending `requests/busy-year.xml` (the file of branch `lab/1713-abandoned-ledger-create`), no time limit, bound 400,000,000 bytes, the answer saved to the row's evidence folder (no key is typed on the screen). C3's rule against a send while a dialog is on Tally's screen is set aside for this one read, deliberately: the box on the screen is the point of the row;
+   2. at once, click **Yes** (screen tool, click only);
+   3. at once, call `post_ledger_creates` with BB's `batch_id` again (`retry_after_s` has passed).
+   BUSY is started no more than 8 seconds before the call and no later than the call, and runs at least 40 seconds past the call (D at least 60 s). EXPECT the call to answer after about 20 to 30 seconds with a refusal, not `posted_verified`: the first read of the call waits behind BUSY and gives up at ComplyEaze Bridge's 20-second limit, with no retry and before any create. Record the answer whole: `code`, `cause`, `attempt_recorded`, `dispatch` and any `next_step`, with the UTC times. EXPECT `attempt_recorded` false and no recorded send. An answer with `attempt_recorded` true, or any create sent (the journal's `dispatch` not `not_dispatched`): record it whole, do NOT call again, and STOP.
+B3. Wait for BUSY's curl to end by itself (LAB-COMMON C9 and row 19's watchdog rule apply: after D + 10 minutes with no end, leave it and report; press no Ctrl+C in Tally). Verify BUSY's answer by size and sha256 as C3 asks. Then `GET /status` (record), screenshot of the whole Tally window, and `ledger_masters`: EXPECT M = M0′ and no `LAns Busy Suspense`.
+B4. **The same batch again.** One Tally. `post_ledger_creates` with BB's `batch_id`. A new box opens (the refused post's approval was withdrawn): wait for the `pending` answer, click **Yes** and call again after `retry_after_s`, as step 5 does (no BUSY now). EXPECT `state` `posted_verified`, `attempt_recorded` true, `dispatch.state` `dispatched`, `counters` `created` 1 and every other counter 0 (a refusal before the intent leaves the batch postable). Anything else: record whole, do NOT call again, STOP. `ledger_masters`: M1, with one new row.
+B5. `egress_log`, whole. Close ComplyEaze Bridge, remove the two write settings. Hash the exe. Shut THE COMPANY as row 19 left it.
+
+STOP RULES (row B): C7 and C8; any dialog before a call; a box other than the one named; BUSY started more than 8 s before the call of B2 or after it; the call of B2 answering before 15 s; a second `tally.exe` (rule 5); BUSY ending before the click (its curl exits earlier than the click's time); the watchdog line of C9.
+
+## What each row records, and what it does not
+Row L, as a table of observations (each is a record, not a pass): the post call's answer and timing; the relay's lines; the follow-up answers at once and at ten minutes; the ledger's presence and mark step; the second batch's refusal code; whether a `posted_verified` or an instruction to create the ledger by hand appeared anywhere (EXPECT neither).
+
+**Confidence.** Each row is a single observation, PARTIAL by the reference's convention, until repeated. The relay's silence is not Tally's: it stands for a Tally that ran the create and never answered, which is one of the cases (#2003). It does not stand for a create that Tally dropped.
+
+## Not measured by this row
+- A create that Tally never runs (the relay forwards every create it matches); an answer cut off partway rather than withheld whole; a connection reset instead of silence.
+- A name held while the ledger is absent from the book: here the create ran, so the book holds the name.
+- Gold, a second company in the data folder, the macOS box, a restart of Tally or of ComplyEaze Bridge between the calls.
+- The read-back finding the ledger absent after the answer is lost (the case #1713 asks for): it needs Tally to drop or delay the create itself, which only row 19's scripts do.
+
+## STOP rules (beyond the rows')
+- **Hazard detail:** any finding that Tally refused every connection or stopped goes to the run coordinator, and its detail through `SECURITY.md`'s private channel, not into the pushed evidence.
+- A finding that a request reached Tally from the relay that ComplyEaze Bridge did not send: STOP and report; the relay's manifest and `0001-request.bin` files are the proof.
+
+## Evidence
+- Every tool answer whole with its size and sha256, the build's commit and exe sha256 before and after, BK1's name, size and sha256, each box's screenshot by name, size and sha256 (never pushed), and a notes file with UTC times and one line per step, kept as C11 sets it out (no roles and no people). The one-Tally record before every post goes in the notes.
+- Row L: the relay's whole recording folder (`manifest.tsv`, `events.txt`, every `NNNN-request.bin`, `NNNN-response.bin` and `NNNN-response-headers.txt`). The withheld answer is Tally's real one: read it and say what it reports (created or not).
+- Row B: BUSY's answer is listed by size, sha256 and row count and kept on the PC, as row 19 does.
+- THE COMPANY's GUID is new for row L: before the evidence is pushed it goes into the merge gate's synthetic-UUID registry, or the evidence shows it as `<company guid>`.
+- Evidence on a new branch, `lab/1650-masters-lost-answer-answers`, with `SHA256.txt`; send the SHA to the run coordinator before pushing, and push only after the pre-push scan and the coordinator's yes.

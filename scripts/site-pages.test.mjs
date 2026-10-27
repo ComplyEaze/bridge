@@ -260,7 +260,7 @@ test("the questions page keeps the claims that tell a reader what ComplyEaze Bri
     "has no tool to delete or undo a posted voucher",
     "None of these files is encrypted",
     "not yet code-signed",
-    "Not run yet: the package of the latest release against a live TallyPrime",
+    "Not run yet: posting with the package of the latest release",
     "book with stock items is read only when",
     "Intel Macs are not supported",
     "has not set a price for ComplyEaze Bridge and does not sell licences to it",
@@ -370,10 +370,14 @@ test("the home page carries an at-a-glance block for the manifest's release, wit
   }
   // the limits the Download page puts on the same claims go with them, so the home page cannot say more than that page
   const squash = (value) => value.replace(/\s+/g, " ");
+  // 0.6.1 is the release whose published Windows program has a recorded run; any other version says what is true when the version is set
+  const publishedRunNeedle = version === "0.6.1"
+    ? "the program in the published Windows 0.6.1 file has had one read-only run against TallyPrime 7.2 Silver"
+    : `we have not yet run the published ${version} file against TallyPrime`;
   const download = squash(visibleText(region(read("download.html"), 'id="at-a-glance"', "</section>")));
   const home = squash(text);
   for (const needle of ["synthetic book", "not tied to the vouchers", "ties to the trial balance", "closes every gap", "Funds Flow", "several currencies",
-    "cannot build onto a Cash-in-Hand ledger", "has not yet been run on a real bank statement", `the published ${version} file has had one read-only run against TallyPrime 7.2 Silver`]) {
+    "cannot build onto a Cash-in-Hand ledger", "has not yet been run on a real bank statement", publishedRunNeedle]) {
     assert.ok(home.includes(needle), `the home page's at-a-glance block lacks "${needle}"`);
     assert.ok(download.includes(needle), `the Download page's at-a-glance block lacks "${needle}", which the home page's block carries`);
   }

@@ -2075,6 +2075,17 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   if it is a placeholder (no name) and its `BILLDATE` is not validated; if it has a
   name, it refuses the read (`bill_allocation_field_missing`).
 
+### The `party` field of a voucher row
+
+`party` is the voucher's `PARTYLEDGERNAME` as Tally answered it, and the parse takes that one element and no
+other. For a Sales or Purchase voucher it names the customer or supplier. On a Receipt, Payment or Contra Tally can
+answer the bank or cash ledger instead. On TallyPrime 7.1 it did for a Receipt and a Payment that ComplyEaze Bridge
+imported with the party in `PARTYLEDGERNAME`, and a Contra imported without the element came back with its debit
+bank ledger ([reference §9.13](../tally/TALLY_PROTOCOL_REFERENCE.md), the scoped correction of 2026-09-17).
+Committed captures of a synthetic book's Payments carry the bank on some rows and the party on others. So the
+counterparty of a Receipt, Payment or Contra is read from the voucher's `amounts`, not from `party`. `verify_import`
+does not compare the field for a Receipt, Payment or Contra.
+
 ### Cost-centre allocations in voucher reads
 
 Each ledger entry that carries cost-centre allocations has `cost_centre_allocations`, a list of

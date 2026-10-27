@@ -1,0 +1,15 @@
+#1233 step 8 comparison (n1-a CLOSINGBALANCE / CLOSINGVALUE as sent; screen T1 and T2 quantity, unit, value; stock_summary 5a closing.quantity / closing.value). A value of stock held is negative on the wire and positive on the screen; a negative quantity's value is the reverse. Quantities compared as number and unit.
+item | n1-a qty | n1-a value | screen T1 | screen T2 | tool qty | tool value | equal?
+A1 Lab Depth1 Nut (Lab Group One) | 20 Nos | -40.00 | 20 Nos 40.00 | 20 Nos 40.00 | inside_stock_group | -40.00 | yes
+A2 Lab Depth1 Powder (Lab Group One) | 2.500 Kgs | -250.00 | 2.500 Kgs 250.00 | 2.500 Kgs 250.00 | inside_stock_group | -250.00 | yes
+B1 Lab Depth2 Washer (Lab Group Two) | 35 Nos | -35.00 | 35 Nos 35.00 | 35 Nos 35.00 | inside_stock_group | -35.00 | yes
+B2 Lab Depth2 Resin (Lab Group Two) | 1.250 Kgs | -100.00 | 1.250 Kgs 100.00 | 1.250 Kgs 100.00 | inside_stock_group | -100.00 | yes
+B3 Lab Depth2 Spare (Lab Group Two) | '' (empty) | '' (empty) | no line (zero-quantity items not shown) | no line | none_sent | null | empty on all three
+C1 Lab Depth3 Pin (Lab Group Three) | 35 Nos | -17.50 | 35 Nos 17.50 | 35 Nos 17.50 | inside_stock_group | -17.50 | yes
+C2 Lab Depth3 Oil (Lab Group Three) | -0.750 Kgs | 45.00 | (-)0.750 Kgs (-)45.00 | (-)0.750 Kgs (-)45.00 | inside_stock_group | 45.00 | yes
+R1 Lab Root Bolt (Primary) | 10 Nos | -50.00 | 10 Nos 50.00 | 10 Nos 50.00 | agreed 10 Nos | -50.00 | yes
+Groups (sum of CLOSINGVALUE of every item at every depth below the group; screen line; n2 line):
+Lab Group Three | C1 -17.50 + C2 45.00 = 27.50 | screen (-)27.50 (T1, T2) | n2 no line
+Lab Group Two | B1 -35.00 + B2 -100.00 + B3 0 + Group Three 27.50 = -107.50 | screen 107.50 (T1, T2) | n2 no line
+Lab Group One | A1 -40.00 + A2 -250.00 + Group Two -107.50 = -397.50 | screen 397.50 (T1, T2) | n2 'Lab Group One' -397.50 (for information)
+Period end (SJ1 15 Sep 2025 inside, SJ2 15 Apr 2026 after): C1 and B1 read 35 Nos in n1-a, 35 Nos on the screen (T1, T2), and the tool's values -17.50 / -35.00 (35 at the rates); none reads 30 or 40. The collection honours the 31 March 2026 period end.

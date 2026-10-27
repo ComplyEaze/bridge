@@ -1,0 +1,10 @@
+n2-a elements in order (tag: text):
+  DSPDISPNAME: 'Lab Group One'
+  DSPCLQTY: ''
+  DSPCLRATE: ''
+  DSPCLAMTA: '-397.50'
+  DSPDISPNAME: 'Lab Root Bolt'
+  DSPCLQTY: '10 Nos'
+  DSPCLRATE: '5.00'
+  DSPCLAMTA: '-50.00'
+name lines: 2

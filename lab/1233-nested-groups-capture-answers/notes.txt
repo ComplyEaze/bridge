@@ -1,0 +1,14 @@
+2026-10-27T11:01Z request-ID check: census ok 2, skipped 1, FAIL 0.
+2026-10-27T11:01Z step 0: no company loaded; one tally.exe owns 9001; GET /status 200; no BRIDGE NESTED STOCK LAB in Select Company.
+2026-10-27T11:02Z step 1: BRIDGE NESTED STOCK LAB created from Select Company's Create Company: FY and books 1-Apr-25, state and currency as offered, no address or password; Features: GST Yes -> No, Maintain Inventory Yes (as offered), others as offered; loaded alone.
+2026-10-27T11:04:47Z server launched (exe 4c9bace3, 0.6.0); tools/list 29 tools.
+2026-10-27T11:04:52Z step 2: list_companies one company, 100086, GUID 4b6094e2-d6db-46b6-a4ad-90c283cd1b52; n3 filled (bf5197c0); ID check ok 3, skipped 1, FAIL 0; marks M0 206, V0 null; n3-a: ALTMSTID 206, ALTVCHID absent, NUMSTOCKITEMS 0.
+2026-10-27T11:06Z step 3: units, groups and items keyed (each captured before its accept); one unit choice was corrected on screen before its accept (A2 had shown Nos; set to Kgs and re-entered); C2 took -0.750; marks M1 219, V1 null.
+2026-10-27T11:18Z step 3b: SJ1 15-Sep-25 keyed; marks V 1. SJ2's date refused ("Date cannot be above the current period (15-Sep-25)"); period set to 1-Apr-25..31-Mar-27 and current date to 15-Apr-2026 (marks unchanged after each); SJ2 keyed (No. 1 of the new year); marks M2 219, V2 2; date and period set back to 15-Sep-2025 and 1-Apr-25..31-Mar-26 (marks unchanged).
+2026-10-27T12:09Z step 4: BK0 by Tally's Backup screen into a new empty folder: TDBK1800_100086.001, 28,269 B, f22cd944; marks 219 / 2.
+2026-10-27T12:11Z step 5: stock_summary as of 20260331 value_total_matched, count matched 8/8, R1 agreed; masters stock_groups, stock_items, units; marks unchanged.
+2026-10-27T12:12Z step 6: n3-b, n1-a (new shape), n2-a (new shape), n1-b (byte-identical to n1-a), n3-c; a screenshot after each new shape showed no dialog.
+2026-10-27T12:14Z a separate read-only check on another build ran between steps 6 and 7; nothing here changed.
+2026-10-27T12:17Z step 7: Stock Summary (period already 1-Apr-25..31-Mar-26); F12 Format Detailed, Expand all levels Yes; transcribed at 17:48 and 17:50 IST, in agreement; both settings set back; report closed.
+2026-10-27T12:21Z step 8: comparison written; every comparison equal; C1 and B1 at 35 Nos.
+2026-10-27T12:22:33Z step 9: server stopped, code 0; exe 4c9bace3 at the end; company shut, no company loaded; one tally.exe owns 9001; GET /status 200. The company is kept.

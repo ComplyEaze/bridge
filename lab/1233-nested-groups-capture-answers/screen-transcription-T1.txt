@@ -1,0 +1,14 @@
+Screen transcription T1 (#1233 step 7c), from shots\s7c-expanded-T1.jpg taken at 17:48 IST (12:18Z), Stock Summary, BRIDGE NESTED STOCK LAB, 1-Apr-25 to 31-Mar-26, Closing Balance, Detailed with every level expanded.
+line | quantity | rate | value
+Lab Group One | | | 397.50
+  Lab Group Two | | | 107.50
+    Lab Group Three | | | (-)27.50
+      Lab Depth3 Oil | (-)0.750 Kgs | 60.00 | (-)45.00
+      Lab Depth3 Pin | 35 Nos | 0.50 | 17.50
+    Lab Depth2 Resin | 1.250 Kgs | 80.00 | 100.00
+    Lab Depth2 Washer | 35 Nos | 1.00 | 35.00
+  Lab Depth1 Nut | 20 Nos | 2.00 | 40.00
+  Lab Depth1 Powder | 2.500 Kgs | 100.00 | 250.00
+Lab Root Bolt | 10 Nos | 5.00 | 50.00
+Grand Total | 10 Nos | | 447.50
+Not on the screen: Lab Depth2 Spare (no quantity; the Configuration shows "Show Stock Items with zero Quantity or Balance: No").

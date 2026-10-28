@@ -1035,3 +1035,6 @@ fn the_approval_text_refusals_of_an_invoice_build_do_not_reach_other_vouchers() 
         assert_eq!(invoice_route_refusal(code.to_string()), code);
     }
 }
+
+#[path = "agent_import_content_review_tests.rs"]
+mod content_review_tests;

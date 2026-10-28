@@ -80,6 +80,8 @@ mod persistence;
 mod post;
 /// The post's next step for a numbering refusal, for the refusal table.
 pub(super) use post::numbering::POST_NEXT_STEP as POST_NUMBERING_NEXT_STEP;
+#[path = "agent_import_content_review.rs"]
+mod content_review;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
 #[path = "agent_import_statement_facts.rs"]
@@ -2394,6 +2396,17 @@ impl Server {
                     .and_then(|imports| ack::operator_review(&imports, &line, &observed.rows, span.bindings.as_deref()))
                 {
                     proof["operator_review"] = review;
+                }
+            }
+            // A person's standing record that they checked this batch, matched
+            // by content only, in Tally (#1039). Beside the verdict, never
+            // instead of it. Standing is the journal's rule, as for
+            // `local_data_report`: a rollback voids it once its record is
+            // written. A journal that cannot be read reports none and fails
+            // nothing here.
+            if dispatched {
+                if let Ok(Some(reviewed)) = self.import_content_review(&line.batch_id) {
+                    proof["content_review"] = content_review::report(reviewed);
                 }
             }
             *observed_rows = Some(observed.rows.clone());

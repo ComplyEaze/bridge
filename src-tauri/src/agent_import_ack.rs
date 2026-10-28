@@ -1023,6 +1023,11 @@ impl Server {
         if args.get("doubt").and_then(Value::as_str) == Some("invoice_stop") {
             return self.release_invoice_stop(args).await;
         }
+        // A batch matched by content only has no doubt to review: its record
+        // is its own, and binds no voucher (#1039).
+        if args.get("doubt").and_then(Value::as_str) == Some("content_only") {
+            return self.review_content_only(args).await;
+        }
         let batch_id = required_string(args, "batch_id")?;
         let imports = self.imports_dir()?;
         let ledger::BatchSnapshot {

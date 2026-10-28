@@ -2110,3 +2110,93 @@ fn naming_a_reference_can_turn_an_ambiguous_bill_into_a_tied_one() {
     let named = bill_trails("P", Some("R"), &read, &natives).unwrap();
     assert_eq!(named[0].state(), "tied");
 }
+
+/// The ledger-scoped read a party detail sends on a larger book (#1356) gives the party exactly the
+/// allocations the book-wide window read gives: on BRIDGE BILLTRAIL LAB, whose party Lab Party P1
+/// holds three bank-ledger Receipts that a filter on the voucher's party ledger loses, the same
+/// lab run read the year both ways (fixtures/ledger-filtered-allocations/PROVENANCE.md).
+#[test]
+fn the_ledger_read_gives_the_party_the_allocations_the_window_read_gives() {
+    const BILLTRAIL_GUID: &str = "9ab5002c-e910-4242-83e4-a27cc490600b";
+    let rows = |bytes: &[u8]| {
+        let text = String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        parse_agent_rows(&text, BILLTRAIL_GUID).unwrap()
+    };
+    let window = rows(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-window-fy.answer.utf16le.xml"
+    ));
+    let ledger = rows(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.answer.utf16le.xml"
+    ));
+    assert_eq!((window.len(), ledger.len()), (7, 7));
+    let from_window = entries_for_party(&window, "Lab Party P1").unwrap();
+    let from_ledger = entries_for_party(&ledger, "Lab Party P1").unwrap();
+    assert_eq!(from_ledger.len(), 9);
+    assert_eq!(from_ledger, from_window);
+    // Every voucher of the ledger-scoped read carries a line on the party's ledger; one that did
+    // not would not be the party's, and is refused.
+    use super::bill_trail::every_row_has_a_line_for;
+    assert_eq!(every_row_has_a_line_for(&ledger, "Lab Party P1"), Ok(()));
+    let mut stray = ledger.clone();
+    stray[0]["amounts"] = json!([]);
+    assert_eq!(
+        every_row_has_a_line_for(&stray, "Lab Party P1"),
+        Err(TrailRefusal("party_voucher_without_party_line"))
+    );
+}
+
+/// A party detail reads by its ledger only on a book too large for one request, under a name a
+/// ledger-scoped request admits, matched to one ledger alone (#1356).
+#[test]
+fn a_detail_reads_by_its_ledger_only_where_the_book_is_large_and_the_name_is_admitted() {
+    use super::bill_trail::ledger_scope_for;
+    let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+    let exact = |name: &str| LedgerMatch::Exact {
+        name: name.to_string(),
+        similar: Vec::new(),
+    };
+    let scope = |resolved: &LedgerMatch, mark| {
+        ledger_scope_for(resolved, resolved.name(), mark, limits)
+            .map(|name| name.as_str().to_string())
+    };
+    // 42 vouchers fit one request at the planner's figure; 43 do not.
+    assert_eq!(scope(&exact("DN Party 001"), 42), None);
+    assert_eq!(
+        scope(&exact("DN Party 001"), 43).as_deref(),
+        Some("DN Party 001")
+    );
+    assert_eq!(
+        scope(&exact("DN Party 001"), 29_900).as_deref(),
+        Some("DN Party 001")
+    );
+    let close = LedgerMatch::CaseOrSpacing {
+        name: "DN Party 001".to_string(),
+    };
+    assert_eq!(scope(&close, 29_900).as_deref(), Some("DN Party 001"));
+    // A name outside the admitted alphabet, or one another ledger shares but for case or spaces,
+    // reads the book's window as before.
+    assert_eq!(scope(&exact("M/s. Party & Co"), 29_900), None);
+    let twins = LedgerMatch::Exact {
+        name: "DN Party 001".to_string(),
+        similar: vec!["DN PARTY 001".to_string()],
+    };
+    assert_eq!(scope(&twins, 29_900), None);
+    // Vouchers that carry the ledger in another spelling than its stored name read the window.
+    assert_eq!(
+        ledger_scope_for(&close, "DN PARTY 001", 29_900, limits),
+        None
+    );
+    // A name holding a word a TDL formula reads as an operator reads the window.
+    assert_eq!(scope(&exact("Sharma and Sons"), 29_900), None);
+    assert_eq!(scope(&exact("A OR B Traders"), 29_900), None);
+    assert_eq!(
+        scope(&exact("Andheri Traders"), 29_900).as_deref(),
+        Some("Andheri Traders")
+    );
+}

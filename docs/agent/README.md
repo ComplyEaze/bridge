@@ -4010,8 +4010,19 @@ the detail is not available for that party; its vouchers can still be read with 
 allocates to (opening bills) are not counted by it, and a party with very many of them can meet
 the response size refusal (`agent_response_too_large`) instead. A reference neither the vouchers
 nor Tally's report know for the party is refused (`bill_reference_not_found`). The detail ignores
-`direction`, `top`, `offset` and `limit`; `window.company_vouchers_read` counts the company's
-vouchers in the window, not the party's. A named bill's window never starts before the books.
+`direction`, `top`, `offset` and `limit`. On a book whose voucher mark (its highest voucher
+AlterID) is above 42, a party is counted and read by its ledger (#1356) when its vouchers carry
+the ledger's name as stored, the name holds only ASCII letters, digits and single spaces and no
+word a TDL formula reads as an operator (`and`, `or`, `not` and a few more), and no other ledger
+shares it but for case or spaces: a ledger-scoped census in AlterID spans, then, when its
+vouchers fit one request (42 at the planner's figure), one ledger-scoped read admitted against
+the census voucher by voucher (protocol reference section 11c.6), and
+`window.party_vouchers_read` counts the party's vouchers. In every other case, and when the
+census counts nothing or the read is not admitted, the company's window is read as before and
+`window.company_vouchers_read` counts the company's vouchers in the window, not the party's; a
+refusal of that read after the party was counted also carries `party_vouchers_at_least`. The
+census costs one request (sent twice, as every read is) per 8,192 of the book's AlterIDs, and
+when the party does not fit it is spent before the window's own census. A named bill's window never starts before the books.
 The company's two change marks are read before the statement of open bills and again after the
 voucher window, and a detail whose marks moved between them is refused as
 `voucher_window_changed_during_read` (a voucher entered or saved, a ledger renamed, or a report

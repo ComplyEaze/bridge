@@ -177,10 +177,9 @@ pub(super) fn render_agent_voucher_census(
 /// 2026): a day of one ledger as 82 vouchers, equal to the book-wide read of that day; a year of
 /// another ledger as 248 vouchers over four spans, equal to its unspanned ledger-scoped read; an
 /// empty span an empty collection (protocol reference section 11c.6, lab
-/// `lab/485-ledger-census-spans-answers`). A CANDIDATE: no tool sends it until the movement read
-/// plans its window from it. Not observed: a name that matches no ledger, and whether a voucher
-/// with two lines on the ledger is listed twice.
-#[cfg_attr(not(test), allow(dead_code))]
+/// `lab/485-ledger-census-spans-answers`). The `outstandings` party detail counts a party with it
+/// on a book too large to read in one request (#1356). Not observed: a name that matches no ledger,
+/// and whether a voucher with two lines on the ledger is listed twice.
 pub(super) fn render_agent_ledger_census(
     company: &str,
     ledger: &LedgerScopeName,
@@ -258,9 +257,10 @@ fn render_windowed_vouchers(
 
 /// The field list of a ledger-scoped voucher read: a closed set, never text from a caller.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) enum LedgerVoucherFields {
-    /// The movement read's: the three entry fields movement uses ([`AGENT_MOVEMENT_FETCH`]).
+    /// The movement read's: the three entry fields movement uses ([`AGENT_MOVEMENT_FETCH`]). Sent
+    /// by no tool yet.
+    #[cfg_attr(not(test), allow(dead_code))]
     Movement,
     /// The window read's list as the lab sent it ledger-scoped, before `REFERENCEDATE` was added to
     /// the window read (#1363): every entry field and the invoice fields, ending `PARTYGSTIN`
@@ -269,7 +269,6 @@ pub(super) enum LedgerVoucherFields {
 }
 
 impl LedgerVoucherFields {
-    #[cfg_attr(not(test), allow(dead_code))]
     fn fetch(self) -> &'static str {
         match self {
             Self::Movement => AGENT_MOVEMENT_FETCH,
@@ -285,8 +284,8 @@ impl LedgerVoucherFields {
 /// census rows of that month, whose lines sum to the committed one-month Trial Balance's debit for
 /// the ledger; [`LedgerVoucherFields::Window`] differs from it in the `FETCH` element alone and
 /// was read by the lab for the bill trail (#1356). A spanned form has not been observed and is not
-/// offered. A CANDIDATE: no tool sends it yet.
-#[cfg_attr(not(test), allow(dead_code))]
+/// offered. The `outstandings` party detail sends it with [`LedgerVoucherFields::Window`] on a
+/// book too large to read in one request, admitted against the ledger's census (#1356).
 pub(super) fn render_agent_ledger_vouchers(
     company: &str,
     ledger: &LedgerScopeName,
@@ -690,6 +689,28 @@ pub(super) fn voucher_census_read(
     span: Option<AlterIdSpan>,
 ) -> Result<ReadRequest, String> {
     render_agent_voucher_census(company, from, to, span).map(ReadRequest)
+}
+
+pub(super) fn ledger_census_read(
+    company: &str,
+    ledger: &LedgerScopeName,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: AlterIdSpan,
+) -> Result<ReadRequest, String> {
+    render_agent_ledger_census(company, ledger, from, to, span).map(ReadRequest)
+}
+
+/// The ledger-scoped read with the window read's fields, the one the party
+/// detail sends (#1356).
+pub(super) fn ledger_vouchers_read(
+    company: &str,
+    ledger: &LedgerScopeName,
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Result<ReadRequest, String> {
+    render_agent_ledger_vouchers(company, ledger, LedgerVoucherFields::Window, from, to)
+        .map(ReadRequest)
 }
 
 #[cfg(feature = "lab-writes")]

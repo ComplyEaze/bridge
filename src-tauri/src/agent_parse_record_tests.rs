@@ -47,6 +47,7 @@ const GST_LEDGER_LAB: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const BANKREF_LAB: &str = "8fb5f4db-478d-4084-b1e5-5b8f5d3fef60";
 const CORPUS_DENSE: &str = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
+const BILLTRAIL_LAB: &str = "9ab5002c-e910-4242-83e4-a27cc490600b";
 const OUTSTANDINGS_LAB: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const STOCK_LAB: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 /// The empty book of the marks capture in `COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md`.
@@ -307,6 +308,33 @@ fn rows() -> Vec<Row> {
         "ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml",
         "parse_agent_rows(CORPUS_DENSE)",
         |_, t| agent_rows(t, CORPUS_DENSE)
+    ));
+    // The party detail's ledger-scoped read (#1356): the last two census spans of the dense day,
+    // the read of that day, and the read of a party's year with the book-wide read it equals.
+    rows.push(row!(
+        "ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.answer.utf16le.xml",
+        "parse_voucher_census(20250515, span 16384 to 24576)",
+        |_, t| census_span(t, ("20250515", "20250515"), (16384, 24576))
+    ));
+    rows.push(row!(
+        "ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.answer.utf16le.xml",
+        "parse_voucher_census(20250515, span 24576 to 29900)",
+        |_, t| census_span(t, ("20250515", "20250515"), (24576, 29900))
+    ));
+    rows.push(row!(
+        "ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.answer.utf16le.xml",
+        "parse_agent_rows(CORPUS_DENSE)",
+        |_, t| agent_rows(t, CORPUS_DENSE)
+    ));
+    rows.push(row!(
+        "ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.answer.utf16le.xml",
+        "parse_agent_rows(BILLTRAIL_LAB)",
+        |_, t| agent_rows(t, BILLTRAIL_LAB)
+    ));
+    rows.push(row!(
+        "ledger-filtered-allocations/billtrail-window-fy.answer.utf16le.xml",
+        "parse_agent_rows(BILLTRAIL_LAB)",
+        |_, t| agent_rows(t, BILLTRAIL_LAB)
     ));
     rows.push(row!(
         "agent/d3-batch-voucher-census.utf16le.xml",
@@ -712,7 +740,9 @@ fn render(row: &Row) -> String {
     )
 }
 
-/// What is committed for a rendering: the rendering itself, or its SHA-256 and length.
+/// What is committed for a rendering: the rendering itself, or its header lines (the fixture, the
+/// parser and the source, which the protocol crate's record check reads) with the SHA-256 and
+/// length of the whole rendering.
 fn committed_form(rendering: &str) -> (&'static str, String) {
     if rendering.len() <= FULL_RECORD_CAP {
         ("txt", rendering.to_string())
@@ -721,9 +751,15 @@ fn committed_form(rendering: &str) -> (&'static str, String) {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
+        let header: String = rendering
+            .lines()
+            .take(3)
+            .take_while(|line| line.starts_with("# "))
+            .map(|line| format!("{line}\n"))
+            .collect();
         (
             "sha256",
-            format!("sha256 {digest}\nlength {}\n", rendering.len()),
+            format!("{header}sha256 {digest}\nlength {}\n", rendering.len()),
         )
     }
 }

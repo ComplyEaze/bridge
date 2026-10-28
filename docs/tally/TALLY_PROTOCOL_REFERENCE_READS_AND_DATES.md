@@ -711,11 +711,14 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
 - **What the tool returns.** An entry with allocations gains `cost_centre_allocations`, a list of
   `{category, cost_centre, amount}` as sent (names trimmed, the amount as sent); an entry without them has no such key. An allocation list that cannot be read
   whole (a centre with no name or no amount, an amount that is not a decimal, a centre named twice in one category, a
-  category without a name, a field sent twice, or an empty container, which is reported as present and not observed, never as
-  no allocations) is not shown in part: the entry carries `cost_centre_allocations_unreadable`
+  category named twice in one entry, a category without a name or without centres, a field sent twice, text that cannot
+  be decoded, an allocation list at a depth the reader does not take, or an empty container, which is reported as
+  present and not observed, never as no allocations) is not shown in part: the entry carries `cost_centre_allocations_unreadable`
   with a reason and the rest of the response is unchanged. An empty amount is never read as zero.
 - **Not shown.** Several categories on one entry; a centre with a parent; quantities; a foreign-currency amount; an
-  allocation on a book whose Cost Centres setting is Yes; a read of a different voucher type; another release or book;
+  allocation on a book whose Cost Centres setting is Yes; an item invoice (its sales or purchase ledger's entry carries
+  the goods line, §12a.13, and no captured item invoice carries allocations; one beside the goods line is read, one inside it
+  is flagged `cost_centre_allocation_shape_unrecognised`, by test only); a read of a different voucher type; another release or book;
   that the allocations of an entry always add up to its amount (the tool does not check this).
 
 ### 8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-12; TallyPrime 7.1, one synthetic book**

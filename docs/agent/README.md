@@ -817,11 +817,12 @@ stock items on that list, each as `item`, `quantity`, `rate` and `value`, in Tal
 `{"state": "read", "amount": ..., "unit": ...}` with the sign Tally sent, or `{"state": "empty"}` or
 `{"state": "unread"}` (text that is not `<number> <unit>`); `rate` and `value` are each
 `{"state": "present", "value": ...}` or `{"state": "empty"}` exactly as Tally printed them, and an empty one
-is not zero. A `value` keeps the sign Tally's export carries, as in the Stock Summary and the trial
-balance: a debit is negative and a credit is positive. The closing value of an item short of stock is a
-credit, so it reads positive where Tally's screen shows it as `(-)`: on the one book measured, the item at
--3 Nos and a rate of 120.00 has the value `360.00` and its screen shows `(-)360.00` (TallyPrime 7.1, again on
-7.2; protocol reference §12a.13). The list is Tally's own and no verdict is added: being listed does not make an item negative
+is not zero. A `value`, when present, keeps the sign Tally's export carries, as in the Stock Summary and
+the trial balance: a debit is negative and a credit is positive, and the screen shows a credit as `(-)`
+and a debit unsigned. On the one book measured, the item at -3 Nos and a rate of 120.00 was exported
+with the value `360.00` (a credit) on TallyPrime 7.1 and on 7.2, and the 7.2 screen showed `(-)360.00`
+(the screen was not read on 7.1); the other two short items captured had no value, and the sign of a
+value can change as an item trades (protocol reference §12a.13 and §12a.16). The list is Tally's own and no verdict is added: being listed does not make an item negative
 (on one book Tally also listed items of positive quantity whose closing value was a credit), so read each
 quantity. The rule by which Tally lists an item is not established and is not derived here.
 

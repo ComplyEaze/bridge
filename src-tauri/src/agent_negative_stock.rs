@@ -26,10 +26,12 @@ fn quantity_json(quantity: &NativeQuantityRead) -> Value {
     }
 }
 
-/// The sign a listed value carries (#2051). Measured on one synthetic book on TallyPrime 7.1 and
-/// again on 7.2: the item at -3 Nos and a rate of 120.00 is exported with the value 360.00 while
-/// Tally's screen shows (-)360.00. Protocol reference section 12a.13 records the wire rule.
-const NEGATIVE_STOCK_VALUE_SIGN: &str = "A value keeps the sign Tally's export carries, as in the Stock Summary and the trial balance: a debit is negative and a credit is positive. The closing value of an item short of stock is a credit, so it reads positive where Tally's screen shows it as (-): on the one book measured, the item at -3 Nos and a rate of 120.00 has the value 360.00 and its screen shows (-)360.00 (TallyPrime 7.1, again on 7.2; protocol reference section 12a.13)";
+/// The sign a listed value carries (#2051). Measured on one synthetic book: the item at -3 Nos and
+/// a rate of 120.00 is exported with the value 360.00 on TallyPrime 7.1 and on 7.2, and Tally's
+/// Negative Stock screen showed (-)360.00 on 7.2 (the screen was not read on 7.1). Of the three
+/// short rows captured, this is the only one that carries a value. Protocol reference sections
+/// 12a.13 (the wire rule, and a sign that flips as an item trades) and 12a.16 (this measurement).
+const NEGATIVE_STOCK_VALUE_SIGN: &str = "When a value is present it keeps the sign Tally's export carries, as in the Stock Summary and the trial balance: a debit is negative and a credit is positive, and the screen shows a credit as (-) and a debit unsigned. On the one book measured, the item at -3 Nos and a rate of 120.00 was exported with the value 360.00, a credit, on TallyPrime 7.1 and on 7.2, and the 7.2 screen showed (-)360.00; the other two short items captured had no value. The sign of a value can change as an item trades (protocol reference sections 12a.13 and 12a.16)";
 
 impl Server {
     pub(super) async fn negative_stock(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {

@@ -198,12 +198,17 @@ async fn the_sign_a_value_carries_is_stated_beside_the_captured_positive_value()
     let sentence = limitations
         .iter()
         .filter_map(Value::as_str)
-        .find(|line| line.starts_with("A value keeps the sign Tally's export carries"))
+        .find(|line| {
+            line.starts_with("When a value is present it keeps the sign Tally's export carries")
+        })
         .expect("the sign is stated in the limitations");
     for part in [
+        "When a value is present",
         "a debit is negative and a credit is positive",
         "(-)360.00",
-        "section 12a.13",
+        "on TallyPrime 7.1 and on 7.2, and the 7.2 screen showed",
+        "the other two short items captured had no value",
+        "sections 12a.13 and 12a.16",
     ] {
         assert!(sentence.contains(part), "{part}: {sentence}");
     }
@@ -214,8 +219,9 @@ async fn the_sign_a_value_carries_is_stated_beside_the_captured_positive_value()
         .and_then(|tool| tool["description"].as_str())
         .expect("negative_stock is registered");
     assert!(
-        description
-            .contains("a value keeps the export's sign (a debit negative, a credit positive)"),
+        description.contains(
+            "a present value keeps the export's sign (a debit negative, a credit positive; the screen shows a credit as (-))"
+        ),
         "{description}"
     );
 }

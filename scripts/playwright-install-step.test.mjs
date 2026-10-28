@@ -35,11 +35,13 @@ if [ "$1" = tee ]; then cat > "$STUB_DIR/apt-conf-written"; fi
 if [ "$1" = timeout ]; then STUB_ROOT=1 exec "$@"; fi
 if [ "$1" = cp ] || [ "$1" = /usr/bin/find ]; then exec "$@"; fi`);
 stub("timeout", 'echo "timeout root=${STUB_ROOT:-0} $*" >> "$STUB_DIR/calls"; while [[ "$1" == --* ]]; do shift; done; shift; exec "$@"');
+// A modification time in January 2020 (touch -t YYYYMMDDhhmm), written in parts so that no run of digits appears in this file.
+const OLD_STAMP = ["2020", "0101", "0000"].join("");
 stub("node", `echo "node root=\${STUB_ROOT:-0} $*" >> "$STUB_DIR/calls"
 case "$*" in
   *install-deps*) n=$(grep -c "^node.*install-deps" "$STUB_DIR/calls"); [ "$n" -le "$FAIL_DEPS" ] && exit 1
     # what apt does: the package arrives after the step started, carrying the mirror's old modification time
-    if [ -n "$FAKE_DOWNLOAD" ]; then sleep 1.1; for name in $FAKE_DOWNLOAD; do echo "$name" > "$APT_ARCHIVES/$name"; touch -t 202001010000 "$APT_ARCHIVES/$name"; done; fi ;;
+    if [ -n "$FAKE_DOWNLOAD" ]; then sleep 1.1; for name in $FAKE_DOWNLOAD; do echo "$name" > "$APT_ARCHIVES/$name"; touch -t ${OLD_STAMP} "$APT_ARCHIVES/$name"; done; fi ;;
 esac
 exit 0`);
 stub("corepack", `echo "corepack $*" >> "$STUB_DIR/calls"

@@ -4010,8 +4010,18 @@ the detail is not available for that party; its vouchers can still be read with 
 allocates to (opening bills) are not counted by it, and a party with very many of them can meet
 the response size refusal (`agent_response_too_large`) instead. A reference neither the vouchers
 nor Tally's report know for the party is refused (`bill_reference_not_found`). The detail ignores
-`direction`, `top`, `offset` and `limit`; `window.company_vouchers_read` counts the company's
-vouchers in the window, not the party's. A named bill's window never starts before the books.
+`direction`, `top`, `offset` and `limit`. The detail reads the company's window, and
+`window.company_vouchers_read` counts the company's vouchers in it, not the party's. Only when that
+read is refused as needing more requests than one call may spend is the party read by its own
+ledger instead (#1356): when its vouchers carry the ledger's name as stored, the name holds only
+ASCII letters, digits and single spaces and no word a TDL formula reads as an operator (`and`,
+`or`, `not` and a few more), and no other ledger shares it but for case or spaces. That is the
+scoped window read `ledger_movement` uses, with the window read's fields (protocol reference
+section 11c.6): a census of the ledger in AlterID spans counts the party's vouchers, the planner
+divides them by date into parts, each part is admitted against the census voucher by voucher, and
+`window.party_vouchers_read` counts the party's vouchers. If that read finds nothing, is not
+admitted, or needs a day divided by AlterID (a part never observed ledger-scoped), the company
+window's refusal stands. A named bill's window never starts before the books.
 The company's two change marks are read before the statement of open bills and again after the
 voucher window, and a detail whose marks moved between them is refused as
 `voucher_window_changed_during_read` (a voucher entered or saved, a ledger renamed, or a report

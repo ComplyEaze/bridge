@@ -2110,3 +2110,96 @@ fn naming_a_reference_can_turn_an_ambiguous_bill_into_a_tied_one() {
     let named = bill_trails("P", Some("R"), &read, &natives).unwrap();
     assert_eq!(named[0].state(), "tied");
 }
+
+/// The ledger-scoped read a party detail sends on a larger book (#1356) gives the party exactly the
+/// allocations the book-wide window read gives: on BRIDGE BILLTRAIL LAB, whose party Lab Party P1
+/// holds three bank-ledger Receipts that a filter on the voucher's party ledger loses, the same
+/// lab run read the year both ways (fixtures/ledger-filtered-allocations/PROVENANCE.md).
+#[test]
+fn the_ledger_read_gives_the_party_the_allocations_the_window_read_gives() {
+    const BILLTRAIL_GUID: &str = "9ab5002c-e910-4242-83e4-a27cc490600b";
+    let rows = |bytes: &[u8]| {
+        let text = String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        parse_agent_rows(&text, BILLTRAIL_GUID).unwrap()
+    };
+    let window = rows(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-window-fy.answer.utf16le.xml"
+    ));
+    let ledger = rows(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.answer.utf16le.xml"
+    ));
+    assert_eq!((window.len(), ledger.len()), (7, 7));
+    let from_window = entries_for_party(&window, "Lab Party P1").unwrap();
+    let from_ledger = entries_for_party(&ledger, "Lab Party P1").unwrap();
+    assert_eq!(from_ledger.len(), 9);
+    assert_eq!(from_ledger, from_window);
+    // Every voucher of the ledger-scoped read carries a line on the party's ledger; one that did
+    // not would not be the party's, and is refused.
+    use super::bill_trail::every_row_has_a_line_for;
+    assert_eq!(every_row_has_a_line_for(&ledger, "Lab Party P1"), Ok(()));
+    let mut stray = ledger.clone();
+    stray[0]["amounts"] = json!([]);
+    assert_eq!(
+        every_row_has_a_line_for(&stray, "Lab Party P1"),
+        Err(TrailRefusal("party_voucher_without_party_line"))
+    );
+}
+
+/// A party detail reads by its ledger only after the book's window was refused as needing more
+/// requests than one call may spend, under a name a ledger-scoped request admits, matched to one
+/// ledger alone (#1356). Every other refusal stands, and every window the book's read answers is
+/// answered by it.
+#[test]
+fn a_detail_reads_by_its_ledger_only_after_the_books_window_needed_too_many_reads() {
+    use super::bill_trail::ledger_scope_after;
+    let too_many = ToolFailure::from("voucher_window_too_many_reads".to_string());
+    let exact = |name: &str| LedgerMatch::Exact {
+        name: name.to_string(),
+        similar: Vec::new(),
+    };
+    let scope = |refusal: &ToolFailure, resolved: &LedgerMatch| {
+        ledger_scope_after(refusal, resolved, resolved.name()).map(|name| name.as_str().to_string())
+    };
+    assert_eq!(
+        scope(&too_many, &exact("DN Party 001")).as_deref(),
+        Some("DN Party 001")
+    );
+    // Any other refusal of the book's window stands.
+    for code in [
+        "voucher_window_book_too_large",
+        "voucher_window_volume_unestimated",
+        "voucher_window_changed_during_read",
+        "trail_window_too_large",
+    ] {
+        assert_eq!(
+            scope(&ToolFailure::from(code.to_string()), &exact("DN Party 001")),
+            None
+        );
+    }
+    let close = LedgerMatch::CaseOrSpacing {
+        name: "DN Party 001".to_string(),
+    };
+    assert_eq!(scope(&too_many, &close).as_deref(), Some("DN Party 001"));
+    // A name outside the admitted alphabet, or one another ledger shares but for case or spaces.
+    assert_eq!(scope(&too_many, &exact("M/s. Party & Co")), None);
+    let twins = LedgerMatch::Exact {
+        name: "DN Party 001".to_string(),
+        similar: vec!["DN PARTY 001".to_string()],
+    };
+    assert_eq!(scope(&too_many, &twins), None);
+    // Vouchers that carry the ledger in another spelling than its stored name.
+    assert_eq!(ledger_scope_after(&too_many, &close, "DN PARTY 001"), None);
+    // A name holding a word a TDL formula reads as an operator.
+    assert_eq!(scope(&too_many, &exact("Sharma and Sons")), None);
+    assert_eq!(scope(&too_many, &exact("A OR B Traders")), None);
+    assert_eq!(
+        scope(&too_many, &exact("Andheri Traders")).as_deref(),
+        Some("Andheri Traders")
+    );
+}

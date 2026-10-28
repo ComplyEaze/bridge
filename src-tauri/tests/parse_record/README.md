@@ -27,7 +27,8 @@ test names (the GUID its capture carries), and for a voucher census the one day 
 for (the day its provenance gives, or its paired request's `SVFROMDATE`/`SVTODATE`).
 
 **Full and hashed records.** A rendering up to 128 KB is committed in full (`.txt`). A longer one is
-committed as its SHA-256 and its length (`.sha256`).
+committed as its three header lines (fixture, parser, source) followed by the SHA-256 and the
+length of the whole rendering (`.sha256`).
 
 **Checking.** `cargo test -p bridge --lib parse_record_tests` compares every rendering with its
 record. On a mismatch it prints the fixture, the parser and the first differing line, and no more.

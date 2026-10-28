@@ -7960,21 +7960,20 @@ mod ledger_scoped {
     }
 
     #[test]
-    fn only_the_movement_read_without_a_span_is_offered_ledger_scoped() {
+    fn only_the_movement_and_window_reads_without_a_span_are_offered_ledger_scoped() {
         let party = ledger("DN Party 001");
         let (from, to) = (tally_date("20250501"), tally_date("20250531"));
         for shape in [
             VoucherReadShape::ImportVerification,
-            VoucherReadShape::EntryWildcard,
             VoucherReadShape::ClassEntryWildcard,
         ] {
             assert_eq!(
-                ledger_movement_part_read(shape, COMPANY, &party, &from, &to, None).unwrap_err(),
+                ledger_part_read(shape, COMPANY, &party, &from, &to, None).unwrap_err(),
                 LEDGER_SCOPE_NEEDS_DAY_SPLIT
             );
         }
         assert_eq!(
-            ledger_movement_part_read(
+            ledger_part_read(
                 VoucherReadShape::Movement,
                 COMPANY,
                 &party,
@@ -7986,7 +7985,7 @@ mod ledger_scoped {
             LEDGER_SCOPE_NEEDS_DAY_SPLIT
         );
         assert_eq!(
-            ledger_movement_part_read(
+            ledger_part_read(
                 VoucherReadShape::Movement,
                 COMPANY,
                 &party,
@@ -7997,6 +7996,316 @@ mod ledger_scoped {
             .unwrap()
             .as_str(),
             sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml"))
+        );
+    }
+}
+
+// The ledger-scoped read of a party detail (#1356): a ledger census in AlterID spans, then one
+// ledger-scoped read admitted against it. Every request is checked against the one the lab sent,
+// byte for byte, and every answer is what Tally returned to it: the census answers come from the
+// #485 run on BRIDGE CORPUS DENSE and the read from the #1356 run, whose marks answers for the
+// company are byte-equal (fixtures/ledger-filtered-allocations/PROVENANCE.md).
+mod ledger_window {
+    use super::*;
+    use bridge_tally_protocol::ledger_scope::LedgerScopeName;
+    use std::sync::Mutex;
+
+    const DENSE: &str = "BRIDGE CORPUS DENSE";
+    const DENSE_GUID: &str = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
+    /// The company's voucher mark in both runs.
+    const DENSE_MARK: u64 = 29_900;
+
+    fn utf16(bytes: &[u8]) -> String {
+        assert_eq!(bytes.len() % 2, 0, "a UTF-16 capture has an even length");
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+        .trim_start_matches('\u{feff}')
+        .to_string()
+    }
+
+    macro_rules! scoped {
+        ($name:literal) => {
+            include_bytes!(concat!(
+                "../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/",
+                $name,
+                ".utf16le.xml"
+            ))
+            .as_slice()
+        };
+    }
+
+    macro_rules! filtered {
+        ($name:literal) => {
+            include_bytes!(concat!(
+                "../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/",
+                $name,
+                ".utf16le.xml"
+            ))
+            .as_slice()
+        };
+    }
+
+    type Exchange = (&'static [u8], &'static [u8]);
+
+    /// Serves the lab's answers in order, each only to the request the lab sent for it.
+    struct Captured(Mutex<Vec<Exchange>>);
+
+    impl WindowReader for Captured {
+        fn evidence_copies(&self) -> u64 {
+            1
+        }
+
+        async fn read(
+            &self,
+            _identity: &VerifiedCompanyIdentity,
+            request: ReadRequest,
+            _kind: WindowReadKind,
+        ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
+            let (sent, answer) = {
+                let mut exchanges = self.0.lock().unwrap();
+                assert!(
+                    !exchanges.is_empty(),
+                    "an extra request: {}",
+                    request.as_str()
+                );
+                exchanges.remove(0)
+            };
+            assert_eq!(request.as_str(), utf16(sent), "the request the lab sent");
+            Ok((
+                utf16(answer),
+                crate::agent::agent_import::local_evidence("captured"),
+                DateBoundaryProfile::ModeAgnostic,
+            ))
+        }
+    }
+
+    /// The census of `DN Sales` on 15 May 2025 in its four spans, then its ledger-scoped read.
+    fn dense_day() -> Vec<Exchange> {
+        vec![
+            (
+                scoped!("census-dn-sales-day-span1.request"),
+                scoped!("census-dn-sales-day-span1.answer"),
+            ),
+            (
+                scoped!("census-dn-sales-day-span2.request"),
+                scoped!("census-dn-sales-day-span2.answer"),
+            ),
+            (
+                filtered!("dense-census-dn-sales-20250515-span3.request"),
+                filtered!("dense-census-dn-sales-20250515-span3.answer"),
+            ),
+            (
+                filtered!("dense-census-dn-sales-20250515-span4.request"),
+                filtered!("dense-census-dn-sales-20250515-span4.answer"),
+            ),
+            (
+                filtered!("dense-ledger-dn-sales-20250515-entries.request"),
+                filtered!("dense-ledger-dn-sales-20250515-entries.answer"),
+            ),
+        ]
+    }
+
+    /// The planner's limits, with a per-voucher figure under which the day's 82 vouchers fit one
+    /// read (the default fits 42). The census capacity, which comes from the budget, is unchanged.
+    fn eighty_two_a_read() -> WindowReadLimits {
+        WindowReadLimits {
+            default_bytes_per_voucher: WINDOW_READ_BUDGET_BYTES / 82,
+            ..WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard)
+        }
+    }
+
+    async fn read_day(
+        exchanges: Vec<Exchange>,
+        limits: WindowReadLimits,
+    ) -> (Result<WindowReadOutcome<Value>, ToolFailure>, usize) {
+        let reader = Captured(Mutex::new(exchanges));
+        let day = tally_date("20250515");
+        let sales = LedgerScopeName::new("DN Sales").unwrap();
+        let read = read_scoped_voucher_window_with(
+            &reader,
+            &VerifiedCompanyIdentity::test_fixture(DENSE, DENSE_GUID),
+            WindowScope::Ledger(&sales),
+            DENSE,
+            &day,
+            &day,
+            VoucherReadShape::EntryWildcard,
+            WindowPlanSource::Estimate {
+                known_marks: Some(CompanyMarks::new(Some(DENSE_MARK), 328)),
+            },
+            limits,
+            |xml| parse_agent_rows(xml, DENSE_GUID),
+        )
+        .await;
+        let left = reader.0.lock().unwrap().len();
+        (read, left)
+    }
+
+    #[tokio::test]
+    async fn the_dense_day_is_counted_in_four_spans_then_read_once_and_admitted() {
+        assert_eq!(
+            WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity(),
+            8192,
+            "the spans the lab sent are the production ones"
+        );
+        let (read, left) = read_day(dense_day(), eighty_two_a_read()).await;
+        assert_eq!(left, 0, "every captured request was sent, and no other");
+        let rows = read.unwrap().rows;
+        let parse = |value: &str| NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
+        let census = parse_voucher_census(
+            &utf16(scoped!("census-dn-sales-day-span1.answer")),
+            (parse("20250515"), parse("20250515")),
+            Some(AlterIdSpan {
+                after: 0,
+                through: 8192,
+            }),
+        )
+        .unwrap();
+        assert_eq!(rows.len(), 82);
+        assert_eq!(
+            rows.iter()
+                .map(|row| row["guid"].as_str().unwrap())
+                .collect::<std::collections::BTreeSet<_>>(),
+            census
+                .iter()
+                .map(|row| row.guid.as_str())
+                .collect::<std::collections::BTreeSet<_>>()
+        );
+    }
+
+    /// Under the planner's own figure the day's 82 vouchers are more than one read carries (42),
+    /// and one day can be divided only by AlterID, a part never observed ledger-scoped: the plan is
+    /// refused after the census, before any data part is sent.
+    #[tokio::test]
+    async fn under_the_planners_figure_the_day_needs_a_part_never_observed_and_none_is_sent() {
+        let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+        let (read, left) = read_day(dense_day(), limits).await;
+        assert_eq!(read.err().unwrap().code, LEDGER_SCOPE_NEEDS_DAY_SPLIT);
+        assert_eq!(left, 1, "the four census spans were sent, and no read");
+    }
+
+    #[tokio::test]
+    async fn a_census_answer_outside_its_span_is_refused_before_any_read() {
+        let mut exchanges = dense_day();
+        exchanges[1].1 = scoped!("census-dn-sales-day-span1.answer");
+        let (read, left) = read_day(exchanges, eighty_two_a_read()).await;
+        let failure = read.err().unwrap();
+        assert_eq!(failure.code, VOLUME_UNESTIMATED);
+        assert_eq!(failure.cause, Some("census_window_not_honoured"));
+        assert_eq!(left, 3);
+    }
+
+    /// A read is held to its window's dates before its census: another ledger's month, from the same
+    /// book and run as the census, none of whose vouchers is on that day, is not admitted. (A read
+    /// on the right day with other vouchers meets the census comparison of `admit_part`, whose own
+    /// tests show it; no captured answer of that day other than the ledger's own exists.)
+    #[tokio::test]
+    async fn a_read_whose_vouchers_lie_outside_the_window_is_not_admitted() {
+        let mut exchanges = dense_day();
+        exchanges[4].1 = scoped!("movement-dn-party-month.answer");
+        let (read, left) = read_day(exchanges, eighty_two_a_read()).await;
+        let failure = read.err().unwrap();
+        assert_eq!(failure.code, PART_NOT_ADMITTED);
+        assert_eq!(failure.cause, Some(PART_ROW_OUTSIDE_DATES));
+        assert_eq!(left, 0);
+    }
+
+    /// A read on the census's own day that returns vouchers the census did not count is not
+    /// admitted: here every span of the day answered empty and the read returned the day's 82.
+    #[tokio::test]
+    async fn a_read_that_is_not_the_census_vouchers_is_not_admitted() {
+        let mut exchanges = dense_day();
+        exchanges[0].1 = scoped!("census-dn-sales-day-span2.answer");
+        let (read, left) = read_day(exchanges, eighty_two_a_read()).await;
+        let failure = read.err().unwrap();
+        assert_eq!(failure.code, PART_NOT_ADMITTED);
+        assert_eq!(failure.cause, Some(PART_CENSUS_MISMATCH));
+        assert_eq!(left, 0);
+    }
+
+    /// What the party detail does with each result of the scoped read of its ledger (#1356): it
+    /// uses only an admitted read of at least one voucher, each with a line on the party's ledger,
+    /// and reads the book's window as before in every other case but a failure of its own.
+    #[tokio::test]
+    async fn the_detail_uses_only_an_admitted_ledger_read_of_the_partys_vouchers() {
+        use crate::agent::bill_trail::{ledger_outcome, LedgerOutcome};
+        let outcome = |read| ledger_outcome(read, "DN Sales").map(|(outcome, _)| outcome);
+        let (read, _) = read_day(dense_day(), eighty_two_a_read()).await;
+        assert!(matches!(outcome(read), Ok(LedgerOutcome::Use(rows)) if rows.len() == 82));
+        // The same read, taken for a party whose ledger none of its vouchers carries a line on.
+        let (read, _) = read_day(dense_day(), eighty_two_a_read()).await;
+        assert!(matches!(
+            ledger_outcome(read, "DN Party 001").map(|(outcome, _)| outcome),
+            Ok(LedgerOutcome::Window)
+        ));
+        // An empty census: every span of the day answered empty, and the read an empty collection
+        // (the captured empty answer of the same book and run).
+        let mut empty = dense_day();
+        empty[0].1 = scoped!("census-dn-sales-day-span2.answer");
+        empty[4].1 = scoped!("census-dn-sales-day-span2.answer");
+        let (read, left) = read_day(empty, eighty_two_a_read()).await;
+        assert_eq!(left, 0);
+        assert!(matches!(outcome(read), Ok(LedgerOutcome::Window)));
+        // A day that only a part never observed ledger-scoped could divide.
+        let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+        let (read, _) = read_day(dense_day(), limits).await;
+        let (decided, evidence) = ledger_outcome(read, "DN Sales").unwrap();
+        assert!(matches!(decided, LedgerOutcome::Window));
+        assert!(evidence.is_some(), "the census reads made are kept");
+        // A read not admitted against its window.
+        let mut stray = dense_day();
+        stray[4].1 = scoped!("movement-dn-party-month.answer");
+        let (read, _) = read_day(stray, eighty_two_a_read()).await;
+        let (decided, evidence) = ledger_outcome(read, "DN Sales").unwrap();
+        assert!(matches!(decided, LedgerOutcome::Window));
+        assert!(evidence.is_some(), "the reads made are kept");
+        // A census Tally did not answer within its span is the detail's own refusal.
+        let mut wrong = dense_day();
+        wrong[1].1 = scoped!("census-dn-sales-day-span1.answer");
+        let (read, _) = read_day(wrong, eighty_two_a_read()).await;
+        assert_eq!(outcome(read).unwrap_err().code, VOLUME_UNESTIMATED);
+    }
+
+    #[test]
+    fn the_party_detail_read_is_the_request_the_lab_sent_byte_for_byte() {
+        let part = |company: &str, ledger: &str, from: &str, to: &str, span| {
+            ledger_part_read(
+                VoucherReadShape::EntryWildcard,
+                company,
+                &LedgerScopeName::new(ledger).unwrap(),
+                &tally_date(from),
+                &tally_date(to),
+                span,
+            )
+            .map(|request| request.as_str().to_string())
+        };
+        assert_eq!(
+            part(
+                "BRIDGE BILLTRAIL LAB",
+                "Lab Party P1",
+                "20250401",
+                "20260331",
+                None
+            )
+            .unwrap(),
+            utf16(filtered!("billtrail-ledger-p1-fy-entries.request"))
+        );
+        assert_eq!(
+            part(DENSE, "DN Sales", "20250515", "20250515", None).unwrap(),
+            utf16(filtered!("dense-ledger-dn-sales-20250515-entries.request"))
+        );
+        // Never sent with an AlterID span, which was not observed ledger-scoped.
+        let span = Some(AlterIdSpan {
+            after: 0,
+            through: 8192,
+        });
+        assert_eq!(
+            part(DENSE, "DN Sales", "20250515", "20250515", span).unwrap_err(),
+            LEDGER_SCOPE_NEEDS_DAY_SPLIT
         );
     }
 }

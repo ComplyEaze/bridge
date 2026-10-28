@@ -2920,6 +2920,26 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
+        "tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/billtrail-window-fy.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/agent/d3-batch-voucher-census.utf16le.xml",
         APP_CENSUS,
     ),

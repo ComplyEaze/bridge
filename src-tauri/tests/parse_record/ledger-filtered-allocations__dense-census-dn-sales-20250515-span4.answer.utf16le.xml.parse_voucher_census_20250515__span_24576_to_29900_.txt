@@ -1,0 +1,4 @@
+# fixture: ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.answer.utf16le.xml
+# parser: parse_voucher_census(20250515, span 24576 to 29900)
+# source: captured
+Ok([])

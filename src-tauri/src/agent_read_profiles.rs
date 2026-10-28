@@ -257,7 +257,6 @@ fn render_windowed_vouchers(
 
 /// The field list of a ledger-scoped voucher read: a closed set, never text from a caller.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) enum LedgerVoucherFields {
     /// The movement read's: the three entry fields movement uses ([`AGENT_MOVEMENT_FETCH`]).
     Movement,
@@ -268,7 +267,6 @@ pub(super) enum LedgerVoucherFields {
 }
 
 impl LedgerVoucherFields {
-    #[cfg_attr(not(test), allow(dead_code))]
     fn fetch(self) -> &'static str {
         match self {
             Self::Movement => AGENT_MOVEMENT_FETCH,
@@ -284,8 +282,8 @@ impl LedgerVoucherFields {
 /// census rows of that month, whose lines sum to the committed one-month Trial Balance's debit for
 /// the ledger; [`LedgerVoucherFields::Window`] differs from it in the `FETCH` element alone and
 /// was read by the lab for the bill trail (#1356). A spanned form has not been observed and is not
-/// offered. `ledger_movement` sends the movement fields (#485); the window fields are for the bill
-/// trail (#1356).
+/// offered. `ledger_movement` sends the movement fields (#485), and the `outstandings` party detail
+/// the window fields (#1356).
 pub(super) fn render_agent_ledger_vouchers(
     company: &str,
     ledger: &LedgerScopeName,
@@ -703,10 +701,11 @@ pub(super) fn ledger_census_read(
     render_agent_ledger_census(company, ledger, from, to, span).map(ReadRequest)
 }
 
-/// The movement read of one part for the vouchers of `ledger` (#485). Only the unspanned movement
-/// read was observed ledger-scoped, so any other shape or a part carrying an AlterID span is
-/// refused here, before it is rendered, with [`LEDGER_SCOPE_NEEDS_DAY_SPLIT`].
-pub(super) fn ledger_movement_part_read(
+/// One part of a read of the vouchers of `ledger`: the movement read (#485), or the window read's
+/// fields for the `outstandings` party detail (#1356). Only these two were observed ledger-scoped,
+/// and only without an AlterID span, so any other shape or a part carrying a span is refused here,
+/// before it is rendered, with [`LEDGER_SCOPE_NEEDS_DAY_SPLIT`].
+pub(super) fn ledger_part_read(
     shape: super::voucher_window::VoucherReadShape,
     company: &str,
     ledger: &LedgerScopeName,
@@ -714,11 +713,13 @@ pub(super) fn ledger_movement_part_read(
     to: &TallyDate,
     span: Option<AlterIdSpan>,
 ) -> Result<ReadRequest, String> {
-    if shape != super::voucher_window::VoucherReadShape::Movement || span.is_some() {
-        return Err(super::voucher_window::LEDGER_SCOPE_NEEDS_DAY_SPLIT.to_string());
-    }
-    render_agent_ledger_vouchers(company, ledger, LedgerVoucherFields::Movement, from, to)
-        .map(ReadRequest)
+    use super::voucher_window::VoucherReadShape;
+    let fields = match (shape, span) {
+        (VoucherReadShape::Movement, None) => LedgerVoucherFields::Movement,
+        (VoucherReadShape::EntryWildcard, None) => LedgerVoucherFields::Window,
+        _ => return Err(super::voucher_window::LEDGER_SCOPE_NEEDS_DAY_SPLIT.to_string()),
+    };
+    render_agent_ledger_vouchers(company, ledger, fields, from, to).map(ReadRequest)
 }
 
 #[cfg(feature = "lab-writes")]

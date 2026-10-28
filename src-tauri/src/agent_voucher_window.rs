@@ -144,8 +144,8 @@ impl VoucherReadShape {
 
 /// Whose vouchers a window read plans and reads (#485): the book's, or those of one ledger.
 ///
-/// A ledger enters only as a [`LedgerScopeName`], which `ledger_movement` builds once, from the
-/// catalogue's own spelling of a ledger it resolved. Everything planned from a ledger-scoped census
+/// A ledger enters only as a [`LedgerScopeName`], which `ledger_movement` and the `outstandings`
+/// party detail (#1356) build once, from the catalogue's own spelling of a ledger they resolved. Everything planned from a ledger-scoped census
 /// counts that ledger's vouchers alone, so such a read is never a count of the book: it earns no
 /// [`BracketedCount`], and its census is not a scan of the book.
 #[derive(Clone, Copy)]
@@ -155,8 +155,9 @@ pub(super) enum WindowScope<'a> {
 }
 
 /// A ledger-scoped plan that needs a part the lab has not observed ledger-scoped (an AlterID span
-/// within one day, or a shape other than the movement read). Refused before any such request is
-/// rendered; `ledger_movement` answers it by reading the book's window instead and says so.
+/// within one day, or a shape other than the movement read and the window read's fields). Refused
+/// before any such request is rendered; `ledger_movement` and the `outstandings` party detail answer
+/// it by reading the book's window instead.
 pub(super) const LEDGER_SCOPE_NEEDS_DAY_SPLIT: &str = "ledger_scope_plan_needs_day_split";
 
 /// An AlterID range `(after, through]`. Within one day it divides a day too
@@ -1988,9 +1989,9 @@ where
                 WindowScope::Book => {
                     voucher_window_part_read(shape, company, &part.from, &part.to, part.span)?
                 }
-                WindowScope::Ledger(ledger) => ledger_movement_part_read(
-                    shape, company, ledger, &part.from, &part.to, part.span,
-                )?,
+                WindowScope::Ledger(ledger) => {
+                    ledger_part_read(shape, company, ledger, &part.from, &part.to, part.span)?
+                }
             };
             match reader
                 .read(identity, request, WindowReadKind::Part(part.clone()))

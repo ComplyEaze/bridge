@@ -79,7 +79,7 @@ impl DesktopJournalError {
             | "import_persisted_file_too_large"
             | "import_review_too_large" => (
                 "This Journal is too large for ComplyEaze Bridge's one-Journal desktop review.",
-                "ComplyEaze Bridge cannot post this Journal from this review, and will not shorten the review to fit.",
+                "ComplyEaze Bridge cannot post this Journal from this review, and will not shorten the review to fit. If its narration is long, build it again with a shorter one; if it has many entries, ask the user whether to split it into smaller Journals.",
             ),
             "import_post_requires_one_journal" => (
                 "ComplyEaze Bridge's desktop review posts one unnumbered Journal, and this saved batch is a different shape.",
@@ -256,7 +256,7 @@ mod tests {
             let refused = DesktopJournalError::refused(code);
             assert_eq!(
                 refused.remediation,
-                "ComplyEaze Bridge cannot post this Journal from this review, and will not shorten the review to fit."
+                "ComplyEaze Bridge cannot post this Journal from this review, and will not shorten the review to fit. If its narration is long, build it again with a shorter one; if it has many entries, ask the user whether to split it into smaller Journals."
             );
         }
     }

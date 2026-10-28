@@ -18,8 +18,8 @@ Both request shapes were captured by curl. The tests replay them byte for byte. 
 ## Build and inputs (hash before the first call and at the end; a different hash = STOP)
 | item | source | bytes | sha256 |
 |---|---|---|---|
-| `bridge-tally.mcpb`, the bundle BUILD-T comes in | #2115 at head 367fbeafa8a7ec1a018c8155544b8498451c636c: CI run 40764944619, artifact 12851150254 `unsigned-bundle-smoke-windows-latest` (expires 4 Nov 2026 20:49 UTC), file `bridge-tally.mcpb`; its sha256 equals the artifact's `mcpb-smoke.json` `archive_sha256` | 15,357,592 | 8ac763b801acb89a833971ed4fcd893a6bb478d0130617528bbdef9f481997ba |
-| `bridge_mcp.exe`, BUILD-T | `bin/x86_64-pc-windows-msvc/bridge_mcp.exe` inside that `.mcpb`; its sha256 equals `mcpb-smoke.json` `binary_sha256`, and its server reports version 0.6.1 | 31,828,992 | fae9cb955aad1b31bf7aadf4c76deb75306d7a0e7743b80fbf85fb8eceaf9d03 |
+| `bridge-tally.mcpb`, the bundle BUILD-T comes in | #2115 at head b85f9f9925192595042661434bfc2c4f64f9afe7: CI run 40769047507, artifact 12851827953 `unsigned-bundle-smoke-windows-latest` (expires 4 Nov 2026 21:14 UTC), file `bridge-tally.mcpb`; its sha256 equals the artifact's `mcpb-smoke.json` `archive_sha256` | 15,357,398 | 380bfe9d213fa1395258d20eb69f85f01de718746665b67b14ff8f0979dd710f |
+| `bridge_mcp.exe`, BUILD-T | `bin/x86_64-pc-windows-msvc/bridge_mcp.exe` inside that `.mcpb`; its sha256 equals `mcpb-smoke.json` `binary_sha256`, and its server reports version 0.6.1 | 31,828,992 | 1561c9f11f9a46e4af1072e5af34b292bf5fb965a0f6b0cf73f0728ec7037ebc |
 
 - Posting stays OFF for this launch: `BRIDGE_AGENT_ENABLE_WRITES` absent or `false`. Record the launch file's key names (not values) and its sha256.
 - Working folder: `C:\bridge-lab\1356b\`. Evidence goes in `C:\bridge-lab\1356b\evidence\`.

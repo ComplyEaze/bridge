@@ -60,11 +60,12 @@ if (
 }
 // Every build for a target other than macOS compiles OpenSSL from source through SQLCipher (#2049). NOTICE states its
 // version, licence and the holders its files name, in one section, so each openssl-src release in the lockfile must be
-// read against that section. Every lockfile entry is checked, not the first. The section is read alone: the Apache phrase
-// and the holder list are looked for inside it, and the holder list must still be there (a floor of ten names; it holds
+// read against that section. Every lockfile entry is checked, not the first. The section is read alone, from its heading
+// to the next separator line or the next heading (a line followed by a Copyright line): the Apache phrase and the holder
+// list are looked for inside it, and the holder list must still be there (a floor of ten names; it holds
 // thirty today).
 const opensslSrcLocked = [...cargoLock.matchAll(/\[\[package\]\]\nname = "openssl-src"\nversion = "([^"]+)"\n/g)].map((match) => match[1]);
-const opensslSection = notice.match(/^OpenSSL\nCopyright 1995-\d{4} The OpenSSL Project Authors\n[\s\S]*?(?=\n-{20,}\n|(?![\s\S]))/m)?.[0] ?? "";
+const opensslSection = notice.match(/^OpenSSL\nCopyright 1995-\d{4} The OpenSSL Project Authors\n[\s\S]*?(?=\n-{20,}\n|\n\S[^\n]*\nCopyright |(?![\s\S]))/m)?.[0] ?? "";
 const opensslHolders = (opensslSection.match(/^ {2}\S/gm) ?? []).length;
 const opensslProse = opensslSection.replace(/\s+/g, " ");
 if (

@@ -1,0 +1,7 @@
+2026-10-28T09:19:36Z exe sha256 6f520338b7f9a25180977c40a5f1d9b03dfa5774df5b5d9a6e65b9c2a050728d ok; launch-env.json sha256 00c82872119240620b8e6afa0736c2d5f81c404fdd6e83422cb63e9740ecbde8; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-28T09:19:36Z launched pid 27620; stderr to server-stderr-20261028T091936Z.log
+2026-10-28T09:19:36Z initialized {'name': 'bridge-tally', 'version': '0.6.0'}
+2026-10-28T09:19:41Z 000-list_companies.json tool=list_companies secs=0.084 isError=False error=None saved_sha256=35c012bbd6d54531ca25d54dc1fd9df9ef800e6b6fe0bde8344c051300731790
+2026-10-28T09:19:41Z 001-tally_status.json tool=tally_status secs=0.094 isError=False error=None saved_sha256=7ac7a1f8caa8b6a64f001d94b142be070a6a493d67efb24defa42fcdf0424419
+2026-10-28T09:19:44Z 002-vouchers-contra-20260401-05.json tool=vouchers secs=2.027 isError=False error=None saved_sha256=57933484d09ff37e9de91ef9f7e4a4baaa505ea7a7009ad979a40976c6eb7ae2
+2026-10-28T09:19:53Z session ended; server pid 27620 exit code 0

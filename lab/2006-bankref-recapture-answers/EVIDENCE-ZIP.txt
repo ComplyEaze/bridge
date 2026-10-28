@@ -1,0 +1,1 @@
+evidence.zip (the files of evidence/): 13064 B, sha256 8244de993abb8d4afc49f8ce598dd6e9a2fbc5d6910d8e257e3f240d21fc3e58; it stays on the lab PC, its contents are in evidence/ here.

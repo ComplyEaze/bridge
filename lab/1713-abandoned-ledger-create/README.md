@@ -49,8 +49,8 @@ T0 is the moment A is queued. Every row's plan prints in five lines with `-DryRu
 | row | compared with | the one thing that differs | decides |
 |---|---|---|---|
 | L0 | | an idle gateway | the control: one Create, its answer, its mark step |
-| L1 | L0 | the gateway is busy with a long read (A, at T0); the create (B, at T0 + 5 s, no limit) is waited out | whether a request sent while the gateway is busy is accepted and queued. GATE: B ends after A, else STOP |
-| L1B | L1 | a ledger read (C) is also sent at T0 + 26 s, when L2 sends it, with L2's observation | the queue-order control: whether B and C are answered in the order they were sent, with A ahead of both. GATE: A < B < C, else STOP before L2 |
+| L1 | L0 | the gateway is busy with a long read (A, at T0); the create (B, at T0 + 5 s, no limit) is waited out | whether a request sent while the gateway is busy is accepted and queued. GATE: B's end after A's first byte, else STOP (B ending during A's stream is a NOTE) |
+| L1B | L1 | a ledger read (C) is also sent at T0 + 26 s, when L2 sends it, with L2's observation | the queue-order control: whether B and C are answered in the order they were sent, with A ahead of both. GATE: A's first byte < B's end < C's end, else STOP before L2 (the gates compare an end against A's first byte, not A's curl end: L1 showed that A's long body streams for seconds after Tally began to answer it) |
 | L2 | L1B | B's limit: 20 s (abandoned) instead of none | THE QUESTION: is the probe ledger present in C's answer, and does anything change afterwards? |
 | L3 | L2 | the probe name only (a repeat, P5) | that L2's answer repeats |
 | L4 | L2 | A is abandoned at 20 s too | the same, when no client waits for A either |
@@ -73,14 +73,14 @@ T0 is the moment A is queued. Every row's plan prints in five lines with `-DryRu
 A void row sends no C. It is recorded and not counted; LEDGERS and MARKS by hand after it record where the probe stands. A netstat taken 10 s after B is sent records B's connection.
 
 **PASS for the rule (decided before the sitting).** In each of L2 to L5 that counts:
-- C is answered after A's answer ends (L2, L3), or after A's and B's curls exited (L4, L5);
+- C is answered after A's first byte (L2, L3; a C that ends during A's stream is recorded as a NOTE and counts), or after A's and B's curls exited (L4, L5);
 - whatever C shows for the probe ledger, present or absent, every observation read after it shows the same.
 
 In L4 and L5 the first condition holds by construction, since C is sent only after both curls have exited, so only the second decides those rows.
 
 **Expected after an abandoned send (UNVERIFIED for a write).** Reference 11b.2 measured 523 s of refused connections after an abandoned read. In L4 and L5, and perhaps in L2 and L3, C may therefore be refused (exit 7) for about nine minutes; those refusals are results, kept in `times.txt`. If no C is answered by D + 10 minutes after the first C, `row.ps1` STOPs, and C9 applies: do nothing more, send nothing by hand, report and wait.
 
-**FAIL:** a probe ledger absent in C appears in a later read (`times.txt`: `FINDING: the probe was absent in C …`), or C is answered before A's answer ends in L2 or L3 (`FINDING: C ended before A's answer ended`). Either way, no read rules out a waiting create, and ComplyEaze Bridge keeps the name held.
+**FAIL:** a probe ledger absent in C appears in a later read (`times.txt`: `FINDING: the probe was absent in C …`), or C is answered before A's first byte in L2 or L3 (`FINDING: C ended before A's first byte`; a C that ends after A's first byte but before A's curl end is recorded as `NOTE: C ended during A's stream`, not a FAIL). Either way, no read rules out a waiting create, and ComplyEaze Bridge keeps the name held.
 
 **Confidence.** L2 and L3 are a repeated pair. L1B, L4 and L5 are single observations, PARTIAL by the reference's convention, until repeated.
 
@@ -117,7 +117,7 @@ Neither script has run on Windows before the sitting: the step "Before the sitti
 - **MARKS:** `python -I read.py marks <answer> <GUID>` (at S1, without the GUID): exactly one COMPANY row. GUID and ALTMSTID must be present. ALTVCHID may be absent: THE COMPANY holds no voucher, and Tally sends no ALTVCHID until one exists (seen at S1 on 28 Oct, which halted the first sitting). No step decides on ALTVCHID.
 - **LEDGERS:** `python -I read.py ledgers <answer> <GUID> "<probe name>"`: every row carries THE COMPANY's GUID and `Lab Bulk Expense` is present once (else FAIL). It prints every `Lab Probe` ledger with its length, and `probe=present` with GUID, parent and ALTERID, or `probe=absent`.
 - **BUSY:** `python -I read.py busy <answer> <GUID> <rows>`: VOUCHER rows counted by structure, each GUID THE COMPANY's. Record the size, CONTENT-LENGTH and `time_total`.
-- **`times.txt`:** the row script's `times.txt` is the record of order; every line it writes is also printed.
+- **`times.txt`:** the row script's `times.txt` is the record of order; every line it writes is also printed. For each send it writes both its curl end (`end <name> at ...`) and its first byte (`first byte <name> at ...`, the send's start plus curl's `time_starttransfer`; the start is taken just before curl.exe is launched, so the first byte reads early, and an end is taken after curl.exe exits, so an end reads late; each error is at most that send's (end - start) - time_total, which `times.txt` gives: 0.128 s for A and 0.089 s for B in L1, against a margin of about 0.58 s). The order gates compare B's or C's end against A's first byte.
 - **Connections:** record the `Connection` header of every answer, from its `.headers.txt`. Every send here is on a new connection. Where Tally keeps connections alive, Bridge's pooled client may reuse one and curl does not, so these rows measure new connections only.
 
 ## Before the sitting
@@ -199,8 +199,9 @@ Neither script has run on Windows before the sitting: the step "Before the sitti
 Each row is started as "Running the scripts" shows, with `-Row <row> -CompanyGuid <S1's GUID> -BusySeconds <D> -BusyBytes <M1's size> -BusyRows <M1's rows>`, and watched to its end. After every row, before the next: a screenshot of Tally's whole window, `GET /status` answers, then LEDGERS and MARKS, by hand.
 
 - **L0** (control). MARKS, then `l0-create.xml`, no limit: EXPECT `import ok CREATED 1`. Screenshot. LEDGERS shows `Lab Probe L0` under `Suspense A/c`. RECORD ALTMSTID's step (reference 9.4i saw +1).
-- **L1.** RECORD from `times.txt`: B's start, end and exit code, and B's read. EXPECT `import ok CREATED 1`, `ORDER ok: A ended before B` and `row done`; LEDGERS then shows `Lab Probe L1`. GATE: anything else = STOP, and L1B is not run.
-- **L1B.** RECORD the order of A's, B's and C's ends and C's probe line. EXPECT `ORDER ok: A < B < C`, `probe=present` in C (the script STOPs if C shows it absent) and in every observation read, and `row done`. GATE: anything else = STOP; L2 is not run, and the run coordinator decides.
+- **L1.** RECORD from `times.txt`: B's start, end and exit code, and B's read. EXPECT `import ok CREATED 1`, `ORDER ok: B ended after A's first byte` and `row done` (the gate compares B's end against A's first byte, `start + time_starttransfer`, both written to `times.txt`; B ending during A's stream is a `NOTE`, not a STOP); LEDGERS then shows `Lab Probe L1`. GATE: anything else = STOP, and L1B is not run.
+  - **Deviation (29 Oct 2026, dated):** L1 ran once and halted on its first gate, `B ended before A ended`, which compared curl ends. From the `curl:` fields of `end A` and `end B` in its `times.txt`, A's first byte (start + `time_starttransfer`) came about 0.58 s before B's end, so B ended during A's stream of 238 MB: Tally answered B while A's body was still arriving. L1 is kept as measured and is not run again; the gates now compare an end against A's first byte (A's first byte marks the end of A's work in Tally, since its CONTENT-LENGTH is sent before the body); `python -I read.py busy` is run by hand on L1's `A.xml` and recorded (the old script halted before that read). The sitting resumes at L1B on the same book.
+- **L1B.** RECORD A's first byte, the ends of A, B and C, and C's probe line. EXPECT `ORDER ok: A first byte < B end < C end`, `probe=present` in C (the script STOPs if C shows it absent) and in every observation read, and `row done`. GATE: anything else = STOP; L2 is not run, and the run coordinator decides.
 - **L2, L3, L4, L5** (L5 only if D is at least 55 s). Each is run to its end, about 35 minutes.
   - RECORD from `times.txt`: A's and B's ends and exit codes, B's classification line, every C attempt with its exit code, which attempt is C, C's end, and A's end.
   - RECORD from C's read and from each `ledgers-plusN` read: the probe ledger, present or absent, with its GUID and ALTERID.

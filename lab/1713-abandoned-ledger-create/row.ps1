@@ -179,14 +179,20 @@ function Finish([string]$name) {
     $fields = "$($result.Printed)" -split ' '
     $r = [pscustomobject]@{ Name = $name; Code = [int]$result.Code; Start = [DateTime]::new([long]$result.Start, 'Utc');
         End = [DateTime]::new([long]$result.End, 'Utc'); Status = ''; Size = -1L; Upload = -1L; Connect = -1.0; Total = -1.0; Length = '';
-        File = (Join-Path $dir "$name.xml") }
+        StartTransfer = -1.0; FirstByte = $null; File = (Join-Path $dir "$name.xml") }
     try {
         $r.Status = $fields[0]
         $r.Size = [long]$fields[1]
         $r.Upload = [long]$fields[2]
         $r.Connect = [double]::Parse($fields[3], $invariant)
+        $r.StartTransfer = [double]::Parse($fields[4], $invariant)
         $r.Total = [double]::Parse($fields[5], $invariant)
     } catch { }
+    # The first byte of the answer: the send's start plus curl's time_starttransfer. The start is taken just before curl.exe is
+    # launched and the end just after it exits, so the first byte reads early and an end reads late, each by at most
+    # (end - start) - time_total (0.128 s for A and 0.089 s for B in L1). The order gates compare an end against the first
+    # byte, never against a curl end, because a long body streams between the first byte and the curl end.
+    if ($r.StartTransfer -gt 0) { $r.FirstByte = $r.Start.AddSeconds($r.StartTransfer) }
     $headers = Join-Path $dir "$name.headers.txt"
     if (Test-Path $headers) {
         $m = @(Select-String -Path $headers -Pattern '^CONTENT-LENGTH:\s*(\d+)')
@@ -194,6 +200,7 @@ function Finish([string]$name) {
     }
     Add-Content -Encoding UTF8 -Path $log -Value ('{0} start {1}' -f (Stamp $r.Start), $name)
     Note ('end {0} at {1} exit={2} curl: {3} content-length={4}' -f $name, (Stamp $r.End), $r.Code, $result.Printed, $r.Length)
+    if ($r.FirstByte) { Note ('first byte {0} at {1} (start + time_starttransfer {2} s)' -f $name, (Stamp $r.FirstByte), $r.StartTransfer.ToString('0.000', $invariant)) }
     if ($late -and -not $script:halting) { Halt 4 "STOP: $name ended only after the D + 10 minute watchdog; nothing more is sent" }
     if ($stopSeen -and -not $script:halting) { Halt 5 'STOP: the STOP file is present; nothing more is sent' }
     $r
@@ -289,8 +296,11 @@ Net 'b-plus10'
 if ($Row -eq 'L1') {
     $bResult = Require 'B' $readBound @('import', '1')
     $aResult = Require 'A' $busyBound $null
-    if ($aResult.End -ge $bResult.End) { Halt 1 'STOP: B ended before A ended; the run coordinator decides on L1B' }
-    Note 'ORDER ok: A ended before B'
+    if (-not $aResult.FirstByte) { Halt 1 'STOP: A''s time_starttransfer is missing or zero, so its first byte is unknown; the run coordinator decides on L1B' }
+    Note ('ORDER A first byte {0}, A ended {1}, B ended {2}' -f (Stamp $aResult.FirstByte), (Stamp $aResult.End), (Stamp $bResult.End))
+    if ($bResult.End -le $aResult.FirstByte) { Halt 1 'STOP: B ended before A''s first byte; the run coordinator decides on L1B' }
+    if ($bResult.End -lt $aResult.End) { Note 'NOTE: B ended during A''s stream (after A''s first byte, before A''s curl end)' }
+    Note 'ORDER ok: B ended after A''s first byte'
     $busy = Read-Check @('busy', $aResult.File, $CompanyGuid, "$BusyRows")
     Note "read A: $($busy.Out)"
     if ($busy.Code -ne 0) { Halt 1 'STOP: A''s answer failed its read' }
@@ -385,17 +395,22 @@ if ($Row -eq 'L1B') {
 if ($Row -in @('L1B', 'L2', 'L3')) {
     $aResult = Require 'A' $busyBound $null
     Net 'a-end'
-    Note ('ORDER A ended {0}, C ended {1}' -f (Stamp $aResult.End), (Stamp $cResult.End))
+    if (-not $aResult.FirstByte) { Halt 1 'STOP: A''s time_starttransfer is missing or zero, so its first byte is unknown; the run coordinator decides' }
+    Note ('ORDER A first byte {0}, A ended {1}, C ended {2}' -f (Stamp $aResult.FirstByte), (Stamp $aResult.End), (Stamp $cResult.End))
 }
 if ($Row -eq 'L1B') {
-    if (-not ($aResult.End -lt $bResult.End -and $bResult.End -lt $cResult.End)) {
-        Halt 1 'STOP: the ends are not ordered A < B < C; L2 is not run; the run coordinator decides'
+    Note ('ORDER B ended {0}' -f (Stamp $bResult.End))
+    if (-not ($aResult.FirstByte -lt $bResult.End -and $bResult.End -lt $cResult.End)) {
+        Halt 1 'STOP: A''s first byte, B''s end and C''s end are not in that order; L2 is not run; the run coordinator decides'
     }
-    Note 'ORDER ok: A < B < C'
+    Note 'ORDER ok: A first byte < B end < C end'
+    if ($bResult.End -lt $aResult.End) { Note 'NOTE: B ended during A''s stream (after A''s first byte, before A''s curl end)' }
     if ($cState -ne 'present') { Halt 1 'STOP: L1B''s C, answered after B, does not show Lab Probe L1B; L2 is not run; the run coordinator decides' }
 }
-if ($Row -in @('L2', 'L3') -and $cResult.End -le $aResult.End) {
-    Note 'FINDING: C ended before A''s answer ended (C did not queue behind A)'
+if ($Row -in @('L2', 'L3') -and $cResult.End -le $aResult.FirstByte) {
+    Note 'FINDING: C ended before A''s first byte (C did not queue behind A)'
+} elseif ($Row -in @('L2', 'L3') -and $cResult.End -lt $aResult.End) {
+    Note 'NOTE: C ended during A''s stream (after A''s first byte, before A''s curl end)'
 }
 
 # Observation is timed from C's answer; nothing is sent while C is unanswered.

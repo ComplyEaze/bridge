@@ -567,6 +567,40 @@ fn a_codes_own_next_step_wins_over_the_unanswered_reasons() {
     );
 }
 
+/// #2071: a refused Trial Balance takes its own step only when no other step applies. Tally
+/// not reachable keeps its step, and the Trial Balance step is the last resort, with or
+/// without a cause.
+#[test]
+fn the_trial_balance_step_is_the_last_resort() {
+    let (server, _directory) = server_at(9, 200_000);
+    let error_of = |unanswered: Option<&'static str>, cause: Option<&'static str>| {
+        let mut failure = ToolFailure::from("trial_balance_read_failed".to_string());
+        failure.unanswered = unanswered.map(Unanswered);
+        failure.cause = cause;
+        let response =
+            server.finish_tool_response("trial_balance", &json!({}), Utc::now(), Err(failure));
+        response.value["structuredContent"]["result"]["error"].clone()
+    };
+    let unreachable = error_of(Some("endpoint_unreachable"), None);
+    assert_eq!(
+        unreachable["remediation"],
+        unanswered_remediation("endpoint_unreachable").unwrap()
+    );
+    for cause in [None, Some("trial_balance_source_identity_missing")] {
+        let answered = error_of(None, cause);
+        assert_eq!(
+            answered["remediation"],
+            TRIAL_BALANCE_READ_FAILED_REMEDIATION
+        );
+    }
+    // A cause with a step of its own keeps it.
+    let identity = error_of(None, Some("company_identity_not_matched"));
+    assert_eq!(
+        identity["remediation"],
+        refusal_remediation("company_identity_not_matched").unwrap()
+    );
+}
+
 /// #697: a send the endpoint's wire gate held back is refused by its own code,
 /// with a retry hint and the step to take, and nothing reaches the port
 /// (nothing listens on it here).

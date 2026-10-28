@@ -1,0 +1,11 @@
+# Captures and BK0; they stay on the lab PC (whole-screen captures show other windows). sha256, bytes, name.
+b8b108949a37703b156137a1c2d807ad5794ddfd37a5cf7a86fbb818f75db942  51139  bk0-before-accept.png
+cf6bff3d91afea12abdcc7a7b313f004db66638069bbe007d2c94c31e9b05467  72614  end-no-company.png
+f922aaf85f7b5cd723305d2c07f75b3b791ca7318a4ebb9c6d86c98c494e1bb4  132587  f1-t0p15-screen-attempt1.png
+4fe4c8327ab40c792dbaceb16a29fc0204757d4348025a513e622b6c7a740e36  148638  f1-t0p15-screen.png
+ffa45ebf7745ad2014eb02bb63133b269627d77c640bbfe61141f788eecba559  127771  f1-t0p5-screen-attempt1.png
+bacba6295a5196427f1ccc278b8b5aee832ea40685c333cd476aaba30e2452ef  123939  f1-t0p5-screen.png
+a1685863e16f8d83c6b008af9fd21040e6957374c8d3e38c9336bd5c3dbff590  137429  f4-after-no-screen.png
+4bbbbbfe893ab27df8a064987e06b97720a137906e756cbb53407662aed4cb9c  44393  p0-gateway-loaded.png
+cf6bff3d91afea12abdcc7a7b313f004db66638069bbe007d2c94c31e9b05467  72614  p0-select-company.png
+14e6888088b3a4fb678fbf7aaf06094e7f71217676fff9f5f9b331866b10c7d4  57180  TDBK1800_100050.001 (BK0)

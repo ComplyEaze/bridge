@@ -5,10 +5,13 @@ use super::*;
 mod bank_allocations;
 #[path = "agent_voucher_cost_centres.rs"]
 mod cost_centres;
+#[path = "agent_voucher_goods_lines.rs"]
+mod goods_lines;
 #[path = "agent_voucher_scalars.rs"]
 mod scalars;
 use bank_allocations::BankAllocationCollector;
 use cost_centres::CostCentreCollector;
+use goods_lines::GoodsLineCollector;
 pub(super) use scalars::*;
 
 /// Shares the native collection boundary used by the protocol crate: CMPINFO
@@ -61,6 +64,13 @@ impl NativeCollectionScope {
     pub(super) fn in_bank_allocations(&self) -> bool {
         self.entry_tail()
             .is_some_and(|tail| tail.first().is_some_and(|c| c == "BANKALLOCATIONS.LIST"))
+    }
+    /// Whether the element being read lies inside an `INVENTORYALLOCATIONS.LIST`.
+    pub(super) fn in_goods_lines(&self) -> bool {
+        self.entry_tail().is_some_and(|tail| {
+            tail.first()
+                .is_some_and(|c| c == "INVENTORYALLOCATIONS.LIST")
+        })
     }
     pub(super) fn bill_allocation(&self) -> bool {
         self.path.len() == 7
@@ -319,6 +329,7 @@ fn parse_voucher_rows(
     let mut allocations = Vec::<Value>::new();
     let mut cost = CostCentreCollector::default();
     let mut bank = BankAllocationCollector::default();
+    let mut goods = GoodsLineCollector::default();
     let mut current_tag = String::new();
     let mut scope = NativeCollectionScope::default();
     // Set by a composite amount under `CompositePolicy::Withhold`, per voucher.
@@ -355,10 +366,12 @@ fn parse_voucher_rows(
                     allocations.clear();
                     cost.reset();
                     bank.reset();
+                    goods.reset();
                 }
                 if let Some(tail) = scope.entry_tail() {
                     cost.start(tail, &tag);
                     bank.start(tail, &tag);
+                    goods.start(tail, &tag);
                 }
                 if tag == "BILLALLOCATIONS.LIST" && scope.child("VOUCHER", "ALLLEDGERENTRIES.LIST")
                 {
@@ -394,6 +407,14 @@ fn parse_voucher_rows(
                         Err(_) => bank.undecodable(),
                     }
                 }
+                if scope.in_goods_lines() {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => {
+                            goods.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => goods.undecodable(),
+                    }
+                }
                 if let Some(row) = allocation
                     .as_mut()
                     .filter(|_| scope.bill_allocation_field())
@@ -412,6 +433,9 @@ fn parse_voucher_rows(
                 }
                 if scope.in_bank_allocations() {
                     bank.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value);
+                }
+                if scope.in_goods_lines() {
+                    goods.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value);
                 }
                 if let Some(row) = allocation
                     .as_mut()
@@ -441,6 +465,14 @@ fn parse_voucher_rows(
                         Err(_) => bank.undecodable(),
                     }
                 }
+                if scope.in_goods_lines() {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => {
+                            goods.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => goods.undecodable(),
+                    }
+                }
                 if let Some(row) = allocation
                     .as_mut()
                     .filter(|_| scope.bill_allocation_field())
@@ -457,6 +489,7 @@ fn parse_voucher_rows(
                 if let Some(tail) = scope.entry_tail() {
                     cost.end(tail);
                     bank.end(tail);
+                    goods.end(tail);
                 }
                 if scope.bill_allocation() {
                     if let Some(allocation_row) = allocation.take().filter(|row| !row.is_empty()) {
@@ -621,6 +654,15 @@ fn parse_voucher_rows(
                             Err(problem) => {
                                 parsed_entry["bank_allocations_unreadable"] =
                                     json!(problem.reason());
+                            }
+                        }
+                        // The same for goods lines (#2015): an invoice's item lines with their
+                        // godown and batch split, withheld unless `vouchers` asks for them.
+                        match goods.finish() {
+                            Ok(rows) if rows.is_empty() => {}
+                            Ok(rows) => parsed_entry["goods_lines"] = Value::Array(rows),
+                            Err(problem) => {
+                                parsed_entry["goods_lines_unreadable"] = json!(problem.reason());
                             }
                         }
                         if parsed_amount.as_ref().is_some_and(|parsed| {
@@ -802,6 +844,7 @@ fn parse_voucher_rows(
                 if let Some(tail) = scope.entry_tail() {
                     cost.start(tail, &name);
                     bank.start(tail, &name);
+                    goods.start(tail, &name);
                 }
                 scope.start(name.clone());
                 if scope.repeated_collection {
@@ -810,6 +853,7 @@ fn parse_voucher_rows(
                 if let Some(tail) = scope.entry_tail() {
                     cost.end(tail);
                     bank.end(tail);
+                    goods.end(tail);
                 }
                 scope.end(&name)?;
             }
@@ -985,3 +1029,6 @@ mod bank_allocation_tests;
 #[cfg(test)]
 #[path = "agent_voucher_cost_centres_tests.rs"]
 mod cost_centre_tests;
+#[cfg(test)]
+#[path = "agent_voucher_goods_lines_tests.rs"]
+mod goods_line_tests;

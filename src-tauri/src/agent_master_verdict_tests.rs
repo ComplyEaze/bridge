@@ -1209,8 +1209,8 @@ fn the_projection_of_a_parsed_row_holds_no_pan_bank_email_phone_or_address() {
     let xml = party_collection(
         "<PARTYGSTIN>08ZZZZZ0000Z2ZP</PARTYGSTIN><INCOMETAXNUMBER>SYNTHPAN01</INCOMETAXNUMBER>\
          <NAMEONPAN>Pan Holder Name</NAMEONPAN><BANKACCHOLDERNAME>Bank Holder Name</BANKACCHOLDERNAME>\
-         <BANKDETAILS>000123456789</BANKDETAILS><IFSCODE>ZZZZ0000001</IFSCODE>\
-         <EMAIL>someone@example.invalid</EMAIL><LEDGERPHONE>9999900000</LEDGERPHONE>\
+         <BANKDETAILS>111111111111</BANKDETAILS><IFSCODE>ZZZZ0000001</IFSCODE>\
+         <EMAIL>someone@example.invalid</EMAIL><LEDGERPHONE>9999999999</LEDGERPHONE>\
          <LEDPINCODE>560001</LEDPINCODE><STATENAME>Synthetic State</STATENAME>\
          <LEDADDRESS.LIST><LEDADDRESS>1 Synthetic Road</LEDADDRESS></LEDADDRESS.LIST>\
          <TAXTYPE>GST</TAXTYPE><GSTDUTYHEAD>SGST/UTGST</GSTDUTYHEAD>",
@@ -1237,10 +1237,10 @@ fn the_projection_of_a_parsed_row_holds_no_pan_bank_email_phone_or_address() {
         "SYNTHPAN01",
         "Pan Holder Name",
         "Bank Holder Name",
-        "000123456789",
+        "111111111111",
         "ZZZZ0000001",
         "someone@example.invalid",
-        "9999900000",
+        "9999999999",
         "560001",
         "Synthetic State",
         "1 Synthetic Road",
@@ -1255,7 +1255,7 @@ fn the_projection_of_a_parsed_row_holds_no_pan_bank_email_phone_or_address() {
 fn the_parsed_row_holds_the_private_values_the_projection_leaves_behind() {
     let xml = party_collection(
         "<INCOMETAXNUMBER>SYNTHPAN01</INCOMETAXNUMBER><EMAIL>someone@example.invalid</EMAIL>\
-         <BANKDETAILS>000123456789</BANKDETAILS><LEDGERPHONE>9999900000</LEDGERPHONE>",
+         <BANKDETAILS>111111111111</BANKDETAILS><LEDGERPHONE>9999999999</LEDGERPHONE>",
     );
     let parsed =
         bridge_tally_protocol::parse_native_party_ledger_master_records_with_evidence(&xml, TARGET)
@@ -1264,8 +1264,8 @@ fn the_parsed_row_holds_the_private_values_the_projection_leaves_behind() {
     for private in [
         "SYNTHPAN01",
         "someone@example.invalid",
-        "000123456789",
-        "9999900000",
+        "111111111111",
+        "9999999999",
     ] {
         assert!(held.contains(private), "{private}");
     }
@@ -1273,8 +1273,8 @@ fn the_parsed_row_holds_the_private_values_the_projection_leaves_behind() {
     for private in [
         "SYNTHPAN01",
         "someone@example.invalid",
-        "000123456789",
-        "9999900000",
+        "111111111111",
+        "9999999999",
     ] {
         assert!(!view.contains(private), "{private}");
     }

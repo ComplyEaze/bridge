@@ -90,10 +90,10 @@ const PRIVATE_VALUES: [&str; 8] = [
     "SYNTHPAN01",
     "Synthetic Pan Holder",
     "Synthetic Bank Holder",
-    "000123456789",
+    "111111111111",
     "ZZZZ0000001",
     "private.person@example.invalid",
-    "9999900000",
+    "9999999999",
     "1 Synthetic Private Road",
 ];
 
@@ -3832,7 +3832,7 @@ fn an_append_refusal_after_the_sidecar_was_written_leaves_no_sidecar() {
         let marks = &mut aimed.as_mut().unwrap().marks;
         marks.extend(
             (0..600_000_u32).map(|n| super::super::master_ledger::MasterMark {
-                company_guid: format!("{n:08x}-0000-4000-8000-000000000000"),
+                company_guid: format!("{n:08x}-{:04x}-4{:03x}-8{:03x}-{:012x}", 0, 0, 0, 0),
                 altmstid: 1,
             }),
         );

@@ -32,31 +32,35 @@ pub enum RemovalRefusal {
     OtherNotZero(ImportCounter, u64),
 }
 
-/// The counters showed exactly the one intended change. Only this module can
-/// make one, so `Altered` and `Deleted` cannot be built from anything else.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct OneChangeCounted(());
+/// The counters showed `ALTERED` 1 and nothing else. Only `CancelOutcome` can
+/// make one, so `Altered` cannot be built from any other answer.
+#[derive(Debug, PartialEq, Eq)]
+pub struct OneAlteredCounted(());
+
+/// The counters showed `DELETED` 1 and nothing else; only `DeleteOutcome` makes one.
+#[derive(Debug, PartialEq, Eq)]
+pub struct OneDeletedCounted(());
 
 /// The answer to a cancel: `Altered` only when `ALTERED` is 1, every other
 /// counter is reported and 0, and there is no line error. `CANCELLED` stayed 0
 /// on the one observed cancel (§9.14), so it is held to 0 like the rest.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum CancelOutcome {
-    Altered(OneChangeCounted),
+    Altered(OneAlteredCounted),
     Refused(RemovalRefusal),
 }
 
 /// The answer to a delete: `Deleted` only when `DELETED` is 1 on the same terms.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DeleteOutcome {
-    Deleted(OneChangeCounted),
+    Deleted(OneDeletedCounted),
     Refused(RemovalRefusal),
 }
 
 impl CancelOutcome {
     pub fn from_counters(result: &TallyImportResult) -> Self {
         match one_change(result, ImportCounter::Altered) {
-            Ok(counted) => Self::Altered(counted),
+            Ok(()) => Self::Altered(OneAlteredCounted(())),
             Err(refusal) => Self::Refused(refusal),
         }
     }
@@ -65,16 +69,15 @@ impl CancelOutcome {
 impl DeleteOutcome {
     pub fn from_counters(result: &TallyImportResult) -> Self {
         match one_change(result, ImportCounter::Deleted) {
-            Ok(counted) => Self::Deleted(counted),
+            Ok(()) => Self::Deleted(OneDeletedCounted(())),
             Err(refusal) => Self::Refused(refusal),
         }
     }
 }
 
-fn one_change(
-    result: &TallyImportResult,
-    intended: ImportCounter,
-) -> Result<OneChangeCounted, RemovalRefusal> {
+/// §9.2's rule (as `TallyImportResult::is_clean_success_for` holds it), with
+/// the reason for a refusal kept.
+fn one_change(result: &TallyImportResult, intended: ImportCounter) -> Result<(), RemovalRefusal> {
     let presence = &result.counter_presence;
     let counters = [
         (ImportCounter::Created, result.created, presence.created),
@@ -107,7 +110,7 @@ fn one_change(
             return Err(RemovalRefusal::OtherNotZero(counter, value));
         }
     }
-    Ok(OneChangeCounted(()))
+    Ok(())
 }
 
 #[cfg(test)]

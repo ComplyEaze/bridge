@@ -132,12 +132,25 @@ fn an_absent_counter_refuses() {
         let present = format!("<{element}>{value}</{element}>");
         assert!(counters_with(&[(&present, "")]).is_err(), "{element}");
     }
-    let mut unobserved = counters_with(&[]).unwrap();
-    unobserved.counter_presence.created = false;
-    assert_eq!(
-        CancelOutcome::from_counters(&unobserved),
-        CancelOutcome::Refused(RemovalRefusal::CounterAbsent(ImportCounter::Created))
-    );
+    // A saved record from before presence was kept reads every counter absent.
+    type Unmark = fn(&mut crate::TallyImportCounterPresence);
+    let unmarks: [(ImportCounter, Unmark); 7] = [
+        (ImportCounter::Created, |p| p.created = false),
+        (ImportCounter::Altered, |p| p.altered = false),
+        (ImportCounter::Deleted, |p| p.deleted = false),
+        (ImportCounter::Ignored, |p| p.ignored = false),
+        (ImportCounter::Errors, |p| p.errors = false),
+        (ImportCounter::Cancelled, |p| p.cancelled = false),
+        (ImportCounter::Exceptions, |p| p.exceptions = false),
+    ];
+    for (counter, unmark) in unmarks {
+        let mut unobserved = counters_with(&[]).unwrap();
+        unmark(&mut unobserved.counter_presence);
+        assert_eq!(
+            CancelOutcome::from_counters(&unobserved),
+            CancelOutcome::Refused(RemovalRefusal::CounterAbsent(counter))
+        );
+    }
 }
 
 #[test]

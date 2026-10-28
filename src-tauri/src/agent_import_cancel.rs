@@ -8,10 +8,12 @@ use super::{render_native_vouchers_as, ImportVoucher, VoucherAction};
 use uuid::Uuid;
 
 /// The REMOTEID of a voucher a native post created, as its dispatch intent
-/// records it (`native_remote_ids`). Only the text a native post mints is
-/// admitted: a version 4 UUID, lowercase and hyphenated (`RemoteIds::mint`).
-/// Anything else, from a model, a document or a Tally response, is refused, so
-/// no such value can shape a request.
+/// records it (`native_remote_id`, or `native_remote_ids` for a batch). Only
+/// the form a native post mints is admitted: a version 4 UUID, lowercase and
+/// hyphenated (`RemoteIds::mint`). That closed alphabet holds no character that
+/// can end the attribute, so no value can shape the request beyond naming a
+/// voucher; it does not prove where an id came from. A file a person imports
+/// carries a version 8 id (`import_identity`), which is refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct RemoteId(Uuid);
 
@@ -30,18 +32,20 @@ impl RemoteId {
     }
 }
 
-/// The cancel candidate: the native post's request for these vouchers, byte
-/// for byte, with `ACTION="Cancel"` in place of `ACTION="Create"`. Protocol
-/// reference §9.14 observed once that a cancel with the full voucher body
-/// cancels in place (PARTIAL, a Journal on Silver); no other type was tried.
-pub(super) fn render_native_cancel_xml<'a>(
+/// The cancel candidate, for one voucher: the native post's request for it,
+/// byte for byte, with `ACTION="Cancel"` in place of `ACTION="Create"`.
+/// Protocol reference §9.14 observed once that a cancel with the full voucher
+/// body cancels in place (PARTIAL, a Journal on Silver, one voucher per
+/// request); no other type was tried.
+pub(super) fn render_native_cancel_xml(
     company: &str,
-    vouchers_with_remote_ids: impl Iterator<Item = (&'a ImportVoucher, RemoteId)>,
+    voucher: &ImportVoucher,
+    remote_id: RemoteId,
 ) -> String {
     render_native_vouchers_as(
         VoucherAction::Cancel,
         company,
-        vouchers_with_remote_ids.map(|(voucher, remote_id)| (voucher, remote_id.0)),
+        std::iter::once((voucher, remote_id.0)),
     )
 }
 

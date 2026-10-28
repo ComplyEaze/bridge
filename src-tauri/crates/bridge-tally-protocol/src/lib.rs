@@ -97,7 +97,8 @@ pub use text_encoding::{
 };
 pub use tolerant_xml::mark_forbidden_numeric_references;
 pub use voucher_removal::{
-    CancelOutcome, DeleteOutcome, ImportCounter, OneChangeCounted, RemovalRefusal,
+    CancelOutcome, DeleteOutcome, ImportCounter, OneAlteredCounted, OneDeletedCounted,
+    RemovalRefusal,
 };
 
 pub const BRIDGE_LEDGER_EXPORT_SCHEMA: &str = "bridge.tally.ledgers/1";

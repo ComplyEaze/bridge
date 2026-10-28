@@ -1,29 +1,25 @@
 use super::super::render_native_vouchers_xml;
 use super::*;
 
-/// The cancel rendering of `vouchers` is their native Create rendering with
-/// only each voucher's `ACTION` changed: a byte comparison, after checking the
-/// Create rendering carries the attribute exactly once per voucher. Returns
-/// the cancel rendering.
+/// For each voucher, its cancel rendering is its native Create rendering with
+/// only the `ACTION` changed: a byte comparison, after checking the Create
+/// rendering carries the attribute exactly once. Returns the last cancel.
 pub(in crate::agent) fn assert_cancel_changes_only_the_action(
     company: &str,
     vouchers: &[(&ImportVoucher, Uuid)],
 ) -> String {
-    let create = render_native_vouchers_xml(company, vouchers.iter().copied());
-    let cancel = render_native_cancel_xml(
-        company,
-        vouchers
-            .iter()
-            .map(|(voucher, id)| (*voucher, RemoteId(*id))),
-    );
-    assert_eq!(
-        create.matches(" ACTION=\"Create\" ").count(),
-        vouchers.len()
-    );
-    assert!(!create.contains("ACTION=\"Cancel\""));
-    let expected = create.replace(" ACTION=\"Create\" ", " ACTION=\"Cancel\" ");
-    assert_eq!(cancel.as_bytes(), expected.as_bytes());
-    cancel
+    assert!(!vouchers.is_empty());
+    let mut last = String::new();
+    for (voucher, id) in vouchers {
+        let create = render_native_vouchers_xml(company, std::iter::once((*voucher, *id)));
+        let cancel = render_native_cancel_xml(company, voucher, RemoteId(*id));
+        assert_eq!(create.matches(" ACTION=\"Create\" ").count(), 1);
+        assert!(!create.contains("ACTION=\"Cancel\""));
+        let expected = create.replace(" ACTION=\"Create\" ", " ACTION=\"Cancel\" ");
+        assert_eq!(cancel.as_bytes(), expected.as_bytes());
+        last = cancel;
+    }
+    last
 }
 
 #[test]
@@ -49,5 +45,26 @@ fn a_remote_id_is_admitted_only_in_the_form_a_native_post_mints() {
         format!("{}c{}", &text[..19], &text[20..]),
     ] {
         assert_eq!(RemoteId::parse(&other), refused, "{other}");
+    }
+}
+
+/// Every REMOTEID of the live-captured native requests is admitted.
+#[test]
+fn every_captured_native_remote_id_is_admitted() {
+    for fixture in [
+        include_str!("../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-import.xml"),
+        include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-journal-import.xml"
+        ),
+    ] {
+        let ids = fixture
+            .split("REMOTEID=\"")
+            .skip(1)
+            .map(|rest| &rest[..36])
+            .collect::<Vec<_>>();
+        assert!(!ids.is_empty());
+        for id in ids {
+            assert!(RemoteId::parse(id).is_ok(), "{id}");
+        }
     }
 }

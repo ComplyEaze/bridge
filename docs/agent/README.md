@@ -2208,6 +2208,36 @@ own amount.
   them in all of them. The presence, bill-trail and summary reads, `verify_import` and
   `ledger_movement` do not return them (`ledger_movement`'s fetch names three entry fields).
 
+### Bank allocations in voucher reads
+
+`vouchers` called with `bank_allocations: true` gives each ledger entry that has a bank allocation `bank_allocations`, a
+list of at most eight, one per allocation as Tally sent it (protocol reference §8.2h; #1231, #1392). Each carries five
+fields, `bank_date` (Tally's `BANKERSDATE`), `instrument_number`, `instrument_date`, `transaction_type` and `status`, and
+each field is `{"state": "absent"}` (the element was not sent), `{"state": "empty"}` (sent with no text) or
+`{"state": "value", "value": "..."}` (trimmed). Without the argument, and in every other answer that returns a voucher's
+entries (the registers), the key is not there; the parse reads the allocations either way.
+
+- **No reconciliation verdict.** Nothing in the list says whether an entry is reconciled. In the one capture, nothing was
+  reconciled: every `bank_date` was empty and every `status` was `No`. A reconciled entry has not been captured, so what
+  those fields read once an entry is reconciled, or cleared again, is not established, and an empty `bank_date` is not
+  shown to mean "unreconciled".
+- A transfer reference typed in the bank allocation of a Contra sits in its `instrument_number`, on both of the voucher's
+  entries, and in no other field the read returns; one typed in the narration is only narration text, and the voucher's
+  own `reference` stayed empty in the capture.
+- An entry with no allocation, or only an allocation element with nothing in it (most entries' answers carry one), has
+  no such key; that does not mean the bank entry has no allocation in Tally.
+- **A list that cannot be read whole does not refuse the read.** The entry carries `bank_allocations_unreadable` with one
+  reason and no partial list: `bank_allocation_field_duplicated`, `bank_allocation_text_undecodable`,
+  `bank_allocation_date_unparsable` (a bank or instrument date that is not `YYYYMMDD`), `bank_allocations_too_many`
+  (more than eight) or `bank_allocation_shape_unrecognised` (an allocation list inside another list of the entry, or an
+  element inside a field that is read).
+- Only those five fields are read. The names and account details an allocation can carry (the payee, bank, branch,
+  account number) are not read or returned. The instrument number is any text typed or sent, usually a cheque number or a transfer
+  reference, and is returned under every redaction mode, as the voucher's own `reference` is (a name typed inside it
+  stays as it is). The `reference` search matches the voucher's own reference only, not this field.
+- Measured on one synthetic book of five Contras keyed by hand (TallyPrime 7.1 Silver); other transaction types, other
+  voucher types, a reconciled entry and other releases are not measured. No request changed.
+
 ## Voucher-file preparation and verification
 
 The MCPB extension exposes `verify_import` by default as a recovery tool (it

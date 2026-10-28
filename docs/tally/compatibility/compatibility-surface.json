@@ -533,6 +533,14 @@
       "path": "src-tauri/src/agent_trial_balance.rs"
     },
     {
+      "path": "src-tauri/src/agent_voucher_bank_allocations.rs",
+      "reason": "Voucher bank allocations: reads each ledger entry's bank date, instrument number and date, transaction type and status from the vouchers answer; a defect hides or invents the reference a transfer is matched on, or shows an empty field as a value."
+    },
+    {
+      "path": "src-tauri/src/agent_voucher_bank_allocations_tests.rs",
+      "reason": "Tests pinning the bank-allocation reader to its captured answer, its typed reasons and its refusals on mutations of that capture."
+    },
+    {
       "path": "src-tauri/src/agent_voucher_cost_centres.rs",
       "reason": "Voucher cost-centre allocations: reads each ledger entry's category and centre rows from the vouchers answer; a defect hides or doubles an allocation, or reads one as none."
     },

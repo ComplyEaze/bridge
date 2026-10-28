@@ -1,0 +1,10 @@
+# fixture: agent/gst-ledger-l1/s6-14nov-n-1.utf16le.xml
+# parser: parse_voucher_census(20251114)
+# source: captured
+Ok([
+    CensusRow {
+        day: 2025-11-14,
+        alter_id: 13,
+        guid: "aae372c5-a894-491c-8843-5532e43d2d2f-0000000d",
+    },
+])

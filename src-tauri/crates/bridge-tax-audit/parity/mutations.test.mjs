@@ -1399,6 +1399,37 @@ console.log(JSON.stringify({ held, overlaps, refused }));
     assert.equal(sh(g.repo, "status", "--porcelain"), "", "the working tree is never touched");
   });
 
+  test("test_killers_from_supplies_killer_lists_only_and_a_missing_file_or_full_refuses", async () => {
+    const outside = g.t;
+    const work = path.join(outside, "mutants");
+    const first = path.join(outside, "first.json");
+    const proof = path.join(outside, "proof.json");
+    await fakeCargo(outside, FAKE_CARGO, {}, async () => {
+      // A full run gives B1 a killed record with its killer list, as the committed records hold.
+      let [rc, out] = await main("B1", "--full", "--workdir", work, "--results", first);
+      assert.equal(rc, 0, out);
+      const killers = readJson(first);
+      assert.deepEqual([killers.B1.verdict, killers.B1.mode], [mu.KILLED, "full"]);
+      const before = fs.readFileSync(first);
+      // A proof run into an empty results file runs B1's killers first, from those records only.
+      [rc, out] = await main("B1", "--killers-from", first, "--workdir", work, "--results", proof);
+      assert.equal(rc, 0, out);
+      const made = readJson(proof);
+      assert.deepEqual(Object.keys(made), ["B1"], "only what this run measured is written");
+      assert.deepEqual([made.B1.verdict, made.B1.mode], [mu.KILLED, "killers-first"]);
+      assert.deepEqual(fs.readFileSync(first), before, "the killers file is read, never written");
+      // Without killer lists it is a full run, which is what proof mode must never quietly become.
+      [rc, out] = await main("B1", "--workdir", work, "--results", path.join(outside, "none.json"));
+      assert.equal(readJson(path.join(outside, "none.json")).B1.mode, "full", out);
+      [rc, out] = await main("B1", "--killers-from", path.join(outside, "absent.json"), "--workdir", work, "--results", proof);
+      assert.equal(rc, 2, out);
+      assert.ok(out.includes("is not a file"), out);
+      [rc, out] = await main("B1", "--full", "--killers-from", first, "--workdir", work, "--results", proof);
+      assert.equal(rc, 2, out);
+      assert.ok(out.includes("--killers-from is for a run of mutations without --full"), out);
+    });
+  });
+
   test("test_a_shard_that_cannot_build_writes_a_typed_refusal_and_prints_the_compiler_lines", async () => {
     const outside = g.t;
     const work = path.join(outside, "mutants");

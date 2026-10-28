@@ -2695,9 +2695,15 @@ impl Server {
         let outcome = response.and_then(|response| response.outcome.as_ref());
         // After a create of N, the mark never again reads below before + N, nor
         // below a mark read after the post, unless the book was rolled back
-        // (a backup restored, or another copy put in its place).
+        // (a backup restored, or another copy put in its place). N is what the
+        // post proved, as the journal's own floor counts it: the vouchers it
+        // bound, else those its answer proves landed.
+        let proved = match &journaled {
+            Some(ledger::PostSpanVerdict::Bound(bindings)) => bindings.len() as u64,
+            _ => outcome.map_or(0, ledger::landed_count),
+        };
         let floor = before
-            .saturating_add(outcome.map_or(0, |outcome| outcome.counters().created))
+            .saturating_add(proved)
             .max(after_post_mark.unwrap_or(0));
         if current < floor {
             return PostSpanDecision {

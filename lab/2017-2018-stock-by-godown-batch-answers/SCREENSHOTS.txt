@@ -1,0 +1,23 @@
+# Captures; they stay on the lab PC. sha256, bytes, name.
+cf6bff3d91afea12abdcc7a7b313f004db66638069bbe007d2c94c31e9b05467  72614  c10-no-company.png
+02dd00140bfa6e1cc83d9c4036c292a4e8c0d6e5b6b93337bac313039f4327bb  76085  s0-about.png
+3b86f6557e4cb64ceaca736c9cf1d863fb507354c4833626a91e3fe6c40371af  46321  s0-gateway-loaded.png
+61b1e96407c68f34c036ebd6e8e4337c3c5e73b97c61e395bb7f1b87caf37d9b  72603  s0-select-company.png
+96f008614df7a9ba53bc73c12c266f088d8de5bf351d21204b889b10564f2974  53063  s3-batch-items-select.png
+89483cf265f8dede7a85fde5982724fcf271b4f000194e8cf61aadfebccd0a04  52541  s3-batch-list.png
+e4352141cb76bfd1e2c7a5cc33c047ec971aa28be962999c7adb2f8cf8760daf  28541  s3-batch-summary-as-opened.png
+281e25caa0936d1bb3b30853a6ccf3ed6e9e0417fd0ddb6ca4986de5974fe54c  28519  s3-batch-summary-fy25.png
+5d5d58cd9b8b904d7ed815ffcce8b96d98ad841a07c35a5f1f314a77a32a999f  34486  s3-batch-vouchers-h2504a.png
+cdf04ddd375fb0b4f7ca007e591c34c3fdd71722f387004a3b5808914b0cd344  28876  s3-godown-factory-floor-raw-chemicals.png
+138e341e73819f7ea3091b0d424fff99cc076f30512cefcde74143e39597f5b7  26924  s3-godown-factory-floor.png
+ce0da4a719f20b2efc59093296b1544de27262bb280d7d1f9a7a71cef2d57851  26830  s3-godown-summary-as-opened.png
+2cdd8c3740090061707de14cf121f66a46663ac1b61a3e1f879cda001b0fddb4  26808  s3-godown-summary-fy25.png
+c12f014cc9ef6d9a465bebc5cc31f06778282f42ac3b2d6fa6e14ac6dfd2cee3  45422  s3-hcl-monthly-fy25.png
+b2a0a4cc52fd15f60cf371f2ed544bc1c9254f09d6cc4c41078c4315b313a1cf  45653  s3-inventory-books-list.png
+63e97364bed27ec7d291782d057429f500258b98f25aa589afbdd3a11e04e707  32297  s3-raw-chemicals-fy25.png
+2a18f54a4f762ccdda0d1e4b1704c5815bd2935ee825c660d02b17bcd8970acd  26806  s3-stock-summary-fy25.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s4-after-batch-1.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s4-after-batch-3.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s4-after-control.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s4-after-godown-1.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s4-after-stock-summary.png

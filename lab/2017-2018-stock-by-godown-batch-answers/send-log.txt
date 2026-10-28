@@ -1,0 +1,10 @@
+2026-10-28T11:55:51.312Z req=stock-summary.xml req_sha256=17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8 curl_exit=0 printed='200 1370' content_length=1370 bytes=1370 sha256=862c3206e5f22922cea932380da07d2170591085da7ef8227f4c911452bfe9a4
+2026-10-28T11:55:51.517Z answered stock-summary.xml as stock-summary.xml exit=0
+2026-10-28T11:56:07.290Z req=control.xml req_sha256=103f686bed40b37dabfca8d87f57570fd362a3ed479e3d47f3669d4396ded89c curl_exit=0 printed='200 434' content_length=434 bytes=434 sha256=09b30fb7a073de8f2373d0589e1275f7da3db9779d41e7a42e200893cb78e744
+2026-10-28T11:56:07.508Z answered control.xml as control.xml exit=0
+2026-10-28T11:56:22.708Z req=godown-1.xml req_sha256=27ccda23a554946b16097fe004c58161d0d718ddb03d4aebf2008d38cd3a5e46 curl_exit=0 printed='200 968' content_length=968 bytes=968 sha256=92c3908ffe3916e5a7f9a86e7a4f84c912a77c926e3a1e4ab2f76f808ca67e01
+2026-10-28T11:56:22.971Z answered godown-1.xml as godown-1.xml exit=0
+2026-10-28T11:56:39.655Z req=batch-1.xml req_sha256=aa5a84366cbbcd6a37ade1c688248b13d852d0da02e62dea38428dcedf564833 curl_exit=0 printed='200 420' content_length=420 bytes=420 sha256=0e952d8fe88c2e9554d1b02d16028c5f2175af6b9d1340ab55d78ab86a44b4a7
+2026-10-28T11:56:39.881Z answered batch-1.xml as batch-1.xml exit=0
+2026-10-28T11:56:56.687Z req=batch-3.xml req_sha256=22b0a1776f3c86d8bf2bda1dfc55286d6b1a0e68042a3f0d6d0430ff47945397 curl_exit=0 printed='200 418' content_length=418 bytes=418 sha256=85e90f2cb18cac45c7069810c77a49006aab95de737f732e8d07cdf6bd5a99d8
+2026-10-28T11:56:56.895Z answered batch-3.xml as batch-3.xml exit=0

@@ -1,0 +1,36 @@
+# Captures and BK1; they stay on the lab PC. sha256, bytes, name.
+aa9b9386eded6cd4b577d24ed3d1410a92fa3f007a3d197655aeda9aebb6e758  52331  bk1-before-accept.png
+02dd00140bfa6e1cc83d9c4036c292a4e8c0d6e5b6b93337bac313039f4327bb  76085  s0-about.png
+f3b788a67b74642664d12cec048c5485f4957a510f4ca07187acd4da23815e16  45259  s0-gateway-loaded.png
+61b1e96407c68f34c036ebd6e8e4337c3c5e73b97c61e395bb7f1b87caf37d9b  72603  s0-select-company.png
+cb98386ea1f14f58d12ca0281549ff0d2c9cb3add25ca754a33d39dfb9ec5476  49517  s2-after-accept-master-alteration.png
+150261fa1d8e2d9393825a099ab17891a39d3dbdaeabc69fb41d1330a319b692  57451  s2-hsn-history-as-found.png
+66818120ab8052dbbc536fea7f0f123d93a52335016bea5cf06a9f0bd554a2bd  59055  s2-hsn-history-keyed.png
+bdf8bb318b74ea3bb88692cef72df7e6ddcd36c37b6a8804717deb73e4d73d31  46835  s2-ledger-as-found.png
+bda95ec9a1a9bb116489edb97f2ff37220c424f281f873c2ae2f04ef1cae8b25  49658  s2-ledger-before-accept.png
+73de3358ac09cbc49c7222494b4eb10fce2f9bcf4f9549f5b212fb0132aaf115  69383  s2-more-details-list.png
+5ba886f82f3f50444859368271876697a61ce5755c49e3f36f02879e57f0ef76  29062  s4-after-accept-blank-no3.png
+a3e6fbcc2cc03c7468338faca85d5cd6ed866920184cbf771fb63527421e4bc2  34770  s4-dispatch-details.png
+a9aa58190f20e8111b665b9d505ecf031091d8dd4f91e2095b81d66b101014e9  42897  s4-party-details.png
+5d8fb46147b88a550ac4ba95b84fdb51e57731b9831d37d8358e5b082382344f  28534  s4-s2-before-accept.png
+1c089577d709cc2cdd6fed0147bacce5cd649baeb408ae24a5350287143ced1f  54450  s5-gstr1-open.png
+23455c29085b0a2c3bd65d3d71f096b74cddb1b1319c0efdb6a3bc08707a7180  45429  s6-after-export-upload-gstr1.png
+669e1059e97d7b30bd1fd061f388dfea56a0e81a689c2ddb8ce08b55124aa4c9  57241  s6-conflicts-warning.png
+c0c6a4c45e1ddabeceab2a9c5239c2a5f4829973d9c6fce15aa93233376bab28  36429  s6-explorer-on-export.jpg
+85df5e431e4f9cf2503f8ac74575d1da3270de7f90af06accebd907b98e6daa8  54765  s6-export-as-offered.png
+297f8a314cdb5b40d163cc1b8a060eb8dabbadafdb8c4352f31ba8c38c309004  28938  s6-export-before-accept-fullscreen-clock.jpg
+305d86341677dfb0f351a4085238a626f8bd0db3e8afde716219f973e2affbce  56585  s6-export-before-accept.png
+1a50163e9cc6e19481ca85bb0534a91a0b286b5f3b04a5a36ab3102ace8d8b5b  49543  s6-upload-gstr1-pending.png
+e13ba9c765aecde5f71108ef2b1a61ffc377f10918d08e0a79e31b6462f4b2de  28992  s7-after-accept-blank-no4.png
+d8fe01e7628253b9784b09f81bbb573bf532c06e263e2a8757ed58945117c93e  54821  s7-esc1-gstr1-after-export.png
+9a4c08f8654c9642c7a816d215ff64c5ad218c82aaeec1ed3ed1dbdf0887a4cf  28514  s7-s3-before-accept.png
+7110e64c8f696db4ad4c64a7fc73882b14808aa0ffef057e8286726f21e5fdc3  45491  s8-after-export2-upload-gstr1.png
+f965f6a88165588bc3fd455b34bc0795bee1acdd526a208734d7a7e41aefb1d3  57396  s8-conflicts-warning.png
+260fbf5fef8a40d3de5b170583ac52fc7b4191b3266056ecc83e952a4bd7e053  124663  s8-explorer-on-export2.jpg
+6c398b7325c66ba4be0464388006f5dbc41d8fb3782dc01d28dace4cd9dd095a  29349  s8-export-before-accept-fullscreen-clock.jpg
+25f816c96c66e0184e372ab4db886d36e978e2b99d0f0804e5494b0f92b021ef  56829  s8-export-before-accept.png
+ee0a3d5311c263d9fe5d1797430ead636b42c94a13bb0ea33a183d006b47f9ac  55512  s8-gstr1-reopen.png
+382dd4e66c5a3c0079c71a1833e8d0fba4c27faad5bcb7eaa9375d0be0e24200  49728  s8-upload-gstr1-pending.png
+015f63ff5e1877c8c9287dbdeaa890055c01ff365eef72d52500e85de5fad2e6  54969  s9-esc1-gstr1-after-export2.png
+61b1e96407c68f34c036ebd6e8e4337c3c5e73b97c61e395bb7f1b87caf37d9b  72603  s9-shut-select-company.png
+db2bf5cafa0d9e87c69eedecbd45acae5ab24dfd80099c84b0b32134996563e9  31904  BK1 TDBK1800_100089.001

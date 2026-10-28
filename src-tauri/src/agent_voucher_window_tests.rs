@@ -7565,16 +7565,6 @@ mod ledger_scoped {
         utf16(bytes).trim_start_matches('\u{feff}').to_string()
     }
 
-    macro_rules! fixture {
-        ($name:literal) => {
-            include_bytes!(concat!(
-                "../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/",
-                $name,
-                ".utf16le.xml"
-            ))
-        };
-    }
-
     fn ledger(name: &str) -> LedgerScopeName {
         LedgerScopeName::new(name).unwrap()
     }
@@ -7589,11 +7579,11 @@ mod ledger_scoped {
         let sales = ledger("DN Sales");
         assert_eq!(
             render_agent_ledger_census(COMPANY, &sales, &day, &day, span(0, 8192)).unwrap(),
-            sent(fixture!("census-dn-sales-day-span1.request"))
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.request.utf16le.xml"))
         );
         assert_eq!(
             render_agent_ledger_census(COMPANY, &sales, &day, &day, span(8192, 16384)).unwrap(),
-            sent(fixture!("census-dn-sales-day-span2.request"))
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.request.utf16le.xml"))
         );
         assert_eq!(
             render_agent_ledger_census(
@@ -7604,7 +7594,7 @@ mod ledger_scoped {
                 span(0, 8192),
             )
             .unwrap(),
-            sent(fixture!("census-dn-party-year-span1.request"))
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.request.utf16le.xml"))
         );
     }
 
@@ -7619,7 +7609,7 @@ mod ledger_scoped {
                 &tally_date("20250531"),
             )
             .unwrap(),
-            sent(fixture!("movement-dn-party-month.request"))
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml"))
         );
     }
 
@@ -7665,8 +7655,8 @@ mod ledger_scoped {
     }
 
     /// The ledger rides in one `CHILDOF` element, and the book-wide requests carry no such element
-    /// and keep their own collection names. A name is never escaped here: the only characters
-    /// admitted are ones XML leaves alone.
+    /// and keep their own collection names. A name is escaped as any XML text is, and the only
+    /// characters admitted are ones that escape leaves unchanged.
     #[test]
     fn the_ledger_sits_in_one_element_and_the_book_wide_requests_are_unchanged() {
         let day = tally_date("20250515");
@@ -7696,7 +7686,7 @@ mod ledger_scoped {
     fn the_existing_census_parser_reads_the_captured_ledger_scoped_answers() {
         let day = ("20250515", "20250515");
         let rows = census(
-            fixture!("census-dn-sales-day-span1.answer"),
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml"),
             day,
             Some(span(0, 8192)),
         );
@@ -7714,13 +7704,13 @@ mod ledger_scoped {
             .all(|row| row.alter_id > 0 && row.alter_id <= 8192));
         // The same day's next span is an empty collection, not a refusal.
         assert!(census(
-            fixture!("census-dn-sales-day-span2.answer"),
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml"),
             day,
             Some(span(8192, 16384))
         )
         .is_empty());
         let year = census(
-            fixture!("census-dn-party-year-span1.answer"),
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml"),
             ("20250401", "20260331"),
             Some(span(0, 8192)),
         );
@@ -7732,7 +7722,7 @@ mod ledger_scoped {
     #[test]
     fn the_movement_row_parser_reads_the_captured_ledger_scoped_movement_answer() {
         let rows = parse_agent_rows(
-            &utf16(fixture!("movement-dn-party-month.answer")),
+            &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml")),
             "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
         )
         .expect("the captured answer parses");
@@ -7753,7 +7743,7 @@ mod ledger_scoped {
             parse_native_trial_balance, NativeTrialBalanceAmount,
         };
         let company = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
-        let rows = parse_agent_rows(&utf16(fixture!("movement-dn-party-month.answer")), company)
+        let rows = parse_agent_rows(&utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml")), company)
             .expect("the captured answer parses");
         let mut lines = ExactDecimal::zero();
         let mut counted = 0;
@@ -7799,7 +7789,7 @@ mod ledger_scoped {
         let parse = |value: &str| NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
         let day = parse("20250515");
         let refused = parse_voucher_census(
-            &utf16(fixture!("census-dn-sales-day-span1.answer")),
+            &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml")),
             (day, day),
             Some(span(8192, 16384)),
         );

@@ -9,9 +9,12 @@
 //! `DN Party 001`, protocol reference section 11c.6). The admission is therefore
 //! the observed alphabet and nothing wider: ASCII letters, ASCII digits and
 //! single spaces. Everything else, including `& . , - _`, other scripts and
-//! every symbol, is refused, never escaped; a TDL word operator is not a
-//! character problem and is covered by the caller resolving the name against
-//! Tally's own ledger catalogue before it builds this type (slice 2).
+//! every symbol, is refused, never escaped. A name that is also a TDL word
+//! operator is not a character problem and this type does not refuse it: the
+//! caller builds the type only from a ledger it resolved against Tally's own
+//! catalogue, so what is sent is a name the book holds, but that does not
+//! establish that Tally reads such a name as a name (not established, section
+//! 11c.6).
 //! A request builder takes this type, never a string (AGENTS.md P2, P3, P7).
 //!
 //! The alphabet can be widened only by a lab run that reads a ledger whose name

@@ -618,7 +618,10 @@ fn folded_live_ledgers_json(twins: &FoldedTwins) -> Value {
         .live
         .iter()
         .map(|(name, parent)| {
-            let mut ledger = json!({"name": party_name(name.clone()), "parent": parent});
+            let mut ledger = json!({
+                "name": party_name(name.clone()),
+                "parent": parent.as_deref().map(bridge_tally_protocol::tally_root_as_sent),
+            });
             if let Some(alias) = twins.through_alias.get(name) {
                 ledger["through_alias"] = json!(party_name(alias.clone()));
             }

@@ -2857,9 +2857,17 @@ nothing. Its `error.hold` says what the journal showed: `held` (it names
 `blocking_batch_ids`, the batches of the refused batch's own company that hold the
 name, and `blocking_batches_other_companies`, each with its `batch_id` and
 `company_guid`), `settled_meanwhile`, which only the check under the lock gives (the
-holder settled since the call began: post this batch again), or `journal_unread`,
-which either check can give (the journal could not be read just now, or did not
-show this batch: call again). When the check before the dialog finds a send of this
+holder settled since the call began: post this batch again), or `journal_unread`
+(a journal read that did not show this batch: call again). The check under the lock
+reads the journal again for its answer. When that read fails (the journal busy because
+another call is writing to it, or unreadable for any other reason), every refusal the
+lock made after reading the journal (all but `master_journal_unavailable`, which could
+not read it) is answered from the journal the lock read when it refused. It names the
+holders, or the send on file, as they were at the refusal: a send another call has
+recorded since is not in it, so where it shows no send its message says only that this
+call sent nothing and that no send of the batch was on file when it was refused
+(bridge#2083).
+When the check before the dialog finds a send of this
 batch recorded since the call began by another call, and when a held-name refusal
 finds it in the journal read that follows, the answer is `import_already_attempted`
 with `error.hold` `send_of_this_batch_recorded_since`: call again later, which
@@ -2896,8 +2904,8 @@ person to create the ledger in Tally by hand. An unconfirmed answer
 and the answer given when the book could not be read back after Tally answered
 say to call again later, which only reads, and to create nothing in Tally by hand
 meanwhile. A failure answer that says the create may have been sent says the same.
-When the journal could not be read for that answer, it says it is not known
-whether a send was recorded: call `post_ledger_creates` with the same `batch_id`
+When the journal could not be read for that answer, a failure other than a refusal under the
+journal's lock made after the lock read the journal says it is not known whether a send was recorded: call `post_ledger_creates` with the same `batch_id`
 again, which reads the book back and sends nothing if a send is on file,
 otherwise asks for approval again before anything is sent, and is refused as
 `master_batch_not_found`, sending nothing, if ComplyEaze Bridge holds no such batch; create nothing in Tally by hand

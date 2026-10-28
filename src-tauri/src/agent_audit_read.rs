@@ -317,14 +317,14 @@ fn memory_read(
         "bridge-audit-{}-{}-{}-{}",
         period.0.as_str(),
         period.1.as_str(),
-        before.vouchers,
-        before.masters
+        before.vouchers(),
+        before.masters()
     );
     let read_at = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     let side = |marks: CompanyMarks, part: &str| {
         json!({
-            "alter_voucher_id": marks.vouchers,
-            "alter_master_id": marks.masters,
+            "alter_voucher_id": marks.reported_vouchers(),
+            "alter_master_id": marks.masters(),
             "part": part,
         })
     };

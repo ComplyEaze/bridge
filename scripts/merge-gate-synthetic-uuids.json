@@ -92,6 +92,10 @@
     {
       "uuid": "9b5b6d54-4cdb-4b90-9600-cab45ee70c3a",
       "note": "company identifier of the synthetic lab company BRIDGE HANDIMPORT LAB, a book created on Tally's screen for a lab item on 26 Oct 2026; the live captures read from it carry this value, and the identifiers of its groups, ledgers and vouchers carry it as a prefix"
+    },
+    {
+      "uuid": "6a9518b2-a88c-417c-a700-40243f9d9119",
+      "note": "company identifier of the synthetic lab company BRIDGE TIEOUT D, as Tally returned it in the read-only Trial Balance capture of 27 October 2026 (lab branch lab/692-opening-stock-d3-answers at 56f293fd7515b4cc0fae6bd60508e39601db8fec); the ledger identifiers in the same capture carry it as a prefix, which the scan reads as the same value"
     }
   ]
 }

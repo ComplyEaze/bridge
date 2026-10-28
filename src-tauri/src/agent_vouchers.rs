@@ -130,8 +130,8 @@ impl VoucherPageSnapshot {
     fn describe(&self, reused: bool) -> Value {
         json!({
             "id": self.id,
-            "master_alter_id": self.marks.masters,
-            "voucher_alter_id": self.marks.vouchers,
+            "master_alter_id": self.marks.masters(),
+            "voucher_alter_id": self.marks.reported_vouchers(),
             "read_at": self.read_at,
             "reused": reused,
         })
@@ -563,11 +563,11 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 .read_company_marks_once(&identity, &company.name)
                 .await?;
             accumulate_evidence(&mut accumulated, marks_evidence);
-            if marks.masters > GROUP_LEDGER_LIST_MARK_LIMIT {
+            if marks.masters() > GROUP_LEDGER_LIST_MARK_LIMIT {
                 let mut failure = ToolFailure::from("summary_group_book_too_large".to_string());
                 failure.read_size = Some(Box::new(ReadSize {
-                    master_alter_id: marks.masters,
-                    estimated_bytes: marks.masters.saturating_mul(GROUP_LEDGER_LIST_BYTES_PER_LEDGER),
+                    master_alter_id: marks.masters(),
+                    estimated_bytes: marks.masters().saturating_mul(GROUP_LEDGER_LIST_BYTES_PER_LEDGER),
                     limit_bytes: GROUP_LEDGER_LIST_LIMIT_BYTES,
                     limit_master_alter_id: GROUP_LEDGER_LIST_MARK_LIMIT,
                 }));

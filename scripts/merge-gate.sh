@@ -245,6 +245,46 @@ $commit_messages
 $commit_identity_names"
   fi
 fi
+# AI attribution in public text (the owner's practice of 25 Oct 2026, not a mandate): a "Generated with" signature line or a
+# Co-authored-by line naming an assistant in the title or body (comments included), or such a trailer or an author or committer
+# identity naming one on a commit, is reported as a note and never blocks a merge. The note says that GitHub's squash merge copies
+# the body into the commit on master. scripts/check-ai-attribution.mjs decides. The title and body are checked even when the commit
+# list is not proven complete (that case is already INDETERMINATE above): then no commit is read. A check that did not run to its
+# end is INDETERMINATE: an unreadable result is an unknown, not a clean one.
+# The commit list goes in on stdin (a long list would not fit an argument); the title and body are arguments, and one too long for
+# that makes the whole check INDETERMINATE, never a pass.
+attribution_source="[]"
+[ "${metadata_commits_proven:-0}" -eq 1 ] && attribution_source="$metadata_commits"
+attribution_input=$(jq -c --arg title "$title" --arg body "$raw_prbody" '{
+    title: $title, body: $body,
+    commits: ((if all(.[]; type == "array") then flatten else . end) |
+      map({sha: .sha, message: .commit.message,
+           identities: [.commit.author.name, .commit.author.email, .commit.committer.name, .commit.committer.email]}))}' <<<"$attribution_source" 2>/dev/null) || attribution_input=""
+if [ -z "$attribution_input" ]; then
+  unknown "could not prepare the AI attribution check"
+else
+  : >"$errfile"
+  attribution_status=0
+  attribution_output=$(printf '%s' "$attribution_input" | node "$script_dir/check-ai-attribution.mjs" 2>"$errfile") || attribution_status=$?
+  # The check's last line must say how many commits it read, and that number must be the number sent; every line before it must be
+  # a note. Anything else (a crash, an old node, a missing module, a replaced file that prints nothing or refuses) is not an answer.
+  attribution_expected=$(jq -r '.commits | length' <<<"$attribution_input" 2>/dev/null) || attribution_expected=""
+  attribution_last=$(printf '%s\n' "$attribution_output" | tail -n 1)
+  attribution_other=$(printf '%s\n' "$attribution_output" | sed '$d' | grep -vc '^NOTE ' || true)
+  if [ "$attribution_status" -eq 0 ] && [ -n "$attribution_expected" ] && [ "$attribution_last" = "CHECKED $attribution_expected" ] && [ "$attribution_other" -eq 0 ]; then
+    attribution_notes=0
+    while IFS= read -r attribution_line; do
+      case "$attribution_line" in
+        "NOTE "*) say "note" "AI attribution: ${attribution_line#NOTE }"; attribution_notes=$((attribution_notes + 1)) ;;
+      esac
+    done <<<"$attribution_output"
+    if [ "$attribution_notes" -eq 0 ] && [ "${metadata_commits_proven:-0}" -eq 1 ]; then
+      say "ok" "no AI attribution in the title, body or commits"
+    fi
+  else
+    unknown "could not run the AI attribution check"
+  fi
+fi
 # Paginate changed files through the REST endpoint; gh pr view hard-codes a
 # first:100 GraphQL fragment in some versions. Retain the line counts as well:
 # the privacy scan can only be complete when the textual diff describes every
@@ -1291,7 +1331,7 @@ PY
   fi
 fi
 gate_paths=$(printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)")
-if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|scripts/review-tier|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
+if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|scripts/review-tier|scripts/check-ai-attribution|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
   bad "this pull request changes the merge gate or a workflow: a verdict about the gate cannot clear a change to the gate, so the merge is the owner's own act"
 fi
 echo

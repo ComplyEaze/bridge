@@ -72,6 +72,7 @@ async fn tally_status_uses_observed_gateway_product_and_preserves_wire_evidence(
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let before = tally_host_today();
@@ -195,6 +196,7 @@ async fn tally_status_failure_retains_completed_sources_in_response_and_history(
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let response = server.call_tool("tally_status", json!({})).await;
@@ -305,6 +307,7 @@ fn server_at(port: u16, max_bytes: usize) -> (Server, tempfile::TempDir) {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     (server, directory)
@@ -693,7 +696,7 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
             "bounded",
             "It does not show what the AI provider received.",
             "amounts included, is sent to the AI provider",
-            "redaction can only shorten party and ledger names and bank account numbers or drop narrations",
+            "redaction can only shorten party and ledger names, bank account numbers and ledger address lines, or drop narrations",
             "and does not hide amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or references, or the last four digits of a bank statement's account number (account_last4); under mask_parties a name written inside a narration or reference stays as it is",
             "Never tell the user that no data has left their computer.",
             "no figures or book content",

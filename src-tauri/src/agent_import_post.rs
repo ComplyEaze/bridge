@@ -1,11 +1,11 @@
 //! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra);
 //! subsequent calls only reconcile its identity.
-use super::approval::{self, ApprovalBinding, Begin, Joined, PreviewForm};
+use super::approval::{self, ApprovalBinding, Begin, HeldRequest, Joined, PreviewForm};
 use super::*;
 use crate::agent::evidence_from_runtime_read;
 use crate::tally::approved_import::{
     Answered, ApprovedImport, ApprovedImportAdmissionError, BeforeDispatchError,
-    PendingPostApproval, UnderLockRefusal,
+    PendingPostApproval, QueuedAdmission, UnderLockRefusal,
 };
 use bridge_tally_protocol::native_outstandings::{parse_company_currency, BaseCurrencyName};
 use bridge_tally_protocol::{parse_import_outcome, TallyImportApplicationStatus};
@@ -57,7 +57,7 @@ impl PostScope {
 const RECHECK_REFUSAL_BUDGET: usize = 4_096;
 
 /// Where a post stands with its person, when it returns without posting.
-enum ApprovalState {
+pub(super) enum ApprovalState {
     /// The dialog is open, with this much of its time limit left when known.
     Pending(Option<std::time::Duration>),
     Approved,
@@ -81,9 +81,19 @@ pub(in crate::agent) enum Entry {
 /// What a post's checked body came to: an answer, or an approval its Join
 /// found that the same call redeems by entering again from the top, so every
 /// check before the wait is made again after it.
-enum Step {
+pub(super) enum Step {
     Done(Box<ToolOutcome>),
     Redeem,
+}
+
+/// What an agent post's approval steps need to know about the post they serve,
+/// whichever kind it is: the tool a caller is told to call again, the batch,
+/// the company, and how many vouchers (one for a master) it would send.
+pub(super) struct ApprovalTarget<'a> {
+    pub(super) tool: &'a str,
+    pub(super) batch_id: &'a str,
+    pub(super) guid: &'a str,
+    pub(super) vouchers: usize,
 }
 
 /// What one pass of a post call came to: its answer, or a click its Join
@@ -98,7 +108,7 @@ pub(in crate::agent) enum Pass {
 }
 
 /// What waiting on a dialog came to.
-enum Waited {
+pub(super) enum Waited {
     /// Boxed: an approval carries an invoice's read plan (#1337), and the two
     /// other cases are a handle and a unit.
     Answered(Box<(Result<ApprovedImport, String>, Answered)>),
@@ -110,7 +120,7 @@ enum Waited {
 
 /// What is left of the call's budget for waiting on the person, never less
 /// than enough to have the dialog up before the call returns.
-fn call_budget(call_started: std::time::Instant) -> std::time::Duration {
+pub(super) fn call_budget(call_started: std::time::Instant) -> std::time::Duration {
     approval::CALL_BUDGET
         .saturating_sub(call_started.elapsed())
         .max(approval::MIN_DIALOG_WAIT)
@@ -148,7 +158,7 @@ fn after_read_retry_budget(
 /// admission read that meets a held lock is refused at once as
 /// `tally_endpoint_busy`, before the attempt is recorded and before anything is
 /// sent, rather than holding the call past its ceiling.
-fn redeem_pass_wire_budget(
+pub(super) fn redeem_pass_wire_budget(
     elapsed: std::time::Duration,
     shared_left: std::time::Duration,
 ) -> std::time::Duration {
@@ -174,7 +184,10 @@ fn after_read_cause(error: &anyhow::Error) -> &'static str {
 
 /// Wait up to `budget` for the person's answer, stopping at once if the call
 /// is withdrawn (#554): nothing is sent to Tally while waiting.
-async fn wait_for_answer(dialog: PendingPostApproval, budget: std::time::Duration) -> Waited {
+pub(super) async fn wait_for_answer(
+    dialog: PendingPostApproval,
+    budget: std::time::Duration,
+) -> Waited {
     let withdrawn = crate::tally::runtime::TOOL_CANCELLATION
         .try_with(Clone::clone)
         .ok();
@@ -273,7 +286,7 @@ impl Server {
     /// clean batch (#697). A busy refusal has waited that whole budget, so it
     /// is tried once more with a second, cut to what the call has left of its
     /// ceiling (#884); a refusal that survives is returned as it is.
-    async fn read_marks_after_post(
+    pub(super) async fn read_marks_after_post(
         &self,
         request: crate::tally::agent_read_request::AgentReadRequest,
         call_started: std::time::Instant,
@@ -415,8 +428,9 @@ impl Server {
     /// open (`pending`) or answered and not yet posted (`approved`). Nothing
     /// was sent to Tally; calling `post_import` again with the same batch
     /// waits on the dialog or posts the approved batch.
-    fn approval_outcome(
+    pub(super) fn approval_outcome(
         &self,
+        tool: &str,
         batch_id: &str,
         guid: &str,
         state: ApprovalState,
@@ -435,7 +449,7 @@ impl Server {
                     .approval_remaining(batch_id)
                     .map(|remaining| remaining.as_secs()),
                 "retry_after_s": 0,
-                "next_step": "Call post_import again now with the same batch: nothing is posted until you do, and the approval lapses after expires_in_s.",
+                "next_step": format!("Call {tool} again now with the same batch: nothing is posted until you do, and the approval lapses after expires_in_s."),
             }),
         };
         ToolOutcome {
@@ -449,6 +463,150 @@ impl Server {
             evidence,
             company_guid: Some(guid.to_string()),
             truncated: false,
+        }
+    }
+
+    /// What a call finds held for its batch, before it checks anything else
+    /// (#725): the one place an agent post's Pending, Redeem and Join are
+    /// decided, shared by the voucher and the master tools so neither forks it.
+    /// `Ok(Ok((redeeming, form)))` goes on, with the form the ask shows or the
+    /// approval is bound to; `Ok(Err(step))` is the call's answer, or a click
+    /// found that a second, redeem-only pass takes.
+    pub(super) async fn begin_agent_approval(
+        &self,
+        target: &ApprovalTarget<'_>,
+        redeem_only: bool,
+        call_started: std::time::Instant,
+        accumulated: &Evidence,
+    ) -> Result<Result<(bool, PreviewForm), Step>, ToolFailure> {
+        let ApprovalTarget {
+            tool,
+            batch_id,
+            guid,
+            vouchers,
+        } = *target;
+        // Re-entered to redeem what its Join found: only that approval lets it
+        // go on, and it never asks (#725 slice 2.0).
+        if redeem_only {
+            return Ok(Ok((true, self.post_approvals.begin_redeem(batch_id)?)));
+        }
+        match self.post_approvals.begin(batch_id) {
+            Begin::Ask(form) => Ok(Ok((false, form))),
+            Begin::Redeem(form) => Ok(Ok((true, form))),
+            Begin::Busy(code) => Err(code.to_string().into()),
+            Begin::Refused(code) => Err(code.into()),
+            Begin::Waiting => Ok(Err(Step::Done(Box::new(self.approval_outcome(
+                tool,
+                batch_id,
+                guid,
+                ApprovalState::Pending(None),
+                accumulated.clone(),
+            ))))),
+            Begin::Join(dialog) => {
+                // Only a click that landed while no call waited is posted by the
+                // call that finds it (#725 slice 2.0): posting after this call's
+                // own wait could run past the host's timeout on a large book
+                // (#852).
+                let answered_at_join = dialog.answered().is_some();
+                let waited = match wait_for_answer(dialog, call_budget(call_started)).await {
+                    Waited::Cancelled => return Err("request_cancelled".to_string().into()),
+                    Waited::Open(dialog) => Err(dialog),
+                    Waited::Answered(answer) => Ok(*answer),
+                };
+                match self.post_approvals.settle_join(batch_id, waited) {
+                    Joined::StillOpen { remaining } => {
+                        Ok(Err(Step::Done(Box::new(self.approval_outcome(
+                            tool,
+                            batch_id,
+                            guid,
+                            ApprovalState::Pending(Some(remaining)),
+                            accumulated.clone(),
+                        )))))
+                    }
+                    // Posted by this call when it found the click already made
+                    // and the redeem fits in it, entering again from the top so
+                    // every check is made anew.
+                    Joined::Approved
+                        if answered_at_join
+                            && self
+                                .post_approvals
+                                .redeem_fits_in_call(call_started.elapsed(), vouchers) =>
+                    {
+                        Ok(Err(Step::Redeem))
+                    }
+                    Joined::Approved => Ok(Err(Step::Done(Box::new(self.approval_outcome(
+                        tool,
+                        batch_id,
+                        guid,
+                        ApprovalState::Approved,
+                        accumulated.clone(),
+                    ))))),
+                    Joined::Refused(code) => Err(code.into()),
+                }
+            }
+        }
+    }
+
+    /// Ask the person in `asked`, wait for the answer within the call's budget,
+    /// and hold what came of it for a later call: the shared tail of every
+    /// agent post's approval. `Ok(Some(step))` is the call's answer (the dialog
+    /// is still open, or was answered too late in the call for the post to
+    /// fit); `Ok(None)` is an approval held for this call to take at once.
+    pub(super) async fn ask_and_hold(
+        &self,
+        target: &ApprovalTarget<'_>,
+        asked: PendingPostApproval,
+        binding: &ApprovalBinding,
+        held: impl Into<HeldRequest>,
+        call_started: std::time::Instant,
+        accumulated: &Evidence,
+    ) -> Result<Option<Step>, ToolFailure> {
+        let ApprovalTarget {
+            tool,
+            batch_id,
+            guid,
+            vouchers,
+        } = *target;
+        match wait_for_answer(asked, call_budget(call_started)).await {
+            Waited::Cancelled => Err("request_cancelled".to_string().into()),
+            Waited::Open(dialog) => {
+                let remaining = dialog.remaining();
+                self.post_approvals
+                    .hold_pending(batch_id, binding.clone(), dialog, held)?;
+                Ok(Some(Step::Done(Box::new(self.approval_outcome(
+                    tool,
+                    batch_id,
+                    guid,
+                    ApprovalState::Pending(Some(remaining)),
+                    accumulated.clone(),
+                )))))
+            }
+            Waited::Answered(answer) => {
+                let (answer, answered) = *answer;
+                self.post_approvals.hold_approved(
+                    batch_id,
+                    binding.clone(),
+                    answer?,
+                    held,
+                    answered,
+                )?;
+                // Answered too late in the call for the post to fit: the next
+                // call redeems it, after checking the book again.
+                if self
+                    .post_approvals
+                    .fits_in_call(call_started.elapsed(), vouchers)
+                {
+                    Ok(None)
+                } else {
+                    Ok(Some(Step::Done(Box::new(self.approval_outcome(
+                        tool,
+                        batch_id,
+                        guid,
+                        ApprovalState::Approved,
+                        accumulated.clone(),
+                    )))))
+                }
+            }
         }
     }
 
@@ -677,67 +835,25 @@ impl Server {
                 PostScope::JournalOnly => (false, PreviewForm::Listed),
                 // Re-entered to redeem what its Join found: only that
                 // approval lets it go on, and it never asks (#725 slice 2.0).
-                PostScope::Vouchers if redeem_only => {
-                    (true, self.post_approvals.begin_redeem(batch_id)?)
-                }
-                PostScope::Vouchers => match self.post_approvals.begin(batch_id) {
-                    Begin::Ask(form) => (false, form),
-                    Begin::Redeem(form) => (true, form),
-                    Begin::Busy(code) => return Err(code.to_string().into()),
-                    Begin::Refused(code) => return Err(code.into()),
-                    Begin::Waiting => {
-                        return Ok(Step::Done(Box::new(self.approval_outcome(
-                            batch_id,
-                            guid,
-                            ApprovalState::Pending(None),
-                            accumulated.clone(),
-                        ))))
-                    }
-                    Begin::Join(dialog) => {
-                        // Only a click that landed while no call waited is
-                        // posted by the call that finds it (#725 slice 2.0):
-                        // posting after this call's own wait could run past
-                        // the host's timeout on a large book (#852).
-                        let answered_at_join = dialog.answered().is_some();
-                        let waited = match wait_for_answer(dialog, call_budget(call_started)).await
-                        {
-                            Waited::Cancelled => {
-                                return Err("request_cancelled".to_string().into())
-                            }
-                            Waited::Open(dialog) => Err(dialog),
-                            Waited::Answered(answer) => Ok(*answer),
-                        };
-                        return match self.post_approvals.settle_join(batch_id, waited) {
-                            Joined::StillOpen { remaining } => {
-                                Ok(Step::Done(Box::new(self.approval_outcome(
-                                    batch_id,
-                                    guid,
-                                    ApprovalState::Pending(Some(remaining)),
-                                    accumulated.clone(),
-                                ))))
-                            }
-                            // Posted by this call when it found the click
-                            // already made and the redeem fits in it, entering
-                            // again from the top so every check is made anew.
-                            Joined::Approved
-                                if answered_at_join
-                                    && self.post_approvals.redeem_fits_in_call(
-                                        call_started.elapsed(),
-                                        line.vouchers.len(),
-                                    ) =>
-                            {
-                                Ok(Step::Redeem)
-                            }
-                            Joined::Approved => Ok(Step::Done(Box::new(self.approval_outcome(
+                PostScope::Vouchers => {
+                    match self
+                        .begin_agent_approval(
+                            &ApprovalTarget {
+                                tool: "post_import",
                                 batch_id,
                                 guid,
-                                ApprovalState::Approved,
-                                accumulated.clone(),
-                            )))),
-                            Joined::Refused(code) => Err(code.into()),
-                        };
+                                vouchers: line.vouchers.len(),
+                            },
+                            redeem_only,
+                            call_started,
+                            &accumulated,
+                        )
+                        .await?
+                    {
+                        Ok(asked) => asked,
+                        Err(step) => return Ok(step),
                     }
-                },
+                }
             };
             // Tally may have seen any REMOTEID the journal records, and resending
             // one can undo a person's cancel or delete (protocol reference §9.3).
@@ -981,7 +1097,7 @@ impl Server {
             let mut redemption = None;
             let (request, native) = match scope {
                 PostScope::JournalOnly => (
-                    ApprovedImport::confirm(
+                    ApprovedImport::confirm_vouchers(
                         xml,
                         &preview,
                         voucher_dates,
@@ -1019,45 +1135,23 @@ impl Server {
                             (form == PreviewForm::Listed && preview_lists_vouchers)
                                 .then(|| self.post_approvals.note_listed_did_not_fit(batch_id)),
                         );
-                        match wait_for_answer(asked, call_budget(call_started)).await {
-                            Waited::Cancelled => {
-                                return Err("request_cancelled".to_string().into())
-                            }
-                            Waited::Open(dialog) => {
-                                let remaining = dialog.remaining();
-                                self.post_approvals
-                                    .hold_pending(batch_id, binding, dialog, native)?;
-                                return Ok(Step::Done(Box::new(self.approval_outcome(
+                        if let Some(step) = self
+                            .ask_and_hold(
+                                &ApprovalTarget {
+                                    tool: "post_import",
                                     batch_id,
                                     guid,
-                                    ApprovalState::Pending(Some(remaining)),
-                                    accumulated.clone(),
-                                ))));
-                            }
-                            Waited::Answered(answer) => {
-                                let (answer, answered) = *answer;
-                                self.post_approvals.hold_approved(
-                                    batch_id,
-                                    binding.clone(),
-                                    answer?,
-                                    native,
-                                    answered,
-                                )?;
-                                // Answered too late in the call for the post to
-                                // fit: the next call redeems it, after checking
-                                // the book again.
-                                if !self
-                                    .post_approvals
-                                    .fits_in_call(call_started.elapsed(), line.vouchers.len())
-                                {
-                                    return Ok(Step::Done(Box::new(self.approval_outcome(
-                                        batch_id,
-                                        guid,
-                                        ApprovalState::Approved,
-                                        accumulated.clone(),
-                                    ))));
-                                }
-                            }
+                                    vouchers: line.vouchers.len(),
+                                },
+                                asked,
+                                &binding,
+                                native,
+                                call_started,
+                                &accumulated,
+                            )
+                            .await?
+                        {
+                            return Ok(step);
                         }
                     }
                     // The dialog may have stayed open: an invoice's masters are
@@ -1086,9 +1180,16 @@ impl Server {
                         accumulated = combine_evidence(accumulated.clone(), evidence);
                         invoice_plan = Some(plan);
                     }
-                    let (taken, request, native) =
+                    let (taken, request, held) =
                         self.post_approvals.take_for_dispatch(batch_id, &binding)?;
                     redemption = Some(taken);
+                    // The binding was a voucher binding, so only a voucher
+                    // request can come back; a master request here is a wiring
+                    // fault, refused as a changed binding with the approval
+                    // unspent (the redemption lapses as this returns).
+                    let HeldRequest::Vouchers(native) = held else {
+                        return Err("import_approval_binding_changed".to_string().into());
+                    };
                     (request.with_invoice(invoice_plan.clone()), native)
                 }
             };
@@ -1120,35 +1221,15 @@ impl Server {
                     &identity,
                     request,
                     |queued| {
-                        recheck_import_admission(
+                        recheck_voucher_queue(
+                            queued,
                             &line,
                             &identity,
-                            queued.first,
-                            queued.second,
-                            queued.catalogue,
-                            queued.groups,
-                            queued.currencies,
-                            queued.ledger_binding,
+                            &aimed_mark,
                             invoice_identity,
-                            queued.invoice,
                             invoice_control.as_ref(),
-                        )?;
-                        admit_queued_aim(
-                            queued.company_marks_at_binding,
-                            queued.company_marks,
-                            identity.company_guid(),
-                            &company.name,
                             &numbering_admission,
-                        )?;
-                        let mark = location::aimed_voucher_mark(
-                            queued.company_marks,
-                            identity.company_guid(),
-                            &company.name,
-                        );
-                        if let Ok(mut aimed) = aimed_mark.lock() {
-                            *aimed = mark;
-                        }
-                        Ok(())
+                        )
                     },
                     || {
                         // The file lock covers only the admission+synced append. It is not
@@ -1290,155 +1371,7 @@ impl Server {
                         _ => None,
                     }
                 });
-                let code = if error.chain().any(|cause| {
-                    cause.is::<crate::tally::approved_import::AmbiguousImportCompany>()
-                }) {
-                    "import_company_scope_ambiguous"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
-                    )
-                }) {
-                    "education_voucher_date_unsupported"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::PreexistingIdentity)
-                    )
-                }) {
-                    "import_preexisting_identity"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::LedgerIdentityChanged)
-                    )
-                }) {
-                    "import_masters_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BankClassificationChanged)
-                    )
-                }) {
-                    "import_bank_classification_changed"
-                } else if invoice_field.is_some() {
-                    "import_invoice_masters_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CashLedgerNotCashInHand { .. })
-                    )
-                }) {
-                    "cash_ledger_not_cash_in_hand"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CashLedgersNotRecorded)
-                    )
-                }) {
-                    CASH_LEDGERS_NOT_RECORDED
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BillWiseNotRecorded)
-                    )
-                }) {
-                    super::bill_wise::BILL_WISE_NOT_RECORDED
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BillWiseChanged)
-                    )
-                }) {
-                    "import_bill_wise_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
-                    )
-                }) {
-                    "ledger_has_folded_twin"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::AdmissionInconsistent)
-                    )
-                }) {
-                    "import_post_admission_inconsistent"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CompanyScopeChanged)
-                    )
-                }) {
-                    "post_company_scope_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CompanyScopeUnconfirmed)
-                    )
-                }) {
-                    "post_company_scope_unconfirmed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::MultiCurrencyBook { .. })
-                    )
-                }) {
-                    "import_multi_currency_unsupported"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BaseCurrencyUndetermined)
-                    )
-                }) {
-                    "import_base_currency_undetermined"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::MastersMoved)
-                    )
-                }) {
-                    "post_masters_moved"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::MastersUnconfirmed)
-                    )
-                }) {
-                    "post_masters_unconfirmed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CatalogueUnreadable(_))
-                    )
-                }) {
-                    "post_catalogue_unreadable"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::GroupExportInvalid { .. })
-                    )
-                }) {
-                    "group_export_invalid"
-                } else if let Some(refusal) = error
-                    .chain()
-                    .find_map(|cause| cause.downcast_ref::<UnderLockRefusal>())
-                {
-                    // Refused under the admission lock before the intent was
-                    // appended (#711): nothing was recorded or sent.
-                    refusal.code()
-                } else if error
-                    .chain()
-                    .any(|cause| cause.is::<crate::tally::approved_import::PreIntentQueueRefusal>())
-                {
-                    // Refused in the queue before the intent (#656): nothing
-                    // was sent, so the outcome is known.
-                    "post_queue_read_failed"
-                } else {
-                    "import_dispatch_outcome_unknown"
-                };
+                let code = refusal_code(&error);
                 let code = invoice_refusal.as_deref().unwrap_or(code);
                 // A queue read that failed in transport has no typed cause of
                 // its own; the transport's safe code names it.
@@ -1806,6 +1739,247 @@ impl Server {
     }
 }
 
+/// The queue's recheck of a voucher post: the batch's vouchers against the
+/// reads the queue made, then the aim, remembering the target's voucher mark
+/// from the aim snapshot for the intent. A master admission handed to it is a
+/// wiring fault, refused with a typed error and never posted.
+#[allow(clippy::too_many_arguments)]
+fn recheck_voucher_queue(
+    queued: QueuedAdmission<'_>,
+    line: &ImportLedgerLine,
+    identity: &crate::tally::VerifiedCompanyIdentity,
+    aimed_mark: &std::sync::Mutex<Option<u64>>,
+    invoice_identity: InvoiceIdentity,
+    invoice_control: Option<&ledger::NumberControl>,
+    numbering: &numbering::NumberingAdmission,
+) -> anyhow::Result<()> {
+    let QueuedAdmission::Vouchers {
+        first,
+        second,
+        catalogue,
+        groups,
+        currencies,
+        company_marks_at_binding,
+        company_marks,
+        ledger_binding,
+        invoice,
+    } = queued
+    else {
+        return Err(ApprovedImportAdmissionError::AdmissionInconsistent.into());
+    };
+    let (company_guid, company_name) = (identity.company_guid(), identity.display_name());
+    recheck_import_admission(
+        line,
+        identity,
+        first,
+        second,
+        catalogue,
+        groups,
+        currencies,
+        ledger_binding,
+        invoice_identity,
+        invoice,
+        invoice_control,
+    )?;
+    admit_queued_voucher_aim(
+        company_marks_at_binding,
+        company_marks,
+        company_guid,
+        company_name,
+        numbering,
+    )?;
+    let mark = location::aimed_voucher_mark(company_marks, company_guid, company_name);
+    if let Ok(mut aimed) = aimed_mark.lock() {
+        *aimed = mark;
+    }
+    Ok(())
+}
+
+/// The code a refused or failed approved post reports, from the typed cause
+/// in its error chain. The first cause that has a rung names it; a refusal
+/// that was made before the intent and has no rung of its own is
+/// `post_queue_read_failed`, and anything else is an unknown outcome, so a
+/// cause added without a rung here is reported as one of those two rather
+/// than as itself. Both a voucher post and a master post end here.
+pub(super) fn refusal_code(error: &anyhow::Error) -> &'static str {
+    if error
+        .chain()
+        .any(|cause| cause.is::<crate::tally::approved_import::AmbiguousImportCompany>())
+    {
+        "import_company_scope_ambiguous"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
+        )
+    }) {
+        "education_voucher_date_unsupported"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::PreexistingIdentity)
+        )
+    }) {
+        "import_preexisting_identity"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::LedgerIdentityChanged)
+        )
+    }) {
+        "import_masters_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BankClassificationChanged)
+        )
+    }) {
+        "import_bank_classification_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::InvoiceMastersChanged { .. })
+        )
+    }) {
+        "import_invoice_masters_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CashLedgerNotCashInHand { .. })
+        )
+    }) {
+        "cash_ledger_not_cash_in_hand"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CashLedgersNotRecorded)
+        )
+    }) {
+        CASH_LEDGERS_NOT_RECORDED
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BillWiseNotRecorded)
+        )
+    }) {
+        super::bill_wise::BILL_WISE_NOT_RECORDED
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BillWiseChanged)
+        )
+    }) {
+        "import_bill_wise_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+        )
+    }) {
+        "ledger_has_folded_twin"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::AdmissionInconsistent)
+        )
+    }) {
+        "import_post_admission_inconsistent"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CompanyScopeChanged)
+        )
+    }) {
+        "post_company_scope_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CompanyScopeUnconfirmed)
+        )
+    }) {
+        "post_company_scope_unconfirmed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MultiCurrencyBook { .. })
+        )
+    }) {
+        "import_multi_currency_unsupported"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BaseCurrencyUndetermined)
+        )
+    }) {
+        "import_base_currency_undetermined"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MastersMoved)
+        )
+    }) {
+        "post_masters_moved"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MastersUnconfirmed)
+        )
+    }) {
+        "post_masters_unconfirmed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CatalogueUnreadable(_))
+        )
+    }) {
+        "post_catalogue_unreadable"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::GroupExportInvalid { .. })
+        )
+    }) {
+        "group_export_invalid"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MasterWritesNeedLicensedMode)
+        )
+    }) {
+        "master_writes_need_licensed_mode"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MasterNameTaken { .. })
+        )
+    }) {
+        "master_name_taken"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MasterLedgerIndexUnavailable { .. })
+        )
+    }) {
+        "master_ledger_index_unavailable"
+    } else if let Some(refusal) = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<UnderLockRefusal>())
+    {
+        // Refused under the admission lock before the intent was
+        // appended (#711): nothing was recorded or sent.
+        refusal.code()
+    } else if error
+        .chain()
+        .any(|cause| cause.is::<crate::tally::approved_import::PreIntentQueueRefusal>())
+    {
+        // Refused in the queue before the intent (#656): nothing
+        // was sent, so the outcome is known.
+        "post_queue_read_failed"
+    } else {
+        "import_dispatch_outcome_unknown"
+    }
+}
+
 fn post_failure_outcome(
     batch_id: &str,
     guid: &str,
@@ -1833,7 +2007,7 @@ fn post_failure_outcome(
 /// The cause a failure adds to its code: none when it would only repeat the
 /// code, as a wire refusal's transport code does once `from_runtime` made it the
 /// code itself (#697).
-fn refusal_cause(
+pub(super) fn refusal_cause(
     code: &str,
     group: Option<&'static str>,
     transport: Option<&'static str>,
@@ -2243,16 +2417,16 @@ fn name_preexisting_rows(
 
 /// The aim check on the snapshot the queue read last before the POST (#574).
 /// The aim check (#574), then the master mark (#239): the target's ALTMSTID in
-/// the aim snapshot must equal the one read as the queue's binding reads began,
-/// and that one must equal the mark the voucher numbering was read under before
-/// the approval (bridge#724), so no master moved from that read to the POST.
-fn admit_queued_aim(
+/// the aim snapshot must equal the one read as the queue's binding reads began.
+/// A voucher post and a master post both make it; the binding snapshot's rows
+/// are returned for the check only a voucher post adds
+/// ([`admit_queued_voucher_aim`]).
+pub(super) fn admit_queued_aim(
     marks_at_binding: &str,
     marks: &str,
     company_guid: &str,
     company_name: &str,
-    numbering: &numbering::NumberingAdmission,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<location::LoadedCompanyMarks>> {
     let rows = location::parse_all_company_marks(marks)
         .map_err(|_| ApprovedImportAdmissionError::CompanyScopeUnconfirmed)?;
     location::admit_post_target(&rows, company_guid, company_name)
@@ -2264,6 +2438,20 @@ fn admit_queued_aim(
         Some(false) => return Err(ApprovedImportAdmissionError::MastersMoved.into()),
         None => return Err(ApprovedImportAdmissionError::MastersUnconfirmed.into()),
     }
+    Ok(at_binding)
+}
+
+/// [`admit_queued_aim`] for a voucher post, whose binding snapshot must also
+/// equal the mark the voucher numbering was read under before the approval
+/// (bridge#724), so no master moved from that read to the POST.
+fn admit_queued_voucher_aim(
+    marks_at_binding: &str,
+    marks: &str,
+    company_guid: &str,
+    company_name: &str,
+    numbering: &numbering::NumberingAdmission,
+) -> anyhow::Result<()> {
+    let at_binding = admit_queued_aim(marks_at_binding, marks, company_guid, company_name)?;
     numbering
         .admit_at_binding(&at_binding, company_guid, company_name)
         .map_err(Into::into)

@@ -55,8 +55,8 @@ use bridge_tally_protocol::{
     company_list_may_be_in_educational_mode, decode_tally_xml_response_bytes_limited,
     export_status, parse_companies_from_collection, parse_company_gateway_capability_observation,
     parse_import_evidence, parse_import_outcome, parse_import_result, parse_ledger_census_slice,
-    parse_ledger_source_records_with_evidence, parse_ledgers, parse_ledgers_with_evidence,
-    parse_native_group_source_records_with_evidence,
+    parse_ledger_name_index, parse_ledger_source_records_with_evidence, parse_ledgers,
+    parse_ledgers_with_evidence, parse_native_group_source_records_with_evidence,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_with_evidence,
     parse_native_voucher_source_records_with_evidence,
@@ -285,10 +285,12 @@ const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
 const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
+const MASTERS_LAB_GUID: &str = "f107e523-3d6b-4516-bd24-5b1a14498fa6";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const GST_LEDGER_LAB_GUID: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
+const MAILING_LAB_GUID: &str = "8e34483e-2bd3-472b-ae37-c4b197e8c15a";
 const TIEOUT_B_GUID: &str = "d64eda55-da7c-4106-a171-3e3cb6cdd331";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
@@ -966,6 +968,30 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_standard_ledger_catalog_with_identities(OUTSTANDINGS LAB)",
         parse: |_, text| catalogue(text, "BRIDGE OUTSTANDINGS LAB", OUTSTANDINGS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-ledger-index-baseline.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-ledger-index-after-name-cases.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-ledger-index-after-fold-cases.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-groups-baseline.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(MASTERS LAB)",
+        parse: |_, text| groups(text, MASTERS_LAB_GUID),
     },
     Row {
         fixture: "tests/fixtures/agent/shape-lab-standard-ledger-catalogue.utf16le.xml",
@@ -1896,6 +1922,18 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_party_ledger_master_records_with_evidence(READS LAB)",
         parse: |_, text| party_masters(text, READS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(MAILING LAB)",
+        parse: |_, text| party_masters(text, MAILING_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/native-party-masters-without-mailing-details.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(MAILING LAB, list not named)",
+        parse: |_, text| party_masters(text, MAILING_LAB_GUID),
     },
     Row {
         fixture: "tests/fixtures/agent/native-party-masters.utf16le.xml",
@@ -2896,6 +2934,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/stock-lab-day/stock_lab_taxed_day_company_marks_response.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
         APP_HIGH_WATER,
     ),
     (

@@ -1992,6 +1992,7 @@ fn a_detail_window_refusal_carries_its_size_remedy_and_window_to_the_caller() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let refusal = || {

@@ -1230,6 +1230,306 @@
       "seed_basis": "synthetic lab book loaded empty; see COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md",
       "sha256": "30ad5317b6fe566b420e435df73274286c21e365934227bc53cfcd8a232a7e88",
       "size": 4818
+    },
+    {
+      "blob": "5bb1f14e88c5b1e770f0f93a278083e742dfebce",
+      "capture_id": "masters-m1-marks/ledger-index-after-m1-shapes.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/ledger-index-after-m1-shapes.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "847eefb5779cd19e909ec4d592b8165c62ba0ecb8fcdba0262e9d9b61aed0b7b",
+      "size": 26750
+    },
+    {
+      "blob": "b69724c2cc7de41f0245eac6c5d727f054f097a1",
+      "capture_id": "masters-m1-marks/ledger-index-after-probe-create.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/ledger-index-after-probe-create.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "8bc9b48b0c7ca0654b71f9db6e834b151a44c593b3868b0aac52f9e2571bdbdc",
+      "size": 28064
+    },
+    {
+      "blob": "b730feca57b653cc302ff00dcac409415bdb80ea",
+      "capture_id": "masters-m1-marks/marks-00-baseline.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-00-baseline.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "1d1d0d2a9c6c43e749624621578fd63ce4b884d5b430690555ce739718e5eea1",
+      "size": 3308
+    },
+    {
+      "blob": "8c58e1631e066b8816879c68e5a1515cfadbd559",
+      "capture_id": "masters-m1-marks/marks-01-n-0a.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-01-n-0a.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "4614d0f31e8651eaf1de59b9b72f1f945ba62403d560edaec69ea02a11252e0f",
+      "size": 3308
+    },
+    {
+      "blob": "7e0e82deb6d8cf277a6691ffda92151875b103b3",
+      "capture_id": "masters-m1-marks/marks-02-n-0b.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-02-n-0b.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "ea7b5d57faeab124496342624a26a9be9e4151a80509ffe12fb48b941f97d083",
+      "size": 3308
+    },
+    {
+      "blob": "7e0e82deb6d8cf277a6691ffda92151875b103b3",
+      "capture_id": "masters-m1-marks/marks-03-n-a.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-03-n-a.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "ea7b5d57faeab124496342624a26a9be9e4151a80509ffe12fb48b941f97d083",
+      "size": 3308
+    },
+    {
+      "blob": "108433f7b1587811e754ce96385663983d6f4575",
+      "capture_id": "masters-m1-marks/marks-04-n-b.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-04-n-b.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "e0ebd57615ea52e748c74a3f662bcb07b4c243bd8247da66fa9478a1e26c16f6",
+      "size": 3308
+    },
+    {
+      "blob": "03550a12a0002cf7b3902b5807ae6b5ac8ada64f",
+      "capture_id": "masters-m1-marks/marks-05-n-c.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-05-n-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "caaaccf44d2a36f1a1865ed1ebbeaf076f8937658330f9e1a22625898f7b1fe9",
+      "size": 3310
+    },
+    {
+      "blob": "60bb73f0aaf29e229f295e577c451b84461a3b3d",
+      "capture_id": "masters-m1-marks/marks-06-n-d.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-06-n-d.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "0e81363596c168fec435cf897adb9bbdaed8135d1799222fde000d1e93fec9ed",
+      "size": 3310
+    },
+    {
+      "blob": "53f9dd41c308831ff2735aff6959a0840553446a",
+      "capture_id": "masters-m1-marks/marks-07-n-f.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-07-n-f.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "35ad1bf55e9909e92fd7f65971ed4244bd00689d0619d294fe39478f25723a34",
+      "size": 3310
+    },
+    {
+      "blob": "05f9f0e707892fd1fd3479a3dd1aabb2e4314424",
+      "capture_id": "masters-m1-marks/marks-08-n-e.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-08-n-e.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "adad350a4fda5d435c6b2c401042c135c848f7b40715e517b5f41b92977448a7",
+      "size": 3310
+    },
+    {
+      "blob": "338102c9971bf658b7c9fe6dc00e142b18508c86",
+      "capture_id": "masters-m1-marks/marks-09-m1-party.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-09-m1-party.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "47f0cc36aa37492c07ae536af2107ec2a6c852144c5febc774a871ab1151bcbb",
+      "size": 3308
+    },
+    {
+      "blob": "c36b31382921456c81a7298638f45346e411bb66",
+      "capture_id": "masters-m1-marks/marks-10-m1-susp.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-10-m1-susp.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "01282f84d0b5a55ef5376ba41bd43efc5d0e1895f7173e28e85e8b8910058ee7",
+      "size": 3308
+    },
+    {
+      "blob": "8fb628cf82553ee0258d9d9b4507de7117f9867e",
+      "capture_id": "masters-m1-marks/marks-11-m1-duty-cgst.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-11-m1-duty-cgst.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "aac88a06614c5832aa7ea12be7ead9c39c4ff0c941f3ecd3e9f72978a42c9e51",
+      "size": 3308
+    },
+    {
+      "blob": "c624b11c5a5cb1113692d290239672d56d23487d",
+      "capture_id": "masters-m1-marks/marks-12-m1-duty-igst.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-12-m1-duty-igst.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "95853e8ce37c245bcd59093c4fd7eeea4085d73b52feba686935efccef963785",
+      "size": 3308
+    },
+    {
+      "blob": "529fd89661899ba01ae5efad0fc5ae0845d57036",
+      "capture_id": "masters-m1-marks/marks-13-m1-duty-state.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-13-m1-duty-state.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "1bab57c9927dea5c6235fe0e55347b391095cb266ae2b381bb0930af1caef931",
+      "size": 3308
+    },
+    {
+      "blob": "0360d93755bb3d2c6412a15f3a982acc6551c911",
+      "capture_id": "masters-m1-marks/marks-14-m1-duty-sgstutgst.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-14-m1-duty-sgstutgst.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "207c8928d1baabc5963232245ed03834c5209a777c708ef9426f3470a1a2fe26",
+      "size": 3308
+    },
+    {
+      "blob": "da7b9c3f1e707d005b05ce28863753f91ee0c3b1",
+      "capture_id": "masters-m1-marks/marks-15-m1-duty-ut.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-15-m1-duty-ut.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "ac4f475ec4fa5816d26c2c7cb322134dbbe41aafa8ca6c80c27a8da697216e3d",
+      "size": 3308
+    },
+    {
+      "blob": "f87f7059021a14d71fa651590f7873abebc5afab",
+      "capture_id": "masters-m1-marks/marks-16-m1-duty-cess.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-16-m1-duty-cess.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "2a199d020a365fd8d16362df47e46b61c56e39afab97a4b7d25504d703805b42",
+      "size": 3308
+    },
+    {
+      "blob": "05a496c47fb86eac81870457f681d19a99540008",
+      "capture_id": "masters-m1-marks/marks-17-q-0.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-17-q-0.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "9891a16b28019a643ecf0e8fc67c6f89b741e26f98f52cfcda3e03f8aa78cd95",
+      "size": 3308
+    },
+    {
+      "blob": "1839d96c63673338630968980740d33b369d22be",
+      "capture_id": "masters-m1-marks/marks-18-q-r.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-18-q-r.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "bb7fa3fd79cf35a15256ce4414d69063fccb1c235e2cb66cbfbdbd7f074aa78d",
+      "size": 3310
+    },
+    {
+      "blob": "3e36f4ea269537228b53f61ca528b4fd9bdccb6f",
+      "capture_id": "masters-m1-marks/marks-19-q-a.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-19-q-a.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "b5fd82d94d3cfa6aaf68de162b0426fc9e603451748231723d4cb0a7e96119c6",
+      "size": 3310
+    },
+    {
+      "blob": "9cc0a612cde0ad6015054504c423bd745e9f47e5",
+      "capture_id": "masters-m1-marks/marks-20-q-c0.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-20-q-c0.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "c9ff9ecb12002d7a9ef11554d461634576763cadd242ea6d0967252e5f0a4595",
+      "size": 3310
+    },
+    {
+      "blob": "e3629ce0d0b4c0bd5f2841c0ee6e6e40cb43bc93",
+      "capture_id": "masters-m1-marks/marks-21-q-c.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-21-q-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "10f6c8127f5373ebf3a88e8691230e15368993c66a18ddf735047ce66e3a10b9",
+      "size": 3310
+    },
+    {
+      "blob": "f15b161fab9c4fc1a1aa73e9843b396cea02429d",
+      "capture_id": "statement_balance_sheet_opening_difference_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_balance_sheet_opening_difference_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "01113e741c2a22ced9e7aa2471a518a2b3931f2ff39579dc7e8e4d8efd7a61f8",
+      "size": 1850
+    },
+    {
+      "blob": "5c6eb2ace2767958ba7a64c00cf97d0851158b02",
+      "capture_id": "statement_balance_sheet_opening_difference_fy_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_balance_sheet_opening_difference_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "140d2c4b42d0bf097108101eb9639fa80aab373a6011dbae7beeeab0d2f2fbc7",
+      "size": 756
+    },
+    {
+      "blob": "371e3a8863aa69ac5a315a2aefbe20928e1c5f21",
+      "capture_id": "statement_profit_and_loss_opening_difference_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_difference_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "4278ab03fd46f83350ac45b005d81aff1ae4a41d0242b06257f5a5ba624fb1e4",
+      "size": 1624
+    },
+    {
+      "blob": "0c4707779c8c59d5efbee1b459d4190c132bd152",
+      "capture_id": "statement_profit_and_loss_opening_difference_fy_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_difference_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ff2275a33834338811b0791778f46c0da0d6e479d2471689dd5e441d65267089",
+      "size": 760
+    },
+    {
+      "blob": "87ba0b33d89fcfb55c7942252de608b1c3350942",
+      "capture_id": "statement_trial_balance_opening_difference_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_trial_balance_opening_difference_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5a1d6ffbf61211d000217e91a1a7fa76bea0bcc6a9e429d25be05607540a40c2",
+      "size": 11128
+    },
+    {
+      "blob": "5adce8e8bcb3602834832f96858cc025daafd11a",
+      "capture_id": "statement_trial_balance_opening_difference_fy_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_trial_balance_opening_difference_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "71978ac472922d01e16864b61bb65ecf342e7070bb0ebbea068dd52abdad2559",
+      "size": 1142
     }
   ]
 }

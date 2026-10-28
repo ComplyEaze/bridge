@@ -1,6 +1,7 @@
 //! Read profiles for the local MCP adapter.
 use super::*;
 use bridge_tally_core::TallyDate;
+use bridge_tally_protocol::ledger_scope::LedgerScopeName;
 
 /// The FETCH list for reads that RETURN bill allocations.
 ///
@@ -156,6 +157,64 @@ pub(super) fn render_agent_voucher_census(
     to: &TallyDate,
     span: Option<AlterIdSpan>,
 ) -> Result<String, String> {
+    render_voucher_census(company, VoucherScope::Book, from, to, span)
+}
+
+/// The census of [`render_agent_voucher_census`] for the vouchers of one ledger (#485): the same
+/// light row per voucher, in the same window, read as a `Vouchers : Ledger` collection `CHILDOF`
+/// the ledger, always in an AlterID span (every answer observed was spanned; an unspanned ledger
+/// census has not been observed). Read on `BRIDGE CORPUS DENSE` (TallyPrime 7.2 Silver, 28 Oct
+/// 2026): a day of one ledger as 82 vouchers, equal to the book-wide read of that day; a year of
+/// another ledger as 248 vouchers over four spans, equal to its unspanned ledger-scoped read; an
+/// empty span an empty collection (protocol reference section 11c.6, lab
+/// `lab/485-ledger-census-spans-answers`). A CANDIDATE: no tool sends it until the movement read
+/// plans its window from it. Not observed: a name that matches no ledger, and whether a voucher
+/// with two lines on the ledger is listed twice.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) fn render_agent_ledger_census(
+    company: &str,
+    ledger: &LedgerScopeName,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: AlterIdSpan,
+) -> Result<String, String> {
+    render_voucher_census(company, VoucherScope::Ledger(ledger), from, to, Some(span))
+}
+
+/// The vouchers a windowed request reads: the book's, or one ledger's (#485). A ledger enters a
+/// request only as a [`LedgerScopeName`], admitted once and closed.
+#[derive(Clone, Copy)]
+enum VoucherScope<'a> {
+    Book,
+    Ledger(&'a LedgerScopeName),
+}
+
+impl VoucherScope<'_> {
+    /// The collection's name (the request header's `ID` is the same) and its `TYPE` element, with
+    /// the `CHILDOF` element after it for a ledger. `book` and `ledger` are the two names.
+    fn collection(self, book: &'static str, ledger: &'static str) -> (&'static str, String) {
+        match self {
+            Self::Book => (book, "<TYPE>Voucher</TYPE>".to_string()),
+            Self::Ledger(name) => (
+                ledger,
+                format!(
+                    "<TYPE>Vouchers : Ledger</TYPE><CHILDOF>{}</CHILDOF>",
+                    xml_escape(name.as_str())
+                ),
+            ),
+        }
+    }
+}
+
+fn render_voucher_census(
+    company: &str,
+    scope: VoucherScope<'_>,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: Option<AlterIdSpan>,
+) -> Result<String, String> {
+    let (collection, type_element) =
+        scope.collection("Bridge Agent Voucher Census", "Bridge Agent Ledger Census");
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
     let span_filter = span.map(AlterIdSpan::filter).unwrap_or_default();
@@ -163,7 +222,7 @@ pub(super) fn render_agent_voucher_census(
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Voucher Census</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentCensus\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Voucher Census\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>GUID,ALTERID,DATE</FETCH><FILTERS>BridgeAgentCensus</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentCensus\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>GUID,ALTERID,DATE</FETCH><FILTERS>BridgeAgentCensus</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str())
     ))
 }
@@ -176,13 +235,82 @@ fn render_windowed_vouchers(
     fetch: &str,
     computes: &str,
 ) -> Result<String, String> {
+    render_scoped_vouchers(
+        company,
+        VoucherScope::Book,
+        from,
+        to,
+        alter_filter,
+        fetch,
+        computes,
+    )
+}
+
+/// The field list of a ledger-scoped voucher read: a closed set, never text from a caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) enum LedgerVoucherFields {
+    /// The movement read's: the three entry fields movement uses ([`AGENT_MOVEMENT_FETCH`]).
+    Movement,
+    /// The window read's: every entry field and the invoice fields ([`AGENT_VOUCHER_FETCH`]).
+    Window,
+}
+
+impl LedgerVoucherFields {
+    #[cfg_attr(not(test), allow(dead_code))]
+    fn fetch(self) -> &'static str {
+        match self {
+            Self::Movement => AGENT_MOVEMENT_FETCH,
+            Self::Window => AGENT_VOUCHER_FETCH,
+        }
+    }
+}
+
+/// A voucher read (`Bridge Agent Ledger Vouchers`) for the vouchers of one ledger (#485): the
+/// book-wide read's window formula, read as a `Vouchers : Ledger` collection `CHILDOF` the ledger,
+/// with the field list `fields` names and nothing else different. Observed without an AlterID span
+/// only: with [`LedgerVoucherFields::Movement`] a month of one ledger as 21 vouchers, equal to the
+/// census rows of that month, whose lines sum to the committed one-month Trial Balance's debit for
+/// the ledger; [`LedgerVoucherFields::Window`] differs from it in the `FETCH` element alone and
+/// was read by the lab for the bill trail (#1356). A spanned form has not been observed and is not
+/// offered. A CANDIDATE: no tool sends it yet.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) fn render_agent_ledger_vouchers(
+    company: &str,
+    ledger: &LedgerScopeName,
+    fields: LedgerVoucherFields,
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Result<String, String> {
+    render_scoped_vouchers(
+        company,
+        VoucherScope::Ledger(ledger),
+        from,
+        to,
+        "",
+        fields.fetch(),
+        "",
+    )
+}
+
+fn render_scoped_vouchers(
+    company: &str,
+    scope: VoucherScope<'_>,
+    from: &TallyDate,
+    to: &TallyDate,
+    alter_filter: &str,
+    fetch: &str,
+    computes: &str,
+) -> Result<String, String> {
+    let (collection, type_element) =
+        scope.collection("Bridge Agent Vouchers", "Bridge Agent Ledger Vouchers");
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Vouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{alter_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Vouchers\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{fetch}</FETCH>{computes}<FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{alter_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>{fetch}</FETCH>{computes}<FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str())
     ))
 }

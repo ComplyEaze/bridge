@@ -130,7 +130,7 @@ test("a commit whose identity names an assistant counts like a trailer, and a sq
   const byIdentity = evaluate(input({ commits: [commit("A fix", SHA, ["Claude", `noreply@${"anthropic.com"}`])] }));
   assert.equal(byIdentity.findings.length, 1);
   assert.match(byIdentity.findings[0], /an author or committer identity naming an assistant; a squash merge can copy it into the commit on master as a Co-authored-by line/);
-  assert.deepEqual(evaluate(input({ commits: [commit("A fix", SHA, ["A Person", "person@example.invalid", "GitHub", "noreply@github.com"])] })), { findings: [] });
+  assert.deepEqual(evaluate(input({ commits: [commit("A fix", SHA, ["A Person", "person@example.invalid", "GitHub", `noreply@${"github.com"}`])] })), { findings: [] });
 });
 
 test("the body and title may not carry a Co-authored-by line naming an assistant either, since a squash merge copies the body into master", () => {

@@ -1691,7 +1691,7 @@ fn the_guide_and_the_tool_description_say_only_what_the_read_back_checks() {
         "make sure Tally is idle and answering",
         // The failure answers.
         "A failure answer that says the create may have been sent says the same.",
-        "When the journal could not be read for that answer, it says it is not known whether a send was recorded: call post_ledger_creates with the same batch_id again, which reads the book back and sends nothing if a send is on file, otherwise asks for approval again before anything is sent, and is refused as master_batch_not_found, sending nothing, if ComplyEaze Bridge holds no such batch",
+        "When the journal could not be read for that answer, a failure other than a refusal under the journal's lock made after the lock read the journal says it is not known whether a send was recorded: call post_ledger_creates with the same batch_id again, which reads the book back and sends nothing if a send is on file, otherwise asks for approval again before anything is sent, and is refused as master_batch_not_found, sending nothing, if ComplyEaze Bridge holds no such batch",
     ] {
         assert!(guide.contains(sentence), "guide: {sentence}");
     }
@@ -2559,21 +2559,22 @@ async fn an_open_dispatch_recorded_while_the_dialog_is_open_refuses_under_the_lo
         .is_none());
 }
 
-/// The same refusal under the lock when the journal cannot be read for the
-/// lookup that names the batches: the fields are left out, and the next step is
-/// the one that is true without them.
+/// The same refusal under the lock when the journal is busy for the lookup that
+/// names the batches: the answer is the journal the lock read when it refused,
+/// which names the holder, never "not known" (#2083).
 #[tokio::test]
-async fn the_refusal_under_the_lock_leaves_the_batches_out_when_its_lookup_finds_the_journal_busy()
-{
+async fn the_refusal_under_the_lock_answers_from_what_the_lock_read_when_its_lookup_finds_the_journal_busy(
+) {
     let mut plans = before_approval();
     plans.extend(after_approval(xml(created_one())));
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
     let (_, args) = saved_batch(&server, LEDGER);
-    let data_dir = directory.path().to_path_buf();
+    let holder = std::sync::Arc::new(std::sync::Mutex::new(None::<MasterBatch>));
+    let (data_dir, recorded) = (directory.path().to_path_buf(), holder.clone());
     let scripted = ScriptedApproval::approving_after(move || {
-        dispatched_batch_in(&data_dir, LEDGER, GUID);
+        *recorded.lock().unwrap() = Some(dispatched_batch_in(&data_dir, LEDGER, GUID));
     });
     let (response, unused) = faulting(
         vec!["failure_read_busy"],
@@ -2584,16 +2585,23 @@ async fn the_refusal_under_the_lock_leaves_the_batches_out_when_its_lookup_finds
     assert!(unused.is_empty(), "the lookup was reached");
     assert_eq!(error_code(&response), OVERLAP_CODE, "{response}");
     let answered = result(&response);
-    // The journal could not be read, so it is not known to be unsent; the call
-    // itself sent nothing, and the answer does not say the create may have been.
-    assert!(answered["attempt_recorded"].is_null(), "{response}");
+    // The lock read the journal with the holder's send and none of this
+    // batch's: this call sent nothing, and the holder is named.
+    assert_eq!(answered["attempt_recorded"], false, "{response}");
     assert_eq!(answered["dispatch"]["state"], "not_dispatched");
     let error = &answered["error"];
-    assert_eq!(error["hold"], "journal_unread");
-    for field in ["blocking_batch_ids", "blocking_batches_other_companies"] {
-        assert!(error.get(field).is_none(), "{field}: {response}");
-    }
-    assert_eq!(error["next_step"], overlap_next_step(&OverlapView::Unread));
+    assert_eq!(error["hold"], "held");
+    let holder = holder
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("the holder was recorded");
+    assert_eq!(error["blocking_batch_ids"], json!([holder.batch_id]));
+    assert_eq!(error["blocking_batches_other_companies"], json!([]));
+    assert!(error["next_step"]
+        .as_str()
+        .unwrap()
+        .starts_with(OVERLAP_HOLD));
     assert!(!error["message"]
         .as_str()
         .unwrap()
@@ -3024,6 +3032,48 @@ async fn an_intent_the_journal_refuses_before_writing_records_nothing_and_sends_
     assert_eq!(observed.len(), post_at + before_approval().len());
 }
 
+/// A failure after which the intent may be in the file keeps no view of the
+/// journal for its answer (#2083): with the answer's own read busy too, the
+/// answer does not know whether a send was recorded, and never says that
+/// nothing was sent.
+#[tokio::test]
+async fn an_intent_that_may_be_in_the_file_is_never_answered_unsent_when_the_answer_read_is_busy() {
+    let mut plans = through_post(xml(created_one()));
+    plans.pop();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let (response, unused) = faulting(
+        vec![
+            "master_dispatch_intent_lost_after_write",
+            "failure_read_busy",
+        ],
+        posting(
+            &ScriptedApproval::approving(),
+            server.call_tool("post_ledger_creates", args),
+        ),
+    )
+    .await;
+    let observed = sent(simulator);
+    assert!(unused.is_empty(), "a fault was not reached: {unused:?}");
+    assert!(!create_was_sent(&observed, &expected_request()));
+    assert_eq!(
+        error_code(&response),
+        "import_dispatch_outcome_unknown",
+        "{response}"
+    );
+    let answered = result(&response);
+    assert!(answered["attempt_recorded"].is_null(), "{response}");
+    assert_eq!(answered["dispatch"]["state"], "reconciliation_required");
+    assert_eq!(answered["error"]["next_step"], NEXT_SEND_NOT_KNOWN);
+    assert!(!answered["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Nothing was sent"));
+    assert!(state_of(directory.path(), &batch.batch_id).intent.is_some());
+}
+
 /// The dispatch intent is written and the append is then reported as failed (a
 /// directory sync that did not hold), so it may be in the file: this call does
 /// not send, the batch is treated as dispatched with the step that reads it
@@ -3191,19 +3241,22 @@ struct RacingPost {
     dialogs: usize,
     /// Whether the approval the call took is still held for redemption.
     approval_held: bool,
+    /// The armed faults the call never reached.
+    faults_unused: Vec<&'static str>,
 }
 
 /// Posts `batch_id` from `data_dir` on a thread and a runtime of its own, as a
 /// second process would, with its own Tally endpoint (`plans`) and its own
 /// approval. It waits at `gate` just before the check that precedes the dialog,
 /// so that both posts pass that check before either records an intent.
-/// `while_asked` runs while the dialog is open.
+/// `while_asked` runs while the dialog is open, and `faults` are armed.
 fn racing_post(
     data_dir: std::path::PathBuf,
     batch_id: String,
     plans: Vec<ScenarioPlan>,
     gate: std::sync::Arc<std::sync::Barrier>,
     while_asked: impl Fn() + Send + Sync + 'static,
+    faults: Vec<&'static str>,
 ) -> std::thread::JoinHandle<RacingPost> {
     std::thread::spawn(move || {
         let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
@@ -3219,12 +3272,15 @@ fn racing_post(
             .enable_all()
             .build()
             .unwrap();
-        let response = runtime.block_on(master_ledger::BEFORE_HOLD_CHECK.scope(
-            hook,
-            posting_then(
-                &scripted,
-                book_after(),
-                server.call_tool("post_ledger_creates", json!({"batch_id": batch_id})),
+        let (response, faults_unused) = runtime.block_on(faulting(
+            faults,
+            master_ledger::BEFORE_HOLD_CHECK.scope(
+                hook,
+                posting_then(
+                    &scripted,
+                    book_after(),
+                    server.call_tool("post_ledger_creates", json!({"batch_id": batch_id})),
+                ),
             ),
         ));
         let observed = sent(simulator);
@@ -3234,6 +3290,7 @@ fn racing_post(
             wire: observed.len(),
             dialogs: scripted.masters().len(),
             approval_held: server.post_approvals.holds(&batch_id),
+            faults_unused,
         }
     })
 }
@@ -3241,12 +3298,14 @@ fn racing_post(
 /// Two posts for one ledger name that both pass the check before the dialog:
 /// `winner` is answered first and sends the create; `loser` is let through its
 /// dialog only once the winner's intent is on file and its lock released, so
-/// which call wins does not depend on timing. The winner's POST answers slowly,
-/// so its dispatch is still open while the loser goes through its queue reads
-/// and reaches the lock. That part is timed: a loser slower than the winner's
-/// two-second answer meets a settled winner instead, and the test then fails
-/// loudly (a second create is counted); it cannot pass wrongly. `same_batch` is whether both name one batch id or two
-/// batches of the same name in the same company.
+/// which call wins does not depend on timing. Tally's answer to the winner's
+/// POST is held until the loser has answered, so the winner's dispatch is open,
+/// and the winner writes nothing to the journal, for the whole of the loser's
+/// call: the race is not run against a short timer (#2083). It is bounded by
+/// the request timeout of the winner's held POST, the simulator's limit on a
+/// held answer and the test's own 20-second wait for the winner's intent. `same_batch` is whether both name one
+/// batch id or two batches of the same name in the same company; `loser_faults`
+/// are armed in the loser's call.
 struct Race {
     winner: RacingPost,
     loser: RacingPost,
@@ -3255,7 +3314,7 @@ struct Race {
     directory: tempfile::TempDir,
 }
 
-fn race_two_posts(same_batch: bool) -> Race {
+fn race_two_posts(same_batch: bool, loser_faults: Vec<&'static str>) -> Race {
     let directory = tempfile::tempdir().unwrap();
     let preparer = unit_server(directory.path());
     let (winner_batch, _) = saved_batch(&preparer, LEDGER);
@@ -3264,9 +3323,9 @@ fn race_two_posts(same_batch: bool) -> Race {
     } else {
         saved_batch(&preparer, LEDGER).0
     };
-    let mut winning = through_post(
-        xml(created_one()).with_delivery(Delivery::SlowHeaders(Duration::from_secs(2))),
-    );
+    let answer = tally_protocol_simulator::DeliveryGate::new();
+    let mut winning =
+        through_post(xml(created_one()).with_delivery(Delivery::Held(answer.clone())));
     winning.extend(clean_read_back());
     // The loser's POST is scripted too, so that a wrongly sent one is counted.
     let losing = through_post(xml(created_one()));
@@ -3277,6 +3336,7 @@ fn race_two_posts(same_batch: bool) -> Race {
         winning,
         gate.clone(),
         || {},
+        Vec::new(),
     );
     let data_dir = directory.path().to_path_buf();
     let second = racing_post(
@@ -3294,10 +3354,13 @@ fn race_two_posts(same_batch: bool) -> Race {
                 std::thread::sleep(Duration::from_millis(5));
             }
         },
+        loser_faults,
     );
+    let loser = second.join().unwrap();
+    answer.open();
     Race {
         winner: first.join().unwrap(),
-        loser: second.join().unwrap(),
+        loser,
         winner_batch,
         loser_batch,
         directory,
@@ -3330,9 +3393,22 @@ fn assert_one_create_and_a_refused_loser(race: &Race) {
     );
 }
 
+/// The loser's answer is what the check under the lock decided on, whether or
+/// not its own read of the journal for the answer finds the journal busy: a
+/// busy read falls back to the journal the lock read (#2083).
 #[test]
 fn two_batches_of_one_name_through_the_check_together_send_one_create_and_the_other_is_held_off() {
-    let race = race_two_posts(false);
+    for faults in [vec![], vec!["failure_read_busy"]] {
+        two_batches_race(faults);
+    }
+}
+
+fn two_batches_race(loser_faults: Vec<&'static str>) {
+    let race = race_two_posts(false, loser_faults);
+    assert!(
+        race.loser.faults_unused.is_empty(),
+        "the busy read was not reached"
+    );
     assert_one_create_and_a_refused_loser(&race);
     assert_eq!(
         error_code(&race.loser.response),
@@ -3357,9 +3433,21 @@ fn two_batches_of_one_name_through_the_check_together_send_one_create_and_the_ot
         .is_some());
 }
 
+/// As for two batches: a busy read for the answer falls back to the journal
+/// the lock read, which holds this batch's send (#2083).
 #[test]
 fn the_same_batch_through_the_check_together_twice_sends_one_create_and_the_other_reads_it_back() {
-    let race = race_two_posts(true);
+    for faults in [vec![], vec!["failure_read_busy"]] {
+        same_batch_race(faults);
+    }
+}
+
+fn same_batch_race(loser_faults: Vec<&'static str>) {
+    let race = race_two_posts(true, loser_faults);
+    assert!(
+        race.loser.faults_unused.is_empty(),
+        "the busy read was not reached"
+    );
     assert_one_create_and_a_refused_loser(&race);
     assert_eq!(
         error_code(&race.loser.response),
@@ -3684,6 +3772,61 @@ fn unit_server(directory: &std::path::Path) -> Server {
     server_at("127.0.0.1:9".parse().unwrap(), directory)
 }
 
+/// The check under the lock keeps what it read only when it refuses: a
+/// recorded intent keeps nothing (a later failure must not be answered from a
+/// journal read before the intent), and a refusal keeps whether a send was on
+/// file and what holds the name (#2083).
+#[test]
+fn the_check_under_the_lock_keeps_its_view_only_when_it_refuses() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = unit_server(directory.path());
+    let (batch, _) = saved_batch(&server, LEDGER);
+    let request = expected_request();
+    let refused = |result: Result<RecordedIntent, BeforeDispatchError>| match result {
+        Err(BeforeDispatchError::Refused(refusal)) => refusal,
+        other => panic!("expected a named refusal, got {other:?}"),
+    };
+    let kept = Mutex::new(None);
+    let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
+    let _licence = server
+        .record_master_intent(&batch, &request, approval, &aim_for_test(), &kept)
+        .expect("recorded");
+    assert!(
+        kept.lock().unwrap().is_none(),
+        "a recorded intent keeps nothing"
+    );
+    // The same batch again: a send of it is on file.
+    let again = server.post_approvals.redeeming_for_test(&batch.batch_id);
+    assert_eq!(
+        refused(server.record_master_intent(&batch, &request, again, &aim_for_test(), &kept)),
+        UnderLockRefusal::AlreadyAttempted
+    );
+    let view = kept
+        .lock()
+        .unwrap()
+        .take()
+        .expect("the refusal kept its view");
+    assert!(view.attempted);
+    assert_eq!(view.overlap, OverlapView::SendRecordedSince);
+    // Another batch of the same name: the first one's open send holds it.
+    let (rival, _) = saved_batch(&server, LEDGER);
+    let approval = server.post_approvals.redeeming_for_test(&rival.batch_id);
+    assert_eq!(
+        refused(server.record_master_intent(&rival, &request, approval, &aim_for_test(), &kept)),
+        UnderLockRefusal::MasterOverlapsOpenDispatch
+    );
+    let view = kept
+        .lock()
+        .unwrap()
+        .take()
+        .expect("the refusal kept its view");
+    assert!(!view.attempted);
+    match view.overlap {
+        OverlapView::Held(held) => assert_eq!(held.ids, vec![batch.batch_id.clone()]),
+        other => panic!("{other:?}"),
+    }
+}
+
 #[test]
 fn before_dispatch_records_the_sidecar_and_the_intent_and_spends_the_approval() {
     let directory = tempfile::tempdir().unwrap();
@@ -3692,7 +3835,13 @@ fn before_dispatch_records_the_sidecar_and_the_intent_and_spends_the_approval() 
     let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
     let request = expected_request();
     let licence = server
-        .record_master_intent(&batch, &request, approval, &aim_for_test())
+        .record_master_intent(
+            &batch,
+            &request,
+            approval,
+            &aim_for_test(),
+            &Mutex::new(None),
+        )
         .expect("recorded");
     assert_eq!(licence.batch_id(), batch.batch_id);
     assert_eq!(licence.native_request_sha256(), request.sha256());
@@ -3730,7 +3879,13 @@ fn before_dispatch_refusals_record_nothing() {
 
     // No aim left by the recheck.
     assert_eq!(
-        refused(server.record_master_intent(&batch, &request, approval, &Mutex::new(None))),
+        refused(server.record_master_intent(
+            &batch,
+            &request,
+            approval,
+            &Mutex::new(None),
+            &Mutex::new(None)
+        )),
         UnderLockRefusal::PreImageUnrecorded
     );
     // An empty pre-image is a failed read, not an empty book.
@@ -3739,32 +3894,56 @@ fn before_dispatch_refusals_record_nothing() {
         marks: aim_for_test().lock().unwrap().clone().unwrap().marks,
     }));
     assert_eq!(
-        refused(server.record_master_intent(&batch, &request, approval, &empty)),
+        refused(server.record_master_intent(&batch, &request, approval, &empty, &Mutex::new(None))),
         UnderLockRefusal::PreImageUnrecorded
     );
     // A batch the caller holds that is not the journal's.
     let mut changed = batch.clone();
     changed.batch_sha256 = "d".repeat(64);
     assert_eq!(
-        refused(server.record_master_intent(&changed, &request, approval, &aim_for_test())),
+        refused(server.record_master_intent(
+            &changed,
+            &request,
+            approval,
+            &aim_for_test(),
+            &Mutex::new(None)
+        )),
         UnderLockRefusal::BatchChanged
     );
     let mut renamed = batch.clone();
     renamed.items[0].name = "Another Name".into();
     assert_eq!(
-        refused(server.record_master_intent(&renamed, &request, approval, &aim_for_test())),
+        refused(server.record_master_intent(
+            &renamed,
+            &request,
+            approval,
+            &aim_for_test(),
+            &Mutex::new(None)
+        )),
         UnderLockRefusal::BatchChanged
     );
     // A batch the journal does not hold.
     let mut unknown = batch.clone();
     unknown.batch_id = format!("bridge-{}", Uuid::new_v4());
     assert_eq!(
-        refused(server.record_master_intent(&unknown, &request, approval, &aim_for_test())),
+        refused(server.record_master_intent(
+            &unknown,
+            &request,
+            approval,
+            &aim_for_test(),
+            &Mutex::new(None)
+        )),
         UnderLockRefusal::BatchNotFound
     );
     // An approval that is not the one taken (revoked, or never taken).
     assert_eq!(
-        refused(server.record_master_intent(&batch, &request, Uuid::new_v4(), &aim_for_test())),
+        refused(server.record_master_intent(
+            &batch,
+            &request,
+            Uuid::new_v4(),
+            &aim_for_test(),
+            &Mutex::new(None)
+        )),
         UnderLockRefusal::ApprovalRevoked
     );
     assert_eq!(journal_bytes(directory.path()), before);
@@ -3774,7 +3953,13 @@ fn before_dispatch_refusals_record_nothing() {
     record_intent_for_test(&server, &batch);
     let after_first = journal_bytes(directory.path());
     assert_eq!(
-        refused(server.record_master_intent(&batch, &request, approval, &aim_for_test())),
+        refused(server.record_master_intent(
+            &batch,
+            &request,
+            approval,
+            &aim_for_test(),
+            &Mutex::new(None)
+        )),
         UnderLockRefusal::AlreadyAttempted
     );
     assert_eq!(journal_bytes(directory.path()), after_first);
@@ -3791,8 +3976,13 @@ fn before_dispatch_refuses_a_second_open_dispatch_of_the_same_ledger() {
     let (second, _) = saved_batch(&server, LEDGER);
     let approval = server.post_approvals.redeeming_for_test(&second.batch_id);
     let before = journal_bytes(directory.path());
-    let result =
-        server.record_master_intent(&second, &expected_request(), approval, &aim_for_test());
+    let result = server.record_master_intent(
+        &second,
+        &expected_request(),
+        approval,
+        &aim_for_test(),
+        &Mutex::new(None),
+    );
     assert!(
         matches!(
             result,
@@ -3838,7 +4028,13 @@ fn an_append_refusal_after_the_sidecar_was_written_leaves_no_sidecar() {
         );
     }
     let before = journal_bytes(directory.path());
-    let result = server.record_master_intent(&batch, &expected_request(), approval, &aim);
+    let result = server.record_master_intent(
+        &batch,
+        &expected_request(),
+        approval,
+        &aim,
+        &Mutex::new(None),
+    );
     assert!(
         matches!(result, Err(Refused(UnderLockRefusal::MasterJournalRefused))),
         "{result:?}"
@@ -4046,7 +4242,13 @@ fn recorded_intent_for(request: &MasterPostRequest) -> (RecordedIntent, String) 
     let (batch, _) = saved_batch(&server, LEDGER);
     let approval = server.post_approvals.redeeming_for_test(&batch.batch_id);
     let intent = server
-        .record_master_intent(&batch, request, approval, &aim_for_test())
+        .record_master_intent(
+            &batch,
+            request,
+            approval,
+            &aim_for_test(),
+            &Mutex::new(None),
+        )
         .unwrap();
     (intent, batch.batch_id)
 }

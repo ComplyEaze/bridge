@@ -1,0 +1,16 @@
+e02_ledger_census_dn_sales_20250515_s1: rows 82; ALTERID outside span (0, 8192): 0; DATE outside 20250515..20250515: 0; GUID not the company's: 0
+e03_ledger_census_dn_sales_20250515_s2: rows 0; ALTERID outside span (8192, 16384): 0; DATE outside 20250515..20250515: 0; GUID not the company's: 0
+e04_ledger_census_dn_sales_20250515_s3: rows 0; ALTERID outside span (16384, 24576): 0; DATE outside 20250515..20250515: 0; GUID not the company's: 0
+e05_ledger_census_dn_sales_20250515_s4: rows 0; ALTERID outside span (24576, 29900): 0; DATE outside 20250515..20250515: 0; GUID not the company's: 0
+union e02-e05 82 vs d03 82: equal True; only in union 0; only in d03 0
+e06_ledger_census_dn_party_001_fy_s1: rows 67; ALTERID outside span (0, 8192): 0; DATE outside 20250401..20260331: 0; GUID not the company's: 0
+e07_ledger_census_dn_party_001_fy_s2: rows 68; ALTERID outside span (8192, 16384): 0; DATE outside 20250401..20260331: 0; GUID not the company's: 0
+e08_ledger_census_dn_party_001_fy_s3: rows 69; ALTERID outside span (16384, 24576): 0; DATE outside 20250401..20260331: 0; GUID not the company's: 0
+e09_ledger_census_dn_party_001_fy_s4: rows 44; ALTERID outside span (24576, 29900): 0; DATE outside 20250401..20260331: 0; GUID not the company's: 0
+e10 rows 248 (distinct GUIDs 248), empty-or-absent {'GUID': 0, 'ALTERID': 0, 'MASTERID': 0}
+union e06-e09 248 vs e10 248: equal True; only in union 0; only in e10 0
+e11 rows 21; dates 20250501..20250530
+e11 GUIDs 21 vs e06-e09 rows dated May 2025 21: equal True; only in e11 0; only in census 0
+e11 DN Party 001 lines 21; sum of negative (debit) amounts -933428.20; sum of positive (credit) amounts 0
+committed one-month TB (parse record on master): DN Party 001 debit -933428.20, credit empty
+debit equal: True; credit equal (empty = 0): True

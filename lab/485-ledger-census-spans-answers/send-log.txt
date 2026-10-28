@@ -1,0 +1,35 @@
+2026-10-28T04:53:19.904Z status e-before-e01 curl_exit=0 printed=' 200 51'
+2026-10-28T04:53:20.294Z req=e01_marks.request.utf16le.xml req_sha256=040ac47754c40a4e2e736f8be2b3f37cac924213ea66c8c4f0074222f9a00280 curl_exit=0 printed='200 3406' content_length=3406 bytes=3406 sha256=fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+2026-10-28T04:53:20.433Z answered e01_marks exit=0
+2026-10-28T04:53:28.953Z req=e02_ledger_census_dn_sales_20250515_s1.request.utf16le.xml req_sha256=16979f8194f45f385f5cc9e5809980c10ba530a82115832aee8d9837101f4d12 curl_exit=0 printed='200 201862' content_length=201862 bytes=201862 sha256=8aa7a6ce01d38f816c6af4a76d1178078163835e3ac363139e8d8d28031ab337
+2026-10-28T04:53:29.252Z answered e02_ledger_census_dn_sales_20250515_s1 exit=0
+2026-10-28T04:53:39.151Z status e-after-e02 curl_exit=0 printed=' 200 51'
+2026-10-28T04:53:47.971Z req=e03_ledger_census_dn_sales_20250515_s2.request.utf16le.xml req_sha256=b7e30f615fe1d22c886f5b8644ba2c1a564bf10fbbd039d1fc910e22f690fd9d curl_exit=0 printed='200 2926' content_length=2926 bytes=2926 sha256=52f69354f7d87de773f68e7d9856f2719374a24c920933f47283e4d662c4f40b
+2026-10-28T04:53:48.219Z answered e03_ledger_census_dn_sales_20250515_s2 exit=0
+2026-10-28T04:53:48.250Z status e-after-e03 curl_exit=0 printed=' 200 51'
+2026-10-28T04:53:48.335Z req=e04_ledger_census_dn_sales_20250515_s3.request.utf16le.xml req_sha256=3ece05acef1df81bdc6594a4df5638f024f29c7cd3a7076f8b37edfa028af649 curl_exit=0 printed='200 2926' content_length=2926 bytes=2926 sha256=52f69354f7d87de773f68e7d9856f2719374a24c920933f47283e4d662c4f40b
+2026-10-28T04:53:48.484Z answered e04_ledger_census_dn_sales_20250515_s3 exit=0
+2026-10-28T04:53:48.499Z status e-after-e04 curl_exit=0 printed=' 200 51'
+2026-10-28T04:53:48.594Z req=e05_ledger_census_dn_sales_20250515_s4.request.utf16le.xml req_sha256=07e768b3e79b5037dd62dffcbf382dfbdaff0795bf67a6d32704e1aa3eb9ccf8 curl_exit=0 printed='200 2926' content_length=2926 bytes=2926 sha256=52f69354f7d87de773f68e7d9856f2719374a24c920933f47283e4d662c4f40b
+2026-10-28T04:53:48.768Z answered e05_ledger_census_dn_sales_20250515_s4 exit=0
+2026-10-28T04:53:48.781Z status e-after-e05 curl_exit=0 printed=' 200 51'
+2026-10-28T04:53:58.398Z req=e06_ledger_census_dn_party_001_fy_s1.request.utf16le.xml req_sha256=a9d3eaff4191aa04c62987f3a27bc0c4ee70922ac0b99d1bef5b867e30e0ae2f curl_exit=0 printed='200 165380' content_length=165380 bytes=165380 sha256=3d65d555487f2906d77d442168421e3faaf91272a3d77a372a3f0e79ee83b8a0
+2026-10-28T04:54:00.814Z answered e06_ledger_census_dn_party_001_fy_s1 exit=0
+2026-10-28T04:54:09.228Z status e-after-e06 curl_exit=0 printed=' 200 51'
+2026-10-28T04:54:17.723Z req=e07_ledger_census_dn_party_001_fy_s2.request.utf16le.xml req_sha256=96e16208e44c4861003c129fdfa6bb102843d4dfc8061511bebf181f78c9267c curl_exit=0 printed='200 168216' content_length=168216 bytes=168216 sha256=4a7ffb1cc7ae6c20d639a78addf82116bb3edffe43f8bc862cb0ec3d503f5b95
+2026-10-28T04:54:18.162Z answered e07_ledger_census_dn_party_001_fy_s2 exit=0
+2026-10-28T04:54:18.193Z status e-after-e07 curl_exit=0 printed=' 200 51'
+2026-10-28T04:54:18.277Z req=e08_ledger_census_dn_party_001_fy_s3.request.utf16le.xml req_sha256=40d5bb81915e403bcc6ce39b4cdc9c9e2db63b5b7ad4ac1453d218c21588c1a3 curl_exit=0 printed='200 170738' content_length=170738 bytes=170738 sha256=e2f432785a5c28499a65a73c3f2a9359e4c09a9bc1c387d6cb115c6c94d09ae2
+2026-10-28T04:54:18.658Z answered e08_ledger_census_dn_party_001_fy_s3 exit=0
+2026-10-28T04:54:18.668Z status e-after-e08 curl_exit=0 printed=' 200 51'
+2026-10-28T04:54:18.779Z req=e09_ledger_census_dn_party_001_fy_s4.request.utf16le.xml req_sha256=f5cf188b97277d32c8229cb3e344521c53f212ec3361ef96389562c91d13c4a1 curl_exit=0 printed='200 110020' content_length=110020 bytes=110020 sha256=0433fe3a8c95f621a0ae230bb158d0f37198784d365ade86fb0987b7924eb3c8
+2026-10-28T04:54:19.145Z answered e09_ledger_census_dn_party_001_fy_s4 exit=0
+2026-10-28T04:54:19.156Z status e-after-e09 curl_exit=0 printed=' 200 51'
+2026-10-28T04:54:33.570Z req=e10_ledger_vouchers_dn_party_001_fy.request.utf16le.xml req_sha256=4de051f5acf10a56d9b3164a4bc72c347e34c36780d017462166bdcc15161d92 curl_exit=0 printed='200 680460' content_length=680460 bytes=680460 sha256=1d6318507325595d9c274677f974430cdbd019bc6c7981e6d25239ab232fca1c
+2026-10-28T04:54:34.072Z answered e10_ledger_vouchers_dn_party_001_fy exit=0
+2026-10-28T04:54:34.104Z status e-after-e10 curl_exit=0 printed=' 200 51'
+2026-10-28T04:54:34.190Z req=e11_ledger_movement_dn_party_001_202505.request.utf16le.xml req_sha256=8060720ed68c5100600098959bfa68708fa72b07bf78589ec839411c3ce8af41 curl_exit=0 printed='200 108918' content_length=108918 bytes=108918 sha256=1dd5fac4e6c743adf46ad834f300f6713192872945680b75764faa60a3ee3f74
+2026-10-28T04:54:34.467Z answered e11_ledger_movement_dn_party_001_202505 exit=0
+2026-10-28T04:54:34.471Z status e-after-e11 curl_exit=0 printed=' 200 51'
+2026-10-28T04:54:42.820Z req=e01_marks.request.utf16le.xml req_sha256=040ac47754c40a4e2e736f8be2b3f37cac924213ea66c8c4f0074222f9a00280 curl_exit=0 printed='200 3406' content_length=3406 bytes=3406 sha256=fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+2026-10-28T04:54:42.996Z answered e01_marks exit=0

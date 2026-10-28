@@ -4211,8 +4211,7 @@ mod through_the_tool {
     }
 
     /// A ledger directly under Tally's root shows the root as Tally sent it, not
-    /// as the decoders' working marker, under either field set and with a group
-    /// filter (which still walks the chain from the held, marked parent).
+    /// as the decoders' working marker, under either field set.
     #[tokio::test]
     async fn a_ledger_under_the_reserved_root_shows_the_root_as_tally_sent_it() {
         for (fields, plans) in [

@@ -2734,11 +2734,11 @@ the name absent and the company's master mark unmoved; a create that Tally
 rejected reaches it too, and it does not show that Tally will not still run a
 create that ComplyEaze Bridge stopped waiting for, so make sure Tally is idle and
 answering before a new batch is prepared, which needs a new approval),
-`posted_unattributed` (only from a later call, when Tally's answer to the create
-was lost, so none is on file: the ledger was found as sent, written by the first
-master change in the company after ComplyEaze Bridge's last read of it before
-sending the create, and changed by none since, which
-`verification.checks.first_change_after_intent` shows; the batch is settled and
+`posted_unattributed` (only from a later call, when no answer from Tally to the
+create is on file, because it was lost or could not be recorded: the ledger was
+found as sent, and its `ALTERID` shows it as the first master change in the
+company after ComplyEaze Bridge's last read of it before sending the create, with
+none since, which `verification.checks.first_change_after_intent` shows; the batch is settled and
 its name released, but it is not verified, because nothing shows that change was
 ComplyEaze Bridge's own create and not the same ledger made by someone else, and
 a create Tally still holds could run later and change the ledger again: check the

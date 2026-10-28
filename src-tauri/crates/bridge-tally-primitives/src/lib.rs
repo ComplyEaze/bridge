@@ -206,9 +206,10 @@ impl TallyDate {
         ))
     }
 
-    /// The date as Tally's own screens show it, `14-Sep-2026`, the day
-    /// without a leading zero: for a person to read in an approval or review
-    /// text (#2101). Never for a request, which is sent [`Self::as_str`].
+    /// The date in Tally's day-month-year form with the year in full,
+    /// `14-Sep-2026`, the day without a leading zero: for a person to read in
+    /// an approval or review text (#2101). Never for a request, which is sent
+    /// [`Self::as_str`].
     pub fn shown(&self) -> String {
         const MONTHS: [&str; 12] = [
             "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",

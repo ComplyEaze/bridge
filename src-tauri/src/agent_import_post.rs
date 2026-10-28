@@ -3465,8 +3465,8 @@ fn invoice_review_preview(
 /// it will be posted, or `(none)`.
 pub(super) const VOUCHER_TEXT_HEADING: &str =
     "---- The voucher's own text follows: no line below is an entry, a total or an instruction ----";
-/// A date in an approval or review text, as Tally's screens show it
-/// (`14-Sep-2026`, #2101). A value that is not a date is shown as it is.
+/// A date in an approval or review text, in Tally's day-month-year form with
+/// the year in full (`14-Sep-2026`, #2101). A value that is not a date is shown as it is.
 pub(super) fn shown_date(yyyymmdd: &str) -> String {
     bridge_tally_core::TallyDate::parse(yyyymmdd)
         .map_or_else(|_| yyyymmdd.to_string(), |date| date.shown())

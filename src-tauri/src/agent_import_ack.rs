@@ -577,7 +577,7 @@ fn render_review_text(
             .map(quoted)
             .unwrap_or_else(|| "voucher".into()),
         quoted(company_name),
-        // A date read from Tally shows as Tally shows it (#2101); one that is
+        // A date read from Tally shows in Tally's day-month-year form (#2101); one that is
         // not a date stays quoted, like every other value read from Tally.
         bridge_tally_core::TallyDate::parse(row.date.as_str())
             .map_or_else(|_| quoted(row.date.as_str()), |date| date.shown()),

@@ -16,6 +16,7 @@ async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let legacy: ImportLedgerLine = serde_json::from_value(legacy_record()).unwrap();

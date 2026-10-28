@@ -127,33 +127,18 @@ impl GstDutyHeadObservation {
                 tax_type: tax_type.clone(),
                 raw: raw.clone(),
             },
-            (Some(raw), None) => match raw.as_str() {
-                "CGST" => Self::Recognized {
-                    raw: raw.clone(),
-                    head: GstDutyHead::Cgst,
-                },
-                "IGST" => Self::Recognized {
-                    raw: raw.clone(),
-                    head: GstDutyHead::Igst,
-                },
-                "State Tax" => Self::Recognized {
-                    raw: raw.clone(),
-                    head: GstDutyHead::StateTax,
-                },
-                "SGST/UTGST" => Self::Recognized {
-                    raw: raw.clone(),
-                    head: GstDutyHead::SgstUtgst,
-                },
-                "UT Tax" => Self::Recognized {
-                    raw: raw.clone(),
-                    head: GstDutyHead::UtTax,
-                },
-                "Cess" => Self::Recognized {
-                    raw: raw.clone(),
-                    head: GstDutyHead::Cess,
-                },
-                _ => Self::Unrecognized { raw: raw.clone() },
-            },
+            (Some(raw), None) => {
+                match GstDutyHead::ALL
+                    .into_iter()
+                    .find(|head| head.tally_spelling() == raw.as_str())
+                {
+                    Some(head) => Self::Recognized {
+                        raw: raw.clone(),
+                        head,
+                    },
+                    None => Self::Unrecognized { raw: raw.clone() },
+                }
+            }
             (None, Some(tax_type)) => Self::NotTaxLedger {
                 tax_type: tax_type.clone(),
             },
@@ -207,6 +192,32 @@ pub enum GstDutyHead {
     SgstUtgst,
     UtTax,
     Cess,
+}
+
+impl GstDutyHead {
+    /// Every head, in the order Tally's vocabulary is documented.
+    pub const ALL: [GstDutyHead; 6] = [
+        Self::Cgst,
+        Self::Igst,
+        Self::StateTax,
+        Self::SgstUtgst,
+        Self::UtTax,
+        Self::Cess,
+    ];
+
+    /// The exact text Tally writes for this head in `GSTDUTYHEAD`. It is the
+    /// single table behind [`GstDutyHeadObservation::from_observations`], so
+    /// what a caller sends and what the parser accepts cannot drift apart.
+    pub const fn tally_spelling(self) -> &'static str {
+        match self {
+            Self::Cgst => "CGST",
+            Self::Igst => "IGST",
+            Self::StateTax => "State Tax",
+            Self::SgstUtgst => "SGST/UTGST",
+            Self::UtTax => "UT Tax",
+            Self::Cess => "Cess",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

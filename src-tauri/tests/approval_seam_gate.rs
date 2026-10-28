@@ -51,6 +51,12 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         // The review dialog for a doubted post (#239), gated the same way.
         ("use confirm_review as approve_review;", "#[cfg(not(test))]"),
         ("use test_seam::approve_review;", "#[cfg(test)]"),
+        // The one-ledger dialog for a master approval, gated the same way.
+        (
+            "use confirm_masters_dialog as approve_masters;",
+            "#[cfg(not(test))]",
+        ),
+        ("use test_seam::approve_masters;", "#[cfg(test)]"),
         // What a post dialog's own task runs under (#725), gated the same way.
         (
             "use carry_nothing as carry_approval_scope;",
@@ -66,11 +72,13 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         }
     }
     // Each dialog is asked from exactly one place, and each answer builds only
-    // its own type: a post approval is an `ApprovedImport`, a review a
-    // `ReviewAcknowledged`, and nothing converts one into the other.
+    // its own type: a post approval and a master approval are an
+    // `ApprovedImport` (of their own kind), a review a `ReviewAcknowledged`,
+    // and nothing converts one into the other.
     for call_site in [
         "approve(count, preview).await?;\n        Ok(Self {",
         "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
+        "approve_masters(preview).await?;\n        Ok(Self {\n            kind: ApprovedKind::Masters(",
     ] {
         if source.matches(call_site).count() != 1 {
             problems.push(format!("expected exactly one call site `{call_site}`"));
@@ -79,6 +87,7 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
     for call in [
         "approve(count, preview)",
         "approve_review(kind, count, preview)",
+        "approve_masters(preview)",
     ] {
         if source.matches(call).count() != 1 {
             problems.push(format!("`{call}` must be called exactly once"));
@@ -574,6 +583,32 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "#[cfg(test)]\nuse test_seam::approve_review;",
             "use test_seam::approve_review;",
         ),
+        source.replace(
+            "approve_masters(preview).await?;",
+            "confirm_masters_dialog(preview).await?;",
+        ),
+        source.replace(
+            "#[cfg(not(test))]\nuse confirm_masters_dialog as approve_masters;",
+            "#[cfg(not(debug_assertions))]\nuse confirm_masters_dialog as approve_masters;",
+        ),
+        source.replace(
+            "#[cfg(test)]\nuse test_seam::approve_masters;",
+            "use test_seam::approve_masters;",
+        ),
+        // A master approval must never be answered by the post dialog, nor a
+        // post by the one-ledger dialog.
+        source.replace(
+            "approve_masters(preview).await?;\n        Ok(Self {",
+            "approve(ONE_ITEM, preview).await?;\n        Ok(Self {",
+        ),
+        source.replace(
+            "approve(count, preview).await?;\n        Ok(Self {",
+            "approve_masters(preview).await?;\n        Ok(Self {",
+        ),
+        source.replace(
+            "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
+            "approve_masters(preview).await?;\n        Ok(Self(()))",
+        ),
         // A review answer must never build a post approval.
         source.replace(
             "approve_review(kind, count, preview).await?;\n        Ok(Self(()))",
@@ -685,6 +720,7 @@ fn dialog_mode_problems(lib: &str) -> Vec<String> {
     for arm in [
         "Some(\"--confirm-journal\") => agent::run_confirmation as fn() -> bool,",
         "Some(\"--confirm-review\") => agent::run_review_confirmation,",
+        "Some(\"--confirm-masters\") => agent::run_masters_confirmation,",
         "Some(\"--confirm-release\") => agent::run_release_confirmation,",
     ] {
         if lib.matches(arm).count() != 1 {
@@ -713,6 +749,30 @@ fn each_dialog_mode_runs_its_own_dialog() {
         .replace("SWAP,", "agent::run_review_confirmation,");
     assert_ne!(swapped, lib);
     assert!(!dialog_mode_problems(&swapped).is_empty());
+    // The one-ledger mode runs only the one-ledger dialog: each other dialog
+    // swapped into its arm, and its dialog swapped into another's, is caught.
+    for broken in [
+        lib.replace(
+            "agent::run_masters_confirmation,",
+            "agent::run_confirmation as fn() -> bool,",
+        ),
+        lib.replace(
+            "agent::run_masters_confirmation,",
+            "agent::run_review_confirmation,",
+        ),
+        lib.replace(
+            "Some(\"--confirm-journal\") => agent::run_confirmation as fn() -> bool,",
+            "Some(\"--confirm-journal\") => agent::run_masters_confirmation as fn() -> bool,",
+        ),
+        lib.replace(
+            "Some(\"--confirm-review\") => agent::run_review_confirmation,",
+            "Some(\"--confirm-review\") => agent::run_masters_confirmation,",
+        ),
+        lib.replace("\"--confirm-masters\"", "\"--confirm-ledger\""),
+    ] {
+        assert_ne!(broken, lib);
+        assert!(!dialog_mode_problems(&broken).is_empty());
+    }
 }
 
 /// The block of the queued post whose errors are marked as refused before the
@@ -794,6 +854,16 @@ const REVIEW_ENTRY: &str = "pub fn run_review_confirmation() -> bool {
     )
 }";
 
+/// The one-ledger child's whole entry point, as [`POST_ENTRY`].
+const MASTERS_ENTRY: &str = "pub fn run_masters_confirmation() -> bool {
+    answer_with_token(
+        MASTERS_TOKEN_PREFIX,
+        show_create_ledger,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}";
+
 /// The release child's whole entry point, as [`POST_ENTRY`] (#1828).
 const RELEASE_ENTRY: &str = "pub fn run_release_confirmation() -> bool {
     answer_with_token(
@@ -817,13 +887,13 @@ const RELEASE_ENTRY: &str = "pub fn run_release_confirmation() -> bool {
 /// rename; the lib.rs mode arms, pinned above, are still the only way in.
 fn dialog_token_problems(source: &str) -> Vec<String> {
     let mut problems = Vec::new();
-    for entry in [POST_ENTRY, REVIEW_ENTRY, RELEASE_ENTRY] {
+    for entry in [POST_ENTRY, REVIEW_ENTRY, RELEASE_ENTRY, MASTERS_ENTRY] {
         if source.matches(entry).count() != 1 {
             problems.push(format!("expected exactly one `{entry}`"));
         }
     }
-    if source.matches("answer_with_token(").count() != 4 {
-        problems.push("expected the three entry points and the definition only".into());
+    if source.matches("answer_with_token(").count() != 5 {
+        problems.push("expected the four entry points and the definition only".into());
     }
     problems
 }
@@ -865,6 +935,19 @@ fn each_dialog_answers_with_its_own_token() {
         source.replace(POST_ENTRY, &POST_ENTRY.replace("show_review,", "|_, _| true,")),
         source.replace(POST_ENTRY, &POST_ENTRY.replace("std::io::stdin()", "&b\"\"[..]")),
         swapped,
+        // The one-ledger entry answers with another dialog's token, or shows
+        // another dialog, or no dialog; and another entry answers with the
+        // one-ledger token or dialog.
+        source.replace(MASTERS_ENTRY, &MASTERS_ENTRY.replace("MASTERS_TOKEN_PREFIX", "POST_TOKEN_PREFIX")),
+        source.replace(MASTERS_ENTRY, &MASTERS_ENTRY.replace("MASTERS_TOKEN_PREFIX", "REVIEW_TOKEN_PREFIX")),
+        source.replace(MASTERS_ENTRY, &MASTERS_ENTRY.replace("show_create_ledger,", "show_review,")),
+        source.replace(MASTERS_ENTRY, &MASTERS_ENTRY.replace("show_create_ledger,", "|_, _| true,")),
+        source.replace(MASTERS_ENTRY, &MASTERS_ENTRY.replace("std::io::stdin()", "&b\"\"[..]")),
+        source.replace(POST_ENTRY, &POST_ENTRY.replace("POST_TOKEN_PREFIX", "MASTERS_TOKEN_PREFIX")),
+        source.replace(REVIEW_ENTRY, &REVIEW_ENTRY.replace("show_review_acknowledgement,", "show_create_ledger,")),
+        format!(
+            "{source}\nfn extra() -> bool {{ answer_with_token(MASTERS_TOKEN_PREFIX, |_, _| true, std::io::stdin(), std::io::stdout()) }}\n"
+        ),
         format!(
             "{source}\nfn extra() -> bool {{ answer_with_token(POST_TOKEN_PREFIX, |_, _| true, std::io::stdin(), std::io::stdout()) }}\n"
         ),
@@ -932,6 +1015,56 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         }
     });
     answer == IDYES
+}"#;
+
+/// The one-ledger dialog (the masters twin of [`POST_DIALOG`]): shown for one
+/// item only, with its own title, its own positive button, and the same
+/// Escape/default-No behaviour.
+const MASTERS_DIALOG: &str = r#"#[cfg(not(windows))]
+fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
+    if count != ONE_ITEM {
+        return false;
+    }
+    rfd::MessageDialog::new()
+        .set_title(MASTERS_TITLE)
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        // The Cancel label supplies the native Escape action. Creating
+        // requires the explicitly matched positive button.
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            MASTERS_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())
+}"#;
+
+const MASTERS_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
+fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
+        MB_YESNOCANCEL,
+    };
+    // As for the post dialog: No is the default, Escape and close are Cancel.
+    if count != ONE_ITEM {
+        return false;
+    }
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
+    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
+    // no parent HWND is borrowed. No application state is exposed to callbacks.
+    unsafe {
+        MessageBoxW(
+            std::ptr::null_mut(),
+            text.as_ptr(),
+            title.as_ptr(),
+            // Topmost: a window the connector opens while Tally fills the
+            // screen is otherwise drawn behind it, since a background
+            // process may not take the foreground (#1589). It changes only
+            // the drawing order; No stays the default button.
+            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+        ) == IDYES
+    }
 }"#;
 
 const POST_DIALOG: &str = r#"#[cfg(not(windows))]
@@ -1114,6 +1247,10 @@ const ANSWER_EFFECT: &str = r#"fn answer_effect(shown: Shown, count: VoucherCoun
                 .into(),
             "Nothing is released until you answer.",
         ),
+        Shown::Masters => (
+            "create this ledger in Tally".into(),
+            "Nothing is created until you answer.",
+        ),
     }
 }"#;
 
@@ -1124,6 +1261,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Post => post_words(count).1,
         Shown::Review => REVIEW_BUTTON.to_string(),
         Shown::StopRelease => RELEASE_BUTTON.to_string(),
+        Shown::Masters => MASTERS_BUTTON.to_string(),
     };
     wrapped(
         &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
@@ -1679,7 +1817,30 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
     }
 }
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 30] = [
+const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {
+    if preview.len() > MAX_PREVIEW_BYTES {
+        return Err("master_review_too_large".into());
+    }
+    match nonce_bound_dialog(
+        executable,
+        "--confirm-masters",
+        MASTERS_TOKEN_PREFIX,
+        ONE_ITEM,
+        preview,
+    )
+    .await
+    {
+        Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
+        // A person's decline is no token and exit 1. A clean exit without the
+        // token is an executable that is not this dialog.
+        Ok(answer) if answer.exited_cleanly => Err("master_approval_unavailable".into()),
+        Ok(_) => Err("master_approval_declined".into()),
+        Err(DialogFailure::Unavailable) => Err("master_approval_unavailable".into()),
+        Err(DialogFailure::TimedOut) => Err("master_approval_timed_out".into()),
+    }
+}"#;
+
+const DIALOG_ANSWER_PINS: [(&str, usize); 38] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -1733,6 +1894,31 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 30] = [
         1,
     ),
     ("pub(crate) const REVIEW_BUTTON: &str = \"Yes\";", 1),
+    // The one-ledger dialog: its words, its count, both native dialogs, and
+    // the two functions that ask it and decide from the child's answer.
+    (
+        "const MASTERS_TITLE: &str = \"ComplyEaze Bridge — create one ledger?\";",
+        1,
+    ),
+    (
+        "#[cfg(not(windows))]\nconst MASTERS_BUTTON: &str = \"Create ledger\";",
+        1,
+    ),
+    (
+        "const ONE_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);",
+        1,
+    ),
+    (MASTERS_DIALOG, 1),
+    (MASTERS_DIALOG_WINDOWS, 1),
+    (
+        "async fn confirm_masters_dialog(preview: &str) -> Result<(), String> {
+    let executable = std::env::current_exe().map_err(|_| \"master_approval_unavailable\")?;
+    let shown = displayed_text(Shown::Masters, ONE_ITEM, preview);
+    confirm_masters_with(&executable, &shown).await
+}",
+        1,
+    ),
+    (CONFIRM_MASTERS_WITH, 1),
     ("const RELEASE_BUTTON: &str = \"Release the stop\";", 1),
     // Each token's value, so no two modes can share one (#1828).
     (
@@ -1747,6 +1933,10 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 30] = [
         "const RELEASE_TOKEN_PREFIX: &str = \"bridge-stop-release-acknowledged:\";",
         1,
     ),
+    (
+        "const MASTERS_TOKEN_PREFIX: &str = \"bridge-create-ledger:\";",
+        1,
+    ),
     (RELEASE_TITLE, 1),
     (RELEASE_QUESTION, 1),
     (RELEASE_ACK_DIALOG, 1),
@@ -1759,18 +1949,20 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 30] = [
 /// `cfg(any(…))` is caught too.
 const CFG_CENSUS: [(&str, usize); 6] = [
     // #725 added one of each seam arm for the dialog task's scope, and the
-    // non-test arm's identity function.
+    // non-test arm's identity function. The one-ledger dialog added one of
+    // each arm of its own.
     // #1780 added one more, the test-only accessor for what a review shows.
-    ("#[cfg(test)]", 7),
-    ("#[cfg(not(test))]", 4),
+    ("#[cfg(test)]", 8),
+    ("#[cfg(not(test))]", 5),
     // #702 ran the parent's seven unix-only test items on every platform.
     ("#[cfg(unix)]", 0),
-    // #1828: the release window's question and box on Windows.
-    ("#[cfg(windows)]", 9),
-    // #1780 follow-up: the Mac one-line answer text test. #1828: the release
-    // window's title, dialog and button on a Mac.
-    ("#[cfg(not(windows))]", 12),
-    ("cfg", 33),
+    // The one-ledger dialog added one Windows dialog, one non-Windows dialog
+    // and the non-Windows button; #1780's follow-up, the Mac one-line answer
+    // text test. #1828: the release window's question and box on Windows, and
+    // its title, dialog and button on a Mac.
+    ("#[cfg(windows)]", 10),
+    ("#[cfg(not(windows))]", 14),
+    ("cfg", 38),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -1928,6 +2120,121 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("\"Yes\";", "\"No\";", 1),
+        // The one-ledger dialog approves on anything but its own button,
+        // reads as the decline, or defaults to Yes (Windows MB_DEFBUTTON1).
+        source.replacen(
+            "== rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())",
+            "!= rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())",
+            1,
+        ),
+        source.replacen("\"Create ledger\"", "\"Cancel\"", 1),
+        source.replacen(
+            MASTERS_DIALOG_WINDOWS,
+            &MASTERS_DIALOG_WINDOWS.replacen(
+                "MB_YESNOCANCEL | MB_DEFBUTTON2",
+                "MB_YESNOCANCEL | MB_DEFBUTTON1",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            MASTERS_DIALOG_WINDOWS,
+            &MASTERS_DIALOG_WINDOWS.replacen(") == IDYES", ") != IDNO", 1),
+            1,
+        ),
+        // The one-ledger dialog's title reads as the post's, or its count
+        // guard is gone, so a batch's count would show it.
+        source.replacen(
+            "const MASTERS_TITLE: &str = \"ComplyEaze Bridge — create one ledger?\";",
+            "const MASTERS_TITLE: &str = \"ComplyEaze Bridge — approve one voucher\";",
+            1,
+        ),
+        source.replacen(
+            MASTERS_DIALOG,
+            &MASTERS_DIALOG.replacen("count != ONE_ITEM", "false", 1),
+            1,
+        ),
+        source.replacen(
+            MASTERS_DIALOG_WINDOWS,
+            &MASTERS_DIALOG_WINDOWS.replacen("count != ONE_ITEM", "false", 1),
+            1,
+        ),
+        source.replacen(
+            "confirm_masters_with(&executable, &shown).await\n}",
+            "let _ = (executable, shown);\n    Ok(())\n}",
+            1,
+        ),
+        // The one-ledger decision approves a clean exit with no token, or on
+        // the token alone, or is asked in another dialog's mode or with
+        // another's token or count.
+        source.replacen(
+            CONFIRM_MASTERS_WITH,
+            &CONFIRM_MASTERS_WITH.replacen(
+                "Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),",
+                "Ok(answer) if answer.exited_cleanly => Ok(()),",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_MASTERS_WITH,
+            &CONFIRM_MASTERS_WITH.replacen(
+                "Ok(answer) if answer.exited_cleanly => Err(\"master_approval_unavailable\".into()),",
+                "Ok(answer) if answer.exited_cleanly => Ok(()),",
+                1,
+            ),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_MASTERS_WITH,
+            &CONFIRM_MASTERS_WITH.replacen("\"--confirm-masters\"", "\"--confirm-journal\"", 1),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_MASTERS_WITH,
+            &CONFIRM_MASTERS_WITH.replacen("MASTERS_TOKEN_PREFIX", "POST_TOKEN_PREFIX", 1),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_MASTERS_WITH,
+            &CONFIRM_MASTERS_WITH.replacen("ONE_ITEM", "VoucherCount(NonZeroUsize::MAX)", 1),
+            1,
+        ),
+        source.replacen(
+            CONFIRM_MASTERS_WITH,
+            &CONFIRM_MASTERS_WITH.replacen("MAX_PREVIEW_BYTES", "usize::MAX", 1),
+            1,
+        ),
+        // A Windows-only twin that approves, beside the real one made
+        // non-Windows.
+        source.replacen(
+            CONFIRM_MASTERS_WITH,
+            &format!(
+                "#[cfg(not(windows))]\n{CONFIRM_MASTERS_WITH}\n#[cfg(windows)]\nasync fn confirm_masters_with(_: &std::path::Path, _: &str) -> Result<(), String> {{\n    Ok(())\n}}"
+            ),
+            1,
+        ),
+        // The post and review dialogs asked in the one-ledger mode.
+        source.replacen(
+            CONFIRM_WITH,
+            &CONFIRM_WITH.replacen("\"--confirm-journal\"", "\"--confirm-masters\"", 1),
+            1,
+        ),
+        // The review's mode now comes from the kind's table, not from the
+        // function, so the review is sent to the one-ledger mode there.
+        source.replacen(
+            "Self::Review => (\"--confirm-review\", REVIEW_TOKEN_PREFIX),",
+            "Self::Review => (\"--confirm-masters\", REVIEW_TOKEN_PREFIX),",
+            1,
+        ),
+        // The one-ledger dialogs discard their answer: they still compute the
+        // comparison, then return true.
+        source.replacen(MASTERS_DIALOG, &discard_answer(MASTERS_DIALOG), 1),
+        source.replacen(
+            MASTERS_DIALOG_WINDOWS,
+            &discard_answer(MASTERS_DIALOG_WINDOWS),
+            1,
+        ),
         // A batch's post button reads as the decline, or the dialog shows one
         // button and compares against another (#746).
         source.replacen("format!(\"Post {count} vouchers\")", "\"Cancel\".into()", 1),

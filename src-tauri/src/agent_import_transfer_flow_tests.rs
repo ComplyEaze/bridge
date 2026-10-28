@@ -952,6 +952,7 @@ async fn the_readback_right_after_a_post_never_computes_the_section() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -1598,6 +1599,7 @@ fn server_with_cap(directory: &Path, port: u16, max_bytes: usize) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }

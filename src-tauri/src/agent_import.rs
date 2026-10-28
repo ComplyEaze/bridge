@@ -16,6 +16,7 @@ use bridge_tally_core::master_binding::{
 };
 use bridge_tally_core::text::draws_nothing;
 use bridge_tally_core::{ExactDecimal, TallyDate};
+use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
@@ -59,10 +60,20 @@ mod approval;
 pub(super) mod ledger;
 #[path = "agent_import_local_data.rs"]
 pub(super) mod local_data;
-// The master write journal; a building block no caller reaches yet.
+// The master write journal. The read-back piece, which follows the tools,
+// reads the parts of it the tools do not yet (the sidecar read, the verdict).
 #[cfg_attr(not(test), allow(dead_code))]
 #[path = "agent_master_ledger.rs"]
 mod master_ledger;
+// The master post's queue recheck.
+#[path = "agent_master_post.rs"]
+mod master_post;
+// The one-ledger dialog's preview.
+#[path = "agent_master_review.rs"]
+mod master_review;
+// `prepare_ledger_creates` and `post_ledger_creates`.
+#[path = "agent_master_tools.rs"]
+mod master_tools;
 #[path = "agent_import_persistence.rs"]
 mod persistence;
 #[path = "agent_import_post.rs"]
@@ -5081,7 +5092,7 @@ fn render_import_xml(company: &str, vouchers: &[ImportVoucher], batch_id: &str) 
             render_voucher_xml(voucher, identity, NarrationAttribution::Tagged(identity))
         })
         .collect::<String>();
-    render_import_envelope(company, &messages)
+    render_import_envelope(company, ImportReport::Vouchers, &messages)
 }
 
 /// The native post's request: each voucher paired with its own REMOTEID. The
@@ -5103,7 +5114,7 @@ fn render_native_vouchers_xml<'a>(
             render_voucher_xml(voucher, remote_id, NarrationAttribution::Untagged)
         })
         .collect();
-    render_import_envelope(company, &messages)
+    render_import_envelope(company, ImportReport::Vouchers, &messages)
 }
 
 /// Whether a rendered voucher's narration carries Bridge's `[BRIDGE:…]` tag.
@@ -5113,10 +5124,6 @@ fn render_native_vouchers_xml<'a>(
 enum NarrationAttribution {
     Tagged(Uuid),
     Untagged,
-}
-
-fn render_import_envelope(company: &str, messages: &str) -> String {
-    format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES></REQUESTDESC><REQUESTDATA>{messages}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>", xml_escape(company))
 }
 
 /// The narration a post sends for `voucher`, and the one its approval dialog

@@ -129,6 +129,7 @@ async fn call_observed(
         redaction,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -331,6 +332,7 @@ async fn a_reversed_window_is_refused_before_any_request() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server

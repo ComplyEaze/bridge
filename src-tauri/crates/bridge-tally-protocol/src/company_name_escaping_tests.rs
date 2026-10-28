@@ -69,6 +69,10 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
             ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render(),
         ),
         (
+            "xml_read_profiles::ReadOnlyProfile::StandardLedgerCatalogV3",
+            ReadOnlyProfile::StandardLedgerCatalogV3 { company: &company }.render(),
+        ),
+        (
             "xml_read_profiles::compatibility::ledgers_request",
             ledgers_request(NAME),
         ),

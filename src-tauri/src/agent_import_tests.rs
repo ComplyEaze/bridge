@@ -78,6 +78,7 @@ async fn batch_total_overflow_is_refused_before_dispatch_or_persistence() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let mut input = payload();
@@ -115,6 +116,7 @@ async fn a_narration_that_would_read_back_rewritten_is_refused_at_build() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let mut input = payload();
@@ -147,6 +149,7 @@ async fn a_batch_with_several_defects_reports_the_validation_defect_before_the_n
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let build = |input: &ImportPayload<String>| {
@@ -433,6 +436,7 @@ fn external_import_ledger_read_refuses_busy_admission_without_waiting() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     };
     let server = Server::new(settings.clone());
@@ -472,6 +476,7 @@ fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     };
     let server = Server::new(settings.clone());
@@ -598,6 +603,7 @@ fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
@@ -735,6 +741,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
@@ -1109,6 +1116,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let input = admitted_payload();
@@ -2294,6 +2302,7 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let built = server
@@ -2967,6 +2976,7 @@ async fn import_bounds_distinct_ledger_names_before_tally_without_reducing_vouch
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -3259,6 +3269,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::from_enabled(writes_enabled),
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let mut input = captured_catalogue_payload();
@@ -3400,6 +3411,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::On,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let built = server
@@ -3759,6 +3771,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
@@ -3892,6 +3905,7 @@ fn line_error_text_does_not_count_against_a_pages_never_cut_part() {
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         })
     };
@@ -3938,6 +3952,7 @@ async fn a_hand_imported_batchs_alter_id_delta_is_measured_from_its_build_mark()
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -3982,6 +3997,7 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         })
     };
@@ -4135,6 +4151,7 @@ async fn a_later_page_of_a_dispatched_batch_states_the_headline_of_the_first() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -4288,6 +4305,7 @@ async fn verify_saved_batch_after_dispatch(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -4367,6 +4385,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -4528,6 +4547,7 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let built = server
@@ -4643,6 +4663,7 @@ async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -5429,6 +5450,7 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
             redaction,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         })
     };
@@ -5867,6 +5889,7 @@ fn numbering_server(directory: &std::path::Path, port: u16) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -6280,6 +6303,7 @@ async fn the_build_names_the_route_at_the_batch_limit_and_never_both_routes() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::from_enabled(writes_enabled),
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let mut input = captured_catalogue_payload();

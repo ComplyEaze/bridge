@@ -1,0 +1,7 @@
+unspanned 5434 bytes, sha256 71c527b65edcb2aaee81561d581528ce3f620a10deaca764f6bd050fd2842973, 1 VOUCHER rows
+  ('3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000029', 41, '20250703')
+spanned   5434 bytes, sha256 71c527b65edcb2aaee81561d581528ce3f620a10deaca764f6bd050fd2842973, 1 VOUCHER rows
+  ('3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000029', 41, '20250703')
+HOLDS: the unspanned answer equals the recorded one, byte for byte
+HOLDS: the spanned answer equals the unspanned one, byte for byte
+HOLDS: every row of both is inside the span (ALTERID <= 111)

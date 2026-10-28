@@ -24,7 +24,10 @@
 //!    master changed or missing, no loaded company's mark moved and no counter
 //!    claiming a create: `confirmed_absent`;
 //! 5. every check of [`Checks`] passed: `posted_verified`;
-//! 6. anything else: `reconciliation_required`, with its reasons.
+//! 6. on a reconcile only, with no counters on file, every other check passed
+//!    and the found ledger's `ALTERID` the target company's intent mark plus
+//!    one ([`FirstChangeAfterIntent`]): `posted_unattributed`;
+//! 7. anything else: `reconciliation_required`, with its reasons.
 use super::super::master_ledger::{
     is_canonical_guid, MasterCounters, MasterMark, MasterVerdictState,
 };
@@ -151,6 +154,11 @@ pub(super) struct Checks {
     pub(super) target_mark_moved: Check,
     pub(super) other_marks_unmoved: Check,
     pub(super) pre_image_unchanged: Check,
+    /// The found ledger's `ALTERID` is the target company's mark at the intent
+    /// plus one. Decided only when no counters are on file, where it stands in
+    /// for them as far as it can ([`FirstChangeAfterIntent`]); never part of
+    /// [`Checks::all_passed`].
+    pub(super) first_change_after_intent: Check,
 }
 
 impl Checks {
@@ -166,6 +174,7 @@ impl Checks {
             target_mark_moved: Check::NotChecked,
             other_marks_unmoved: Check::NotChecked,
             pre_image_unchanged: Check::NotChecked,
+            first_change_after_intent: Check::NotChecked,
         }
     }
 
@@ -183,6 +192,41 @@ impl Checks {
             && passed(self.target_mark_moved)
             && passed(self.other_marks_unmoved)
             && passed(self.pre_image_unchanged)
+    }
+
+    /// Whether every check but the counters passed: what `posted_unattributed`
+    /// needs besides [`FirstChangeAfterIntent`].
+    fn all_but_counters_passed(&self) -> bool {
+        Self {
+            counters: Check::Passed,
+            ..*self
+        }
+        .all_passed()
+    }
+}
+
+/// The found ledger's `ALTERID` is the target company's `ALTMSTID` at the
+/// intent plus one: the ledger was written by the first master change in that
+/// company after the intent, and by none since. A same-name ledger someone made
+/// between the aim read and the POST takes that first change, and the create
+/// that then alters it moves it one further, so it never builds this. Private
+/// to this module and built only by [`FirstChangeAfterIntent::of`], which only
+/// [`judge`] calls: `posted_unattributed` cannot be reached without it.
+/// Measured: each gateway write moved the mark by exactly one, to the written
+/// ledger's `ALTERID` (protocol reference §9.4j).
+struct FirstChangeAfterIntent(());
+
+impl FirstChangeAfterIntent {
+    /// The proof, or the reason it fails: a later `ALTERID` means the ledger
+    /// was changed after the create (or another master change came first); one
+    /// at or below the mark, or a mark with no successor, is not after the
+    /// intent at all.
+    fn of(intent_mark: u64, ledger_alter_id: u64) -> Result<Self, &'static str> {
+        match intent_mark.checked_add(1) {
+            Some(next) if ledger_alter_id == next => Ok(Self(())),
+            Some(next) if ledger_alter_id > next => Err("ledger_altered_since_create"),
+            _ => Err("ledger_alter_id_not_after_intent"),
+        }
     }
 }
 
@@ -249,6 +293,25 @@ impl Judgement {
             checks: Checks::none(),
             reasons: vec![reason],
             name_absent_in_read_book: false,
+            sealed: (),
+        }
+    }
+
+    /// `posted_unattributed`, which needs the proof that the ledger was the
+    /// first master change after the intent. Its reason says why it is not
+    /// `posted_verified`.
+    fn unattributed(
+        guid: Option<String>,
+        checks: Checks,
+        name_absent_in_read_book: bool,
+        _first_change: FirstChangeAfterIntent,
+    ) -> Self {
+        Self {
+            state: MasterVerdictState::PostedUnattributed,
+            guid,
+            checks,
+            reasons: vec!["counters_unavailable"],
+            name_absent_in_read_book,
             sealed: (),
         }
     }
@@ -606,8 +669,30 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         };
     }
 
-    // 6. Anything else is for a person.
+    // 6. Tally's answer is not on file: the ledger is as sent, and it was
+    // written by the first master change after the intent.
+    let first_change = match (&found, pre.get(facts.company_guid), facts.counters) {
+        (Some(guid), Some(intent_mark), None) => current
+            .get(guid)
+            .map(|alter_id| FirstChangeAfterIntent::of(*intent_mark, *alter_id)),
+        _ => None,
+    };
+    if let Some(first_change) = &first_change {
+        checks.first_change_after_intent = passed(first_change.is_ok());
+    }
+    let unattributed =
+        facts.moment == Moment::Reconcile && checks.all_but_counters_passed() && recordable;
+    let first_change = match first_change {
+        Some(Ok(proof)) if unattributed => {
+            return Judgement::unattributed(found, checks, name_absent, proof);
+        }
+        Some(Err(reason)) => Some(reason),
+        Some(Ok(_)) | None => None,
+    };
+
+    // 7. Anything else is for a person.
     reasons.extend(reasons_of(&checks));
+    reasons.extend(first_change);
     if checks.counters == Check::NotChecked {
         reasons.push("counters_unavailable");
     }

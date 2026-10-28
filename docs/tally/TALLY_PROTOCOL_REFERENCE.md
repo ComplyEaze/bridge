@@ -210,6 +210,9 @@ base revision.
 <a id="94i-a-ledger-create-on-a-new-name-moved-the-master-mark-by-one-and-changed-nothing-else"></a>
 
 [9.4i A ledger `Create` on a new name moved the master mark by one and changed nothing else](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94i-a-ledger-create-on-a-new-name-moved-the-master-mark-by-one-and-changed-nothing-else)
+<a id="94j-each-gateway-master-write-moved-the-master-mark-by-one-to-the-written-ledgers-alterid"></a>
+
+[9.4j Each gateway master write moved the master mark by one, to the written ledger's `ALTERID`](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94j-each-gateway-master-write-moved-the-master-mark-by-one-to-the-written-ledgers-alterid)
 <a id="95-identity-after-write"></a>
 
 [9.5 Identity after write](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#95-identity-after-write)

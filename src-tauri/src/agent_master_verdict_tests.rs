@@ -130,7 +130,9 @@ impl World {
                 masters: Some(vec![
                     master(MasterKind::Ledger, cash(), 9, &["Cash"]),
                     master(MasterKind::Group, debtors_group(), 4, &["Sundry Debtors"]),
-                    master(MasterKind::Ledger, new_ledger(), 11, &[NAME]),
+                    // The first master change after the intent's mark of 7,
+                    // as every measured gateway write was.
+                    master(MasterKind::Ledger, new_ledger(), 8, &[NAME]),
                 ]),
                 party: PartyRead::Rows(vec![row]),
             },
@@ -149,6 +151,23 @@ impl World {
         ]);
         world.read.party = PartyRead::NotRead;
         world
+    }
+
+    /// The clean world read back by a later call whose batch has no counters
+    /// on file: Tally's answer was lost.
+    fn lost_answer(item: LedgerCreateItem) -> Self {
+        let mut world = Self::clean(item);
+        world.moment = Moment::Reconcile;
+        world.counters = None;
+        world
+    }
+
+    fn new_ledger_alter_id(&mut self, alter_id: u64) {
+        self.masters()
+            .iter_mut()
+            .find(|master| master.guid == new_ledger())
+            .unwrap()
+            .alter_id = alter_id;
     }
 
     fn judge(&self) -> Judgement {
@@ -266,11 +285,11 @@ fn absent_counters_never_give_posted_verified_whatever_else_holds() {
         assert_eq!(judgement.guid.as_deref(), Some(new_ledger()), "{label}");
         assert_eq!(judgement.checks.name, Check::Passed);
         assert_eq!(judgement.checks.parent, Check::Passed);
-        // The same on a reconcile, where an unknown outcome has no counters.
+        // On a reconcile the same world settles, and is still never verified.
         world.moment = Moment::Reconcile;
         assert_eq!(
             world.judge().state,
-            MasterVerdictState::ReconciliationRequired,
+            MasterVerdictState::PostedUnattributed,
             "{label} reconcile"
         );
     }
@@ -718,8 +737,18 @@ fn all_passed_needs_every_check_counters_included() {
         target_mark_moved: Check::Passed,
         other_marks_unmoved: Check::Passed,
         pre_image_unchanged: Check::Passed,
+        first_change_after_intent: Check::NotChecked,
     };
     assert!(all.all_passed());
+    // The ALTERID check stands in for the counters only where they are not
+    // on file: it is never part of a verified create.
+    for value in [Check::Passed, Check::Failed] {
+        assert!(Checks {
+            first_change_after_intent: value,
+            ..all
+        }
+        .all_passed());
+    }
     assert!(!Checks {
         counters: Check::NotChecked,
         ..all
@@ -778,6 +807,367 @@ fn all_passed_needs_every_check_counters_included() {
         .all_passed());
     }
     assert!(!Checks::none().all_passed());
+}
+
+// --- posted_unattributed ---------------------------------------------------
+
+#[test]
+fn a_reconcile_with_no_counters_that_finds_the_first_change_as_sent_is_unattributed() {
+    for (label, item) in items() {
+        let judgement = World::lost_answer(item).judge();
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::PostedUnattributed,
+            "{label}: {judgement:?}"
+        );
+        assert!(judgement.state.is_terminal(), "{label}");
+        assert_eq!(judgement.guid.as_deref(), Some(new_ledger()), "{label}");
+        assert_eq!(judgement.reasons, vec!["counters_unavailable"], "{label}");
+        assert_eq!(judgement.checks.counters, Check::NotChecked, "{label}");
+        assert_eq!(
+            judgement.checks.first_change_after_intent,
+            Check::Passed,
+            "{label}"
+        );
+        assert!(!judgement.checks.all_passed(), "{label}");
+        assert!(judgement.checks.all_but_counters_passed(), "{label}");
+    }
+}
+
+#[test]
+fn right_after_a_post_a_create_with_no_counters_is_never_unattributed() {
+    for (label, item) in items() {
+        let mut world = World::lost_answer(item);
+        world.moment = Moment::JustPosted;
+        let judgement = world.judge();
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::ReconciliationRequired,
+            "{label}"
+        );
+        assert_eq!(judgement.checks.first_change_after_intent, Check::Passed);
+        assert_eq!(judgement.reasons, vec!["counters_unavailable"], "{label}");
+    }
+}
+
+#[test]
+fn counters_on_file_decide_and_the_alter_id_check_is_not_made() {
+    let mut world = World::lost_answer(suspense());
+    world.counters = Some(counters(1, 0, 0, 0));
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::PostedVerified);
+    assert_eq!(
+        judgement.checks.first_change_after_intent,
+        Check::NotChecked
+    );
+    // Counters that fail are never overruled by the mark.
+    for failing in [
+        counters(0, 0, 0, 0),
+        counters(1, 0, 1, 0),
+        counters(1, 0, 0, 1),
+    ] {
+        world.counters = Some(failing);
+        let judgement = world.judge();
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::ReconciliationRequired,
+            "{failing:?}"
+        );
+        assert_eq!(
+            judgement.checks.first_change_after_intent,
+            Check::NotChecked
+        );
+    }
+}
+
+/// A same-name ledger someone made between the aim read and the POST takes
+/// the first master change, and the create that alters it moves it one
+/// further: the case the counters exist for stays open with its own reason.
+#[test]
+fn a_ledger_changed_after_the_first_change_stays_open_as_altered_since_create() {
+    for (label, item) in items() {
+        let mut world = World::lost_answer(item);
+        world.new_ledger_alter_id(9);
+        world.marks()[0] = mark(TARGET, 9);
+        let judgement = world.judge();
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::ReconciliationRequired,
+            "{label}"
+        );
+        assert!(!judgement.state.is_terminal());
+        assert_eq!(
+            judgement.checks.first_change_after_intent,
+            Check::Failed,
+            "{label}"
+        );
+        assert_eq!(
+            judgement.reasons,
+            vec!["ledger_altered_since_create", "counters_unavailable"],
+            "{label}"
+        );
+        // The ledger is still named, for the person to compare.
+        assert_eq!(judgement.guid.as_deref(), Some(new_ledger()), "{label}");
+    }
+}
+
+#[test]
+fn an_alter_id_not_after_the_intent_mark_stays_open_with_its_own_reason() {
+    for alter_id in [0, 6, 7] {
+        let mut world = World::lost_answer(suspense());
+        world.new_ledger_alter_id(alter_id);
+        let judgement = world.judge();
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::ReconciliationRequired,
+            "{alter_id}"
+        );
+        assert_eq!(judgement.checks.first_change_after_intent, Check::Failed);
+        assert_eq!(
+            judgement.reasons,
+            vec!["ledger_alter_id_not_after_intent", "counters_unavailable"],
+            "{alter_id}"
+        );
+    }
+}
+
+#[test]
+fn the_first_change_is_exactly_the_mark_plus_one_and_a_last_mark_has_none() {
+    assert!(FirstChangeAfterIntent::of(7, 8).is_ok());
+    for (mark, alter_id, reason) in [
+        (7, 9, "ledger_altered_since_create"),
+        (7, u64::MAX, "ledger_altered_since_create"),
+        (7, 7, "ledger_alter_id_not_after_intent"),
+        (7, 6, "ledger_alter_id_not_after_intent"),
+        (u64::MAX, u64::MAX, "ledger_alter_id_not_after_intent"),
+        (u64::MAX, 0, "ledger_alter_id_not_after_intent"),
+    ] {
+        assert_eq!(
+            FirstChangeAfterIntent::of(mark, alter_id).err(),
+            Some(reason),
+            "{mark} {alter_id}"
+        );
+    }
+    assert!(FirstChangeAfterIntent::of(u64::MAX - 1, u64::MAX).is_ok());
+}
+
+/// Master changes after the ledger's own, in this company, do not undo what
+/// its `ALTERID` shows.
+#[test]
+fn later_master_changes_in_the_company_do_not_stop_it_settling() {
+    let mut world = World::lost_answer(suspense());
+    world.marks()[0] = mark(TARGET, 40);
+    assert_eq!(world.judge().state, MasterVerdictState::PostedUnattributed);
+}
+
+/// Every other check must pass: one failing keeps the batch out of
+/// `posted_unattributed`, whatever the ALTERID shows.
+#[test]
+fn any_other_failing_check_forbids_unattributed() {
+    type Change = fn(&mut World);
+    let changes: [(&str, Change); 11] = [
+        ("parent", |world| {
+            world.rows().parent = Some("Cash-in-Hand".into())
+        }),
+        ("tax fields", |world| {
+            world.rows().tax_type = Some("GST".into())
+        }),
+        ("gstin", |world| {
+            world.rows().party_gstin = Some(LAB_GSTIN.into());
+        }),
+        ("opening balance", |world| {
+            world.rows().opening_balance = Some("5.00".into());
+        }),
+        ("row name", |world| world.rows().name = "Other".into()),
+        ("target mark unmoved", |world| {
+            world.marks()[0] = mark(TARGET, 7);
+        }),
+        ("other mark moved", |world| {
+            world.marks()[1] = mark(other(), 4)
+        }),
+        ("companies changed", |world| {
+            world.marks().pop();
+        }),
+        ("pre-image changed", |world| {
+            world.masters()[0].alter_id = 10
+        }),
+        ("second ledger of the name", |world| {
+            world.masters().push(master(
+                MasterKind::Ledger,
+                crate::synthetic_guid(0x5151),
+                8,
+                &[NAME],
+            ));
+        }),
+        ("party read not made", |world| {
+            world.read.party = PartyRead::NotRead
+        }),
+    ];
+    for (label, change) in changes {
+        let mut world = World::lost_answer(suspense());
+        change(&mut world);
+        let judgement = world.judge();
+        assert!(
+            !matches!(
+                judgement.state,
+                MasterVerdictState::PostedUnattributed | MasterVerdictState::PostedVerified
+            ),
+            "{label}: {judgement:?}"
+        );
+    }
+    // A GUID the journal cannot record never settles either.
+    let mut world = World::lost_answer(suspense());
+    let odd = "not-a-canonical-guid";
+    world
+        .masters()
+        .iter_mut()
+        .find(|master| master.guid == new_ledger())
+        .unwrap()
+        .guid = odd.into();
+    world.rows().guid = odd.into();
+    assert_ne!(world.judge().state, MasterVerdictState::PostedUnattributed);
+}
+
+/// The measured series behind [`FirstChangeAfterIntent`]: on one synthetic
+/// book, the company's master mark after each of 21 gateway writes, and the
+/// ledger index reads that show each written ledger's `ALTERID`. Every write
+/// that changed a ledger moved the mark by exactly one, to that ledger's
+/// `ALTERID`; the one refused write moved nothing
+/// (`masters-m1-marks/PROVENANCE.md`).
+#[test]
+fn the_measured_marks_series_has_each_written_ledger_at_its_writes_mark() {
+    const LAB: &str = "f107e523-3d6b-4516-bd24-5b1a14498fa6";
+    macro_rules! capture {
+        ($file:literal) => {
+            include_bytes!(concat!(
+                "../crates/bridge-tally-protocol/tests/fixtures/agent/",
+                $file
+            ))
+            .as_slice()
+        };
+    }
+    let text = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let marks = [
+        capture!("masters-m1-marks/marks-00-baseline.utf16le.xml"),
+        capture!("masters-m1-marks/marks-01-n-0a.utf16le.xml"),
+        capture!("masters-m1-marks/marks-02-n-0b.utf16le.xml"),
+        capture!("masters-m1-marks/marks-03-n-a.utf16le.xml"),
+        capture!("masters-m1-marks/marks-04-n-b.utf16le.xml"),
+        capture!("masters-m1-marks/marks-05-n-c.utf16le.xml"),
+        capture!("masters-m1-marks/marks-06-n-d.utf16le.xml"),
+        capture!("masters-m1-marks/marks-07-n-f.utf16le.xml"),
+        capture!("masters-m1-marks/marks-08-n-e.utf16le.xml"),
+        capture!("masters-m1-marks/marks-09-m1-party.utf16le.xml"),
+        capture!("masters-m1-marks/marks-10-m1-susp.utf16le.xml"),
+        capture!("masters-m1-marks/marks-11-m1-duty-cgst.utf16le.xml"),
+        capture!("masters-m1-marks/marks-12-m1-duty-igst.utf16le.xml"),
+        capture!("masters-m1-marks/marks-13-m1-duty-state.utf16le.xml"),
+        capture!("masters-m1-marks/marks-14-m1-duty-sgstutgst.utf16le.xml"),
+        capture!("masters-m1-marks/marks-15-m1-duty-ut.utf16le.xml"),
+        capture!("masters-m1-marks/marks-16-m1-duty-cess.utf16le.xml"),
+        capture!("masters-m1-marks/marks-17-q-0.utf16le.xml"),
+        capture!("masters-m1-marks/marks-18-q-r.utf16le.xml"),
+        capture!("masters-m1-marks/marks-19-q-a.utf16le.xml"),
+        capture!("masters-m1-marks/marks-20-q-c0.utf16le.xml"),
+        capture!("masters-m1-marks/marks-21-q-c.utf16le.xml"),
+    ]
+    .map(|bytes| {
+        let rows = crate::agent::change_parse::parse_all_company_marks(&text(bytes)).unwrap();
+        assert_eq!(rows.len(), 1, "one company loaded");
+        assert_eq!(rows[0].guid, LAB);
+        rows[0].masters
+    });
+    // Each ledger index read with the mark of the write just before it.
+    let reads = [
+        (
+            capture!("masters-lab-ledger-index-after-name-cases.utf16le.xml"),
+            8,
+        ),
+        (
+            capture!("masters-m1-marks/ledger-index-after-m1-shapes.utf16le.xml"),
+            16,
+        ),
+        (
+            capture!("masters-m1-marks/ledger-index-after-probe-create.utf16le.xml"),
+            20,
+        ),
+        (
+            capture!("masters-lab-ledger-index-after-fold-cases.utf16le.xml"),
+            21,
+        ),
+    ]
+    .map(|(bytes, after)| {
+        let rows = bridge_tally_protocol::parse_ledger_name_index(&text(bytes), LAB).unwrap();
+        let alter_ids = rows
+            .into_iter()
+            .map(|row| (row.guid, row.alter_id))
+            .collect::<BTreeMap<_, _>>();
+        // The last write before each read changed a ledger: no ledger is
+        // later than the mark, and one is at it.
+        assert_eq!(
+            alter_ids.values().max(),
+            Some(&marks[after]),
+            "read {after}"
+        );
+        (after, alter_ids)
+    });
+    // Write k (after marks[k - 1], before marks[k]): the ledger it wrote, by
+    // the last two hex digits of its GUID, and the read that shows it.
+    let writes: [(usize, Option<&str>, usize); 21] = [
+        (1, Some("d5"), 8),
+        (2, Some("ce"), 8),
+        (3, None, 8),
+        (4, Some("d0"), 8),
+        (5, Some("d1"), 8),
+        (6, Some("d2"), 8),
+        (7, Some("d3"), 8),
+        (8, Some("d6"), 8),
+        (9, Some("d7"), 16),
+        (10, Some("d8"), 16),
+        (11, Some("d9"), 16),
+        (12, Some("da"), 16),
+        (13, Some("db"), 16),
+        (14, Some("dc"), 16),
+        (15, Some("dd"), 16),
+        (16, Some("de"), 16),
+        (17, Some("ce"), 21),
+        (18, Some("cf"), 21),
+        (19, Some("d5"), 21),
+        (20, Some("df"), 20),
+        (21, Some("df"), 21),
+    ];
+    let mut moved = 0;
+    for (k, written, read) in writes {
+        let (before, after) = (marks[k - 1], marks[k]);
+        let Some(suffix) = written else {
+            // The alias name refused as a duplicate: nothing moved.
+            assert_eq!(after, before, "write {k}");
+            continue;
+        };
+        moved += 1;
+        assert_eq!(after, before + 1, "write {k}");
+        let alter_ids = &reads.iter().find(|(at, _)| *at == read).unwrap().1;
+        let alter_id = alter_ids[&format!("{LAB}-000000{suffix}")];
+        assert_eq!(alter_id, after, "write {k}");
+        assert!(
+            FirstChangeAfterIntent::of(before, alter_id).is_ok(),
+            "write {k}"
+        );
+    }
+    assert_eq!(moved, 20);
+    assert_eq!((marks[0], marks[21]), (216, 236));
+    // The refused write's ledger kept its keyed ALTERID: not after the mark.
+    let refused = reads[0].1[&format!("{LAB}-000000cf")];
+    assert_eq!(refused, 211);
+    assert!(FirstChangeAfterIntent::of(marks[2], refused).is_err());
 }
 
 // --- confirmed_absent ------------------------------------------------------
@@ -982,7 +1372,7 @@ fn every_verdict_state_and_reason_is_unchanged_and_the_fact_beside_them_is_exact
     type Change = fn(&mut World);
     use MasterVerdictState::{
         ConfirmedAbsent, MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed,
-        PostedIntoExistingMaster, PostedVerified, ReconciliationRequired,
+        PostedIntoExistingMaster, PostedUnattributed, PostedVerified, ReconciliationRequired,
     };
     type Case = (
         &'static str,
@@ -992,7 +1382,7 @@ fn every_verdict_state_and_reason_is_unchanged_and_the_fact_beside_them_is_exact
         Vec<&'static str>,
         bool,
     );
-    let cases: [Case; 12] = [
+    let cases: [Case; 14] = [
         (
             "clean",
             World::clean(suspense()),
@@ -1059,6 +1449,22 @@ fn every_verdict_state_and_reason_is_unchanged_and_the_fact_beside_them_is_exact
             |world| world.counters = None,
             ReconciliationRequired,
             vec!["counters_unavailable"],
+            false,
+        ),
+        (
+            "present, no counters, reconcile",
+            World::lost_answer(suspense()),
+            |_| {},
+            PostedUnattributed,
+            vec!["counters_unavailable"],
+            false,
+        ),
+        (
+            "present, no counters, reconcile, changed since",
+            World::lost_answer(suspense()),
+            |world| world.new_ledger_alter_id(9),
+            ReconciliationRequired,
+            vec!["ledger_altered_since_create", "counters_unavailable"],
             false,
         ),
         (

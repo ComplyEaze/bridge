@@ -962,6 +962,19 @@ const ROWS: &[Row] = &[
         parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
     },
     Row {
+        fixture: "tests/fixtures/agent/masters-m1-marks/ledger-index-after-m1-shapes.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture:
+            "tests/fixtures/agent/masters-m1-marks/ledger-index-after-probe-create.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
         fixture: "tests/fixtures/agent/masters-lab-groups-baseline.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_group_snapshot(MASTERS LAB)",
@@ -2460,6 +2473,8 @@ const APP_CENSUS: &str =
     "recorded by the app crate's record (#1198 slice 2): parse_voucher_census (a voucher census)";
 const APP_HIGH_WATER: &str = "recorded by the app crate's record (#1198 slice 2): \
      parse_company_high_water / parse_company_marks (a company ALTVCHID/ALTMSTID read)";
+const APP_ALL_MARKS: &str = "recorded by the app crate's record (#1198 slice 2): \
+     parse_all_company_marks (a company ALTMSTID read of a book that holds no voucher)";
 const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slice 2): \
      parse_agent_rows_withholding (src/currency_composite_tests.rs only classifies its amounts)";
 const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
@@ -2855,6 +2870,94 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/stock-lab-day/stock_lab_taxed_day_company_marks_response.utf16le.xml",
         APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-00-baseline.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-01-n-0a.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-02-n-0b.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-03-n-a.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-04-n-b.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-05-n-c.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-06-n-d.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-07-n-f.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-08-n-e.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-09-m1-party.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-10-m1-susp.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-11-m1-duty-cgst.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-12-m1-duty-igst.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-13-m1-duty-state.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-14-m1-duty-sgstutgst.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-15-m1-duty-ut.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-16-m1-duty-cess.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-17-q-0.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-18-q-r.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-19-q-a.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-20-q-c0.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-21-q-c.utf16le.xml",
+        APP_ALL_MARKS,
     ),
     (
         "tests/fixtures/agent/native-company-book-extents.utf16le.xml",

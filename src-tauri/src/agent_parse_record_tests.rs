@@ -255,6 +255,39 @@ fn rows() -> Vec<Row> {
         "parse_all_company_marks",
         |_, t| all_marks(t)
     ));
+    // The masters lab's marks after each ledger Create
+    // (`agent_master_verdict_tests.rs`).
+    for fixture in [
+        "agent/masters-m1-marks/marks-00-baseline.utf16le.xml",
+        "agent/masters-m1-marks/marks-01-n-0a.utf16le.xml",
+        "agent/masters-m1-marks/marks-02-n-0b.utf16le.xml",
+        "agent/masters-m1-marks/marks-03-n-a.utf16le.xml",
+        "agent/masters-m1-marks/marks-04-n-b.utf16le.xml",
+        "agent/masters-m1-marks/marks-05-n-c.utf16le.xml",
+        "agent/masters-m1-marks/marks-06-n-d.utf16le.xml",
+        "agent/masters-m1-marks/marks-07-n-f.utf16le.xml",
+        "agent/masters-m1-marks/marks-08-n-e.utf16le.xml",
+        "agent/masters-m1-marks/marks-09-m1-party.utf16le.xml",
+        "agent/masters-m1-marks/marks-10-m1-susp.utf16le.xml",
+        "agent/masters-m1-marks/marks-11-m1-duty-cgst.utf16le.xml",
+        "agent/masters-m1-marks/marks-12-m1-duty-igst.utf16le.xml",
+        "agent/masters-m1-marks/marks-13-m1-duty-state.utf16le.xml",
+        "agent/masters-m1-marks/marks-14-m1-duty-sgstutgst.utf16le.xml",
+        "agent/masters-m1-marks/marks-15-m1-duty-ut.utf16le.xml",
+        "agent/masters-m1-marks/marks-16-m1-duty-cess.utf16le.xml",
+        "agent/masters-m1-marks/marks-17-q-0.utf16le.xml",
+        "agent/masters-m1-marks/marks-18-q-r.utf16le.xml",
+        "agent/masters-m1-marks/marks-19-q-a.utf16le.xml",
+        "agent/masters-m1-marks/marks-20-q-c0.utf16le.xml",
+        "agent/masters-m1-marks/marks-21-q-c.utf16le.xml",
+    ] {
+        rows.push(Row {
+            fixture,
+            source: Source::Captured,
+            parser: "parse_all_company_marks",
+            parse: |_, t| all_marks(t),
+        });
+    }
     // Voucher censuses, each over the day its capture asked for: the voucher day its provenance
     // gives (D3, L1, WA1, the register end-to-end read), or its paired request's
     // SVFROMDATE/SVTODATE (the note days).

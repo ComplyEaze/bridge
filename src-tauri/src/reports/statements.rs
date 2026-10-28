@@ -32,7 +32,9 @@ use bridge_tally_protocol::{
     is_tally_reserved_root,
     native_statement_reports::{NativeStatement, NativeStatementAmount, NativeStatementKind},
     native_stock_summary::{NativeFlag, NativeInventoryFlags},
-    native_trial_balance::{NativeTrialBalanceAmount, NativeTrialBalanceRow},
+    native_trial_balance::{
+        NativeTrialBalanceAmount, NativeTrialBalanceMovements, NativeTrialBalanceRow,
+    },
     TallyNamedMaster,
 };
 use serde::Serialize;
@@ -912,27 +914,15 @@ fn present_nonzero(amount: &NativeTrialBalanceAmount) -> bool {
     matches!(amount, NativeTrialBalanceAmount::Present(value) if !value.is_zero())
 }
 
-/// Opening plus the window's debit and credit is the closing (§5.6).
-///
-/// Only here is an empty amount taken as zero, and only because this check can
-/// refuse a read but never produce a figure. Required all four present, it
-/// fired on none of the rows in either tie capture; this way it holds on every
-/// row of every captured Trial Balance, and it catches a P&L row whose closing
-/// carries an amount its movement columns do not.
+/// Opening plus the window's debit and credit is the closing (§5.6): the row's own
+/// check, [`NativeTrialBalanceRow::movements`], which `trial_balance` reports as a flag.
+/// Here a row that does not add up refuses the read, as this check can refuse but never
+/// produce a figure; it holds on every row of every captured Trial Balance, and it
+/// catches a P&L row whose closing carries an amount its movement columns do not.
 fn check_row_identity(row: &NativeTrialBalanceRow) -> Result<(), StatementsError> {
-    let zero = ExactDecimal::zero();
-    let value = |amount: &NativeTrialBalanceAmount| match amount {
-        NativeTrialBalanceAmount::Present(value) => value.clone(),
-        NativeTrialBalanceAmount::PresentEmpty => zero.clone(),
-    };
-    let moved = value(&row.opening)
-        .checked_add(&value(&row.debit))
-        .and_then(|total| total.checked_add(&value(&row.credit)))
-        .map_err(|_| StatementsError::Arithmetic)?;
-    if moved.numeric_eq(&value(&row.closing)) {
-        Ok(())
-    } else {
-        Err(StatementsError::RowInconsistent)
+    match row.movements() {
+        NativeTrialBalanceMovements::Tie => Ok(()),
+        NativeTrialBalanceMovements::Differ(_) => Err(StatementsError::RowInconsistent),
     }
 }
 

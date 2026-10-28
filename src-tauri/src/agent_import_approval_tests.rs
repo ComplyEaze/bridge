@@ -2048,8 +2048,8 @@ fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
     for shown in [
-        "Journal 20260901  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Synthetic test only\"",
-        "Journal 20260901  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Second rent\"",
+        "Journal 1-Sep-2026  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Synthetic test only\"",
+        "Journal 1-Sep-2026  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Second rent\"",
     ] {
         assert!(batch.lines().any(|text| text == shown), "{shown}\n{batch}");
     }
@@ -3598,7 +3598,7 @@ fn the_totals_form_is_the_listed_forms_fallback_text_and_nothing_else() {
     let listed = form(&two, PreviewForm::Listed);
     let totals = form(&two, PreviewForm::TotalsOnly);
     let voucher_line =
-        "Journal 20260901  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Synthetic test only\"";
+        "Journal 1-Sep-2026  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Synthetic test only\"";
     assert!(listed.lines().any(|text| text == voucher_line), "{listed}");
     assert!(!listed.contains(VOUCHER_LINES_DO_NOT_FIT), "{listed}");
     assert!(!totals.lines().any(|text| text == voucher_line), "{totals}");

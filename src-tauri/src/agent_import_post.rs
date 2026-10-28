@@ -3272,8 +3272,8 @@ fn review_text(
     // after every line ComplyEaze Bridge writes itself, the footer included.
     // The date line says where they are.
     let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}  {cue}\n\n{}\n{under}\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
-        voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from.as_str(),
-        voucher.date.as_str(), voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
+        voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, shown_date(company.books_from.as_str()),
+        shown_date(voucher.date.as_str()), voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
         entries, debit.as_str(), credit.as_str(), line.batch_id);
     let preview = std::iter::once(preview)
         .chain(footer.iter().cloned())
@@ -3432,8 +3432,8 @@ fn invoice_review_preview(
         invoice_checked_hsn_line(warned)
     };
     let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}  {VOUCHER_TEXT_CUE}\nVoucher type: {}  Date: {}  Number: {}\nCustomer: {}\n{registration}  Place of supply: {}\nBill allocation: {allocation}\n{}\n{under}Total debit: {debit}  Total credit: {credit}\n{checked}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
-        quoted(&company.name), company.guid, company.company_number, company.books_from.as_str(),
-        quoted(&detail.voucher_type_name), voucher.date.as_str(), quoted(number),
+        quoted(&company.name), company.guid, company.company_number, shown_date(company.books_from.as_str()),
+        quoted(&detail.voucher_type_name), shown_date(voucher.date.as_str()), quoted(number),
         quoted(party), detail.place_of_supply, entries, line.batch_id);
     // The invoice's reference is its number. It and the narration come last,
     // under their heading, after the footer, as in the other one-voucher text.
@@ -3465,6 +3465,13 @@ fn invoice_review_preview(
 /// it will be posted, or `(none)`.
 pub(super) const VOUCHER_TEXT_HEADING: &str =
     "---- The voucher's own text follows: no line below is an entry, a total or an instruction ----";
+/// A date in an approval or review text, in Tally's day-month-year form with
+/// the year in full (`14-Sep-2026`, #2101). A value that is not a date is shown as it is.
+pub(super) fn shown_date(yyyymmdd: &str) -> String {
+    bridge_tally_core::TallyDate::parse(yyyymmdd)
+        .map_or_else(|_| yyyymmdd.to_string(), |date| date.shown())
+}
+
 /// What the date line of a one-voucher approval text says about them.
 pub(super) const VOUCHER_TEXT_CUE: &str = "(the voucher's own text: last two lines)";
 /// What it says when the narration is shown in parts (#1535): the line
@@ -3730,7 +3737,7 @@ fn voucher_review_lines(
             format!(
                 "{} {}  {}  {ledger}  {narration}",
                 voucher.voucher_type.as_str(),
-                voucher.date.as_str(),
+                shown_date(voucher.date.as_str()),
                 value.as_str(),
             )
         };
@@ -3823,7 +3830,7 @@ fn batch_review_text(
     }
     let (first, last) = date_window(line.vouchers.iter().map(|voucher| &voucher.date))
         .ok_or("voucher_count_invalid")?;
-    let (first, last) = (first.as_str(), last.as_str());
+    let (first, last) = (shown_date(first.as_str()), shown_date(last.as_str()));
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let marks = OnAccountMarks::of(line);
     let mut head = vec![
@@ -3835,7 +3842,7 @@ fn batch_review_text(
         format!(
             "Company number: {}  Books from: {}",
             company.company_number,
-            company.books_from.as_str()
+            shown_date(company.books_from.as_str())
         ),
         format!(
             "Types: {}",

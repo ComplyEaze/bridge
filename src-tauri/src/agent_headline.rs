@@ -240,6 +240,9 @@ pub(super) struct TrialBalanceBasis {
     from: bridge_tally_core::TallyDate,
     to: bridge_tally_core::TallyDate,
     completeness: Completeness,
+    /// How many of the read's ledgers have a closing that is not their opening plus their
+    /// debit and credit totals (`movements_differ_by` on the row).
+    movements_differ: usize,
 }
 
 impl TrialBalanceBasis {
@@ -252,7 +255,14 @@ impl TrialBalanceBasis {
             from,
             to,
             completeness,
+            movements_differ: 0,
         }
+    }
+
+    /// Records how many ledgers of the whole read do not add up, so every page says so.
+    pub(super) fn with_movements_differ(mut self, count: usize) -> Self {
+        self.movements_differ = count;
+        self
     }
 
     /// The headline of one page of this trial balance.
@@ -263,7 +273,7 @@ impl TrialBalanceBasis {
             plain_date(&self.from),
             plain_date(&self.to)
         );
-        let lead = if self.completeness.is_whole() {
+        let mut lead = if self.completeness.is_whole() {
             format!("{}: read for every ledger.", capitalised(&subject))
         } else {
             // The first sentence says it is partial and what that costs; the
@@ -273,6 +283,17 @@ impl TrialBalanceBasis {
             let detail = gaps.iter().map(Gap::detail).collect::<Vec<_>>().join(" ");
             format!("Partial {subject}: {short}. {detail}")
         };
+        if self.movements_differ > 0 {
+            let count = self.movements_differ;
+            let (noun, verb) = if count == 1 {
+                ("ledger", "does")
+            } else {
+                ("ledgers", "do")
+            };
+            lead.push_str(&format!(
+                " {count} {noun} {verb} not add up: the closing is not the opening plus the debit and credit totals (see movements_differ_by); each is shown as Tally sent it."
+            ));
+        }
         Headline {
             lead,
             rows: Some(page.sentence()),

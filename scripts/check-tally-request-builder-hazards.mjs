@@ -85,9 +85,8 @@ function scanRequestBuilderStrings(repositoryRoot, path, violations) {
   // tracked via brace-depth), inside a file under a tests/ directory
   // (integration tests), or in a file reached only through a test-only
   // `mod name;` declaration (testOnlyFiles(), by its #[cfg] attribute and never
-  // by the file's name: #837). This is deliberate, not incidental: unit tests such
-  // as `exact_report_collection_is_shared_by_count_and_rows`, which live
-  // inside `#[cfg(test)] mod tests { ... }`, assert against string literals
+  // by the file's name: #837). This is deliberate, not incidental: unit tests,
+  // which live inside `#[cfg(test)] mod tests { ... }`, may assert against string literals
   // containing `<REPORT NAME="...">` or `$$NumItems:... With Spaces` as
   // *expectations*, not as a dispatched request. Those are not request
   // builders and must not be scanned.

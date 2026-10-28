@@ -417,6 +417,14 @@ Negative values are debits; positive values are credits. No empty value is
 converted to zero. `totals` sums numeric observations across all returned ledgers
 and carries an `empty_count` for each column. A fully observed nonzero opening
 net is the difference in opening balances; Bridge does not add a balancing row.
+A ledger whose closing is not its opening plus its debit and credit totals (an empty amount
+counted as zero) carries `movements_differ_by` (the exact difference, closing minus the three, in
+Tally's sign), the first line says how many do not add up, and a limitation explains. The row is
+as Tally sent it and nothing is corrected. Measured on a Closing Stock ledger whose closing
+balance was keyed on Tally's screen: Tally kept the opening as its closing and showed the change
+only in the debit total. On the book not integrated with inventory Tally's Profit and Loss and
+Balance Sheet used the keyed figure; on the integrated book they valued the stock from the stock
+item, so the ledger's `closing` is not necessarily the figure those statements use.
 
 `offset` and `limit` restrict output, not the source read. A first page captures a
 fresh report and holds it in memory; a later page continues from it while the book's extent is
@@ -817,7 +825,12 @@ stock items on that list, each as `item`, `quantity`, `rate` and `value`, in Tal
 `{"state": "read", "amount": ..., "unit": ...}` with the sign Tally sent, or `{"state": "empty"}` or
 `{"state": "unread"}` (text that is not `<number> <unit>`); `rate` and `value` are each
 `{"state": "present", "value": ...}` or `{"state": "empty"}` exactly as Tally printed them, and an empty one
-is not zero. The list is Tally's own and no verdict is added: being listed does not make an item negative
+is not zero. A `value`, when present, keeps the sign Tally's export carries, as in the Stock Summary and
+the trial balance: a debit is negative and a credit is positive, and the screen shows a credit as `(-)`
+and a debit unsigned. On the one book measured, the item at -3 Nos and a rate of 120.00 was exported
+with the value `360.00` (a credit) on TallyPrime 7.1 and on 7.2, and the 7.2 screen showed `(-)360.00`
+(the screen was not read on 7.1); the other two short items captured had no value, and the sign of a
+value can change as an item trades (protocol reference §12a.13 and §12a.16). The list is Tally's own and no verdict is added: being listed does not make an item negative
 (on one book Tally also listed items of positive quantity whose closing value was a credit), so read each
 quantity. The rule by which Tally lists an item is not established and is not derived here.
 
@@ -1022,7 +1035,11 @@ parts: purchases on Indirect Expenses, Direct Expenses and Fixed
 Assets ledgers and on two expense ledgers at once, two item invoices whose purchase ledger was among their entries
 (one with freight), journals with input IGST, with a TDS ledger typed Others, a set-off and a reversal with no
 supplier, a debit note, two tax payments (one also paying interest) and a credit note with output tax.
-Not measured: vouchers created by import, Gold and other releases, a book with registered GSTINs, other item-invoice shapes, more than 64 vouchers
+A registered book was read once, by an earlier build that did not yet admit Direct Expenses or Fixed Assets ledgers or name the ledger GUID
+(the same synthetic book after its company and one supplier were registered and December's vouchers keyed, TallyPrime 7.2 Silver): none of
+December's six vouchers was set aside, and a supplier invoice entered twice (the same reference, date and bill) was totalled twice with nothing
+flagged, so the tool does not detect a duplicate invoice. A year of 70 vouchers was read whole in the same run.
+Not measured: vouchers created by import, Gold and other releases, a registered book on this build, other item-invoice shapes, more than 64 vouchers
 in a window.
 
 ### Uncertain vouchers of one voucher type (`gst_uncertain_vouchers`)

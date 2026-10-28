@@ -7538,3 +7538,261 @@ fn a_census_holds_a_voucher_between_two_days_including_both_ends() {
     let failure = census.holds_a_voucher_between(&to, &from).unwrap_err();
     assert_eq!(failure.code, "invalid_date_range");
 }
+
+// A ledger-scoped census and movement read (#485, candidate builders). The requests are the ones
+// the lab sent on BRIDGE CORPUS DENSE (TallyPrime 7.2 Silver, 28 Oct 2026) and the answers are
+// what Tally returned; the builders must render the requests byte for byte, and the existing
+// census parser must read the answers (fixtures/ledger-scoped-vouchers/PROVENANCE.md).
+mod ledger_scoped {
+    use super::*;
+    use bridge_tally_protocol::ledger_scope::LedgerScopeName;
+
+    const COMPANY: &str = "BRIDGE CORPUS DENSE";
+
+    fn utf16(bytes: &[u8]) -> String {
+        assert_eq!(bytes.len() % 2, 0, "a UTF-16 capture has an even length");
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    }
+
+    /// A request as the lab sent it: UTF-16LE with a BOM.
+    fn sent(bytes: &[u8]) -> String {
+        utf16(bytes).trim_start_matches('\u{feff}').to_string()
+    }
+
+    fn ledger(name: &str) -> LedgerScopeName {
+        LedgerScopeName::new(name).unwrap()
+    }
+
+    fn span(after: u64, through: u64) -> AlterIdSpan {
+        AlterIdSpan { after, through }
+    }
+
+    #[test]
+    fn the_census_builder_renders_the_requests_the_lab_sent_byte_for_byte() {
+        let day = tally_date("20250515");
+        let sales = ledger("DN Sales");
+        assert_eq!(
+            render_agent_ledger_census(COMPANY, &sales, &day, &day, span(0, 8192)).unwrap(),
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.request.utf16le.xml"))
+        );
+        assert_eq!(
+            render_agent_ledger_census(COMPANY, &sales, &day, &day, span(8192, 16384)).unwrap(),
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.request.utf16le.xml"))
+        );
+        assert_eq!(
+            render_agent_ledger_census(
+                COMPANY,
+                &ledger("DN Party 001"),
+                &tally_date("20250401"),
+                &tally_date("20260331"),
+                span(0, 8192),
+            )
+            .unwrap(),
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.request.utf16le.xml"))
+        );
+    }
+
+    #[test]
+    fn the_movement_builder_renders_the_request_the_lab_sent_byte_for_byte() {
+        assert_eq!(
+            render_agent_ledger_vouchers(
+                COMPANY,
+                &ledger("DN Party 001"),
+                LedgerVoucherFields::Movement,
+                &tally_date("20250501"),
+                &tally_date("20250531"),
+            )
+            .unwrap(),
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml"))
+        );
+    }
+
+    /// The window field list changes the `FETCH` element and nothing else: the request is the
+    /// lab's movement request with that one element replaced.
+    #[test]
+    fn the_window_field_list_differs_from_the_movement_one_in_the_fetch_element_alone() {
+        let render = |fields| {
+            render_agent_ledger_vouchers(
+                COMPANY,
+                &ledger("DN Party 001"),
+                fields,
+                &tally_date("20250501"),
+                &tally_date("20250531"),
+            )
+            .unwrap()
+        };
+        let movement = render(LedgerVoucherFields::Movement);
+        let window = render(LedgerVoucherFields::Window);
+        let element = |request: &str| {
+            let start = request.find("<FETCH>").unwrap() + "<FETCH>".len();
+            let end = request.find("</FETCH>").unwrap();
+            (start, end)
+        };
+        let (movement_start, movement_end) = element(&movement);
+        let (window_start, window_end) = element(&window);
+        assert_eq!(movement[..movement_start], window[..window_start]);
+        assert_eq!(movement[movement_end..], window[window_end..]);
+        let fetch = &window[window_start..window_end];
+        // The list the lab sent ledger-scoped: the book-wide window read's list as it stood before
+        // `REFERENCEDATE` was added (#1363), ending `PARTYGSTIN`.
+        assert!(fetch.starts_with("DATE,VOUCHERNUMBER,"), "{fetch}");
+        assert!(fetch.contains("ALLLEDGERENTRIES.*"), "{fetch}");
+        assert!(fetch.ends_with("REFERENCE,ISINVOICE,PARTYGSTIN"), "{fetch}");
+        assert!(!fetch.contains("REFERENCEDATE"), "{fetch}");
+        // It is the book-wide window list minus that one word: a change to the book-wide list is
+        // seen here, not silently sent ledger-scoped.
+        assert_eq!(
+            Some(fetch),
+            crate::agent::read_profiles::AGENT_VOUCHER_FETCH.strip_suffix(",REFERENCEDATE")
+        );
+        assert!(!movement[movement_start..movement_end].contains("ALLLEDGERENTRIES.*"));
+    }
+
+    /// The ledger rides in one `CHILDOF` element, and the book-wide requests carry no such element
+    /// and keep their own collection names. A name is escaped as any XML text is, and the only
+    /// characters admitted are ones that escape leaves unchanged.
+    #[test]
+    fn the_ledger_sits_in_one_element_and_the_book_wide_requests_are_unchanged() {
+        let day = tally_date("20250515");
+        let census =
+            render_agent_ledger_census(COMPANY, &ledger("Sales 2025"), &day, &day, span(0, 8192))
+                .unwrap();
+        assert_eq!(census.matches("<CHILDOF>").count(), 1);
+        assert!(census.contains("<CHILDOF>Sales 2025</CHILDOF>"), "{census}");
+        assert!(census.contains("<TYPE>Vouchers : Ledger</TYPE>"));
+        let book = render_agent_voucher_census(COMPANY, &day, &day, None).unwrap();
+        assert!(
+            !book.contains("CHILDOF") && !book.contains("Ledger Census"),
+            "{book}"
+        );
+        assert!(book.contains("<TYPE>Voucher</TYPE>"));
+        let movement = render_agent_movement_vouchers(COMPANY, &day, &day).unwrap();
+        assert!(!movement.contains("CHILDOF") && !movement.contains("Ledger Vouchers"));
+    }
+
+    fn census(bytes: &[u8], window: (&str, &str), span: Option<AlterIdSpan>) -> Vec<CensusRow> {
+        let parse = |value: &str| NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
+        parse_voucher_census(&utf16(bytes), (parse(window.0), parse(window.1)), span)
+            .expect("the captured answer parses")
+    }
+
+    #[test]
+    fn the_existing_census_parser_reads_the_captured_ledger_scoped_answers() {
+        let day = ("20250515", "20250515");
+        let rows = census(
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml"),
+            day,
+            Some(span(0, 8192)),
+        );
+        assert_eq!(rows.len(), 82);
+        let guids = rows
+            .iter()
+            .map(|row| row.guid.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(guids.len(), 82, "82 distinct vouchers");
+        assert!(rows.iter().all(|row| row
+            .guid
+            .starts_with("d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-")));
+        assert!(rows
+            .iter()
+            .all(|row| row.alter_id > 0 && row.alter_id <= 8192));
+        // The same day's next span is an empty collection, not a refusal.
+        assert!(census(
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml"),
+            day,
+            Some(span(8192, 16384))
+        )
+        .is_empty());
+        let year = census(
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml"),
+            ("20250401", "20260331"),
+            Some(span(0, 8192)),
+        );
+        assert_eq!(year.len(), 67);
+    }
+
+    /// The movement answer is read by the voucher row parser the movement read already uses: 21
+    /// vouchers, each with a line on the ledger asked for.
+    #[test]
+    fn the_movement_row_parser_reads_the_captured_ledger_scoped_movement_answer() {
+        let rows = parse_agent_rows(
+            &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml")),
+            "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+        )
+        .expect("the captured answer parses");
+        assert_eq!(rows.len(), 21);
+        assert!(rows.iter().all(|row| row["amounts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|line| line["ledger"] == "DN Party 001")));
+    }
+
+    /// The 21 vouchers' lines on the ledger add up, exactly, to the debit the committed one-month
+    /// Trial Balance gives the same ledger (the lab compared them; this pins it).
+    #[test]
+    fn the_movement_answers_lines_on_the_ledger_sum_to_the_trial_balances_debit() {
+        use bridge_tally_core::ExactDecimal;
+        use bridge_tally_protocol::native_trial_balance::{
+            parse_native_trial_balance, NativeTrialBalanceAmount,
+        };
+        let company = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
+        let rows = parse_agent_rows(&utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml")), company)
+            .expect("the captured answer parses");
+        let mut lines = ExactDecimal::zero();
+        let mut counted = 0;
+        for row in &rows {
+            for line in row["amounts"].as_array().unwrap() {
+                if line["ledger"] == "DN Party 001" {
+                    let amount =
+                        ExactDecimal::parse(line["amount"].as_str().expect("an exact amount"))
+                            .expect("an exact decimal");
+                    lines = lines.checked_add(&amount).expect("no overflow");
+                    counted += 1;
+                }
+            }
+        }
+        assert!(counted >= 21, "{counted} lines on the ledger");
+        let trial_balance = parse_native_trial_balance(
+            &utf16(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/statement_trial_balance_dense_month_live.utf16le.xml"
+            )),
+            company,
+        )
+        .expect("the committed Trial Balance parses");
+        let row = trial_balance
+            .rows
+            .iter()
+            .find(|row| row.name == "DN Party 001")
+            .expect("the ledger is in the Trial Balance");
+        let NativeTrialBalanceAmount::Present(debit) = &row.debit else {
+            panic!("the ledger has a debit total");
+        };
+        assert!(
+            lines.numeric_eq(debit),
+            "{} against {}",
+            lines.as_str(),
+            debit.as_str()
+        );
+    }
+
+    /// An answer is read against the span it is read for: the first span's rows are not accepted
+    /// as the second's, so a mixed-up pair of answers is refused, not summed.
+    #[test]
+    fn an_answer_read_against_another_span_is_refused() {
+        let parse = |value: &str| NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
+        let day = parse("20250515");
+        let refused = parse_voucher_census(
+            &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml")),
+            (day, day),
+            Some(span(8192, 16384)),
+        );
+        assert_eq!(refused.unwrap_err(), "window_not_honoured");
+    }
+}

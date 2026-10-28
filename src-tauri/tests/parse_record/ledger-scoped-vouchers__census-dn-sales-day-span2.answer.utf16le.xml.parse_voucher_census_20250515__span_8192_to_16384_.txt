@@ -1,0 +1,4 @@
+# fixture: ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml
+# parser: parse_voucher_census(20250515, span 8192 to 16384)
+# source: captured
+Ok([])

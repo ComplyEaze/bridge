@@ -1282,11 +1282,20 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
     differs, a Tally line with an amount nothing derived matches, or a derived
     line with an amount that Tally does not show, refuses every result as
     `tally_balance_sheet_differs`, with those lines named;
+  - Tally's own Balance Sheet lines sum to zero (each line's amount is the column it
+    carries; a debit is negative). On the one book measured (TallyPrime 7.2, §12a.21),
+    Tally's screen showed a gap in the book's opening balances as `Difference in
+    opening balances`, and the export had no line for it. When the lines do not sum to
+    zero the result carries `tally_balance_sheet_sides` (`credits` and `debits`, as
+    magnitudes), the headline says both totals, and no result is established:
+    `tally_balance_sheet_does_not_balance` when no other reason applies, the other
+    reason when one does;
   - the Profit & Loss A/c ledger is returned in the Trial Balance.
 - **Reasons** a result is `not_established`: `unclassified_ledger_carries_an_amount`,
   `closing_stock_not_derivable_from_trial_balance`,
-  `profit_and_loss_ledger_not_returned`, `tally_balance_sheet_differs`, and for
-  gross and net `tally_profit_and_loss_differs`.
+  `profit_and_loss_ledger_not_returned`, `tally_balance_sheet_differs`,
+  `tally_balance_sheet_does_not_balance`, and for gross and net
+  `tally_profit_and_loss_differs`.
 - **Top-level state.** `result.state` is `observed` only while this tool's
   result is established (`profit_and_loss`: both `gross_result` and
   `net_result`; `balance_sheet`: `carried`). Otherwise it is `not_established`
@@ -1302,10 +1311,11 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
     Balance is read (measured once on the lab's multi-currency book), so an
     unadjusted forex difference (#683) never reaches the gate.
   - A Tally line the derivation has no counterpart for, such as a heading with
-    an amount, refuses the results rather than being guessed at. A difference
-    in opening balances is such a line when Tally shows it; the inventory
-    book's Balance Sheet export did not carry it (§12a.21), which is why the
-    derived lines must also sum to zero before the closing stock is used.
+    an amount, refuses the results rather than being guessed at. On the one
+    book measured the export did not carry Tally's `Difference in opening
+    balances` line (§12a.21), which is why its own lines must sum to zero, and
+    the derived lines too before the closing stock is used. A balanced average-cost
+    book whose rounded lines sum to a paisa off zero has not been measured.
   - Tally's own statements carry no company identity; the company, mode and
     book-extent checks around the read are what bind them.
   - The gate has been measured over one full year on one book and one month on

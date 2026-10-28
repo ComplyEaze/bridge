@@ -150,6 +150,8 @@ pub enum NotEstablishedReason {
     ProfitAndLossLedgerNotReturned,
     TallyBalanceSheetDiffers,
     TallyProfitAndLossDiffers,
+    /// Tally's own Balance Sheet lines do not sum to zero: its two sides differ.
+    TallyBalanceSheetDoesNotBalance,
 }
 
 impl NotEstablishedReason {
@@ -162,6 +164,7 @@ impl NotEstablishedReason {
             Self::ProfitAndLossLedgerNotReturned => "profit_and_loss_ledger_not_returned",
             Self::TallyBalanceSheetDiffers => "tally_balance_sheet_differs",
             Self::TallyProfitAndLossDiffers => "tally_profit_and_loss_differs",
+            Self::TallyBalanceSheetDoesNotBalance => "tally_balance_sheet_does_not_balance",
         }
     }
 }
@@ -186,6 +189,42 @@ impl Established {
             reason,
             lines: Vec::new(),
         }
+    }
+}
+
+/// The two sides of Tally's own Balance Sheet export, when they differ. A debit
+/// is negative in the export: `debits` is the sum of its negative lines and
+/// `credits` that of its positive lines, both as magnitudes. On the one book
+/// measured, Tally's screen showed the gap as `Difference in opening balances`,
+/// a line the export left out (protocol reference §12a.21, #2063).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct BalanceSheetSides {
+    pub credits: ExactDecimal,
+    pub debits: ExactDecimal,
+}
+
+impl BalanceSheetSides {
+    /// `Some` only when the lines' amounts do not sum to zero. A line's amount is
+    /// the column it carries, as the gate reads it (`compare`); with both columns
+    /// present the gate refuses the line, so the main column stands for it here.
+    fn of(statement: &NativeStatement) -> Result<Option<Self>, StatementsError> {
+        let (mut credits, mut debits) = (ExactDecimal::zero(), ExactDecimal::zero());
+        for line in &statement.lines {
+            let amount = match (&line.main, &line.sub) {
+                (NativeStatementAmount::Present(amount), _)
+                | (NativeStatementAmount::Empty, NativeStatementAmount::Present(amount)) => amount,
+                (NativeStatementAmount::Empty, NativeStatementAmount::Empty) => continue,
+            };
+            let side = if amount.is_negative() {
+                &mut debits
+            } else {
+                &mut credits
+            };
+            *side = side
+                .checked_add(&amount.magnitude())
+                .map_err(|_| StatementsError::Arithmetic)?;
+        }
+        Ok((!credits.numeric_eq(&debits)).then_some(Self { credits, debits }))
     }
 }
 
@@ -216,6 +255,9 @@ pub struct DerivedStatements {
     /// Whether Tally's own closing-stock figure was used, and if it was
     /// offered and declined, why.
     pub closing_stock: ClosingStockUse,
+    /// Set when Tally's own Balance Sheet does not balance: every result is
+    /// then not established, whatever else ties.
+    pub tally_balance_sheet_sides: Option<BalanceSheetSides>,
 }
 
 /// The name of Tally's closing-stock line in its own Profit and Loss, spelled
@@ -551,6 +593,7 @@ pub fn derive_statements(
     }
     let profit_and_loss: Vec<_> = profit_and_loss.into_iter().flatten().collect();
     let balance_sheet: Vec<_> = balance_sheet.into_iter().flatten().collect();
+    let tally_balance_sheet_sides = BalanceSheetSides::of(tally_balance_sheet)?;
     let omitted = unclassified.iter().any(|ledger| {
         [&ledger.closing, &ledger.debit, &ledger.credit]
             .iter()
@@ -643,15 +686,24 @@ pub fn derive_statements(
             }
             result => result,
         };
-        let gross_result = movement_gated(moved(&gross)?);
-        let net_result = movement_gated(moved(&net)?);
-        let balance_sheet_profit_and_loss = match carried {
+        // Last, so that every other reason keeps its place: each line may tie while
+        // the statement does not, because the export leaves out Tally's `Difference
+        // in opening balances` line (#2063).
+        let balanced = |result: Established| match result {
+            Established::Established { .. } if tally_balance_sheet_sides.is_some() => {
+                Established::blocked(NotEstablishedReason::TallyBalanceSheetDoesNotBalance)
+            }
+            other => other,
+        };
+        let gross_result = balanced(movement_gated(moved(&gross)?));
+        let net_result = balanced(movement_gated(moved(&net)?));
+        let balance_sheet_profit_and_loss = balanced(match carried {
             Established::Established { value } => gated(value),
             blocked_carried => match blocked {
                 Some(reason) => Established::blocked(reason),
                 None => blocked_carried,
             },
-        };
+        });
         let mut unmet = failures;
         unmet.extend(profit_and_loss_failures);
         Ok(Evaluated {
@@ -746,6 +798,7 @@ pub fn derive_statements(
         balance_sheet_tie: evaluated.balance_sheet_tie,
         profit_and_loss_tie: evaluated.profit_and_loss_tie,
         closing_stock,
+        tally_balance_sheet_sides,
     })
 }
 

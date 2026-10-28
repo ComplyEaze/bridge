@@ -362,6 +362,27 @@ async fn a_balance_sheet_that_does_not_tie_is_not_established_at_the_top() {
     );
     let carried = &result["result"]["profit_and_loss"]["carried"];
     assert_eq!(carried["reason"], result["reason"]);
+    // The synthetic statement's two sides differ by one: the tool says so, in the
+    // result and in its first line (#2063).
+    assert_eq!(
+        result["tally_balance_sheet_sides"],
+        json!({"credits": "11027", "debits": "11026"})
+    );
+    let lead = lead(&response);
+    assert!(
+        lead.contains("credit lines add to 11027 and its debit lines to 11026"),
+        "{lead}"
+    );
+}
+
+/// A statement whose sides agree carries no such key.
+#[tokio::test]
+async fn a_balance_sheet_that_balances_carries_no_sides() {
+    let (response, _, _) = call("balance_sheet", plans("-11027.00")).await;
+    assert!(
+        result(&response).get("tally_balance_sheet_sides").is_none(),
+        "{response}"
+    );
 }
 
 #[tokio::test]
@@ -400,6 +421,7 @@ fn every_not_established_reason_is_carried_to_the_top() {
         NotEstablishedReason::ProfitAndLossLedgerNotReturned,
         NotEstablishedReason::TallyBalanceSheetDiffers,
         NotEstablishedReason::TallyProfitAndLossDiffers,
+        NotEstablishedReason::TallyBalanceSheetDoesNotBalance,
     ] {
         assert_eq!(
             top_level(&not_established(reason)),

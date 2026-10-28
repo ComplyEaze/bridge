@@ -1,0 +1,15 @@
+# Captures of the whole Tally window (and the approval box); they stay on the lab PC. sha256, bytes, name.
+bd9d47e6da943f9bd2220834f0ff2d1ed0d3ff5553c356ea0eb661071cdbebb9  33044  a2-approval-box.png
+b7cb95d02fba2523eac3d45475f22899d6fb36c68f3b3bb2dd030145a7ccec75  27948  a3-edit-before-accept.png
+35a89de315009f08bc2bd647ff358eb4eadf613ae7d983df4d576d254fdc378c  51822  bk1-before-accept.png
+8902f660828549b28924d540e043754b976fabc339e94fdfe1bb3ee1ff7bd9da  72704  s0-no-company.png
+664d2ecd3f6a8603ba23f8be579db3775b7d40005d6836c78f470c7161366fdd  41791  s1-bank-before-accept.png
+4c31e184ec9f0c9dccd90f9167bbaf1b2aa526d791d01741a176e19d891e1e5e  39734  s1-create-before-accept.png
+6611024e4b0d957c871b4f95818e951de5a75901b3eef68811e4ed54c6a4a4c7  81664  s1-features-offered.png
+a3297061429527c86940586e24b376929df0c6de2cc2628ece21e50e704cea28  45541  s1-gateway.png
+1977f17ef1338cc6a4931e04be7cf4136759d5421423e35c3f7d900f7d57423d  41360  s1-party1-before-accept.png
+88ebf0f700781d1028221965e5723a1517c078e3849b57266dbbe01cc2803ce4  42128  s1-party2-before-accept.png
+e7c7bc1ba02f815b05bcd8dfd34b215c86154049874bcd7d861882117646302e  57919  s1-receipt-vtype-as-offered.png
+09508ac3db9212755749fbba802cae4c199c44091dd2a78ae03283a16205633a  27354  seed-before-accept.png
+# Backup, stays on the lab PC
+80c3515b1080a63c07676219c3443db37efbac1769af2347e00e234ad3cccd45  24166  TDBK1800_100091.001 (BK1)

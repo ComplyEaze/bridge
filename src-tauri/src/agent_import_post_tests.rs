@@ -1226,6 +1226,22 @@ fn absence_is_required_before_a_first_attempt() {
     .is_ok());
 }
 
+/// #2062: the cancel candidate of each voucher of a saved batch is its native
+/// request with only the `ACTION` changed.
+#[test]
+fn the_cancel_candidate_of_a_saved_batch_changes_only_its_actions() {
+    let (line, _) = batch();
+    let pairs = line
+        .vouchers
+        .iter()
+        .map(|voucher| (voucher, Uuid::new_v4()))
+        .collect::<Vec<_>>();
+    super::super::cancel::tests::assert_cancel_changes_only_the_action(
+        "Synthetic Accounts",
+        &pairs,
+    );
+}
+
 /// A native post sends a fresh REMOTEID and a print-ready narration with no
 /// `[BRIDGE:…]` tag (owner decision, 2026-09-28); everything else is the
 /// reviewed public file byte for byte. The public file keeps its tag.

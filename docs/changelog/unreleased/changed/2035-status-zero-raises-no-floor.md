@@ -6,4 +6,6 @@
   another batch that holds it; and the post stays unverified, as an answer reporting `STATUS` 0 always leaves it. The
   readback in that post's own `post_import` call still reads `book_rolled_back` when the mark falls between the one
   read before the post and the one read just after it; that post's own floor then records no rollback, though another
-  native post of the company at that Tally address can still record one in the same call.
+  native post of the company at that Tally address can still record one in the same call. The answers the tests use are
+  written by hand: no import answer with `STATUS` 0 and a `CREATED` count has been captured from a live Tally, and the
+  native posts measured answer with a `RESPONSE` root that reports no status, so this has not been seen on a live post.

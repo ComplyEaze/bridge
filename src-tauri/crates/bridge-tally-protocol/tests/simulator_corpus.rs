@@ -1,15 +1,19 @@
 use bridge_tally_protocol::{
     decode_xml_bytes, decode_xml_bytes_limited, export_status, parse_companies,
     parse_companies_for_interactive_discovery, parse_companies_from_collection,
-    parse_companies_with_evidence, parse_import_result, parse_ledger_source_records_with_evidence,
-    parse_ledgers, parse_ledgers_with_evidence, parse_native_ledger_source_records_with_evidence,
-    parse_standard_ledger_catalog, parse_standard_ledger_catalog_with_identities,
-    parse_standard_ledger_identity_observation, verify_company_context, ParsedSourceIdentityKind,
-    PartyLedgerMasterFieldObservation, StandardLedgerCatalogError, TallyExportStatus,
-    BRIDGE_LEDGER_EXPORT_SCHEMA, MAX_INTERACTIVE_DISCOVERY_COMPANIES,
+    parse_companies_with_evidence, parse_import_result,
+    parse_native_ledger_source_records_with_evidence, parse_standard_ledger_catalog,
+    parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
+    verify_company_context, PartyLedgerMasterFieldObservation, StandardLedgerCatalogError,
+    TallyExportStatus, MAX_INTERACTIVE_DISCOVERY_COMPANIES,
 };
 use quick_xml::{events::Event, Reader};
 use tally_protocol_simulator::{encode, Fixture, ScenarioPlan, WireEncoding};
+
+/// The schema string the simulator's company-context fixtures carry. No parser
+/// binds it since the Bridge-defined ledger read was deleted (#1570); the
+/// company-list parser still reads the context through the same evidence scan.
+const CONTEXT_SCHEMA: &str = "bridge.tally.ledgers/1";
 
 #[test]
 fn production_status_parser_distinguishes_all_application_states() {
@@ -82,21 +86,6 @@ fn export_status_reads_bank_allocation_status_as_data_not_protocol() {
     // A data element may shadow any protocol name, including with attributes.
     let shadowed = "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><VOUCHER><ALLLEDGERENTRIES.LIST><BANKALLOCATIONS.LIST><STATUS TYPE=\"Number\">0</STATUS><VERSION>2</VERSION><HEADER>x</HEADER></BANKALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST></VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>";
     assert_eq!(export_status(shadowed).unwrap(), TallyExportStatus::Success);
-}
-
-#[test]
-fn primary_rows_and_company_context_must_use_supported_export_parents() {
-    let nested_ledger = format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><UNEXPECTED><LEDGER NAME="BRIDGE LEDGER" GUID="ledger-guid"><PARENT>Primary</PARENT></LEDGER></UNEXPECTED></BODY></ENVELOPE>"#,
-        BRIDGE_LEDGER_EXPORT_SCHEMA
-    );
-    assert!(parse_ledger_source_records_with_evidence(&nested_ledger).is_err());
-
-    let nested_context = format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><UNEXPECTED><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/></UNEXPECTED><LEDGER NAME="BRIDGE LEDGER" GUID="ledger-guid"><PARENT>Primary</PARENT></LEDGER></BODY></ENVELOPE>"#,
-        BRIDGE_LEDGER_EXPORT_SCHEMA
-    );
-    assert!(parse_ledger_source_records_with_evidence(&nested_context).is_err());
 }
 
 #[test]
@@ -283,128 +272,13 @@ fn production_byte_limit_is_checked_before_decoding() {
 
 #[test]
 fn malformed_and_truncated_corpus_never_returns_partial_records() {
-    assert!(parse_ledgers(&Fixture::MalformedXml.body()).is_err());
-    assert!(parse_ledgers(&Fixture::TruncatedXml.body()).is_err());
-}
-
-#[test]
-fn ledger_parser_preserves_exact_decimal_text_and_company_evidence() {
-    let parsed = parse_ledgers_with_evidence(&Fixture::NormalExport.body()).unwrap();
-    assert_eq!(parsed.records.len(), 1);
-    assert_eq!(parsed.records[0].name, "BRIDGE SYNTHETIC LEDGER");
-    assert_eq!(
-        parsed.records[0].opening_balance.as_deref(),
-        Some("-1180.00")
-    );
-    assert_eq!(parsed.evidence.identified_record_count, 1);
-    assert_eq!(
-        parsed.evidence.schema.as_deref(),
-        Some(BRIDGE_LEDGER_EXPORT_SCHEMA)
-    );
-    assert_eq!(parsed.evidence.object_type.as_deref(), Some("LEDGER"));
-    assert_eq!(parsed.evidence.source_record_count, Some(1));
-    let context = parsed.evidence.company_context.as_ref().unwrap();
-    assert_eq!(context.name.as_deref(), Some("BRIDGE SYNTHETIC BOOK"));
-    assert_eq!(
-        context.guid.as_deref(),
-        Some("00000000-0000-4000-8000-000000000001")
-    );
-    verify_company_context(&parsed.evidence, "00000000-0000-4000-8000-000000000001").unwrap();
-}
-
-#[test]
-fn source_record_parsers_preserve_identity_kind_and_exact_fragment_hash() {
-    let xml = Fixture::NormalExport.body();
-    let ledgers = parse_ledger_source_records_with_evidence(&xml).unwrap();
-    assert_eq!(ledgers.records.len(), 1);
-    assert_eq!(
-        ledgers.records[0].identity_kind,
-        Some(ParsedSourceIdentityKind::Guid)
-    );
-    assert_eq!(
-        ledgers.records[0].source_id.as_deref(),
-        Some("00000000-0000-4000-8000-000000000101")
-    );
-    assert_eq!(ledgers.records[0].raw_source_sha256.len(), 64);
-    assert_eq!(
-        ledgers.records[0].raw_source_sha256,
-        parse_ledger_source_records_with_evidence(&xml)
-            .unwrap()
-            .records[0]
-            .raw_source_sha256
-    );
-
-    let mixed_case_guid = xml.replace(
-        "00000000-0000-4000-8000-000000000101",
-        "00000000-0000-4000-8000-000000000AaB",
-    );
-    let mixed_case = parse_ledger_source_records_with_evidence(&mixed_case_guid).unwrap();
-    assert_eq!(
-        mixed_case.records[0].source_id.as_deref(),
-        Some("00000000-0000-4000-8000-000000000aab")
-    );
-    assert_eq!(
-        mixed_case.records[0].identities.guid.as_deref(),
-        Some("00000000-0000-4000-8000-000000000aab")
-    );
-}
-
-#[test]
-fn a_record_is_identified_by_guid_then_remote_id_then_master_id() {
-    let export = |identity_attributes: &str| {
-        format!(
-            r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><LEDGER NAME="BRIDGE SYNTHETIC LEDGER" {identity_attributes}><PARENT>Primary</PARENT></LEDGER></BODY></ENVELOPE>"#,
-            BRIDGE_LEDGER_EXPORT_SCHEMA
-        )
-    };
-
-    let all_three = parse_ledger_source_records_with_evidence(&export(
-        r#"GUID="ledger-guid" REMOTEID="ledger-remote" MASTERID="7" ALTERID="11""#,
-    ))
-    .unwrap();
-    assert_eq!(
-        all_three.records[0].identity_kind,
-        Some(ParsedSourceIdentityKind::Guid)
-    );
-    assert_eq!(
-        all_three.records[0].source_id.as_deref(),
-        Some("ledger-guid")
-    );
-    assert_eq!(
-        all_three.records[0].identities.master_id.as_deref(),
-        Some("7")
-    );
-    assert_eq!(all_three.records[0].alter_id.as_deref(), Some("11"));
-
-    let remote_only = parse_ledger_source_records_with_evidence(&export(
-        r#"REMOTEID="bridge-synthetic-ledger-001""#,
-    ))
-    .unwrap();
-    let record = &remote_only.records[0];
-    assert_eq!(
-        record.identity_kind,
-        Some(ParsedSourceIdentityKind::RemoteId)
-    );
-    assert_eq!(
-        record.source_id.as_deref(),
-        Some("bridge-synthetic-ledger-001")
-    );
-
-    let master_only =
-        parse_ledger_source_records_with_evidence(&export(r#"MASTERID="9" ALTERID="12""#)).unwrap();
-    let record = &master_only.records[0];
-    assert_eq!(
-        record.identity_kind,
-        Some(ParsedSourceIdentityKind::MasterId)
-    );
-    assert_eq!(record.source_id.as_deref(), Some("9"));
-    assert_eq!(record.identities.master_id.as_deref(), Some("9"));
-    assert_eq!(record.alter_id.as_deref(), Some("12"));
+    assert!(parse_companies(&Fixture::MalformedXml.body()).is_err());
+    assert!(parse_companies(&Fixture::TruncatedXml.body()).is_err());
 }
 
 #[test]
 fn wrong_company_and_duplicate_identities_are_explicit_safe_evidence() {
-    let wrong = parse_ledgers_with_evidence(&Fixture::WrongCompany.body()).unwrap();
+    let wrong = parse_companies_with_evidence(&Fixture::WrongCompany.body()).unwrap();
     let error = verify_company_context(&wrong.evidence, "00000000-0000-4000-8000-000000000001")
         .unwrap_err();
     assert_eq!(
@@ -413,8 +287,7 @@ fn wrong_company_and_duplicate_identities_are_explicit_safe_evidence() {
     );
     assert!(!error.to_string().contains("00000000"));
 
-    let duplicate = parse_ledgers_with_evidence(&Fixture::DuplicateIdentity.body()).unwrap();
-    assert_eq!(duplicate.records.len(), 2);
+    let duplicate = parse_companies_with_evidence(&Fixture::DuplicateIdentity.body()).unwrap();
     assert_eq!(duplicate.evidence.identified_record_count, 2);
     assert_eq!(duplicate.evidence.duplicate_identities.len(), 1);
     assert_eq!(duplicate.evidence.duplicate_identities[0].occurrences, 2);
@@ -430,23 +303,16 @@ fn wrong_company_and_duplicate_identities_are_explicit_safe_evidence() {
 
 #[test]
 fn child_and_attribute_metadata_shapes_are_strictly_equivalent() {
-    let child = parse_ledgers_with_evidence(&Fixture::NormalExport.body()).unwrap();
-    assert_eq!(
-        child.evidence.schema.as_deref(),
-        Some(BRIDGE_LEDGER_EXPORT_SCHEMA)
-    );
+    let child = parse_companies_with_evidence(&Fixture::NormalExport.body()).unwrap();
+    assert_eq!(child.evidence.schema.as_deref(), Some(CONTEXT_SCHEMA));
     assert_eq!(child.evidence.source_record_count, Some(1));
 
     let attribute_shape = format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="00000000-0000-4000-8000-000000000001" RECORDCOUNT="1" /><LEDGER NAME="BRIDGE SYNTHETIC LEDGER" GUID="00000000-0000-4000-8000-000000000101"><PARENT>BRIDGE SYNTHETIC GROUP</PARENT></LEDGER></DATA></BODY></ENVELOPE>"#,
-        BRIDGE_LEDGER_EXPORT_SCHEMA
+        CONTEXT_SCHEMA
     );
-    let attributes = parse_ledgers_with_evidence(&attribute_shape).unwrap();
-    assert_eq!(attributes.records.len(), 1);
-    assert_eq!(
-        attributes.evidence.schema.as_deref(),
-        Some(BRIDGE_LEDGER_EXPORT_SCHEMA)
-    );
+    let attributes = parse_companies_with_evidence(&attribute_shape).unwrap();
+    assert_eq!(attributes.evidence.schema.as_deref(), Some(CONTEXT_SCHEMA));
     assert_eq!(attributes.evidence.object_type.as_deref(), Some("LEDGER"));
     assert_eq!(attributes.evidence.source_record_count, Some(1));
     assert_eq!(
@@ -460,13 +326,13 @@ fn a_company_context_date_that_names_no_calendar_day_is_refused() {
     let with_date = |attribute: &str, date: &str| {
         format!(
             r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="00000000-0000-4000-8000-000000000001" RECORDCOUNT="1" {attribute}="{date}" /><LEDGER NAME="BRIDGE SYNTHETIC LEDGER" GUID="00000000-0000-4000-8000-000000000101"><PARENT>BRIDGE SYNTHETIC GROUP</PARENT></LEDGER></DATA></BODY></ENVELOPE>"#,
-            BRIDGE_LEDGER_EXPORT_SCHEMA
+            CONTEXT_SCHEMA
         )
     };
     for attribute in ["FROMDATE", "TODATE"] {
-        assert!(parse_ledgers_with_evidence(&with_date(attribute, "20250401")).is_ok());
+        assert!(parse_companies_with_evidence(&with_date(attribute, "20250401")).is_ok());
         for impossible in ["20251340", "20250229", "00000101"] {
-            let refused = parse_ledgers_with_evidence(&with_date(attribute, impossible))
+            let refused = parse_companies_with_evidence(&with_date(attribute, impossible))
                 .expect_err("an impossible date must refuse the context");
             assert!(
                 refused.to_string().contains("invalid date binding"),
@@ -476,35 +342,63 @@ fn a_company_context_date_that_names_no_calendar_day_is_refused() {
     }
 }
 
+/// The evidence scan reads a company context and counts a primary row only
+/// directly under `BODY`, `BODY/DATA` or `BODY/DATA/COLLECTION`. One nested
+/// anywhere else is not evidence: the context is absent and the row is not
+/// counted, whichever parser the scan serves.
+#[test]
+fn a_context_or_row_under_an_unsupported_parent_is_not_evidence() {
+    let supported = format!(
+        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{CONTEXT_SCHEMA}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><LEDGER NAME="BRIDGE LEDGER" GUID="ledger-guid"><PARENT>Primary</PARENT></LEDGER></BODY></ENVELOPE>"#
+    );
+    let evidence = parse_companies_with_evidence(&supported).unwrap().evidence;
+    assert!(evidence.company_context.is_some());
+    assert_eq!(evidence.identified_record_count, 1);
+
+    let nested_ledger = supported.replace(
+        r#"<LEDGER NAME="BRIDGE LEDGER" GUID="ledger-guid"><PARENT>Primary</PARENT></LEDGER>"#,
+        r#"<UNEXPECTED><LEDGER NAME="BRIDGE LEDGER" GUID="ledger-guid"><PARENT>Primary</PARENT></LEDGER></UNEXPECTED>"#,
+    );
+    let evidence = parse_companies_with_evidence(&nested_ledger)
+        .unwrap()
+        .evidence;
+    assert!(evidence.company_context.is_some());
+    assert_eq!(evidence.identified_record_count, 0);
+
+    let nested_context = supported
+        .replace("<COMPANYCONTEXT ", "<UNEXPECTED><COMPANYCONTEXT ")
+        .replace(r#"RECORDCOUNT="1"/>"#, r#"RECORDCOUNT="1"/></UNEXPECTED>"#);
+    let evidence = parse_companies_with_evidence(&nested_context)
+        .unwrap()
+        .evidence;
+    assert_eq!(evidence.company_context, None);
+    assert_eq!(evidence.source_record_count, None);
+    assert_eq!(evidence.identified_record_count, 1);
+}
+
 #[test]
 fn a_proven_empty_export_is_not_confused_with_missing_evidence() {
-    let empty = parse_ledgers_with_evidence(&Fixture::EmptyExport.body()).unwrap();
-    assert!(empty.records.is_empty());
+    let empty = parse_companies_with_evidence(&Fixture::EmptyExport.body()).unwrap();
     assert_eq!(empty.evidence.source_record_count, Some(0));
     assert_eq!(empty.evidence.object_type.as_deref(), Some("LEDGER"));
 
     let missing = r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY /></ENVELOPE>"#;
-    let error = parse_ledgers_with_evidence(missing).unwrap_err();
-    assert_eq!(error.to_string(), "Tally response omitted company context");
+    let missing = parse_companies_with_evidence(missing).unwrap();
+    assert_eq!(missing.evidence.company_context, None);
+    assert_eq!(missing.evidence.source_record_count, None);
 }
 
 #[test]
 fn count_mismatch_and_malformed_or_duplicate_metadata_fail_closed() {
-    let mismatch = parse_ledgers_with_evidence(&Fixture::RecordCountMismatch.body()).unwrap_err();
-    assert_eq!(
-        mismatch.to_string(),
-        "Tally source record count did not match parsed primary rows"
-    );
-
     let malformed =
-        parse_ledgers_with_evidence(&Fixture::MalformedExportMetadata.body()).unwrap_err();
+        parse_companies_with_evidence(&Fixture::MalformedExportMetadata.body()).unwrap_err();
     assert_eq!(
         malformed.to_string(),
         "Tally company context RECORDCOUNT was not a non-negative integer"
     );
 
     let duplicate =
-        parse_ledgers_with_evidence(&Fixture::DuplicateExportMetadata.body()).unwrap_err();
+        parse_companies_with_evidence(&Fixture::DuplicateExportMetadata.body()).unwrap_err();
     assert_eq!(
         duplicate.to_string(),
         "Tally company context contained duplicate metadata"
@@ -515,33 +409,11 @@ fn count_mismatch_and_malformed_or_duplicate_metadata_fail_closed() {
 fn primary_rows_reject_case_insensitive_duplicate_identity_attributes() {
     let xml = format!(
         r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><LEDGER NAME="BRIDGE SYNTHETIC LEDGER" GUID="guid-a" guid="guid-b"><PARENT>Primary</PARENT></LEDGER></BODY></ENVELOPE>"#,
-        BRIDGE_LEDGER_EXPORT_SCHEMA
+        CONTEXT_SCHEMA
     );
-    let error = parse_ledger_source_records_with_evidence(&xml)
+    let error = parse_companies_with_evidence(&xml)
         .expect_err("case-insensitive duplicate identity attributes must fail closed");
     assert!(error.to_string().contains("repeated an attribute"));
-}
-
-#[test]
-fn schema_and_object_type_are_bound_to_the_public_parser() {
-    let wrong_schema = Fixture::NormalExport
-        .body()
-        .replace(BRIDGE_LEDGER_EXPORT_SCHEMA, "bridge.tally.vouchers/3");
-    let error = parse_ledgers_with_evidence(&wrong_schema).unwrap_err();
-    assert_eq!(
-        error.to_string(),
-        "Tally response export schema did not match the parser"
-    );
-
-    let wrong_object = Fixture::NormalExport.body().replace(
-        "<OBJECTTYPE>LEDGER</OBJECTTYPE>",
-        "<OBJECTTYPE>VOUCHER</OBJECTTYPE>",
-    );
-    let error = parse_ledgers_with_evidence(&wrong_object).unwrap_err();
-    assert_eq!(
-        error.to_string(),
-        "Tally response object type did not match the parser"
-    );
 }
 
 #[test]
@@ -550,7 +422,7 @@ fn multiple_company_contexts_are_rejected_as_ambiguous() {
       <COMPANYCONTEXT><SCHEMA>bridge.tally.ledgers/1</SCHEMA><OBJECTTYPE>LEDGER</OBJECTTYPE><NAME>BRIDGE SYNTHETIC COMPANY A</NAME><GUID>guid-a</GUID><RECORDCOUNT>0</RECORDCOUNT></COMPANYCONTEXT>
       <COMPANYCONTEXT><SCHEMA>bridge.tally.ledgers/1</SCHEMA><OBJECTTYPE>LEDGER</OBJECTTYPE><NAME>BRIDGE SYNTHETIC COMPANY B</NAME><GUID>guid-b</GUID><RECORDCOUNT>0</RECORDCOUNT></COMPANYCONTEXT>
     </BODY></ENVELOPE>"#;
-    let error = parse_ledgers_with_evidence(xml).expect_err("ambiguous context must fail closed");
+    let error = parse_companies_with_evidence(xml).expect_err("ambiguous context must fail closed");
     assert!(error.to_string().contains("multiple company contexts"));
 }
 
@@ -561,7 +433,7 @@ fn duplicate_identity_evidence_is_object_scoped_and_uses_guid_fallback() {
       <LEDGER REMOTEID="shared-id" NAME="BRIDGE SYNTHETIC LEDGER" />
       <VOUCHER REMOTEID="shared-id" />
     </BODY></ENVELOPE>"#;
-    let evidence = parse_ledgers_with_evidence(cross_type).unwrap().evidence;
+    let evidence = parse_companies_with_evidence(cross_type).unwrap().evidence;
     assert_eq!(evidence.identified_record_count, 2);
     assert!(evidence.duplicate_identities.is_empty());
 
@@ -570,7 +442,7 @@ fn duplicate_identity_evidence_is_object_scoped_and_uses_guid_fallback() {
       <LEDGER GUID="synthetic-guid" NAME="BRIDGE SYNTHETIC LEDGER A" />
       <LEDGER GUID="synthetic-guid" NAME="BRIDGE SYNTHETIC LEDGER B" />
     </BODY></ENVELOPE>"#;
-    let evidence = parse_ledgers_with_evidence(duplicate_guid)
+    let evidence = parse_companies_with_evidence(duplicate_guid)
         .unwrap()
         .evidence;
     assert_eq!(evidence.identified_record_count, 2);
@@ -581,7 +453,7 @@ fn duplicate_identity_evidence_is_object_scoped_and_uses_guid_fallback() {
         "<LEDGER GUID=\"synthetic-guid\" NAME=\"BRIDGE SYNTHETIC LEDGER B\"",
         "<LEDGER GUID=\"SYNTHETIC-GUID\" NAME=\"BRIDGE SYNTHETIC LEDGER B\"",
     );
-    let evidence = parse_ledgers_with_evidence(&case_variant_guid)
+    let evidence = parse_companies_with_evidence(&case_variant_guid)
         .unwrap()
         .evidence;
     assert_eq!(evidence.duplicate_identities.len(), 1);
@@ -622,7 +494,7 @@ fn production_import_parser_preserves_every_exact_counter() {
 
 #[test]
 fn application_failure_errors_do_not_echo_line_error_payloads() {
-    let error = parse_ledgers(&Fixture::ExportStatusZero.body()).unwrap_err();
+    let error = parse_companies(&Fixture::ExportStatusZero.body()).unwrap_err();
     assert_eq!(
         error.to_string(),
         "Tally reported that the export request failed"
@@ -662,11 +534,6 @@ fn direct_company_report_response_is_narrowly_admitted_without_status_header() {
     ] {
         assert!(parse_companies_for_interactive_discovery(xml).is_err(), "must reject {xml}");
     }
-
-    assert!(parse_ledgers(
-        "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>BRIDGE DIRECT SYNTHETIC BOOK</COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000099</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
-    )
-    .is_err());
 }
 
 #[test]

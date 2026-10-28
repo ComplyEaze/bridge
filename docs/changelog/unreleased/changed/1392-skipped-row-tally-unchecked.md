@@ -10,4 +10,7 @@
   withdrawn (`withdraw_skips`), on one side only, solely when the person confirms that no entry in Tally carries the
   transfer. Reading a day sends its vouchers to the AI provider: `mask_parties` shortens party and ledger names,
   `drop_narration` drops narrations, and neither hides amounts. A row the other account's statements do not cover stays `not_established`. Tested on invented
-  facts; the whole-day read is not built and not yet seen against a live TallyPrime (part of #1392).
+  facts. The whole-day read is not built and has not run against a live TallyPrime. The requests it would send were run
+  by hand on TallyPrime 7.2 against one synthetic book (four days, 3 to 6 April 2026): each day's two censuses were
+  byte-identical and agreed with the vouchers answer, which held the book's five Contras and none on 6 April (part of
+  #1392).

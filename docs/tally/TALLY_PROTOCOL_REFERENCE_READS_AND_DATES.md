@@ -188,6 +188,31 @@ zero: the captured opening corpus has an opening net of `-49833.50`. Report that
 difference separately; do not manufacture a balancing ledger. Numeric column
 sums must disclose any empty observations excluded from arithmetic.
 
+**A Closing Stock ledger's closing is not opening plus movements (verified once on each of
+two synthetic TallyPrime 7.2 Silver books, 28 October 2026).** A ledger under Stock-in-Hand
+whose closing balance was keyed on Tally's screen keeps its opening as `TBALCLOSING`, and the
+change shows only in `DEBITTOTALS`: on a book not integrated with inventory, opening -1000.00,
+debit -400.00, credit empty, closing -1000.00 (keyed closing 1,400.00); on an integrated book,
+the same figures (Tally offers the closing-balance field on both). Tally's own Trial Balance
+screen shows the ledger as an Opening Stock line. On the non-integrated book its Profit and Loss
+and Balance Sheet used the keyed 1,400.00; on the integrated book they valued the stock from the
+stock item (1,200.00, 12 Nos) (that book's report figures are from screenshots kept on the lab
+machine, not a committed answer). Bridge returns the row as sent and adds `movements_differ_by`
+(closing minus opening, debit and credit, exactly, in Tally's sign, at the amounts' own number of
+decimal places) when that is not zero, counting an empty amount as zero, as the statements' row
+check does. That check is the same code: `profit_and_loss` and `balance_sheet` refuse a read
+(`statement_trial_balance_row_inconsistent`) where it differs. Every row of the committed Trial
+Balance captures adds up (known lab 6 rows, opening-year 8, dense month 123, year 7, stock book 9,
+several-currency 10). The raw XML of the two lab rows is not committed (the lab kept the tool
+answers), so the shape is pinned on the answers' values and on committed captures edited in one
+element. Other readers of `TBALCLOSING`, named and not changed here: `bridge-tax-audit`
+`book.rs` (`closing_paise` is read from `TBALCLOSING` and `movement_paise` is closing minus
+opening, so such a ledger shows no movement there; `financial_statements.rs` recomputes the
+closing stock from opening and movements and counts such ledgers as stale, and its text says the
+quirk occurs only on books not integrated with inventory, which the integrated book above
+contradicts; `stock.rs` `books_close_tb` still takes the raw closing) and the desktop Trial
+Balance workbook.
+
 The export includes dormant ledger masters that Tally's rendered report may
 omit. Stable paired bytes and bracketed company/mode/book-extent observations
 are bounded source evidence, not an atomic snapshot or a completeness proof.
@@ -721,7 +746,7 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
   is flagged `cost_centre_allocation_shape_unrecognised`, by test only); a read of a different voucher type; another release or book;
   that the allocations of an entry always add up to its amount (the tool does not check this).
 
-### 8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-12; TallyPrime 7.1, one synthetic book**
+### 8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-28; TallyPrime 7.2, two synthetic books**
 
 **Scope: TallyPrime 7.2 Silver, licensed, `education_mode: false`, synthetic company `BRIDGE BANKREF LAB` (28 Oct 2026; a recapture of a 12 Oct run on 7.1 whose references the privacy scan could not carry, which is not committed), one read of five days (1 to 5 Apr 2026): five Contras of 50,000.00 between two bank ledgers, keyed in double entry on Tally's screen.** Request and response
 retained with sha256 in `tests/fixtures/VOUCHER_CONTRA_HAND_KEYED_CAPTURE_PROVENANCE.md`; the request is the one the vouchers read
@@ -729,10 +754,11 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
 
 - **Where a hand-keyed transfer reference sits.** The voucher-level `REFERENCE` is empty on all five. A reference typed in the narration is only narration text. A reference typed in the bank allocation sits in `INSTRUMENTNUMBER` of the `BANKALLOCATIONS.LIST` on **each** of the voucher's two entries (voucher 2: `222222222222`, type `Same Bank Transfer`; voucher 5: a cheque number `123456`, type `Cheque` on one entry and `Cheque/DD` on the other). `TRANSACTIONID` was empty in every case.
 - **Every bank entry carries an allocation, with or without a number.** Vouchers 1, 3 and 4 carry one with a `TRANSACTIONTYPE` (`Cheque` or `Cheque/DD`) and an empty `<INSTRUMENTNUMBER/>`; the allocation's `INSTRUMENTDATE` equals the voucher date.
-- **The reconciliation fields, with nothing reconciled.** On all ten allocations `BANKERSDATE` was empty (`<BANKERSDATE/>`), `STATUS` was `No`, `BANKRECONSTATUS` (`TYPE="String"`) was `Available Only in Books` and `PAYMENTMODE` was `Transacted`. Counted with an XML parser over the capture. No entry had been reconciled, so what these read for a reconciled entry, or one reconciled and cleared, is not observed.
+- **The reconciliation fields, with nothing reconciled.** On all ten allocations `BANKERSDATE` was empty (`<BANKERSDATE/>`), `STATUS` was `No`, `BANKRECONSTATUS` (`TYPE="String"`) was `Available Only in Books` and `PAYMENTMODE` was `Transacted`. Counted with an XML parser over the capture. No entry of this book had been reconciled; a reconciled entry is in the next bullet, from another book.
+- **A reconciled entry (VERIFIED 2026-10-27; one run, TallyPrime 7.2 Silver, synthetic company `BRIDGE TRANSFER LAB`, five Contras of 50,000.00 between two bank ledgers).** Contras 1 and 2 were reconciled on screen on the second bank ledger with bank date 6 April 2026, and the same raw request read again. On exactly that entry of each of the two vouchers (`ALLLEDGERENTRIES.LIST[2]/BANKALLOCATIONS.LIST`) and nowhere else: `BANKERSDATE` went from empty to `20260406`, `BANKMANUALSTATUS` from empty to `Reconciled` and `BANKRECONSTATUS` from `Available Only in Books` to `Reconciled`; `STATUS` stayed `No`. Each voucher's `ALTERID` moved (1 to 6, 2 to 7) and the company's voucher mark from 5 to 7; the master mark did not move. The first bank ledger's entries of the same two vouchers and the other three Contras were byte-identical. The request and both responses are retained with their hashes on lab branch `lab/1231-bank-reconciliation-answers` at `bb6531ca`, not in this tree: before, 211,552 bytes, sha256 `262e30039b6879b0d9bd37cf00c1000eada923dd1344947049a9f1a49b6197de`; after, 211,698 bytes, sha256 `b9ac75ffa3218444277eeae7d6e8821d759180806bf75f390e004b2e5647cb57`. Blanking the bank date in Set Status to clear a manual reconciliation was refused by Tally (the bank date cannot be earlier than the reconciliation beginning date), so a reconciled and then cleared entry was not read. What the tool returns for such an entry follows from its five fields: the bank date, and a `status` of `No`; the tool has not been run against it.
 - **Elsewhere in the repository's captures.** The other committed voucher answers carry 365 `BANKALLOCATIONS.LIST` elements, every one with no children (one more, populated, is a project-authored fixture and is not evidence).
-- **What the tool returns.** Only when `vouchers` is called with `bank_allocations: true`: an entry with one or more allocations that have children gains `bank_allocations`, at most eight, each with `bank_date` (`BANKERSDATE`), `instrument_number`, `instrument_date`, `transaction_type` and `status`, every one `absent`, `empty` or a trimmed `value`; a date that is not `YYYYMMDD` is not shown. No reconciliation verdict is drawn and `BANKRECONSTATUS` is not read. A list that cannot be read whole (a field sent twice in one allocation, more than eight, an allocation list inside another list of the entry, an element inside a field that is read, an undecodable text, a date that is not a date) is not shown in part: the entry carries `bank_allocations_unreadable` with a reason and the rest of the response is unchanged. Without the argument, and in the registers, neither key is returned.
-- **Not shown.** A reconciled entry; other transaction types (NEFT, RTGS, IMPS) and whether any keeps a UTR in `TRANSACTIONID`; a cash deposit or withdrawal; Payment, Receipt and Journal vouchers; Gold and other releases; several currencies. That the number on one entry equals the number on the other is observed here for two vouchers and is not enforced by the tool.
+- **What the tool returns.** Only when `vouchers` is called with `bank_allocations: true`: an entry with one or more allocations that have children gains `bank_allocations`, at most eight, each with `bank_date` (`BANKERSDATE`), `instrument_number`, `instrument_date`, `transaction_type` and `status`, every one `absent`, `empty` or a trimmed `value`; a date that is not `YYYYMMDD` is not shown. No reconciliation verdict is drawn, and neither `BANKRECONSTATUS` nor `BANKMANUALSTATUS` is read. A list that cannot be read whole (a field sent twice in one allocation, more than eight, an allocation list inside another list of the entry, an element inside a field that is read, an undecodable text, a date that is not a date) is not shown in part: the entry carries `bank_allocations_unreadable` with a reason and the rest of the response is unchanged. Without the argument, and in the registers, neither key is returned.
+- **Not shown.** A reconciled entry read through the tool, and a reconciled entry that was then cleared; other transaction types (NEFT, RTGS, IMPS) and whether any keeps a UTR in `TRANSACTIONID`; a cash deposit or withdrawal; Payment, Receipt and Journal vouchers; Gold and other releases; several currencies. That the number on one entry equals the number on the other is observed here for two vouchers and is not enforced by the tool.
 
 ### 8.2i Goods lines on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, two synthetic books**
 

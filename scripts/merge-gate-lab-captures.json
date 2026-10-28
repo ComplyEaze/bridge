@@ -1632,6 +1632,46 @@
       "size": 108918
     },
     {
+      "blob": "7025e4dced559623e0bfcae0b2c8001bba828c31",
+      "capture_id": "voucher-cancel/journal-create.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2062-cancel-capture at 22ef7ff64036",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher-cancel/journal-create.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ba93bc46e1f88258a3109f085b8c272a94792dc80712119b26b6d3cfde88a658",
+      "size": 1798
+    },
+    {
+      "blob": "7ea0af75b3e028da93fea48ebe7bf1a6682a4342",
+      "capture_id": "voucher-cancel/journal-create.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2062-cancel-capture-answers at f91d20034f4b",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher-cancel/journal-create.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5eda5c4d127271d95fd2115bc692a4b039981cb35a1d3555937e087092b35e92",
+      "size": 540
+    },
+    {
+      "blob": "39ee575bdd964b3aa50f063a1d3d1384fb1ec229",
+      "capture_id": "voucher-cancel/journal-cancel.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2062-cancel-capture at 22ef7ff64036",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher-cancel/journal-cancel.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7e2967fe52c89e45e843ecdf167c26fd5601b38829ea7703feed6ff3349a62b2",
+      "size": 1798
+    },
+    {
+      "blob": "f3e9eb83927796fa9110bd2125aa48c2c05c2db7",
+      "capture_id": "voucher-cancel/journal-cancel.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2062-cancel-capture-answers at f91d20034f4b",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher-cancel/journal-cancel.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7f3222109df767c5822f7871aa5af586e51f6971f57853889743e2f2b86441e4",
+      "size": 540
+    },
+    {
       "blob": "1f150901ae7b0aa2226bb361edb7933dd0fb6c26",
       "capture_id": "ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.answer.utf16le.xml",
       "company": "BRIDGE BILLTRAIL LAB",

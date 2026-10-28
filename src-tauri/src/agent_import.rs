@@ -29,6 +29,10 @@ use std::io::{Seek, SeekFrom, Write};
 
 #[path = "agent_import_bill_wise.rs"]
 mod bill_wise;
+// Candidate requests that remove a voucher Bridge posted (#2062): nothing sends them yet.
+#[cfg_attr(not(test), allow(dead_code))]
+#[path = "agent_import_cancel.rs"]
+mod cancel;
 #[path = "agent_import_cash_bank.rs"]
 mod cash_bank;
 use cash_bank::{CashBankState, LegRequirement, ObservedMasters};
@@ -618,7 +622,10 @@ fn folded_live_ledgers_json(twins: &FoldedTwins) -> Value {
         .live
         .iter()
         .map(|(name, parent)| {
-            let mut ledger = json!({"name": party_name(name.clone()), "parent": parent});
+            let mut ledger = json!({
+                "name": party_name(name.clone()),
+                "parent": parent.as_deref().map(bridge_tally_protocol::tally_root_as_sent),
+            });
             if let Some(alias) = twins.through_alias.get(name) {
                 ledger["through_alias"] = json!(party_name(alias.clone()));
             }
@@ -5089,7 +5096,12 @@ fn render_import_xml(company: &str, vouchers: &[ImportVoucher], batch_id: &str) 
         .iter()
         .map(|voucher| {
             let identity = import_identity(batch_id, &voucher.bridge_txn_id);
-            render_voucher_xml(voucher, identity, NarrationAttribution::Tagged(identity))
+            render_voucher_xml(
+                voucher,
+                identity,
+                NarrationAttribution::Tagged(identity),
+                VoucherAction::Create,
+            )
         })
         .collect::<String>();
     render_import_envelope(company, ImportReport::Vouchers, &messages)
@@ -5109,12 +5121,38 @@ fn render_native_vouchers_xml<'a>(
     company: &str,
     vouchers_with_remote_ids: impl Iterator<Item = (&'a ImportVoucher, Uuid)>,
 ) -> String {
+    render_native_vouchers_as(VoucherAction::Create, company, vouchers_with_remote_ids)
+}
+
+/// The native request with `action` on every voucher; nothing else depends on it.
+fn render_native_vouchers_as<'a>(
+    action: VoucherAction,
+    company: &str,
+    vouchers_with_remote_ids: impl Iterator<Item = (&'a ImportVoucher, Uuid)>,
+) -> String {
     let messages: String = vouchers_with_remote_ids
         .map(|(voucher, remote_id)| {
-            render_voucher_xml(voucher, remote_id, NarrationAttribution::Untagged)
+            render_voucher_xml(voucher, remote_id, NarrationAttribution::Untagged, action)
         })
         .collect();
     render_import_envelope(company, ImportReport::Vouchers, &messages)
+}
+
+/// A rendered voucher's `ACTION`. Every post sends `Create`; `Cancel` is the
+/// candidate of #2062, which nothing sends yet.
+#[derive(Clone, Copy)]
+enum VoucherAction {
+    Create,
+    Cancel,
+}
+
+impl VoucherAction {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Create => "Create",
+            Self::Cancel => "Cancel",
+        }
+    }
 }
 
 /// Whether a rendered voucher's narration carries Bridge's `[BRIDGE:…]` tag.
@@ -5138,6 +5176,7 @@ fn render_voucher_xml(
     voucher: &ImportVoucher,
     remote_id: Uuid,
     attribution: NarrationAttribution,
+    action: VoucherAction,
 ) -> String {
     let text = posted_narration(voucher).unwrap_or("");
     let narration = match attribution {
@@ -5163,7 +5202,7 @@ fn render_voucher_xml(
         // An invoice reaches here only after the build recorded what it
         // observed (`admit_saved_voucher_integrity` refuses one that has not).
         // An unobserved one renders as nothing rather than as a guess.
-        return invoice::render_sales_invoice_xml(voucher, remote_id, &date, &narration)
+        return invoice::render_sales_invoice_xml(voucher, remote_id, &date, &narration, action)
             .unwrap_or_default();
     }
     let shape = voucher.voucher_type.bank_shape();
@@ -5211,7 +5250,7 @@ fn render_voucher_xml(
     // The qualified human-import slice uses Create + stable client REMOTEID;
     // native posting uses a separate private REMOTEID and no supplied number.
     // See docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.8 for scope and limits.
-    format!("<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{}\" VCHTYPE=\"{}\" ACTION=\"Create\" OBJVIEW=\"Accounting Voucher View\"><DATE>{date}</DATE>{effective_date}<VOUCHERTYPENAME>{}</VOUCHERTYPENAME>{party}{voucher_number}{narration}{reference}{entries}</VOUCHER></TALLYMESSAGE>", remote_id, voucher.voucher_type.as_str(), voucher.voucher_type.as_str())
+    format!("<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{}\" VCHTYPE=\"{}\" ACTION=\"{}\" OBJVIEW=\"Accounting Voucher View\"><DATE>{date}</DATE>{effective_date}<VOUCHERTYPENAME>{}</VOUCHERTYPENAME>{party}{voucher_number}{narration}{reference}{entries}</VOUCHER></TALLYMESSAGE>", remote_id, voucher.voucher_type.as_str(), action.as_str(), voucher.voucher_type.as_str())
 }
 
 /// The voucher mark to record when Tally omitted it twice in one verification. The company is read as

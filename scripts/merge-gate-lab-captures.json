@@ -782,6 +782,46 @@
       "size": 54280
     },
     {
+      "blob": "65506c22d5bb7e583a00d89057148daad8ca0cdd",
+      "capture_id": "voucher_contra_hand_keyed_bankref_lab_request.utf16le.xml",
+      "company": "BRIDGE BANKREF LAB",
+      "lab_ref": "branch lab/2006-bankref-recapture-answers at e49f2d0823a4",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_contra_hand_keyed_bankref_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_CONTRA_HAND_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d93946038f2ae6a40b48eb53d4e567352434533fc8b593a5aa766935ecbcc080",
+      "size": 1744
+    },
+    {
+      "blob": "c4637be80598b579516c037c1cb731ef0ed4b51e",
+      "capture_id": "voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
+      "company": "BRIDGE BANKREF LAB",
+      "lab_ref": "branch lab/2006-bankref-recapture-answers at e49f2d0823a4",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_CONTRA_HAND_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c5b465b3ebfec9df6950b8a520003e08de71c1be4438c95d1d2f64d410d1cc92",
+      "size": 211536
+    },
+    {
+      "blob": "8613e59eb759fbc4894ddfaccc3dca08d7514a4c",
+      "capture_id": "voucher_goods_lines_two_godowns_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/missing-reads-answers at 6ab1fffa680a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see GOODS_LINES_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "47cf36c300a5cc31297033dba27c6233729e93d3ad6e17d72022e73d28352d9c",
+      "size": 1740
+    },
+    {
+      "blob": "ea1deb5ec32086b04f5e3778bb12fc02bb2ce165",
+      "capture_id": "voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/missing-reads-answers at 6ab1fffa680a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see GOODS_LINES_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "393a49416675b03720b0a89700a9dc212179920326259725ed2df0523ac42c63",
+      "size": 110156
+    },
+    {
       "blob": "2fd8b7f299cd2754e9cb1bdb3ca47a12193ddf81",
       "capture_id": "whole-day-read-transfer-lab/d03-c1.request.utf16le.xml",
       "company": "BRIDGE TRANSFER LAB",

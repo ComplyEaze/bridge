@@ -322,6 +322,31 @@ test("native shards: both shards uploading one artifact name (a name without the
   refused(withChange(CI_FILE, (text) => text.replace("          name: native-crash-binaries-macos-shard-${{ matrix.shard }}", "          name: native-crash-binaries-macos")), "native: the pinned shard line must appear exactly once: name: native-crash-binaries-macos-shard-${{ matrix.shard }}");
 });
 
+// The scope job names the operating systems of the native tests (Windows on a pull request and in the queue, macOS added on a
+// push, the nightly and a manual run). A matrix with a fixed list would drop macOS from those runs and every check would pass.
+for (const [name, replacement] of [
+  ["a fixed Windows-only list", "os: [windows-latest]"],
+  ["the bundle job's system list", "os: ${{ fromJSON(needs.changes.outputs.bundle_os) }}"],
+]) {
+  test(`native systems: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/ci.yml", (text) => text.replace("        os: ${{ fromJSON(needs.changes.outputs.native_os) }}", `        ${replacement}`)),
+      "native must run on the systems the scope job's native_os names");
+  });
+}
+
+// A draft-scoped run must post a name no ruleset requires. If it posted `Required checks`, its green (heavy jobs skipped on
+// purpose) would satisfy the ruleset on a head whose ready run has not started its own gate yet.
+for (const [name, replacement] of [
+  ["a constant name", "name: Required checks"],
+  ["the draft name made the required one", "name: ${{ needs.changes.outputs.draft == 'true' && 'Required checks' || 'Required checks' }}"],
+  ["the condition inverted", "name: ${{ needs.changes.outputs.draft != 'true' && 'Required checks (draft)' || 'Required checks' }}"],
+]) {
+  test(`required checks name: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/ci.yml", (text) => text.replace("    name: ${{ needs.changes.outputs.draft == 'true' && 'Required checks (draft)' || 'Required checks' }}", `    ${replacement}`)),
+      "required-checks changed shape, or does not need every other job");
+  });
+}
+
 // The nightly records run must not hold eight of the account's twenty runner slots at once.
 for (const [name, replacement] of [
   ["the limit removed", ""],
@@ -332,4 +357,3 @@ for (const [name, replacement] of [
       "the mutation shards must run four at a time");
   });
 }
-

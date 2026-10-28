@@ -52,9 +52,14 @@ jobs:
       contents: read
       # Only to read this workflow's own merge-queue runs and their jobs (scripts/master-push-reuse.mjs).
       actions: read
+      # Only to read whether a pull request is still a draft when its draft run starts.
+      pull-requests: read
     outputs:
       bundle: ${{ steps.scope.outputs.bundle }}
+      bundle_os: ${{ steps.scope.outputs.bundle_os }}
+      draft: ${{ steps.scope.outputs.draft }}
       native: ${{ steps.scope.outputs.native }}
+      native_os: ${{ steps.scope.outputs.native_os }}
       tax_audit: ${{ steps.scope.outputs.tax_audit }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -67,12 +72,43 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
-          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
+          GH_TOKEN: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && github.token || '' }}
         run: |
           set -euo pipefail
 
-          # The unscoped run: every heavy job runs, whatever changed.
+          # native_os and bundle_os are the systems the native, bundle-smoke and seam-control matrices run on. The macOS
+          # native tests run on a push to master, on a scheduled or manual run and on a release pull request (the owner's
+          # rule of 26 Oct 2026), never on another pull request or in the merge queue. The macOS bundle and seam jobs run
+          # on a scheduled or manual run and on a release pull request, and in the queue or on a push only when a packaging
+          # path below changed. Another pull request runs the bundle and seam jobs on Windows only.
+          windows='["windows-latest"]'
+          both='["windows-latest", "macos-latest"]'
+          # Packaging paths: src-tauri/tauri.conf.json, src-tauri/icons/, src-tauri/build.rs (it copies the bundled legal
+          # files), LICENSE, NOTICE, THIRD_PARTY_LICENSES.txt, THIRD_PARTY_LICENSES_RUST.txt, packaging/ (the MCPB manifest
+          # and the PDFium lock), package.json (the Tauri CLI and its build script), this workflow, and the scripts the
+          # bundle job runs: fetch-pdfium, capture-package-log, check-mcpb-bundle, package-mcpb, check-license-metadata,
+          # check-dependency-inventory, check-macos-bundle-resources and check-no-test-seam, with their tests. Also what
+          # pins the bundler and the build: pnpm-lock.yaml, .node-version, rust-toolchain.toml, .cargo/ and
+          # src-tauri/Cargo.lock, Cargo.toml and .cargo/.
+          packaging_paths='^(\.github/workflows/ci\.yml$|packaging/|package\.json$|pnpm-lock\.yaml$|\.node-version$|rust-toolchain\.toml$|\.cargo/|src-tauri/(tauri\.conf\.json$|icons/|build\.rs$|Cargo\.(lock|toml)$|\.cargo/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$)'
+
+          # A draft pull request runs no native, bundle or seam job; every other job is scoped as below. Marking it ready
+          # (`ready_for_review`, a trigger above) starts a new run of the same head that is scoped in full (and cancels this
+          # one if it is still running), and Required checks there needs those jobs again. The merge queue's run is never a draft run. Only the
+          # exact payload value `true` is a draft, and then the pull request is read again: a re-run of an old draft run
+          # keeps its payload, and a push made just before the ready click can start its run after the ready run. A pull
+          # request that is no longer a draft, or whose state cannot be read, is scoped in full.
+          draft=false
+          if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then
+            live_draft="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .draft)" || live_draft=unreadable
+            if [[ "$live_draft" == "true" ]]; then draft=true; fi
+          fi
+          echo "draft=$draft" >> "$GITHUB_OUTPUT"
+
+          # The unscoped run: every heavy job runs, whatever changed. Its caller writes the systems first.
           full_run() {
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
             echo 'native=true' >> "$GITHUB_OUTPUT"
@@ -81,29 +117,45 @@ jobs:
           }
 
           if [[ "$EVENT_NAME" == "workflow_dispatch" || "$EVENT_NAME" == "schedule" ]]; then
+            { echo "native_os=$both"; echo "bundle_os=$both"; } >> "$GITHUB_OUTPUT"
             full_run
           fi
 
-          # A push to master runs a family of heavy jobs unless the merge queue already RAN that family
-          # on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped
+          # A push to master runs a family of heavy jobs on Windows unless the merge queue already RAN that
+          # family on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped
           # the family by scope is no evidence, so it is run here as it always was. Any error or doubt
           # in the lookup runs both: a non-zero exit discards whatever was printed (its status goes to the job
           # summary), and only an exact
           # `reuse_<family>=true` line among the first two skips anything. tax_audit is cheap and always runs on a push.
-          # To turn the reuse off, delete this block: every push is then a full run again.
+          # The queue never runs the macOS native tests, so a push always does. It runs the macOS bundle and seam jobs
+          # when it changes a packaging path, or when its before commit cannot be compared.
+          # To turn the reuse off, delete the reuse lookup: every push then runs the Windows jobs again.
           if [[ "$EVENT_NAME" == "push" ]]; then
             lookup_status=0
             decision="$(node scripts/master-push-reuse.mjs)" || lookup_status=$?
             if [[ "$lookup_status" -ne 0 ]]; then decision=''; fi
             printf '%s\n' "$decision"
             { echo '### Master push reuse'; echo '```'; printf '%s\n' "$decision"; echo '```'; echo "Lookup exit status: $lookup_status"; } >> "$GITHUB_STEP_SUMMARY"
-            for family in native bundle; do
-              if printf '%s\n' "$decision" | head -n 2 | grep -qx "reuse_${family}=true"; then
-                echo "${family}=false" >> "$GITHUB_OUTPUT"
-              else
-                echo "${family}=true" >> "$GITHUB_OUTPUT"
-              fi
-            done
+            reused() { printf '%s\n' "$decision" | head -n 2 | grep -qx "reuse_$1=true"; }
+            packaging=true
+            if [[ -n "$BEFORE_SHA" && ! "$BEFORE_SHA" =~ ^0+$ ]] && pushed_files="$(git diff --name-only --no-renames -z "$BEFORE_SHA" "$GITHUB_SHA" | tr '\0' '\n')" && ! grep -Eq "$packaging_paths" <<< "$pushed_files"; then
+              packaging=false
+            fi
+            echo 'native=true' >> "$GITHUB_OUTPUT"
+            if reused native; then
+              echo 'native_os=["macos-latest"]' >> "$GITHUB_OUTPUT"
+            else
+              echo "native_os=$both" >> "$GITHUB_OUTPUT"
+            fi
+            if reused bundle && [[ "$packaging" == true ]]; then
+              { echo 'bundle=true'; echo 'bundle_os=["macos-latest"]'; } >> "$GITHUB_OUTPUT"
+            elif reused bundle; then
+              { echo 'bundle=false'; echo "bundle_os=$windows"; } >> "$GITHUB_OUTPUT"
+            elif [[ "$packaging" == true ]]; then
+              { echo 'bundle=true'; echo "bundle_os=$both"; } >> "$GITHUB_OUTPUT"
+            else
+              { echo 'bundle=true'; echo "bundle_os=$windows"; } >> "$GITHUB_OUTPUT"
+            fi
             echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -114,15 +166,30 @@ jobs:
             base="$MERGE_GROUP_BASE_SHA"
           fi
 
+          # A release pull request is the version pull request of docs/release-process.md: `next-version.mjs --apply` changes
+          # the version in src-tauri/tauri.conf.json, so a pull request or queue entry whose version differs from its base's
+          # is one. A version that cannot be read on one side only counts as a difference. It runs both systems for the
+          # native, bundle and seam jobs, in the queue as well.
+          version_at() {
+            { git show "$1:src-tauri/tauri.conf.json" | grep -m1 -o '"version": *"[^"]*"'; } 2>/dev/null || true
+          }
+          release=false
+          if [[ -n "$base" && ! "$base" =~ ^0+$ && "$(version_at "$base")" != "$(version_at "$GITHUB_SHA")" ]]; then release=true; fi
+          if [[ "$release" == true ]]; then
+            echo "native_os=$both" >> "$GITHUB_OUTPUT"
+          else
+            echo "native_os=$windows" >> "$GITHUB_OUTPUT"
+          fi
           # A missing base has no useful predecessor. Keep the conservative path.
           if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            if [[ "$EVENT_NAME" == "merge_group" ]]; then echo "bundle_os=$both" >> "$GITHUB_OUTPUT"; else echo "bundle_os=$windows" >> "$GITHUB_OUTPUT"; fi
             full_run
           fi
 
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.mjs$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes(\.test)?\.mjs$|retain-macos-test-binaries(\.test)?\.mjs$))' <<< "$changed_files"; then
+          if [[ "$draft" == false ]] && grep -Eq '^(\.github/workflows/|\.github/actions/|rust-toolchain\.toml|glama/Dockerfile$|src-tauri/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.mjs$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes(\.test)?\.mjs$|retain-macos-test-binaries(\.test)?\.mjs$))' <<< "$changed_files"; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
@@ -135,10 +202,16 @@ jobs:
             echo 'tax_audit=false' >> "$GITHUB_OUTPUT"
           fi
 
-          if grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
+          if [[ "$draft" == false ]] && grep -Eq '^(\.github/workflows/ci\.yml|\.github/actions/setup-windows-native/|packaging/mcpb/|package\.json|pnpm-lock\.yaml|\.node-version|vite\.config\.ts|tsconfig\.json|postcss\.config\.js|index\.html|src/|src-tauri/(src/|crates/|Cargo\.lock|Cargo\.toml|.*/Cargo\.toml|tauri\.conf\.json|build\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\.txt$|THIRD_PARTY_LICENSES_RUST\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\.test)?\.mjs|capture-package-log(\.test)?\.mjs|check-mcpb-bundle(\.test)?\.py|package-mcpb\.mjs|check-license-metadata\.mjs|check-dependency-inventory\.mjs|check-windows-bundle-resources\.ps1|check-macos-bundle-resources(\.mutation)?\.mjs|check-no-test-seam(\.test)?\.mjs)$|\.cargo/|src-tauri/\.cargo/)' <<< "$changed_files"; then
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
           else
             echo 'bundle=false' >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ "$release" == true ]] || { [[ "$EVENT_NAME" == "merge_group" ]] && grep -Eq "$packaging_paths" <<< "$changed_files"; }; then
+            echo "bundle_os=$both" >> "$GITHUB_OUTPUT"
+          else
+            echo "bundle_os=$windows" >> "$GITHUB_OUTPUT"
           fi
 
   frontend:
@@ -348,9 +421,12 @@ jobs:
   native:
     name: Native checks (${{ matrix.os }}, shard ${{ matrix.shard }} of 2)
     needs: changes
-    # Rust/Tauri changes always receive Windows and macOS coverage on PRs. The
-    # check is deliberately skipped only for frontend- and documentation-only PRs, and on a master
-    # push whose commit the merge queue already ran this job on (scripts/master-push-reuse.mjs).
+    # Rust/Tauri changes always receive Windows coverage on PRs and in the merge queue; macOS runs these
+    # tests on a push to master, on a scheduled or manual run and on a release pull request, the one that
+    # changes the version (the scope job's native_os). The check is
+    # deliberately skipped for frontend- and documentation-only PRs and for a draft PR, and a master push
+    # runs it on macOS alone when the merge queue already ran it on Windows for that commit
+    # (scripts/master-push-reuse.mjs).
     if: needs.changes.outputs.native == 'true'
     runs-on: ${{ matrix.os }}
     # CI does not debug native test executables. Keep local line tables and
@@ -367,7 +443,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: ${{ fromJSON(needs.changes.outputs.native_os) }}
         # The workspace tests are split in two halves by nextest's own partitioning (the test step below), each half on
         # its own runner. Each shard compiles the whole workspace for itself and the two share one Rust cache key, which
         # shard 1 alone saves (so a freshly saved cache holds no clippy-only dependency builds, and shard 2 may check those
@@ -548,10 +624,10 @@ jobs:
     needs: changes
     # Bundle output is validated for packaging-relevant pull requests and for every
     # manual or scheduled run, and on a master push unless the merge queue already ran it
-    # on that commit. Rust/Tauri PRs retain the native platform matrix above. A pull request
-    # runs Windows only: the macOS bundle and seam jobs run in the merge queue and on a master
-    # push, so a macOS-only packaging failure is found at the queue (it ejects that entry)
-    # rather than costing every pull request about 12 macOS runner minutes.
+    # on that commit. A pull request runs Windows only. The macOS bundle and seam jobs run
+    # in the merge queue and on a master push only when a packaging path changed (the
+    # scope job's packaging_paths and bundle_os), so a macOS-only packaging failure is
+    # found at the queue (it ejects that entry) and the nightly run covers everything else.
     if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
@@ -560,7 +636,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["windows-latest", "macos-latest"]') }}
+        os: ${{ fromJSON(needs.changes.outputs.bundle_os) }}
     env:
       SCCACHE_DIR: ${{ github.workspace }}/.cache/bridge-package-sccache
       SCCACHE_CACHE_SIZE: 64M
@@ -769,7 +845,7 @@ jobs:
     # rather than after it: it builds the bridge lib unit-test executable in
     # release and requires the marker there, so a clean scan of the shipped
     # executables means the scan could have seen the seam. Same scope and
-    # platforms as bundle-smoke, whose runs it guards (on a pull request, Windows only).
+    # platforms as bundle-smoke, whose runs it guards (the scope job's bundle_os).
     if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -778,7 +854,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["windows-latest", "macos-latest"]') }}
+        os: ${{ fromJSON(needs.changes.outputs.bundle_os) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -895,37 +971,93 @@ jobs:
           --changed-since "$BASE_SHA" --nightly-issues "$RUNNER_TEMP/nightly-issues.txt"
 
   required-checks:
-    name: Required checks
+    # A draft-scoped run posts `Required checks (draft)`, which no ruleset requires, never `Required checks`: its
+    # green means the heavy jobs were skipped on purpose, and must not stand in for the ready run's gate on the same
+    # head. The ready run, the merge queue's run and every other event post `Required checks`.
+    name: ${{ needs.changes.outputs.draft == 'true' && 'Required checks (draft)' || 'Required checks' }}
     # Always runs so it can report a single, stable required status for branch
-    # protection. Workflow consistency is unconditional and must succeed. Other
-    # upstream jobs may be legitimately skipped (e.g. native/bundle on docs-only
-    # PRs), but any failure or cancellation fails this job. Point branch
-    # protection at this context instead of the individual matrix jobs so
-    # docs-only PRs are not blocked by skipped native/bundle checks.
-    # tax-audit-mutations is required too, on pull requests that touch the
-    # crate: it runs the mutation runner's tests and `--verify` (no build), so a
-    # bridge-tax-audit change merges only with its selected mutations proven on
-    # the merged tree. Skipped on other pull requests, which is a pass here.
+    # protection. Point branch protection at this context instead of the
+    # individual matrix jobs, which report `skipped` when they are not selected.
+    # Each job it needs has one rule below. A job with no condition must succeed.
+    # native, bundle-smoke, seam-control and tax-audit-mutations run exactly when
+    # the scope job's output for them is 'true' (a draft pull request, a change
+    # outside their paths and a reused master push set it 'false'): each must
+    # succeed then and be skipped otherwise, so a job that should have run and
+    # did not fails this job. compiler-cache-retention runs on master only and
+    # may be skipped. A failure or cancellation fails every rule.
     if: ${{ always() }}
     needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, seam-control, compiler-cache-retention, tax-audit-mutations]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
+      # Only to read whether a draft-scoped run's pull request is still a draft.
+      pull-requests: read
     steps:
-      - name: Verify no required job failed
+      - name: Verify every job that should have run passed
         shell: bash
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           printf '%s\n' "$NEEDS_JSON"
-          failed="$(
-            printf '%s' "$NEEDS_JSON" \
-              | node -e 'const d = JSON.parse(require("fs").readFileSync(0, "utf8")); const failed = Object.keys(d).filter((k) => ["failure", "cancelled"].includes(d[k].result)); if (d["workflow-consistency"]?.result !== "success") failed.push("workflow-consistency"); console.log([...new Set(failed)].join(" "))'
-          )"
-          if [[ -n "$failed" ]]; then
-            echo "Required jobs did not pass: $failed"
-            exit 1
-          fi
-          echo "All required jobs succeeded or were legitimately skipped."
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          // A rule is one of three kinds: { kind: 'always' }, { kind: 'scope', output } or { kind: 'optional' }.
+          const rules = new Map([
+            ['changes', { kind: 'always' }],
+            ['frontend', { kind: 'always' }],
+            ['rust-format', { kind: 'always' }],
+            ['workflow-consistency', { kind: 'always' }],
+            ['tally-portable', { kind: 'always' }],
+            ['native', { kind: 'scope', output: 'native' }],
+            ['bundle-smoke', { kind: 'scope', output: 'bundle' }],
+            ['seam-control', { kind: 'scope', output: 'bundle' }],
+            ['tax-audit-mutations', { kind: 'scope', output: 'tax_audit' }],
+            ['compiler-cache-retention', { kind: 'optional' }],
+          ]);
+          const RESULTS = new Set(['success', 'failure', 'cancelled', 'skipped']);
+          const needs = JSON.parse(process.env.NEEDS_JSON);
+          const scope = needs.changes?.outputs ?? {};
+          const problems = [];
+          // A draft-scoped run skipped the heavy jobs because its pull request was a draft when the scope job ran. It
+          // passes only while the pull request still is one, read again here: re-running the failed jobs of an old draft
+          // run after the ready click re-runs this job but not the scope job, and must not turn this job green.
+          if (scope.draft === 'true') {
+            let live = 'unreadable';
+            try {
+              live = execFileSync('gh', ['api', `repos/${process.env.GITHUB_REPOSITORY}/pulls/${process.env.PR_NUMBER}`, '--jq', '.draft'], { encoding: 'utf8' }).trim();
+            } catch { /* an unreadable pull request is not a draft */ }
+            console.log(`draft-scoped run; the pull request is a draft now: ${live}`);
+            if (live !== 'true') problems.push(`draft-scoped run, but the pull request is not a draft now (${JSON.stringify(live)}): its heavy jobs were skipped, so use the run of the ready state`);
+          } else if (scope.draft !== 'false') {
+            problems.push(`scope output draft is ${JSON.stringify(scope.draft)}, neither 'true' nor 'false'`);
+          }
+          // What this job requires of each result: the set of results that pass, or a reason it cannot judge.
+          function expected(rule) {
+            if (rule.kind === 'always') return { pass: ['success'] };
+            if (rule.kind === 'optional') return { pass: ['success', 'skipped'] };
+            if (rule.kind !== 'scope') return { error: `rule kind ${JSON.stringify(rule.kind)} is unknown` };
+            const selected = scope[rule.output];
+            if (selected === 'true') return { pass: ['success'] };
+            if (selected === 'false') return { pass: ['skipped'] };
+            return { error: `scope output ${rule.output} is ${JSON.stringify(selected)}, neither 'true' nor 'false'` };
+          }
+          for (const job of [...new Set([...Object.keys(needs), ...rules.keys()])].sort()) {
+            const result = Object.hasOwn(needs, job) ? needs[job]?.result : undefined;
+            const rule = rules.get(job);
+            if (!rule) { problems.push(`${job}: no rule says whether it must run`); continue; }
+            if (!RESULTS.has(result)) { problems.push(`${job}: result ${JSON.stringify(result)} is not one of GitHub's four`); continue; }
+            const want = expected(rule);
+            if (want.error) { problems.push(`${job}: ${want.error}`); continue; }
+            console.log(`${job}: ${result} (passes as ${want.pass.join(' or ')})`);
+            if (!want.pass.includes(result)) problems.push(`${job}: ${result}, required ${want.pass.join(' or ')}`);
+          }
+          if (problems.length) {
+            console.log(`Required jobs did not pass:\n${problems.join('\n')}`);
+            process.exit(1);
+          }
+          console.log('Every job that should have run passed, and every skipped job was not selected.');
+          JS

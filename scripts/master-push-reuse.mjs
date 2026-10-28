@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Decides, per family of heavy CI jobs, whether a push to master may skip that family because the
-// merge queue already RAN it, and it passed, on this exact commit. The scope job in ci.yml runs it
+// Decides, per family of heavy CI jobs, whether a push to master may skip that family's Windows jobs
+// because the merge queue already RAN them, and they passed, on this exact commit. The queue runs no
+// macOS native job, and the macOS bundle and seam jobs only for a packaging change, so the scope step
+// decides the macOS jobs of a push itself and this lookup never judges them. The scope job in ci.yml runs it
 // and reads exact lines from stdout: `reuse_native=true|false`, `reuse_bundle=true|false`, then
 // `code=...` and `reason=...`.
 //
@@ -32,17 +34,12 @@ import { pathToFileURL } from "node:url";
 const SHA = /^[0-9a-f]{40,64}$/;
 const FORCE_FULL = /^(?:\.github\/workflows\/ci\.yml$|\.github\/actions\/|(?:.*\/)?\.cargo\/|src-tauri\/tauri\.conf\.json$|scripts\/master-push-reuse\.mjs$|rust-toolchain(?:\.toml)?$|(?:.*\/)?Cargo\.(?:lock|toml)$)/;
 const WORKFLOW_FILE = "ci.yml";
-// The job names a queue run reports when the job ran: ci.yml's `name:` with the matrix expanded.
-// scripts/master-push-reuse.test.mjs derives them from ci.yml and fails if these lists drift.
+// The job names a queue run reports when the job ran on Windows: ci.yml's `name:` with the matrix expanded.
+// scripts/master-push-reuse.test.mjs derives them from ci.yml, and scripts/master-push-scope.test.mjs checks
+// that a queue run selecting the family runs exactly these systems; either fails if the lists drift.
 export const FAMILIES = {
-  native: [
-    "Native checks (windows-latest, shard 1 of 2)", "Native checks (windows-latest, shard 2 of 2)",
-    "Native checks (macos-latest, shard 1 of 2)", "Native checks (macos-latest, shard 2 of 2)",
-  ],
-  bundle: [
-    "Bundle smoke (windows-latest)", "Bundle smoke (macos-latest)",
-    "Seam positive control (windows-latest)", "Seam positive control (macos-latest)",
-  ],
+  native: ["Native checks (windows-latest, shard 1 of 2)", "Native checks (windows-latest, shard 2 of 2)"],
+  bundle: ["Bundle smoke (windows-latest)", "Seam positive control (windows-latest)"],
 };
 // A completed queue run can lag the landing push by a few seconds; wait a bounded time for it.
 const ATTEMPTS = 4;

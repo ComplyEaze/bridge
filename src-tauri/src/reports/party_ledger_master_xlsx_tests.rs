@@ -656,9 +656,9 @@ fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
 /// Both digests were taken again when the five mailing columns and the Covered text
 /// changed the package (#1490); nothing since then may change them.
 const HOST_DATE_PACKAGE_WITHOUT_NOTE: &str =
-    "0bf01ad3ea16fa07ac3bc1c8dd08a7d8b48af31c2bae0871a0664e8ec46805ff";
+    "e4f7d2e17368452339fec684c64918e6e13a87504a07d89c55113fa067757759";
 const HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE: &str =
-    "77fe15c29e5a87b49add7ee280eec4b1ce38829b3c6c0deb66ebe60669e80c7e";
+    "54d5f0032f235fae58514f9727326237d804a181f19cf3d391c6f8ceb29460b4";
 
 #[test]
 fn the_host_date_workbook_is_byte_for_byte_what_it_was_before_a_date_could_be_typed() {

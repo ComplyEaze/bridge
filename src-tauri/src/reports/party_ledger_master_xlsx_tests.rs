@@ -815,6 +815,34 @@ fn a_partys_mailing_entry_in_force_on_the_balances_date_fills_the_five_cells() {
     assert_eq!(cell("AB16").as_deref(), Some("not observed"));
 }
 
+/// A workbook none of whose ledgers carried the mailing list (a book read without it) says so in
+/// its header, beside the per-ledger status; one that carries a list for any ledger does not.
+#[test]
+fn a_workbook_that_observed_no_mailing_details_says_so_loudly() {
+    const NOTE: &str = "No ledger's mailing details were observed in this read";
+    let mut source = source_with_precision(2);
+    source.rows = vec![
+        mailing_row("A", "1", MailingDetailsHistory::NotObserved),
+        mailing_row("B", "2", MailingDetailsHistory::NotObserved),
+    ];
+    assert!(workbook_text(source.clone()).contains(NOTE));
+    assert_eq!(
+        sheet_cell(source.clone(), "C4")
+            .as_deref()
+            .map(|t| t.starts_with(NOTE)),
+        Some(true)
+    );
+    source.rows[1] = mailing_row(
+        "B",
+        "2",
+        MailingDetailsHistory::Entries {
+            entries: vec![mailing_entry("20260401", "560001")],
+        },
+    );
+    assert!(!workbook_text(source.clone()).contains(NOTE));
+    assert_eq!(sheet_cell(source, "C4"), None);
+}
+
 #[test]
 fn each_mailing_status_says_why_the_values_are_blank() {
     let status = |history: MailingDetailsHistory, as_of: &str| {

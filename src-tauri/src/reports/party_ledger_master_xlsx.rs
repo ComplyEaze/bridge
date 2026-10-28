@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use bridge_tally_protocol::PartyLedgerMasterFieldObservation;
 use rust_xlsxwriter::{Format, Workbook, XlsxError};
 
-use super::party_ledger_master::PartyLedgerMasterWorkbook;
+use super::party_ledger_master::{PartyLedgerMasterSource, PartyLedgerMasterWorkbook};
 use super::party_statement_xlsx::amount_to_f64;
 use super::schedule_iii::{
     build_schedule_iii_view, DecisionInput, DecisionSource, DecisionStatus, DecisionsUnavailable,
@@ -86,6 +86,9 @@ pub(crate) fn render_party_ledger_master_xlsx(
     }
     if let Some(note) = source.notes_text() {
         worksheet.write_string(2, 2, note)?;
+    }
+    if no_mailing_details_were_observed(source) {
+        worksheet.write_string(3, 2, NO_MAILING_DETAILS_OBSERVED_NOTE)?;
     }
     worksheet.write_string_with_format(7, 0, "Repeated read agreement", &bold)?;
     worksheet.write_string(
@@ -241,6 +244,21 @@ pub(crate) fn render_party_ledger_master_xlsx(
     workbook
         .save_to_buffer()
         .map_err(PartyLedgerMasterXlsxError::from)
+}
+
+/// Said in the workbook when no ledger's answer carried a mailing-details list. The export asks
+/// for the lists only where the whole read fits their bound, so a book past it is read as it was
+/// before they existed (bridge#1490); a blank mailing column is then not "no address".
+const NO_MAILING_DETAILS_OBSERVED_NOTE: &str = "No ledger's mailing details were observed in this read: the request for them is made only for a book small enough for it, or Tally returned none. The Mailing columns are empty and their status says not observed; that is not the same as a party having no mailing address. Read the address in Tally.";
+
+fn no_mailing_details_were_observed(source: &PartyLedgerMasterSource) -> bool {
+    !source.rows.is_empty()
+        && source.rows.iter().all(|row| {
+            matches!(
+                row.fields.mailing_details,
+                MailingDetailsHistory::NotObserved
+            )
+        })
 }
 
 /// The five mailing-details cells of one ledger as of `as_of` (`YYYYMMDD`):

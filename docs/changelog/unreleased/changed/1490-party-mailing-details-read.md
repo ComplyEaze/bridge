@@ -8,7 +8,11 @@
   sooner). It is refused together with `include_gst_details`, as the request naming both has not been captured. The
   party/ledger master workbook, a local file written by the desktop app, gains five columns at its end: the mailing
   address, PIN code and state in force on the Balances-as-of date, the date they apply from, and a status that says
-  why they are blank (no mailing details, none in force on that date, not observed, or unreadable). A second mailing
+  why they are blank (no mailing details, none in force on that date, not observed, or unreadable). The workbook
+  asks Tally for the mailing details only for a book whose master-alteration mark (an upper bound on its ledgers) is
+  at most 3,404; for a larger book it sends the same request as before and every ledger's status reads not
+  observed, with a note in the workbook's header saying so, so a book that exported before is never refused for the
+  larger per-ledger estimate. A book past that mark has no mailing columns until the bound is measured. A second mailing
   entry with a later date, a party with two mailing rows and other releases are not measured. `mask_parties` shortens
   the mailing name, every address line and the flat address field like a party's name, to their first two and last two
   characters; the PIN code, state and country are returned under every redaction mode. The registers do not read the

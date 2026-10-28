@@ -393,19 +393,44 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_00
 /// details. They are not combined: the request naming both has not been captured
 /// live, so `ledger_masters` refuses the two flags together. Each is sized by its
 /// own per-ledger estimate wherever the standard one would be.
+/// [`Self::WithMailingDetailsWhereWholeReadFits`] is what the party/ledger master
+/// workbook asks for (bridge#1490): the mailing details where the book's master
+/// change mark puts the whole read inside the mailing bound, the standard request
+/// otherwise, so a book the standard request read before is never refused for the
+/// larger per-ledger estimate. [`Self::resolved_for_mark`] makes that choice before
+/// any ledger request is sent; no request is rendered for the unresolved kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComplianceRead {
     Standard,
     WithMailingDetails,
+    WithMailingDetailsWhereWholeReadFits,
     WithGstDetails,
 }
 
 impl ComplianceRead {
+    /// The kind of read a book is actually sent, and whether the mailing details
+    /// asked for were given up for it. The mark upper-bounds the ledgers (every
+    /// master raises it), so a mark inside the mailing bound is a whole read the
+    /// mailing request may carry; a larger one is read as it was before the mailing
+    /// details existed, whatever its size class then. Any other kind is unchanged.
+    pub(crate) fn resolved_for_mark(self, master_mark: u64) -> Self {
+        match self {
+            Self::WithMailingDetailsWhereWholeReadFits => {
+                if compliance_estimate_unverified(master_mark, Self::WithMailingDetails).fits {
+                    Self::WithMailingDetails
+                } else {
+                    Self::Standard
+                }
+            }
+            other => other,
+        }
+    }
+
     /// The bytes one ledger is estimated to add to this read's master response.
     const fn bytes_per_ledger(self) -> u64 {
         match self {
             Self::Standard => COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
-            Self::WithMailingDetails => {
+            Self::WithMailingDetails | Self::WithMailingDetailsWhereWholeReadFits => {
                 COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED
             }
             Self::WithGstDetails => COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED,
@@ -1752,6 +1777,9 @@ impl TallyClient {
                 .master_alter_id_high_water()
                 .ok_or(OutstandingsError::MasterWitnessAbsent)?
                 .get();
+            // The workbook's mailing details are given up where the mark puts the
+            // whole read past the mailing bound, so nothing it read before is refused.
+            let read = read.resolved_for_mark(master_mark);
             // Sized before any ledger request is sent (#637): by the mark when
             // it fits, otherwise by the count of a balance-free catalogue read
             // once the local checks below have passed (#668).
@@ -1887,7 +1915,8 @@ impl TallyClient {
                             identity.display_name(),
                             &master_period,
                         ),
-                        ComplianceRead::WithMailingDetails => {
+                        ComplianceRead::WithMailingDetails
+                        | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
                             render_party_ledger_master_request_with_mailing_details(
                                 identity.display_name(),
                                 &master_period,
@@ -1915,7 +1944,8 @@ impl TallyClient {
                                         part,
                                     )
                                 }
-                                ComplianceRead::WithMailingDetails => {
+                                ComplianceRead::WithMailingDetails
+                                | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
                                     render_party_ledger_master_request_for_parents_with_mailing_details(
                                         identity.display_name(),
                                         &master_period,

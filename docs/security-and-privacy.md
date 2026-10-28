@@ -123,8 +123,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     or a town at either end of a line can stay readable. Every `ledger_masters` call
     with `fields=compliance` reads and returns the older flat fields (the address
     from `LEDADDRESS.LIST`, the PIN code and the state), as before: under mode `none`
-    they are in clear, and under `mask_parties` the flat address is shortened and the
-    PIN code and state are not. The dated mailing address (lines, PIN code, state and
+    (and under dropping narrations, which masks no name) they are in clear, and under
+    `mask_parties` the flat address is shortened and the PIN code and state are not. The dated mailing address (lines, PIN code, state and
     country) is read from Tally only when the assistant asks for it
     (`include_mailing_details`); without that argument `ledger_masters` does not read
     it. The flat PIN code and state, and the mailing entry's PIN code, state and

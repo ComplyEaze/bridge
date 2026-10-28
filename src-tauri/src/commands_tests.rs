@@ -653,7 +653,7 @@ fn the_export_request_reads_a_chosen_date_and_refuses_a_malformed_one_at_the_bou
 fn the_party_ledger_master_export_asks_for_the_mailing_details() {
     assert_eq!(
         PARTY_LEDGER_MASTER_EXPORT_READ,
-        crate::tally::connection::ComplianceRead::WithMailingDetails
+        crate::tally::connection::ComplianceRead::WithMailingDetailsWhereWholeReadFits
     );
 }
 

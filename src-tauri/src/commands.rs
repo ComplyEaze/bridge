@@ -1936,10 +1936,12 @@ fn verify_observed_company_tuple_from_companies(
 }
 
 /// What the party/ledger master export asks Tally for: it shows each party's dated
-/// mailing details, so its request names them (bridge#1490). A grouping-decision save
-/// uses none of them and sends the standard request.
+/// mailing details, so its request names them where the whole read fits the mailing
+/// bound and is the standard request otherwise, so a book that exported before is never
+/// refused for the mailing details (bridge#1490); the workbook says when they were not
+/// read. A grouping-decision save uses none of them and sends the standard request.
 const PARTY_LEDGER_MASTER_EXPORT_READ: crate::tally::connection::ComplianceRead =
-    crate::tally::connection::ComplianceRead::WithMailingDetails;
+    crate::tally::connection::ComplianceRead::WithMailingDetailsWhereWholeReadFits;
 
 /// The verified company and its party/ledger master, read through the one
 /// sized path: company tuple check, currency admission, then the paired

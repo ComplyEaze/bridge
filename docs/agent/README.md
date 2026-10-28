@@ -264,7 +264,11 @@ measured (948 bytes for one populated party row; UNVERIFIED for a populated book
 refused as `parent_over_budget`, never truncated. A held listing is served only to a page that asks for the same mode, so
 repeat `include_mailing_details` on later pages. Measured on one synthetic book; a second dated entry, a party with two
 mailing rows and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
-local file, reads the mailing details always and shows only the entry in force on its Balances-as-of date.
+local file, names the mailing details only where the book's master-alteration mark is at most 3,404 (the
+whole read fits their bound) and otherwise sends the standard request, as before #1490, so a book that exported
+before is never refused for the larger estimate; its header then says that no ledger's mailing details were
+observed and the status column reads not observed. Where it reads them it shows only the entry in force on its
+Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields`, a true value is refused before any read as `ledger_masters_gst_details_requires_compliance`,
 and a value that is not a boolean is `argument_invalid:include_gst_details`. Without it (absent or false) every

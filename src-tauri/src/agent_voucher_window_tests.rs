@@ -8028,28 +8028,6 @@ mod ledger_window {
         .to_string()
     }
 
-    macro_rules! scoped {
-        ($name:literal) => {
-            include_bytes!(concat!(
-                "../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/",
-                $name,
-                ".utf16le.xml"
-            ))
-            .as_slice()
-        };
-    }
-
-    macro_rules! filtered {
-        ($name:literal) => {
-            include_bytes!(concat!(
-                "../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/",
-                $name,
-                ".utf16le.xml"
-            ))
-            .as_slice()
-        };
-    }
-
     type Exchange = (&'static [u8], &'static [u8]);
 
     /// Serves the lab's answers in order, each only to the request the lab sent for it.
@@ -8088,24 +8066,24 @@ mod ledger_window {
     fn dense_day() -> Vec<Exchange> {
         vec![
             (
-                scoped!("census-dn-sales-day-span1.request"),
-                scoped!("census-dn-sales-day-span1.answer"),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.request.utf16le.xml").as_slice(),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml").as_slice(),
             ),
             (
-                scoped!("census-dn-sales-day-span2.request"),
-                scoped!("census-dn-sales-day-span2.answer"),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.request.utf16le.xml").as_slice(),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice(),
             ),
             (
-                filtered!("dense-census-dn-sales-20250515-span3.request"),
-                filtered!("dense-census-dn-sales-20250515-span3.answer"),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.request.utf16le.xml").as_slice(),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.answer.utf16le.xml").as_slice(),
             ),
             (
-                filtered!("dense-census-dn-sales-20250515-span4.request"),
-                filtered!("dense-census-dn-sales-20250515-span4.answer"),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.request.utf16le.xml").as_slice(),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.answer.utf16le.xml").as_slice(),
             ),
             (
-                filtered!("dense-ledger-dn-sales-20250515-entries.request"),
-                filtered!("dense-ledger-dn-sales-20250515-entries.answer"),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.request.utf16le.xml").as_slice(),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.answer.utf16le.xml").as_slice(),
             ),
         ]
     }
@@ -8157,7 +8135,7 @@ mod ledger_window {
         let rows = read.unwrap().rows;
         let parse = |value: &str| NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
         let census = parse_voucher_census(
-            &utf16(scoped!("census-dn-sales-day-span1.answer")),
+            &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml").as_slice()),
             (parse("20250515"), parse("20250515")),
             Some(AlterIdSpan {
                 after: 0,
@@ -8191,7 +8169,7 @@ mod ledger_window {
     #[tokio::test]
     async fn a_census_answer_outside_its_span_is_refused_before_any_read() {
         let mut exchanges = dense_day();
-        exchanges[1].1 = scoped!("census-dn-sales-day-span1.answer");
+        exchanges[1].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml").as_slice();
         let (read, left) = read_day(exchanges, eighty_two_a_read()).await;
         let failure = read.err().unwrap();
         assert_eq!(failure.code, VOLUME_UNESTIMATED);
@@ -8206,7 +8184,7 @@ mod ledger_window {
     #[tokio::test]
     async fn a_read_whose_vouchers_lie_outside_the_window_is_not_admitted() {
         let mut exchanges = dense_day();
-        exchanges[4].1 = scoped!("movement-dn-party-month.answer");
+        exchanges[4].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml").as_slice();
         let (read, left) = read_day(exchanges, eighty_two_a_read()).await;
         let failure = read.err().unwrap();
         assert_eq!(failure.code, PART_NOT_ADMITTED);
@@ -8219,7 +8197,7 @@ mod ledger_window {
     #[tokio::test]
     async fn a_read_that_is_not_the_census_vouchers_is_not_admitted() {
         let mut exchanges = dense_day();
-        exchanges[0].1 = scoped!("census-dn-sales-day-span2.answer");
+        exchanges[0].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice();
         let (read, left) = read_day(exchanges, eighty_two_a_read()).await;
         let failure = read.err().unwrap();
         assert_eq!(failure.code, PART_NOT_ADMITTED);
@@ -8245,8 +8223,8 @@ mod ledger_window {
         // An empty census: every span of the day answered empty, and the read an empty collection
         // (the captured empty answer of the same book and run).
         let mut empty = dense_day();
-        empty[0].1 = scoped!("census-dn-sales-day-span2.answer");
-        empty[4].1 = scoped!("census-dn-sales-day-span2.answer");
+        empty[0].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice();
+        empty[4].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice();
         let (read, left) = read_day(empty, eighty_two_a_read()).await;
         assert_eq!(left, 0);
         assert!(matches!(outcome(read), Ok(LedgerOutcome::Window)));
@@ -8258,14 +8236,14 @@ mod ledger_window {
         assert!(evidence.is_some(), "the census reads made are kept");
         // A read not admitted against its window.
         let mut stray = dense_day();
-        stray[4].1 = scoped!("movement-dn-party-month.answer");
+        stray[4].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml").as_slice();
         let (read, _) = read_day(stray, eighty_two_a_read()).await;
         let (decided, evidence) = ledger_outcome(read, "DN Sales").unwrap();
         assert!(matches!(decided, LedgerOutcome::Window));
         assert!(evidence.is_some(), "the reads made are kept");
         // A census Tally did not answer within its span is the detail's own refusal.
         let mut wrong = dense_day();
-        wrong[1].1 = scoped!("census-dn-sales-day-span1.answer");
+        wrong[1].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml").as_slice();
         let (read, _) = read_day(wrong, eighty_two_a_read()).await;
         assert_eq!(outcome(read).unwrap_err().code, VOLUME_UNESTIMATED);
     }
@@ -8292,11 +8270,11 @@ mod ledger_window {
                 None
             )
             .unwrap(),
-            utf16(filtered!("billtrail-ledger-p1-fy-entries.request"))
+            utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.request.utf16le.xml").as_slice())
         );
         assert_eq!(
             part(DENSE, "DN Sales", "20250515", "20250515", None).unwrap(),
-            utf16(filtered!("dense-ledger-dn-sales-20250515-entries.request"))
+            utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.request.utf16le.xml").as_slice())
         );
         // Never sent with an AlterID span, which was not observed ledger-scoped.
         let span = Some(AlterIdSpan {

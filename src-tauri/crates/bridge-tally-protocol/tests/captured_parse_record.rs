@@ -2899,6 +2899,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_HIGH_WATER,
     ),
     (
+        "tests/fixtures/company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
         "tests/fixtures/agent/native-company-book-extents.utf16le.xml",
         "recorded by the app crate's record (#1198 slice 2): company_high_water_rows \
          (src/agent_company_checkpoint.rs reads this extent collection for its marks)",

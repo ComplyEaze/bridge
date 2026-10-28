@@ -1497,7 +1497,7 @@ impl Server {
                     (&date_from, &date_to),
                     super::WindowPlanSource::Estimate {
                         known_marks: mark.value.zip(mark.master_value).map(
-                            |(vouchers, masters)| super::CompanyMarks { vouchers, masters },
+                            |(vouchers, masters)| super::CompanyMarks::new(Some(vouchers), masters),
                         ),
                     },
                 )
@@ -2078,7 +2078,7 @@ impl Server {
             let window_voucher_mark = observed_read
                 .witness
                 .as_ref()
-                .map(|witness| witness.marks.vouchers);
+                .map(|witness| witness.marks.vouchers());
             let corroboration_proof = match super::SecondRead::of(
                 observed_read.reads,
                 observed_read.witness,

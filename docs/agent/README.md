@@ -1651,7 +1651,10 @@ snapshot, instead of serving the older read as current. Redaction and party
 marking are applied to each page as it is served. The result carries `snapshot`
 (`id`, `master_alter_id`, `voucher_alter_id`, `read_at`, `reused`); a served
 page's `window` timings and `read_at` are the first page's, and its `evidence`
-covers only the identity and marks reads it sent.
+covers only the identity and marks reads it sent. `voucher_alter_id` is null
+when Tally's answer carried no voucher mark, which it omits for a company that
+has never held a voucher, as `ledger_masters` reports it; a number, 0 included,
+is the mark Tally sent.
 
 - **A named snapshot is loud.** A later page that passes the first page's
   `snapshot_id` is refused as `listing_snapshot_changed` (cause

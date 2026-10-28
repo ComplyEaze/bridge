@@ -187,6 +187,39 @@ async fn the_captured_list_is_returned_as_tallys_own_and_says_what_was_not_check
     assert!(result.get("reason").is_none(), "{result}");
 }
 
+/// The sign a value carries is stated in the result and the tool text (#2051): the captured
+/// item's value 360.00 is positive, and the screen shows it as (-)360.00.
+#[tokio::test]
+async fn the_sign_a_value_carries_is_stated_beside_the_captured_positive_value() {
+    let (response, _) = call(plans(captured()), "2026-04-01", "2027-03-31").await;
+    let result = result(&response);
+    assert_eq!(result["listed_items"][0]["value"]["value"], "360.00");
+    let limitations = result["limitations"].as_array().unwrap();
+    let sentence = limitations
+        .iter()
+        .filter_map(Value::as_str)
+        .find(|line| line.starts_with("A value keeps the sign Tally's export carries"))
+        .expect("the sign is stated in the limitations");
+    for part in [
+        "a debit is negative and a credit is positive",
+        "(-)360.00",
+        "section 12a.13",
+    ] {
+        assert!(sentence.contains(part), "{part}: {sentence}");
+    }
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "negative_stock"))
+        .and_then(|tool| tool["description"].as_str())
+        .expect("negative_stock is registered");
+    assert!(
+        description
+            .contains("a value keeps the export's sign (a debit negative, a credit positive)"),
+        "{description}"
+    );
+}
+
 #[tokio::test]
 async fn an_empty_rate_and_value_stay_empty_and_the_quantity_keeps_its_sign() {
     let (response, _) = call(plans(captured_to_may()), "2026-04-01", "2026-05-31").await;

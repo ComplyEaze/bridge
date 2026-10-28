@@ -26,6 +26,11 @@ fn quantity_json(quantity: &NativeQuantityRead) -> Value {
     }
 }
 
+/// The sign a listed value carries (#2051). Measured on one synthetic book on TallyPrime 7.1 and
+/// again on 7.2: the item at -3 Nos and a rate of 120.00 is exported with the value 360.00 while
+/// Tally's screen shows (-)360.00. Protocol reference section 12a.13 records the wire rule.
+const NEGATIVE_STOCK_VALUE_SIGN: &str = "A value keeps the sign Tally's export carries, as in the Stock Summary and the trial balance: a debit is negative and a credit is positive. The closing value of an item short of stock is a credit, so it reads positive where Tally's screen shows it as (-): on the one book measured, the item at -3 Nos and a rate of 120.00 has the value 360.00 and its screen shows (-)360.00 (TallyPrime 7.1, again on 7.2; protocol reference section 12a.13)";
+
 impl Server {
     pub(super) async fn negative_stock(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
         let guid = required_string(args, "company_guid")?;
@@ -79,6 +84,7 @@ impl Server {
             "verification": VERIFICATION,
             "limitations": [
                 "This is Tally's own Negative Stock list, returned as it is. Being listed is not a finding that the quantity is below zero: on one book Tally also listed items of positive quantity whose closing value was a credit, so read each item's quantity as printed. The rule by which Tally lists an item is not established and is not derived here",
+                NEGATIVE_STOCK_VALUE_SIGN,
                 "A rate or value Tally printed empty is returned empty and is not zero; on one book the rate and value were empty on an item listed for a window ending mid-year",
                 "On the one book read to a mid-year date the quantity was as at the window's end, not the book's end. Windows that do not start on 1 April, cross a financial year or end after 31 March were not measured",
                 "An empty answer is returned as not established and does not say that no item is negative: Tally's empty answer cannot be told from a report that was not rendered (on a book with stock items and none short it was an empty envelope)",

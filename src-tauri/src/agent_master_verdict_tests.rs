@@ -897,13 +897,19 @@ fn counters_on_file_decide_and_the_alter_id_check_is_not_made() {
         judgement.checks.first_change_after_intent,
         Check::NotChecked
     );
-    // Counters that fail are never overruled by the mark.
-    for failing in [
+    // Counters that fail are never overruled by the mark, even in facts that
+    // say no answer is held (the reader never builds those: counters come
+    // only from an answer).
+    for (failing, answer_held) in [
         counters(0, 0, 0, 0),
         counters(1, 0, 1, 0),
         counters(1, 0, 0, 1),
-    ] {
+    ]
+    .into_iter()
+    .flat_map(|failing| [(failing, true), (failing, false)])
+    {
         world.counters = Some(failing);
+        world.answer_held = answer_held;
         let judgement = world.judge();
         assert_eq!(
             judgement.state,

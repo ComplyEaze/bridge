@@ -373,6 +373,9 @@ fn reason_words(reason: NotEstablishedReason) -> &'static str {
         NotEstablishedReason::TallyProfitAndLossDiffers => {
             "Tally's own Profit and Loss differs from the derived lines"
         }
+        NotEstablishedReason::TallyBalanceSheetDoesNotBalance => {
+            "Tally's own Balance Sheet does not balance"
+        }
     }
 }
 
@@ -394,6 +397,9 @@ fn reason_next_step(reason: NotEstablishedReason) -> &'static str {
         NotEstablishedReason::TallyProfitAndLossDiffers => {
             "See tie_out in the result for the lines that differ, and tell the user."
         }
+        NotEstablishedReason::TallyBalanceSheetDoesNotBalance => {
+            "Tell the user the two sides of Tally's Balance Sheet export differ, so no figure can be given from it. Ask them to open Tally's own Balance Sheet for the same period and to check the book's opening balances there; on the one book measured, Tally showed this gap as Difference in opening balances and left it out of the export."
+        }
     }
 }
 
@@ -410,6 +416,8 @@ pub(super) struct StatementBasis {
     read_tally_profit_and_loss: bool,
     /// Whether the results were established with Tally's own closing stock.
     closing_stock_from_tally: bool,
+    /// The two sides of Tally's own Balance Sheet export, as text, when they differ.
+    tally_sides: Option<(String, String)>,
 }
 
 impl StatementBasis {
@@ -427,7 +435,15 @@ impl StatementBasis {
             parts,
             read_tally_profit_and_loss,
             closing_stock_from_tally: false,
+            tally_sides: None,
         }
+    }
+
+    /// Tally's own Balance Sheet export does not balance: the headline then says
+    /// by how much, from the two sides' totals.
+    pub(super) fn with_tally_balance_sheet_sides(mut self, credits: &str, debits: &str) -> Self {
+        self.tally_sides = Some((credits.to_string(), debits.to_string()));
+        self
     }
 
     /// The results were established with Tally's own closing stock, which the
@@ -523,8 +539,18 @@ impl StatementBasis {
             } else {
                 ""
             };
+            // Whatever the reason above, the two sides of Tally's own export are said when they differ.
+            let sides = match &self.tally_sides {
+                Some((credits, debits)) => format!(
+                    " Tally's own Balance Sheet export does not balance (its credit lines add to {credits} and its debit lines to {debits}); on the one book measured, Tally's screen showed such a gap as Difference in opening balances and the export left it out."
+                ),
+                None => String::new(),
+            };
             // One next step for each distinct reason, in the order they appear.
             let mut reasons = Vec::new();
+            if self.tally_sides.is_some() {
+                reasons.push(NotEstablishedReason::TallyBalanceSheetDoesNotBalance);
+            }
             for (_, outcome) in &self.parts {
                 if let PartOutcome::NotEstablished { reason, .. } = outcome {
                     if !reasons.contains(reason) {
@@ -537,7 +563,7 @@ impl StatementBasis {
                 .map(|reason| reason_next_step(*reason))
                 .collect::<Vec<_>>()
                 .join(" ");
-            format!("Not established: the {subject}. {sentences}{withheld} {next}")
+            format!("Not established: the {subject}. {sentences}{sides}{withheld} {next}")
         };
         Headline {
             lead,

@@ -500,8 +500,8 @@ Measured on one synthetic book of TallyPrime 7.1 Silver (PARTIAL); a state row o
 `Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured (protocol
 reference §12a.22). A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
-parent that is Tally's reserved root keeps its marker form, as in
-`trial_balance`. Alias names are not returned.
+parent that is Tally's reserved root is written `&#4; Primary`, the text Tally
+sends, as in `trial_balance` (a group a user named Primary is written plain). Alias names are not returned.
 
 A `voucher_types` row also carries `series_numbering`, the numbering of the
 type's number series, which `numbering_method` is not (that is the type-level
@@ -621,8 +621,8 @@ hints (the company's `NUM*` fields), stock-item quantities or values (use `stock
 
 Under `mask_parties`, godown, stock-group, stock-item, cost-centre and cost-category names, their `parent`
 values and a cost centre's `category` are masked like a party name, because a job-work
-godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is a
-fixed marker and is left as it is. Voucher-type, unit and account-group names
+godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is shown as
+`&#4; Primary` and is not masked. Voucher-type, unit and account-group names
 are not masked: they are configuration labels, not counterparties.
 
 ### Cash Flow
@@ -1257,8 +1257,8 @@ company-flags read requires exactly one Company row for the GUID
 
 Under `mask_parties`, an item's `name` and `parent` are masked like a party name,
 because stock-item and stock-group names are free text that can carry a customer's
-or supplier's name; Tally's reserved root as a parent is a fixed marker and is left
-as it is. `guid` is not masked and is the identity the `items` filter uses.
+or supplier's name; Tally's reserved root as a parent is shown as `&#4; Primary` and is
+not masked. `guid` is not masked and is the identity the `items` filter uses.
 
 ### Profit and Loss and Balance Sheet
 
@@ -1290,11 +1290,20 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
     differs, a Tally line with an amount nothing derived matches, or a derived
     line with an amount that Tally does not show, refuses every result as
     `tally_balance_sheet_differs`, with those lines named;
+  - Tally's own Balance Sheet lines sum to zero (each line's amount is the column it
+    carries; a debit is negative). On the one book measured (TallyPrime 7.2, §12a.21),
+    Tally's screen showed a gap in the book's opening balances as `Difference in
+    opening balances`, and the export had no line for it. When the lines do not sum to
+    zero the result carries `tally_balance_sheet_sides` (`credits` and `debits`, as
+    magnitudes), the headline says both totals, and no result is established:
+    `tally_balance_sheet_does_not_balance` when no other reason applies, the other
+    reason when one does;
   - the Profit & Loss A/c ledger is returned in the Trial Balance.
 - **Reasons** a result is `not_established`: `unclassified_ledger_carries_an_amount`,
   `closing_stock_not_derivable_from_trial_balance`,
-  `profit_and_loss_ledger_not_returned`, `tally_balance_sheet_differs`, and for
-  gross and net `tally_profit_and_loss_differs`.
+  `profit_and_loss_ledger_not_returned`, `tally_balance_sheet_differs`,
+  `tally_balance_sheet_does_not_balance`, and for gross and net
+  `tally_profit_and_loss_differs`.
 - **Top-level state.** `result.state` is `observed` only while this tool's
   result is established (`profit_and_loss`: both `gross_result` and
   `net_result`; `balance_sheet`: `carried`). Otherwise it is `not_established`
@@ -1310,10 +1319,11 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
     Balance is read (measured once on the lab's multi-currency book), so an
     unadjusted forex difference (#683) never reaches the gate.
   - A Tally line the derivation has no counterpart for, such as a heading with
-    an amount, refuses the results rather than being guessed at. A difference
-    in opening balances is such a line when Tally shows it; the inventory
-    book's Balance Sheet export did not carry it (§12a.21), which is why the
-    derived lines must also sum to zero before the closing stock is used.
+    an amount, refuses the results rather than being guessed at. On the one
+    book measured the export did not carry Tally's `Difference in opening
+    balances` line (§12a.21), which is why its own lines must sum to zero, and
+    the derived lines too before the closing stock is used. A balanced average-cost
+    book whose rounded lines sum to a paisa off zero has not been measured.
   - Tally's own statements carry no company identity; the company, mode and
     book-extent checks around the read are what bind them.
   - The gate has been measured over one full year on one book and one month on
@@ -2245,6 +2255,35 @@ entries (the registers), the key is not there; the parse reads the allocations e
   stays as it is). The `reference` search matches the voucher's own reference only, not this field.
 - Measured on one synthetic book of five Contras keyed by hand (TallyPrime 7.1 Silver); other transaction types, other
   voucher types, a reconciled entry and other releases are not measured. No request changed.
+
+### Goods lines in voucher reads
+
+`vouchers` called with `goods_lines: true` gives each ledger entry of an invoice voucher that carries goods `goods_lines`,
+one per line as Tally sent it (protocol reference §8.2i; #2015). Each line has `stock_item` and four fields,
+`actual_quantity`, `billed_quantity`, `rate` and `amount`, each `{"state": "absent"}`, `{"state": "empty"}` or
+`{"state": "value", "value": "..."}` (trimmed); a quantity or a rate keeps its unit as Tally wrote it (`666.667 Kgs`,
+`30.00/Kgs`). Where Tally split the line by godown and batch, the line has `batches`, each with `godown`, `batch`, both
+quantities and `amount` in the same form. A Purchase line's amount is negative and a Sales line's positive, the sign of
+its ledger entry. Without the argument, and in every other answer that returns a voucher's entries (the registers), the
+key is not there; the parse reads the lines either way.
+
+- **Invoice vouchers.** In the captures Tally sent a goods line under a ledger entry only on an invoice-mode voucher; the read does not test the voucher's invoice flag and shows the lines of any entry that carries them. A Stock
+  Journal answered an empty entry list in the one read of it (TallyPrime 7.2; that answer is not committed, and no
+  committed capture holds a Stock Journal), and a Delivery Note, Receipt Note, Physical Stock or Manufacturing
+  Journal is not captured, so an entry or a voucher without the key may still have moved stock.
+- **Held pages.** The goods lines are parsed on every voucher read, so they count toward the 64 MiB of a held window
+  (see "What is held" above) whether or not the argument is given: a window rich in goods lines may not be held, and a
+  later page then reads it again.
+- **A list that cannot be read whole does not refuse the read.** The entry carries `goods_lines_unreadable` with one
+  reason and no partial list: `goods_line_batch_amounts_differ` (the batch amounts do not add up to the line's),
+  `goods_line_amount_unparsable`, `goods_line_item_missing`, `goods_line_field_duplicated`,
+  `goods_line_text_undecodable`, `goods_lines_too_many` (more than 1,000 lines on an entry or 100 batch rows on a line,
+  bounds chosen, not measured) or `goods_line_shape_unrecognised` (a line or batch list at another depth, or an element
+  inside a field that is read).
+- Item, godown and batch names are masked under `mask_parties`, as the masters tool masks item and godown names.
+- Measured on Sales and Purchase invoices of two synthetic books (TallyPrime 7.1), one of them also on 7.2; a Credit or
+  Debit Note with items, discounts, additional cost, a bill of materials, a foreign-currency line and a voucher typed on
+  Tally's screen are not measured. No request changed.
 
 ## Voucher-file preparation and verification
 

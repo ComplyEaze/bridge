@@ -7456,7 +7456,7 @@ fn pilot_refused_in_the_queue(run: &PilotRun, code: &str, requests: usize) -> Va
 async fn a_voucher_type_that_changed_after_the_approval_is_refused_in_the_queue() {
     let run = pilot_post_changed(&[Changed {
         positions: pilot_queue_positions('T'),
-        body: pilot_text('T').replacen("000000ce", "000000cf", 1),
+        body: replaced_once(&pilot_text('T'), "000000ce", "000000cf"),
     }])
     .await;
     let error = pilot_refused_in_the_queue(
@@ -7560,9 +7560,15 @@ async fn a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_r
     let marks = pilot_text('m');
     let count = captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/company-ledger-count.utf16le.xml"
-    ))
-    .replace("BRIDGE SIZE 2K", "BRIDGE PILOT LAB")
-    .replace("f8dab51e-a5d9-49d5-9232-54a16c8b95bb", PILOT_GUID);
+    ));
+    // The company's name occurs twice in the captured answer and its GUID once; an edit that matched fewer
+    // would leave the answer naming another company.
+    assert_eq!(count.matches("BRIDGE SIZE 2K").count(), 2);
+    let count = replaced_once(
+        &count.replace("BRIDGE SIZE 2K", "BRIDGE PILOT LAB"),
+        "f8dab51e-a5d9-49d5-9232-54a16c8b95bb",
+        PILOT_GUID,
+    );
     // The queue's currency read, then the ledger count's paired read (K).
     let start = pilot_queue_start();
     let order = format!("{}eKsKse{}", &PILOT_ORDER[..start], &PILOT_ORDER[start..]);
@@ -7571,7 +7577,7 @@ async fn a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_r
         &[
             Changed {
                 positions: vec![at],
-                body: marks.replacen(" 223</ALTMSTID>", " 5001</ALTMSTID>", 1),
+                body: replaced_once(&marks, " 223</ALTMSTID>", " 5001</ALTMSTID>"),
             },
             Changed {
                 positions: vec![start + 1, start + 3],
@@ -7617,7 +7623,7 @@ async fn a_master_mark_that_moves_after_the_invoice_reads_is_refused_by_the_aim_
     let marks = pilot_text('m');
     let run = pilot_post_changed(&[Changed {
         positions: vec![aim],
-        body: marks.replacen(" 223</ALTMSTID>", " 224</ALTMSTID>", 1),
+        body: replaced_once(&marks, " 223</ALTMSTID>", " 224</ALTMSTID>"),
     }])
     .await;
     pilot_refused_in_the_queue(&run, "post_masters_moved", PILOT_ORDER.find('Z').unwrap());

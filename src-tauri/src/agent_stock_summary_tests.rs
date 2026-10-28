@@ -1642,10 +1642,7 @@ async fn a_stock_group_parent_is_marked_under_mask_parties_and_the_reserved_root
     assert_eq!(
         names_and_parents,
         [
-            (
-                json!(mask("Carton Box Small")),
-                json!("\u{fffd}#4; Primary")
-            ),
+            (json!(mask("Carton Box Small")), json!("&#4; Primary")),
             (
                 json!(mask("Caustic Soda Flakes")),
                 json!(mask("Raw Chemicals"))

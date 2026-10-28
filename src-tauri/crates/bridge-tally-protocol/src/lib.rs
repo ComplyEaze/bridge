@@ -123,6 +123,27 @@ pub fn is_tally_reserved_root(value: &str) -> bool {
         .is_some_and(|rest| rest.trim().eq_ignore_ascii_case("primary"))
 }
 
+/// A parent as an answer shows it: the reserved root as Tally wrote it, every
+/// other value as decoded.
+///
+/// The decoders mark the root's forbidden `&#4;` reference as
+/// [`TALLY_SANITIZED_ROOT_MARKER`] so that one spelling reaches every
+/// comparison ([`is_tally_reserved_root`]). That marker is a working form, not
+/// text for a reader: U+FFFD followed by `#4; Primary` looks like a corrupted
+/// string. A parent that [`is_tally_reserved_root`] accepts is therefore shown
+/// as `&#4; Primary`, the text Tally sent, with the rest of the value as
+/// returned. A bare `Primary` is a group a user named that and is not changed.
+/// Apply it to the row an answer carries, after any step that reads the held
+/// row's `parent` back (the `ledger_masters` group filter walks the chain from
+/// it): the shown form is not the root to [`is_tally_reserved_root`].
+pub fn tally_root_as_sent(value: &str) -> std::borrow::Cow<'_, str> {
+    if !is_tally_reserved_root(value) {
+        return std::borrow::Cow::Borrowed(value);
+    }
+    let rest = value.trim().trim_start_matches(TALLY_SANITIZED_ROOT_MARKER);
+    std::borrow::Cow::Owned(format!("&#4;{rest}"))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct TallyCompany {
     pub name: String,

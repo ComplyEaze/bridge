@@ -206,6 +206,17 @@ fn party_name_value(value: String) -> Value {
     serde_json::to_value(party_name(value)).unwrap_or_default()
 }
 
+/// A row's `parent`, shown as Tally sent the root (`tally_root_as_sent`). Call it on the
+/// row an answer carries, never on one a later step reads back: some listings walk the
+/// group chain from the held row's parent, which must stay the decoders' form.
+fn show_root_parent(row: &mut Value) {
+    let Some(Value::String(parent)) = row.get("parent") else {
+        return;
+    };
+    let shown = bridge_tally_protocol::tally_root_as_sent(parent).into_owned();
+    row["parent"] = Value::String(shown);
+}
+
 fn mark_party_field(value: &mut Value, field: &str) {
     let Some(object) = value.as_object_mut() else {
         return;
@@ -271,6 +282,23 @@ fn mark_entry_party_names(entry: &mut Value) {
             mark_party_field(allocation, "category");
         }
     }
+    // A goods line's item, godown and batch, for the reason the masters tool masks item and
+    // godown names: a supplier-named item or a job-work godown can carry a party's name, and
+    // a batch name is whatever text was typed (#2015).
+    if let Some(lines) = entry.get_mut("goods_lines").and_then(Value::as_array_mut) {
+        for line in lines {
+            mark_party_field(line, "stock_item");
+            if let Some(batches) = line.get_mut("batches").and_then(Value::as_array_mut) {
+                for batch in batches {
+                    for field in ["godown", "batch"] {
+                        if let Some(state) = batch.get_mut(field) {
+                            mark_party_field(state, "value");
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Whether an answer that returns a voucher's entries shows their bank allocations (#1231).
@@ -305,6 +333,42 @@ fn present_voucher_bank_allocations(mut voucher: Value, shown: BankAllocationsSh
     if shown == BankAllocationsShown::Withheld {
         if let Some(entries) = voucher.get_mut("amounts").and_then(Value::as_array_mut) {
             entries.iter_mut().for_each(withhold_entry_bank_allocations);
+        }
+    }
+    voucher
+}
+
+/// Whether an answer that returns a voucher's entries shows their goods lines (#2015).
+/// Only `vouchers` called with `goods_lines: true` shows them; the parse always reads them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum GoodsLinesShown {
+    Withheld,
+    Shown,
+}
+
+impl GoodsLinesShown {
+    /// From the `goods_lines` argument: absent or false withholds them.
+    pub(super) fn from_args(args: &Value) -> Result<Self, String> {
+        Ok(match optional_bool(args, "goods_lines")? {
+            Some(true) => Self::Shown,
+            Some(false) | None => Self::Withheld,
+        })
+    }
+}
+
+/// An entry as an answer that did not ask for goods lines shows it: without them.
+fn withhold_entry_goods_lines(entry: &mut Value) {
+    if let Some(entry) = entry.as_object_mut() {
+        entry.remove("goods_lines");
+        entry.remove("goods_lines_unreadable");
+    }
+}
+
+/// A voucher's entries without their goods lines, unless `shown` asks for them.
+fn present_voucher_goods_lines(mut voucher: Value, shown: GoodsLinesShown) -> Value {
+    if shown == GoodsLinesShown::Withheld {
+        if let Some(entries) = voucher.get_mut("amounts").and_then(Value::as_array_mut) {
+            entries.iter_mut().for_each(withhold_entry_goods_lines);
         }
     }
     voucher

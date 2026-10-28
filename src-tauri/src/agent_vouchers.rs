@@ -228,19 +228,22 @@ enum PageServe {
 }
 
 /// The rows of one page, redacted and party-marked as `vouchers` always did, with each
-/// entry's bank allocations only when the call asked for them (#1231).
+/// entry's bank allocations (#1231) and goods lines (#2015) only when the call asked for them.
 pub(super) fn page_items(
     server: &Server,
     rows: &[Value],
     (offset, limit): (usize, usize),
-    bank: BankAllocationsShown,
+    (bank, goods): (BankAllocationsShown, GoodsLinesShown),
 ) -> Vec<Value> {
     rows.iter()
         .skip(offset)
         .take(limit)
         .map(|row| {
             redact_value(
-                mark_voucher_party_names(present_voucher_bank_allocations(row.clone(), bank)),
+                mark_voucher_party_names(present_voucher_goods_lines(
+                    present_voucher_bank_allocations(row.clone(), bank),
+                    goods,
+                )),
                 server.settings.redaction,
             )
         })
@@ -311,10 +314,10 @@ pub(super) fn render_page_body(
     rows: &[Value],
     summary: Option<&SummaryRequest>,
     (offset, limit): (usize, usize),
-    bank: BankAllocationsShown,
+    shown: (BankAllocationsShown, GoodsLinesShown),
 ) -> Result<PageBody, ToolFailure> {
     let Some(request) = summary else {
-        let items = page_items(server, rows, (offset, limit), bank);
+        let items = page_items(server, rows, (offset, limit), shown);
         return Ok(PageBody {
             items_key: "items",
             profile: "agent_vouchers_v1_filters",
@@ -502,7 +505,10 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let type_selector = VoucherTypeSelector::from_args(args)?;
         let search = VoucherSearch::from_args(args, server.settings.redaction)?;
         let summary_group = SummaryGroup::from_args(args)?;
-        let bank = BankAllocationsShown::from_args(args)?;
+        let shown = (
+            BankAllocationsShown::from_args(args)?,
+            GoodsLinesShown::from_args(args)?,
+        );
         // A type GUID that is not this company's cannot name any of its
         // types: refused rather than answered with an empty selection.
         if let Some(VoucherTypeSelector::Guid(type_guid)) = &type_selector {
@@ -545,7 +551,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                         &mut accumulated,
                         &guid,
                         summary_group,
-                        bank,
+                        shown,
                     )
                     .await?
                 {
@@ -790,7 +796,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             selected_ledger: selected_ledger.clone(),
             placements: placements.clone(),
         });
-        let body = render_page_body(server, &rows, summary.as_ref(), (offset, limit), bank)?;
+        let body = render_page_body(server, &rows, summary.as_ref(), (offset, limit), shown)?;
         let (mut payload, truncated) = voucher_page_payload(
             &company,
             result_state,
@@ -912,7 +918,7 @@ impl Server {
         accumulated: &mut Option<Evidence>,
         guid: &str,
         summary_group: Option<SummaryGroup>,
-        bank: BankAllocationsShown,
+        shown: (BankAllocationsShown, GoodsLinesShown),
     ) -> Result<PageServe, ToolFailure> {
         let held = self
             .voucher_pages
@@ -958,7 +964,7 @@ impl Server {
             &snapshot.rows,
             summary.as_ref(),
             (offset, limit),
-            bank,
+            shown,
         )?;
         if let (Some(reason), Some(evidence)) = (snapshot.reason, accumulated.as_mut()) {
             evidence.reason_code = Some(reason.to_string());

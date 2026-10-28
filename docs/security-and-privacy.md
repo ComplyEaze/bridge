@@ -281,6 +281,13 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       stays as it is: it is sent under every setting, as the voucher's own
       reference is. An entry whose allocations cannot be read whole says so with
       a reason and sends none of them.
+    - Goods lines of a voucher's ledger entries (in source and not yet in a
+      published build), only when `vouchers` is asked for them with
+      `goods_lines: true`: for each line of an invoice voucher, the stock item,
+      quantities, rate and amount, and each godown and batch row with its
+      quantities and amount. Item, godown and batch names are masked under
+      `mask_parties`. An entry whose lines cannot be read whole says so with a
+      reason and sends none of them.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

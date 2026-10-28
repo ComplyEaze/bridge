@@ -1,6 +1,7 @@
 //! Thin MCP presentation of the shared native report operation.
 use super::*;
 use bridge_tally_protocol::native_trial_balance::NativeTrialBalanceMovements;
+use bridge_tally_protocol::tally_root_as_sent;
 
 /// The first limitation when a ledger's closing is not its opening plus its debit and credit
 /// totals (#2068). Measured on a Closing Stock ledger with a closing balance keyed on Tally's
@@ -52,7 +53,7 @@ impl Server {
                         let movements = row.movements();
                         let mut json = json!({
                             "ledger": party_name(row.name), "guid": row.guid,
-                            "parent": row.parent, "opening": row.opening,
+                            "parent": row.parent.returned_text().map(tally_root_as_sent), "opening": row.opening,
                             "debit": row.debit, "credit": row.credit, "closing": row.closing,
                         });
                         // The row stays as Tally sent it; this says its own columns do not

@@ -292,6 +292,7 @@ const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
 const MAILING_LAB_GUID: &str = "8e34483e-2bd3-472b-ae37-c4b197e8c15a";
 const TIEOUT_B_GUID: &str = "d64eda55-da7c-4106-a171-3e3cb6cdd331";
+const TIEOUT_D_GUID: &str = "6a9518b2-a88c-417c-a700-40243f9d9119";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
 const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.utf16le.xml";
@@ -1106,6 +1107,35 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_trial_balance",
         parse: |_, text| typed(parse_native_trial_balance(text, TIEOUT_B_GUID)),
+    },
+    // A book whose Balance Sheet export does not balance (BRIDGE TIEOUT D, #2063): src/reports/statements_tests.rs.
+    Row {
+        fixture: "tests/fixtures/statement_balance_sheet_opening_difference_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(BalanceSheet)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::BalanceSheet,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_difference_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_trial_balance_opening_difference_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, TIEOUT_D_GUID)),
     },
     // Native trial balances: src/native_trial_balance/tests.rs; src/reports/statements_tests.rs for
     // the statement captures; the FOREX plain request (FOREX_601D_CAPTURE_PROVENANCE.md) by the
@@ -3215,6 +3245,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

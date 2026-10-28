@@ -341,5 +341,37 @@ fn every_captured_root_parent_is_the_root_and_its_bare_word_is_not() {
         assert_eq!(parent, "\u{fffd}#4; Primary");
         let bare = parent.trim_start_matches(crate::TALLY_SANITIZED_ROOT_MARKER);
         assert!(!crate::is_tally_reserved_root(bare), "{bare:?}");
+        // Shown to a reader the root is Tally's own text, which no decoder
+        // marks again, so nothing treats the shown form as the root.
+        let shown = crate::tally_root_as_sent(parent);
+        assert_eq!(shown, "&#4; Primary");
+        assert!(!crate::is_tally_reserved_root(&shown));
+    }
+}
+
+/// Only the root's marked form is rewritten for display: a group a user named
+/// `Primary`, another reserved value, an empty text and the shown form itself
+/// pass through unchanged.
+#[test]
+fn only_the_marked_root_is_shown_as_tally_sent_it() {
+    let marker = crate::TALLY_SANITIZED_ROOT_MARKER;
+    assert_eq!(
+        crate::tally_root_as_sent(&format!("{marker} Primary")),
+        "&#4; Primary"
+    );
+    assert_eq!(
+        crate::tally_root_as_sent(&format!(" {marker} primary ")),
+        "&#4; primary"
+    );
+    for other in [
+        "Primary",
+        "",
+        "&#4; Primary",
+        &format!("{marker} Resave"),
+        &format!("{marker} Not Applicable"),
+        &format!("{marker} Primary Group"),
+        "\u{fffd}#65533; Primary",
+    ] {
+        assert_eq!(crate::tally_root_as_sent(other), other, "{other:?}");
     }
 }

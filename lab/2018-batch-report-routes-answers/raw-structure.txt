@@ -1,0 +1,54 @@
+== raw/stock-summary: 1370 B
+  root ENVELOPE
+  DSPACCNAME: DSPDISPNAME='Finished Kits'
+  DSPSTKINFO: DSPSTKCL/DSPCLQTY='<empty>', DSPSTKCL/DSPCLRATE='<empty>', DSPSTKCL/DSPCLAMTA='18750.00'
+  DSPACCNAME: DSPDISPNAME='Packaging'
+  DSPSTKINFO: DSPSTKCL/DSPCLQTY='<empty>', DSPSTKCL/DSPCLRATE='<empty>', DSPSTKCL/DSPCLAMTA='14500.00'
+  DSPACCNAME: DSPDISPNAME='Raw Chemicals'
+  DSPSTKINFO: DSPSTKCL/DSPCLQTY='<empty>', DSPSTKCL/DSPCLRATE='<empty>', DSPSTKCL/DSPCLAMTA='-30249.99'
+== raw/control: 434 B
+  root ENVELOPE
+  STATUS '0'
+  LINEERROR "Could not find Report 'Bridge Probe Unknown'!"
+  HEADER: VERSION='1', STATUS='0'
+  BODY: DATA/LINEERROR="Could not find Report 'Bridge Probe Unknown'!"
+== raw/t1-1: 46 B
+  root ENVELOPE
+== raw/t1-3: 46 B
+  root ENVELOPE
+== raw/t2-1: 422 B
+  root ENVELOPE
+  STATUS '0'
+  LINEERROR "Could not find Report 'Batch Vouchers'!"
+  HEADER: VERSION='1', STATUS='0'
+  BODY: DATA/LINEERROR="Could not find Report 'Batch Vouchers'!"
+== raw/t2-3: 420 B
+  root ENVELOPE
+  STATUS '0'
+  LINEERROR "Could not find Report 'BatchVouchers'!"
+  HEADER: VERSION='1', STATUS='0'
+  BODY: DATA/LINEERROR="Could not find Report 'BatchVouchers'!"
+== raw/t3-1: 446 B
+  root ENVELOPE
+  STATUS '0'
+  LINEERROR "Could not find Report 'Stock Item Monthly Summary'!"
+  HEADER: VERSION='1', STATUS='0'
+  BODY: DATA/LINEERROR="Could not find Report 'Stock Item Monthly Summary'!"
+== raw/t3-3: 440 B
+  root ENVELOPE
+  STATUS '0'
+  LINEERROR "Could not find Report 'StockItemMonthlySummary'!"
+  HEADER: VERSION='1', STATUS='0'
+  BODY: DATA/LINEERROR="Could not find Report 'StockItemMonthlySummary'!"
+== raw/t4-1: 432 B
+  root ENVELOPE
+  STATUS '0'
+  LINEERROR "Could not find Report 'Stock Item Vouchers'!"
+  HEADER: VERSION='1', STATUS='0'
+  BODY: DATA/LINEERROR="Could not find Report 'Stock Item Vouchers'!"
+== raw/t4-3: 428 B
+  root ENVELOPE
+  STATUS '0'
+  LINEERROR "Could not find Report 'StockItemVouchers'!"
+  HEADER: VERSION='1', STATUS='0'
+  BODY: DATA/LINEERROR="Could not find Report 'StockItemVouchers'!"

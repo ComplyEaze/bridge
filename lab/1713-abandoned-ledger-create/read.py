@@ -5,8 +5,10 @@ says why; the sheet treats it as STOP), 2 = the command line is wrong.
 
   import  <answer> <created>                  an import answer: every counter present, CREATED as given, the others
                                               0, no LINEERROR; prints LASTVCHID and LASTMID
-  marks   <answer> [<company-guid>]           MARKS: exactly one COMPANY row (with that GUID, if given), its GUID,
-                                              ALTVCHID and ALTMSTID present (one absent = FAIL)
+  marks   <answer> [<company-guid>]           MARKS: exactly one COMPANY row (with that GUID, if given), its GUID
+                                              and ALTMSTID present (one absent = FAIL); ALTVCHID is printed, and
+                                              may be absent: THE COMPANY holds no voucher, and Tally sends no
+                                              ALTVCHID until one exists (measured at S1, 28 Oct)
   ledgers <answer> <company-guid> [<probe>]   LEDGERS: every row of THE COMPANY, `Lab Bulk Expense` present once;
                                               prints probe=present (with GUID, parent, ALTERID) or probe=absent
   busy    <answer> <company-guid> <rows>      BUSY: VOUCHER rows counted by structure, each GUID THE COMPANY's
@@ -159,11 +161,13 @@ def check_marks(path, guid):
     row_guid, altvchid, altmstid = found[0]
     if guid is not None and row_guid != guid:
         raise Failed("the COMPANY row's GUID is {}, not THE COMPANY's".format(row_guid))
-    missing = [tag for tag, value in (("GUID", row_guid), ("ALTVCHID", altvchid), ("ALTMSTID", altmstid))
+    # ALTVCHID is not required: this row writes masters only, on a company with no voucher, and Tally sends no
+    # ALTVCHID until a voucher exists (seen at S1). No decision of this sheet reads ALTVCHID.
+    missing = [tag for tag, value in (("GUID", row_guid), ("ALTMSTID", altmstid))
                if shown(value) == "absent"]
     if missing:
         raise Failed("the COMPANY row has {} absent".format(", ".join(missing)))
-    return "marks ok GUID {} ALTVCHID {} ALTMSTID {}".format(row_guid, altvchid, altmstid)
+    return "marks ok GUID {} ALTVCHID {} ALTMSTID {}".format(row_guid, shown(altvchid), altmstid)
 
 
 def check_ledgers(path, guid, probe):

@@ -114,7 +114,7 @@ Neither script has run on Windows before the sitting: the step "Before the sitti
 
 **Reading the answers.** By hand, each request is sent by C3's line and then read by `read.py`; the scripts do the same. A `FAIL:` line from `read.py` is a STOP, reported as "the request failed", never as "nothing found".
 - **Imports:** `python -I read.py import <answer> <objects>`: EXPECT `import ok CREATED <objects> …`; record LASTVCHID and LASTMID.
-- **MARKS:** `python -I read.py marks <answer> <GUID>` (at S1, without the GUID): exactly one COMPANY row.
+- **MARKS:** `python -I read.py marks <answer> <GUID>` (at S1, without the GUID): exactly one COMPANY row. GUID and ALTMSTID must be present. ALTVCHID may be absent: THE COMPANY holds no voucher, and Tally sends no ALTVCHID until one exists (seen at S1 on 28 Oct, which halted the first sitting). No step decides on ALTVCHID.
 - **LEDGERS:** `python -I read.py ledgers <answer> <GUID> "<probe name>"`: every row carries THE COMPANY's GUID and `Lab Bulk Expense` is present once (else FAIL). It prints every `Lab Probe` ledger with its length, and `probe=present` with GUID, parent and ALTERID, or `probe=absent`.
 - **BUSY:** `python -I read.py busy <answer> <GUID> <rows>`: VOUCHER rows counted by structure, each GUID THE COMPANY's. Record the size, CONTENT-LENGTH and `time_total`.
 - **`times.txt`:** the row script's `times.txt` is the record of order; every line it writes is also printed.

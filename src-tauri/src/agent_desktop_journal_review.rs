@@ -79,7 +79,7 @@ impl DesktopJournalError {
             | "import_persisted_file_too_large"
             | "import_review_too_large" => (
                 "This Journal is too large for ComplyEaze Bridge's one-Journal desktop review.",
-                "Use the manual workflow for this file; ComplyEaze Bridge will not truncate the review.",
+                "ComplyEaze Bridge cannot post this Journal from this review, and will not shorten the review to fit.",
             ),
             "import_post_requires_one_journal" => (
                 "ComplyEaze Bridge's desktop review posts one unnumbered Journal, and this saved batch is a different shape.",
@@ -243,6 +243,22 @@ mod tests {
             format!("{} {}", refused.message, refused.remediation),
             post::DESKTOP_LEDGER_LINE_BREAK_ACTION
         );
+    }
+
+    /// #1709: a Journal too large for this review is not sent to a hand import.
+    #[test]
+    fn a_journal_too_large_for_the_review_is_not_sent_to_a_hand_import() {
+        for code in [
+            "import_selected_file_too_large",
+            "import_persisted_file_too_large",
+            "import_review_too_large",
+        ] {
+            let refused = DesktopJournalError::refused(code);
+            assert_eq!(
+                refused.remediation,
+                "ComplyEaze Bridge cannot post this Journal from this review, and will not shorten the review to fit."
+            );
+        }
     }
 
     #[test]

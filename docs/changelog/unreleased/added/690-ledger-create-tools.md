@@ -6,12 +6,12 @@
   no XML, and can set no opening balance or parent. `prepare_ledger_creates` reads the company's ledger and group names,
   refuses a name that already exists as a ledger, a group or an alias or that differs from one only in case, spaces or
   symbols (Tally can take such a Create for the existing ledger and change it), writes nothing to Tally, and returns a
-  `batch_id` and the preview the person will see. `post_ledger_creates` asks the local user in a native dialog and sends
+  `batch_id` and the preview the person will be shown (its ledger name masked under `mask_parties`). `post_ledger_creates` asks the local user in a native dialog and sends
   the create once; a batch already sent is never sent again. After the send the book is read back and one state is
-  returned, `posted_verified` only when exactly one new ledger of the name exists with the parent, tax fields and GSTIN
-  as sent, no ledger or group that existed before changed, and no other loaded company's master mark moved (bill-wise
-  is not read back). Measured: one ledger created and read back as `posted_verified` through the tools on a synthetic
+  returned, `posted_verified` only when Tally's counters show one create and no alteration, the company's own master
+  mark moved, exactly one new ledger of the name exists with the parent, tax fields and GSTIN as sent, no ledger or
+  group that existed before changed, and no other loaded company's master mark moved (bill-wise is not read back). Measured: one ledger created and read back as `posted_verified` through the tools on a synthetic
   company (TallyPrime 7.1 Silver, 14 Oct 2026), and the approval box shown whole, declined with nothing sent, accepted
-  and then answered from the journal with no second box (TallyPrime 7.2, a continuous-integration package of the
-  change, 28 Oct 2026). Not run: a create whose answer is lost, other TallyPrime releases and editions, and the build
+  and then answered from the journal with no second box (TallyPrime 7.2, a continuous-integration package of an earlier
+  head of the change, 239896f8, 28 Oct 2026). Not run: a create whose answer is lost, other TallyPrime releases and editions, and the build
   of this release. A name Tally resolves to an existing ledger is reported loudly and is not retried.

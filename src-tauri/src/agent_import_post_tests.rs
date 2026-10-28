@@ -3580,7 +3580,7 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
     let (mut line, endpoint) = batch_of_every_type();
     let narrations = [
         Some("जुलाई का किराया ₹500"),
-        Some("  NEFT CR 000123456789 SYNTHETIC TRADERS RENT FOR JULY 2026  "),
+        Some("  NEFT CR 000000000000 SYNTHETIC TRADERS RENT FOR JULY 2026  "),
         Some("जुलाई महीने का किराया बिजली बिल भुगतान क्षेत्रीय कार्यालय ₹500"),
         None,
     ];
@@ -3592,7 +3592,7 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
         voucher_block(&preview)[2..],
         [
             "Journal 1-Sep-2026  12.5  Dr \"Expense\"  Cr \"Cash\"  \"जुलाई का किराया ₹500\"",
-            "Receipt 2-Sep-2026  40  \"Party A\"  \"NEFT CR 000123456789 SYNTHETIC TRADERS R\"… (+17 characters)",
+            "Receipt 2-Sep-2026  40  \"Party A\"  \"NEFT CR 000000000000 SYNTHETIC TRADERS R\"… (+17 characters)",
             "Payment 2-Sep-2026  15  \"Party B\"  \"जुलाई महीने का किराया बिजली बिल भुगतान क\"… (+22 characters)",
             "Contra 2-Sep-2026  5  \"Bank\"  (none)",
         ],

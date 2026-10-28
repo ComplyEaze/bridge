@@ -1,0 +1,6 @@
+answers-d/d02_vouchers_20250515.answer.xml: row tags {'VOUCHER': 82}; VOUCHER rows 82; empty-or-absent per field {'GUID': 0, 'ALTERID': 0, 'MASTERID': 0, 'DATE': 0}
+ground truth: vouchers with a "DN Sales" ledger line: 82
+answers-d/d03_ledger_vouchers_dn_sales_20250515.answer.xml: row tags {'VOUCHER': 82}; VOUCHER rows 82; empty-or-absent per field {'GUID': 0, 'ALTERID': 0, 'MASTERID': 0, 'DATE': 0}
+  answers-d/d03_ledger_vouchers_dn_sales_20250515.answer.xml: GUIDs 82 (distinct 82); equal sets: True; only in candidate 0; only in ground truth 0
+  ALTERID range 3579..3660; dates ['20250515']
+answers-d/d04_ledger_vouchers_dn_sales_20250512_18.answer.xml: VOUCHER rows 574 (sheet: 574, recorded only; no ground-truth read for the week); distinct GUIDs 574 ; empty-or-absent {'GUID': 0, 'ALTERID': 0, 'MASTERID': 0, 'DATE': 0} ; dates 20250512 .. 20250518

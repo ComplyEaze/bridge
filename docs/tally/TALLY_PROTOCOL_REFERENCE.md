@@ -369,6 +369,9 @@ base revision.
 <a id="11c5-live-evidence-2026-09-21"></a>
 
 [11c.5 Live evidence, 2026-09-21](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c5-live-evidence-2026-09-21)
+<a id="11c6-one-ledgers-vouchers-can-be-read-alone-with-the-same-spans--verified-once-2026-10-28-tallyprime-72-silver-one-synthetic-book"></a>
+
+[11c.6 One ledger's vouchers can be read alone, with the same spans — **VERIFIED once, 2026-10-28; TallyPrime 7.2 Silver, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c6-one-ledgers-vouchers-can-be-read-alone-with-the-same-spans--verified-once-2026-10-28-tallyprime-72-silver-one-synthetic-book)
 <a id="11d-education-refuses-bridges-report-family-tdl-with-a-blocking-dialog--verified-live-for-ledgers_v1-2026-09-22-the-rest-inferred"></a>
 
 [11d. Education refuses Bridge's report-family TDL with a blocking dialog — **VERIFIED live for `ledgers_v1`, 2026-09-22; the rest inferred**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11d-education-refuses-bridges-report-family-tdl-with-a-blocking-dialog--verified-live-for-ledgers_v1-2026-09-22-the-rest-inferred)

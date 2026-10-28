@@ -26,7 +26,7 @@ use sha2::{Digest, Sha256};
 use super::{
     parse_agent_rows, parse_agent_rows_withholding, parse_all_company_marks,
     parse_company_high_water, parse_company_marks, parse_company_marks_as_answered,
-    parse_import_verification_rows, parse_voucher_census,
+    parse_import_verification_rows, parse_voucher_census, AlterIdSpan,
 };
 use crate::source_draft_xml::parse_source_xml;
 
@@ -46,6 +46,7 @@ const REGISTER_LAB: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const GST_LEDGER_LAB: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const BANKREF_LAB: &str = "8fb5f4db-478d-4084-b1e5-5b8f5d3fef60";
+const CORPUS_DENSE: &str = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
 const OUTSTANDINGS_LAB: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const STOCK_LAB: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 /// The empty book of the marks capture in `COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md`.
@@ -149,6 +150,15 @@ fn verification(text: &str, guid: &str) -> String {
 /// A one-day census, as the window and census reads ask for it, with no ALTERID span.
 fn census(text: &str, on: &str) -> String {
     coded(parse_voucher_census(text, (day(on), day(on)), None))
+}
+
+/// A census over a window and one AlterID span, as a ledger-scoped census read asks for it.
+fn census_span(text: &str, (from, to): (&str, &str), (after, through): (u64, u64)) -> String {
+    coded(parse_voucher_census(
+        text,
+        (day(from), day(to)),
+        Some(AlterIdSpan { after, through }),
+    ))
 }
 
 fn high_water(text: &str, guid: &str) -> String {
@@ -277,6 +287,27 @@ fn rows() -> Vec<Row> {
     // Voucher censuses, each over the day its capture asked for: the voucher day its provenance
     // gives (D3, L1, WA1, the register end-to-end read), or its paired request's
     // SVFROMDATE/SVTODATE (the note days).
+    // The ledger-scoped censuses (#485): the window and span each lab request asked for.
+    rows.push(row!(
+        "ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml",
+        "parse_voucher_census(20250515, span 0 to 8192)",
+        |_, t| census_span(t, ("20250515", "20250515"), (0, 8192))
+    ));
+    rows.push(row!(
+        "ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml",
+        "parse_voucher_census(20250515, span 8192 to 16384)",
+        |_, t| census_span(t, ("20250515", "20250515"), (8192, 16384))
+    ));
+    rows.push(row!(
+        "ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml",
+        "parse_voucher_census(20250401 to 20260331, span 0 to 8192)",
+        |_, t| census_span(t, ("20250401", "20260331"), (0, 8192))
+    ));
+    rows.push(row!(
+        "ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml",
+        "parse_agent_rows(CORPUS_DENSE)",
+        |_, t| agent_rows(t, CORPUS_DENSE)
+    ));
     rows.push(row!(
         "agent/d3-batch-voucher-census.utf16le.xml",
         "parse_voucher_census(20260401)",

@@ -2904,6 +2904,22 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     // Voucher censuses.
     (
+        "tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/agent/d3-batch-voucher-census.utf16le.xml",
         APP_CENSUS,
     ),

@@ -12,7 +12,7 @@ pub(in crate::agent) fn assert_cancel_changes_only_the_action(
     let mut last = String::new();
     for (voucher, id) in vouchers {
         let create = render_native_vouchers_xml(company, std::iter::once((*voucher, *id)));
-        let cancel = render_native_cancel_xml(company, voucher, RemoteId(*id));
+        let cancel = render_native_cancel_xml(company, voucher, RemoteId(*id)).unwrap();
         assert_eq!(create.matches(" ACTION=\"Create\" ").count(), 1);
         assert!(!create.contains("ACTION=\"Cancel\""));
         let expected = create.replace(" ACTION=\"Create\" ", " ACTION=\"Cancel\" ");

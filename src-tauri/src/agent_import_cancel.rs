@@ -4,7 +4,10 @@
 //! answer to such a request is read by `CancelOutcome` and `DeleteOutcome` in
 //! the protocol crate.
 
-use super::{render_native_vouchers_as, ImportVoucher, VoucherAction};
+use super::{
+    render_import_envelope, render_voucher_xml, ImportReport, ImportVoucher, NarrationAttribution,
+    VoucherAction,
+};
 use uuid::Uuid;
 
 /// The REMOTEID of a voucher a native post created, as its dispatch intent
@@ -36,17 +39,35 @@ impl RemoteId {
 /// byte for byte, with `ACTION="Cancel"` in place of `ACTION="Create"`.
 /// Protocol reference §9.14 observed once that a cancel with the full voucher
 /// body cancels in place (PARTIAL, a Journal on Silver, one voucher per
-/// request); no other type was tried.
+/// request); no other type was tried. A voucher the native renderer renders
+/// as nothing (an invoice with nothing observed) is refused, never sent as an
+/// empty request.
 pub(super) fn render_native_cancel_xml(
     company: &str,
     voucher: &ImportVoucher,
     remote_id: RemoteId,
-) -> String {
-    render_native_vouchers_as(
+) -> Result<String, CancelRenderRefusal> {
+    let message = render_voucher_xml(
+        voucher,
+        remote_id.0,
+        NarrationAttribution::Untagged,
         VoucherAction::Cancel,
+    );
+    if message.is_empty() {
+        return Err(CancelRenderRefusal::VoucherNotRenderable);
+    }
+    Ok(render_import_envelope(
         company,
-        std::iter::once((voucher, remote_id.0)),
-    )
+        ImportReport::Vouchers,
+        &message,
+    ))
+}
+
+/// Why no cancel request was rendered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CancelRenderRefusal {
+    /// The native renderer renders this voucher as nothing.
+    VoucherNotRenderable,
 }
 
 #[cfg(test)]

@@ -899,6 +899,20 @@ fn the_cancel_candidate_of_an_invoice_changes_only_its_action() {
     assert!(cancel_of(&v).contains("VCHTYPE=\"Sales &quot;A&quot;\" ACTION=\"Cancel\""));
 }
 
+/// #2062: an invoice with nothing observed renders as nothing natively, so its
+/// cancel is refused rather than sent as a request with no voucher.
+#[test]
+fn an_invoice_with_nothing_observed_has_no_cancel_request() {
+    use crate::agent::agent_import::cancel::{
+        render_native_cancel_xml, CancelRenderRefusal, RemoteId,
+    };
+    let id = RemoteId::parse(&uuid::Uuid::new_v4().to_string()).unwrap();
+    assert_eq!(
+        render_native_cancel_xml("Synthetic company", &voucher(), id),
+        Err(CancelRenderRefusal::VoucherNotRenderable)
+    );
+}
+
 fn observed_voucher() -> ImportVoucher {
     let mut v = voucher();
     v.invoice.as_mut().unwrap().observed = Some(observed());

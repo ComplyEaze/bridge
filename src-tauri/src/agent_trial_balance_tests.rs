@@ -319,6 +319,34 @@ mod listing {
         assert_eq!(flagged[0]["movements_differ_by"], "2000.00");
     }
 
+    /// A Trial Balance answer Bridge cannot use is refused with the rule it failed as `cause`
+    /// and a next step, not with the code alone (#2071). The answer here is a captured company
+    /// list, which is not a Trial Balance: the parser refuses it by name.
+    #[tokio::test]
+    async fn an_unusable_answer_is_refused_with_its_cause_and_a_next_step() {
+        let mut plans = first_page_plans_answering(14, companies());
+        // The refusal ends the call at the report's pair: the extent re-read and the
+        // identity brackets after it are never asked for.
+        plans.truncate(19);
+        let one = OneServer::spawn(plans);
+        let response = one
+            .call(json!({"company_guid":GUID,"from":"2026-04-01","to":"2026-09-02"}))
+            .await;
+        assert_eq!(response["isError"], true, "{response}");
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], "trial_balance_read_failed", "{error}");
+        let cause = error["cause"]
+            .as_str()
+            .expect("the refusal names its cause");
+        assert_eq!(cause, "trial_balance_source_identity_missing");
+        let remediation = error["remediation"].as_str().expect("and a next step");
+        assert!(
+            remediation.contains("Do not repeat this same read"),
+            "{remediation}"
+        );
+        let _ = one.requests();
+    }
+
     /// Page 2 costs the identity read and one extent read, and continues the
     /// same report: its rows follow page 1's, and the frame is the same.
     #[tokio::test]

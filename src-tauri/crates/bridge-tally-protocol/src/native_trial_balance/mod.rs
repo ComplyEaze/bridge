@@ -111,6 +111,17 @@ pub enum NativeTrialBalanceError {
     TallyReportedFailure,
 }
 
+impl NativeTrialBalanceError {
+    /// The reason a refusal names, as the other native reports' errors do.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::InvalidAmount => "trial_balance_amount_invalid",
+            Self::InvalidResponse(code) => code,
+            Self::TallyReportedFailure => "trial_balance_tally_reported_failure",
+        }
+    }
+}
+
 impl fmt::Display for NativeTrialBalanceError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

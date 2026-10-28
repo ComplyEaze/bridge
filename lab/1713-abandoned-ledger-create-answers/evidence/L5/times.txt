@@ -1,0 +1,68 @@
+﻿row L5; evidence <lab folder>\1713\evidence\L5; HALT file: HALT in this script's folder
+A: busy-year.xml, limit 20 (0 = none), at T0
+B: l5-create.xml, limit 20, when A's curl has exited; netstat 10 s after B is sent
+C: ledgers.xml, no limit, at T0 + 26 s or 1 s after B's curl has exited, whichever is later; sent again 30 s apart after curl exit 7 until D + 10 minutes after the first C, and at most 5 times after exit 52 or 56
+observation: LEDGERS, MARKS and netstat at C answered + 1, + 5, + 15 and + 30 minutes
+2026-10-28T23:18:00.919Z D 187 s; M1 238211294 bytes, 48000 rows; company 5f4825c4-5d89-47fa-9872-6397cca3a591
+2026-10-28T23:18:01.520Z netstat before exit=0
+2026-10-28T23:18:02.222Z queue A (busy-year.xml, sha256 ok, limit 20)
+2026-10-28T23:18:04.634Z start A
+2026-10-28T23:18:25.043Z end A at 2026-10-28T23:18:24.738Z exit=28 curl: 000 0 1826 0.006475 0.000000 20.014486 content-length=
+2026-10-28T23:18:25.186Z netstat a-exit exit=0
+2026-10-28T23:18:25.221Z queue B (l5-create.xml, sha256 ok, limit 20)
+2026-10-28T23:18:35.398Z netstat b-plus10 exit=0
+2026-10-28T23:18:26.033Z start B
+2026-10-28T23:18:46.166Z end B at 2026-10-28T23:18:46.102Z exit=28 curl: 000 0 1004 0.004304 0.000000 20.002938 content-length=
+2026-10-28T23:18:46.313Z netstat b-exit exit=0
+2026-10-28T23:18:46.330Z B abandoned at its limit with a connection made and all 1004 bytes uploaded: the row counts
+2026-10-28T23:18:47.178Z queue C1 (ledgers.xml, sha256 ok, limit 0)
+2026-10-28T23:18:48.029Z start C1
+2026-10-28T23:20:48.004Z end C1 at 2026-10-28T23:20:47.893Z exit=0 curl: 200 17164 2232 0.003395 119.767002 119.770354 content-length=17164
+2026-10-28T23:20:48.025Z first byte C1 at 2026-10-28T23:20:47.796Z (start + time_starttransfer 119.767 s)
+2026-10-28T23:20:48.438Z read C1: ledgers ok rows 11; Lab Probe ledgers: 'Lab Probe L0'(len 12) 'Lab Probe L1'(len 12) 'Lab Probe L1B'(len 13) 'Lab Probe L2'(len 12) 'Lab Probe L3'(len 12) 'Lab Probe L4'(len 12) 'Lab Probe L5'(len 12); probe=present 'Lab Probe L5' GUID 5f4825c4-5d89-47fa-9872-6397cca3a591-000000d6 PARENT 'Suspense A/c' ALTERID 216
+2026-10-28T23:20:48.456Z C is C1
+2026-10-28T23:21:48.086Z queue ledgers-plus1 (ledgers.xml, sha256 ok, limit 0)
+2026-10-28T23:21:48.540Z start ledgers-plus1
+2026-10-28T23:21:48.792Z end ledgers-plus1 at 2026-10-28T23:21:48.739Z exit=0 curl: 200 17164 2232 0.003757 0.026016 0.027439 content-length=17164
+2026-10-28T23:21:48.808Z first byte ledgers-plus1 at 2026-10-28T23:21:48.566Z (start + time_starttransfer 0.026 s)
+2026-10-28T23:21:49.109Z read ledgers-plus1: ledgers ok rows 11; Lab Probe ledgers: 'Lab Probe L0'(len 12) 'Lab Probe L1'(len 12) 'Lab Probe L1B'(len 13) 'Lab Probe L2'(len 12) 'Lab Probe L3'(len 12) 'Lab Probe L4'(len 12) 'Lab Probe L5'(len 12); probe=present 'Lab Probe L5' GUID 5f4825c4-5d89-47fa-9872-6397cca3a591-000000d6 PARENT 'Suspense A/c' ALTERID 216
+2026-10-28T23:21:49.129Z queue marks-plus1 (marks.xml, sha256 ok, limit 0)
+2026-10-28T23:21:49.670Z start marks-plus1
+2026-10-28T23:21:49.945Z end marks-plus1 at 2026-10-28T23:21:49.892Z exit=0 curl: 200 3404 980 0.004310 0.008742 0.010349 content-length=3404
+2026-10-28T23:21:49.975Z first byte marks-plus1 at 2026-10-28T23:21:49.679Z (start + time_starttransfer 0.009 s)
+2026-10-28T23:21:50.273Z read marks-plus1: marks ok GUID 5f4825c4-5d89-47fa-9872-6397cca3a591 ALTVCHID 48000 ALTMSTID 216
+2026-10-28T23:21:50.393Z netstat plus1 exit=0
+2026-10-28T23:25:48.070Z queue ledgers-plus5 (ledgers.xml, sha256 ok, limit 0)
+2026-10-28T23:25:48.516Z start ledgers-plus5
+2026-10-28T23:25:48.837Z end ledgers-plus5 at 2026-10-28T23:25:48.787Z exit=0 curl: 200 17164 2232 0.002514 0.033546 0.040217 content-length=17164
+2026-10-28T23:25:48.852Z first byte ledgers-plus5 at 2026-10-28T23:25:48.550Z (start + time_starttransfer 0.034 s)
+2026-10-28T23:25:49.147Z read ledgers-plus5: ledgers ok rows 11; Lab Probe ledgers: 'Lab Probe L0'(len 12) 'Lab Probe L1'(len 12) 'Lab Probe L1B'(len 13) 'Lab Probe L2'(len 12) 'Lab Probe L3'(len 12) 'Lab Probe L4'(len 12) 'Lab Probe L5'(len 12); probe=present 'Lab Probe L5' GUID 5f4825c4-5d89-47fa-9872-6397cca3a591-000000d6 PARENT 'Suspense A/c' ALTERID 216
+2026-10-28T23:25:49.167Z queue marks-plus5 (marks.xml, sha256 ok, limit 0)
+2026-10-28T23:25:49.744Z start marks-plus5
+2026-10-28T23:25:50.010Z end marks-plus5 at 2026-10-28T23:25:49.964Z exit=0 curl: 200 3404 980 0.003113 0.010006 0.011261 content-length=3404
+2026-10-28T23:25:50.031Z first byte marks-plus5 at 2026-10-28T23:25:49.754Z (start + time_starttransfer 0.010 s)
+2026-10-28T23:25:50.336Z read marks-plus5: marks ok GUID 5f4825c4-5d89-47fa-9872-6397cca3a591 ALTVCHID 48000 ALTMSTID 216
+2026-10-28T23:25:50.460Z netstat plus5 exit=0
+2026-10-28T23:35:48.020Z queue ledgers-plus15 (ledgers.xml, sha256 ok, limit 0)
+2026-10-28T23:35:48.462Z start ledgers-plus15
+2026-10-28T23:35:48.709Z end ledgers-plus15 at 2026-10-28T23:35:48.655Z exit=0 curl: 200 17164 2232 0.001954 0.020623 0.022145 content-length=17164
+2026-10-28T23:35:48.725Z first byte ledgers-plus15 at 2026-10-28T23:35:48.483Z (start + time_starttransfer 0.021 s)
+2026-10-28T23:35:49.024Z read ledgers-plus15: ledgers ok rows 11; Lab Probe ledgers: 'Lab Probe L0'(len 12) 'Lab Probe L1'(len 12) 'Lab Probe L1B'(len 13) 'Lab Probe L2'(len 12) 'Lab Probe L3'(len 12) 'Lab Probe L4'(len 12) 'Lab Probe L5'(len 12); probe=present 'Lab Probe L5' GUID 5f4825c4-5d89-47fa-9872-6397cca3a591-000000d6 PARENT 'Suspense A/c' ALTERID 216
+2026-10-28T23:35:49.044Z queue marks-plus15 (marks.xml, sha256 ok, limit 0)
+2026-10-28T23:35:49.610Z start marks-plus15
+2026-10-28T23:35:49.888Z end marks-plus15 at 2026-10-28T23:35:49.837Z exit=0 curl: 200 3404 980 0.003061 0.006894 0.008199 content-length=3404
+2026-10-28T23:35:49.902Z first byte marks-plus15 at 2026-10-28T23:35:49.617Z (start + time_starttransfer 0.007 s)
+2026-10-28T23:35:50.240Z read marks-plus15: marks ok GUID 5f4825c4-5d89-47fa-9872-6397cca3a591 ALTVCHID 48000 ALTMSTID 216
+2026-10-28T23:35:50.391Z netstat plus15 exit=0
+2026-10-28T23:50:47.946Z queue ledgers-plus30 (ledgers.xml, sha256 ok, limit 0)
+2026-10-28T23:50:48.660Z start ledgers-plus30
+2026-10-28T23:50:49.109Z end ledgers-plus30 at 2026-10-28T23:50:49.023Z exit=0 curl: 200 17164 2232 0.003937 0.033205 0.036673 content-length=17164
+2026-10-28T23:50:49.128Z first byte ledgers-plus30 at 2026-10-28T23:50:48.693Z (start + time_starttransfer 0.033 s)
+2026-10-28T23:50:49.723Z read ledgers-plus30: ledgers ok rows 11; Lab Probe ledgers: 'Lab Probe L0'(len 12) 'Lab Probe L1'(len 12) 'Lab Probe L1B'(len 13) 'Lab Probe L2'(len 12) 'Lab Probe L3'(len 12) 'Lab Probe L4'(len 12) 'Lab Probe L5'(len 12); probe=present 'Lab Probe L5' GUID 5f4825c4-5d89-47fa-9872-6397cca3a591-000000d6 PARENT 'Suspense A/c' ALTERID 216
+2026-10-28T23:50:49.759Z queue marks-plus30 (marks.xml, sha256 ok, limit 0)
+2026-10-28T23:50:50.746Z start marks-plus30
+2026-10-28T23:50:51.273Z end marks-plus30 at 2026-10-28T23:50:51.160Z exit=0 curl: 200 3404 980 0.008694 0.014524 0.029830 content-length=3404
+2026-10-28T23:50:51.298Z first byte marks-plus30 at 2026-10-28T23:50:50.761Z (start + time_starttransfer 0.015 s)
+2026-10-28T23:50:51.812Z read marks-plus30: marks ok GUID 5f4825c4-5d89-47fa-9872-6397cca3a591 ALTVCHID 48000 ALTMSTID 216
+2026-10-28T23:50:52.044Z netstat plus30 exit=0
+2026-10-28T23:50:52.059Z row done

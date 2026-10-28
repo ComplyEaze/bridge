@@ -1,3 +1,8 @@
 ﻿2026-10-28T19:47:55.626Z bulk.ps1 -First 1 -Last 96: started; log <lab folder>\1713\evidence\bulk\bulk-answers.txt
 2026-10-28T20:01:20.013Z bulk.ps1 -First 97 -Last 192: started; log <lab folder>\1713\evidence\bulk\bulk-answers.txt
 2026-10-28T20:20:38.252Z row.ps1 -Row L1: started; log <lab folder>\1713\evidence\L1\times.txt
+2026-10-28T21:01:27.913Z row.ps1 -Row L1B: started; log <lab folder>\1713\evidence\L1B\times.txt
+2026-10-28T21:35:47.114Z row.ps1 -Row L2: started; log <lab folder>\1713\evidence\L2\times.txt
+2026-10-28T22:09:46.395Z row.ps1 -Row L3: started; log <lab folder>\1713\evidence\L3\times.txt
+2026-10-28T22:44:04.829Z row.ps1 -Row L4: started; log <lab folder>\1713\evidence\L4\times.txt
+2026-10-28T23:18:00.737Z row.ps1 -Row L5: started; log <lab folder>\1713\evidence\L5\times.txt

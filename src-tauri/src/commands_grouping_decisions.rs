@@ -68,6 +68,7 @@ pub async fn record_grouping_decisions(
         request.config,
         &request.selected_company,
         None,
+        crate::tally::connection::ComplianceRead::Standard,
     )
     .await?;
     let planned = plan_grouping_events(

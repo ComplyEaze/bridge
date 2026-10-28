@@ -77,6 +77,7 @@ async fn uncertain_build_retains_xml_journal_and_exact_recovery_error() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let result = json!({"isError":true,"content":[],"structuredContent":{"result":{
@@ -267,6 +268,7 @@ async fn staged_build_failures_retain_recorded_batch_identity_through_framing() 
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         assert_eq!(
@@ -324,6 +326,7 @@ fn interruption_after_xml_publication_keeps_admission_blocked() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     assert_eq!(
@@ -580,6 +583,7 @@ fn an_append_of_unknown_outcome_keeps_its_marker_and_blocks_import_admission() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     assert_eq!(

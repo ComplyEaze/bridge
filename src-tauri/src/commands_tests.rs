@@ -50,7 +50,7 @@ use super::{
     write_unique_download, CompanySweepFailure, OutstandingsRequest, PartyLedgerMasterExport,
     PartyLedgerMasterRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
     VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED, MIRROR_KEY_INVALID_MESSAGE,
-    MIRROR_KEY_MISSING_MESSAGE,
+    MIRROR_KEY_MISSING_MESSAGE, PARTY_LEDGER_MASTER_EXPORT_READ,
 };
 use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
@@ -645,6 +645,16 @@ fn the_export_request_reads_a_chosen_date_and_refuses_a_malformed_one_at_the_bou
     for malformed in ["2026-07-31", "20260230", "", "2026073"] {
         assert!(request(Some(malformed)).is_err(), "{malformed}");
     }
+}
+
+/// The export's mailing columns are blank unless its request names the mailing
+/// details: the read it sends is the one that does (bridge#1490).
+#[test]
+fn the_party_ledger_master_export_asks_for_the_mailing_details() {
+    assert_eq!(
+        PARTY_LEDGER_MASTER_EXPORT_READ,
+        crate::tally::connection::ComplianceRead::WithMailingDetailsWhereWholeReadFits
+    );
 }
 
 #[test]

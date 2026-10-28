@@ -264,6 +264,7 @@ fn server_redacting(
         redaction,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -1314,6 +1315,7 @@ async fn a_dispatch_admission_that_fails_sends_nothing() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::On,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         other.append_import_ledger(&changed).unwrap();
@@ -4724,6 +4726,7 @@ async fn a_tiny_response_budget_keeps_the_code_and_withholds_the_row_list() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let (_line, args) = saved_batch(&server);

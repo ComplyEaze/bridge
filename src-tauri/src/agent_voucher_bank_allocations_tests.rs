@@ -3,13 +3,13 @@
 //! none is authored from nothing.
 use super::*;
 
-const COMPANY_GUID: &str = "d6e4c24f-8c7a-4797-93ec-e44bdff60bc9";
+const COMPANY_GUID: &str = "8fb5f4db-478d-4084-b1e5-5b8f5d3fef60";
 const FIELD: &str = "bank_allocations";
 const UNREADABLE_FIELD: &str = "bank_allocations_unreadable";
 
 fn captured() -> String {
     let bytes = include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml"
     );
     String::from_utf16(
         &bytes
@@ -69,7 +69,7 @@ fn the_captured_contras_carry_each_field_as_tally_sent_it() {
             voucher(&rows, "2")["amounts"][side][FIELD],
             json!([allocation(
                 empty(),
-                value("900000000002"),
+                value("222222222222"),
                 value("20260403"),
                 value("Same Bank Transfer"),
                 value("No"),
@@ -119,7 +119,7 @@ fn the_existing_fields_of_an_entry_are_as_they_were() {
 /// The capture with voucher 2's first allocation changed by `edit`.
 fn with_first_allocation_of_voucher_2(edit: impl Fn(&str) -> String) -> Vec<Value> {
     let xml = captured();
-    let at = xml.find("<INSTRUMENTNUMBER>900000000002").unwrap();
+    let at = xml.find("<INSTRUMENTNUMBER>222222222222").unwrap();
     let start = xml[..at].rfind("<BANKALLOCATIONS.LIST>").unwrap();
     let end = xml[start..].find("</BANKALLOCATIONS.LIST>").unwrap()
         + start
@@ -138,7 +138,7 @@ fn first_entry_of_voucher_2(rows: &[Value]) -> &Value {
 fn an_empty_field_is_empty_and_a_missing_one_is_absent_never_an_empty_string() {
     let rows = with_first_allocation_of_voucher_2(|block| {
         block.replace(
-            "<INSTRUMENTNUMBER>900000000002</INSTRUMENTNUMBER>",
+            "<INSTRUMENTNUMBER>222222222222</INSTRUMENTNUMBER>",
             "<INSTRUMENTNUMBER/>",
         )
     });
@@ -154,7 +154,7 @@ fn an_empty_field_is_empty_and_a_missing_one_is_absent_never_an_empty_string() {
     let listed = &first_entry_of_voucher_2(&rows)[FIELD][0];
     assert_eq!(listed["bank_date"], json!({"state": "absent"}));
     assert_eq!(listed["status"], json!({"state": "absent"}));
-    assert_eq!(listed["instrument_number"], value("900000000002"));
+    assert_eq!(listed["instrument_number"], value("222222222222"));
 }
 
 #[test]
@@ -253,7 +253,7 @@ fn an_allocation_list_nested_anywhere_else_is_reported() {
 /// The capture with the instrument number of voucher 2's first entry replaced.
 fn with_number_markup(markup: &str) -> Vec<Value> {
     with_first_allocation_of_voucher_2(|block| {
-        block.replace("<INSTRUMENTNUMBER>900000000002</INSTRUMENTNUMBER>", markup)
+        block.replace("<INSTRUMENTNUMBER>222222222222</INSTRUMENTNUMBER>", markup)
     })
 }
 
@@ -294,8 +294,8 @@ fn an_empty_element_and_a_full_one_are_a_repeated_field_not_a_number() {
 #[test]
 fn an_element_inside_the_number_is_reported_not_listed_in_part() {
     for markup in [
-        "<INSTRUMENTNUMBER>9000<X></X>0002</INSTRUMENTNUMBER>",
-        "<INSTRUMENTNUMBER>9000<X/>0002</INSTRUMENTNUMBER>",
+        "<INSTRUMENTNUMBER>2222<X></X>22222222</INSTRUMENTNUMBER>",
+        "<INSTRUMENTNUMBER>2222<X/>22222222</INSTRUMENTNUMBER>",
     ] {
         let rows = with_number_markup(markup);
         let entry = first_entry_of_voucher_2(&rows);

@@ -72,6 +72,7 @@ async fn tally_status_uses_observed_gateway_product_and_preserves_wire_evidence(
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let before = tally_host_today();
@@ -195,6 +196,7 @@ async fn tally_status_failure_retains_completed_sources_in_response_and_history(
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let response = server.call_tool("tally_status", json!({})).await;
@@ -305,6 +307,7 @@ fn server_at(port: u16, max_bytes: usize) -> (Server, tempfile::TempDir) {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     (server, directory)
@@ -564,6 +567,40 @@ fn a_codes_own_next_step_wins_over_the_unanswered_reasons() {
     );
 }
 
+/// #2071: a refused Trial Balance takes its own step only when no other step applies. Tally
+/// not reachable keeps its step, and the Trial Balance step is the last resort, with or
+/// without a cause.
+#[test]
+fn the_trial_balance_step_is_the_last_resort() {
+    let (server, _directory) = server_at(9, 200_000);
+    let error_of = |unanswered: Option<&'static str>, cause: Option<&'static str>| {
+        let mut failure = ToolFailure::from("trial_balance_read_failed".to_string());
+        failure.unanswered = unanswered.map(Unanswered);
+        failure.cause = cause;
+        let response =
+            server.finish_tool_response("trial_balance", &json!({}), Utc::now(), Err(failure));
+        response.value["structuredContent"]["result"]["error"].clone()
+    };
+    let unreachable = error_of(Some("endpoint_unreachable"), None);
+    assert_eq!(
+        unreachable["remediation"],
+        unanswered_remediation("endpoint_unreachable").unwrap()
+    );
+    for cause in [None, Some("trial_balance_source_identity_missing")] {
+        let answered = error_of(None, cause);
+        assert_eq!(
+            answered["remediation"],
+            TRIAL_BALANCE_READ_FAILED_REMEDIATION
+        );
+    }
+    // A cause with a step of its own keeps it.
+    let identity = error_of(None, Some("company_identity_not_matched"));
+    assert_eq!(
+        identity["remediation"],
+        refusal_remediation("company_identity_not_matched").unwrap()
+    );
+}
+
 /// #697: a send the endpoint's wire gate held back is refused by its own code,
 /// with a retry hint and the step to take, and nothing reaches the port
 /// (nothing listens on it here).
@@ -693,7 +730,7 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
             "bounded",
             "It does not show what the AI provider received.",
             "amounts included, is sent to the AI provider",
-            "redaction can only shorten party and ledger names and bank account numbers or drop narrations",
+            "redaction can only shorten party and ledger names, bank account numbers and ledger address lines, or drop narrations",
             "and does not hide amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or references, or the last four digits of a bank statement's account number (account_last4); under mask_parties a name written inside a narration or reference stays as it is",
             "Never tell the user that no data has left their computer.",
             "no figures or book content",

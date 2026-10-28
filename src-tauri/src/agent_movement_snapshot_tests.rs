@@ -166,6 +166,7 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let response = server
@@ -321,6 +322,7 @@ async fn an_empty_movement_window_beside_a_busy_day_is_refused_by_the_wider_read
         redaction: Redaction::None,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -520,6 +522,7 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let response = server
@@ -573,6 +576,7 @@ async fn movement_call(plans: Vec<ScenarioPlan>, guid: &str, ledger: &str) -> (V
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -777,6 +781,7 @@ fn movement_server(
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     server.runtime = TallyRuntime::with_transport_policy(policy);

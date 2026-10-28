@@ -583,6 +583,7 @@ async fn an_unknown_amendment_target_is_refused_before_any_tally_read() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let mut input = serde_json::to_value(payload()).unwrap();
@@ -611,6 +612,7 @@ fn simulated_server(directory: &std::path::Path, port: u16) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }

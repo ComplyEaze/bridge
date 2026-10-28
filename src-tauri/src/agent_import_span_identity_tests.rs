@@ -776,6 +776,7 @@ fn journaled_batch_answered(
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let batch_id = "bridge-00000000-0000-4000-8000-000000001055";

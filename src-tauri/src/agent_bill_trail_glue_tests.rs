@@ -65,10 +65,7 @@ fn detail_plans(window: ScenarioPlan) -> Vec<ScenarioPlan> {
 }
 
 /// The marks the detail's handler is given: those the captured pre-flight reads.
-const OPENING_MARKS: CompanyMarks = CompanyMarks {
-    vouchers: 10,
-    masters: 7,
-};
+const OPENING_MARKS: CompanyMarks = CompanyMarks::new(Some(10), 7);
 
 fn native_bill(reference: &str) -> OpenBillRow {
     OpenBillRow {
@@ -143,6 +140,7 @@ async fn run(
         redaction: call.redaction,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let (mut company, identity, _) = server.verified_company(CAPTURED_GUID).await.unwrap();

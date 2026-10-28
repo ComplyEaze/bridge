@@ -534,3 +534,52 @@ fn the_gst_details_parent_part_request_differs_from_the_production_part_request_
         );
     }
 }
+
+const MAILING_DETAILS_REQUEST: &[u8] = include_bytes!(
+    "../../tests/fixtures/agent/native-party-masters-mailing-details.request.utf16le.xml"
+);
+
+/// The party-master request that names the mailing details is the one sent live
+/// when they were first read (bridge#1490); the plain one is the same request
+/// without that element, which the registers keep sending.
+#[test]
+fn the_mailing_details_request_is_byte_for_byte_the_one_sent_live() {
+    let period = NativeLedgerExportPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20260401").unwrap(),
+        TallyDate::parse("20260831").unwrap(),
+    )
+    .expect("mode-agnostic profile accepts valid calendar dates");
+    let live = crate::text_encoding::decode_xml_bytes(MAILING_DETAILS_REQUEST).unwrap();
+    assert_eq!(
+        render_party_ledger_master_request_with_mailing_details("Bridge Lab Win 0.5.1", &period),
+        live
+    );
+    assert_eq!(
+        render_party_ledger_master_request("Bridge Lab Win 0.5.1", &period),
+        live.replacen(", LEDMAILINGDETAILS.LIST", "", 1)
+    );
+}
+
+/// A part's mailing details read is the plain part request and one element.
+#[test]
+fn a_parent_parts_mailing_details_read_is_the_plain_part_request_and_one_element() {
+    let period = gst_details_period();
+    for part in [
+        one_part(&["Sundry Debtors"]),
+        one_part(&["Sundry Debtors", "Duties & Taxes"]),
+    ] {
+        let plain = render_party_ledger_master_request_for_parents("Co", &period, &part);
+        let with_mailing = render_party_ledger_master_request_for_parents_with_mailing_details(
+            "Co", &period, &part,
+        );
+        assert_eq!(
+            plain.replacen(
+                "LEDGSTREGDETAILS.LIST</FETCH>",
+                "LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST</FETCH>",
+                1
+            ),
+            with_mailing
+        );
+    }
+}

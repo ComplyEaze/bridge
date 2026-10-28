@@ -6,9 +6,13 @@
 //! looseness is only partly measured, and a Create that resolves to an existing
 //! ledger overwrites it (§9.4g). A false "absent" is therefore the dangerous
 //! answer and a false "present" is a loud, safe one, so [`MasterNameIndex::collisions`]
-//! reports a match under either of two keys, and a hit on either is a collision:
-//! [`canonical_master_key`] and [`absence_key`] (the third [`twin_fold_keys`]
-//! position). Neither subsumes the other: lowercasing and NFC do not commute,
+//! reports a match under any of three keys, and a hit on any is a collision:
+//! [`canonical_master_key`], [`absence_key`] (the third [`twin_fold_keys`]
+//! position) and [`letters_and_digits_key`], which drops every space and
+//! symbol: a ledger Create was measured to fold a removed space and removed
+//! full stops, and every other symbol is refused conservatively, since a false
+//! refusal costs less than an overwrite. The first two do not subsume each
+//! other: lowercasing and NFC do not commute,
 //! so `J` + caron and `j` + caron share a canonical key but not an absence key,
 //! while NFC against NFD, or an en dash against a space, share an absence key
 //! but not a canonical key. What is subsumed, and pinned by property tests in
@@ -16,16 +20,18 @@
 //! equality on [`absence_key`] (it is a function of key 0), and equality on
 //! twin key 1 implies equality on [`canonical_master_key`].
 //!
-//! A name matches a master through its stored name or through any alias; a
-//! ledger name can collide with a group, because ledgers and groups share one
-//! namespace in Tally.
+//! A name matches a master through its stored name or any alias. A ledger name also collides with a
+//! group's: Tally created a ledger named like an existing group (one synthetic
+//! book, `bridge-tally-protocol/tests/fixtures/agent/masters-lab.PROVENANCE.md`),
+//! but a person reading either name cannot tell the two apart, so the index
+//! refuses it by choice.
 //!
 //! This module performs no I/O and holds no company identity. It decides
 //! nothing about a binding: it only finds names that could be the same master.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::master_binding::{absence_key, canonical_master_key};
+use crate::master_binding::{absence_key, canonical_master_key, letters_and_digits_key};
 
 /// What kind of master an indexed name belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -44,7 +50,13 @@ pub enum Via {
 }
 
 /// One existing master as read from the book: `names[0]` is the stored name
-/// and the rest are aliases.
+/// and the rest are aliases. A ledger's export can also carry a row spelling
+/// that is none of its names: a Create Tally resolved to an existing ledger
+/// rewrites its stored name and leaves the row's `NAME` attribute as it was
+/// until Tally restarts (one synthetic book,
+/// `bridge-tally-protocol/tests/fixtures/agent/masters-lab.PROVENANCE.md`).
+/// A caller appends it after the aliases, so the book is checked against it
+/// too; a match on it alone is reported as [`Via::Alias`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexedMaster {
     pub kind: MasterKind,
@@ -87,8 +99,17 @@ type KeyMap = BTreeMap<String, Vec<(usize, usize)>>;
 #[derive(Debug, Clone)]
 pub struct MasterNameIndex {
     masters: Vec<IndexedMaster>,
-    by_absence_key: KeyMap,
-    by_canonical_key: KeyMap,
+    /// One map per key of [`collision_keys`], in its order.
+    keys: [KeyMap; 3],
+}
+
+/// The keys a name is matched on, in a fixed order.
+fn collision_keys(name: &str) -> [String; 3] {
+    [
+        absence_key(name),
+        canonical_master_key(name),
+        letters_and_digits_key(name),
+    ]
 }
 
 impl MasterNameIndex {
@@ -118,29 +139,19 @@ impl MasterNameIndex {
             }
         }
 
-        let mut by_absence_key = KeyMap::new();
-        let mut by_canonical_key = KeyMap::new();
+        let mut keys: [KeyMap; 3] = Default::default();
         for (master, entry) in masters.iter().enumerate() {
             for (position, name) in entry.names.iter().enumerate() {
-                by_absence_key
-                    .entry(absence_key(name))
-                    .or_default()
-                    .push((master, position));
-                by_canonical_key
-                    .entry(canonical_master_key(name))
-                    .or_default()
-                    .push((master, position));
+                for (map, key) in keys.iter_mut().zip(collision_keys(name)) {
+                    map.entry(key).or_default().push((master, position));
+                }
             }
         }
-        Ok(Self {
-            masters,
-            by_absence_key,
-            by_canonical_key,
-        })
+        Ok(Self { masters, keys })
     }
 
     /// Every existing name `candidate` could resolve to, in the masters' input
-    /// order and then name order, each reported once. Empty means neither key
+    /// order and then name order, each reported once. Empty means no key
     /// matches any name or alias. A blank candidate is an error, not an empty
     /// answer: it names nothing, so "no collision" would be meaningless.
     pub fn collisions(&self, candidate: &str) -> Result<Vec<NameCollision>, MasterNameIndexError> {
@@ -148,11 +159,10 @@ impl MasterNameIndex {
             return Err(MasterNameIndexError::BlankCandidate);
         }
         let mut slots = BTreeSet::new();
-        if let Some(found) = self.by_absence_key.get(&absence_key(candidate)) {
-            slots.extend(found.iter().copied());
-        }
-        if let Some(found) = self.by_canonical_key.get(&canonical_master_key(candidate)) {
-            slots.extend(found.iter().copied());
+        for (map, key) in self.keys.iter().zip(collision_keys(candidate)) {
+            if let Some(found) = map.get(&key) {
+                slots.extend(found.iter().copied());
+            }
         }
         Ok(slots
             .into_iter()

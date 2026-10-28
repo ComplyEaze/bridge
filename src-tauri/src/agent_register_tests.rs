@@ -497,10 +497,7 @@ fn masters_read(marks: CompanyMarks, index: MasterIndex) -> RegisterMasters {
     }
 }
 
-const PINNED: CompanyMarks = CompanyMarks {
-    vouchers: 54,
-    masters: 120,
-};
+const PINNED: CompanyMarks = CompanyMarks::new(Some(54), 120);
 
 #[test]
 fn a_window_whose_marks_are_unchanged_is_stable() {
@@ -508,15 +505,19 @@ fn a_window_whose_marks_are_unchanged_is_stable() {
 }
 
 #[test]
+fn a_voucher_mark_omitted_by_one_read_and_sent_as_zero_by_the_other_is_not_drift() {
+    // The extent listing and the high-water read are two requests; on a book that has never
+    // held a voucher they may differ on whether ALTVCHID is sent, which is not the book moving.
+    let extent = CompanyMarks::new(None, 120);
+    let high_water = CompanyMarks::new(Some(0), 120);
+    assert_eq!(window_drift(extent, high_water), None);
+    assert_eq!(window_drift(high_water, extent), None);
+}
+
+#[test]
 fn a_window_is_refused_when_either_mark_moved_after_it() {
-    let moved_voucher = CompanyMarks {
-        vouchers: 55,
-        ..PINNED
-    };
-    let moved_master = CompanyMarks {
-        masters: 121,
-        ..PINNED
-    };
+    let moved_voucher = CompanyMarks::new(Some(55), 120);
+    let moved_master = CompanyMarks::new(Some(54), 121);
     for closing in [moved_voucher, moved_master] {
         assert_eq!(
             window_drift(PINNED, closing),
@@ -538,13 +539,7 @@ fn masters_read_again_must_match_in_classification_and_marks() {
     assert_eq!(
         masters_drifted(
             &first,
-            &masters_read(
-                CompanyMarks {
-                    masters: 121,
-                    ..PINNED
-                },
-                captured_index()
-            )
+            &masters_read(CompanyMarks::new(Some(54), 121), captured_index())
         ),
         Some("ledger_snapshot_drifted")
     );
@@ -564,13 +559,7 @@ fn masters_read_again_must_match_in_classification_and_marks() {
     assert_eq!(
         masters_drifted(
             &first,
-            &masters_read(
-                CompanyMarks {
-                    vouchers: 55,
-                    ..PINNED
-                },
-                captured_index()
-            )
+            &masters_read(CompanyMarks::new(Some(55), 120), captured_index())
         ),
         Some("voucher_window_changed_during_read")
     );

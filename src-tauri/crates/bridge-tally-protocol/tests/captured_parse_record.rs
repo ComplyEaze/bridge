@@ -2601,8 +2601,16 @@ const AUDIT_READ_LIVE: &str = "an answer of the audit read's live sittings on th
      read (src/agent_audit_read.rs) and the tax-audit crate parse it, and src/agent_audit_read_tests.rs \
      (live_pilot_lab) serves it in the reader's order and pins the book admitted from it; \
      agent/audit-read-pilot-lab/PROVENANCE.md says what each file is";
+const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDGE TRANSFER LAB \
+     (26 Oct 2026, #1392), with no row here: no parser or test reads it yet, and the pull request \
+     that adds the day reader replays it and changes this reason; \
+     agent/whole-day-read-transfer-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
+const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRANSFER LAB and \
+     BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
+     yet, and the pull request that renders the census as a span replays it and changes this \
+     reason; agent/spanned-census-two-books/PROVENANCE.md says what each file is";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
@@ -2928,6 +2936,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/stock-lab-day/stock_lab_taxed_day_company_marks_response.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
         APP_HIGH_WATER,
     ),
     (
@@ -3311,6 +3323,63 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/vouchers_ageing_corpus_live.utf16le.xml",
         VOUCHER_EXPORT_NO_PARSER,
     ),
+    // The whole-day read's answers on BRIDGE TRANSFER LAB (#1392).
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/m1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
     // Built-in reports no parser reads.
     (
         "tests/fixtures/builtin_ratio_analysis_probe_b_fy_live.utf16le.xml",
@@ -3329,6 +3398,39 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/unit_a_invalid_char_ref_live.xml",
         "only the pre-parse sanitizer reads it (src/tolerant_xml_tests.rs): a NAME/PARENT-only \
          ledger collection with no GUID, company or balance, which no parser of this crate binds",
+    ),
+    // The span read's answers on two synthetic books (#899).
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-m1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-c1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-c2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-m2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-m1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-c1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-c2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-m2.utf16le.xml",
+        SPANNED_CENSUS,
     ),
 ];
 

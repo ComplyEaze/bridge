@@ -310,11 +310,56 @@ pub(super) const BOOK_TOO_LARGE: &str = "voucher_window_book_too_large";
 /// mark — while every voucher export naming that ledger changed. A read
 /// bracketed on the voucher mark alone returned `complete` across a rename made
 /// between two of its parts.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+///
+/// The voucher mark is what every comparison, census and empty-book check uses,
+/// with an answer that omits `ALTVCHID` read as 0 ([`CompanyMarks::vouchers`]).
+/// Whether Tally reported it is kept beside it ([`CompanyMarks::reported_vouchers`]),
+/// so a caller shown the mark is told "no mark" rather than a 0 Tally never sent
+/// (AGENTS.md P3). Equality is over the two marks alone, so a mark Tally omitted in
+/// one read and sent as 0 in another is the same book, as it was before the flag
+/// existed: no bracket, drift check or held-page reuse decides differently.
+#[derive(Clone, Copy, Debug)]
 pub(super) struct CompanyMarks {
-    pub(super) vouchers: u64,
-    pub(super) masters: u64,
+    voucher_mark: Option<u64>,
+    master_mark: u64,
 }
+
+impl CompanyMarks {
+    /// The marks from an answer's voucher mark (`None` when the answer omitted
+    /// it) and its master mark.
+    pub(super) const fn new(vouchers: Option<u64>, masters: u64) -> Self {
+        Self {
+            voucher_mark: vouchers,
+            master_mark: masters,
+        }
+    }
+
+    /// The voucher mark every comparison uses: 0 when the answer omitted it.
+    pub(super) const fn vouchers(self) -> u64 {
+        match self.voucher_mark {
+            Some(mark) => mark,
+            None => 0,
+        }
+    }
+
+    /// The master mark.
+    pub(super) const fn masters(self) -> u64 {
+        self.master_mark
+    }
+
+    /// The voucher mark as Tally answered it: `None` when it was not reported.
+    pub(super) const fn reported_vouchers(self) -> Option<u64> {
+        self.voucher_mark
+    }
+}
+
+impl PartialEq for CompanyMarks {
+    fn eq(&self, other: &Self) -> bool {
+        self.vouchers() == other.vouchers() && self.masters() == other.masters()
+    }
+}
+
+impl Eq for CompanyMarks {}
 
 /// What a divided read observed that a replay of it must still hold: the marks
 /// it opened and closed on (equal, or it would have been refused), and the
@@ -1729,7 +1774,7 @@ where
             match witness {
                 Some(witness) => {
                     opening = Some(witness.marks);
-                    ceiling = witness.marks.vouchers.max(
+                    ceiling = witness.marks.vouchers().max(
                         witness
                             .census
                             .as_ref()
@@ -1775,7 +1820,7 @@ where
                 } => {
                     if let Some(counted) = &counted {
                         ceiling = marks
-                            .map_or(0, |marks| marks.vouchers)
+                            .map_or(0, |marks| marks.vouchers())
                             .max(counted.max_alter_id());
                     }
                     census = counted;
@@ -1790,7 +1835,7 @@ where
                     marks,
                 } => {
                     ceiling = marks
-                        .map_or(0, |marks| marks.vouchers)
+                        .map_or(0, |marks| marks.vouchers())
                         .max(counted.max_alter_id());
                     let plan = plan_window_reads(
                         first,
@@ -2117,7 +2162,7 @@ pub(super) async fn count_window_only<R: WindowReader>(
     };
     let mut closing = None;
     if let Some(opened) = opening {
-        let spans = census_spans(opened.vouchers, limits.census_capacity())
+        let spans = census_spans(opened.vouchers(), limits.census_capacity())
             .map_or(usize::MAX, Iterator::count);
         if spans > 1 {
             let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
@@ -2201,7 +2246,7 @@ async fn estimate_window_volume<R: WindowReader>(
         None => read_marks(reader, identity, company, preflight, boundary).await?,
     };
     *observed_marks = Some(marks);
-    let high_water = marks.vouchers;
+    let high_water = marks.vouchers();
     // Every voucher carries a distinct AlterID no greater than the high-water
     // mark (§10), so the book — and therefore any window of it — holds at
     // most `high_water` vouchers. A mark of zero is a company that has never
@@ -2603,12 +2648,12 @@ pub(super) fn split_verification_window(
 
 /// The company's marks, with a company that has never held a voucher read as a
 /// voucher mark of zero (Tally omits `ALTVCHID` for it; see
-/// `pre_import_mark_refusal`). A response the marks cannot be read from is
+/// `pre_import_mark_refusal`) and recorded as not reported. A response the marks cannot be read from is
 /// refused with the parser's own code — never read as an empty book, and never
 /// folded into a planning or bracket outcome that would hide which it was.
 pub(super) fn company_marks(xml: &str, company_guid: &str) -> Result<CompanyMarks, String> {
-    parse_company_marks(xml, company_guid)
-        .map(|(vouchers, masters)| CompanyMarks { vouchers, masters })
+    parse_company_marks_as_answered(xml, company_guid)
+        .map(|(vouchers, masters)| CompanyMarks::new(vouchers, masters))
 }
 
 /// Parse a census response into a [`CensusRow`] per voucher.

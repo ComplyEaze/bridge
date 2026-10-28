@@ -1550,6 +1550,86 @@
       "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
       "sha256": "71978ac472922d01e16864b61bb65ecf342e7070bb0ebbea068dd52abdad2559",
       "size": 1142
+    },
+    {
+      "blob": "e1b44a826b19fbff97ce89036391b038965acd7f",
+      "capture_id": "ledger-scoped-vouchers/census-dn-sales-day-span1.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans at 97fdc0635a43",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "16979f8194f45f385f5cc9e5809980c10ba530a82115832aee8d9837101f4d12",
+      "size": 1600
+    },
+    {
+      "blob": "3858b1ef7ef2ed1591ce1a6a62e496fd0bcc0591",
+      "capture_id": "ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans-answers at ba180df99d45",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8aa7a6ce01d38f816c6af4a76d1178078163835e3ac363139e8d8d28031ab337",
+      "size": 201862
+    },
+    {
+      "blob": "c17818ebfd72e563782224285230ed86f1c07747",
+      "capture_id": "ledger-scoped-vouchers/census-dn-sales-day-span2.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans at 97fdc0635a43",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b7e30f615fe1d22c886f5b8644ba2c1a564bf10fbbd039d1fc910e22f690fd9d",
+      "size": 1608
+    },
+    {
+      "blob": "0fda940388aa03c32e6169b6975bbff9e8696174",
+      "capture_id": "ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans-answers at ba180df99d45",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "52f69354f7d87de773f68e7d9856f2719374a24c920933f47283e4d662c4f40b",
+      "size": 2926
+    },
+    {
+      "blob": "6031ccc526491d7d04bfad4bbf9b9d9fab69fddd",
+      "capture_id": "ledger-scoped-vouchers/census-dn-party-year-span1.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans at 97fdc0635a43",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a9d3eaff4191aa04c62987f3a27bc0c4ee70922ac0b99d1bef5b867e30e0ae2f",
+      "size": 1608
+    },
+    {
+      "blob": "be7a48eb4e0d75b7510168efe430e375e5520b46",
+      "capture_id": "ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans-answers at ba180df99d45",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "3d65d555487f2906d77d442168421e3faaf91272a3d77a372a3f0e79ee83b8a0",
+      "size": 165380
+    },
+    {
+      "blob": "c549d620ed9675bdcf96bf5042e4c49b696d4ca0",
+      "capture_id": "ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans at 97fdc0635a43",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8060720ed68c5100600098959bfa68708fa72b07bf78589ec839411c3ce8af41",
+      "size": 1876
+    },
+    {
+      "blob": "e71e11c99d7916813ef3896d46ac978c2e69b258",
+      "capture_id": "ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans-answers at ba180df99d45",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1dd5fac4e6c743adf46ad834f300f6713192872945680b75764faa60a3ee3f74",
+      "size": 108918
     }
   ]
 }

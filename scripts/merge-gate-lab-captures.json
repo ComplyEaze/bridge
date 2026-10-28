@@ -782,26 +782,6 @@
       "size": 54280
     },
     {
-      "blob": "15160f5918436d462398d9e3175260c5a58a886c",
-      "capture_id": "voucher_contra_hand_keyed_transfer_lab_request.utf16le.xml",
-      "company": "BRIDGE TRANSFER LAB",
-      "lab_ref": "branch lab/transfer-1392-requests at f0250cb9830f",
-      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_contra_hand_keyed_transfer_lab_request.utf16le.xml",
-      "seed_basis": "synthetic lab book; see VOUCHER_CONTRA_HAND_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
-      "sha256": "38f572e26ce010db638754aafe152d67999dd670de2bf9869e54628905694375",
-      "size": 1746
-    },
-    {
-      "blob": "d154ff3438ec21e7391cce19f21f1271f2496670",
-      "capture_id": "voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml",
-      "company": "BRIDGE TRANSFER LAB",
-      "lab_ref": "branch lab/transfer-1392-requests at f0250cb9830f",
-      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml",
-      "seed_basis": "synthetic lab book; see VOUCHER_CONTRA_HAND_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
-      "sha256": "e67c0abfe375351e8b60282efa46754ad029999e6d00335077034575651f4add",
-      "size": 210796
-    },
-    {
       "blob": "2fd8b7f299cd2754e9cb1bdb3ca47a12193ddf81",
       "capture_id": "whole-day-read-transfer-lab/d03-c1.request.utf16le.xml",
       "company": "BRIDGE TRANSFER LAB",

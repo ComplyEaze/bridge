@@ -1,5 +1,5 @@
-# fixture: voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml
-# parser: parse_agent_rows(TRANSFER_LAB)
+# fixture: voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml
+# parser: parse_agent_rows(BANKREF_LAB)
 # source: captured
 Ok([
     Object {
@@ -64,10 +64,10 @@ Ok([
         ],
         "cancelled": Bool(false),
         "date": String("20260403"),
-        "guid": String("d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000001"),
+        "guid": String("8fb5f4db-478d-4084-b1e5-5b8f5d3fef60-00000001"),
         "is_invoice": Bool(false),
         "master_id": String("1"),
-        "narration": String("UTR 900000000001"),
+        "narration": String("UTR 111111111111"),
         "optional": Bool(false),
         "party": String("TLab Bank A"),
         "post_dated": Bool(false),
@@ -90,7 +90,7 @@ Ok([
                         },
                         "instrument_number": Object {
                             "state": String("value"),
-                            "value": String("900000000002"),
+                            "value": String("222222222222"),
                         },
                         "status": Object {
                             "state": String("value"),
@@ -119,7 +119,7 @@ Ok([
                         },
                         "instrument_number": Object {
                             "state": String("value"),
-                            "value": String("900000000002"),
+                            "value": String("222222222222"),
                         },
                         "status": Object {
                             "state": String("value"),
@@ -138,7 +138,7 @@ Ok([
         ],
         "cancelled": Bool(false),
         "date": String("20260403"),
-        "guid": String("d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000002"),
+        "guid": String("8fb5f4db-478d-4084-b1e5-5b8f5d3fef60-00000002"),
         "is_invoice": Bool(false),
         "master_id": String("2"),
         "narration": String(""),
@@ -210,10 +210,10 @@ Ok([
         ],
         "cancelled": Bool(false),
         "date": String("20260403"),
-        "guid": String("d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000004"),
+        "guid": String("8fb5f4db-478d-4084-b1e5-5b8f5d3fef60-00000004"),
         "is_invoice": Bool(false),
         "master_id": String("4"),
-        "narration": String("UTR 900000000004"),
+        "narration": String("UTR 444444444444"),
         "optional": Bool(false),
         "party": String("TLab Bank B"),
         "post_dated": Bool(false),
@@ -282,7 +282,7 @@ Ok([
         ],
         "cancelled": Bool(false),
         "date": String("20260404"),
-        "guid": String("d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000003"),
+        "guid": String("8fb5f4db-478d-4084-b1e5-5b8f5d3fef60-00000003"),
         "is_invoice": Bool(false),
         "master_id": String("3"),
         "narration": String(""),
@@ -356,7 +356,7 @@ Ok([
         ],
         "cancelled": Bool(false),
         "date": String("20260405"),
-        "guid": String("d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000005"),
+        "guid": String("8fb5f4db-478d-4084-b1e5-5b8f5d3fef60-00000005"),
         "is_invoice": Bool(false),
         "master_id": String("5"),
         "narration": String(""),

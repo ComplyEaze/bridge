@@ -3214,7 +3214,7 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
-        "tests/fixtures/voucher_contra_hand_keyed_transfer_lab_live.utf16le.xml",
+        "tests/fixtures/voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

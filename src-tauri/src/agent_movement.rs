@@ -32,6 +32,12 @@ impl WholeBookReason {
         }
     }
 
+    /// Whether a ledger-scoped read was sent and then given up, so that the call's `read_cost`
+    /// (which counts the book's window reads) leaves it out.
+    const fn abandons_a_scoped_read(self) -> bool {
+        matches!(self, Self::PlanNeedsDaySplit | Self::ScopedReadFoundNothing)
+    }
+
     const fn note(self) -> &'static str {
         match self {
             Self::NameOutsideScopedAlphabet => {
@@ -302,7 +308,14 @@ impl Server {
                 (None, _) => Value::Null,
                 (Some(_), None) => json!({"basis": "ledger_scoped", "vouchers_read": voucher_rows_observed, "note": LEDGER_SCOPED_NOTE}),
                 (Some(_), Some(reason)) => {
-                    json!({"basis": "whole_book", "reason": reason.code(), "note": reason.note()})
+                    let mut scope =
+                        json!({"basis": "whole_book", "reason": reason.code(), "note": reason.note()});
+                    if reason.abandons_a_scoped_read() {
+                        // The `read_cost` below is the book's window reads: the scoped attempt
+                        // that was given up is not in it.
+                        scope["read_cost_excludes"] = json!("first_ledger_scoped_attempt");
+                    }
+                    scope
                 }
             };
             let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": if opening_unobserved {"partial"} else {"complete"}, "partial_reason": opening_unobserved.then_some("opening_balance_not_observed"), "ledger_match": selected.as_ref().map(|found| found.to_json(self.settings.redaction)), "ledgers": rows, "offset": offset, "next_offset": next_offset, "voucher_rows_observed": voucher_rows_observed, "window_scope": window_scope, "balance_basis": "tally_period_opening_plus_direct_voucher_movement", "evidence_method": "runtime_ledger_opening_at_from_plus_literal_window_entries"}});

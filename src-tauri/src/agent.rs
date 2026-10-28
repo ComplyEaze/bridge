@@ -1698,6 +1698,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              as different text and could never be confirmed as posted. Rename the ledger to \
              drop that sequence and resubmit.",
         ),
+        // A ledger-scoped movement read returned a voucher with no line on the ledger (#485):
+        // nothing was summed. The same figures are in the Trial Balance, which does not read
+        // vouchers.
+        "ledger_scope_row_without_line" => Some(
+            "ComplyEaze Bridge read this ledger's vouchers by the ledger, and Tally returned a \
+             voucher that has no line on that ledger, so it summed nothing and released no \
+             figure. Tell the user the ledger's movement could not be read this way, and do not \
+             repeat the same call in a loop. For the ledger's opening, debit, credit and closing \
+             over the same dates, use trial_balance, which does not read vouchers.",
+        ),
         // A cause, reached through `voucher_window_part_not_admitted`. Since
         // #985 a window read whole is admitted against the census that sized
         // it, so this is reachable on an ordinary day's read, not only on a

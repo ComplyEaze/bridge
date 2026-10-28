@@ -58,6 +58,17 @@ if (
 ) {
   failures.push("complete bundled SQLCipher NOTICE attribution");
 }
+// The Windows build compiles OpenSSL from source through SQLCipher (#2049); NOTICE states its version, licence and
+// the holders its files name, so a new openssl-src release in the lockfile must be read against that section.
+const opensslVersion = cargoLock.match(/\[\[package\]\]\nname = "openssl-src"\nversion = "[^"+]+\+([^"]+)"\n/)?.[1];
+if (
+  !opensslVersion ||
+  !notice.includes(`OpenSSL ${opensslVersion} from source`) ||
+  !notice.includes("Copyright 1995-2026 The OpenSSL Project Authors") ||
+  !notice.includes("Apache License, Version 2.0")
+) {
+  failures.push("bundled OpenSSL NOTICE attribution");
+}
 if (!readme.includes("Apache License, Version 2.0")) failures.push("README license declaration");
 if (!frontendNotices.includes("lucide-react") || !/\breact \d+\.\d+\.\d+/.test(frontendNotices)) {
   failures.push("frontend third-party notices");

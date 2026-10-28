@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::BTreeSet;
 
 #[test]
 fn missing_opening_is_partial_even_at_book_start() {
@@ -315,6 +316,7 @@ async fn movement_read_preserves_observed_count_after_accounting_exclusions() {
             .read_movement_vouchers(
                 &identity,
                 &observed.name,
+                WindowScope::Book,
                 (date.clone(), date),
                 WindowPlanSource::Estimate {
                     known_marks: Some(CompanyMarks::new(Some(3), 7)),
@@ -392,4 +394,140 @@ fn a_zero_entry_adds_a_plain_zero_to_the_column_its_flag_names() {
     let (is_debit, magnitude) = movement_entry_effect(&amount("-0.00"), true);
     assert!(is_debit);
     assert!(bridge_tally_core::ExactDecimal::parse(format!("-{magnitude}")).is_ok());
+}
+
+/// The lab's ledger-scoped movement answer (#485): 21 vouchers, each with a line on the ledger
+/// asked for.
+fn scoped_movement_rows() -> Vec<Value> {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    parse_agent_changed_rows(&xml, "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3").unwrap()
+}
+
+#[test]
+fn a_ledger_scoped_row_without_a_line_on_the_ledger_refuses_the_read() {
+    let party = LedgerScopeName::new("DN Party 001").unwrap();
+    let rows = scoped_movement_rows();
+    assert_eq!(rows.len(), 21);
+    let page = parse_scoped_movement_rows(
+        rows.clone(),
+        WindowScope::Ledger(&party),
+        "20250501",
+        "20250531",
+    )
+    .unwrap();
+    assert_eq!(page.observed_rows, 21);
+    // The same rows are not the vouchers of a ledger none of them touches, and the book's read,
+    // which promised nothing of the kind, takes them as before.
+    let ledger_none_touches = LedgerScopeName::new("DN Party 999").unwrap();
+    assert_eq!(
+        parse_scoped_movement_rows(
+            rows.clone(),
+            WindowScope::Ledger(&ledger_none_touches),
+            "20250501",
+            "20250531"
+        )
+        .err()
+        .as_deref(),
+        Some(LEDGER_SCOPE_ROW_WITHOUT_LINE)
+    );
+    assert_eq!(
+        parse_movement_rows(rows, "20250501", "20250531")
+            .unwrap()
+            .observed_rows,
+        21
+    );
+}
+
+#[test]
+fn a_ledger_scoped_row_with_no_entries_at_all_is_refused_too() {
+    let party = LedgerScopeName::new("DN Party 001").unwrap();
+    let mut rows = scoped_movement_rows();
+    rows[0]["amounts"] = serde_json::json!([]);
+    assert_eq!(
+        parse_scoped_movement_rows(rows, WindowScope::Ledger(&party), "20250501", "20250531")
+            .err()
+            .as_deref(),
+        Some(LEDGER_SCOPE_ROW_WITHOUT_LINE)
+    );
+}
+
+/// The scope a catalogue name reads by is decided in one function: a name the type refuses reads
+/// the book's window, for the formula-word reason when that is why and the alphabet reason
+/// otherwise, and the names of an ordinary chart of accounts read by their own ledger.
+#[test]
+fn a_catalogue_name_reads_by_its_ledger_or_names_why_it_does_not() {
+    for name in ["DN Party 001", "DN Sales", "Cash", "Office Rent"] {
+        assert_eq!(scope_name_of(name).unwrap().as_str(), name);
+    }
+    for name in [
+        "Printing and Stationery",
+        "Rates and Taxes",
+        "Salary Not Paid",
+        "Sales or Returns",
+    ] {
+        assert_eq!(
+            scope_name_of(name).unwrap_err(),
+            WholeBookReason::NameHoldsFormulaWord,
+            "{name}"
+        );
+    }
+    for name in [
+        "Profit & Loss A/c",
+        "Sales 2024-25",
+        "A  B",
+        " Cash",
+        "M.S. Traders",
+    ] {
+        assert_eq!(
+            scope_name_of(name).unwrap_err(),
+            WholeBookReason::NameOutsideScopedAlphabet,
+            "{name}"
+        );
+    }
+}
+
+/// Each reason a movement read goes to the book's window carries its own code and a sentence, and
+/// only the two codes a ledger-scoped read raises ask for the fallback. No sentence says the
+/// figures of the two reads agree: that has been compared for two cases only.
+#[test]
+fn the_whole_book_reasons_are_distinct_and_only_the_scoped_read_codes_ask_for_one() {
+    let reasons = [
+        WholeBookReason::NameOutsideScopedAlphabet,
+        WholeBookReason::NameHoldsFormulaWord,
+        WholeBookReason::PlanNeedsDaySplit,
+        WholeBookReason::ScopedReadFoundNothing,
+    ];
+    let codes = reasons.iter().map(|r| r.code()).collect::<BTreeSet<_>>();
+    let notes = reasons.iter().map(|r| r.note()).collect::<BTreeSet<_>>();
+    assert_eq!((codes.len(), notes.len()), (4, 4));
+    for reason in reasons {
+        assert!(reason.note().contains("whole book"), "{}", reason.note());
+        assert!(!reason.note().contains("are the same"), "{}", reason.note());
+    }
+    assert!(!LEDGER_SCOPED_NOTE.contains("are the same"));
+    let failure = |code: &str| ToolFailure::from(code.to_string());
+    assert_eq!(
+        WholeBookReason::of_failure(&failure(LEDGER_SCOPE_NEEDS_DAY_SPLIT)),
+        Some(WholeBookReason::PlanNeedsDaySplit)
+    );
+    assert_eq!(
+        WholeBookReason::of_failure(&failure(LEDGER_SCOPE_EMPTY_NOT_ESTABLISHED)),
+        Some(WholeBookReason::ScopedReadFoundNothing)
+    );
+    for code in [
+        LEDGER_SCOPE_ROW_WITHOUT_LINE,
+        "window_not_honoured",
+        "voucher_snapshot_drifted",
+    ] {
+        assert_eq!(WholeBookReason::of_failure(&failure(code)), None, "{code}");
+    }
 }

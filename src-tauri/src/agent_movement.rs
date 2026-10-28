@@ -1,6 +1,80 @@
 //! Movement for the local MCP adapter.
+use super::voucher_window::{WindowScope, LEDGER_SCOPE_NEEDS_DAY_SPLIT};
 use super::*;
 use bridge_tally_core::TallyDate;
+use bridge_tally_protocol::ledger_scope::{LedgerScopeName, LedgerScopeNameError};
+
+/// A ledger-scoped read found no vouchers. Not taken as proof of none (#485): the whole book's
+/// window decides, through the same empty-window corroboration as any other read.
+const LEDGER_SCOPE_EMPTY_NOT_ESTABLISHED: &str = "ledger_scope_empty_not_established";
+/// A ledger-scoped row without a line on the ledger: the scoped read did not do what it was
+/// admitted for, so nothing it returned is summed.
+const LEDGER_SCOPE_ROW_WITHOUT_LINE: &str = "ledger_scope_row_without_line";
+
+/// Why a movement read went to the book's window though a ledger was named: a closed set of
+/// reasons that hold no data from Tally or the caller, each with the sentence the result carries
+/// beside it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WholeBookReason {
+    NameOutsideScopedAlphabet,
+    NameHoldsFormulaWord,
+    PlanNeedsDaySplit,
+    ScopedReadFoundNothing,
+}
+
+impl WholeBookReason {
+    const fn code(self) -> &'static str {
+        match self {
+            Self::NameOutsideScopedAlphabet => "ledger_name_outside_scoped_alphabet",
+            Self::NameHoldsFormulaWord => "ledger_name_holds_formula_word",
+            Self::PlanNeedsDaySplit => LEDGER_SCOPE_NEEDS_DAY_SPLIT,
+            Self::ScopedReadFoundNothing => LEDGER_SCOPE_EMPTY_NOT_ESTABLISHED,
+        }
+    }
+
+    const fn note(self) -> &'static str {
+        match self {
+            Self::NameOutsideScopedAlphabet => {
+                "The named ledger's name is not one the ledger-scoped read sends (a character, spacing or length it does not admit), so the whole book's vouchers for the period were read and this ledger's figures taken from them. The read is larger and slower."
+            }
+            Self::NameHoldsFormulaWord => {
+                "The named ledger's name holds a word that Tally's formulas read as an operator, and the ledger-scoped read has not been observed on such a name, so the whole book's vouchers for the period were read and this ledger's figures taken from them. The read is larger and slower."
+            }
+            Self::PlanNeedsDaySplit => {
+                "A day of the named ledger's vouchers was too heavy for one ledger-scoped read, so the whole book's vouchers for the period were read and this ledger's figures taken from them. The read is larger and slower."
+            }
+            Self::ScopedReadFoundNothing => {
+                "The ledger-scoped read found no vouchers for the named ledger in the period, which is not taken as proof that there are none: the whole book's vouchers for the period were read and checked instead."
+            }
+        }
+    }
+
+    /// The fallback a failed ledger-scoped read asks for, from its code alone.
+    fn of_failure(failure: &ToolFailure) -> Option<Self> {
+        match failure.code.as_str() {
+            LEDGER_SCOPE_NEEDS_DAY_SPLIT => Some(Self::PlanNeedsDaySplit),
+            LEDGER_SCOPE_EMPTY_NOT_ESTABLISHED => Some(Self::ScopedReadFoundNothing),
+            _ => None,
+        }
+    }
+}
+
+/// The scope a catalogue ledger name reads by, or the reason it reads the book's window instead.
+fn scope_name_of(name: &str) -> Result<LedgerScopeName, WholeBookReason> {
+    LedgerScopeName::new(name).map_err(|refusal| match refusal {
+        LedgerScopeNameError::FormulaWord => WholeBookReason::NameHoldsFormulaWord,
+        LedgerScopeNameError::Empty
+        | LedgerScopeNameError::TooLong
+        | LedgerScopeNameError::Spacing
+        | LedgerScopeNameError::Character => WholeBookReason::NameOutsideScopedAlphabet,
+    })
+}
+
+/// What the result says about a read by the ledger's own vouchers. It states what was compared,
+/// not that the two reads agree: the lab has compared them for one party ledger over a month
+/// and for one sales ledger on a day, and not for post-dated, optional, cancelled or zero-amount
+/// vouchers, nor for a ledger that holds most of the book.
+const LEDGER_SCOPED_NOTE: &str = "Only the vouchers Tally lists under the named ledger were read, not the whole book's. Compared with a whole-book read for one party ledger over a month and one sales ledger on a day only; a voucher Tally leaves out of its list for the ledger would not be seen.";
 
 impl Server {
     pub(super) async fn ledger_movement(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -37,15 +111,53 @@ impl Server {
                     )
                 })
                 .transpose()?;
-            let opening_read = self
+            // The one place a ledger enters a request (#485): the catalogue's own spelling of
+            // the ledger just resolved, never the argument. A name the scoped read does not
+            // admit reads the book's window instead, and the result says so.
+            let mut whole_book = None;
+            let scope_name = match selected.as_ref().map(|found| scope_name_of(found.name())) {
+                Some(Ok(name)) => Some(name),
+                Some(Err(reason)) => {
+                    whole_book = Some(reason);
+                    None
+                }
+                None => None,
+            };
+            let scoped_first = scope_name.as_ref().map_or(WindowScope::Book, WindowScope::Ledger);
+            let opening = self
                 .read_movement_vouchers(
                     &identity,
                     &company.name,
+                    scoped_first,
                     (from.clone(), to.clone()),
                     WindowPlanSource::Estimate { known_marks: None },
                     None,
                 )
-                .await?;
+                .await;
+            let (opening_read, scope) = match opening {
+                Ok(read) => (read, scoped_first),
+                Err(failure) if matches!(scoped_first, WindowScope::Ledger(_)) => {
+                    let Some(reason) = WholeBookReason::of_failure(&failure) else {
+                        return Err(failure);
+                    };
+                    whole_book = Some(reason);
+                    if let Some(attempt) = failure.evidence {
+                        evidence = combine_evidence(evidence.clone(), *attempt);
+                    }
+                    let read = self
+                        .read_movement_vouchers(
+                            &identity,
+                            &company.name,
+                            WindowScope::Book,
+                            (from.clone(), to.clone()),
+                            WindowPlanSource::Estimate { known_marks: None },
+                            None,
+                        )
+                        .await?;
+                    (read, WindowScope::Book)
+                }
+                Err(failure) => return Err(failure),
+            };
             let MovementPage {
                 rows: vouchers,
                 observed_rows: voucher_rows_observed,
@@ -76,11 +188,21 @@ impl Server {
                 .read_movement_vouchers(
                     &identity,
                     &company.name,
+                    scope,
                     (from, to),
                     WindowPlanSource::replay_of(opening_read.reads, opening_read.witness),
                     marks,
                 )
-                .await?;
+                .await
+                .map_err(|failure| match WholeBookReason::of_failure(&failure) {
+                    // The same parts, read again, now answer differently: the book moved.
+                    Some(_) => {
+                        let mut drifted = ToolFailure::from("voucher_snapshot_drifted".to_string());
+                        drifted.evidence = failure.evidence;
+                        drifted
+                    }
+                    None => failure,
+                })?;
             let closing_voucher_evidence = closing_read.evidence;
             let closing_snapshot = closing_voucher_evidence.response_sha256.clone();
             evidence = combine_evidence(evidence.clone(), closing_voucher_evidence);
@@ -176,7 +298,14 @@ impl Server {
                 .collect::<Vec<_>>();
             let truncated = offset.saturating_add(rows.len()) < total;
             let next_offset = truncated.then_some(offset + rows.len());
-            let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": if opening_unobserved {"partial"} else {"complete"}, "partial_reason": opening_unobserved.then_some("opening_balance_not_observed"), "ledger_match": selected.as_ref().map(|found| found.to_json(self.settings.redaction)), "ledgers": rows, "offset": offset, "next_offset": next_offset, "voucher_rows_observed": voucher_rows_observed, "balance_basis": "tally_period_opening_plus_direct_voucher_movement", "evidence_method": "runtime_ledger_opening_at_from_plus_literal_window_entries"}});
+            let window_scope = match (&selected, whole_book) {
+                (None, _) => Value::Null,
+                (Some(_), None) => json!({"basis": "ledger_scoped", "vouchers_read": voucher_rows_observed, "note": LEDGER_SCOPED_NOTE}),
+                (Some(_), Some(reason)) => {
+                    json!({"basis": "whole_book", "reason": reason.code(), "note": reason.note()})
+                }
+            };
+            let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": if opening_unobserved {"partial"} else {"complete"}, "partial_reason": opening_unobserved.then_some("opening_balance_not_observed"), "ledger_match": selected.as_ref().map(|found| found.to_json(self.settings.redaction)), "ledgers": rows, "offset": offset, "next_offset": next_offset, "voucher_rows_observed": voucher_rows_observed, "window_scope": window_scope, "balance_basis": "tally_period_opening_plus_direct_voucher_movement", "evidence_method": "runtime_ledger_opening_at_from_plus_literal_window_entries"}});
             // What the two window reads cost, when it is worth saying, goes in the
             // result beside the ledgers (#1239); the replay is the second read.
             let mut cost = json!({});
@@ -240,6 +369,7 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
+        scope: WindowScope<'_>,
         (from, to): (TallyDate, TallyDate),
         source: WindowPlanSource,
         known_marks: Option<CompanyMarks>,
@@ -250,8 +380,9 @@ impl Server {
             .map_err(|_| "invalid_date_range".to_string())?;
         let shape = VoucherReadShape::Movement;
         let read = self
-            .read_voucher_window(
+            .read_scoped_voucher_window(
                 identity,
+                scope,
                 company.as_str(),
                 &from,
                 &to,
@@ -273,8 +404,18 @@ impl Server {
         let mut evidence = read.evidence;
         let voucher_rows = read.rows;
         let result: Result<MovementPage, ToolFailure> = async {
-            let page =
-                parse_movement_rows(voucher_rows, range.from_yyyymmdd(), range.to_yyyymmdd())?;
+            let page = parse_scoped_movement_rows(
+                voucher_rows,
+                scope,
+                range.from_yyyymmdd(),
+                range.to_yyyymmdd(),
+            )?;
+            if page.observed_rows == 0 && matches!(scope, WindowScope::Ledger(_)) {
+                // The corroboration below asks whether the whole book is empty over the
+                // window; a ledger with no vouchers in a busy window is not that. Nothing is
+                // concluded from a scoped answer of none.
+                return Err(LEDGER_SCOPE_EMPTY_NOT_ESTABLISHED.to_string().into());
+            }
             if page.observed_rows == 0 {
                 let (corroboration, partial, reason) = self
                     .corroborate_empty_voucher_read(identity, company.as_str(), &from, &to, marks)
@@ -433,7 +574,17 @@ struct MovementPage {
     observed_rows: usize,
 }
 
+#[cfg(test)]
 fn parse_movement_rows(rows: Vec<Value>, from: &str, to: &str) -> Result<MovementPage, String> {
+    parse_scoped_movement_rows(rows, WindowScope::Book, from, to)
+}
+
+fn parse_scoped_movement_rows(
+    rows: Vec<Value>,
+    scope: WindowScope<'_>,
+    from: &str,
+    to: &str,
+) -> Result<MovementPage, String> {
     let observed_rows = rows.len();
     let vouchers = rows
         .into_iter()
@@ -442,6 +593,18 @@ fn parse_movement_rows(rows: Vec<Value>, from: &str, to: &str) -> Result<Movemen
                 .map_err(|_| "ledger_movement_read_failed".to_string())
         })
         .collect::<Result<Vec<_>, _>>()?;
+    // A ledger-scoped read promised the vouchers with a line on that ledger: a row without one
+    // means the filter is not what it was admitted as, and nothing it returned is summed.
+    if let WindowScope::Ledger(ledger) = scope {
+        if vouchers.iter().any(|voucher| {
+            !voucher
+                .ledger_entries
+                .iter()
+                .any(|entry| entry.ledger_name == ledger.as_str())
+        }) {
+            return Err(LEDGER_SCOPE_ROW_WITHOUT_LINE.to_string());
+        }
+    }
     // Check the whole window before excluding cancelled/optional records.
     if vouchers
         .iter()

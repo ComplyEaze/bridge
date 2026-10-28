@@ -9,20 +9,28 @@
 //! `DN Party 001`, protocol reference section 11c.6). The admission is therefore
 //! the observed alphabet and nothing wider: ASCII letters, ASCII digits and
 //! single spaces. Everything else, including `& . , - _`, other scripts and
-//! every symbol, is refused, never escaped. A name that is also a TDL word
-//! operator is not a character problem and this type does not refuse it: the
-//! caller builds the type only from a ledger it resolved against Tally's own
-//! catalogue, so what is sent is a name the book holds, but that does not
-//! establish that Tally reads such a name as a name (not established, section
-//! 11c.6).
+//! every symbol, is refused, never escaped. A name with a word a TDL formula
+//! reads as an operator (`FORMULA_WORDS`) is refused too: `CHILDOF` takes a
+//! formula, and no ledger name holding such a word has been read there (not
+//! established, section 11c.6). The caller builds the type only from a ledger it
+//! resolved against Tally's own catalogue, so what is sent is a name the book
+//! holds; that alone does not show Tally reads the name as a name.
 //! A request builder takes this type, never a string (AGENTS.md P2, P3, P7).
 //!
 //! The alphabet can be widened only by a lab run that reads a ledger whose name
-//! carries each added mark, a word operator, digits with a dash, and another
+//! carries each added mark, an operator word, digits with a dash, and another
 //! script, and compares the answers with the book-wide read.
 
 /// The longest ledger name admitted: the longest master name the import accepts.
 pub const LEDGER_SCOPE_NAME_MAX_CHARS: usize = 1024;
+
+/// Words a TDL formula reads as operators, compared without regard to case. A name holding one
+/// is refused. The list errs wide: a name it catches costs only the old, larger read of the
+/// book's window.
+pub const FORMULA_WORDS: [&str; 15] = [
+    "and", "or", "not", "is", "in", "contains", "like", "between", "starting", "ending", "with",
+    "equal", "greater", "less", "than",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LedgerScopeNameError {
@@ -32,6 +40,8 @@ pub enum LedgerScopeNameError {
     Spacing,
     /// A character outside the admitted alphabet.
     Character,
+    /// A word a TDL formula reads as an operator ([`FORMULA_WORDS`]).
+    FormulaWord,
 }
 
 impl LedgerScopeNameError {
@@ -41,6 +51,7 @@ impl LedgerScopeNameError {
             Self::TooLong => "ledger_scope_name_too_long",
             Self::Spacing => "ledger_scope_name_spacing",
             Self::Character => "ledger_scope_name_character",
+            Self::FormulaWord => "ledger_scope_name_formula_word",
         }
     }
 }
@@ -72,6 +83,13 @@ impl LedgerScopeName {
         if previous_space {
             return Err(LedgerScopeNameError::Spacing);
         }
+        if name.split(' ').any(|word| {
+            FORMULA_WORDS
+                .iter()
+                .any(|operator| word.eq_ignore_ascii_case(operator))
+        }) {
+            return Err(LedgerScopeNameError::FormulaWord);
+        }
         Ok(Self(name.to_string()))
     }
 
@@ -95,7 +113,16 @@ mod tests {
 
     #[test]
     fn plain_words_digits_and_single_spaces_are_admitted() {
-        for name in ["Cash", "ABC", "7", "Sales 2024", "a b c"] {
+        for name in [
+            "Cash",
+            "ABC",
+            "7",
+            "Sales 2024",
+            "a b c",
+            "Android",
+            "Order Book",
+            "Island",
+        ] {
             assert!(LedgerScopeName::new(name).is_ok(), "{name}");
         }
     }
@@ -175,11 +202,48 @@ mod tests {
             LedgerScopeNameError::TooLong,
             LedgerScopeNameError::Spacing,
             LedgerScopeNameError::Character,
+            LedgerScopeNameError::FormulaWord,
         ]
         .map(LedgerScopeNameError::code);
         let mut sorted = codes.to_vec();
         sorted.sort_unstable();
         sorted.dedup();
-        assert_eq!(sorted.len(), 4);
+        assert_eq!(sorted.len(), 5);
+    }
+
+    /// A name holding a word a formula reads as an operator is refused whatever its case, as a word
+    /// only: the same letters inside a longer word are a plain name.
+    #[test]
+    fn a_name_with_a_formula_word_is_refused_by_its_own_reason() {
+        for name in [
+            "Printing and Stationery",
+            "Rates and Taxes",
+            "Repairs AND Maintenance",
+            "Salary Not Paid",
+            "Interest On Loan Is Due",
+            "in",
+            "Sales or Returns",
+            "Less Than 10",
+            "Starting Stock",
+            "Bank With Overdraft",
+        ] {
+            assert_eq!(
+                LedgerScopeName::new(name),
+                Err(LedgerScopeNameError::FormulaWord),
+                "{name:?}"
+            );
+        }
+        for word in super::FORMULA_WORDS {
+            assert_eq!(
+                LedgerScopeName::new(word),
+                Err(LedgerScopeNameError::FormulaWord),
+                "{word}"
+            );
+        }
+        // An alphabet refusal is reported before a formula word is looked for.
+        assert_eq!(
+            LedgerScopeName::new("Ram & Sons and Co"),
+            Err(LedgerScopeNameError::Character)
+        );
     }
 }

@@ -7649,9 +7649,17 @@ mod ledger_scoped {
         assert_eq!(movement[..movement_start], window[..window_start]);
         assert_eq!(movement[movement_end..], window[window_end..]);
         let fetch = &window[window_start..window_end];
-        assert!(
-            fetch.contains("ALLLEDGERENTRIES.*") && fetch.contains("PARTYGSTIN"),
-            "{fetch}"
+        // The list the lab sent ledger-scoped: the book-wide window read's list as it stood before
+        // `REFERENCEDATE` was added (#1363), ending `PARTYGSTIN`.
+        assert!(fetch.starts_with("DATE,VOUCHERNUMBER,"), "{fetch}");
+        assert!(fetch.contains("ALLLEDGERENTRIES.*"), "{fetch}");
+        assert!(fetch.ends_with("REFERENCE,ISINVOICE,PARTYGSTIN"), "{fetch}");
+        assert!(!fetch.contains("REFERENCEDATE"), "{fetch}");
+        // It is the book-wide window list minus that one word: a change to the book-wide list is
+        // seen here, not silently sent ledger-scoped.
+        assert_eq!(
+            Some(fetch),
+            crate::agent::read_profiles::AGENT_VOUCHER_FETCH.strip_suffix(",REFERENCEDATE")
         );
         assert!(!movement[movement_start..movement_end].contains("ALLLEDGERENTRIES.*"));
     }

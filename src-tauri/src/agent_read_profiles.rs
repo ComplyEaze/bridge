@@ -44,9 +44,19 @@ use bridge_tally_protocol::ledger_scope::LedgerScopeName;
 /// synthetic book `BRIDGE SHAPE LAB` with this word added returned the element on every voucher
 /// (`TYPE="Date"`, empty on 66 of 67 and `YYYYMMDD` on one), and the answers were byte-equal to the
 /// same reads without it apart from the elements (protocol reference §8.2f).
-const AGENT_VOUCHER_FETCH: &str = "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
+pub(super) const AGENT_VOUCHER_FETCH: &str =
+    "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
 GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
 REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE";
+
+/// The window read's list without `REFERENCEDATE`: the list every ledger-scoped window read the lab
+/// sent carried (the bill trail's, #1356, on two books), and the book-wide window reads it was
+/// compared with. [`AGENT_VOUCHER_FETCH`] added `REFERENCEDATE` later (#1363) and has not been
+/// sent ledger-scoped, so it is not what a ledger-scoped read sends until a lab run does.
+const AGENT_LEDGER_WINDOW_FETCH: &str =
+    "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
+GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
+REFERENCE,ISINVOICE,PARTYGSTIN";
 
 /// The FETCH list for `ledger_movement`, which DISCARDS bill allocations.
 ///
@@ -252,7 +262,9 @@ fn render_windowed_vouchers(
 pub(super) enum LedgerVoucherFields {
     /// The movement read's: the three entry fields movement uses ([`AGENT_MOVEMENT_FETCH`]).
     Movement,
-    /// The window read's: every entry field and the invoice fields ([`AGENT_VOUCHER_FETCH`]).
+    /// The window read's list as the lab sent it ledger-scoped, before `REFERENCEDATE` was added to
+    /// the window read (#1363): every entry field and the invoice fields, ending `PARTYGSTIN`
+    /// ([`AGENT_LEDGER_WINDOW_FETCH`]).
     Window,
 }
 
@@ -261,7 +273,7 @@ impl LedgerVoucherFields {
     fn fetch(self) -> &'static str {
         match self {
             Self::Movement => AGENT_MOVEMENT_FETCH,
-            Self::Window => AGENT_VOUCHER_FETCH,
+            Self::Window => AGENT_LEDGER_WINDOW_FETCH,
         }
     }
 }

@@ -8221,7 +8221,7 @@ mod ledger_window {
         // The same read, taken for a party whose ledger none of its vouchers carries a line on.
         let (read, _) = read_day(dense_day(), eighty_two_a_read()).await;
         let refused = outcome(read, "DN Party 001").unwrap_err();
-        assert_eq!(refused.code, "ledger_scope_row_without_line");
+        assert_eq!(refused.code, "party_ledger_row_without_line");
         assert!(refused.evidence.is_some(), "the reads made are kept");
         // An empty census: every span of the day answered empty, and the read an empty collection
         // (the captured empty answer of the same book and run).

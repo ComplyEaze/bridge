@@ -463,7 +463,61 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
             crate::agent::refusal_remediation(code).is_some(),
             "{code} names its next step"
         );
+        // The party's name is outside what a read by a ledger sends, so its ledger is not read
+        // and the company window's refusal stands, saying why (#1356).
+        let scope = failure
+            .window_scope()
+            .expect("the refusal says why the ledger was not read");
+        assert_eq!(scope.basis, "whole_book", "{code}");
+        assert_eq!(
+            scope.reason,
+            Some("ledger_name_outside_scoped_alphabet"),
+            "{code}"
+        );
     }
+}
+
+/// A party the company window cannot be read for, whose ledger name a read by a ledger sends, is
+/// read by its ledger (#1356): its census, served the captured three vouchers, which all carry
+/// that ledger. Under these limits the party's own plan needs as many requests as the company's,
+/// so the read by the ledger is refused in turn, as its own refusal and said to be so.
+#[tokio::test]
+async fn a_party_whose_window_is_refused_is_read_by_its_ledger_and_its_refusal_says_so() {
+    let window = WindowReadLimits {
+        budget_bytes: crate::agent::WINDOW_READ_BUDGET_BYTES,
+        default_bytes_per_voucher: crate::agent::WINDOW_READ_BUDGET_BYTES,
+        max_reads: 2,
+        small_books: SmallBooks::Skip,
+    };
+    let cycle = import_cycle_plans();
+    let census = || {
+        [
+            cycle[0].clone(),
+            captured_window(),
+            cycle[1].clone(),
+            captured_window(),
+            cycle[1].clone(),
+            cycle[0].clone(),
+        ]
+    };
+    let mut plans = company_and_catalogue();
+    plans.extend(census());
+    // The ledger's census: one span of the book's mark.
+    plans.extend(census());
+    let mut call = Call::new(DetailKind::BillTrail);
+    call.party = "WR2 Sales";
+    call.limits = Some(DetailLimits { rows: 500, window });
+    let (result, served) = run(plans, call).await;
+    let failure = result.unwrap_err();
+    assert_eq!(failure.code, "trail_window_too_large");
+    assert_eq!(failure.cause, Some("voucher_window_too_many_reads"));
+    let scope = failure
+        .window_scope()
+        .expect("the refusal says which read it was");
+    assert_eq!(scope.basis, "ledger_scoped");
+    assert_eq!(scope.reason, None);
+    // The company, the catalogue, the marks and the company census, then the ledger's census.
+    assert_eq!(served, 22);
 }
 
 /// Any other refusal of the window read is passed through unchanged.

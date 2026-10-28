@@ -866,6 +866,12 @@ impl ToolFailure {
         self
     }
 
+    /// The scope a refusal reports, when it reports one.
+    #[cfg(test)]
+    fn window_scope(&self) -> Option<ScopeReport> {
+        self.read_detail.as_ref()?.window_scope
+    }
+
     fn with_incomplete_read(mut self, read: IncompleteRead) -> Self {
         self.read_detail
             .get_or_insert_with(Box::default)
@@ -1697,6 +1703,17 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              exactly that sequence before parsing, so a ledger name carrying it would read back \
              as different text and could never be confirmed as posted. Rename the ledger to \
              drop that sequence and resubmit.",
+        ),
+        // The `outstandings` party detail's read by the party's ledger returned a voucher with no
+        // line on that ledger (#1356): nothing was used, and the company window's own read had
+        // already been refused as needing too many requests.
+        "party_ledger_row_without_line" => Some(
+            "ComplyEaze Bridge read this party's vouchers by its ledger, because the company's \
+             vouchers for the window needed too many requests, and Tally returned a voucher that \
+             has no line on that ledger, so the detail used none of them. Tell the user the \
+             party's detail could not be read this way, and do not repeat the same call in a \
+             loop. A shorter window helps when a bill is named: name a `reference` that \
+             `open_bills` lists for the party, and the read starts at that bill's date.",
         ),
         // A ledger-scoped movement read returned a voucher with no line on the ledger (#485):
         // nothing was summed. The same figures are in the Trial Balance, which does not read

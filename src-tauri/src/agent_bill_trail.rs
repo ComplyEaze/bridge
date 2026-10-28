@@ -18,10 +18,7 @@
 //! whether that difference equals the ledger's opening balance is stated as a
 //! fact and never called an opening. A [`BillTrail`] exists only for a bill
 //! that tied (its constructor is private).
-use super::movement::{
-    scope_name_of, WholeBookReason, LEDGER_SCOPE_EMPTY_NOT_ESTABLISHED,
-    LEDGER_SCOPE_ROW_WITHOUT_LINE,
-};
+use super::movement::{scope_name_of, WholeBookReason, LEDGER_SCOPE_EMPTY_NOT_ESTABLISHED};
 use super::*;
 use bridge_tally_core::{ExactDecimal, TallyDate};
 use bridge_tally_protocol::ledger_scope::LedgerScopeName;
@@ -901,6 +898,11 @@ pub(super) fn ledger_scope_after(
     scope_name_of(party).map_err(|reason| Some(NotByLedger::Name(reason)))
 }
 
+/// The read by the party's ledger returned a voucher with no line on that ledger (#1356): nothing
+/// it returned is used. Its own code, not the movement read's, so the next step it names is the
+/// detail's.
+pub(super) const PARTY_LEDGER_ROW_WITHOUT_LINE: &str = "party_ledger_row_without_line";
+
 /// What a party detail does with its ledger-scoped read (#1356).
 #[derive(Debug)]
 pub(super) enum LedgerOutcome {
@@ -916,8 +918,8 @@ pub(super) enum LedgerOutcome {
 /// nothing (a party with no voucher in the window, or a name the collection did not resolve: not
 /// told apart) and a plan that needs a part never observed ledger-scoped (a day divided by
 /// AlterID) leave the company window's refusal standing, with their reason. A row with no line on
-/// the ledger is the ledger read's own refusal (`ledger_scope_row_without_line`, as the movement
-/// read refuses it), and so is every other failure of that read, a part not admitted against the
+/// the ledger is the ledger read's own refusal ([`PARTY_LEDGER_ROW_WITHOUT_LINE`]), and so is
+/// every other failure of that read, a part not admitted against the
 /// census included: its code is kept. The evidence of every read made is returned beside it.
 pub(super) fn ledger_outcome(
     read: Result<WindowReadOutcome<Value>, ToolFailure>,
@@ -935,7 +937,7 @@ pub(super) fn ledger_outcome(
             }
             if !every_row_has_a_line_for(&rows, party) {
                 return Err(with_evidence(
-                    ToolFailure::from(LEDGER_SCOPE_ROW_WITHOUT_LINE.to_string()),
+                    ToolFailure::from(PARTY_LEDGER_ROW_WITHOUT_LINE.to_string()),
                     &evidence,
                 ));
             }

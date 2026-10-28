@@ -4031,7 +4031,7 @@ refusal stands and carries `window_scope` with `basis` `whole_book` and the `rea
 ledger read itself keeps its own code, with `window_scope` `basis` `ledger_scoped`: a part not
 admitted against the census (`voucher_window_part_not_admitted`, which is what a book that moved
 between the census and the read looks like), a row with no line on the ledger
-(`ledger_scope_row_without_line`), or the party's own vouchers needing too many requests. The
+(`party_ledger_row_without_line`), or the party's own vouchers needing too many requests. The
 ledger census costs one request (sent twice, as every read is) per 8,192 of the book's AlterIDs,
 spent after the company window's census, so such a call can take about twice as long; that cost
 is unmeasured. A named bill's window never starts before the books.

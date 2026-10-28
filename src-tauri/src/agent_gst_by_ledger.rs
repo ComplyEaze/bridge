@@ -387,19 +387,22 @@ fn gst_by_ledger_result(index: &MasterIndex, totals: &GstByLedger, redaction: Re
         .iter()
         .map(|(name, bucket)| {
             let ledger = index.by_name.get(name);
+            let parent = ledger.and_then(|ledger| ledger.parent.as_deref());
+            let under_root = parent.is_some_and(bridge_tally_protocol::is_tally_reserved_root);
             let mut item = json!({
                 "ledger": name,
                 "ledger_guid": index.guid_of(name),
                 "group": ledger.and_then(|ledger| ledger.reserved.as_deref()),
-                "parent": ledger.and_then(|ledger| ledger.parent.as_deref()),
+                "parent": parent.map(bridge_tally_protocol::tally_root_as_sent),
                 "vouchers": bucket.vouchers,
                 "debit_side_tax": bucket.debit.to_json(),
                 "credit_side_tax": bucket.credit.to_json(),
             });
             mark_party_field(&mut item, "ledger");
             // A parent the book named itself (a sub-group) is masked like a ledger name; a
-            // parent that is the predefined group itself is not a name of the book's.
-            if item["parent"] != item["group"] {
+            // parent that is the predefined group itself, or Tally's root, is not a name of
+            // the book's.
+            if !under_root && item["parent"] != item["group"] {
                 mark_party_field(&mut item, "parent");
             }
             item

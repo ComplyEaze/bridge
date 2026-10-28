@@ -9,6 +9,7 @@ use bridge_tally_protocol::native_masters::{
 use bridge_tally_protocol::native_voucher_type_numbering::{
     DuplicateSetting, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
 };
+use bridge_tally_protocol::tally_root_as_sent;
 
 impl Server {
     pub(super) async fn masters(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -64,7 +65,7 @@ impl Server {
                         .map(|group| {
                             json!({
                                 "name": group.name,
-                                "parent": group.parent.nonempty_returned_text(),
+                                "parent": group.parent.nonempty_returned_text().map(tally_root_as_sent),
                                 "reserved_name": group.reserved_name,
                             })
                         })
@@ -100,7 +101,7 @@ impl Server {
             "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only",
             "One kind per call; no counts or hints; a master's aliases are not returned",
             if marks_party_text(kind) {
-                "Under mask_parties, godown, stock-group, stock-item, cost-centre and cost-category names, parents and categories are masked, because a job-work godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is left as it is"
+                "Under mask_parties, godown, stock-group, stock-item, cost-centre and cost-category names, parents and categories are masked, because a job-work godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is shown as `&#4; Primary` and is not masked"
             } else {
                 "Voucher-type, unit and account-group names are not masked by mask_parties: they are configuration labels, not counterparties (godown, stock-group, stock-item, cost-centre and cost-category names are masked)"
             },
@@ -288,7 +289,7 @@ fn native_row(row: &NativeMasterRow, mark_party_text: bool) -> Value {
     let mut json = json!({
         "name": row.name, "guid": row.guid,
         "master_id": row.master_id, "alter_id": row.alter_id,
-        "parent": row.parent,
+        "parent": row.parent.as_deref().map(tally_root_as_sent),
     });
     if mark_party_text {
         mark_party_field(&mut json, "name");

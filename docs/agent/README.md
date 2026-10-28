@@ -492,8 +492,8 @@ Measured on one synthetic book of TallyPrime 7.1 Silver (PARTIAL); a state row o
 `Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured (protocol
 reference §12a.22). A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
-parent that is Tally's reserved root keeps its marker form, as in
-`trial_balance`. Alias names are not returned.
+parent that is Tally's reserved root is written `&#4; Primary`, the text Tally
+sends, as in `trial_balance` (a group a user named Primary is written plain). Alias names are not returned.
 
 A `voucher_types` row also carries `series_numbering`, the numbering of the
 type's number series, which `numbering_method` is not (that is the type-level
@@ -613,8 +613,8 @@ hints (the company's `NUM*` fields), stock-item quantities or values (use `stock
 
 Under `mask_parties`, godown, stock-group, stock-item, cost-centre and cost-category names, their `parent`
 values and a cost centre's `category` are masked like a party name, because a job-work
-godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is a
-fixed marker and is left as it is. Voucher-type, unit and account-group names
+godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is shown as
+`&#4; Primary` and is not masked. Voucher-type, unit and account-group names
 are not masked: they are configuration labels, not counterparties.
 
 ### Cash Flow
@@ -1249,8 +1249,8 @@ company-flags read requires exactly one Company row for the GUID
 
 Under `mask_parties`, an item's `name` and `parent` are masked like a party name,
 because stock-item and stock-group names are free text that can carry a customer's
-or supplier's name; Tally's reserved root as a parent is a fixed marker and is left
-as it is. `guid` is not masked and is the identity the `items` filter uses.
+or supplier's name; Tally's reserved root as a parent is shown as `&#4; Primary` and is
+not masked. `guid` is not masked and is the identity the `items` filter uses.
 
 ### Profit and Loss and Balance Sheet
 

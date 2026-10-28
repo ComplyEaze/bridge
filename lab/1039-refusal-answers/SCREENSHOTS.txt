@@ -1,0 +1,11 @@
+# Captures of the whole Tally window; they stay on the lab PC. sha256, bytes, name.
+2e023765f94fc3484f7f29e669418e863f40fa9b45dce9ab8eccba1d22373d93  25742  a1-after-save.png
+db8c3ea3c7d2f7195c1928e5d59ff549c2b1c24aa265b3dde65017082a242ad9  27573  a1-hand1-filled-unsaved.png
+356232743c32251f10b44b677061b39e77975ebcf5c08046cc98513141b34a4b  52352  bkr-before-accept.png
+9ee9425020853f46798709c289d69751694d39a9fad741cf7208f3e8c653811e  72584  c10-no-company.png
+9b566351d3552b4452752ad3dcb96e86df4bf4eb620c44b4263e9fcc5531bc49  45319  s0-tally.png
+67bde168a5f4890bd80c5385d4cc937ed0ee506d97f1860aaf86563522def12d  28407  s1-after-save-click.png
+24deb00f7093d6fa7bb667117953b2b36ea7a9b268525abb7fe92aebab6fd1f3  27515  s1-hand0-filled.png
+# Frame recorder log and backup, stay on the lab PC
+8f1310b86b9e2615573a579b4b46eb3633a4dd75a3a80ce7ba2a889945cb6151  122  rec-log.txt (3,553 frames, 145,619,029 B in all; see rec-manifest.txt)
+56c851bc78b71616d9c9ee243e401876622edc247e7b949ed258f1b79924cf54  27408  TDBK1800_100091.001 (BK-R)

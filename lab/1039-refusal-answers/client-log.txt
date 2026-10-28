@@ -1,0 +1,19 @@
+2026-10-28T05:28:51Z exe sha256 6f520338b7f9a25180977c40a5f1d9b03dfa5774df5b5d9a6e65b9c2a050728d ok; launch-env.json sha256 8471045cbae9d90a5d13dbedf8ea44f256ec0c08bacf924751389af6637066bd; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: True
+2026-10-28T05:28:51Z launched pid 23940; stderr to server-stderr-20261028T052851Z.log
+2026-10-28T05:28:51Z initialized {'name': 'bridge-tally', 'version': '0.6.0'}
+2026-10-28T05:28:55Z 000-tools-list.json tool=list secs=0.018 isError=None error=None saved_sha256=d2e478984f4f01f07bc8375bff0eb41f3fc5f68522eb42b501effd07f947a743
+2026-10-28T05:28:56Z 001-s0-list_companies.json tool=list_companies secs=0.109 isError=False error=None saved_sha256=8948b0fcaa12824696598be20f576478c92a5779cef342a77568e84e0afce27a
+2026-10-28T05:28:58Z 002-s0-m0-marks.json tool=ledger_masters secs=0.709 isError=False error=None saved_sha256=1d89300691820261f009560f3a47eade27677837e0507931cca933e4ef15c43c
+2026-10-28T05:29:00Z 003-s0-vouchers-202504.json tool=vouchers secs=2.021 isError=False error=None saved_sha256=f1a0ff3586842dac60307d9ad1bc1881e1d9ba44986441db6c2ba41067c2fbd1
+2026-10-28T05:30:54Z 004-s0-after-bkr-marks.json tool=ledger_masters secs=0.767 isError=False error=None saved_sha256=c5945c816fc24ee32e8b6d27242858afbf52d229f778e5214267ab67cf55ca58
+2026-10-28T05:31:14Z 005-s1-md0-marks.json tool=ledger_masters secs=0.854 isError=False error=None saved_sha256=ef8806ea5d330d8f14742160c40fc5dc10cd57b847da2c3fccaff7cd7c52c95d
+2026-10-28T05:33:51Z 006-s1-md1-marks.json tool=ledger_masters secs=0.857 isError=False error=None saved_sha256=eaac3f333150d0ff97f8f27ff2accde95f07ddcc58be6f6f5f5cef8cb18b2c77
+2026-10-28T05:34:31Z 007-a1-build_import_xml.json tool=build_import_xml secs=5.526 isError=False error=None saved_sha256=d7527f7e9110a371a3b74c3888e751b06eacd2bcd3e5f27d69db2381f20e9882
+2026-10-28T05:36:18Z 008-a1-vk0-marks.json tool=ledger_masters secs=0.869 isError=False error=None saved_sha256=20147ea13a7c52796c18b12a838aa96c000caf772ca2902912b850130bf5b17e
+2026-10-28T05:39:00Z 009-a1-post_import.json tool=post_import secs=30.284 isError=True error=None saved_sha256=e2f123c777d57a30089c75eff1517cc7f23b0599b5ae15e571ab8ecef97a6462
+2026-10-28T05:39:49Z 010-a1-s6-vouchers-20250428.json tool=vouchers secs=2.344 isError=False error=None saved_sha256=cc0150cfeb3f2a91df4d413f035f460c2ddf0416f80c3c6a01e02110934e773e
+2026-10-28T05:39:54Z 011-a1-s6-vouchers-20250421.json tool=vouchers secs=4.381 isError=False error=None saved_sha256=c37263371d7c431924acbcd144fd7b7285bebdd8e3f3f4ab2612639b05760e01
+2026-10-28T05:39:56Z 012-a1-vk1-marks.json tool=ledger_masters secs=0.866 isError=False error=None saved_sha256=0643a62505d3b5e46c04f76dfce7f255b9ab838c8bcf7bd66f1ce047b5ece070
+2026-10-28T05:40:23Z 013-s8-verify_import-b1.json tool=verify_import secs=3.355 isError=True error=None saved_sha256=93f57151a41fed962934231c9c8ec0539120bb97bb4ae94acbeb584a0d3498c8
+2026-10-28T05:40:37Z 014-s8-local_data_report.json tool=local_data_report secs=13.046 isError=False error=None saved_sha256=5b8d9ebffb7846e730b8f3c171b74580cd9913b68ec4746e8adc051abdade6cb
+2026-10-28T05:42:35Z session ended; server pid 23940 exit code 0

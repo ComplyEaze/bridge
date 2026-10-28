@@ -59,9 +59,34 @@ WRITES to the book: NONE. The box is answered **No, by mouse**. No key is typed 
   - the box's position, `topmost` and `foreground`, and Tally's;
   - title `ComplyEaze Bridge — post this voucher?`;
   - first line, with line breaks read as spaces: `Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is posted until you answer.`;
-  - voucher lines that match the build file, and No drawn as the default.
+  - No drawn as the default;
+  - the lines under the first line, compared line by line with the list below. This is the one-voucher text as `agent_import_post.rs` renders it at 67f647e1a. Dates are shown as Tally's own `YYYYMMDD`, not "14 Sep 2026". `<BATCH-C>` is C0's `batch_id`:
 
-  A difference in the voucher lines = No by mouse, then STOP. Type nothing.
+    ```
+    Create ONE Receipt in "BRIDGE BATCH LAB"
+    Company GUID: a30f23c3-4819-4334-96ab-ffa6fba70976
+    Company number: 100050  Books from: 20260401
+    Tally: http://127.0.0.1:9001
+    Date: 20260914  Voucher number: Tally assigns it  (the voucher's own text: last two lines)
+
+    Dr 141.00  "Synthetic Bank Ledger"
+    Cr 141.00  "Party A"
+    Total debit: 141  Total credit: 141
+    Checked in Tally: every Dr ledger is bank/cash; every Cr ledger holds no money.
+    Batch: <BATCH-C>
+    Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+    Do not post a file already imported manually.
+    Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+    After a timeout, reconcile this batch; do not rebuild or resend it.
+    ---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+    Reference: (none)
+    Narration: "Lab topmost probe 1"
+    ```
+
+  - The box may show more lines of ComplyEaze Bridge's own between "After a timeout ..." and the dashed line, for example one that says when it posts. Record each word for word; they are not a STOP.
+  - **STOP rule:** a difference in any line that names the company, its GUID or number, the voucher type, the date, an entry, a total, the batch, the reference or the narration = No by mouse, then STOP.
+  - A difference only in a line of ComplyEaze Bridge's own wording is recorded word for word and is not a STOP.
+  - Type nothing.
 - C3. **The click into Tally**, at about T0+17 s.
   - From the T0+15 s screenshot, pick ONE point inside Tally's window that is:
     - at least 100 px from every edge of the box;

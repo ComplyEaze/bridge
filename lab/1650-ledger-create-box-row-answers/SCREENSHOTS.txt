@@ -1,0 +1,12 @@
+# Captures (Tally window and the two answered boxes); they stay on the lab PC. sha256, bytes, name.
+4ef9300e4adf9ce9e5e02e99744055da2fa8e9efe60524e1efbcb2f3938644cc  52103  bk1-before-accept.png
+5cf7ffa478cb62c4d115d5f3ea92b9ee87e457ee17426b07e3dd313d1abc3e2f  72573  c10-no-company.png
+02dd00140bfa6e1cc83d9c4036c292a4e8c0d6e5b6b93337bac313039f4327bb  76085  s0-about.png (machine details; local only)
+fe82dd049a22ef6af9d9b5c7cc5013577838dd07f7b81a8262b6e0837be5429a  82384  s0-list-no-ledgerbox.png
+6ebca9a4b43abd01d4b758ef72ab90c4f9f7dd8fdf69e81ff37cda7bc8b487c9  39882  s1-create-before-accept.png
+0ec02564b67c28e845bbd969edb093f1f3ebe87c7ce0cd03885e62c3dec12980  81838  s1-features-offered.png
+009ec2a6a9cb21345165944e0a0171ab700efe0ade8a9de5f1bb82c18b41fabc  21301  s5-box-decline.png
+b50a34175fba14aa6fe2e64fa34af38782a413b8479175f871108b0718d2714e  21390  s6-box-accept.png
+531c76747e4574619b66f916f40b116e27acacb0264ba8e8f8a7bd400b8e925a  44575  s6-tally-after.png
+# Backup, stays on the lab PC
+7f5eeebc8a83ffeaf8a0f5dc1e4887abf9cfd3794e04e228c446bc5e237dcaa4  23406  TDBK1800_100092.001 (BK1)

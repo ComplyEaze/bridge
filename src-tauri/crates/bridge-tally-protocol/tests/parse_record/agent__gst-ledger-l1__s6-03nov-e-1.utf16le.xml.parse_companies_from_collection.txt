@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "BRIDGE GST LEDGER LAB",
+        guid: Some(
+            "aae372c5-a894-491c-8843-5532e43d2d2f",
+        ),
+        company_number: Some(
+            "100077",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+])

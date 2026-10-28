@@ -1,0 +1,16 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/src/native_ledger_collection.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/mod.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/request.rs
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_ledgers.rs
+src-tauri/src/agent_tests.rs
+src-tauri/src/commands.rs
+src-tauri/src/reports/party_ledger_master_xlsx.rs
+src-tauri/src/reports/party_ledger_master_xlsx_tests.rs
+src-tauri/src/tally/connection.rs
+reviewer: lamemustafa

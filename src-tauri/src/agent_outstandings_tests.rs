@@ -193,6 +193,7 @@ async fn forex_outstandings(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -635,6 +636,7 @@ async fn mcp_outstandings_refuse_a_conflicting_detail_request_before_any_read() 
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let guid = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
@@ -805,6 +807,7 @@ async fn ageing_outstandings_with(
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let mut arguments =
@@ -1093,6 +1096,7 @@ async fn replay_recorded_call(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server

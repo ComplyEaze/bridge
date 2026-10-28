@@ -91,6 +91,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "cash_flow",
         "company_features",
         "egress_log",
+        "gst_by_counter_ledger",
         "gst_status",
         "gst_uncertain_vouchers",
         "ledger_masters",
@@ -143,6 +144,8 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         ("verify_import", false, "Reads the batch's date window from Tally, then adds new proof files for the batch beside every earlier one and a status record naming them current, and may also add a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer, replacing and deleting nothing there (paging an existing proof only reads it); writes nothing to Tally."),
         // Its two verifications add proofs as verify_import does: additive.
         ("acknowledge_post_review", false, "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also adds proof files and status records there, replacing and deleting nothing; writes nothing to Tally."),
+        // A new record of the prepared ledger each call, replacing nothing: additive.
+        ("prepare_ledger_creates", false, "Reads the company's ledger and group names from Tally once, then writes one record of the prepared ledger to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally."),
     ];
     let definitions = registered_tool_definitions(true, true);
     let published: Vec<&str> = definitions
@@ -155,6 +158,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     let mut expected: Vec<&str> = READ_TOOLS.to_vec();
     expected.extend(LOCAL_WRITERS.iter().map(|(name, _, _)| *name));
     expected.push("post_import");
+    expected.push("post_ledger_creates");
     let mut published_sorted = published.clone();
     published_sorted.sort_unstable();
     expected.sort_unstable();
@@ -214,9 +218,12 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
             );
             assert!(!description.contains(READ_SENTENCE), "{name}");
         } else {
-            // post_import: its own long description says it posts to Tally, and it
-            // takes no appended sentence.
-            assert_eq!(name, "post_import");
+            // post_import and post_ledger_creates: each long description says it
+            // posts to Tally, and takes no appended sentence.
+            assert!(
+                matches!(name, "post_import" | "post_ledger_creates"),
+                "{name}"
+            );
             assert_eq!(annotation(tool, "readOnlyHint"), json!(false), "{name}");
             assert_eq!(annotation(tool, "destructiveHint"), json!(true), "{name}");
             assert!(!description.contains(READ_SENTENCE), "{name}");
@@ -308,6 +315,7 @@ async fn voucher_type_selector_is_bounded_before_any_tally_read() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let mut args = json!({"company_guid":"00000000-0000-4000-8000-000000000001",
@@ -348,6 +356,7 @@ async fn verification_remains_catalogued_and_admitted_when_import_and_writes_are
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server.call_tool_response("verify_import", json!({})).await;
@@ -373,6 +382,7 @@ async fn master_validation_rejects_unbounded_and_blank_names_before_tally() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     for ledgers in [
@@ -420,6 +430,7 @@ async fn ledger_selectors_are_bounded_before_company_or_catalogue_reads() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     for tool in ["vouchers", "ledger_movement"] {
@@ -456,6 +467,7 @@ async fn oversized_unknown_property_cannot_expand_response_or_retained_evidence(
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     for key in ["unknown".to_string(), "x".repeat(1_000_000)] {
@@ -1364,6 +1376,21 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "a voucher whose flags were not read is not reported as in the return",
         ),
         (
+            "gst_by_counter_ledger",
+            "not a return figure",
+            "the GST totals are not presented as a return figure",
+        ),
+        (
+            "gst_by_counter_ledger",
+            "Nothing is apportioned",
+            "a voucher with several counter ledgers is never split",
+        ),
+        (
+            "gst_by_counter_ledger",
+            "It does not decide input tax credit eligibility",
+            "the totals make no eligibility or availment claim",
+        ),
+        (
             "gst_status",
             "The reason for a status is not available",
             "the tool names no reason for a status",
@@ -1475,7 +1502,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         .expect("extension description");
     for phrase in [
         "goes to your AI provider",
-        "can only shorten party and ledger names and bank account numbers or drop narrations",
+        "can only shorten party and ledger names, bank account numbers and ledger address lines, or drop narrations",
     ] {
         assert!(
             extension.contains(phrase),
@@ -1743,20 +1770,25 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// The most bytes each configuration's tools/list answer may take, as
 /// `listed_tool_definitions` serves it: the extension default (the list every
 /// desktop extension user carries, its settings read from the manifest below),
-/// then import and posting on, then import, posting and the tax audit on. The
+/// then import and posting on, then import, posting and the tax audit on, then
+/// all of those and master writes (the two ledger tools) on. The
 /// answer is sent whole at the start of every session, so its size is a cost to
 /// every conversation; raising a budget is argued in the pull request that
 /// needs it. Each must also stay under the control-message ceiling, or
 /// tools/list would answer `agent_response_too_large` and leave the server
 /// without tools. Each was set to its list's size plus the margin the full list
 /// then had under its single budget (18,752 bytes), rounded up to a thousand:
-/// none was raised, and each keeps at least that margin.
-const TOOL_LIST_BUDGETS: [usize; 3] = [200_000, 223_000, 225_000];
+/// none was raised, and each keeps at least that margin. The master-writes list
+/// has a budget of its own: the two ledger tools add about 4,700 bytes to the
+/// full list, so its budget is the full list's plus the margin the full list now
+/// has under its own (about 4,000 bytes), rounded up to a thousand.
+const TOOL_LIST_BUDGETS: [usize; 4] = [200_000, 223_000, 225_000, 230_000];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);
     assert!(TOOL_LIST_BUDGETS[1] < ceiling);
     assert!(TOOL_LIST_BUDGETS[2] < ceiling);
+    assert!(TOOL_LIST_BUDGETS[3] < ceiling);
 };
 
 #[test]
@@ -1778,10 +1810,17 @@ fn each_tool_list_stays_within_its_byte_budget() {
         true,
         default_of(super::super::POSTING_SETTING_KEY),
         default_of(super::super::AUDIT_SETTING_KEY),
+        // master writes are not an extension setting
+        false,
     );
-    let settings = [extension_default, (true, true, false), (true, true, true)];
-    let measured = settings.map(|(import, posting, audit)| {
-        let definitions = listed_tool_definitions(import, posting, audit);
+    let settings = [
+        extension_default,
+        (true, true, false, false),
+        (true, true, true, false),
+        (true, true, true, true),
+    ];
+    let measured = settings.map(|(import, posting, audit, masters)| {
+        let definitions = listed_tool_definitions(import, posting, audit, masters);
         // As `agent_protocol.rs` frames it, with its newline and a short request
         // id; a longer id takes its own bytes.
         let total = format!(
@@ -1792,8 +1831,8 @@ fn each_tool_list_stays_within_its_byte_budget() {
         (total, definitions)
     });
     let summary = format!(
-        "extension default {}, import and posting on {}, everything on {} (budgets {TOOL_LIST_BUDGETS:?})",
-        measured[0].0, measured[1].0, measured[2].0
+        "extension default {}, import and posting on {}, everything on {}, master writes as well {} (budgets {TOOL_LIST_BUDGETS:?})",
+        measured[0].0, measured[1].0, measured[2].0, measured[3].0
     );
     for ((total, definitions), budget) in measured.iter().zip(TOOL_LIST_BUDGETS) {
         let mut sizes = definitions

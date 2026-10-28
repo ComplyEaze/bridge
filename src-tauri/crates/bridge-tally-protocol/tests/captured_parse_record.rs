@@ -55,8 +55,8 @@ use bridge_tally_protocol::{
     company_list_may_be_in_educational_mode, decode_tally_xml_response_bytes_limited,
     export_status, parse_companies_from_collection, parse_company_gateway_capability_observation,
     parse_import_evidence, parse_import_outcome, parse_import_result, parse_ledger_census_slice,
-    parse_ledger_source_records_with_evidence, parse_ledgers, parse_ledgers_with_evidence,
-    parse_native_group_source_records_with_evidence,
+    parse_ledger_name_index, parse_ledger_source_records_with_evidence, parse_ledgers,
+    parse_ledgers_with_evidence, parse_native_group_source_records_with_evidence,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_with_evidence,
     parse_native_voucher_source_records_with_evidence,
@@ -285,9 +285,12 @@ const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
 const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
+const MASTERS_LAB_GUID: &str = "f107e523-3d6b-4516-bd24-5b1a14498fa6";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+const GST_LEDGER_LAB_GUID: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
+const MAILING_LAB_GUID: &str = "8e34483e-2bd3-472b-ae37-c4b197e8c15a";
 const TIEOUT_B_GUID: &str = "d64eda55-da7c-4106-a171-3e3cb6cdd331";
 const TIEOUT_D_GUID: &str = "6a9518b2-a88c-417c-a700-40243f9d9119";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
@@ -591,7 +594,19 @@ const ROWS: &[Row] = &[
         parse: |_, text| companies(text),
     },
     Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_companies_from_collection",
+        parse: |_, text| companies(text),
+    },
+    Row {
         fixture: "tests/fixtures/agent/register-e2e/native-register-e2e-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_gateway_capability_observation",
+        parse: |_, text| gateway(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml",
         source: Source::Captured,
         parser: "parse_company_gateway_capability_observation",
         parse: |_, text| gateway(text),
@@ -658,6 +673,18 @@ const ROWS: &[Row] = &[
                 text,
                 "tests/fixtures/agent/register-e2e/native-register-e2e-extent.utf16le.xml",
                 REGISTER_LAB_GUID,
+            )
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-b-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_book_extent_v2(GST LEDGER LAB)",
+        parse: |_, text| {
+            extent_v2(
+                text,
+                "tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml",
+                GST_LEDGER_LAB_GUID,
             )
         },
     },
@@ -942,6 +969,30 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_standard_ledger_catalog_with_identities(OUTSTANDINGS LAB)",
         parse: |_, text| catalogue(text, "BRIDGE OUTSTANDINGS LAB", OUTSTANDINGS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-ledger-index-baseline.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-ledger-index-after-name-cases.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-ledger-index-after-fold-cases.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-groups-baseline.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(MASTERS LAB)",
+        parse: |_, text| groups(text, MASTERS_LAB_GUID),
     },
     Row {
         fixture: "tests/fixtures/agent/shape-lab-standard-ledger-catalogue.utf16le.xml",
@@ -1550,7 +1601,19 @@ const ROWS: &[Row] = &[
         parse: |_, text| currency(text),
     },
     Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-c-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_currency",
+        parse: |_, text| currency(text),
+    },
+    Row {
         fixture: "tests/fixtures/agent/register-e2e/native-register-e2e-currencies.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_currency_master_list",
+        parse: |_, text| currency_masters(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-c-1.utf16le.xml",
         source: Source::Captured,
         parser: "parse_currency_master_list",
         parse: |_, text| currency_masters(text),
@@ -1814,6 +1877,12 @@ const ROWS: &[Row] = &[
         parse: |_, text| ledger_snapshot_for(text, REGISTER_LAB_GUID),
     },
     Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-P-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot_for_company(GST LEDGER LAB)",
+        parse: |_, text| ledger_snapshot_for(text, GST_LEDGER_LAB_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/note-days/shape_lab_ledgers_2_response.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_ledger_snapshot_for_company(SHAPE LAB)",
@@ -1885,6 +1954,18 @@ const ROWS: &[Row] = &[
         parse: |_, text| party_masters(text, READS_LAB_GUID),
     },
     Row {
+        fixture: "tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(MAILING LAB)",
+        parse: |_, text| party_masters(text, MAILING_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/native-party-masters-without-mailing-details.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(MAILING LAB, list not named)",
+        parse: |_, text| party_masters(text, MAILING_LAB_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/agent/native-party-masters.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_party_ledger_master_records_with_evidence(WR2)",
@@ -1901,6 +1982,12 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_party_ledger_master_records_with_evidence(REGISTER LAB)",
         parse: |_, text| party_masters(text, REGISTER_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-L-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(GST LEDGER LAB)",
+        parse: |_, text| party_masters(text, GST_LEDGER_LAB_GUID),
     },
     Row {
         fixture: "tests/fixtures/note-days/shape_lab_ledgers_1_response.utf16le.xml",
@@ -2036,6 +2123,12 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_group_snapshot(REGISTER LAB)",
         parse: |_, text| groups(text, REGISTER_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-g-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(GST LEDGER LAB)",
+        parse: |_, text| groups(text, GST_LEDGER_LAB_GUID),
     },
     Row {
         fixture: "tests/fixtures/agent/native-shape-lab-groups.utf16le.xml",
@@ -2536,8 +2629,16 @@ const AUDIT_READ_LIVE: &str = "an answer of the audit read's live sittings on th
      read (src/agent_audit_read.rs) and the tax-audit crate parse it, and src/agent_audit_read_tests.rs \
      (live_pilot_lab) serves it in the reader's order and pins the book admitted from it; \
      agent/audit-read-pilot-lab/PROVENANCE.md says what each file is";
+const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDGE TRANSFER LAB \
+     (26 Oct 2026, #1392), with no row here: no parser or test reads it yet, and the pull request \
+     that adds the day reader replays it and changes this reason; \
+     agent/whole-day-read-transfer-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
+const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRANSFER LAB and \
+     BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
+     yet, and the pull request that renders the census as a span replays it and changes this \
+     reason; agent/spanned-census-two-books/PROVENANCE.md says what each file is";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
@@ -2854,11 +2955,19 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_HIGH_WATER,
     ),
     (
+        "tests/fixtures/agent/gst-ledger-l1/s6-03nov-m-1.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
         "tests/fixtures/note-days/shape_lab_company_marks_response.utf16le.xml",
         APP_HIGH_WATER,
     ),
     (
         "tests/fixtures/stock-lab-day/stock_lab_taxed_day_company_marks_response.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
         APP_HIGH_WATER,
     ),
     (
@@ -2885,6 +2994,62 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/register-e2e/native-register-e2e-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-03nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-04nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-05nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-06nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-07nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-08nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-10nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-11nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-12nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-13nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-14nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-15nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-16nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-17nov-n-1.utf16le.xml",
         APP_CENSUS,
     ),
     (
@@ -2982,6 +3147,62 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
+        "tests/fixtures/agent/gst-ledger-l1/s6-03nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-04nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-05nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-06nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-07nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-08nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-10nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-11nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-12nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-13nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-14nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-15nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-16nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-17nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/note-days/cancelled_purchase_day_voucher_window_response.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
@@ -3042,6 +3263,63 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/vouchers_ageing_corpus_live.utf16le.xml",
         VOUCHER_EXPORT_NO_PARSER,
     ),
+    // The whole-day read's answers on BRIDGE TRANSFER LAB (#1392).
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/m1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
     // Built-in reports no parser reads.
     (
         "tests/fixtures/builtin_ratio_analysis_probe_b_fy_live.utf16le.xml",
@@ -3060,6 +3338,39 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/unit_a_invalid_char_ref_live.xml",
         "only the pre-parse sanitizer reads it (src/tolerant_xml_tests.rs): a NAME/PARENT-only \
          ledger collection with no GUID, company or balance, which no parser of this crate binds",
+    ),
+    // The span read's answers on two synthetic books (#899).
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-m1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-c1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-c2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-m2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-m1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-c1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-c2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-m2.utf16le.xml",
+        SPANNED_CENSUS,
     ),
 ];
 

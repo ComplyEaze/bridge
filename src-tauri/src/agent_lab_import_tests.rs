@@ -2092,6 +2092,7 @@ async fn the_opening_bills_refusal_runs_before_the_first_request() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let args = json!({
@@ -2547,6 +2548,7 @@ async fn the_root_group_refusal_runs_before_the_first_request() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let args = json!({

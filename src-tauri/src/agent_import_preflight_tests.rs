@@ -82,6 +82,7 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let error = server

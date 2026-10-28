@@ -177,6 +177,7 @@ async fn egress_log_reports_byte_bounded_tail_even_below_requested_record_count(
         redaction: Redaction::MaskParties,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     append_egress_line(&path, r#"{"index":0}"#).unwrap();
@@ -232,6 +233,7 @@ async fn egress_log_rejects_unterminated_and_malformed_receipts_in_band() {
         redaction: Redaction::MaskParties,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     server
@@ -359,6 +361,7 @@ async fn egress_log_reads_back_receipts_that_carry_a_full_trail() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     // The default read (20 receipts) of receipts that each carry a full trail

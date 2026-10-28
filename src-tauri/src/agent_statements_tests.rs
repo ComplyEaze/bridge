@@ -153,6 +153,7 @@ async fn call_with(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server

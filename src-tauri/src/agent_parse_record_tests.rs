@@ -25,8 +25,8 @@ use sha2::{Digest, Sha256};
 
 use super::{
     parse_agent_rows, parse_agent_rows_withholding, parse_all_company_marks,
-    parse_company_high_water, parse_company_marks, parse_import_verification_rows,
-    parse_voucher_census,
+    parse_company_high_water, parse_company_marks, parse_company_marks_as_answered,
+    parse_import_verification_rows, parse_voucher_census,
 };
 use crate::source_draft_xml::parse_source_xml;
 
@@ -43,9 +43,12 @@ const MISMATCHES_SHOWN: usize = 20;
 /// The companies the reading tests name, each the GUID its capture carries.
 const WR2_LAB: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const REGISTER_LAB: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+const GST_LEDGER_LAB: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const OUTSTANDINGS_LAB: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const STOCK_LAB: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
+/// The empty book of the marks capture in `COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md`.
+const HANDIMPORT_LAB: &str = "9b5b6d54-4cdb-4b90-9600-cab45ee70c3a";
 const READS_LAB: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
 /// The import lab of the D3, L1, WA1 and post-span captures (`agent_import_ack_tests.rs`'
 /// `D3_GUID`, `agent_import_span_identity_tests.rs`' `COMPANY_GUID`).
@@ -200,7 +203,7 @@ fn rows() -> Vec<Row> {
     let mut rows = Vec::new();
     // Company high water and marks (`agent_import_ack_tests.rs`,
     // `agent_import_span_identity_tests.rs`, `agent_register_server_tests.rs`; the outstandings,
-    // note-day and stock-lab captures by the company each carries).
+    // note-day, stock-lab and empty-book captures by the company each carries).
     rows.extend(high_water_rows!(
         "agent/d3-batch-company-high-water.utf16le.xml",
         IMPORT_LAB
@@ -242,12 +245,27 @@ fn rows() -> Vec<Row> {
         REGISTER_LAB
     ));
     rows.extend(high_water_rows!(
+        "agent/gst-ledger-l1/s6-03nov-m-1.utf16le.xml",
+        GST_LEDGER_LAB
+    ));
+    rows.extend(high_water_rows!(
         "note-days/shape_lab_company_marks_response.utf16le.xml",
         SHAPE_LAB
     ));
     rows.extend(high_water_rows!(
         "stock-lab-day/stock_lab_taxed_day_company_marks_response.utf16le.xml",
         STOCK_LAB
+    ));
+    rows.extend(high_water_rows!(
+        "company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
+        HANDIMPORT_LAB
+    ));
+    // The same capture as the window reads parse it: the voucher mark kept as answered, so a
+    // mark Tally omitted (`None`) is recorded apart from one it sent as 0.
+    rows.push(row!(
+        "company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
+        "parse_company_marks_as_answered(HANDIMPORT_LAB)",
+        |_, t| coded(parse_company_marks_as_answered(t, HANDIMPORT_LAB))
     ));
     // Every loaded company's marks (`agent_import_post_location_tests.rs`).
     rows.push(row!(
@@ -282,6 +300,76 @@ fn rows() -> Vec<Row> {
         "agent/register-e2e/native-register-e2e-census.utf16le.xml",
         "parse_voucher_census(20250903)",
         |_, t| census(t, "20250903")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-03nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251103)",
+        |_, t| census(t, "20251103")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-04nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251104)",
+        |_, t| census(t, "20251104")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-05nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251105)",
+        |_, t| census(t, "20251105")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-06nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251106)",
+        |_, t| census(t, "20251106")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-07nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251107)",
+        |_, t| census(t, "20251107")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-08nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251108)",
+        |_, t| census(t, "20251108")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-10nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251110)",
+        |_, t| census(t, "20251110")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-11nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251111)",
+        |_, t| census(t, "20251111")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-12nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251112)",
+        |_, t| census(t, "20251112")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-13nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251113)",
+        |_, t| census(t, "20251113")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-14nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251114)",
+        |_, t| census(t, "20251114")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-15nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251115)",
+        |_, t| census(t, "20251115")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-16nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251116)",
+        |_, t| census(t, "20251116")
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-17nov-n-1.utf16le.xml",
+        "parse_voucher_census(20251117)",
+        |_, t| census(t, "20251117")
     ));
     rows.push(row!(
         "note-days/cancelled_purchase_day_voucher_census_response.utf16le.xml",
@@ -401,6 +489,76 @@ fn rows() -> Vec<Row> {
         "agent/register-e2e/native-register-e2e-window.utf16le.xml",
         "parse_agent_rows(REGISTER_LAB)",
         |_, t| agent_rows(t, REGISTER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-03nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-04nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-05nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-06nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-07nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-08nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-10nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-11nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-12nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-13nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-14nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-15nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-16nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l1/s6-17nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
     ));
     rows.push(row!(
         "note-days/cancelled_purchase_day_voucher_window_response.utf16le.xml",

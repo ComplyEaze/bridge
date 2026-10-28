@@ -100,7 +100,7 @@ pub(crate) fn render_party_ledger_master_xlsx(
     worksheet.write_string(
         8,
         1,
-        "Ledger identity, parent, Party GSTIN and requested party/master fields when returned, the dated mailing details (address, PIN code, state) in force on the Balances-as-of date, plus opening/closing balances over the named period. The \"as returned\" address, PIN code and state columns are Tally's older flat fields, which can be empty for a party that holds a mailing address: read the Mailing columns at the right.",
+        "Ledger identity, parent, Party GSTIN and requested party/master fields when returned, the dated mailing details (address, PIN code, state) in force on the Balances-as-of date (requested only for a book small enough for the request to name them; a note beside the header says when none were observed), plus opening/closing balances over the named period. The \"as returned\" address, PIN code and state columns are Tally's older flat fields, which can be empty for a party that holds a mailing address: read the Mailing columns at the right when they were observed.",
     )?;
     worksheet.write_string_with_format(9, 0, "Not observed fields", &bold)?;
     worksheet.write_string(

@@ -12,7 +12,7 @@
   asks Tally for the mailing details only for a book whose master-alteration mark (an upper bound on its ledgers) is
   at most 3,404; for a larger book it sends the same request as before and every ledger's status reads not
   observed, with a note in the workbook's header saying so, so a book that exported before is never refused for the
-  larger per-ledger estimate. A book past that mark has no mailing columns until the bound is measured. A second mailing
+  larger per-ledger estimate. A book past that mark has no mailing columns until the bound is measured. A dense book inside the bound reads a larger answer than before (about 950 bytes more for each party that holds an address); how that compares with the 20-second read deadline is not measured. A second mailing
   entry with a later date, a party with two mailing rows and other releases are not measured. `mask_parties` shortens
   the mailing name, every address line and the flat address field like a party's name, to their first two and last two
   characters; the PIN code, state and country are returned under every redaction mode. The registers do not read the

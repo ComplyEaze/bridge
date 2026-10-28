@@ -388,8 +388,7 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_00
 /// production request, and every caller other than a `ledger_masters` call that
 /// asked for the dated mailing or GST details and the party/ledger master
 /// workbook passes it. [`Self::WithMailingDetails`] names each ledger's dated
-/// mailing details (`include_mailing_details`, and the workbook, which shows the
-/// entry in force). [`Self::WithGstDetails`] names each ledger's dated GST
+/// mailing details (`include_mailing_details`). [`Self::WithGstDetails`] names each ledger's dated GST
 /// details. They are not combined: the request naming both has not been captured
 /// live, so `ledger_masters` refuses the two flags together. Each is sized by its
 /// own per-ledger estimate wherever the standard one would be.

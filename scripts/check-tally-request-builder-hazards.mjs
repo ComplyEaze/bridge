@@ -17,9 +17,7 @@ const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(process.argv[r
 // to this list and a distinct request-profile decision.
 const expected = new Set([
   "custom-report|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_company_list|Company Report",
-  "custom-report|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_ledgers|BRIDGE Ledger Export V1",
   "custom-report|src-tauri/src/tally/tdl_engine.rs::legacy_company_list_request|Company Report",
-  "function-argument-with-space|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_ledgers|$$NumItems:BRIDGE Ledger Collection V1",
 ]);
 
 // Method and function names whose value is money, by suffix. A money method

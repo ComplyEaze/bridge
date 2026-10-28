@@ -55,8 +55,7 @@ use bridge_tally_protocol::{
     company_list_may_be_in_educational_mode, decode_tally_xml_response_bytes_limited,
     export_status, parse_companies_from_collection, parse_company_gateway_capability_observation,
     parse_import_evidence, parse_import_outcome, parse_import_result, parse_ledger_census_slice,
-    parse_ledger_name_index, parse_ledger_source_records_with_evidence, parse_ledgers,
-    parse_ledgers_with_evidence, parse_native_group_source_records_with_evidence,
+    parse_ledger_name_index, parse_native_group_source_records_with_evidence,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_with_evidence,
     parse_native_voucher_source_records_with_evidence,
@@ -2416,12 +2415,6 @@ const ROWS: &[Row] = &[
         parse: |_, text| untyped(export_status(text)),
     },
     Row {
-        fixture: "../tally-protocol-simulator/fixtures/export_status_0.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
-    },
-    Row {
         fixture: "../tally-protocol-simulator/fixtures/export_status_missing.xml",
         source: Source::Synthetic,
         parser: "export_status",
@@ -2432,60 +2425,6 @@ const ROWS: &[Row] = &[
         source: Source::Synthetic,
         parser: "export_status",
         parse: |_, text| untyped(export_status(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/normal_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/normal_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/normal_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledger_source_records_with_evidence",
-        parse: |_, text| untyped(parse_ledger_source_records_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/empty_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/duplicate_identity.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/wrong_company.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/record_count_mismatch.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/malformed_export_metadata.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/duplicate_export_metadata.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
     },
     Row {
         fixture: "../tally-protocol-simulator/fixtures/import_counters.xml",
@@ -2504,18 +2443,6 @@ const ROWS: &[Row] = &[
         source: Source::Synthetic,
         parser: "parse_import_result",
         parse: |_, text| untyped(parse_import_result(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/malformed.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/truncated.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
     },
     // src/native_masters_tests.rs: cost centres and cost categories (#1398).
     Row {

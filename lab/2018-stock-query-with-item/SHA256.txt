@@ -1,0 +1,12 @@
+d13bfb7ad438ed990b12090ee49e38d6d751345e951ff6048bc7ae5136a74149  66  .gitattributes
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+26721b9aa62ce6058f251d896ec6b7fc1cf937a4ec2060c354e5e76cea557272  14783  RUN-SHEET.md
+4f1f0f36e33fb559e274a4388a25e71e80a3720f06a95d038521b67c9eaf9667  7012  gen_requests.py
+17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8  758  requests/r-1-stock-summary.utf16le.xml
+103f686bed40b37dabfca8d87f57570fd362a3ed479e3d47f3669d4396ded89c  772  requests/r-2-unknown-id.utf16le.xml
+de7408067d9140f3bf7aa7d516635441f4ec5f0efb0aa450b3dd838ce0225696  754  requests/r-3-stock-query.utf16le.xml
+fff4e42cb65b14100e0c271579a8e35b05d65f0a96e987b92407318f0261119d  860  requests/r-4-stock-query-stockitemname.utf16le.xml
+e9ad07d65dac4b06b911bc109448aa171a539351c62b46975efac39e4b98434b  852  requests/r-5-stock-query-svstockitem.utf16le.xml
+18cc0bf31457ff150017e7fa7dbf003319cc144adee7e56fbd48500f60f17a90  864  requests/r-6-stock-query-probe-variable.utf16le.xml
+98c06d132ddf2347690a532c4b5760134db202531c5b5b9d6dbb5a0be7e04263  850  requests/r-7-stock-query-probe-item.utf16le.xml
+17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8  758  templates/stock_summary_request.utf16le.xml

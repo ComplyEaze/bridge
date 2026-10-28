@@ -2216,6 +2216,36 @@ own amount.
   them in all of them. The presence, bill-trail and summary reads, `verify_import` and
   `ledger_movement` do not return them (`ledger_movement`'s fetch names three entry fields).
 
+### Bank allocations in voucher reads
+
+`vouchers` called with `bank_allocations: true` gives each ledger entry that has a bank allocation `bank_allocations`, a
+list of at most eight, one per allocation as Tally sent it (protocol reference §8.2h; #1231, #1392). Each carries five
+fields, `bank_date` (Tally's `BANKERSDATE`), `instrument_number`, `instrument_date`, `transaction_type` and `status`, and
+each field is `{"state": "absent"}` (the element was not sent), `{"state": "empty"}` (sent with no text) or
+`{"state": "value", "value": "..."}` (trimmed). Without the argument, and in every other answer that returns a voucher's
+entries (the registers), the key is not there; the parse reads the allocations either way.
+
+- **No reconciliation verdict.** Nothing in the list says whether an entry is reconciled. In the one capture, nothing was
+  reconciled: every `bank_date` was empty and every `status` was `No`. A reconciled entry has not been captured, so what
+  those fields read once an entry is reconciled, or cleared again, is not established, and an empty `bank_date` is not
+  shown to mean "unreconciled".
+- A transfer reference typed in the bank allocation of a Contra sits in its `instrument_number`, on both of the voucher's
+  entries, and in no other field the read returns; one typed in the narration is only narration text, and the voucher's
+  own `reference` stayed empty in the capture.
+- An entry with no allocation, or only an allocation element with nothing in it (most entries' answers carry one), has
+  no such key; that does not mean the bank entry has no allocation in Tally.
+- **A list that cannot be read whole does not refuse the read.** The entry carries `bank_allocations_unreadable` with one
+  reason and no partial list: `bank_allocation_field_duplicated`, `bank_allocation_text_undecodable`,
+  `bank_allocation_date_unparsable` (a bank or instrument date that is not `YYYYMMDD`), `bank_allocations_too_many`
+  (more than eight) or `bank_allocation_shape_unrecognised` (an allocation list inside another list of the entry, or an
+  element inside a field that is read).
+- Only those five fields are read. The names and account details an allocation can carry (the payee, bank, branch,
+  account number) are not read or returned. The instrument number is any text typed or sent, usually a cheque number or a transfer
+  reference, and is returned under every redaction mode, as the voucher's own `reference` is (a name typed inside it
+  stays as it is). The `reference` search matches the voucher's own reference only, not this field.
+- Measured on one synthetic book of five Contras keyed by hand (TallyPrime 7.1 Silver); other transaction types, other
+  voucher types, a reconciled entry and other releases are not measured. No request changed.
+
 ## Voucher-file preparation and verification
 
 The MCPB extension exposes `verify_import` by default as a recovery tool (it
@@ -2835,9 +2865,17 @@ nothing. Its `error.hold` says what the journal showed: `held` (it names
 `blocking_batch_ids`, the batches of the refused batch's own company that hold the
 name, and `blocking_batches_other_companies`, each with its `batch_id` and
 `company_guid`), `settled_meanwhile`, which only the check under the lock gives (the
-holder settled since the call began: post this batch again), or `journal_unread`,
-which either check can give (the journal could not be read just now, or did not
-show this batch: call again). When the check before the dialog finds a send of this
+holder settled since the call began: post this batch again), or `journal_unread`
+(a journal read that did not show this batch: call again). The check under the lock
+reads the journal again for its answer. When that read fails (the journal busy because
+another call is writing to it, or unreadable for any other reason), every refusal the
+lock made after reading the journal (all but `master_journal_unavailable`, which could
+not read it) is answered from the journal the lock read when it refused. It names the
+holders, or the send on file, as they were at the refusal: a send another call has
+recorded since is not in it, so where it shows no send its message says only that this
+call sent nothing and that no send of the batch was on file when it was refused
+(bridge#2083).
+When the check before the dialog finds a send of this
 batch recorded since the call began by another call, and when a held-name refusal
 finds it in the journal read that follows, the answer is `import_already_attempted`
 with `error.hold` `send_of_this_batch_recorded_since`: call again later, which
@@ -2874,8 +2912,8 @@ person to create the ledger in Tally by hand. An unconfirmed answer
 and the answer given when the book could not be read back after Tally answered
 say to call again later, which only reads, and to create nothing in Tally by hand
 meanwhile. A failure answer that says the create may have been sent says the same.
-When the journal could not be read for that answer, it says it is not known
-whether a send was recorded: call `post_ledger_creates` with the same `batch_id`
+When the journal could not be read for that answer, a failure other than a refusal under the
+journal's lock made after the lock read the journal says it is not known whether a send was recorded: call `post_ledger_creates` with the same `batch_id`
 again, which reads the book back and sends nothing if a send is on file,
 otherwise asks for approval again before anything is sent, and is refused as
 `master_batch_not_found`, sending nothing, if ComplyEaze Bridge holds no such batch; create nothing in Tally by hand

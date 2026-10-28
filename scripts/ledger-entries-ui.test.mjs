@@ -56,8 +56,8 @@ test("desktop command invokes the one shared selected-voucher operation", async 
   // pages and `render_page_body` cuts the page: for a listing it calls `page_items` (which applies `skip(offset)` then
   // `take(limit)`), for a summary the bucket page. A served later page calls the same `render_page_body` on the held rows
   // (no pattern may cross into another function).
-  assert.match(vouchers, /filter_voucher_rows_for_ledger(?:(?!\bfn\s)[\s\S])*?render_page_body\(server, &rows, summary\.as_ref\(\), \(offset, limit\)\)/);
-  assert.match(vouchers, /fn render_page_body(?:(?!\bfn\s)[\s\S])*?page_items\(server, rows, offset, limit\)/);
+  assert.match(vouchers, /filter_voucher_rows_for_ledger(?:(?!\bfn\s)[\s\S])*?render_page_body\(server, &rows, summary\.as_ref\(\), \(offset, limit\), bank\)/);
+  assert.match(vouchers, /fn render_page_body(?:(?!\bfn\s)[\s\S])*?page_items\(server, rows, \(offset, limit\), bank\)/);
   assert.match(vouchers, /fn page_items(?:(?!\bfn\s)[\s\S])*?skip\(offset\)(?:(?!\bfn\s)[\s\S])*?take\(limit\)/);
-  assert.match(vouchers, /render_page_body\(self, &snapshot\.rows, summary\.as_ref\(\), \(offset, limit\)\)/);
+  assert.match(vouchers, /render_page_body\(\s*self,\s*&snapshot\.rows,\s*summary\.as_ref\(\),\s*\(offset, limit\),\s*bank,?\s*\)/);
 });

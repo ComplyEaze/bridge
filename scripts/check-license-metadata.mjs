@@ -58,12 +58,36 @@ if (
 ) {
   failures.push("complete bundled SQLCipher NOTICE attribution");
 }
+// Every build for a target other than macOS compiles OpenSSL from source through SQLCipher (#2049). NOTICE states its
+// version, licence and the holders its files name, in one section, so each openssl-src release in the lockfile must be
+// read against that section. Every lockfile entry is checked, not the first. The section is read alone, from its heading
+// to the next separator line or the next heading (a line followed by a Copyright line): the Apache phrase and the holder
+// list are looked for inside it, and the holder list must still be there (a floor of ten names; it holds
+// thirty today).
+const opensslSrcLocked = [...cargoLock.matchAll(/\[\[package\]\]\nname = "openssl-src"\nversion = "([^"]+)"\n/g)].map((match) => match[1]);
+const opensslSection = notice.match(/^OpenSSL\nCopyright 1995-\d{4} The OpenSSL Project Authors\n[\s\S]*?(?=\n-{20,}\n|\n\S[^\n]*\nCopyright |(?![\s\S]))/m)?.[0] ?? "";
+const opensslHolders = (opensslSection.match(/^ {2}\S/gm) ?? []).length;
+const opensslProse = opensslSection.replace(/\s+/g, " ");
+if (
+  opensslSrcLocked.length === 0 ||
+  !opensslSrcLocked.every((version) => opensslProse.includes(`OpenSSL ${version.split("+")[1]} from source`)) ||
+  !opensslProse.includes("Apache License, Version 2.0") ||
+  opensslHolders < 10
+) {
+  failures.push("bundled OpenSSL NOTICE attribution");
+}
 if (!readme.includes("Apache License, Version 2.0")) failures.push("README license declaration");
 if (!frontendNotices.includes("lucide-react") || !/\breact \d+\.\d+\.\d+/.test(frontendNotices)) {
   failures.push("frontend third-party notices");
 }
 if (!rustNotices.includes("Mozilla Public License 2.0")) {
   failures.push("native third-party report");
+}
+// OpenSSL (Apache-2.0) is built from the openssl-src crate, whose own licence is the wrapper's "MIT OR Apache-2.0".
+// src-tauri/about.toml clarifies the entry, but cargo-about only warns when the clarification no longer applies and then
+// prints the wrapper's licence, so the committed report is checked for every locked version (#2049).
+if (opensslSrcLocked.length === 0 || !opensslSrcLocked.every((version) => rustNotices.includes(`\nopenssl-src ${version}\nLicense: Apache-2.0\n`))) {
+  failures.push("native third-party report licence for openssl-src");
 }
 
 const portableFiles = [license, notice, readme, frontendNotices, rustNotices];

@@ -361,7 +361,9 @@ impl Server {
 
     /// The one journal read of a failed post, which says whether a send was
     /// recorded and names the batches holding a name. A busy or unreadable
-    /// journal is an answer too: the fields it would fill are left out.
+    /// journal is an answer too: a refusal under the lock made after that check
+    /// read the journal then answers from what it read (#2083), and any other
+    /// failure leaves the fields it would fill out.
     fn read_master_journal_for_failure(&self) -> Result<MasterJournal, String> {
         #[cfg(test)]
         if super::master_ledger::test_fault_fires("failure_read_busy") {
@@ -626,6 +628,9 @@ impl Server {
         let batch = state.batch.clone();
         let guid = batch.company.guid.clone();
         let mut accumulated = carried.unwrap_or_else(empty_evidence);
+        // What the check under the lock read of the journal when it refused,
+        // kept for the failure answer below (#2083).
+        let under_lock = Mutex::new(None::<UnderLockView>);
         let operation: Result<Step, ToolFailure> = async {
             if state.intent.is_some() {
                 // Sent by any route: whatever was held for it can never be
@@ -770,7 +775,7 @@ impl Server {
                     &identity,
                     approved,
                     |queued| recheck_master_for_dispatch(queued, &aim),
-                    || self.record_master_intent(&batch, &request, taken.id(), &aim),
+                    || self.record_master_intent(&batch, &request, taken.id(), &aim, &under_lock),
                 )
                 .await;
             // An approval this post did not spend lapses: it is never offered
@@ -920,25 +925,39 @@ impl Server {
                 #[cfg(test)]
                 let _ = super::master_ledger::BEFORE_FAILURE_READ.try_with(|before| before());
                 let journal = self.read_master_journal_for_failure().ok();
+                // A read that fails now, for any reason (another call holding
+                // the journal's lock to write, or a journal that cannot be
+                // read), falls back to what the check under the lock read when
+                // it refused. A view is kept only by that refusal,
+                // which ends the post, so this failure is that refusal: the
+                // answer then says what it was decided on, never "not known"
+                // (#2083). It is as of the refusal: a send another call
+                // recorded since is not in it, so its message says only what is
+                // true either way (`as_of_refusal`). A read that works wins, so
+                // a holder settled since is told.
+                let held = under_lock
+                    .into_inner()
+                    .ok()
+                    .flatten()
+                    .filter(|_| journal.is_none());
+                let kept = held.is_some();
                 if failure.code == OVERLAP_CODE {
                     // The typed refusal: this call recorded nothing and sent
                     // nothing, whatever the journal shows now.
-                    let view = overlap_view(journal.as_ref(), batch_id, &guid);
-                    return Ok(Pass::Done(overlap_refusal_outcome(
-                        batch_id,
-                        &guid,
-                        accumulated,
-                        &view,
-                    )));
+                    let view = match held {
+                        Some(held) => held.overlap,
+                        None => overlap_view(journal.as_ref(), batch_id, &guid),
+                    };
+                    let outcome = overlap_refusal_outcome(batch_id, &guid, accumulated, &view);
+                    return Ok(Pass::Done(as_of_refusal(outcome, kept, true)));
                 }
-                let attempted = journal.as_ref().map(|journal| journal.dispatched(batch_id));
-                Ok(Pass::Done(master_failure_outcome(
-                    batch_id,
-                    &guid,
-                    failure,
-                    accumulated,
-                    attempted,
-                )))
+                let attempted = journal
+                    .as_ref()
+                    .map(|journal| journal.dispatched(batch_id))
+                    .or(held.map(|held| held.attempted));
+                let outcome =
+                    master_failure_outcome(batch_id, &guid, failure, accumulated, attempted);
+                Ok(Pass::Done(as_of_refusal(outcome, kept, false)))
             }
         }
     }
@@ -957,29 +976,40 @@ impl Server {
         request: &MasterPostRequest,
         approval: Uuid,
         aim: &Mutex<Option<MasterAim>>,
+        under_lock: &Mutex<Option<UnderLockView>>,
     ) -> Result<RecordedIntent, BeforeDispatchError> {
         use BeforeDispatchError::{Other, Refused};
         let data_dir = &self.settings.data_dir;
         let lock = ExclusiveAdmission::acquire(data_dir).map_err(Other)?;
         let journal = read_journal(data_dir)
             .map_err(|_| Refused(UnderLockRefusal::MasterJournalUnavailable))?;
+        // Each refusal below is made before any byte of the intent is written,
+        // so the journal just read is what the refusal was decided on: it is
+        // kept for the answer. A failure after which the intent may be in the
+        // file keeps nothing.
+        let refused = |refusal: UnderLockRefusal| {
+            if let Ok(mut held) = under_lock.lock() {
+                *held = Some(UnderLockView::of(&journal, batch));
+            }
+            Refused(refusal)
+        };
         let current = journal
             .state(&batch.batch_id)
-            .ok_or(Refused(UnderLockRefusal::BatchNotFound))?;
+            .ok_or_else(|| refused(UnderLockRefusal::BatchNotFound))?;
         if current.intent.is_some() {
-            return Err(Refused(UnderLockRefusal::AlreadyAttempted));
+            return Err(refused(UnderLockRefusal::AlreadyAttempted));
         }
         if current.batch.batch_sha256 != batch.batch_sha256 || current.batch != *batch {
-            return Err(Refused(UnderLockRefusal::BatchChanged));
+            return Err(refused(UnderLockRefusal::BatchChanged));
         }
         // What the queue's recheck saw last before the POST; none is a fault.
         let aimed = aim
             .lock()
             .ok()
             .and_then(|mut aimed| aimed.take())
-            .ok_or(Refused(UnderLockRefusal::PreImageUnrecorded))?;
+            .ok_or_else(|| refused(UnderLockRefusal::PreImageUnrecorded))?;
         let pre_image = PreImage::new(aimed.pre_image)
-            .map_err(|_| Refused(UnderLockRefusal::PreImageUnrecorded))?;
+            .map_err(|_| refused(UnderLockRefusal::PreImageUnrecorded))?;
         // Every refusal the journal would raise for this intent, decided against
         // the journal just read under this lock, before the approval is spent
         // and before any sidecar is written: a refused intent leaves the
@@ -987,7 +1017,7 @@ impl Server {
         journal
             .check_intent_admissible(&current.batch, &aimed.marks)
             .map_err(|error| match journal_refusal(error) {
-                Ok(refusal) => Refused(refusal),
+                Ok(refusal) => refused(refusal),
                 Err(code) => Other(code),
             })?;
         // Spent here, once, under this lock and before the intent: a revoked
@@ -995,9 +1025,9 @@ impl Server {
         // intent (#725).
         self.post_approvals
             .spend(&batch.batch_id, approval)
-            .map_err(Refused)?;
+            .map_err(refused)?;
         let written = write_pre_image(data_dir, &lock, &current.batch, &pre_image)
-            .map_err(|_| Refused(UnderLockRefusal::PreImageWriteFailed))?;
+            .map_err(|_| refused(UnderLockRefusal::PreImageWriteFailed))?;
         let intent = MasterDispatchIntent::new(
             &current.batch,
             request.sha256().to_string(),
@@ -1013,8 +1043,8 @@ impl Server {
             // the sidecar this call wrote names no intent, so it is removed
             // while the lock is held. A removal that fails is reported.
             Ok(refusal) => match remove_pre_image(data_dir, &lock, &batch.batch_id) {
-                Ok(()) => Refused(refusal),
-                Err(_) => Refused(UnderLockRefusal::PreImageRemoveFailed),
+                Ok(()) => refused(refusal),
+                Err(_) => refused(UnderLockRefusal::PreImageRemoveFailed),
             },
             // The intent may be in the file: the batch is treated as sent, and
             // the sidecar its digest names is kept.
@@ -1231,6 +1261,45 @@ impl BlockerReport {
             .collect::<Vec<_>>());
     }
 }
+
+/// What the check under the lock read of the journal when it refused a batch
+/// (#2083): whether a send of the batch was on file, and what holds its name.
+/// The failure answer reads the journal again, and falls back to this only
+/// when that read fails.
+#[derive(Debug)]
+struct UnderLockView {
+    attempted: bool,
+    overlap: OverlapView,
+}
+
+impl UnderLockView {
+    fn of(journal: &MasterJournal, batch: &MasterBatch) -> Self {
+        Self {
+            attempted: journal.dispatched(&batch.batch_id),
+            overlap: overlap_view(Some(journal), &batch.batch_id, &batch.company.guid),
+        }
+    }
+}
+
+/// The message of a failure answer made from the journal the check under the
+/// lock read (`kept`), when it says no send of the batch was on file: another
+/// call may have recorded one since, so it says only what is true either way,
+/// that this call sent nothing, and what the journal held at the refusal
+/// (#2083). Every other answer, and every field, is left as it is.
+fn as_of_refusal(mut outcome: ToolOutcome, kept: bool, held_name: bool) -> ToolOutcome {
+    let result = &mut outcome.payload["result"];
+    if kept && result["attempt_recorded"] == false {
+        result["error"]["message"] = json!(if held_name {
+            KEPT_HELD_NAME_MESSAGE
+        } else {
+            KEPT_NOT_SENT_MESSAGE
+        });
+    }
+    outcome
+}
+
+const KEPT_NOT_SENT_MESSAGE: &str = "This call sent nothing. When it was refused, no send of this batch was on file. Review the error before requesting approval again.";
+const KEPT_HELD_NAME_MESSAGE: &str = "This call sent nothing. When it was refused, an earlier create held this ledger name and no send of this batch was on file.";
 
 /// What a read of the journal showed of a batch refused for its ledger name.
 #[derive(Debug, PartialEq, Eq)]

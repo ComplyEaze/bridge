@@ -6055,7 +6055,8 @@ fn page_items_masks_the_party_names_of_every_row_it_cuts() {
     let directory = tempfile::tempdir().unwrap();
     let address: std::net::SocketAddr = "127.0.0.1:9".parse().unwrap();
     let masked = server_with(address, directory.path(), Redaction::MaskParties);
-    let page = super::super::vouchers::page_items(&masked, &rows, 1, 1);
+    let page =
+        super::super::vouchers::page_items(&masked, &rows, (1, 1), BankAllocationsShown::Withheld);
     assert_eq!(page.len(), 1);
     let text = serde_json::to_string(&page).unwrap();
     assert!(
@@ -6064,8 +6065,13 @@ fn page_items_masks_the_party_names_of_every_row_it_cuts() {
     );
     // The control: with nothing masked the same page carries the names as plain text.
     let plain = server_with(address, directory.path(), Redaction::None);
-    let text =
-        serde_json::to_string(&super::super::vouchers::page_items(&plain, &rows, 1, 1)).unwrap();
+    let text = serde_json::to_string(&super::super::vouchers::page_items(
+        &plain,
+        &rows,
+        (1, 1),
+        BankAllocationsShown::Withheld,
+    ))
+    .unwrap();
     assert!(
         text.contains("Lab Party 1") && text.contains("Lab Party Pvt"),
         "{text}"
@@ -6614,15 +6620,27 @@ async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_rem
         selected_ledger: None,
         placements: None,
     };
-    let body =
-        vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
+    let body = vouchers::render_page_body(
+        &one.server,
+        &rows,
+        Some(&request),
+        (0, 500),
+        BankAllocationsShown::Withheld,
+    )
+    .expect("renders");
     assert_eq!(body.items.len(), 3, "{:?}", body.items);
     assert_eq!(body.total, 4);
     assert!(body.truncated);
     // Under a budget that holds everything the page is whole.
     one.server.settings.max_bytes = 200_000;
-    let whole =
-        vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
+    let whole = vouchers::render_page_body(
+        &one.server,
+        &rows,
+        Some(&request),
+        (0, 500),
+        BankAllocationsShown::Withheld,
+    )
+    .expect("renders");
     assert_eq!(whole.items.len(), 4);
     assert!(!whole.truncated);
 }

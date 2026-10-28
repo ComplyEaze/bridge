@@ -25,4 +25,6 @@ The build G1 row A ran on, as `lab/1039-live-rows` README names it and the row A
 
 **The data folder is kept.** The refused batch, its data folder and the book are the input of the later dialog row for #1039: nothing in this row restores the book or clears the folder unless the run coordinator says RESTORE.
 
+**Row R2**, `R2-1039-review-dialog.md`, runs after R1 on R1's kept batch, data folder and book, on a later build that its own section names (not the build above). It shows the refused batch in the content review dialog and records the review; it writes nothing to Tally.
+
 `SHA256.txt` lists every file here.

@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/agent/gst-ledger-l1/s6-03nov-b-1.utf16le.xml
+# parser: parse_company_book_extent_v2(GST LEDGER LAB)
+# source: captured
+Ok(CompanyBookExtentFields {
+    company_name: "BRIDGE GST LEDGER LAB",
+    company_guid: "aae372c5-a894-491c-8843-5532e43d2d2f",
+    books_from: TallyDate(
+        "20250401",
+    ),
+    last_voucher_date: TallyDate(
+        "20251127",
+    ),
+    voucher_alter_id_high_water: Some(
+        64,
+    ),
+    master_alter_id_high_water: Some(
+        225,
+    ),
+})

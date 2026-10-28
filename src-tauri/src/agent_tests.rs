@@ -793,7 +793,14 @@ fn ledger_movement_schema_exposes_offset_and_limit() {
 
 #[test]
 fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
-    let known_parties = ["Customer One", "Supplier Two", "PAN Holder", "Entry Ledger"];
+    let known_parties = [
+        "Customer One",
+        "Supplier Two",
+        "PAN Holder",
+        "Entry Ledger",
+        "Cost Centre One",
+        "Cost Category One",
+    ];
     let samples = [
         (
             "balance_sheet",
@@ -804,6 +811,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             json!({"masters":[{"requested":party_name("Supplier Two"),"candidates":[party_name("Supplier Two")]}]}),
         ),
         ("egress_log", json!({"records":[]})),
+        (
+            "gst_by_counter_ledger",
+            json!({"counter_ledgers":[{"ledger":party_name("Supplier Two"),"group":"Indirect Expenses"}]}),
+        ),
         (
             "gst_uncertain_vouchers",
             json!({"items":[{"list":"uncertain","voucher_number":"BP/1","party":party_name("Customer One"),"amount":"1050.00","party_side":"debit"}]}),
@@ -823,6 +834,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "masters",
             json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
+        ),
+        (
+            "negative_ledgers",
+            json!({"result":{"ledgers":[{"ledger":party_name("Customer One"),"side":"credit","amount":"10.00"}]}}),
         ),
         (
             "negative_stock",
@@ -887,7 +902,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "vouchers",
             mark_voucher_party_names(
-                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger"}]}),
+                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger","cost_centre_allocations":[{"category":"Cost Category One","cost_centre":"Cost Centre One","amount":"-1.00"}]}]}),
             ),
         ),
     ];
@@ -965,6 +980,24 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
                     }],
                     "offset": 0,
                 },
+            }),
+        ));
+    }
+    // `lab_read_purchase_identity` returns no name beyond the company: a difference names the voucher's GUID and
+    // the field, never its values (they stay in the exchange the lab keeps).
+    #[cfg(feature = "lab-writes")]
+    if registered.contains("lab_read_purchase_identity") {
+        lab_samples.push((
+            "lab_read_purchase_identity",
+            json!({
+                "agent": {"rows": 2, "response_chars": 120_000, "response_chars_per_row": 60_000, "window_honoured": true},
+                "narrow": {"rows": 2, "response_chars": 16_000, "response_chars_per_row": 8_000, "window_honoured": true},
+                "differences": {
+                    "total": 1,
+                    "listed": [{"guid": "synthetic-guid-00000001", "field": "party"}],
+                    "listed_truncated": false,
+                },
+                "inconclusive": false,
             }),
         ));
     }

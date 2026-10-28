@@ -52,7 +52,7 @@ names and bank account numbers to their first two and last two characters (a nam
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
 and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
-GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes and descriptions or contact details, and the bank statement tool's `account_last4` (the last
+GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes (an HSN description is masked under `mask_parties`) or contact details, and the bank statement tool's `account_last4` (the last
 four digits of the statement's account number) is sent under every setting. Set the
 environment variable before launch when that better fits the workflow.
 
@@ -93,6 +93,7 @@ The ordinary default tools, in name order:
 - `cash_flow`
 - `company_features`
 - `egress_log`
+- `gst_by_counter_ledger`
 - `gst_status`
 - `gst_uncertain_vouchers`
 - `ledger_masters`
@@ -101,6 +102,7 @@ The ordinary default tools, in name order:
 - `local_data_report`
 - `masters`
 - `month_register`
+- `negative_ledgers`
 - `negative_stock`
 - `outstandings`
 - `profit_and_loss`
@@ -121,8 +123,8 @@ The ordinary default tools, in name order:
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
-release 0.6.0. `audit_test_run` is in the source after release 0.6.0 and is not in a published build yet; it is
-not a default tool: it is listed only when its setting is on (below). `gst_uncertain_vouchers` and `negative_stock` are in the source after release 0.6.0 and are not in a published build yet. `local_data_report` (also
+release 0.6.0. `audit_test_run`, `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` were added in release 0.6.1; `audit_test_run` is
+not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` is in the source after release 0.6.1 and is not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -237,7 +239,7 @@ company with fewer ledgers may be refused. The limits are unverified against a l
 two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
 these books.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
-false). With any other `fields` it is refused before any read as `ledger_masters_gst_details_requires_compliance`,
+false). With any other `fields`, a true value is refused before any read as `ledger_masters_gst_details_requires_compliance`,
 and a value that is not a boolean is `argument_invalid:include_gst_details`. Without it (absent or false) every
 request, the request commitment, the sizing and the result are what they were, and no row has a `gst_details`
 key. With it, the master read of each request (the whole book or each part by parent group) also names every
@@ -385,8 +387,10 @@ converted to zero. `totals` sums numeric observations across all returned ledger
 and carries an `empty_count` for each column. A fully observed nonzero opening
 net is the difference in opening balances; Bridge does not add a balancing row.
 
-`offset` and `limit` restrict output, not the source read. Each call captures a
-fresh report; compare source evidence before combining separate pages. Native
+`offset` and `limit` restrict output, not the source read. A first page captures a
+fresh report and holds it in memory; a later page continues from it while the book's extent is
+unchanged (`snapshot`, `snapshot_id`, `listing_snapshot_changed`), as `masters` does, so compare source
+evidence before combining pages from separate calls. Native
 Trial Balance uses Tally's TBAL fields, including the Profit & Loss treatment;
 see [protocol semantics](../tally/TALLY_PROTOCOL_REFERENCE.md#56-native-trial-balance-fields).
 It may include dormant ledgers hidden by Tally's screen. Paired response,
@@ -418,8 +422,8 @@ cost collections must carry the `MSTDEPTYPE` Tally printed on every captured ans
 (32 for centres, 16 for categories), or the read is refused as
 `masters_collection_type_unexpected`, so an empty answer that was not resolved to the
 type asked for is not read as "none defined". Under `mask_parties` the names of cost centres and categories, a cost centre's parent
-and a cost centre's category are masked, as godown, stock-group and stock-item names are. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool
-reads those allocations yet.
+and a cost centre's category are masked, as godown, stock-group and stock-item names are. How a voucher's entries were allocated to cost centres is read with the voucher reads
+("Cost-centre allocations in voucher reads" below), not by this tool.
 
 A `stock_items` row carries the item's own dated `hsn` and `gst` lists, each as Tally
 sent it, and `inherited_from_group_or_company: not_read`. Each list is an `observation`:
@@ -669,6 +673,49 @@ include (each differed from the totals of the ledgers Tally counts as cash and b
 ending in February, a window crossing a financial year, optional or post-dated vouchers, a book with
 several currencies, and a large book with cash activity.
 
+### Negative Ledgers (`negative_ledgers`)
+
+Use `negative_ledgers` with `company_guid`, `from` and `to` for Tally's own Negative
+Ledgers list: the ledgers on that list, each as `ledger`, `side` (`debit` or `credit`) and `amount` (an exact decimal
+with no sign). The list is Tally's own and is returned as it is, in Tally's order. The
+rule by which Tally lists a ledger is not established and is not derived here: on three
+books each listed ledger's balance sat on the side opposite its group, and on the first
+book measured a creditor with a debit balance and a debtor with a credit balance were
+listed and a ledger under Suspense A/c with a credit balance was not.
+
+It is **not compared with any other report**: `checks` says `list_complete` and
+`amounts_against_trial_balance` are `not_checked`, so a ledger Tally did not list is not
+shown to be absent, and a listed amount is not shown to equal the ledger's closing
+balance in the trial balance (reported, not kept: on the first book both did; on two more books the one ledger listed on each did too). An empty list is
+returned with `state` `not_established` and `reason`
+`negative_ledgers_empty_answer_is_not_a_finding`: Tally's empty answer cannot be told from
+a report that was not rendered, so it never says that no ledger is negative. A non-empty
+list is `observed`. `mask_parties` masks each `ledger` name.
+
+The report was captured for one whole financial year (1 April to 31 March) on one
+synthetic company, and read for a whole year on two more synthetic books: any other window
+is named in `unmeasured_in_this_answer` as `window_other_than_a_whole_financial_year`.
+What GST, stock, several currencies, or optional or post-dated vouchers do to the list was
+not measured: one of the two further books holds GST ledgers and
+one optional voucher, and neither book's settings were read. A window starting before the book is
+`negative_ledgers_before_books`, a reversed window `invalid_date_range`, and Education mode
+`negative_ledgers_education_unqualified`. A refused answer fails the call as `negative_ledgers_read_failed`, with the specific code below in `error.cause`; `negative_ledgers_before_books`, `negative_ledgers_education_unqualified` and `negative_ledgers_period_not_honoured` are the error's own code. The answer is refused, never reinterpreted, when
+a listed ledger carries both columns, neither, a zero, or the other sign than the one
+measured (a debit as a negative debit amount, a credit as a positive credit amount:
+`negative_ledgers_balance_unexpected`), when a ledger is named twice
+(`negative_ledgers_ledger_repeated`), when Tally reports a failure
+(`negative_ledgers_tally_reported_failure`) or does not know the report
+(`negative_ledgers_report_unknown`), when an amount is not a plain decimal
+(`negative_ledgers_amount_invalid`), or when the report or the book changed between the paired
+reads (`native_negative_ledgers_changed`), or the book's extent differed before and after the read (`native_ledger_extent_changed`). A window the read could not build a period for is `negative_ledgers_period_not_honoured`. The report has no
+size check and its cost on a large book is not known; the report is one paired read (two requests), never retried. Measured on one
+synthetic TallyPrime 7.1 Silver book (the captures are in the protocol crate's fixtures);
+this tool has not yet been run against Tally. Two further synthetic books were read with the same report request (raw requests to Tally, not through this tool) for one whole financial year each,
+with Tally's trial balance of the same year read beside the report: each listed one ledger (an expense ledger and a bank ledger, each
+with a credit balance), its amount equalled the ledger's closing balance in the trial balance, and no other ledger of either
+trial balance read on the opposite side to its group. No empty answer, no list of many ledgers, no other group and no shorter
+period was seen on those books.
+
 ### Company settings and currency symbol (`company_features`)
 
 `company_features` takes `company_guid` and nothing else. It reads the company's own record in Tally
@@ -766,7 +813,8 @@ measurement of this report, and the mark counts masters of every kind. A larger 
 report request as `negative_stock_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
 `limit_bytes` and `limit_master_alter_id`), and retrying refuses again. After a read, the row count and the
 response size are checked against the mark and the admitted size, and a breach refuses the whole read as
-`negative_stock_read_failed` with cause `negative_stock_bound_premise_violated`'s reason, unless the closing extent shows the book moved
+`negative_stock_bound_premise_violated`, with the reason (`stock_rows_exceed_master_mark` or
+`stock_response_over_admitted_bytes`) in `error.cause`, unless the closing extent shows the book moved
 (`negative_stock_extent_changed`). The report is one paired read (two requests), never retried. Any other
 refused answer fails the call as `negative_stock_read_failed` with the specific code in `error.cause`
 (for example `negative_stock_item_duplicated`, `negative_stock_amount_invalid`,
@@ -893,6 +941,58 @@ Measured on the engine's synthetic book replayed through the simulator. The engi
 a real-book parity check on 21 Oct 2026 at reference pin 6168aeaa (crate tree 53938eb8), on one book
 whose cash payments were zero, so its payments side was checked only at zero. The tool itself
 has not yet run against a live Tally: the lab comparison comes first.
+
+### GST booked per counter ledger (`gst_by_counter_ledger`)
+
+`gst_by_counter_ledger` takes `company_guid`, `from` and `to` (YYYYMMDD or YYYY-MM-DD). It makes the reads
+`purchase_register` makes, in the same order and with the same drift checks and refusals, and for every voucher with an
+entry on a ledger under Duties & Taxes whose master carries a recognised GST duty head it decides one thing:
+
+- **attributed** to the voucher's one ledger under Purchase Accounts, Direct Expenses, Indirect Expenses or Fixed
+  Assets, when the voucher is a
+  Purchase, Debit Note, Journal or Payment with a ledger under Sundry Creditors on it, has exactly one such counter
+  ledger (a round-off ledger under Indirect Expenses counts as one), its ledger entries sum to zero, all its GST entries
+  are on one side, and every other entry is on the party, cash, bank or a ledger typed TDS or TCS. A duty head does not
+  say input or output, so a sale, a credit note or a tax payment with no supplier on it is never attributed; or
+- **set aside** under the first reason that applies: `class_not_admitted` (sales, credit notes, memoranda and any
+  other class), `head_conflict`, `unrecognised_head`, `head_absent`, `duty_ledger_without_gst_type` (a Duties & Taxes
+  ledger typed neither GST nor TDS or TCS, such as the `Others` an imported ledger reads by default),
+  `unresolved_group` (a ledger whose group does not resolve, which may be a GST ledger), `sign_and_flag_disagree`, `entries_do_not_balance` (a ledger sits where the read does
+  not look, such as an item invoice of a shape not measured whose purchase ledger is in an inventory allocation), `sales_ledger_present`,
+  `gst_on_both_sides` (reverse-charge and set-off journals), `other_ledgers_present` (any other group, such as Current
+  Assets or Stock-in-Hand), `no_creditor_party` (such as a GST challan payment),
+  `no_counter_ledger` or `several_counter_ledgers`.
+
+`counter_ledgers` gives, per ledger, its `ledger_guid` (Tally's GUID of the ledger), its predefined `group`, its `parent` (masked like a ledger name when it is a group
+the book named), `vouchers`, `debit_side_tax` (negative, as
+the books state it) and `credit_side_tax` (positive) per head, never netted. `set_aside` gives, per reason, the same
+totals and at most 100 vouchers listed. Cancelled, optional and post-dated vouchers are counted and not totalled; a
+window that is not complete is refused as `gst_by_ledger_window_partial`. Every total is folded from one decision per
+voucher, so a voucher's tax is counted once. Nothing is apportioned, and GST booked to a ledger outside Duties & Taxes
+is not seen. It is the books side a CA starts from for expense-head-wise input tax credit (GSTR-9C Table 14); it
+decides no eligibility, availment, input or output side, and no return row.
+
+For a GSTR-9C Table 14 working: a counter ledger's `debit_side_tax` is the GST booked against it and its
+`credit_side_tax` the GST booked back (a debit note or a return), both as the books state them and never netted here;
+the CA nets them for the expense head that ledger is mapped to. Credit-side tax can also be output tax, for an asset or
+goods returned or sold to a supplier: the tool does not tell the two apart. `set_aside` holds every voucher with GST
+the tool could not place, of every kind: input tax on a voucher with two counter ledgers or an untyped duty ledger, but
+also output tax, set-offs and tax payments. The CA places them voucher by voucher from the vouchers listed, so a
+working built from `counter_ledgers` alone misses at least the input tax among them. Cancelled, optional and
+post-dated vouchers are counted, not totalled, and GST booked outside Duties & Taxes is not seen. A ledger's value for
+the year is read separately, from `trial_balance` for the same dates, where the same GUID is the ledger's `guid` (a
+masked name is not a key). That value covers every voucher on the ledger, set-aside ones included, so it is never
+divided into this tax as a rate. The mapping of ledgers to the table's heads, eligibility, what was availed, and the
+GSTR-9 figure the table is compared with are the CA's.
+
+Measured on one synthetic book of TallyPrime 7.2 Silver: fourteen vouchers typed on Tally's screen, read a day at a time and, by the
+build before Direct Expenses and Fixed Assets were admitted, as one month of 64 vouchers that the window read in two
+parts: purchases on Indirect Expenses, Direct Expenses and Fixed
+Assets ledgers and on two expense ledgers at once, two item invoices whose purchase ledger was among their entries
+(one with freight), journals with input IGST, with a TDS ledger typed Others, a set-off and a reversal with no
+supplier, a debit note, two tax payments (one also paying interest) and a credit note with output tax.
+Not measured: vouchers created by import, Gold and other releases, a book with registered GSTINs, other item-invoice shapes, more than 64 vouchers
+in a window.
 
 ### Uncertain vouchers of one voucher type (`gst_uncertain_vouchers`)
 
@@ -1088,7 +1188,7 @@ the stock items and Tally's Stock Summary are each read twice and compared, the 
 extent is read before and after and must be equal, and Education mode is refused.
 A book whose `ISINVENTORYON` is `No` is refused as `stock_not_enabled` before any
 item is read; an absent flag is reported `unknown` and does not refuse. `offset`,
-`limit`, `snapshot` and `snapshot_id` behave as in `masters`.
+`limit` and `snapshot_id` behave as in `masters`, and the result reports `snapshot`.
 
 Small books only. The items are read whole only when the master-alteration mark
 (`ALTMSTID`) times an assumed worst-case row (18,296 bytes) fits 16,000,000 bytes, which admits
@@ -1137,7 +1237,8 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
     ones it left out.
   - `lines` is null while the tool's result (`net_result`, or the Balance
     Sheet's `carried`) is not established, so a derived line is never shown
-    as the statement. `balance_sheet_gate` and `tie_out` then show how each
+    as the statement. `balance_sheet_gate` and, where it is not null (on a Balance
+    Sheet only when a closing stock was considered), `tie_out` then show how each
     of Tally's own lines compared.
 - **When a result is established.** Only when all of these hold:
   - every ledger is classified; a ledger under a user-created primary group,
@@ -1332,7 +1433,7 @@ divided window is checked whole before its first part, and a read whose closing 
 reports Education is refused the same way, since either mode may have served it. Any
 `EDUMODE` value other than `No` counts as Education even when the other capability fields
 do not parse; a company list with no `EDUMODE` field keeps ordinary boundaries, and
-`EDUMODE = Yes` itself has not yet been captured from a live Education instance. The end
+`EDUMODE = Yes` itself was observed on a live Education instance on 22 September 2026 (with `SILVER = Yes` and `GOLD = No`). The end
 side is held to the same rule without a live measurement in these shapes, so an Education
 whole-month read ending on the 30th is refused.
 A genuinely empty voucher response uses the same wider-window
@@ -1387,7 +1488,8 @@ or vouchers.
   is. Reverse-charge journals, imports and input service distribution get no special treatment.
 - **Tax comes only from the GST duty head on the ledger master.** An entry on a
   ledger with a recognised head is listed in `tax_in_books` as
-  `{ledger, head, raw_head, amount}`. An entry on a Duties & Taxes ledger with
+  `{ledger, head, raw_head, amount}` (each entry also carries what the vouchers read carries on it, among it
+  `cost_centre_allocations`, with the cost-centre and category names masked as `vouchers` masks them). An entry on a Duties & Taxes ledger with
   no GST head is listed in `duties_taxes_entries_without_gst_head` and is never
   assigned one. Its `observation` says which case it is: `not_tax_ledger` is a
   ledger whose own tax type is not GST (usually TDS or another payable), and
@@ -2026,6 +2128,52 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   if it is a placeholder (no name) and its `BILLDATE` is not validated; if it has a
   name, it refuses the read (`bill_allocation_field_missing`).
 
+### The `party` field of a voucher row
+
+`party` is the voucher's `PARTYLEDGERNAME` as Tally answered it, and the parse takes that one element and no
+other. For a Sales or Purchase voucher it names the customer or supplier. On a Receipt, Payment or Contra Tally can
+answer the bank or cash ledger instead. On TallyPrime 7.1 it did for a Receipt and a Payment that ComplyEaze Bridge
+imported with the party in `PARTYLEDGERNAME`, and a Contra imported without the element came back with its debit
+bank ledger ([reference §9.13](../tally/TALLY_PROTOCOL_REFERENCE.md), the scoped correction of 2026-09-17).
+Committed captures of a synthetic book's Payments carry the bank on some rows and the party on others. So the
+counterparty of a Receipt, Payment or Contra is read from the voucher's `amounts`, not from `party`. `verify_import`
+does not compare the field for a Receipt, Payment or Contra.
+
+### Cost-centre allocations in voucher reads
+
+Each ledger entry that carries cost-centre allocations has `cost_centre_allocations`, a list of
+`{"category": ..., "cost_centre": ..., "amount": ...}` as Tally sent them, one row per centre, in Tally's order
+(protocol reference §8.2g). The amount is signed as sent; the rows of one entry are not checked against the entry's
+own amount.
+
+- An entry without allocations has no such key. In the one capture of the read the vouchers tool sends, Tally printed no allocation element for such an entry.
+  On an item invoice the read returns the sales or purchase ledger as a ledger entry with the goods line nested under
+  it (§12a.13 of the protocol reference). An allocation list directly under that entry is read like any other; one
+  inside the goods line is flagged `cost_centre_allocation_shape_unrecognised`. No captured item invoice carries
+  allocations, so where Tally prints them there is not measured.
+- **A list that cannot be read whole does not refuse the read.** The entry carries
+  `cost_centre_allocations_unreadable` with one reason, and no partial list; the rest of the response is unchanged.
+  The reasons: `cost_centre_name_missing`, `cost_centre_amount_missing` (an empty amount is never read as zero),
+  `cost_centre_amount_unparsable`, `cost_centre_duplicate` (one centre named twice in one category),
+  `cost_category_missing`, `cost_category_without_centres`, `cost_category_present_but_empty`,
+  `cost_category_repeated` (one category named twice in one entry), `cost_centre_field_duplicated`,
+  `cost_centre_text_undecodable` and `cost_centre_allocation_shape_unrecognised` (an allocation list at a depth the
+  read does not take).
+- Names are carried trimmed; the amount is carried exactly as Tally sent it (an amount with space around it is
+  refused as `cost_centre_amount_unparsable`, as the entry's own amount would be). Under `mask_parties` the category and
+  cost-centre names are masked like a party name (as the masters read masks the same names); the amounts are sent.
+- An empty `CATEGORYALLOCATIONS.LIST` is not read as "no allocations": the entry carries
+  `cost_category_present_but_empty`. No capture of the vouchers read shows an empty container; the empty containers on
+  record are in import-verification reads, whose fetch does not ask for the allocation's fields, and there stood for
+  a real allocation.
+- A repeated child of a category or centre (a list included) reads as `cost_centre_field_duplicated`; no capture
+  shows one.
+- No request changed: the allocations were already in the answers the read asks for, and were dropped.
+- It reaches the readers that return a voucher's entries from this parser: the vouchers read (and its search) and
+  the entries the purchase and sales registers list; each marks the two names the same way, so `mask_parties` masks
+  them in all of them. The presence, bill-trail and summary reads, `verify_import` and
+  `ledger_movement` do not return them (`ledger_movement`'s fetch names three entry fields).
+
 ## Voucher-file preparation and verification
 
 The MCPB extension exposes `verify_import` by default as a recovery tool (it
@@ -2103,6 +2251,12 @@ posting setting covers both, in the MCPB extension and on the command line (#109
      decision. For every reason,
      render `candidate_count_is_lower_bound` as "at least N", never an exact total.
    - `missing` — no live ledger matched. Bridge never creates masters.
+   - A `missing` or `near_miss` row without `folded_twins` whose name is,
+     character for character, an alias of exactly one live ledger also carries
+     `alias_of`, that ledger's name as Tally lists it. The row is still not
+     bound and Bridge never sends an alias: replace the name with `alias_of`
+     only after an operator confirms that ledger is the one meant, then run
+     `validate_masters` again.
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,
    company date extent, live masters, and local journal integrity,
    repeats the full catalogue to reject intervening changes, then writes `<data_dir>/imports/<batch_id>.xml` and records an append-only
@@ -2157,9 +2311,9 @@ posting setting covers both, in the MCPB extension and on the command line (#109
    ComplyEaze Bridge never reads it back. Every pair is kept until you delete
    it; nothing in ComplyEaze Bridge deletes one. A batch last verified by an earlier build keeps its
    single `<batch>.proof.json`, which no longer changes. It compares the
-   date, voucher type and entries; it does **not** compare `EFFECTIVEDATE` or
-   `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see
-   the limits noted in reference §9.13.
+   date, voucher type, the voucher number when you supplied one, the narration, the entries and, for any
+   voucher but a Journal, the effective date (a value Tally leaves out is reported as not observed); it does
+   **not** compare `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see the limits noted in reference §9.13.
 
 ### Skipped rows and the `transfers` section (#1392)
 
@@ -2186,18 +2340,39 @@ refused as `proposals_legacy` (parse the statement again).
   `not_established` when the view could not be computed or the section was cut
   to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired` and
   `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
-  `batch_id` where one is involved: `not_found`, `ambiguous`,
+  `batch_id` where one is involved: `not_found`, `tally_unchecked`, `ambiguous`,
   `other_side_unverified`, `held_elsewhere`, `posted_against_skip`, `matched_unconfirmed`,
   `reference_differs`, `reversed_same_day`, `not_established`, or
   `double_booked` for a Contra booked from both statements. No amount,
   reference, instrument, party or ledger is returned.
-- **What `not_found` claims.** Only that the other account's statement went
+- **What `not_found` claims.** That the other account's statement went
   through ComplyEaze Bridge, was verified for that day, and holds no Contra of
   the row's day, amount, ledgers and direction that is not already paired, or
-  matched by date, with another row, whatever its reference. A row pairs by an
+  matched by date, with another row, whatever its reference, and that
+  ComplyEaze Bridge read every voucher of that day in Tally and found no Contra
+  between the two accounts. No read of a whole day of Tally exists yet, so no row
+  says `not_found` yet (#1392). A row pairs by an
   equal reference, or by an equal date (k = 0 until two real statements of one
   transfer have been measured), so a Contra the other bank printed on another
   day is not matched.
+- **What `tally_unchecked` claims.** Only the first half of that: the other
+  account's statement holds no such Contra, and whether Tally holds one is not
+  established, because ComplyEaze Bridge did not read every voucher of that day in
+  Tally, so a Contra entered in Tally directly is not in its records. Every row that
+  would be `not_found` is `tally_unchecked` until a whole-day read exists. The
+  assistant reads that day's vouchers with `vouchers` and looks for a voucher of
+  the Contra voucher class, or of any other type such as a Journal or Payment,
+  that carries the row's amount on the bank ledger the other account's statement
+  was built for (and reads its narration where it was not dropped). It tells the
+  person what it found, and keeps the skip; it does not look for a voucher dated
+  another day or booked against another ledger, a transfer may print on different
+  days, and a masked ledger name can read like another, so it compares amounts and
+  dates too. A skip is withdrawn, on one side only, solely on the person's
+  confirmation that no entry in Tally carries the transfer (`withdraw_skips`, as
+  for any open row), and the step says not to book the transfer in Tally another
+  way, because a later post of the other statement would book it twice. Reading
+  the day sends its vouchers to the AI provider: `mask_parties` shortens party and
+  ledger names, `drop_narration` drops narrations, and neither hides amounts.
 - **What `restored` means.** A batch that a restore ComplyEaze Bridge recorded
   covers (see `verify_import`, `book_rolled_back`) is never found posted or
   verified for the transfer check, whatever its last status: a row it holds
@@ -2205,8 +2380,13 @@ refused as `proposals_legacy` (parse the statement again).
   its days give no coverage. Every row naming such a batch carries
   `"restored": true`, and `next_steps.restored` says what that means: no step
   inside ComplyEaze Bridge settles the row, so do not name it in
-  `withdraw_skips` or build or amend its rows (that is advice: a withdrawal is
-  refused only when a Contra carries the row); check in Tally whether that
+  `withdraw_skips` or build or amend its rows (that is advice, and the code refuses all
+  three: a withdrawal as `withdraw_skip_paired` where a Contra carries the row, naming that batch
+  with `"restored": true` when it is the covered one, or as `import_txn_already_posted` or
+  `withdraw_skip_invalid` where the covered batch holds the row; an amendment of the batch's
+  lineage as `import_amend_natively_posted`, since a recorded rollback covers only dispatched
+  batches and a dispatched batch's lineage is never amended; a new build that posts a row the
+  covered batch holds as `import_txn_already_posted`); check in Tally whether that
   batch's voucher for it is there and tell the person, and do not enter the
   transfer by hand or import that batch's file. A rollback never retires a skip
   that would be held without it.
@@ -2233,8 +2413,10 @@ refused as `proposals_legacy` (parse the statement again).
   that were built apart are reported once both are sent and one is found
   posted. A skip may be withdrawn whether or not its statement was ever sent,
   so a statement parsed again with the row posted is built again naming the row
-  in `withdraw_skips`, and the batch built first is not sent: sending it
-  instead gives `posted_against_skip`. The answer of the build that names the
+  in `withdraw_skips`, and the batch built first is neither sent nor imported:
+  sent or imported and found posted, it leaves the row `posted_against_skip`,
+  and once the skip is live `post_import` refuses that send as
+  `skip_row_paired_elsewhere`. The answer of the build that names the
   row lists it as `held_elsewhere` with its own batch, which is the one to send
   and verify. The batch left unsent blocks the days of its rows for the other
   account's coverage until it is verified, and no step inside ComplyEaze Bridge
@@ -2283,8 +2465,9 @@ refused as `proposals_legacy` (parse the statement again).
   date, and the date in its `st-` id) give no coverage for the ledgers it names,
   whatever the batch's status. A skip naming one of those ledgers that a single
   verified Contra matches by date on such a day is `matched_unconfirmed`, never
-  paired. A skip with no candidate is `not_found` only where the other
-  account's windows still hold its day, and otherwise `not_established`;
+  paired. A skip with no candidate is `tally_unchecked` (or `not_found` after a
+  whole-day read of Tally) only where the other account's windows still hold its
+  day, and otherwise `not_established`;
   `reference_differs` and `reversed_same_day` are decided before either. A
   Contra with no statement record inside a statement's own builds blocks the
   same way; another voucher there does not.
@@ -2593,10 +2776,14 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    measured for ledger renames and creates made through the gateway, and each
    of thirteen saves of a voucher type's screen in Tally moved it by 2 (nine of
    a type holding no vouchers, and two in each of two runs on a type holding
-   vouchers, all on one synthetic book, TallyPrime 7.1 Silver). A regroup, any
-   other edit made in Tally's own screens, and whether posting a voucher moves
-   it are not yet measured. A queue catalogue re-read that does not parse as this
-   company's catalogue refuses with `post_catalogue_unreadable`, whose `cause`
+   vouchers, all on one synthetic book, TallyPrime 7.1 Silver), and a ledger
+   regrouped, created or deleted, or its opening balance changed, on Tally's
+   own screens moved it by 1 (VERIFIED, one run each, protocol reference
+   §11c.5); enabling cost centres, creating one and making a ledger applicable
+   moved it by 3 (PARTIAL). Other screen edits, and whether posting a voucher
+   moves it, are not yet measured. A queue catalogue re-read that does not
+   parse as this company's catalogue refuses with `post_catalogue_unreadable`,
+   whose `cause`
    names why, and nothing is sent; a repeated or unusable ledger name refuses
    again until it is corrected in Tally. A queue re-read of the group collection
    (for a Payment, Receipt or Contra) that does not parse refuses with
@@ -2691,9 +2878,12 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    narration, every debit/credit entry, and totals; for a bank voucher, also the
    side that must be bank or cash. A batch's dialog shows the same company and
    endpoint, and summarises the vouchers: their count, types and date range,
-   each ledger's totals, and the overall totals. It does not show any voucher's
-   own date, amounts, entries, narration or reference: equal ledger totals do
-   not prove each voucher is right, so check those before building the batch.
+   each ledger's totals, and the overall totals. A batch of at most 10 vouchers
+   also lists one line per voucher (type, date, amount, ledger and the start of the
+   narration, quoted); no line shows a reference, and a batch of more than 10, or
+   one whose lines do not fit or hold an unsafe narration or reference, shows totals
+   only, with a sentence saying why. Equal ledger totals do
+   not prove each voucher is right, so check the vouchers before building the batch.
    Choose **Post voucher** (for a batch,
    **Post N vouchers**) on macOS or **Yes** on Windows to permit this attempt. **Cancel** or Escape
    declines on macOS; Return may leave the dialog open. Windows defaults to
@@ -2757,7 +2947,7 @@ The posted vouchers are identified by their place in the post's own range of
 Tally AlterIDs (protocol reference §9.15). The dispatch intent records the
 company's voucher mark from the last read before the POST, and the readback
 binds each voucher to the Tally GUID its POST created. Binding needs a clean
-response (`CREATED` equal to the voucher count, and `LASTVCHID`), the mark after
+response (no `STATUS` 0, `CREATED` equal to the voucher count, and `LASTVCHID`), the mark after
 the POST moved by exactly `CREATED`, and the vouchers in that range in the order
 sent with the content sent. If the mark after the POST could not be read, the
 range the clean response implies is used instead. A post whose response was lost
@@ -2787,8 +2977,8 @@ fails the check, to be run again.
 From then on no native post of the same company (name, GUID, company number
 and books-from date) at the same Tally address reads `posted_verified` if it
 was sent before that check read the journal and the vouchers it had proved by
-then (its binding, else Tally's answer, else its mark before the post) put it
-above the mark read:
+then (its binding, else Tally's answer unless it reported `STATUS` 0, else
+its mark before the post) put it above the mark read:
 `post_span_binding` is then `book_rolled_back` with `mark_read` and `seen_by`
 (the batch whose check saw it), its vouchers read as matching content, not as
 its own, and the plain line says to check them in Tally. The check still sees a
@@ -3326,7 +3516,7 @@ beside a gap. The headline sorts ahead of `result` in the serialized form (the k
 are in alphabetical order), so it is read before the figures. When a byte cap trims the page of rows
 the headline lists, the `rows` sentence is restated from the rows that are left, and `page` (`offset`,
 `shown`, `total`) keeps the numbers it is made from; a headline that cannot be restated loses its
-`rows` sentence rather than keeping a stale one. A partial read names every gap with its counts, and
+`rows` sentence and its `page` rather than keeping a stale one. A partial read names every gap with its counts, and
 the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. `profit_and_loss` and `balance_sheet` carry one too, with no `rows`:
 when every result of the statement is established, the lead says so and what the derived lines passed
 the comparison with (Tally's own Balance Sheet, and its own Profit and Loss when a profit and loss read it
@@ -3336,7 +3526,7 @@ until it has words) and, for a difference, how many lines did not tie (a Tally l
 amount that nothing derived was compared with, a derived line Tally has no counterpart for, and for a
 profit and loss the Cost of Sales heading when it is off the derived cost of sales), says when the
 derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
-`profit_and_loss` and `balance_sheet` carry one, and `post_import` and `verify_import` carry one of
+`profit_and_loss`, `balance_sheet`, `cash_flow` and `company_features` carry one, and `post_import` and `verify_import` carry one of
 another shape (below); the other read tools and the refusals follow.
 
 `post_import` (after a send was read back) and every page of `verify_import` carry a headline that
@@ -3353,8 +3543,8 @@ confirmed. When only some vouchers read back, the counts hold the rows only and 
 about the whole batch from a doubt about one row, so the lead says that the vouchers read back and that
 the batch is not confirmed, and never calls those vouchers confirmed. When some vouchers are not
 confirmed, the lead says that each row says what was found and
-gives a next step where there is one: only four statuses (`bound_not_in_window`, `book_rolled_back`,
-`sent_not_attributed`, `tally_reported_not_created`) carry a `next_step`. Only a batch ComplyEaze Bridge dispatched natively
+gives a next step where there is one: only five statuses (`bound_not_in_window`, `book_rolled_back`,
+`sent_not_attributed`, `tally_reported_not_created`, and `posted_divergent` on an invoice only) carry a `next_step`. Only a batch ComplyEaze Bridge dispatched natively
 (`result.dispatch.state` present and not `not_dispatched`) carries one: a built batch not yet posted, a
 file imported by hand and a refusal before anything was sent carry none, because the batch can still be
 posted.
@@ -3541,9 +3731,16 @@ the response size refusal (`agent_response_too_large`) instead. A reference neit
 nor Tally's report know for the party is refused (`bill_reference_not_found`). The detail ignores
 `direction`, `top`, `offset` and `limit`; `window.company_vouchers_read` counts the company's
 vouchers in the window, not the party's. A named bill's window never starts before the books.
-The vouchers and the bills reports are two reads whose extents are not compared: a voucher posted
-between them usually shows as `trail_does_not_tie`, but two changes that compensate, or
-allocations that net to zero, can still read `tied`. Measured on one synthetic book only
+The company's two change marks are read before the statement of open bills and again after the
+voucher window, and a detail whose marks moved between them is refused as
+`voucher_window_changed_during_read` (a voucher entered or saved, a ledger renamed, or a report
+that raises a mark; an export raised the voucher mark by 3 once): the bills, the ledger catalogue
+and the vouchers are tied by the party's spelling, so a rename between those reads would have
+tied different ledgers. It reads the marks twice and the window reads none of its own, so it costs one marks read more than before,
+and any edit in Tally during the call refuses it, so run it again once. A change that moves
+neither mark is not seen: one letter-case-only rename of a ledger moved neither (reference,
+the walk-in ledger's spelling), so that rename can still answer as a finding. Allocations that net
+to zero can still read `tied`. The three reads are not otherwise compared. Measured on one synthetic book only
 (reference 12a.14); a second synthetic book (captures of 9 October 2026) also showed an `as_of`
 earlier than the last voucher, a post-dated voucher and an advance later adjusted by an invoice
 reading as Tally's own screen does, bill for bill. Not measured: a client book, an opening bill with

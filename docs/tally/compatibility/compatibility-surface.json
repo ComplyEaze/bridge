@@ -402,6 +402,10 @@
       "path": "src-tauri/src/agent_egress.rs"
     },
     {
+      "path": "src-tauri/src/agent_gst_by_ledger.rs",
+      "reason": "The gst_by_counter_ledger tool: totals the GST the books record per counter ledger and sets every other voucher aside under a named reason. A defect gives one expense or purchase ledger tax that belongs to another voucher shape (an item invoice, a two-ledger voucher, a reverse-charge journal) or counts a voucher's tax twice or not at all."
+    },
+    {
       "path": "src-tauri/src/agent_gst_status.rs",
       "reason": "The gst_status tool: reads Tally's GSTR-1 status flags of the vouchers of one type in a window and parses the answer closed. A defect reports a voucher whose flags were absent, repeated or odd as included, or a voucher outside the type or window."
     },
@@ -527,6 +531,14 @@
     },
     {
       "path": "src-tauri/src/agent_trial_balance.rs"
+    },
+    {
+      "path": "src-tauri/src/agent_voucher_cost_centres.rs",
+      "reason": "Voucher cost-centre allocations: reads each ledger entry's category and centre rows from the vouchers answer; a defect hides or doubles an allocation, or reads one as none."
+    },
+    {
+      "path": "src-tauri/src/agent_voucher_cost_centres_tests.rs",
+      "reason": "Tests pinning the allocation reader to its captured answer, its typed reasons and its refusals on mutations of that capture."
     },
     {
       "path": "src-tauri/src/agent_voucher_parse.rs"

@@ -107,7 +107,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - `mask_parties` shortens, to their first two and last two characters, the
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase
-    register, bank-statement proposals, voucher totals by ledger, the party ledger of
+    register, the GST totals per counter ledger, bank-statement proposals, voucher totals by ledger, the party ledger of
     each voucher `gst_uncertain_vouchers` lists, the ledgers
     listed under a group total, the ledger named when a group total cannot be
     given, the list of bill-wise ledgers waiting for approval, the suspense ledger
@@ -235,6 +235,12 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       post-dated and what its status flags read) and whether it was accepted
       as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
+    - The GST-by-ledger read (`gst_by_counter_ledger`) sends the company, the
+      dates, each counter ledger's name, Tally GUID, group and parent with its
+      voucher count and its GST totals per head, and for each set-aside reason its totals and
+      up to 100 vouchers by number, date, type, class and Tally's identifier.
+      It sends no party names and no narrations; `mask_parties` shortens the
+      ledger names and does not mask the GUID, which names no party.
     - The negative ledgers read (`negative_ledgers`) sends the company name and
       its identifier and the dates, and for each ledger on Tally's Negative
       Ledgers list, the ledger's name (shortened under `mask_parties`), the side
@@ -258,9 +264,14 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       registers list. The two names are shortened under
       `mask_parties`, like the cost centre and cost category lists; the amount
       is not a name and is sent under every setting. An entry whose allocations
-      cannot be read whole says so with a reason and sends none of them; an
-      allocation in a shape the read does not recognise is not sent and is not
-      flagged.
+      cannot be read whole says so with a reason and sends none of them, an
+      allocation in a shape the read does not recognise included. On an item
+      invoice the read returns the sales or purchase ledger as a ledger entry
+      with the goods line nested under it: an allocation list directly under
+      that entry is read and sent like any other, and one inside the goods line
+      is flagged as in a shape the read does not recognise. No captured item
+      invoice carries allocations, so where Tally prints them there is not
+      measured.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

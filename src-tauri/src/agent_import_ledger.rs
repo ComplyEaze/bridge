@@ -1460,7 +1460,7 @@ struct NativePost {
     intent_at: Option<usize>,
     pre_post_voucher_mark: Option<u64>,
     /// Where its answer with a parsed outcome was recorded, and the vouchers
-    /// that answer counted created.
+    /// that answer proves landed ([`landed_count`]).
     created_at: Option<(usize, u64)>,
     /// Where its binding was recorded, and how many vouchers it bound.
     bound_at: Option<(usize, u64)>,
@@ -1470,7 +1470,8 @@ impl NativePost {
     /// The floor the post had proved within the first `prefix` records: the
     /// vouchers it bound (the bind read exactly those AlterIDs above the
     /// pre-POST mark), else the vouchers Tally's recorded answer counted
-    /// created (a recorded answer means they had landed), else the pre-POST
+    /// created (a recorded answer means they had landed, unless it reported
+    /// `STATUS=0`: [`landed_count`]), else the pre-POST
     /// mark alone. `None` for a post not dispatched within the prefix or with
     /// no pre-POST mark.
     fn floor_within(&self, prefix: usize) -> Option<u64> {
@@ -1484,6 +1485,18 @@ impl NativePost {
             _ => 0,
         };
         Some(before.saturating_add(proved))
+    }
+}
+
+/// The vouchers a recorded answer proves landed: its `CREATED`, unless it
+/// reported `STATUS=0`, which failed whatever its counters say
+/// (IMPLEMENTATION_GUIDE.md §3.2, I6; #2035).
+pub(super) fn landed_count(outcome: &bridge_tally_protocol::TallyImportOutcome) -> u64 {
+    if outcome.application_status() == bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    {
+        0
+    } else {
+        outcome.counters().created
     }
 }
 
@@ -1624,7 +1637,7 @@ impl RollbackFacts {
                             .as_ref()
                             .and_then(|response| response.outcome.as_ref())
                         {
-                            post.created_at = Some((at, outcome.counters().created));
+                            post.created_at = Some((at, landed_count(outcome)));
                         }
                     }
                     StatusKind::PostSpanVerdict => {

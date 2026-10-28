@@ -1,0 +1,11 @@
+﻿frames 855 R (median capture interval, s) 0.118 largest interval 0.890
+input groups 15 ['10:53:16.703', '10:53:17.414', '10:53:25.157', '10:53:32.801', '10:53:39.578', '10:53:48.015', '10:53:50.984', '10:53:58.551', '10:54:06.466', '10:54:14.367', '10:54:21.274', '10:54:28.639', '10:54:35.373', '10:54:42.481', '10:54:45.327']
+1 Day Book             t0 10:53:32.801  t1 10:53:33.869  latency 1.068 s  (end capture 00192.jpg)
+2 Page Down x5         t0 10:53:39.578  t1 10:53:39.654  latency 0.076 s  (end capture 00234.jpg)
+3 Escape to Gateway    t0 10:53:48.015  t1 10:53:51.144  latency 3.129 s  (end capture 00321.jpg)
+4 Balance Sheet        t0 10:53:58.551  t1 10:53:59.100  latency 0.549 s  (end capture 00386.jpg)
+5 Escape to Gateway    t0 10:54:06.466  t1 10:54:06.679  latency 0.213 s  (end capture 00432.jpg)
+6 Profit & Loss        t0 10:54:14.367  t1 10:54:14.762  latency 0.395 s  (end capture 00490.jpg)
+7 Escape to Gateway    t0 10:54:21.274  t1 10:54:21.576  latency 0.302 s  (end capture 00543.jpg)
+8 Trial Balance        t0 10:54:35.373  t1 10:54:35.732  latency 0.359 s  (end capture 00650.jpg)
+8b Escape to Gateway   t0 10:54:42.481  t1 10:54:45.481  latency 3.000 s  (end capture 00726.jpg)

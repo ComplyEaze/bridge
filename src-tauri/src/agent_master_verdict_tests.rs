@@ -112,6 +112,7 @@ struct World {
     pre_image: BTreeMap<String, u64>,
     pre_marks: Vec<MasterMark>,
     counters: Option<MasterCounters>,
+    answer_held: bool,
     moment: Moment,
     read: ReadBack,
 }
@@ -124,6 +125,7 @@ impl World {
             pre_image: pre_image(),
             pre_marks: vec![mark(TARGET, 7), mark(other(), 3)],
             counters: Some(counters(1, 0, 0, 0)),
+            answer_held: true,
             moment: Moment::JustPosted,
             read: ReadBack {
                 marks: Some(vec![mark(TARGET, 8), mark(other(), 3)]),
@@ -144,6 +146,7 @@ impl World {
         let mut world = Self::clean(item);
         world.moment = Moment::Reconcile;
         world.counters = None;
+        world.answer_held = false;
         world.read.marks = Some(vec![mark(TARGET, 7), mark(other(), 3)]);
         world.read.masters = Some(vec![
             master(MasterKind::Ledger, cash(), 9, &["Cash"]),
@@ -159,6 +162,7 @@ impl World {
         let mut world = Self::clean(item);
         world.moment = Moment::Reconcile;
         world.counters = None;
+        world.answer_held = false;
         world
     }
 
@@ -178,6 +182,7 @@ impl World {
                 pre_image: &self.pre_image,
                 pre_marks: &self.pre_marks,
                 counters: self.counters,
+                answer_held: self.answer_held,
                 moment: self.moment,
             },
             &self.read,
@@ -285,12 +290,19 @@ fn absent_counters_never_give_posted_verified_whatever_else_holds() {
         assert_eq!(judgement.guid.as_deref(), Some(new_ledger()), "{label}");
         assert_eq!(judgement.checks.name, Check::Passed);
         assert_eq!(judgement.checks.parent, Check::Passed);
-        // On a reconcile the same world settles, and is still never verified.
+        // The same on a reconcile, while Tally's answer is on file.
         world.moment = Moment::Reconcile;
         assert_eq!(
             world.judge().state,
-            MasterVerdictState::PostedUnattributed,
+            MasterVerdictState::ReconciliationRequired,
             "{label} reconcile"
+        );
+        // With the answer lost it settles, and is still never verified.
+        world.answer_held = false;
+        assert_eq!(
+            world.judge().state,
+            MasterVerdictState::PostedUnattributed,
+            "{label} lost answer"
         );
     }
 }
@@ -834,6 +846,8 @@ fn a_reconcile_with_no_counters_that_finds_the_first_change_as_sent_is_unattribu
     }
 }
 
+/// The call that made the POST always holds its answer; the moment alone
+/// keeps it out of the state too.
 #[test]
 fn right_after_a_post_a_create_with_no_counters_is_never_unattributed() {
     for (label, item) in items() {
@@ -850,10 +864,33 @@ fn right_after_a_post_a_create_with_no_counters_is_never_unattributed() {
     }
 }
 
+/// An answer on file without counters (one whose counters could not all be
+/// read) was not lost: it may have been Tally's refusal. The state is not
+/// reached and the check is not made.
+#[test]
+fn an_answer_on_file_without_counters_is_never_unattributed() {
+    for (label, item) in items() {
+        let mut world = World::lost_answer(item);
+        world.answer_held = true;
+        let judgement = world.judge();
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::ReconciliationRequired,
+            "{label}"
+        );
+        assert_eq!(
+            judgement.checks.first_change_after_intent,
+            Check::NotChecked
+        );
+        assert_eq!(judgement.reasons, vec!["counters_unavailable"], "{label}");
+    }
+}
+
 #[test]
 fn counters_on_file_decide_and_the_alter_id_check_is_not_made() {
     let mut world = World::lost_answer(suspense());
     world.counters = Some(counters(1, 0, 0, 0));
+    world.answer_held = true;
     let judgement = world.judge();
     assert_eq!(judgement.state, MasterVerdictState::PostedVerified);
     assert_eq!(

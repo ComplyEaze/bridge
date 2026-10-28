@@ -1223,11 +1223,11 @@ fn unattributed_verdict(batch: &MasterBatch) -> MasterVerdict {
     verdict
 }
 
-/// The state stands in for counters that are not on file, so it is admitted
-/// after no answer, or after an answer whose counters could not be read, and
-/// refused after any answer that holds counters, even ones that count nothing.
+/// The state is for an answer that was lost, so it is admitted only when no
+/// answer is on file, and refused after any answer: one whose counters could
+/// not be read, and one with counters, even counters that count nothing.
 #[test]
-fn posted_unattributed_is_admitted_only_with_no_counters_on_file() {
+fn posted_unattributed_is_admitted_only_with_no_answer_on_file() {
     let batch = batch(&batch_id());
     let intent = journal_text(&full_records(&batch)[..2]);
     let unattributed = line(&MasterRecord::Verdict(unattributed_verdict(&batch)));
@@ -1237,7 +1237,10 @@ fn posted_unattributed_is_admitted_only_with_no_counters_on_file() {
         response.counters = counters;
         line(&MasterRecord::DispatchResponse(response))
     };
-    assert!(read(&format!("{intent}{}{unattributed}", answered(None))).is_ok());
+    assert_eq!(
+        read(&format!("{intent}{}{unattributed}", answered(None))).unwrap_err(),
+        invalid(Invalid::UnattributedWithAnswer)
+    );
     let count = |created: u64, altered: u64, errors: u64| MasterCounters {
         created,
         altered,
@@ -1259,7 +1262,7 @@ fn posted_unattributed_is_admitted_only_with_no_counters_on_file() {
                 answered(Some(counters))
             ))
             .unwrap_err(),
-            invalid(Invalid::UnattributedAgainstCounters),
+            invalid(Invalid::UnattributedWithAnswer),
             "{counters:?}"
         );
     }

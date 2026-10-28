@@ -47,8 +47,9 @@
 //!   (`agent_master_verdict.rs`). `confirmed_absent` is given when its paired
 //!   read-back shows the ledger absent, and a new batch for the same ledger then
 //!   needs a new approval: nothing is ever sent again automatically.
-//!   `posted_unattributed` is given when no counters are on file and the ledger
-//!   was found as sent, written by the first master change after the intent.
+//!   `posted_unattributed` is given when no answer from Tally is on file and the
+//!   ledger was found as sent, written by the first master change after the
+//!   mark the intent recorded.
 //! - A build that predates a verdict state refuses the whole journal on a line
 //!   holding it, which stops every master write and reconcile with no repair in
 //!   the product. So a new state ships in the same release as the first build
@@ -354,12 +355,12 @@ pub(super) enum MasterVerdictState {
     /// moved since the intent. Nothing was created; the batch is closed and is
     /// never sent again. A new batch needs a new approval.
     ConfirmedAbsent,
-    /// A reconcile with no counters on file found the ledger as sent, every
-    /// check but the counters passed, and the ledger's `ALTERID` is the target
-    /// company's mark at the intent plus one: the first master change after
-    /// the intent wrote it, and none since. Settled, never verified: with
-    /// Tally's answer lost, nothing shows that change was this create rather
-    /// than a person keying the identical ledger.
+    /// A reconcile of a batch with no answer from Tally on file found the
+    /// ledger as sent, every check but the counters passed, and the ledger's
+    /// `ALTERID` is the target company's mark read before the send plus one:
+    /// the first master change after that read wrote it, and none since.
+    /// Settled, never verified: with Tally's answer lost, nothing shows that
+    /// change was this create rather than a person keying the identical ledger.
     PostedUnattributed,
 }
 
@@ -540,10 +541,10 @@ pub(super) enum Invalid {
     /// say Tally created or altered something: absence is never concluded
     /// against Tally's own count of a write.
     AbsentAgainstCounters,
-    /// A `posted_unattributed` verdict against an answer on record that holds
-    /// counters: that state exists only for a batch with no counters on file,
-    /// and Tally's own count decides one that has them.
-    UnattributedAgainstCounters,
+    /// A `posted_unattributed` verdict for a batch with an answer on record,
+    /// with or without counters: that state exists only for an answer that was
+    /// lost, and Tally's own answer decides one that is on file.
+    UnattributedWithAnswer,
     /// A second response for a batch: one POST, one response.
     SecondResponse,
     /// An intent recording no company mark, or none for the batch's company.
@@ -1096,14 +1097,10 @@ impl MasterJournal {
                 if verdict.state == MasterVerdictState::ConfirmedAbsent && counted_a_write {
                     return Err(MasterLedgerError::Invalid(Invalid::AbsentAgainstCounters));
                 }
-                let counters_on_file = state
-                    .response
-                    .as_ref()
-                    .is_some_and(|response| response.counters.is_some());
-                if verdict.state == MasterVerdictState::PostedUnattributed && counters_on_file {
-                    return Err(MasterLedgerError::Invalid(
-                        Invalid::UnattributedAgainstCounters,
-                    ));
+                if verdict.state == MasterVerdictState::PostedUnattributed
+                    && state.response.is_some()
+                {
+                    return Err(MasterLedgerError::Invalid(Invalid::UnattributedWithAnswer));
                 }
                 let named = verdict
                     .items

@@ -5692,14 +5692,15 @@ async fn a_lost_answer_whose_ledger_is_the_first_change_after_the_intent_settles
         verification["counters_note"],
         verify::NO_ANSWER_RECORDED_NOTE
     );
-    assert_eq!(
-        reported["next_step"],
-        settled_next_step(MasterVerdictState::PostedUnattributed)
-    );
+    assert_eq!(reported["next_step"], verify::NEXT_UNATTRIBUTED);
     assert_eq!(
         reported["note"],
         settled_note(MasterVerdictState::PostedUnattributed)
     );
+    assert!(reported["note"]
+        .as_str()
+        .unwrap()
+        .contains("the create is NOT verified"));
     assert!(reported.get("alert").is_none());
     let state = state_of(&path, &batch_id);
     assert!(state.is_settled());
@@ -5720,10 +5721,58 @@ async fn a_lost_answer_whose_ledger_is_the_first_change_after_the_intent_settles
     assert_eq!(reported["state"], "posted_unattributed", "{report}");
     assert_eq!(reported["journal"]["response_recorded"], false);
     assert_ne!(reported["note"], MAY_HAVE_BEEN_SENT_NOTE);
+    assert_eq!(reported["next_step"], verify::NEXT_UNATTRIBUTED);
+}
+
+/// Tally answered without counters ComplyEaze Bridge could read, so the answer
+/// is on file and was not lost: a later reconcile that finds the ledger as
+/// sent at the first master change still does not settle it.
+#[tokio::test]
+async fn an_answer_on_file_without_counters_never_settles_unattributed() {
+    let mut plans = through_post(xml(
+        "<ENVELOPE><BODY>no counters here</BODY></ENVELOPE>".to_string()
+    ));
+    plans.extend(read_back(8, 3, Some(suspense_answer())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let first = posting_then(
+        &ScriptedApproval::approving(),
+        book_with_new_ledger(8),
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    sent(simulator);
     assert_eq!(
-        reported["next_step"],
-        settled_next_step(MasterVerdictState::PostedUnattributed)
+        result(&first)["state"],
+        "reconciliation_required",
+        "{first}"
     );
+    assert!(state_of(directory.path(), &batch.batch_id)
+        .response
+        .is_some());
+    let reads = SequenceSimulator::spawn(with_sentinel(reconcile_reads(
+        8,
+        3,
+        Some(suspense_answer()),
+    )))
+    .unwrap();
+    let later = server_at(reads.address(), directory.path());
+    let answer = reconciling(
+        book_with_new_ledger(8),
+        later.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    assert_eq!(create_count(&sent(reads)), 0);
+    let reported = result(&answer);
+    assert_eq!(reported["state"], "reconciliation_required", "{answer}");
+    assert_eq!(reported["verification"]["moment"], "reconcile");
+    assert_eq!(
+        reported["verification"]["checks"]["first_change_after_intent"],
+        "not_checked"
+    );
+    assert!(!state_of(directory.path(), &batch.batch_id).is_settled());
 }
 
 /// The same lost answer, with the ledger changed after the first master change

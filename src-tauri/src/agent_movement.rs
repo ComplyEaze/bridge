@@ -2,7 +2,7 @@
 use super::voucher_window::{WindowScope, LEDGER_SCOPE_NEEDS_DAY_SPLIT};
 use super::*;
 use bridge_tally_core::TallyDate;
-use bridge_tally_protocol::ledger_scope::LedgerScopeName;
+use bridge_tally_protocol::ledger_scope::{LedgerScopeName, LedgerScopeNameError};
 
 /// A ledger-scoped read found no vouchers. Not taken as proof of none (#485): the whole book's
 /// window decides, through the same empty-window corroboration as any other read.
@@ -17,6 +17,7 @@ const LEDGER_SCOPE_ROW_WITHOUT_LINE: &str = "ledger_scope_row_without_line";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum WholeBookReason {
     NameOutsideScopedAlphabet,
+    NameHoldsFormulaWord,
     PlanNeedsDaySplit,
     ScopedReadFoundNothing,
 }
@@ -25,6 +26,7 @@ impl WholeBookReason {
     const fn code(self) -> &'static str {
         match self {
             Self::NameOutsideScopedAlphabet => "ledger_name_outside_scoped_alphabet",
+            Self::NameHoldsFormulaWord => "ledger_name_holds_formula_word",
             Self::PlanNeedsDaySplit => LEDGER_SCOPE_NEEDS_DAY_SPLIT,
             Self::ScopedReadFoundNothing => LEDGER_SCOPE_EMPTY_NOT_ESTABLISHED,
         }
@@ -33,10 +35,13 @@ impl WholeBookReason {
     const fn note(self) -> &'static str {
         match self {
             Self::NameOutsideScopedAlphabet => {
-                "The named ledger's name has a character the ledger-scoped read does not send, so the whole book's vouchers for the period were read and this ledger's figures taken from them. The figures are the same; the read was larger and slower."
+                "The named ledger's name is not one the ledger-scoped read sends (a character, spacing or length it does not admit), so the whole book's vouchers for the period were read and this ledger's figures taken from them. The read is larger and slower."
+            }
+            Self::NameHoldsFormulaWord => {
+                "The named ledger's name holds a word that Tally's formulas read as an operator, and the ledger-scoped read has not been observed on such a name, so the whole book's vouchers for the period were read and this ledger's figures taken from them. The read is larger and slower."
             }
             Self::PlanNeedsDaySplit => {
-                "A day of the named ledger's vouchers was too heavy for one ledger-scoped read, so the whole book's vouchers for the period were read and this ledger's figures taken from them. The figures are the same; the read was larger and slower."
+                "A day of the named ledger's vouchers was too heavy for one ledger-scoped read, so the whole book's vouchers for the period were read and this ledger's figures taken from them. The read is larger and slower."
             }
             Self::ScopedReadFoundNothing => {
                 "The ledger-scoped read found no vouchers for the named ledger in the period, which is not taken as proof that there are none: the whole book's vouchers for the period were read and checked instead."
@@ -53,6 +58,23 @@ impl WholeBookReason {
         }
     }
 }
+
+/// The scope a catalogue ledger name reads by, or the reason it reads the book's window instead.
+fn scope_name_of(name: &str) -> Result<LedgerScopeName, WholeBookReason> {
+    LedgerScopeName::new(name).map_err(|refusal| match refusal {
+        LedgerScopeNameError::FormulaWord => WholeBookReason::NameHoldsFormulaWord,
+        LedgerScopeNameError::Empty
+        | LedgerScopeNameError::TooLong
+        | LedgerScopeNameError::Spacing
+        | LedgerScopeNameError::Character => WholeBookReason::NameOutsideScopedAlphabet,
+    })
+}
+
+/// What the result says about a read by the ledger's own vouchers. It states what was compared,
+/// not that the two reads agree: the lab has compared them for one party ledger over a month
+/// and for one sales ledger on a day, and not for post-dated, optional, cancelled or zero-amount
+/// vouchers, nor for a ledger that holds most of the book.
+const LEDGER_SCOPED_NOTE: &str = "Only the vouchers Tally lists under the named ledger were read, not the whole book's. Compared with a whole-book read for one party ledger over a month and one sales ledger on a day only; a voucher Tally leaves out of its list for the ledger would not be seen.";
 
 impl Server {
     pub(super) async fn ledger_movement(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -93,10 +115,10 @@ impl Server {
             // the ledger just resolved, never the argument. A name the scoped read does not
             // admit reads the book's window instead, and the result says so.
             let mut whole_book = None;
-            let scope_name = match selected.as_ref().map(|found| LedgerScopeName::new(found.name())) {
+            let scope_name = match selected.as_ref().map(|found| scope_name_of(found.name())) {
                 Some(Ok(name)) => Some(name),
-                Some(Err(_)) => {
-                    whole_book = Some(WholeBookReason::NameOutsideScopedAlphabet);
+                Some(Err(reason)) => {
+                    whole_book = Some(reason);
                     None
                 }
                 None => None,
@@ -278,7 +300,7 @@ impl Server {
             let next_offset = truncated.then_some(offset + rows.len());
             let window_scope = match (&selected, whole_book) {
                 (None, _) => Value::Null,
-                (Some(_), None) => json!({"basis": "ledger_scoped", "vouchers_read": voucher_rows_observed}),
+                (Some(_), None) => json!({"basis": "ledger_scoped", "vouchers_read": voucher_rows_observed, "note": LEDGER_SCOPED_NOTE}),
                 (Some(_), Some(reason)) => {
                     json!({"basis": "whole_book", "reason": reason.code(), "note": reason.note()})
                 }

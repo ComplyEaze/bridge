@@ -460,21 +460,60 @@ fn a_ledger_scoped_row_with_no_entries_at_all_is_refused_too() {
     );
 }
 
+/// The scope a catalogue name reads by is decided in one function: a name the type refuses reads
+/// the book's window, for the formula-word reason when that is why and the alphabet reason
+/// otherwise, and the names of an ordinary chart of accounts read by their own ledger.
+#[test]
+fn a_catalogue_name_reads_by_its_ledger_or_names_why_it_does_not() {
+    for name in ["DN Party 001", "DN Sales", "Cash", "Office Rent"] {
+        assert_eq!(scope_name_of(name).unwrap().as_str(), name);
+    }
+    for name in [
+        "Printing and Stationery",
+        "Rates and Taxes",
+        "Salary Not Paid",
+        "Sales or Returns",
+    ] {
+        assert_eq!(
+            scope_name_of(name).unwrap_err(),
+            WholeBookReason::NameHoldsFormulaWord,
+            "{name}"
+        );
+    }
+    for name in [
+        "Profit & Loss A/c",
+        "Sales 2024-25",
+        "A  B",
+        " Cash",
+        "M.S. Traders",
+    ] {
+        assert_eq!(
+            scope_name_of(name).unwrap_err(),
+            WholeBookReason::NameOutsideScopedAlphabet,
+            "{name}"
+        );
+    }
+}
+
 /// Each reason a movement read goes to the book's window carries its own code and a sentence, and
-/// only the two codes a ledger-scoped read raises ask for the fallback.
+/// only the two codes a ledger-scoped read raises ask for the fallback. No sentence says the
+/// figures of the two reads agree: that has been compared for two cases only.
 #[test]
 fn the_whole_book_reasons_are_distinct_and_only_the_scoped_read_codes_ask_for_one() {
     let reasons = [
         WholeBookReason::NameOutsideScopedAlphabet,
+        WholeBookReason::NameHoldsFormulaWord,
         WholeBookReason::PlanNeedsDaySplit,
         WholeBookReason::ScopedReadFoundNothing,
     ];
     let codes = reasons.iter().map(|r| r.code()).collect::<BTreeSet<_>>();
     let notes = reasons.iter().map(|r| r.note()).collect::<BTreeSet<_>>();
-    assert_eq!((codes.len(), notes.len()), (3, 3));
+    assert_eq!((codes.len(), notes.len()), (4, 4));
     for reason in reasons {
         assert!(reason.note().contains("whole book"), "{}", reason.note());
+        assert!(!reason.note().contains("are the same"), "{}", reason.note());
     }
+    assert!(!LEDGER_SCOPED_NOTE.contains("are the same"));
     let failure = |code: &str| ToolFailure::from(code.to_string());
     assert_eq!(
         WholeBookReason::of_failure(&failure(LEDGER_SCOPE_NEEDS_DAY_SPLIT)),

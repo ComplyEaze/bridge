@@ -55,10 +55,16 @@ is the openssl-src crate, version 300.6.1+3.6.3. The macOS build uses
 SQLCipher's CommonCrypto provider and does not include OpenSSL. OpenSSL is
 distributed under the Apache License, Version 2.0, the same licence as Bridge;
 its text is in the LICENSE file of this distribution. The OpenSSL source has no
-NOTICE file of its own. The source files of its library (crypto, ssl and
-providers) state the following copyright holders, in addition to The OpenSSL
-Project Authors; a few RISC-V assembler files also offer the BSD 2-Clause
-licence as an alternative to the Apache License 2.0:
+NOTICE file of its own. Some files in its crypto and include directories
+carry other licence terms in their own headers, which apply to those files as
+the headers state: alternative BSD-style licences (for example the directory
+sources crypto/LPdir_*.c, the X.509 sources crypto/x509/v3_pci.c and
+v3_pcia.c, and assembler sources for RISC-V, LoongArch and SPARC T4), the
+CRYPTOGAMS licence under which Andy Polyakov's assembler modules are also
+available, and public-domain notices on some reference code. Read the file
+headers in the openssl-src crate for any one file. The source files of the
+OpenSSL library (crypto, ssl and providers) state the following copyright
+holders, in addition to The OpenSSL Project Authors:
 
   Oracle and/or its affiliates (2002-2019)
   Intel Corporation (2012-2025)

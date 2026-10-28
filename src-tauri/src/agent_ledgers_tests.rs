@@ -3622,6 +3622,69 @@ mod through_the_tool {
         assert_eq!(one.requests(), total);
     }
 
+    /// A listing read with the dated mailing details is served only to a page that
+    /// asks for them too. Named, a page that drops `include_mailing_details` is
+    /// refused (nothing more is read); unnamed, it reads fresh from the standard
+    /// request and its rows carry no `mailing_details` key.
+    #[tokio::test]
+    async fn a_compliance_continuation_that_drops_the_mailing_details_is_not_served_from_the_snapshot(
+    ) {
+        let held = mailing_masters();
+        let held_balances = balances_matching(&held);
+        let mut plans = compliance_plans(held, held_balances);
+        plans.extend(continuation_plans(extent_with_master_mark(219)));
+        let total = plans.len();
+        let one = OneServer::spawn(plans);
+        let first = one
+            .call(json!({"company_guid":GUID,"fields":"compliance","include_mailing_details":true,"limit":1}))
+            .await;
+        let id = snapshot_id(&first);
+        let refused = one
+            .call(
+                json!({"company_guid":GUID,"fields":"compliance","offset":1,"limit":1,
+                "snapshot_id":id}),
+            )
+            .await;
+        let error = refusal(&refused);
+        assert_eq!(error["code"], "listing_snapshot_changed");
+        assert_eq!(error["cause"], "snapshot_not_held");
+        assert_eq!(
+            one.requests(),
+            total,
+            "nothing is read after the extent check"
+        );
+
+        let held = mailing_masters();
+        let held_balances = balances_matching(&held);
+        let mut plans = compliance_plans(held, held_balances);
+        plans.extend(continuation_plans(extent_with_master_mark(219)));
+        plans.extend(
+            compliance_plans(masters(), balances())
+                .into_iter()
+                .skip(identity_plans().len()),
+        );
+        let total = plans.len();
+        let one = OneServer::spawn(plans);
+        let first = one
+            .call(json!({"company_guid":GUID,"fields":"compliance","include_mailing_details":true,"limit":1}))
+            .await;
+        assert!(items(&first)[0]["compliance"]["mailing_details"].is_object());
+        let fresh = one
+            .call(json!({"company_guid":GUID,"fields":"compliance","offset":1,"limit":1}))
+            .await;
+        assert_eq!(snapshot_of(&fresh)["reused"], false);
+        for row in items(&fresh) {
+            assert!(
+                !row["compliance"]
+                    .as_object()
+                    .unwrap()
+                    .contains_key("mailing_details"),
+                "{row}"
+            );
+        }
+        assert_eq!(one.requests(), total);
+    }
+
     /// A continuation that names no snapshot is still served from the held
     /// read while the book is unchanged: the id only makes a change loud.
     #[tokio::test]

@@ -255,8 +255,9 @@ from `mailing_details`; other books may fill the flat fields. `mask_parties` sho
 of its address lines (and the flat `address`) like a party name, to their first two and last two characters, so a house
 number or a town at either end of a line can stay readable; the mailing entry's PIN code, state and country reach the
 assistant's provider under every redaction mode (the flat `pin_code`, `gst_pin_code` and `state` already go on every
-compliance read, unchanged), and for a party that is an individual, such as a proprietor, the PIN code and state can
-point to the locality of a home address. The read is admitted at 4,700 bytes a ledger instead of 3,750, from the one growth
+compliance read, unchanged); for a party that is an individual, such as a proprietor, the flat PIN code and state sent
+on every compliance read, and the mailing entry's PIN code, state and country when asked for, can point to the
+locality of a home address. The read is admitted at 4,700 bytes a ledger instead of 3,750, from the one growth
 measured (948 bytes for one populated party row; UNVERIFIED for a populated book), so a read holds at most 3,404 ledgers
 (the 16 MB budget over the constant, not measured); a book that fits a standard read may come back in more parts, or be
 refused as `parent_over_budget`, never truncated. A held listing is served only to a page that asks for the same mode, so

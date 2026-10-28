@@ -12,6 +12,8 @@
 //     node parity/mutations.mjs --changed-since origin/master --verify   # no build: the merge check
 //     node parity/mutations.mjs --check-anchors        # no build: exit 2 on an anchor not exactly once at HEAD
 //     node parity/mutations.mjs --full --shard 2/8 --results shard.json  # nightly, one shard
+//     node parity/mutations.mjs --shard 2/8 --results shard.json --killers-from parity/mutation-results.json
+//                                                       # a pull request head's proof run, one shard
 //     node parity/mutations.mjs --merge shard*.json --results all.json --report report.md
 //
 // Run from anywhere with Node 22 or later and the pinned toolchain exported (RUSTC, RUSTDOC and PATH; see
@@ -48,7 +50,10 @@
 // tests run first (`--exact`, only their targets). If one fails or hangs, the mutation is killed
 // ("killers-first" mode, and its margin is then a lower bound). Otherwise the FULL suite runs, so any
 // verdict other than killed comes from the full suite. `--full` skips the killers-first step (the
-// nightly run).
+// nightly run). `--killers-from FILE` supplies killer lists from other records (a proof run's shards
+// start with an empty results file): those records are read for their killers only, never counted
+// or written as results. A killer subset is not run on the unmutated copy on its own, only the full
+// suite is, so a test that fails only when run alone (order or shared state) would read as a kill.
 //
 // SIGINT or SIGTERM stops the cargo runs in flight (their own process groups) and exits; records
 // already written stay. A run killed outright (SIGKILL) can leave its cargo running and a mutation
@@ -1129,11 +1134,13 @@ const OPTIONS = {
   "--merge": { key: "merge", many: true },
   "--report": { key: "report", value: "MD" },
   "--check-anchors": { key: "checkAnchors", flag: true },
+  "--killers-from": { key: "killersFrom", value: "FILE" },
 };
 
 export const USAGE = `usage: mutations.mjs [ids ...] [--changed-since BASE] [--verify] [--nightly-issues FILE] [--list]
                     [--full] [--jobs N] [--shard K/N] [--timeout SECONDS] [--build-timeout SECONDS]
-                    [--results FILE] [--workdir DIR] [--merge FILE ...] [--report MD] [--check-anchors]`;
+                    [--results FILE] [--workdir DIR] [--merge FILE ...] [--report MD] [--check-anchors]
+                    [--killers-from FILE]`;
 
 /** Read the command line (the options of the Python runner this replaces). Throws a ValueError with
  * the usage when it cannot. */
@@ -1154,6 +1161,7 @@ export function parseArgs(argv, lay = DEFAULT) {
     merge: null,
     report: null,
     checkAnchors: false,
+    killersFrom: null,
     help: false,
   };
   const fail = (message) => {
@@ -1261,6 +1269,7 @@ export function checkAnchors(args, lay = DEFAULT) {
     ["--report", args.report !== null],
     ["--full", args.full],
     ["--shard", args.shard !== null],
+    ["--killers-from", args.killersFrom !== null],
   ]
     .filter(([, set]) => set)
     .map(([name]) => name);
@@ -1286,6 +1295,27 @@ export function checkAnchors(args, lay = DEFAULT) {
 
 export async function run(args, lay = DEFAULT) {
   if (args.checkAnchors) return checkAnchors(args, lay); // before the working-tree list is read
+  // --killers-from names records read ONLY for their killer lists (a proof run's killers-first pass);
+  // they are never results: the run's own results file starts as it is, and only what this run
+  // measured is written. A missing file would quietly make every mutation run the full suite.
+  if (args.killersFrom !== null) {
+    const clash = [
+      ["--full", args.full],
+      ["--merge", args.merge !== null],
+      ["--verify", args.verify],
+      ["--list", args.list],
+    ]
+      .filter(([, set]) => set)
+      .map(([name]) => name);
+    if (clash.length) {
+      err(`refusing: --killers-from is for a run of mutations without --full: ${pyList(clash)}`);
+      return 2;
+    }
+    if (!isFile(args.killersFrom)) {
+      err(`refusing: --killers-from ${args.killersFrom} is not a file, so no mutation would run its killers first`);
+      return 2;
+    }
+  }
 
   const mutations = readJson(lay.list);
   const order = mutations.map((m) => m.id);
@@ -1399,7 +1429,8 @@ export async function run(args, lay = DEFAULT) {
     return 2;
   }
   try {
-    return await runMutations({ args, lay, mutations, order, accepted, results, resultsPath, head, tree, chosen, stale });
+    const killers = args.killersFrom === null ? dict() : loadResults(args.killersFrom);
+    return await runMutations({ args, lay, mutations, order, accepted, results, killers, resultsPath, head, tree, chosen, stale });
   } finally {
     lock.release();
   }
@@ -1412,7 +1443,7 @@ function readFailure(e) {
   return e.code === "ENOENT" ? "FileNotFoundError" : e.code === "EISDIR" ? "IsADirectoryError" : e.code === "EACCES" ? "PermissionError" : "OSError";
 }
 
-async function runMutations({ args, lay, mutations, order, accepted, results, resultsPath, head, tree, chosen, stale }) {
+async function runMutations({ args, lay, mutations, order, accepted, results, killers, resultsPath, head, tree, chosen, stale }) {
   const files = committedFiles(head, lay.repo);
   const jobs = Math.max(1, Math.min(args.jobs, chosen.length || 1));
   const workers = Array.from({ length: jobs }, (_, i) => new Worker(i, args.workdir, lay));
@@ -1454,7 +1485,9 @@ async function runMutations({ args, lay, mutations, order, accepted, results, re
         if (m === undefined) return;
         let rec;
         try {
-          rec = await runOne(w, m, has(results, m.id) ? results[m.id] : undefined, args.full, args.timeout, args.buildTimeout);
+          // This run's own record first; else a --killers-from record, used only for its killer list.
+          const prior = has(results, m.id) ? results[m.id] : has(killers, m.id) ? killers[m.id] : undefined;
+          rec = await runOne(w, m, prior, args.full, args.timeout, args.buildTimeout);
         } catch (e) {
           if (e instanceof Stopped) return;
           throw e;

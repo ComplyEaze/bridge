@@ -91,6 +91,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "cash_flow",
         "company_features",
         "egress_log",
+        "gst_by_counter_ledger",
         "gst_status",
         "gst_uncertain_vouchers",
         "ledger_masters",
@@ -1362,6 +1363,21 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "gst_status",
             "never as included",
             "a voucher whose flags were not read is not reported as in the return",
+        ),
+        (
+            "gst_by_counter_ledger",
+            "not a return figure",
+            "the GST totals are not presented as a return figure",
+        ),
+        (
+            "gst_by_counter_ledger",
+            "Nothing is apportioned",
+            "a voucher with several counter ledgers is never split",
+        ),
+        (
+            "gst_by_counter_ledger",
+            "It does not decide input tax credit eligibility",
+            "the totals make no eligibility or availment claim",
         ),
         (
             "gst_status",

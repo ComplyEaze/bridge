@@ -156,6 +156,34 @@
     {
       "uuid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
       "note": "company identifier of the synthetic lab company BRIDGE CORPUS DENSE (about 30,000 vouchers), as Tally returned it in the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml on master and in the marks read of the ledger-scoped census run (TallyPrime 7.2 Silver, 28 October 2026, lab branch lab/485-ledger-census-spans-answers at ba180df99d4595c9e4e12121b58b6a577151e0c3); the identifiers of that company's vouchers in its captures carry it as a prefix"
+    },
+    {
+      "uuid": "9ab5002c-e910-4242-83e4-a27cc490600b",
+      "note": "company identifier of the synthetic lab company BRIDGE BILLTRAIL LAB, as Tally returned it in the company marks read of the read-only captures of #1356 on 28 October 2026 (lab branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9); the identifiers of that company's vouchers and voucher types in the same answers, and their REMOTEID and VCHKEY attributes, carry it as a prefix"
+    },
+    {
+      "uuid": "a08384fd-d18b-5494-847d-ca5b5b1ff61f",
+      "note": "synthetic seed marker (a name-based UUID) written as [BRIDGE-LAB:...] in the narration of the BRIDGE BILLTRAIL LAB voucher the lab seeded with the label INV-1, as Tally returned it in the read-only captures of #1356 on 28 October 2026 (lab branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9)"
+    },
+    {
+      "uuid": "63a93690-912a-54b4-86e4-022df9af729d",
+      "note": "synthetic seed marker (a name-based UUID) written as [BRIDGE-LAB:...] in the narration of the BRIDGE BILLTRAIL LAB voucher the lab seeded with the label ADV-1, as Tally returned it in the read-only captures of #1356 on 28 October 2026 (lab branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9)"
+    },
+    {
+      "uuid": "3a7cdc98-0088-5697-b08f-300a82ae88f0",
+      "note": "synthetic seed marker (a name-based UUID) written as [BRIDGE-LAB:...] in the narration of the BRIDGE BILLTRAIL LAB voucher the lab seeded with the label ADV-2, as Tally returned it in the read-only captures of #1356 on 28 October 2026 (lab branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9)"
+    },
+    {
+      "uuid": "e9ea6cd2-88e7-56b3-b0f4-22eb4fe6b273",
+      "note": "synthetic seed marker (a name-based UUID) written as [BRIDGE-LAB:...] in the narration of the BRIDGE BILLTRAIL LAB voucher the lab seeded with the label INV-2, as Tally returned it in the read-only captures of #1356 on 28 October 2026 (lab branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9)"
+    },
+    {
+      "uuid": "f7f8adaf-960c-5423-a29d-86236e71fd96",
+      "note": "synthetic seed marker (a name-based UUID) written as [BRIDGE-LAB:...] in the narration of the BRIDGE BILLTRAIL LAB voucher the lab seeded with the label receipt against INV-1, as Tally returned it in the read-only captures of #1356 on 28 October 2026 (lab branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9)"
+    },
+    {
+      "uuid": "4f45d573-697a-4c0a-b3a2-873df57e65a0",
+      "note": "the NAME Tally generated for the bank allocation of a post-dated receipt keyed by hand in the synthetic lab company BRIDGE BILLTRAIL LAB, as returned in the read-only captures of #1356 on 28 October 2026 (lab branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9)"
     }
   ]
 }

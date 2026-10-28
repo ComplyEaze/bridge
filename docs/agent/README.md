@@ -1030,7 +1030,11 @@ parts: purchases on Indirect Expenses, Direct Expenses and Fixed
 Assets ledgers and on two expense ledgers at once, two item invoices whose purchase ledger was among their entries
 (one with freight), journals with input IGST, with a TDS ledger typed Others, a set-off and a reversal with no
 supplier, a debit note, two tax payments (one also paying interest) and a credit note with output tax.
-Not measured: vouchers created by import, Gold and other releases, a book with registered GSTINs, other item-invoice shapes, more than 64 vouchers
+A registered book was read once, by an earlier build that did not yet admit Direct Expenses or Fixed Assets ledgers or name the ledger GUID
+(the same synthetic book after its company and one supplier were registered and December's vouchers keyed, TallyPrime 7.2 Silver): none of
+December's six vouchers was set aside, and a supplier invoice entered twice (the same reference, date and bill) was totalled twice with nothing
+flagged, so the tool does not detect a duplicate invoice. A year of 70 vouchers was read whole in the same run.
+Not measured: vouchers created by import, Gold and other releases, a registered book on this build, other item-invoice shapes, more than 64 vouchers
 in a window.
 
 ### Uncertain vouchers of one voucher type (`gst_uncertain_vouchers`)

@@ -133,7 +133,12 @@ fn review_lines(
         format!(
             "Company number: {}  Books from: {}",
             company.company_number(),
-            company.books_from_yyyymmdd()
+            // In Tally's day-month-year form, as the approval boxes show it
+            // (#2101).
+            bridge_tally_core::TallyDate::parse(company.books_from_yyyymmdd()).map_or_else(
+                |_| company.books_from_yyyymmdd().to_string(),
+                |date| date.shown()
+            )
         ),
         format!("Tally: {origin}"),
         String::new(),

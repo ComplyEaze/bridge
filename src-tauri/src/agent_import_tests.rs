@@ -6396,3 +6396,29 @@ fn the_rebuild_route_is_offered_only_for_a_batch_over_the_limit() {
         assert_eq!(native_post_route(code, false), " Import", "{code}");
     }
 }
+
+/// A folded twin directly under Tally's root shows the root as Tally sent it, not as the
+/// decoders' working marker; a group a user named Primary and an absent parent are as read.
+#[test]
+fn a_folded_twin_under_the_reserved_root_shows_the_root_as_tally_sent_it() {
+    let root = format!(
+        "{} Primary",
+        bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER
+    );
+    let twins = FoldedTwins {
+        requested: "Profit & Loss A/c".to_string(),
+        live: vec![
+            ("Profit & Loss A/c".to_string(), Some(root)),
+            (
+                "Profit and Loss A/c".to_string(),
+                Some("Primary".to_string()),
+            ),
+            ("Profit &amp; Loss A/c".to_string(), None),
+        ],
+        through_alias: Default::default(),
+    };
+    let shown = folded_live_ledgers_json(&twins);
+    assert_eq!(shown[0]["parent"], "&#4; Primary");
+    assert_eq!(shown[1]["parent"], "Primary");
+    assert_eq!(shown[2]["parent"], Value::Null);
+}

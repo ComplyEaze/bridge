@@ -206,6 +206,21 @@ impl TallyDate {
         ))
     }
 
+    /// The date as Tally's own screens show it, `14-Sep-2026`, the day
+    /// without a leading zero: for a person to read in an approval or review
+    /// text (#2101). Never for a request, which is sent [`Self::as_str`].
+    pub fn shown(&self) -> String {
+        const MONTHS: [&str; 12] = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ];
+        match self.parts() {
+            Ok((year, month, day)) => {
+                format!("{day}-{}-{year:04}", MONTHS[month as usize - 1])
+            }
+            Err(_) => self.0.clone(),
+        }
+    }
+
     /// Adds calendar days in constant time. This deliberately does not step
     /// one day at a time: callers can be parsing an untrusted wire magnitude.
     pub fn add_days(&self, days: u32) -> Result<Self, TallyError> {

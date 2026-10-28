@@ -66,7 +66,7 @@ fn native_preview_contains_all_accounting_inputs_and_pinned_destination() {
     for field in [
         "Synthetic Accounts",
         "9001",
-        "20260901",
+        "1-Sep-2026",
         "Expense",
         "Cash",
         "12.50",
@@ -3382,7 +3382,7 @@ fn the_batch_dates_are_the_earliest_and_latest_whatever_the_voucher_order() {
             .lines()
             .filter(|text| text.starts_with("Dates: "))
             .collect::<Vec<_>>(),
-        ["Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them"]
+        ["Dates: 1-Sep-2026 to 2-Sep-2026  Voucher numbers: Tally assigns them"]
     );
 }
 
@@ -3395,7 +3395,7 @@ fn a_batch_approval_summarizes_every_ledger_and_the_money_the_types_move() {
     for expected in [
         "Create 4 vouchers in \"Synthetic Accounts\"",
         "Types: 1 Contra, 1 Journal, 1 Payment, 1 Receipt",
-        "Dates: 20260901 to 20260902",
+        "Dates: 1-Sep-2026 to 2-Sep-2026",
         "Dr 40  Cr 17.5  3 entries  \"Cash\"",
         "Dr 5  Cr 15  2 entries  \"Bank\"",
         "Dr 12.5  Cr 0  1 entry  \"Expense\"",
@@ -3443,10 +3443,10 @@ fn a_small_batch_lists_each_voucher_on_one_line() {
         [
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
             "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
-            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
-            "Receipt 20260902  40  \"Party A\"  \"Synthetic test only\"",
-            "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
-            "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
+            "Journal 1-Sep-2026  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
+            "Receipt 2-Sep-2026  40  \"Party A\"  \"Synthetic test only\"",
+            "Payment 2-Sep-2026  15  \"Party B\"  \"Synthetic test only\"",
+            "Contra 2-Sep-2026  5  \"Bank\"  \"Synthetic test only\"",
         ],
         "{preview}"
     );
@@ -3466,8 +3466,8 @@ fn a_small_batch_lists_each_voucher_on_one_line() {
     assert_eq!(
         voucher_block(&preview)[2..4],
         [
-            "Journal 20260901  12.5  Dr \"Expense\" +1 more  Cr \"Cash\"  \"Synthetic test only\"",
-            "Receipt 20260902  40  \"Party C\" +1 more  \"Synthetic test only\"",
+            "Journal 1-Sep-2026  12.5  Dr \"Expense\" +1 more  Cr \"Cash\"  \"Synthetic test only\"",
+            "Receipt 2-Sep-2026  40  \"Party C\" +1 more  \"Synthetic test only\"",
         ],
         "{preview}"
     );
@@ -3591,10 +3591,10 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
     assert_eq!(
         voucher_block(&preview)[2..],
         [
-            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"जुलाई का किराया ₹500\"",
-            "Receipt 20260902  40  \"Party A\"  \"NEFT CR 000123456789 SYNTHETIC TRADERS R\"… (+17 characters)",
-            "Payment 20260902  15  \"Party B\"  \"जुलाई महीने का किराया बिजली बिल भुगतान क\"… (+22 characters)",
-            "Contra 20260902  5  \"Bank\"  (none)",
+            "Journal 1-Sep-2026  12.5  Dr \"Expense\"  Cr \"Cash\"  \"जुलाई का किराया ₹500\"",
+            "Receipt 2-Sep-2026  40  \"Party A\"  \"NEFT CR 000123456789 SYNTHETIC TRADERS R\"… (+17 characters)",
+            "Payment 2-Sep-2026  15  \"Party B\"  \"जुलाई महीने का किराया बिजली बिल भुगतान क\"… (+22 characters)",
+            "Contra 2-Sep-2026  5  \"Bank\"  (none)",
         ],
         "{preview}"
     );
@@ -3618,11 +3618,11 @@ fn a_journal_line_names_a_ledger_on_each_side() {
     let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
     assert_eq!(
         voucher_block(&preview)[2],
-        "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\" +1 more  \"Reclass of July rent\"… (+18 characters)",
+        "Journal 1-Sep-2026  12.5  Dr \"Expense\"  Cr \"Cash\" +1 more  \"Reclass of July rent\"… (+18 characters)",
         "{preview}"
     );
     // The Payment, Receipt and Contra lines still name one side.
-    assert!(voucher_block(&preview)[3].starts_with("Receipt 20260902  40  \"Party A\"  "));
+    assert!(voucher_block(&preview)[3].starts_with("Receipt 2-Sep-2026  40  \"Party A\"  "));
     line.vouchers[0].entries = serde_json::from_value(json!([
         {"ledger":format!("Expense {}", "E".repeat(40)),"amount":"12.50","side":"Dr"},
         {"ledger":format!("Cash {}", "C".repeat(40)),"amount":"12.50","side":"Cr"}]))
@@ -3633,7 +3633,7 @@ fn a_journal_line_names_a_ledger_on_each_side() {
     assert!(
         !preview
             .lines()
-            .any(|shown| shown.starts_with("Journal 2026")),
+            .any(|shown| shown.starts_with("Journal 1-Sep-2026")),
         "{preview}"
     );
 }
@@ -3652,12 +3652,12 @@ fn a_journal_line_cuts_its_narration_shorter_to_fit() {
     line.vouchers[0].narration = Some("Depreciation for September".into());
     refresh_batch_sha256(&mut line);
     let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
-    let journal = "Journal 20260901  300  Dr \"Depreciation\"  Cr \"Furniture\" +1 more  \"Depreciation f\"… (+12 characters)";
+    let journal = "Journal 1-Sep-2026  300  Dr \"Depreciation\"  Cr \"Furniture\" +1 more  \"Depreciation\"… (+14 characters)";
     assert_eq!(journal.chars().count(), BATCH_REVIEW_MAX_LINE_CHARS);
     assert_eq!(voucher_block(&preview)[2], journal, "{preview}");
-    // A debit ledger of seventeen characters fits only at a 9-character cut.
+    // A debit ledger of fifteen characters fits only at a 9-character cut.
     line.vouchers[0].entries = serde_json::from_value(json!([
-        {"ledger":"Depreciation 2026","amount":"300.00","side":"Dr"},
+        {"ledger":"Depreciation 20","amount":"300.00","side":"Dr"},
         {"ledger":"Furniture","amount":"200.00","side":"Cr"},
         {"ledger":"Computers","amount":"100.00","side":"Cr"}]))
     .unwrap();
@@ -3667,7 +3667,7 @@ fn a_journal_line_cuts_its_narration_shorter_to_fit() {
     assert!(
         !preview
             .lines()
-            .any(|shown| shown.starts_with("Journal 2026")),
+            .any(|shown| shown.starts_with("Journal 1-Sep-2026")),
         "{preview}"
     );
 }
@@ -3710,7 +3710,7 @@ fn an_unsafe_narration_or_reference_leaves_the_totals_and_says_so() {
 #[test]
 fn a_narration_that_reads_like_a_dialog_line_is_withheld_on_its_line() {
     let withheld =
-        "Receipt 20260902  40  \"Party A\"  (narration withheld: it reads like a dialog line)";
+        "Receipt 2-Sep-2026  40  \"Party A\"  (narration withheld: it reads like a dialog line)";
     for narration in [
         "x Dr 500.00  Cr 0 y",
         "ATM 1234 Total debit: 0  Total credit: 0",
@@ -3726,7 +3726,7 @@ fn a_narration_that_reads_like_a_dialog_line_is_withheld_on_its_line() {
         // The other vouchers keep theirs.
         assert_eq!(
             voucher_block(&preview)[4],
-            "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
+            "Payment 2-Sep-2026  15  \"Party B\"  \"Synthetic test only\"",
             "{narration}"
         );
     }
@@ -3743,7 +3743,7 @@ fn a_narration_that_reads_like_a_dialog_line_is_withheld_on_its_line() {
         let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
         assert_eq!(
             voucher_block(&preview)[3],
-            format!("Receipt 20260902  40  \"Party A\"  \"{narration}\""),
+            format!("Receipt 2-Sep-2026  40  \"Party A\"  \"{narration}\""),
             "{narration}"
         );
     }
@@ -4411,9 +4411,9 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
         [
             "Create ONE Sales invoice in \"Synthetic Accounts\"",
             company_line.as_str(),
-            "Company number: 100001  Books from: 20260401",
+            "Company number: 100001  Books from: 1-Apr-2026",
             "Tally: http://127.0.0.1:9001  (the voucher's own text: last two lines)",
-            "Voucher type: \"Sales Acc\"  Date: 20260901  Number: \"278\"",
+            "Voucher type: \"Sales Acc\"  Date: 1-Sep-2026  Number: \"278\"",
             "Customer: \"Customer A\"",
             "Unregistered, no GSTIN  Place of supply: Rajasthan",
             "Bill allocation: New Ref \"278\"",
@@ -4573,7 +4573,7 @@ fn a_one_voucher_text_ends_with_the_vouchers_own_text() {
             );
             assert_eq!(
                 own[4],
-                format!("Date: 20260901  Voucher number: Tally assigns it  {VOUCHER_TEXT_CUE}"),
+                format!("Date: 1-Sep-2026  Voucher number: Tally assigns it  {VOUCHER_TEXT_CUE}"),
                 "{text}"
             );
             // Every line the dialog writes itself is above the heading, and
@@ -4650,7 +4650,7 @@ fn a_long_narration_is_shown_in_quoted_parts_below_the_dashes() {
     );
     assert_eq!(
         lines[4],
-        format!("Date: 20260901  Voucher number: Tally assigns it  {VOUCHER_TEXT_CUE_PARTS}"),
+        format!("Date: 1-Sep-2026  Voucher number: Tally assigns it  {VOUCHER_TEXT_CUE_PARTS}"),
         "{text}"
     );
     // One dashed line, and everything the voucher wrote is under it.
@@ -5117,7 +5117,7 @@ fn a_batch_marks_the_totals_line_of_a_ledger_approved_on_account() {
     assert!(VOUCHER_LINES_HEADING_MARKED.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS);
     assert!(
         voucher_block(&marked)
-            .contains(&"Receipt 20260902  40  \"Party A\"  \"Synthetic test only\""),
+            .contains(&"Receipt 2-Sep-2026  40  \"Party A\"  \"Synthetic test only\""),
         "{marked}"
     );
 
@@ -5342,8 +5342,8 @@ fn a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it() {
     assert_eq!(
         voucher_block(&unmarked)[3..5],
         [
-            "Receipt 20260902  40  \"Party A\"  \"On Account: no ledger here is bill-wise\"",
-            "Payment 20260902  15  \"Party B\"  \"PAID ON ACCOUNT\"",
+            "Receipt 2-Sep-2026  40  \"Party A\"  \"On Account: no ledger here is bill-wise\"",
+            "Payment 2-Sep-2026  15  \"Party B\"  \"PAID ON ACCOUNT\"",
         ],
         "{unmarked}"
     );
@@ -5352,8 +5352,8 @@ fn a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it() {
     assert_eq!(
         voucher_block(&marked)[3..5],
         [
-            format!("Receipt 20260902  40  \"Party A\"  {NARRATION_WITHHELD}"),
-            "Payment 20260902  15  \"Party B\"  \"PAID ON ACCOUNT\"".to_string(),
+            format!("Receipt 2-Sep-2026  40  \"Party A\"  {NARRATION_WITHHELD}"),
+            "Payment 2-Sep-2026  15  \"Party B\"  \"PAID ON ACCOUNT\"".to_string(),
         ],
         "{marked}"
     );
@@ -5376,21 +5376,21 @@ fn a_marked_one_voucher_text_at_every_cap_is_shown_whole() {
         approve_on_account(&mut line, &["Party 0"]);
         line
     };
-    let text = agent_review_preview(&voucher(&[75, 75, 75, 75]), &endpoint).unwrap();
+    let text = agent_review_preview(&voucher(&[74, 74, 74, 74]), &endpoint).unwrap();
     assert_eq!(
         text,
         [
             "Create ONE Payment in \"Synthetic Accounts\"",
             "Company GUID: 00000000-0000-4000-8000-000000000002",
-            "Company number: 100001  Books from: 20260401",
+            "Company number: 100001  Books from: 1-Apr-2026",
             "Tally: http://127.0.0.1:9001",
-            "Date: 20260901  Voucher number: Tally assigns it  (the voucher's own text: last two lines)",
+            "Date: 1-Sep-2026  Voucher number: Tally assigns it  (the voucher's own text: last two lines)",
             "",
             "Dr 1.00  On Account  \"Party 0\"",
-            "Dr 1.00  \"Party 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
-            "Dr 1.00  \"Party 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
-            "Dr 1.00  \"Party 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
-            "Dr 1.00  \"Party 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
+            "Dr 1.00  \"Party 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
+            "Dr 1.00  \"Party 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
+            "Dr 1.00  \"Party 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
+            "Dr 1.00  \"Party 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
             "Cr 5.00  \"Cash\"",
             "On Account: a bill-wise ledger when this batch was built. Its entries carry no bill allocation.",
             "Total debit: 5  Total credit: 5",
@@ -5410,7 +5410,7 @@ fn a_marked_one_voucher_text_at_every_cap_is_shown_whole() {
     assert_eq!((text.lines().count(), text.chars().count()), (24, 1_600));
     // One character more, on a line that stays under 100; then a seventh
     // entry, with names short enough to stay under 1,600 characters.
-    for over in [&[75, 75, 75, 76][..], &[0, 0, 0, 0, 0]] {
+    for over in [&[74, 74, 74, 75][..], &[0, 0, 0, 0, 0]] {
         assert_eq!(
             agent_review_preview(&voucher(over), &endpoint).unwrap_err(),
             "import_review_too_large",
@@ -5429,9 +5429,9 @@ fn a_batch_that_marks_nothing_is_shown_whole() {
         review_preview_with(&line, &endpoint, &[]).unwrap(),
         [
             "Create 4 vouchers in \"Synthetic Accounts\"",
-            "Company number: 100001  Books from: 20260401",
+            "Company number: 100001  Books from: 1-Apr-2026",
             "Types: 1 Contra, 1 Journal, 1 Payment, 1 Receipt",
-            "Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them",
+            "Dates: 1-Sep-2026 to 2-Sep-2026  Voucher numbers: Tally assigns them",
             "Total debit: 72.5  Total credit: 72.5",
             "Money in by Receipt vouchers: 40",
             "Money out by Payment vouchers: 15",
@@ -5441,10 +5441,10 @@ fn a_batch_that_marks_nothing_is_shown_whole() {
             "Tally: http://127.0.0.1:9001",
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
             "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
-            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
-            "Receipt 20260902  40  \"Party A\"  \"Synthetic test only\"",
-            "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
-            "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
+            "Journal 1-Sep-2026  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
+            "Receipt 2-Sep-2026  40  \"Party A\"  \"Synthetic test only\"",
+            "Payment 2-Sep-2026  15  \"Party B\"  \"Synthetic test only\"",
+            "Contra 2-Sep-2026  5  \"Bank\"  \"Synthetic test only\"",
             "",
             "Dr 5  Cr 15  2 entries  \"Bank\"",
             "Dr 40  Cr 17.5  3 entries  \"Cash\"",
@@ -5839,8 +5839,9 @@ fn a_batch_text_shows_a_line_break_at_the_end_of_a_ledger_name() {
         "{text}"
     );
     assert!(
-        voucher_block(&text)
-            .contains(&r#"Receipt 20260902  40  Line break  "Party A\r\n"  "Synthetic test only""#),
+        voucher_block(&text).contains(
+            &r#"Receipt 2-Sep-2026  40  Line break  "Party A\r\n"  "Synthetic test only""#
+        ),
         "{text}"
     );
     assert!(
@@ -5984,7 +5985,7 @@ fn a_text_that_shows_a_line_break_name_once_without_its_mark_is_refused() {
     let bare_once = text.replacen(r#"Line break  "Party B\r\n""#, r#""Party B\r\n""#, 1);
     assert_eq!(
         voucher_block(&bare_once)[4],
-        r#"Payment 20260902  15  "Party B\r\n"  "Synthetic test only""#,
+        r#"Payment 2-Sep-2026  15  "Party B\r\n"  "Synthetic test only""#,
         "{bare_once}"
     );
     assert!(
@@ -6055,9 +6056,9 @@ fn a_one_voucher_text_with_a_line_break_name_is_shown_whole() {
         [
             "Create ONE Journal in \"Synthetic Accounts\"",
             "Company GUID: 00000000-0000-4000-8000-000000000002",
-            "Company number: 100001  Books from: 20260401",
+            "Company number: 100001  Books from: 1-Apr-2026",
             "Tally: http://127.0.0.1:9001",
-            "Date: 20260901  Voucher number: Tally assigns it  (the voucher's own text: last two lines)",
+            "Date: 1-Sep-2026  Voucher number: Tally assigns it  (the voucher's own text: last two lines)",
             "",
             r#"Dr 12.50  On Account  Line break  "Expense\r\n""#,
             "Cr 12.50  \"Cash\"",
@@ -6089,9 +6090,9 @@ fn a_batch_text_with_a_line_break_name_is_shown_whole() {
         review_preview_with(&line, &endpoint, &[]).unwrap(),
         [
             "Create 4 vouchers in \"Synthetic Accounts\"",
-            "Company number: 100001  Books from: 20260401",
+            "Company number: 100001  Books from: 1-Apr-2026",
             "Types: 1 Contra, 1 Journal, 1 Payment, 1 Receipt",
-            "Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them",
+            "Dates: 1-Sep-2026 to 2-Sep-2026  Voucher numbers: Tally assigns them",
             "Total debit: 72.5  Total credit: 72.5",
             "Money in by Receipt vouchers: 40",
             "Money out by Payment vouchers: 15",
@@ -6101,10 +6102,10 @@ fn a_batch_text_with_a_line_break_name_is_shown_whole() {
             "Tally: http://127.0.0.1:9001",
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
             "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
-            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
-            r#"Receipt 20260902  40  Line break  "Party A\r\n"  "Synthetic test only""#,
-            "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
-            "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
+            "Journal 1-Sep-2026  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
+            r#"Receipt 2-Sep-2026  40  Line break  "Party A\r\n"  "Synthetic test only""#,
+            "Payment 2-Sep-2026  15  \"Party B\"  \"Synthetic test only\"",
+            "Contra 2-Sep-2026  5  \"Bank\"  \"Synthetic test only\"",
             "",
             "Dr 5  Cr 15  2 entries  \"Bank\"",
             "Dr 40  Cr 17.5  3 entries  \"Cash\"",
@@ -6161,14 +6162,14 @@ fn a_marked_line_over_the_cap_in_a_batch_gives_way_or_refuses() {
         line.vouchers[1].entries[1].ledger = name;
         review_preview_with(&line, &endpoint, &[])
     };
-    let listed = named(format!("{}\r\n", "x".repeat(37))).unwrap();
+    let listed = named(format!("{}\r\n", "x".repeat(35))).unwrap();
     let voucher = voucher_block(&listed)[3];
     assert!(
-        voucher.starts_with("Receipt 20260902  40  Line break  \"x"),
+        voucher.starts_with("Receipt 2-Sep-2026  40  Line break  \"x"),
         "{listed}"
     );
     assert_eq!(voucher.chars().count(), 100, "{voucher}");
-    let gave_way = named(format!("{}\r\n", "x".repeat(38))).unwrap();
+    let gave_way = named(format!("{}\r\n", "x".repeat(36))).unwrap();
     assert_eq!(
         voucher_block(&gave_way),
         [VOUCHER_LINES_DO_NOT_FIT],
@@ -6177,7 +6178,7 @@ fn a_marked_line_over_the_cap_in_a_batch_gives_way_or_refuses() {
     assert!(
         gave_way.contains(&format!(
             "\nDr 0  Cr 40  1 entry  Line break  \"{}\\r\\n\"\n",
-            "x".repeat(38)
+            "x".repeat(36)
         )),
         "{gave_way}"
     );
@@ -6234,7 +6235,7 @@ fn a_line_break_in_another_value_of_a_batch_is_not_shown() {
         );
         assert_eq!(
             text.lines()
-                .any(|shown| shown == r#"Receipt 20260902  40  "Party A"  "Paid""#),
+                .any(|shown| shown == r#"Receipt 2-Sep-2026  40  "Party A"  "Paid""#),
             listed,
             "{text}"
         );

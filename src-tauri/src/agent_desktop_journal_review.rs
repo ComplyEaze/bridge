@@ -75,11 +75,13 @@ impl DesktopJournalError {
                 "This saved Journal was built for a different Tally endpoint.",
                 "Reconnect to the saved host and port, then choose the original Journal again.",
             ),
-            "import_selected_file_too_large"
-            | "import_persisted_file_too_large"
-            | "import_review_too_large" => (
+            "import_selected_file_too_large" | "import_persisted_file_too_large" => (
                 "This Journal is too large for ComplyEaze Bridge's one-Journal desktop review.",
-                "ComplyEaze Bridge cannot post this Journal from this review, and will not shorten the review to fit. If its narration is long, build it again with a shorter one; if it has many entries, ask the user whether to split it into smaller Journals.",
+                "ComplyEaze Bridge cannot post this Journal from this review: its file is larger than the review reads. Decide whether to split it into smaller Journals, each built as its own batch, and ask the assistant to build them.",
+            ),
+            "import_review_too_large" => (
+                "This Journal is too large for ComplyEaze Bridge's one-Journal desktop review.",
+                "ComplyEaze Bridge cannot post this Journal from this review, and will not shorten the review to fit. Ask the assistant to build it again with a shorter narration, or decide whether to split it into smaller Journals, each built as its own batch.",
             ),
             "import_post_requires_one_journal" => (
                 "ComplyEaze Bridge's desktop review posts one unnumbered Journal, and this saved batch is a different shape.",
@@ -248,17 +250,21 @@ mod tests {
     /// #1709: a Journal too large for this review is not sent to a hand import.
     #[test]
     fn a_journal_too_large_for_the_review_is_not_sent_to_a_hand_import() {
+        // The file codes cannot be caused by a long narration, so they do not suggest a shorter one.
         for code in [
             "import_selected_file_too_large",
             "import_persisted_file_too_large",
-            "import_review_too_large",
         ] {
             let refused = DesktopJournalError::refused(code);
             assert_eq!(
                 refused.remediation,
-                "ComplyEaze Bridge cannot post this Journal from this review, and will not shorten the review to fit. If its narration is long, build it again with a shorter one; if it has many entries, ask the user whether to split it into smaller Journals."
+                "ComplyEaze Bridge cannot post this Journal from this review: its file is larger than the review reads. Decide whether to split it into smaller Journals, each built as its own batch, and ask the assistant to build them."
             );
         }
+        assert_eq!(
+            DesktopJournalError::refused("import_review_too_large").remediation,
+            "ComplyEaze Bridge cannot post this Journal from this review, and will not shorten the review to fit. Ask the assistant to build it again with a shorter narration, or decide whether to split it into smaller Journals, each built as its own batch."
+        );
     }
 
     #[test]

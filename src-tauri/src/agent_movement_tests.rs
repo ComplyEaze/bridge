@@ -514,6 +514,9 @@ fn the_whole_book_reasons_are_distinct_and_only_the_scoped_read_codes_ask_for_on
         assert!(!reason.note().contains("are the same"), "{}", reason.note());
     }
     assert!(!LEDGER_SCOPED_NOTE.contains("are the same"));
+    // Only the reasons that follow a scoped read that was sent say so in the read cost.
+    let abandoned = reasons.map(WholeBookReason::abandons_a_scoped_read);
+    assert_eq!(abandoned, [false, false, true, true]);
     let failure = |code: &str| ToolFailure::from(code.to_string());
     assert_eq!(
         WholeBookReason::of_failure(&failure(LEDGER_SCOPE_NEEDS_DAY_SPLIT)),
@@ -530,4 +533,14 @@ fn the_whole_book_reasons_are_distinct_and_only_the_scoped_read_codes_ask_for_on
     ] {
         assert_eq!(WholeBookReason::of_failure(&failure(code)), None, "{code}");
     }
+}
+
+/// A scoped read that returned a row with no line on the ledger refuses with a next step: the
+/// Trial Balance carries the same figures without reading vouchers, and the call is not repeated.
+#[test]
+fn the_row_without_a_line_refusal_names_its_next_step() {
+    let step = crate::agent::refusal_remediation(LEDGER_SCOPE_ROW_WITHOUT_LINE)
+        .expect("the refusal has a next step");
+    assert!(step.contains("trial_balance"), "{step}");
+    assert!(step.contains("do not repeat"), "{step}");
 }

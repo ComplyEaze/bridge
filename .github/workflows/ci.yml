@@ -369,6 +369,7 @@ jobs:
       - run: node --test scripts/check-conflict-markers.test.mjs
       - run: node --test scripts/collect-macos-test-crashes.test.mjs scripts/retain-macos-test-binaries.test.mjs
       - run: node --test scripts/fetch-pdfium.test.mjs
+      - run: node --test scripts/check-ai-attribution.test.mjs
       - run: python3 scripts/merge-gate.test.py
       - run: python3 scripts/surface_coverage_report.test.py
 

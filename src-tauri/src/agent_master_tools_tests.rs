@@ -2606,6 +2606,9 @@ async fn the_refusal_under_the_lock_answers_from_what_the_lock_read_when_its_loo
         .as_str()
         .unwrap()
         .contains("may have been sent"));
+    // As of the refusal: true whether or not a send of this batch was
+    // recorded since.
+    assert_eq!(error["message"], KEPT_HELD_NAME_MESSAGE);
 }
 
 /// Settles `holder` as a read-back that found nothing does.
@@ -3404,6 +3407,7 @@ fn two_batches_of_one_name_through_the_check_together_send_one_create_and_the_ot
 }
 
 fn two_batches_race(loser_faults: Vec<&'static str>) {
+    let busy = !loser_faults.is_empty();
     let race = race_two_posts(false, loser_faults);
     assert!(
         race.loser.faults_unused.is_empty(),
@@ -3420,6 +3424,15 @@ fn two_batches_race(loser_faults: Vec<&'static str>) {
     assert_eq!(answered["attempt_recorded"], false);
     assert_eq!(answered["dispatch"]["state"], "not_dispatched");
     assert_eq!(answered["error"]["hold"], "held");
+    // A busy answer read is answered as of the refusal.
+    if busy {
+        assert_eq!(answered["error"]["message"], KEPT_HELD_NAME_MESSAGE);
+    } else {
+        assert_eq!(
+            answered["error"]["message"],
+            "Nothing was sent. An earlier create holds this ledger name."
+        );
+    }
     assert_eq!(
         answered["error"]["blocking_batch_ids"],
         json!([race.winner_batch.batch_id])
@@ -3824,6 +3837,37 @@ fn the_check_under_the_lock_keeps_its_view_only_when_it_refuses() {
     match view.overlap {
         OverlapView::Held(held) => assert_eq!(held.ids, vec![batch.batch_id.clone()]),
         other => panic!("{other:?}"),
+    }
+}
+
+/// Only an answer made from the journal the lock read, that says no send was
+/// on file, gets the message that is true as of the refusal; every field and
+/// every other answer is left as it is (#2083).
+#[test]
+fn only_an_answer_from_the_kept_view_that_shows_no_send_is_worded_as_of_the_refusal() {
+    let answer = |attempted: Option<bool>| {
+        master_failure_outcome(
+            "batch",
+            GUID,
+            ToolFailure::from("import_approval_revoked".to_string()),
+            empty_evidence(),
+            attempted,
+        )
+    };
+    let kept = as_of_refusal(answer(Some(false)), true, false);
+    assert_eq!(
+        kept.payload["result"]["error"]["message"],
+        KEPT_NOT_SENT_MESSAGE
+    );
+    let mut expected = answer(Some(false)).payload;
+    expected["result"]["error"]["message"] = json!(KEPT_NOT_SENT_MESSAGE);
+    assert_eq!(kept.payload, expected, "only the message changes");
+    for (attempted, from_view) in [(Some(false), false), (Some(true), true), (None, true)] {
+        assert_eq!(
+            as_of_refusal(answer(attempted), from_view, false).payload,
+            answer(attempted).payload,
+            "{attempted:?} {from_view}"
+        );
     }
 }
 

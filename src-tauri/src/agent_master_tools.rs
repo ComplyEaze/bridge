@@ -925,19 +925,22 @@ impl Server {
                 #[cfg(test)]
                 let _ = super::master_ledger::BEFORE_FAILURE_READ.try_with(|before| before());
                 let journal = self.read_master_journal_for_failure().ok();
-                // A read that fails now (another call holding the journal's
-                // lock to write) falls back to what the check under the lock
-                // read when it refused. A view is kept only by that refusal,
+                // A read that fails now, for any reason (another call holding
+                // the journal's lock to write, or a journal that cannot be
+                // read), falls back to what the check under the lock read when
+                // it refused. A view is kept only by that refusal,
                 // which ends the post, so this failure is that refusal: the
                 // answer then says what it was decided on, never "not known"
                 // (#2083). It is as of the refusal: a send another call
-                // recorded since is not in it. A read that works wins, so a
-                // holder settled since is told.
+                // recorded since is not in it, so its message says only what is
+                // true either way (`as_of_refusal`). A read that works wins, so
+                // a holder settled since is told.
                 let held = under_lock
                     .into_inner()
                     .ok()
                     .flatten()
                     .filter(|_| journal.is_none());
+                let kept = held.is_some();
                 if failure.code == OVERLAP_CODE {
                     // The typed refusal: this call recorded nothing and sent
                     // nothing, whatever the journal shows now.
@@ -945,24 +948,16 @@ impl Server {
                         Some(held) => held.overlap,
                         None => overlap_view(journal.as_ref(), batch_id, &guid),
                     };
-                    return Ok(Pass::Done(overlap_refusal_outcome(
-                        batch_id,
-                        &guid,
-                        accumulated,
-                        &view,
-                    )));
+                    let outcome = overlap_refusal_outcome(batch_id, &guid, accumulated, &view);
+                    return Ok(Pass::Done(as_of_refusal(outcome, kept, true)));
                 }
                 let attempted = journal
                     .as_ref()
                     .map(|journal| journal.dispatched(batch_id))
                     .or(held.map(|held| held.attempted));
-                Ok(Pass::Done(master_failure_outcome(
-                    batch_id,
-                    &guid,
-                    failure,
-                    accumulated,
-                    attempted,
-                )))
+                let outcome =
+                    master_failure_outcome(batch_id, &guid, failure, accumulated, attempted);
+                Ok(Pass::Done(as_of_refusal(outcome, kept, false)))
             }
         }
     }
@@ -1285,6 +1280,26 @@ impl UnderLockView {
         }
     }
 }
+
+/// The message of a failure answer made from the journal the check under the
+/// lock read (`kept`), when it says no send of the batch was on file: another
+/// call may have recorded one since, so it says only what is true either way,
+/// that this call sent nothing, and what the journal held at the refusal
+/// (#2083). Every other answer, and every field, is left as it is.
+fn as_of_refusal(mut outcome: ToolOutcome, kept: bool, held_name: bool) -> ToolOutcome {
+    let result = &mut outcome.payload["result"];
+    if kept && result["attempt_recorded"] == false {
+        result["error"]["message"] = json!(if held_name {
+            KEPT_HELD_NAME_MESSAGE
+        } else {
+            KEPT_NOT_SENT_MESSAGE
+        });
+    }
+    outcome
+}
+
+const KEPT_NOT_SENT_MESSAGE: &str = "This call sent nothing. When it was refused, no send of this batch was on file. Review the error before requesting approval again.";
+const KEPT_HELD_NAME_MESSAGE: &str = "This call sent nothing. When it was refused, an earlier create held this ledger name and no send of this batch was on file.";
 
 /// What a read of the journal showed of a batch refused for its ledger name.
 #[derive(Debug, PartialEq, Eq)]

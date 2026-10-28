@@ -2829,11 +2829,15 @@ name, and `blocking_batches_other_companies`, each with its `batch_id` and
 `company_guid`), `settled_meanwhile`, which only the check under the lock gives (the
 holder settled since the call began: post this batch again), or `journal_unread`
 (a journal read that did not show this batch: call again). The check under the lock
-reads the journal again for its answer. When that read finds the journal busy (another
-call writing to it), every refusal the lock made after reading the journal (all but
-`master_journal_unavailable`, which could not read it) is answered from the journal the
-lock read when it refused: it names the holders, or the send on file, as they were at
-the refusal, and a send another call has recorded since is not in it (bridge#2083). When the check before the dialog finds a send of this
+reads the journal again for its answer. When that read fails (the journal busy because
+another call is writing to it, or unreadable for any other reason), every refusal the
+lock made after reading the journal (all but `master_journal_unavailable`, which could
+not read it) is answered from the journal the lock read when it refused. It names the
+holders, or the send on file, as they were at the refusal: a send another call has
+recorded since is not in it, so where it shows no send its message says only that this
+call sent nothing and that no send of the batch was on file when it was refused
+(bridge#2083).
+When the check before the dialog finds a send of this
 batch recorded since the call began by another call, and when a held-name refusal
 finds it in the journal read that follows, the answer is `import_already_attempted`
 with `error.hold` `send_of_this_batch_recorded_since`: call again later, which

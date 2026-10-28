@@ -210,7 +210,7 @@ const PLAYWRIGHT_SAVE = [
   "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}",
 ].join("\n");
 const COMBINED = "ci.yml must not use the combined restore-and-save cache action (actions/cache@)";
-const PLAYWRIGHT_RESTORE_KEY = "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}\n      - name: Install Playwright browsers and system dependencies";
+const PLAYWRIGHT_RESTORE_KEY = "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}\n      # The system packages Playwright needs";
 const PLAYWRIGHT_INSTALL_HEAD = "      - name: Install Playwright browsers and system dependencies\n";
 const SAVE_SHAPE = "the Playwright browsers save step changed shape";
 const RESTORE_SHAPE = "the Playwright browsers restore step changed shape";
@@ -222,9 +222,38 @@ for (const [name, change, message] of [
   ["the save step moved before the install step", (text) => text.replace(`${PLAYWRIGHT_SAVE}\n`, "").replace(PLAYWRIGHT_INSTALL_HEAD, `${PLAYWRIGHT_SAVE}\n${PLAYWRIGHT_INSTALL_HEAD}`), SAVE_SHAPE],
   ["a second cache save step in the job", (text) => text.replace(`${PLAYWRIGHT_SAVE}\n`, `${PLAYWRIGHT_SAVE}\n${PLAYWRIGHT_SAVE.replace("Save Playwright browsers", "Save more browsers")}\n`), SAVE_SHAPE],
   ["a restore key that differs from the save key", (text) => text.replace(PLAYWRIGHT_RESTORE_KEY, PLAYWRIGHT_RESTORE_KEY.replace("key: playwright-", "key: playwright-v2-")), RESTORE_SHAPE],
-  ["restore-keys added to the restore step", (text) => text.replace(PLAYWRIGHT_RESTORE_KEY, PLAYWRIGHT_RESTORE_KEY.replace("\n      - name", "\n          restore-keys: playwright-\n      - name")), RESTORE_SHAPE],
+  ["restore-keys added to the restore step", (text) => text.replace(PLAYWRIGHT_RESTORE_KEY, PLAYWRIGHT_RESTORE_KEY.replace("\n      #", "\n          restore-keys: playwright-\n      #")), RESTORE_SHAPE],
 ]) {
   test(`cache saving: ${name} is refused`, () => {
+    refused(withChange(CI_FILE, change), message);
+  });
+}
+
+// The Playwright system packages (the .deb files) are cached and saved under the same rules (bridge#2056): a write from a
+// pull-request or merge-queue ref would plant what a later run copies into apt's archive directory.
+const DEBS_KEY = "          key: playwright-debs-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-${{ steps.playwright-version.outputs.image }}";
+const DEBS_SAVE = [
+  "      - name: Save Playwright system packages",
+  "        if: ${{ steps.apt-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}",
+  "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+  "        with:",
+  "          path: ~/apt-debs",
+  DEBS_KEY,
+].join("\n");
+const DEBS_RESTORE_KEY = `${DEBS_KEY}\n      - name: Install Playwright browsers and system dependencies`;
+const DEBS_SAVE_SHAPE = "the Playwright system packages save step changed shape";
+const DEBS_RESTORE_SHAPE = "the Playwright system packages restore step changed shape";
+for (const [name, change, message] of [
+  ["the packages save step on pull requests too", (text) => text.replace(DEBS_SAVE, DEBS_SAVE.replace(" || github.event_name == 'schedule')", " || github.event_name == 'schedule' || github.event_name == 'pull_request')")), DEBS_SAVE_SHAPE],
+  ["the packages save step on the merge queue too", (text) => text.replace(DEBS_SAVE, DEBS_SAVE.replace(" || github.event_name == 'schedule')", " || github.event_name == 'schedule' || github.event_name == 'merge_group')")), DEBS_SAVE_SHAPE],
+  ["the packages save step without its event condition", (text) => text.replace(DEBS_SAVE, DEBS_SAVE.replace(" && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')", "")), DEBS_SAVE_SHAPE],
+  ["the packages save step removed", (text) => text.replace(`${DEBS_SAVE}\n`, ""), "the Playwright browsers save step changed shape"],
+  ["the packages save step moved before the install step", (text) => text.replace(`${DEBS_SAVE}\n`, "").replace(PLAYWRIGHT_INSTALL_HEAD, `${DEBS_SAVE}\n${PLAYWRIGHT_INSTALL_HEAD}`), DEBS_SAVE_SHAPE],
+  ["a packages key without the runner image", (text) => text.split(DEBS_KEY).join(DEBS_KEY.replace("-${{ steps.playwright-version.outputs.image }}", "")), DEBS_RESTORE_SHAPE],
+  ["restore-keys added to the packages restore step", (text) => text.replace(DEBS_RESTORE_KEY, DEBS_RESTORE_KEY.replace("\n      - name", "\n          restore-keys: playwright-debs-\n      - name")), DEBS_RESTORE_SHAPE],
+  ["the combined action for the packages restore", (text) => text.replace("        id: apt-cache\n        uses: actions/cache/restore@", "        id: apt-cache\n        uses: actions/cache@"), COMBINED],
+]) {
+  test(`package cache saving: ${name} is refused`, () => {
     refused(withChange(CI_FILE, change), message);
   });
 }

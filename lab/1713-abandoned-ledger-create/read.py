@@ -31,6 +31,9 @@ ROW_PATH = ("ENVELOPE", "BODY", "DATA", "COLLECTION")
 COUNTERS = ("CREATED", "ALTERED", "DELETED", "LASTVCHID", "LASTMID", "COMBINED", "IGNORED", "ERRORS", "CANCELLED",
             "EXCEPTIONS")
 ZERO = ("ALTERED", "DELETED", "COMBINED", "IGNORED", "ERRORS", "CANCELLED", "EXCEPTIONS")
+# Where an import answer carries its counters. A native create answers with a bare RESPONSE root (seen at S3 on 28 Oct:
+# 538 B, CREATED 2, no ENVELOPE); the enveloped IMPORTRESULT form is kept. Exactly one block must be present.
+RESULT_BLOCKS = (("ENVELOPE", "BODY", "DATA", "IMPORTRESULT"), ("RESPONSE",))
 BUSY_TARGET = 300_000_000
 M0_ROWS = 24_000
 PER_FILE = 250
@@ -130,15 +133,15 @@ def check_import(path, created):
             continue
         if element.tag == "LINEERROR":
             line_errors.append(repr(element.text or ""))
-        if path_now == ("ENVELOPE", "BODY", "DATA", "IMPORTRESULT"):
+        if path_now in RESULT_BLOCKS:
             results += 1
-        if len(path_now) == 5 and path_now[:4] == ("ENVELOPE", "BODY", "DATA", "IMPORTRESULT"):
+        if path_now[:-1] in RESULT_BLOCKS:
             if element.tag in COUNTERS:
                 if element.tag in seen:
                     raise Failed("counter {} appears twice".format(element.tag))
                 seen[element.tag] = (element.text or "").strip()
     if results != 1:
-        raise Failed("{} IMPORTRESULT blocks, expected 1".format(results))
+        raise Failed("{} result blocks (IMPORTRESULT or a RESPONSE root), expected 1".format(results))
     missing = [name for name in COUNTERS if name not in seen]
     if missing:
         raise Failed("counters missing: {}".format(",".join(missing)))
@@ -161,8 +164,8 @@ def check_marks(path, guid):
     row_guid, altvchid, altmstid = found[0]
     if guid is not None and row_guid != guid:
         raise Failed("the COMPANY row's GUID is {}, not THE COMPANY's".format(row_guid))
-    # ALTVCHID is not required: this row writes masters only, on a company with no voucher, and Tally sends no
-    # ALTVCHID until a voucher exists (seen at S1). No decision of this sheet reads ALTVCHID.
+    # ALTVCHID is not required: the company holds no voucher until S4's bulk Journals, and Tally sends no ALTVCHID
+    # until a voucher exists (seen at S1). No decision of this sheet reads ALTVCHID.
     missing = [tag for tag, value in (("GUID", row_guid), ("ALTMSTID", altmstid))
                if shown(value) == "absent"]
     if missing:

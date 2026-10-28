@@ -456,6 +456,27 @@ fn child_and_attribute_metadata_shapes_are_strictly_equivalent() {
 }
 
 #[test]
+fn a_company_context_date_that_names_no_calendar_day_is_refused() {
+    let with_date = |attribute: &str, date: &str| {
+        format!(
+            r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="00000000-0000-4000-8000-000000000001" RECORDCOUNT="1" {attribute}="{date}" /><LEDGER NAME="BRIDGE SYNTHETIC LEDGER" GUID="00000000-0000-4000-8000-000000000101"><PARENT>BRIDGE SYNTHETIC GROUP</PARENT></LEDGER></DATA></BODY></ENVELOPE>"#,
+            BRIDGE_LEDGER_EXPORT_SCHEMA
+        )
+    };
+    for attribute in ["FROMDATE", "TODATE"] {
+        assert!(parse_ledgers_with_evidence(&with_date(attribute, "20250401")).is_ok());
+        for impossible in ["20251340", "20250229", "00000101"] {
+            let refused = parse_ledgers_with_evidence(&with_date(attribute, impossible))
+                .expect_err("an impossible date must refuse the context");
+            assert!(
+                refused.to_string().contains("invalid date binding"),
+                "{attribute}={impossible}: {refused}"
+            );
+        }
+    }
+}
+
+#[test]
 fn a_proven_empty_export_is_not_confused_with_missing_evidence() {
     let empty = parse_ledgers_with_evidence(&Fixture::EmptyExport.body()).unwrap();
     assert!(empty.records.is_empty());

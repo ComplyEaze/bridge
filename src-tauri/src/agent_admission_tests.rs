@@ -91,6 +91,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "cash_flow",
         "company_features",
         "egress_log",
+        "gst_by_counter_ledger",
         "gst_status",
         "gst_uncertain_vouchers",
         "ledger_masters",
@@ -829,6 +830,27 @@ fn the_vouchers_description_names_the_bill_date_and_credit_period_of_an_allocati
     );
 }
 
+/// What `party` is on a Receipt, Payment or Contra: Tally's own value, which can be the bank or cash
+/// ledger (protocol reference §9.13), so the description sends the reader to `amounts` for the
+/// counterparty.
+#[test]
+fn the_vouchers_description_says_what_party_is_on_a_receipt() {
+    let definitions = registered_tool_definitions(true, true);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "vouchers"))
+        .expect("vouchers tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    for needle in [
+        "A row's `party` is Tally's own PARTYLEDGERNAME for the voucher",
+        "can name the bank or cash ledger",
+        "read the counterparty from `amounts`, not from `party`",
+    ] {
+        assert!(description.contains(needle), "missing: {needle}");
+    }
+}
+
 /// The `vouchers` description states the master-mark limit of the group summaries as the code has it, and
 /// calls it provisional: the number in the text is the constant's, written with its thousands separator.
 #[test]
@@ -1354,6 +1376,21 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "a voucher whose flags were not read is not reported as in the return",
         ),
         (
+            "gst_by_counter_ledger",
+            "not a return figure",
+            "the GST totals are not presented as a return figure",
+        ),
+        (
+            "gst_by_counter_ledger",
+            "Nothing is apportioned",
+            "a voucher with several counter ledgers is never split",
+        ),
+        (
+            "gst_by_counter_ledger",
+            "It does not decide input tax credit eligibility",
+            "the totals make no eligibility or availment claim",
+        ),
+        (
             "gst_status",
             "The reason for a status is not available",
             "the tool names no reason for a status",
@@ -1742,8 +1779,10 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// without tools. Each was set to its list's size plus the margin the full list
 /// then had under its single budget (18,752 bytes), rounded up to a thousand:
 /// none was raised, and each keeps at least that margin. The master-writes list
-/// shares the full list's budget: adding its tools raised no budget.
-const TOOL_LIST_BUDGETS: [usize; 4] = [200_000, 223_000, 225_000, 225_000];
+/// has a budget of its own: the two ledger tools add about 4,700 bytes to the
+/// full list, so its budget is the full list's plus the margin the full list now
+/// has under its own (about 4,000 bytes), rounded up to a thousand.
+const TOOL_LIST_BUDGETS: [usize; 4] = [200_000, 223_000, 225_000, 230_000];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

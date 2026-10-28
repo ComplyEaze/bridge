@@ -37,6 +37,26 @@ fn view_of(
     coverage: &Coverage,
     k_days: u32,
 ) -> TransferView {
+    // Every skip's own day counts as read whole, so that these tests keep asking
+    // what the statements and the pairing say; what a read of Tally adds is
+    // asked below, with `view_without_tally`.
+    transfer_pairing_view_with(
+        skips,
+        contras,
+        coverage,
+        &TallyDays::clean_for(skips),
+        k_days,
+    )
+    .expect("no duplicate keys")
+}
+
+/// The view as production builds it: no day of Tally has been read.
+fn view_without_tally(
+    skips: &[SkipFact],
+    contras: &[ContraFact],
+    coverage: &Coverage,
+    k_days: u32,
+) -> TransferView {
     transfer_pairing_view(skips, contras, coverage, k_days).expect("no duplicate keys")
 }
 
@@ -1048,7 +1068,7 @@ fn transfer_pairing_no_state_names_a_removed_contra() {
                     assert!(!candidates.contains(&gone));
                 }
                 SkipState::OtherSideUnverified { batch } => assert_ne!(batch, &gone.batch),
-                SkipState::NotFound | SkipState::NotEstablished => {}
+                SkipState::NotFound | SkipState::TallyUnchecked | SkipState::NotEstablished => {}
             }
         }
         for found in &view.double_booked {
@@ -1948,4 +1968,63 @@ fn transfer_pairing_a_flag_does_not_hide_why_a_referenced_skip_is_open() {
         state_of(&view, "st-1"),
         reversed_state(&[("batch-1", "t1")])
     );
+}
+
+/// A skip with no candidate whose other ledger's statements cover its date is
+/// `NotFound` only when a read of Tally covered the same day with no Contra
+/// between the two ledgers; without one it is `TallyUnchecked`; and where the
+/// statements do not cover the date it is `NotEstablished` whatever Tally read.
+#[test]
+fn not_found_needs_a_whole_day_read_of_tally_besides_the_statements() {
+    let coverage = january_covered();
+    let one = [skip("st-1")];
+    // no read of Tally: the production call
+    let view = view_without_tally(&one, &[], &coverage, 0);
+    assert_eq!(state_of(&view, "st-1"), SkipState::TallyUnchecked);
+    // the day read whole between these two ledgers
+    let view =
+        transfer_pairing_view_with(&one, &[], &coverage, &TallyDays::clean_for(&one), 0).unwrap();
+    assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
+    // a read of another day, other ledgers or another company does not count
+    for other in [
+        {
+            let mut s = skip("st-1");
+            s.date = date("20260106");
+            s
+        },
+        {
+            let mut s = skip("st-1");
+            s.other_ledger = ledger("b9");
+            s
+        },
+    ] {
+        let view =
+            transfer_pairing_view_with(&one, &[], &coverage, &TallyDays::clean_for(&[other]), 0)
+                .unwrap();
+        assert_eq!(state_of(&view, "st-1"), SkipState::TallyUnchecked);
+    }
+    // statements that do not cover the date: not established, read or not
+    let view = transfer_pairing_view_with(
+        &one,
+        &[],
+        &Coverage::default(),
+        &TallyDays::clean_for(&one),
+        0,
+    )
+    .unwrap();
+    assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
+}
+
+/// A read of Tally changes nothing about a row that has a candidate: only the
+/// absence of any candidate is said as `NotFound` or `TallyUnchecked`.
+#[test]
+fn a_read_of_tally_does_not_change_a_row_with_a_candidate() {
+    let coverage = january_covered();
+    let one = [skip("st-1")];
+    let contras = [contra("batch-1", "t1")];
+    let without = view_without_tally(&one, &contras, &coverage, 0);
+    let with =
+        transfer_pairing_view_with(&one, &contras, &coverage, &TallyDays::clean_for(&one), 0)
+            .unwrap();
+    assert_eq!(state_of(&without, "st-1"), state_of(&with, "st-1"));
 }

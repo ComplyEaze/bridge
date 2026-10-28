@@ -239,3 +239,7 @@ fn grouping_store_error(error: GroupingStoreError) -> TallyCommandError {
         "Retry; if it persists, check that this is the latest version of ComplyEaze Bridge.",
     )
 }
+
+#[cfg(test)]
+#[path = "commands_grouping_decisions_tests.rs"]
+mod tests;

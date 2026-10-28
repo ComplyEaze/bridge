@@ -2556,7 +2556,7 @@ fn set_context_field(
 }
 
 fn validate_yyyymmdd_context(value: &str) -> anyhow::Result<()> {
-    if value.len() != 8 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+    if bridge_tally_primitives::TallyDate::parse(value).is_err() {
         anyhow::bail!("Tally company context contained an invalid date binding");
     }
     Ok(())

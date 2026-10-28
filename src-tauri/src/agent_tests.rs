@@ -813,6 +813,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ),
         ("egress_log", json!({"records":[]})),
         (
+            "gst_by_counter_ledger",
+            json!({"counter_ledgers":[{"ledger":party_name("Supplier Two"),"group":"Indirect Expenses"}]}),
+        ),
+        (
             "gst_uncertain_vouchers",
             json!({"items":[{"list":"uncertain","voucher_number":"BP/1","party":party_name("Customer One"),"amount":"1050.00","party_side":"debit"}]}),
         ),

@@ -1370,6 +1370,8 @@ struct LedgerOpeningRead {
 #[derive(Debug)]
 pub(crate) struct PartyLedgerMasterListing {
     pub(crate) records: Vec<bridge_tally_protocol::PartyLedgerMasterRecord>,
+    /// Each record's ledger GUID, by ledger name, as the same rows carried it.
+    pub(crate) ledger_guids: std::collections::BTreeMap<String, String>,
     pub(crate) groups: Vec<bridge_tally_protocol::TallyNamedMaster>,
     /// Ledgers kept in another currency, set aside by name.
     pub(crate) foreign_currency_ledgers_excluded:
@@ -1992,6 +1994,11 @@ fn party_ledger_listing(
     let count_cross_check = source.count_cross_check;
     // The master request's SVFROMDATE (the admitted BOOKSFROM): each opening is as of it.
     let opening_as_of = source.from.clone();
+    let ledger_guids = source
+        .rows
+        .iter()
+        .map(|row| (row.name.clone(), row.guid.clone()))
+        .collect();
     let records = source
         .rows
         .into_iter()
@@ -2007,6 +2014,7 @@ fn party_ledger_listing(
         .collect();
     PartyLedgerMasterListing {
         records,
+        ledger_guids,
         groups,
         foreign_currency_ledgers_excluded: foreign,
         mixed_currency_ledgers_excluded: mixed,

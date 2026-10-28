@@ -153,8 +153,20 @@ async fn forex_outstandings(
     }
     pair(&mut plans, extent.clone());
     plans.push(companies.clone());
-    // The native outstandings read.
+    // A party detail reads the company's marks before the statement of open bills (the
+    // partial arms refuse before the detail's closing read, so they need no second one):
+    // one paired read between two extent reads.
+    if extra_arguments["party"].is_string() && extra_arguments["detail"].is_string() {
+        let marks = xml(
+            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>b14e9b2d-8a63-4779-804d-25d59eb787eb</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+                .to_string(),
+        );
+        plans.push(companies.clone());
+        pair(&mut plans, marks);
+        plans.push(companies.clone());
+    }
     plans.extend([status(), companies.clone(), companies.clone()]);
+    // The native outstandings read.
     pair(&mut plans, extent.clone());
     for source in [
         captured(receivable),
@@ -574,7 +586,9 @@ fn the_outstandings_description_carries_the_party_details_caveats() {
         .expect("tool description");
     for needle in [
         "`tied` means the two figures are equal, not that the composition is proven",
-        "two changes that compensate, or allocations that net to zero, can still read `tied`",
+        "a detail whose marks moved is refused (`voucher_window_changed_during_read`)",
+        "a change that moves neither mark is not seen",
+        "allocations that net to zero can still read `tied`",
         "`no_residual_row_for_party` (with `residual` null)",
         "`no_named_bill_for_party`",
         "`window_returned_no_vouchers`",
@@ -700,6 +714,10 @@ async fn ageing_outstandings(ledgers: String, extra_arguments: Value) -> Value {
     ageing_outstandings_with(None, ledgers, extra_arguments).await
 }
 
+/// The ageing book's company marks as a quiet book answers them (the party detail reads them
+/// before the statement of open bills).
+const AGEING_MARKS_BODY: &str = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>eebb9a9f-1679-4468-9e8f-814c729674cb</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>";
+
 /// [`ageing_outstandings`] with the Bills Receivable report replaced when `receivable` is given.
 async fn ageing_outstandings_with(
     receivable: Option<String>,
@@ -745,8 +763,17 @@ async fn ageing_outstandings_with(
     );
     pair(&mut plans, extent.clone());
     plans.push(companies.clone());
-    // The native outstandings read.
+    // A party detail reads the company's marks before the statement of open bills (the
+    // partial arms refuse before the detail's closing read, so they need no second one):
+    // one paired read between two extent reads.
+    if extra_arguments["party"].is_string() && extra_arguments["detail"].is_string() {
+        let marks = xml(AGEING_MARKS_BODY.to_string());
+        plans.push(companies.clone());
+        pair(&mut plans, marks);
+        plans.push(companies.clone());
+    }
     plans.extend([status(), companies.clone(), companies.clone()]);
+    // The native outstandings read.
     pair(&mut plans, extent.clone());
     let receivable = receivable.unwrap_or_else(|| {
         decode(include_bytes!(
@@ -907,12 +934,20 @@ async fn mcp_outstandings_keep_the_partial_reason_when_refusing_a_party_detail()
     // the currency and the outstandings read, the same reads the plain call
     // made.
     let plain_evidence = &plain["structuredContent"]["evidence"];
-    assert_eq!(content["evidence"]["bytes"], plain_evidence["bytes"]);
+    // And the party detail's own read of the company's marks, before them: both bodies of the
+    // paired read, each as the double serves it (UTF-16LE with a byte-order mark).
+    let marks_bytes = 2 * (2 * AGEING_MARKS_BODY.encode_utf16().count() + 2);
     assert_eq!(
+        content["evidence"]["bytes"].as_u64().unwrap(),
+        plain_evidence["bytes"].as_u64().unwrap() + marks_bytes as u64
+    );
+    // The evidence digests chain the reads in order, so the marks read, sent between the
+    // currency probe and the outstandings read, changes both.
+    assert_ne!(
         content["evidence"]["request_sha256"],
         plain_evidence["request_sha256"]
     );
-    assert_eq!(
+    assert_ne!(
         content["evidence"]["response_sha256"],
         plain_evidence["response_sha256"]
     );
@@ -939,6 +974,49 @@ async fn replay_recorded_detail_call(
     replay_recorded_call(record, |_| true, |arguments| arguments, Redaction::None).await
 }
 
+/// The recorded live call predates the party detail's two reads of the company's marks, one
+/// before the statement of open bills (after the currency probe's last extent read, request
+/// 18) and one after the voucher window (a rename between those reads would tie different
+/// spellings). Each is the same read the window's own pre-flight made in the recording, so a
+/// copy of its requests, answered with the recorded bodies, stands for it. The copies are
+/// marked `marks_bracket` and nothing else is edited.
+fn add_the_detail_marks_brackets(record: &mut Value) {
+    let requests = record["requests"].as_array().unwrap().clone();
+    let by_seq = |seq: u64| {
+        requests
+            .iter()
+            .find(|request| request["seq"] == seq)
+            .unwrap()
+            .clone()
+    };
+    // One paired, identity-bracketed read: an extent read, the pair with its status reads, an
+    // extent read (requests 55 to 60 of the recording, the window's pre-flight read of them).
+    let block = [55, 56, 57, 58, 59, 60]
+        .into_iter()
+        .map(|seq| {
+            let mut request = by_seq(seq);
+            request["marks_bracket"] = json!(true);
+            request
+        })
+        .collect::<Vec<_>>();
+    let mut with = Vec::new();
+    for (index, request) in requests.iter().enumerate() {
+        // The window opens on the marks the call already holds, so the recording's own
+        // pre-flight read of them (requests 55 to 60) is not sent any more.
+        if (55..=60).contains(&request["seq"].as_u64().unwrap()) {
+            continue;
+        }
+        with.push(request.clone());
+        if request["seq"] == 18u64 {
+            with.extend(block.iter().cloned());
+        }
+        if index + 1 == requests.len() {
+            with.extend(block.iter().cloned());
+        }
+    }
+    record["requests"] = Value::Array(with);
+}
+
 /// [`replay_recorded_detail_call`] serving only the recorded requests `keep`
 /// admits, with the call's arguments passed through `arguments`, under
 /// `redaction`.
@@ -951,7 +1029,10 @@ async fn replay_recorded_call(
     use tally_protocol_simulator::{
         Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
     };
-    let record: Value = serde_json::from_str(record).unwrap();
+    let mut record: Value = serde_json::from_str(record).unwrap();
+    if arguments(record["arguments"].clone())["party"].is_string() {
+        add_the_detail_marks_brackets(&mut record);
+    }
     let directory_of_fixtures = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("crates/bridge-tally-protocol/tests/fixtures/agent");
     let plans = record["requests"]
@@ -1106,7 +1187,7 @@ async fn assert_detail_reads_are_in_the_evidence(response: &Value, record: &Valu
     ];
     let is_detail_read = |request: &Value| {
         let seq = request["seq"].as_u64().unwrap();
-        (50..=65).contains(&seq)
+        (50..=65).contains(&seq) || request.get("marks_bracket").is_some()
     };
     let text = record.to_string();
     let (plain, _, _) = replay_recorded_call(

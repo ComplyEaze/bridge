@@ -277,10 +277,11 @@ test("anything but a push to master, or an unusable SHA, runs everything", async
   }
 });
 
-// The job names above are what a queue run reports for ci.yml's matrix jobs. Derive them from the
-// workflow itself, so a renamed job or a changed matrix fails here instead of silently never matching
-// (the push would then run everything) or, for a new OS, matching without the new job being judged.
-test("the family job names are exactly ci.yml's native, bundle-smoke and seam-control jobs", () => {
+// The job names above are what a queue run reports for ci.yml's matrix jobs on Windows. Derive them from
+// the workflow itself, so a renamed job or a changed shard list fails here instead of silently never
+// matching (the push would then run everything). The systems come from the scope job's outputs, and
+// master-push-scope.test.mjs proves a queue run that selects a family runs exactly the systems judged here.
+test("the family job names are exactly ci.yml's native, bundle-smoke and seam-control jobs on Windows", () => {
   const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
   const block = (job) => {
     const start = workflow.indexOf(`\n  ${job}:\n`);
@@ -293,13 +294,11 @@ test("the family job names are exactly ci.yml's native, bundle-smoke and seam-co
     const label = /^    name: (.+) \(\$\{\{ matrix\.os \}\}(?:, shard \$\{\{ matrix\.shard \}\} of 2)?\)$/m.exec(text)?.[1];
     // A job with a `shard: [1, 2]` row (the native job) reports one job per system and shard.
     const sharded = /^        shard: \[1, 2\]$/m.test(text);
-    // The queue and a push run every system; a pull request may run fewer (the macOS bundle and seam jobs
-    // skip it), so the list that matters here is the one for events other than a pull request.
-    const osLine = /^        os: (.+)$/m.exec(text)?.[1] ?? "";
-    const lists = osLine.startsWith("[") ? [osLine.slice(1, -1)] : [...osLine.matchAll(/'\[([^\]]+)\]'/g)].map((match) => match[1]);
-    const systems = lists.at(-1)?.split(",").map((entry) => entry.trim().replaceAll('"', ""));
-    assert.ok(label && systems?.length, `${job} has a matrix name and an os list`);
-    return systems.flatMap((system) => sharded ? [1, 2].map((shard) => `${label} (${system}, shard ${shard} of 2)`) : [`${label} (${system})`]);
+    // The matrix reads its systems from the scope job, never from a list or an expression of its own.
+    const output = job === "native" ? "native_os" : "bundle_os";
+    assert.match(text, new RegExp(`^        os: \\$\\{\\{ fromJSON\\(needs\\.changes\\.outputs\\.${output}\\) \\}\\}$`, "m"), `${job} reads ${output}`);
+    assert.ok(label, `${job} has a matrix name`);
+    return sharded ? [1, 2].map((shard) => `${label} (windows-latest, shard ${shard} of 2)`) : [`${label} (windows-latest)`];
   };
   assert.deepEqual(FAMILIES.native, expand("native"));
   assert.deepEqual(FAMILIES.bundle, [...expand("bundle-smoke"), ...expand("seam-control")]);
@@ -416,23 +415,8 @@ test("a commit SHA must be a full-length hex SHA", async () => {
   }
 });
 
-// The macOS bundle and seam jobs run in the queue and on a push, not on a pull request. The expression
-// that does this is pinned as text elsewhere; this reads it and proves what it selects for each event.
-test("a pull request runs Windows only for the bundle and seam jobs, and every other event runs both", () => {
-  const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
-  const evaluate = (job, event) => {
-    const start = workflow.indexOf(`\n  ${job}:\n`);
-    const line = /^        os: (.+)$/m.exec(workflow.slice(start))[1];
-    const match = /^\$\{\{ fromJSON\(github\.event_name == '([a-z_]+)' && '(\[[^']*\])' \|\| '(\[[^']*\])'\) \}\}$/.exec(line);
-    assert.ok(match, `${job} uses the event-dependent matrix expression`);
-    return JSON.parse(event === match[1] ? match[2] : match[3]);
-  };
-  for (const job of ["bundle-smoke", "seam-control"]) {
-    assert.deepEqual(evaluate(job, "pull_request"), ["windows-latest"], job);
-    for (const event of ["merge_group", "push", "workflow_dispatch", "schedule"]) {
-      assert.deepEqual(evaluate(job, event), ["windows-latest", "macos-latest"], `${job} on ${event}`);
-    }
-  }
-  assert.deepEqual(FAMILIES.bundle.filter((name) => name.includes("macos")), ["Bundle smoke (macos-latest)", "Seam positive control (macos-latest)"],
-    "the lookup still judges the macOS bundle and seam jobs, which the queue and a push still run");
+// The queue never runs a macOS native job and runs the macOS bundle and seam jobs only for a packaging
+// change, so a family judged on a macOS job would never be reused. The push decides its macOS jobs itself.
+test("the lookup judges no macOS job", () => {
+  assert.deepEqual([...FAMILIES.native, ...FAMILIES.bundle].filter((name) => name.includes("macos")), []);
 });

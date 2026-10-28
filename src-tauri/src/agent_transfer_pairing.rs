@@ -64,9 +64,15 @@
 //! measured, so two references that differ neither pair two rows nor prove
 //! them apart. This changes no pair: the two rounds never read it.
 //!
-//! Otherwise a skip with no candidate is `NotFound` only when the other bank
-//! ledger's verified parse windows cover its whole date +/- k interval; if
-//! they do not, the absence proves nothing and it is `NotEstablished`.
+//! Otherwise a skip with no candidate is open for one of three reasons. If the
+//! other bank ledger's verified parse windows do not cover its whole date +/- k
+//! interval, the absence proves nothing and it is `NotEstablished`. If they do,
+//! it is `NotFound` only when a read of Tally has covered the skip's whole date
+//! and found no Contra between the two ledgers, plain or not (`TallyDays`).
+//! Without such a read it is `TallyUnchecked`: the statements hold no Contra
+//! for it, and a Contra entered in Tally by other means is not in their records.
+//! No caller supplies such a read yet, so every row that was `NotFound` is
+//! `TallyUnchecked` until one does (#1392).
 //!
 //! Two skips with one `SkipKey`, or two Contras with one `ContraKey`, are refused
 //! with a typed error naming the smallest such key, whatever the input order.
@@ -247,6 +253,61 @@ impl Coverage {
     }
 }
 
+/// The days of Tally that a read of the whole day has covered and found without
+/// any Contra between a skip's two ledgers, plain two-entry or not. Only such a
+/// day lets a skip with no candidate be `NotFound`. There is no constructor for
+/// it outside tests yet: the whole-day read that would make one is not built
+/// (#1392), so [`TallyDays::none`] is what every caller passes.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct TallyDays(
+    BTreeSet<(
+        CompanyGuid,
+        EndpointOrigin,
+        TallyDate,
+        LedgerGuid,
+        LedgerGuid,
+    )>,
+);
+
+impl TallyDays {
+    /// No day of Tally has been read.
+    pub(crate) fn none() -> Self {
+        Self::default()
+    }
+
+    /// Whether a whole-day read found no Contra between the skip's two ledgers
+    /// on the skip's own date.
+    fn found_no_contra(&self, skip: &SkipFact) -> bool {
+        self.0.contains(&(
+            skip.key.company.clone(),
+            skip.key.endpoint_origin.clone(),
+            skip.date.clone(),
+            skip.key.bank_ledger.clone(),
+            skip.other_ledger.clone(),
+        ))
+    }
+
+    /// Every skip's own day read whole with no Contra between its ledgers, for
+    /// the tests of what `NotFound` needs besides a read of Tally.
+    #[cfg(test)]
+    pub(crate) fn clean_for(skips: &[SkipFact]) -> Self {
+        Self(
+            skips
+                .iter()
+                .map(|skip| {
+                    (
+                        skip.key.company.clone(),
+                        skip.key.endpoint_origin.clone(),
+                        skip.date.clone(),
+                        skip.key.bank_ledger.clone(),
+                        skip.other_ledger.clone(),
+                    )
+                })
+                .collect(),
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PairRound {
     Reference,
@@ -259,7 +320,13 @@ pub(crate) enum SkipState {
         round: PairRound,
         contra: ContraKey,
     },
+    /// The statements hold no Contra for the row, and a read of Tally covered
+    /// the row's whole date and found none between the two ledgers.
     NotFound,
+    /// The statements hold no Contra for the row, and no read of Tally covered
+    /// its whole date: a Contra entered in Tally by other means is not in the
+    /// statements' records.
+    TallyUnchecked,
     Ambiguous {
         candidates: Vec<ContraKey>,
     },
@@ -424,6 +491,18 @@ pub(crate) fn transfer_pairing_view(
     skips: &[SkipFact],
     contras: &[ContraFact],
     coverage: &Coverage,
+    k_days: u32,
+) -> Result<TransferView, PairingInputError> {
+    transfer_pairing_view_with(skips, contras, coverage, &TallyDays::none(), k_days)
+}
+
+/// The view with the days of Tally a whole-day read has covered. With
+/// [`TallyDays::none`] it is [`transfer_pairing_view`].
+pub(crate) fn transfer_pairing_view_with(
+    skips: &[SkipFact],
+    contras: &[ContraFact],
+    coverage: &Coverage,
+    tally: &TallyDays,
     k_days: u32,
 ) -> Result<TransferView, PairingInputError> {
     let mut skips: Vec<&SkipFact> = skips.iter().collect();
@@ -619,7 +698,7 @@ pub(crate) fn transfer_pairing_view(
                             candidates: sorted_keys(&candidates, &contras),
                         }
                     } else {
-                        open_state(skip, &candidates, &contras, &coverage, k_days)
+                        open_state(skip, &candidates, &contras, &coverage, tally, k_days)
                     }
                 }
             };
@@ -709,13 +788,16 @@ fn open_state(
     candidates: &[usize],
     contras: &[&ContraFact],
     coverage: &MergedCoverage,
+    tally: &TallyDays,
     k_days: u32,
 ) -> SkipState {
     if candidates.is_empty() {
-        return if coverage.holds(skip, &skip.other_ledger, &skip.date, k_days) {
+        return if !coverage.holds(skip, &skip.other_ledger, &skip.date, k_days) {
+            SkipState::NotEstablished
+        } else if tally.found_no_contra(skip) {
             SkipState::NotFound
         } else {
-            SkipState::NotEstablished
+            SkipState::TallyUnchecked
         };
     }
     let unverified: BTreeSet<&BatchId> = candidates

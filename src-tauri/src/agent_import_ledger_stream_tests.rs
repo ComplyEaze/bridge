@@ -1524,6 +1524,48 @@ fn a_record_covers_only_what_the_journal_held_before_its_mark_was_read() {
     );
 }
 
+/// An answer that reported `STATUS=0` failed whatever its counters say
+/// (IMPLEMENTATION_GUIDE.md §3.2, I6), so its `CREATED` proves no voucher
+/// landed: the post's floor stays its pre-POST mark (#2035).
+#[test]
+fn an_answer_reporting_status_zero_raises_no_floor() {
+    let failed = bridge_tally_protocol::parse_import_outcome(
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>11</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>",
+    )
+    .unwrap();
+    assert_eq!(failed.counters().created, 10);
+    assert_eq!(
+        failed.application_status(),
+        bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    );
+    let refused = placed("refused", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let seer = placed("seer", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![
+        record(&refused),
+        intent(&refused, Some(1)),
+        record(&StatusRecord::response(
+            &refused,
+            DispatchResponse {
+                request_sha256: "c".repeat(64),
+                response_sha256: "d".repeat(64),
+                bytes: 1,
+                outcome: Some(failed),
+            },
+        )),
+        record(&seer),
+        intent(&seer, Some(1)),
+    ];
+    let read = journal.len() as u64;
+    // The mark still reads 1: Tally created nothing for the refused post, so
+    // no record would be written for it.
+    assert!(!rollback_record_extends(Cursor::new(journal.concat()), "seer", 1, read).unwrap());
+    journal.push(seen(&seer, 1, read));
+    assert_eq!(cover(&journal, "refused").covered_by, None);
+    assert!(covered_by_records_of(Cursor::new(journal.concat()), "seer")
+        .unwrap()
+        .is_empty());
+}
+
 /// Only the same company, by all four fields, at the same Tally address.
 #[test]
 fn a_record_covers_no_batch_of_another_company_or_address() {

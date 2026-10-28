@@ -799,10 +799,22 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     } else {
         "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it."
     };
+    let mut summary = summary.to_string();
+    // A refusal by the mark's step or the span's count says what was observed
+    // and what can do that, as examples, after the line that says what to
+    // check (#1633).
+    if report["state"] == "refused" {
+        if let Some(line) = report["code"]
+            .as_str()
+            .and_then(span_identity::concurrent_change_line_for)
+        {
+            summary.push(' ');
+            summary.push_str(line);
+        }
+    }
     // A check that recorded a restore while its own post reads intact names
     // it: the restore reaches other posts of the company, and the posts it
     // covers keep their status until each is verified again (#1050).
-    let mut summary = summary.to_string();
     if report["rollback_recorded"] == true && report["state"] != "book_rolled_back" {
         let count = report["other_batches_covered"]["count"]
             .as_u64()
@@ -2694,9 +2706,15 @@ impl Server {
         let outcome = response.and_then(|response| response.outcome.as_ref());
         // After a create of N, the mark never again reads below before + N, nor
         // below a mark read after the post, unless the book was rolled back
-        // (a backup restored, or another copy put in its place).
+        // (a backup restored, or another copy put in its place). N is what the
+        // post proved, as the journal's own floor counts it: the vouchers it
+        // bound, else those its answer proves landed.
+        let proved = match &journaled {
+            Some(ledger::PostSpanVerdict::Bound(bindings)) => bindings.len() as u64,
+            _ => outcome.map_or(0, ledger::landed_count),
+        };
         let floor = before
-            .saturating_add(outcome.map_or(0, |outcome| outcome.counters().created))
+            .saturating_add(proved)
             .max(after_post_mark.unwrap_or(0));
         if current < floor {
             return PostSpanDecision {

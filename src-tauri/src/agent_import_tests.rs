@@ -5598,6 +5598,88 @@ fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_n
     assert_eq!(summary(&[]), refused);
 }
 
+/// #1633: a refusal by the mark's step or the span's count adds, after the line
+/// that says what to check, that another change was made during the post, as
+/// an example and never as the cause; no other refusal and no binding adds it.
+#[test]
+fn a_step_or_count_refusal_names_a_concurrent_change_after_what_to_check() {
+    let line = super::span_identity::CONCURRENT_CHANGE_LINE;
+    let matched = json!([{ "status": "matching_content_observed", "accounting_effective": true }]);
+    for code in ["span_step_not_created", "span_count_mismatch"] {
+        let summary = with_post_span_summary(json!({ "state": "refused", "code": code }), &matched)
+            ["summary"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(
+            summary.starts_with("ComplyEaze Bridge could not confirm which Tally vouchers"),
+            "{code}: {summary}"
+        );
+        assert!(summary.ends_with(line), "{code}: {summary}");
+        assert!(
+            summary.contains("check each voucher in Tally before posting any of them again"),
+            "{code}"
+        );
+    }
+    // With no voucher matched by content, the line follows the plain refusal.
+    let plain = with_post_span_summary(
+        json!({ "state": "refused", "code": "span_step_not_created" }),
+        &json!([]),
+    )["summary"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(
+        plain,
+        format!("ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it. {line}")
+    );
+    // A mark that moved by less than the post created refuses with the same
+    // code, so it reads the same line.
+    assert_eq!(
+        super::span_identity::concurrent_change_line_for(
+            super::span_identity::SpanRefusal::StepNotCreated {
+                step: 0,
+                created: 2
+            }
+            .code()
+        ),
+        Some(line)
+    );
+    // A restore recorded by the same check is named after the line.
+    let restored = with_post_span_summary(
+        json!({
+            "state": "refused",
+            "code": "span_count_mismatch",
+            "rollback_recorded": true,
+            "other_batches_covered": {"count": 1},
+        }),
+        &matched,
+    )["summary"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let at_line = restored.find(line).expect("the line");
+    let at_restore = restored
+        .find("This check also found the company's books restored")
+        .expect("the restore sentence");
+    assert!(at_line < at_restore, "{restored}");
+    for (state, code) in [
+        ("refused", "span_position_mismatch"),
+        ("refused", "span_content_mismatch"),
+        ("refused", "span_mark_went_back"),
+        ("bound", "span_step_not_created"),
+        ("unsettled", "span_count_mismatch"),
+    ] {
+        let summary = with_post_span_summary(json!({ "state": state, "code": code }), &matched)
+            ["summary"]
+            .clone();
+        assert!(
+            !summary.as_str().unwrap().contains(line),
+            "{state} {code}: {summary}"
+        );
+    }
+}
+
 /// A refused binding whose vouchers the book matches by content says what the
 /// book holds, and never that the vouchers are this post's (#1039). Only a
 /// refused binding reads so.

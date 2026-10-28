@@ -28,7 +28,7 @@ Bridge is not made by, or affiliated with, Tally Solutions, and we have not run
 the two side by side. TallyPrime also has its own Bank Statement import, which
 takes statement files in the formats Tally lists for each bank.
 
-**Current release:** <!-- managed:current-release -->[`mcp-v0.6.0`](https://github.com/ComplyEaze/bridge/releases/latest) (16 October 2026)<!-- /managed:current-release -->,
+**Current release:** <!-- managed:current-release -->[`mcp-v0.6.1`](https://github.com/ComplyEaze/bridge/releases/latest) (27 October 2026)<!-- /managed:current-release -->,
 for Windows x64 and Apple Silicon Macs, as a Claude Desktop extension (an .mcpb
 file); it has not been run in other MCP clients. We check each release before
 we publish it: the release check confirms that each package launches, lists its
@@ -62,9 +62,9 @@ update itself, so look for a newer version on the
 - **Partly:** profit and loss and the balance sheet (a book with stock items is read only when Tally's own closing stock closes every gap, measured on one synthetic book; a book with several currencies is refused); closing stock value at 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
 - **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags (one test, the cash share of receipts and payments against the s.44AB(a) limit, is off by default and not yet run against a live TallyPrime), and Tally's Funds Flow and Ratio Analysis reports.
 
-"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.6.1 file against a live TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; the program inside the published Windows x64 0.6.1 file (checked against its `.sha256` file) has had one read-only run against a live TallyPrime 7.2 Silver, on one Windows computer on 27 October 2026, started directly by our test client rather than installed in Claude Desktop (it reported version 0.6.1, read Tally's status, the company list and the ledger masters of one synthetic company; nothing was posted); the macOS file has not been run against TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
-**Its tools.** In name order; release 0.6.1 installs 32 of them, 31 offered by default (`audit_test_run` appears only when its setting is on). None of them changes your TallyPrime books; with posting on, two more appear, described below the table. Every call adds a receipt line,
+**Its tools.** In name order; release 0.6.1 installs 32 of them, 31 offered by default (`audit_test_run` appears only when its setting is on), and `gst_by_counter_ledger` is in source, not yet in a published build. None of them changes your TallyPrime books; with posting on, two more appear, described below the table. Every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
@@ -75,6 +75,7 @@ with no figures, to a log on this computer.
 | `cash_flow` | Tally’s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, returned only after its net total matches the trial balance; the split into months is Tally’s own and is not checked (not a cash flow statement under AS 3) | Nothing |
 | `company_features` | Three settings the company’s record in Tally holds today (cost centres, GST and batch-wise stock; each yes, no or not reported) and the currency symbol; no ledger, voucher, amount or narration. Each of the three settings equalled Tally’s F11 screen on three synthetic books, not on this company; a setting changed inside a sitting has not been measured | Nothing |
 | `egress_log` | The receipts ComplyEaze Bridge keeps of its own tool calls, with no figures | Nothing |
+| `gst_by_counter_ledger` | For a period, the GST the books record on ledgers under Duties & Taxes, totalled per counter ledger: the one Purchase Accounts, Direct Expenses, Indirect Expenses or Fixed Assets ledger on a purchase, debit note, journal or payment with a supplier on it, named with its GUID, debit and credit side apart, per head; every other voucher with GST is set aside under a named reason with its own totals. Books only, not a return figure or an eligibility decision; measured on fourteen vouchers typed on Tally's screen in one synthetic book | Nothing |
 | `gst_status` | Tally’s own GSTR-1 status flags on the vouchers of one voucher type in a period of at most 93 days: for each voucher its number, date, a status (included, uncertain, excluded, not in return, cancelled, optional or post-dated; for the last three also what the three status flags read) and whether a person accepted it as it stands; no amount, party, ledger or narration. A status is Tally’s own flag and not a judgement of ComplyEaze Bridge. Measured on one synthetic book of TallyPrime 7.1 Silver, where `excluded` has not been observed | Nothing |
 | `gst_uncertain_vouchers` | The vouchers of one voucher type (a Sales type is what was measured) in a period of at most 93 days that Tally marks Uncertain in its GSTR-1, and the ones a person accepted as they stand: for each its number, date, party ledger, invoice total (without its sign, with the side) and Tally’s identifiers, and the line a CA reads before filing, which names the voucher type it covers and is withheld when no voucher was read, none is uncertain, or a voucher it depends on could not be read. The party and the total are returned to the assistant, and `mask_parties` masks the party and not the total. The reason for uncertainty is not read, and bills missing an HSN/SAC are not split out. Measured on one synthetic book of TallyPrime 7.1 Silver, before and after one Accept As Is; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not measured | Nothing |
 | `ledger_masters` | Ledgers with their opening balances; optionally GSTIN, PAN and other party details | Nothing |
@@ -284,6 +285,15 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   Sales invoice posting (not offered in 0.6.0), Gold, macOS, other Windows or Tally releases, and an upgrade from 0.5.1. The
   record of the pass is in the 0.6.0 entry of the changelog; the comparison with the published file was made from the release
   assets after the release.
+- The published 0.6.1 file for Windows, on 27 October 2026. `bridge-tally-mcp-v0.6.1-windows-x64.mcpb` (SHA-256
+  `7812d8ad7b0ff6a07eac20828dfedaef4d50104bd5d679db3fc03c26e784c47a`, equal to its `.sha256` file, smoke report and provenance
+  record; `bridge_mcp.exe` SHA-256 `bdd428e4806bdbf70925956f90d410df48a0470b1a2f78c746c4c18088471d8d`), unpacked and started
+  directly by our test client (not installed in Claude Desktop; the posting and import settings unset, so it listed 29 tools),
+  against licensed TallyPrime 7.2 Silver with one synthetic company: it reported version 0.6.1, and `tally_status`,
+  `list_companies` and `ledger_masters` answered. Nothing was posted. Not run: the macOS file, Claude Desktop, posting,
+  `audit_test_run` with its setting on, any other read. Record:
+  [`lab/061-post-publish-answers`](https://github.com/ComplyEaze/bridge/tree/647a64014ce7369acc611b7adc3de63bd80df708/lab/061-post-publish-answers)
+  at commit `647a64014ce7369acc611b7adc3de63bd80df708`.
 - The bank-statement path through its fourth step, on a Mac, on 4 and 5 October
   2026, with that same CI-built 0.4.2 candidate (installed on 3 October; not the
   published file), against licensed TallyPrime Silver 7.1 holding the lab's own
@@ -498,7 +508,7 @@ it. Before you do, know what it is and is not:
   your Tally, or in conversation inside Claude Desktop. What has been run
   against a real TallyPrime, and on which builds, is
   [listed above](#what-has-been-run-against-a-real-tallyprime); the published
-  0.6.0 package itself has been run by us against a live TallyPrime on one day, 16 October 2026 (#1780), where it posted one Contra to a synthetic company; two other builds of 0.6.0, made by
+  0.6.0 package itself has been run by us against a live TallyPrime on one day, 16 October 2026 (#1780), where it posted one Contra to a synthetic company; the program in the published Windows 0.6.1 file has had one read-only run, on 27 October 2026, and has not posted (see the 27 October 2026 entry above), and the macOS 0.6.1 file has not been run against TallyPrime; two other builds of 0.6.0, made by
   our checks from the same source, were run against TallyPrime 7.1 Silver on one Windows computer
   (see the 16 October 2026 entry above).
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.

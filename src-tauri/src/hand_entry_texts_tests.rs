@@ -24,7 +24,7 @@ const PHRASES: [&str; 4] = ["entry screen", "by hand", "manually", "gateway of t
 const PINNED: &[(&str, usize)] = &[
     ("crates/bridge-tax-audit/src/financial_statements.rs", 1),
     ("src/agent_bank_statement.rs", 1),
-    ("src/agent_catalog.rs", 21),
+    ("src/agent_catalog.rs", 20),
     ("src/agent_desktop_journal_review.rs", 4),
     ("src/agent_gst_status.rs", 1),
     ("src/agent_import.rs", 8),

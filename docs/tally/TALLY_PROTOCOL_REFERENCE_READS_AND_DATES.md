@@ -746,7 +746,7 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
   is flagged `cost_centre_allocation_shape_unrecognised`, by test only); a read of a different voucher type; another release or book;
   that the allocations of an entry always add up to its amount (the tool does not check this).
 
-### 8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-12; TallyPrime 7.1, one synthetic book**
+### 8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-28; TallyPrime 7.2, two synthetic books**
 
 **Scope: TallyPrime 7.2 Silver, licensed, `education_mode: false`, synthetic company `BRIDGE BANKREF LAB` (28 Oct 2026; a recapture of a 12 Oct run on 7.1 whose references the privacy scan could not carry, which is not committed), one read of five days (1 to 5 Apr 2026): five Contras of 50,000.00 between two bank ledgers, keyed in double entry on Tally's screen.** Request and response
 retained with sha256 in `tests/fixtures/VOUCHER_CONTRA_HAND_KEYED_CAPTURE_PROVENANCE.md`; the request is the one the vouchers read

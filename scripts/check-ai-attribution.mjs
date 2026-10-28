@@ -19,7 +19,7 @@
 // Output: one line per finding, "NOTE <where>: <what>", then "CHECKED <n>"; exit 0 whatever it found, 2 on bad input.
 // Run:    node scripts/check-ai-attribution.mjs < input.json
 
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 // The assistants the rule names: Claude and Anthropic's model family names, and the other assistants that sign commits.
@@ -114,7 +114,7 @@ function parseInput(text) {
   return input;
 }
 
-if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
   const input = parseInput(Buffer.concat(chunks).toString("utf8"));

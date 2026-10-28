@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { commitFindings, evaluate } from "./check-ai-attribution.mjs";
 
 const SCRIPT = new URL("./check-ai-attribution.mjs", import.meta.url);
@@ -173,7 +174,7 @@ test("a very long run of spaces does not hang the match", () => {
 });
 
 function run(stdin) {
-  const result = spawnSync(process.execPath, [SCRIPT.pathname], { input: stdin, encoding: "utf8" });
+  const result = spawnSync(process.execPath, [fileURLToPath(SCRIPT)], { input: stdin, encoding: "utf8" });
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 

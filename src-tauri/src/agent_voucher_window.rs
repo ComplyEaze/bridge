@@ -18,6 +18,7 @@
 use super::*;
 use bridge_tally_core::book_presence::WindowRead;
 use bridge_tally_core::{DateSpan, TallyDate};
+use bridge_tally_protocol::ledger_scope::LedgerScopeName;
 use chrono::NaiveDate;
 
 /// Predicted encoded bytes one windowed read may carry.
@@ -140,6 +141,23 @@ impl VoucherReadShape {
         }
     }
 }
+
+/// Whose vouchers a window read plans and reads (#485): the book's, or those of one ledger.
+///
+/// A ledger enters only as a [`LedgerScopeName`], which `ledger_movement` builds once, from the
+/// catalogue's own spelling of a ledger it resolved. Everything planned from a ledger-scoped census
+/// counts that ledger's vouchers alone, so such a read is never a count of the book: it earns no
+/// [`BracketedCount`], and its census is not a scan of the book.
+#[derive(Clone, Copy)]
+pub(super) enum WindowScope<'a> {
+    Book,
+    Ledger(&'a LedgerScopeName),
+}
+
+/// A ledger-scoped plan that needs a part the lab has not observed ledger-scoped (an AlterID span
+/// within one day, or a shape other than the movement read). Refused before any such request is
+/// rendered; `ledger_movement` answers it by reading the book's window instead and says so.
+pub(super) const LEDGER_SCOPE_NEEDS_DAY_SPLIT: &str = "ledger_scope_plan_needs_day_split";
 
 /// An AlterID range `(after, through]`. Within one day it divides a day too
 /// heavy for one read; in a census it bounds each census request by
@@ -1644,9 +1662,43 @@ impl Server {
         T: WindowRow,
         P: FnMut(&str) -> Result<Vec<T>, String>,
     {
-        read_voucher_window_with(
+        self.read_scoped_voucher_window(
+            identity,
+            WindowScope::Book,
+            company,
+            from,
+            to,
+            shape,
+            source,
+            limits,
+            parse,
+        )
+        .await
+    }
+
+    /// [`Self::read_voucher_window`] for the vouchers of `scope`. See
+    /// [`read_scoped_voucher_window_with`].
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn read_scoped_voucher_window<T, P>(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        scope: WindowScope<'_>,
+        company: &str,
+        from: &TallyDate,
+        to: &TallyDate,
+        shape: VoucherReadShape,
+        source: WindowPlanSource,
+        limits: WindowReadLimits,
+        parse: P,
+    ) -> Result<WindowReadOutcome<T>, ToolFailure>
+    where
+        T: WindowRow,
+        P: FnMut(&str) -> Result<Vec<T>, String>,
+    {
+        read_scoped_voucher_window_with(
             &AgentReader(self),
             identity,
+            scope,
             company,
             from,
             to,
@@ -1698,6 +1750,44 @@ where
     T: WindowRow,
     P: FnMut(&str) -> Result<Vec<T>, String>,
 {
+    read_scoped_voucher_window_with(
+        reader,
+        identity,
+        WindowScope::Book,
+        company,
+        from,
+        to,
+        shape,
+        source,
+        limits,
+        parse,
+    )
+    .await
+}
+
+/// [`read_voucher_window_with`] for the vouchers of `scope`: the book's, or one ledger's (#485).
+/// A ledger-scoped read plans from a census of that ledger's vouchers and sends only parts the lab
+/// has observed ledger-scoped; a plan that needs another is refused with
+/// [`LEDGER_SCOPE_NEEDS_DAY_SPLIT`], never sent. Every admission and the closing bracket are the
+/// book-wide read's.
+#[allow(clippy::too_many_arguments)]
+pub(super) async fn read_scoped_voucher_window_with<R, T, P>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    shape: VoucherReadShape,
+    source: WindowPlanSource,
+    limits: WindowReadLimits,
+    parse: P,
+) -> Result<WindowReadOutcome<T>, ToolFailure>
+where
+    R: WindowReader,
+    T: WindowRow,
+    P: FnMut(&str) -> Result<Vec<T>, String>,
+{
     reader.begin_window();
     if reader.seals_its_reads()
         && !matches!(source, WindowPlanSource::Estimate { known_marks: None })
@@ -1706,7 +1796,7 @@ where
     }
     let timed = TimedReader::new(reader, from, to);
     let read = read_voucher_window_timed(
-        &timed, identity, company, from, to, shape, source, limits, parse,
+        &timed, identity, scope, company, from, to, shape, source, limits, parse,
     )
     .await;
     let timings = timed.into_timings();
@@ -1730,6 +1820,7 @@ where
 async fn read_voucher_window_timed<R, T, P>(
     reader: &TimedReader<'_, R>,
     identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
@@ -1800,6 +1891,7 @@ where
                 WindowPlanSource::Estimate { known_marks } => estimate_window_volume(
                     reader,
                     identity,
+                    scope,
                     company,
                     (from, to),
                     (first, last),
@@ -1892,8 +1984,14 @@ where
                 .into_failure());
             }
             dispatched += 1;
-            let request =
-                voucher_window_part_read(shape, company, &part.from, &part.to, part.span)?;
+            let request = match scope {
+                WindowScope::Book => {
+                    voucher_window_part_read(shape, company, &part.from, &part.to, part.span)?
+                }
+                WindowScope::Ledger(ledger) => ledger_movement_part_read(
+                    shape, company, ledger, &part.from, &part.to, part.span,
+                )?,
+            };
             match reader
                 .read(identity, request, WindowReadKind::Part(part.clone()))
                 .await
@@ -2042,6 +2140,7 @@ where
     // one: it is itself the second read. A reader that does not seal closes
     // only a divided read, so closing the marks is what says the read was divided.
     let bracketed = (!replaying
+        && matches!(scope, WindowScope::Book)
         && !reader.seals_its_reads()
         && closed_on_opening_marks
         && census.as_ref().is_some_and(WindowCensus::names_every_guid))
@@ -2136,6 +2235,7 @@ pub(super) async fn count_window_only<R: WindowReader>(
     let estimate = estimate_window_volume(
         reader,
         identity,
+        WindowScope::Book,
         company,
         (from, to),
         days,
@@ -2232,6 +2332,7 @@ async fn read_marks<R: WindowReader>(
 async fn estimate_window_volume<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
     company: &str,
     window: (&TallyDate, &TallyDate),
     days: (NaiveDate, NaiveDate),
@@ -2261,7 +2362,7 @@ async fn estimate_window_volume<R: WindowReader>(
         });
     }
     let rows = census_window(
-        reader, identity, company, window, days, high_water, limits, preflight, boundary,
+        reader, identity, scope, company, window, days, high_water, limits, preflight, boundary,
     )
     .await?;
     let census = WindowCensus::from_census_rows(rows)
@@ -2307,6 +2408,7 @@ pub(super) fn census_read_count(
 async fn census_window<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
     company: &str,
     (from, to): (&TallyDate, &TallyDate),
     days: (NaiveDate, NaiveDate),
@@ -2327,7 +2429,21 @@ async fn census_window<R: WindowReader>(
     let mut spans = spans.peekable();
     let mut rows = Vec::new();
     while let Some(span) = spans.next() {
-        let request = voucher_census_read(company, from, to, span)?;
+        // A ledger census is always spanned, the one form observed: a book that fits
+        // one census request is asked over (0, high_water], the same rows.
+        let span = match scope {
+            WindowScope::Book => span,
+            WindowScope::Ledger(_) => Some(span.unwrap_or(AlterIdSpan {
+                after: 0,
+                through: high_water,
+            })),
+        };
+        let request = match (scope, span) {
+            (WindowScope::Ledger(ledger), Some(span)) => {
+                ledger_census_read(company, ledger, from, to, span)?
+            }
+            _ => voucher_census_read(company, from, to, span)?,
+        };
         let (xml, evidence) = match reader.read(identity, request, WindowReadKind::Census).await {
             Ok((xml, evidence, observed)) => {
                 observe_boundary(boundary, observed);

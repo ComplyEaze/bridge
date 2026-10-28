@@ -213,6 +213,10 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
             let ledger_match = &response["structuredContent"]["result"]["ledger_match"];
             assert_eq!(ledger_match["ledger"], "WR2 Sales", "{ledger_match}");
             assert_eq!(ledger_match["matched"], "exact", "{ledger_match}");
+            // #485: the vouchers read were the ledger's own, and the answer says so.
+            let scope = &response["structuredContent"]["result"]["window_scope"];
+            assert_eq!(scope["basis"], "ledger_scoped", "{scope}");
+            assert_eq!(scope["vouchers_read"], 3, "{scope}");
             let result = response["structuredContent"]["result"].clone();
             match change {
                 "stable" => stable_result = Some(result),
@@ -306,6 +310,10 @@ async fn an_empty_movement_window_beside_a_busy_day_is_refused_by_the_wider_read
     // The window's pre-flight mark, the window (empty), and the corroboration's
     // widened read (rows), which reuses that mark. The refusal ends the call: no
     // closing read follows.
+    // The named ledger is read first through its own scoped window, which finds nothing. That is
+    // not taken as an empty window (#485): the book's window is read, with its own mark.
+    plans.extend(paired(&high_water));
+    plans.extend(paired(&empty));
     plans.extend(paired(&high_water));
     plans.extend(paired(&empty));
     plans.extend(paired(&busy_neighbour));
@@ -349,9 +357,10 @@ async fn an_empty_movement_window_beside_a_busy_day_is_refused_by_the_wider_read
         response["structuredContent"]["evidence"]["state"],
         "partial"
     );
-    // 4 prelude legs, the 22-leg opening read, then three paired reads of six
-    // legs: mark, window, widened window.
-    assert_eq!(observed.len(), 44);
+    // 4 prelude legs, the 22-leg opening read, then five paired reads of six legs: mark, the
+    // named ledger's own window (empty, and not believed), mark again, the book's window, and
+    // the widened window.
+    assert_eq!(observed.len(), 56);
     let identity = {
         let companies =
             bridge_tally_protocol::parse_companies_from_collection(&company.fixture.body())
@@ -369,16 +378,28 @@ async fn an_empty_movement_window_beside_a_busy_day_is_refused_by_the_wider_read
         ))
     };
     let mark = render_agent_company_high_water(&identity);
+    let scoped_window = render_agent_ledger_vouchers(
+        &identity,
+        &bridge_tally_protocol::ledger_scope::LedgerScopeName::new("WR2 Sales").unwrap(),
+        LedgerVoucherFields::Movement,
+        &day("20260802"),
+        &day("20260802"),
+    )
+    .unwrap();
     let window =
         render_agent_movement_vouchers(&identity, &day("20260802"), &day("20260802")).unwrap();
     let wider = render_agent_vouchers(&identity, &day("20260801"), &day("20260803"), None).unwrap();
     for (leg, request) in [
         (27, &mark),
         (29, &mark),
-        (33, &window),
-        (35, &window),
-        (39, &wider),
-        (41, &wider),
+        (33, &scoped_window),
+        (35, &scoped_window),
+        (39, &mark),
+        (41, &mark),
+        (45, &window),
+        (47, &window),
+        (51, &wider),
+        (53, &wider),
     ] {
         assert_eq!(observed[leg].request_body_sha256, sha(request), "leg {leg}");
     }
@@ -497,6 +518,11 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
             status.clone(),
         ];
         plans.extend(opening());
+        // The named ledger's own window is planned first, from a census of its vouchers. A day
+        // that divides in AlterID spans is not a form read ledger-scoped (#485), so that plan is
+        // refused before a part is sent and the book's window is planned in its place.
+        plans.extend(voucher_read(marks(200)));
+        plans.extend(voucher_read(census.clone()));
         plans.extend(voucher_read(marks(200)));
         plans.extend(voucher_read(census.clone()));
         let parts = [first_span.clone(), second_span.clone()];
@@ -542,6 +568,11 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
             );
             // A quick call's result is unchanged: no block, nothing left out (#1239).
             let result = &response["structuredContent"]["result"];
+            assert_eq!(result["window_scope"]["basis"], "whole_book", "{result}");
+            assert_eq!(
+                result["window_scope"]["reason"], "ledger_scope_plan_needs_day_split",
+                "{result}"
+            );
             assert!(result.get("read_cost").is_none(), "{result}");
             assert!(result.get("read_cost_left_out").is_none(), "{result}");
         } else {

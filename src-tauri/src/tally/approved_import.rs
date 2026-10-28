@@ -2741,7 +2741,9 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
                 title.as_ptr(),
                 // Topmost: a window the connector opens while Tally fills the
                 // screen is otherwise drawn behind it, since a background
-                // process may not take the foreground (#1589). With
+                // process may not take the foreground (#1589). The flag alone
+                // did not keep the box topmost on the lab PC, so `box_fit`
+                // sets it again once the box shows (#1780). With
                 // MB_SETFOREGROUND the box also takes the foreground, so a key
                 // typed for Tally answers it; the parent puts a first line on
                 // its text that says what Y and N do (#1780). No stays the
@@ -2855,7 +2857,9 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
                 title.as_ptr(),
                 // Topmost: a window the connector opens while Tally fills the
                 // screen is otherwise drawn behind it, since a background
-                // process may not take the foreground (#1589). With
+                // process may not take the foreground (#1589). The flag alone
+                // did not keep the box topmost on the lab PC, so `box_fit`
+                // sets it again once the box shows (#1780). With
                 // MB_SETFOREGROUND the box also takes the foreground, so a key
                 // typed for Tally answers it; the parent puts a first line on
                 // its text that says what Y and N do (#1780). No stays the
@@ -2907,10 +2911,10 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). It changes only
-            // the drawing order; No stays the default button.
+            // Topmost and taking the foreground, as the post's box asks
+            // (#1589). This box is not shown through `box_fit`, so nothing
+            // sets it topmost again if the flag does not hold (#1780). No
+            // stays the default button.
             MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }

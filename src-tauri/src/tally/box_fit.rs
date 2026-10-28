@@ -159,8 +159,9 @@ mod windows_hook {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         BringWindowToTop, CallNextHookEx, EnumThreadWindows, FlashWindowEx, GetForegroundWindow,
         GetWindowRect, GetWindowThreadProcessId, IsWindowVisible, PostMessageW,
-        SetForegroundWindow, SetWindowsHookExW, UnhookWindowsHookEx, FLASHWINFO, FLASHW_ALL,
-        FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT, WM_COMMAND,
+        SetForegroundWindow, SetWindowPos, SetWindowsHookExW, UnhookWindowsHookEx, FLASHWINFO,
+        FLASHW_ALL, FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, HWND_TOPMOST, IDCANCEL, SWP_NOACTIVATE,
+        SWP_NOMOVE, SWP_NOSIZE, WH_CBT, WM_COMMAND,
     };
 
     #[link(name = "kernel32")]
@@ -279,12 +280,25 @@ mod windows_hook {
         found
     }
 
-    /// Try to make `window` the foreground window; if Windows refuses, flash
-    /// its taskbar button until it is.
+    /// Keep `window` above every window that is not topmost, Tally's
+    /// included, then try to make it the foreground window; if Windows
+    /// refuses, flash its taskbar button until it is. `MB_TOPMOST` alone did
+    /// not keep the box topmost: on the lab PC the box read not topmost, and
+    /// one click into a maximised Tally covered it (#1780). Being topmost
+    /// takes neither the foreground nor the keyboard.
     fn raise(window: HWND) {
         // SAFETY: every handle is one just read from Windows; the input
         // attachment is undone before returning.
         unsafe {
+            SetWindowPos(
+                window,
+                HWND_TOPMOST,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            );
             let foreground = GetForegroundWindow();
             if foreground == window {
                 return;

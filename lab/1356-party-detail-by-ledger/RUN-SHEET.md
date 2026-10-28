@@ -18,8 +18,8 @@ Both request shapes were captured by curl. The tests replay them byte for byte. 
 ## Build and inputs (hash before the first call and at the end; a different hash = STOP)
 | item | source | bytes | sha256 |
 |---|---|---|---|
-| `bridge-tally.mcpb`, the bundle BUILD-T comes in | #2115 at head 73289a9b094a570e7d70d65dbaa4f90ec04a9486: CI run 40758082390, artifact 12846649341 `unsigned-bundle-smoke-windows-latest` (expires 4 Nov 2026 20:04 UTC), file `bridge-tally.mcpb`; its sha256 equals the artifact's `mcpb-smoke.json` `archive_sha256` | 15,355,579 | e500bf153df74c73ce79a91b7457a847930fbbf02da016eca3d715c32201559f |
-| `bridge_mcp.exe`, BUILD-T | `bin/x86_64-pc-windows-msvc/bridge_mcp.exe` inside that `.mcpb`; its sha256 equals `mcpb-smoke.json` `binary_sha256`, and its server reports version 0.6.1 | 31,879,680 | 7a3c07f01bcfccff2f44e1547709260632ccebac974ceddf67a9f81cf34ff556 |
+| `bridge-tally.mcpb`, the bundle BUILD-T comes in | #2115 at head 367fbeafa8a7ec1a018c8155544b8498451c636c: CI run 40764944619, artifact 12851150254 `unsigned-bundle-smoke-windows-latest` (expires 4 Nov 2026 20:49 UTC), file `bridge-tally.mcpb`; its sha256 equals the artifact's `mcpb-smoke.json` `archive_sha256` | 15,357,592 | 8ac763b801acb89a833971ed4fcd893a6bb478d0130617528bbdef9f481997ba |
+| `bridge_mcp.exe`, BUILD-T | `bin/x86_64-pc-windows-msvc/bridge_mcp.exe` inside that `.mcpb`; its sha256 equals `mcpb-smoke.json` `binary_sha256`, and its server reports version 0.6.1 | 31,828,992 | fae9cb955aad1b31bf7aadf4c76deb75306d7a0e7743b80fbf85fb8eceaf9d03 |
 
 - Posting stays OFF for this launch: `BRIDGE_AGENT_ENABLE_WRITES` absent or `false`. Record the launch file's key names (not values) and its sha256.
 - Working folder: `C:\bridge-lab\1356b\`. Evidence goes in `C:\bridge-lab\1356b\evidence\`.
@@ -38,17 +38,18 @@ Each call is `outstandings` with `company_guid` THE COMPANY's GUID, `party` `DN 
 - D1. `as_of` `20250630`, `detail` `bill_trail`.
   - EXPECT a result, not a refusal: the company window is refused before any data request (its census shows it), and the party is then read by its ledger.
   - EXPECT `detail.window` to hold `party_vouchers_read` 61, and no `company_vouchers_read`.
+  - EXPECT `detail.window_scope.basis` `ledger_scoped`, with `vouchers_read` 61 and a `note`. Record the note.
   - EXPECT `detail.ledger_match.matched` `exact`.
   - Record `detail.state`, and for each bill its `state`. A bill whose `state` is `tied` has its signed allocations equal to Tally's own balance for that bill: the voucher read and Tally's bills report agree on it.
   - Any bill `trail_does_not_tie`: record both numbers. That is the finding, not a STOP.
-  - A refusal, or `company_vouchers_read`, is the finding, not a STOP: keep it whole, and record its code and `reads`.
+  - A refusal, or `company_vouchers_read`, is the finding, not a STOP: keep it whole, and record its code, `reads` and `window_scope` (its `basis`, `reason` and `note`).
 - D2. `as_of` `20250630`, `detail` `unadjusted`.
-  - EXPECT `party_vouchers_read` 61.
+  - EXPECT `party_vouchers_read` 61 and `window_scope.basis` `ledger_scoped`.
   - Record `detail.state`, `residual`, `on_account_sum` and the row count.
 - D3. `as_of` `20260331`, `detail` `bill_trail`.
   - EXPECT a result: 248 vouchers, read by the ledger in several date parts.
-  - EXPECT `party_vouchers_read` 248, and no `company_vouchers_read`.
-  - Record `detail.state` and each bill's `state`, as in D1. A refusal is the finding, not a STOP: keep it whole, with its code and `reads`.
+  - EXPECT `party_vouchers_read` 248, no `company_vouchers_read`, and `window_scope.basis` `ledger_scoped`.
+  - Record `detail.state` and each bill's `state`, as in D1. A refusal is the finding, not a STOP: keep it whole, with its code, `reads` and `window_scope`.
 - D4. `egress_log` (the newest 200). Keep it whole. From it, for each of D1 to D3, count the reads by their request fingerprints between the call's start and end. Record the counts only.
 - D5. `ledger_masters` (basic) again. EXPECT the marks of P1, since the calls write nothing. A difference = record it and STOP.
 - D6. Optional, on the run coordinator's word: Tally's own Ledger Outstandings screen for `DN Party 001` as on 30 June 2025. Screenshot it, and record each bill's name and pending amount beside D1's.

@@ -6,16 +6,16 @@ use bridge_tally_protocol::ledger_scope::{LedgerScopeName, LedgerScopeNameError}
 
 /// A ledger-scoped read found no vouchers. Not taken as proof of none (#485): the whole book's
 /// window decides, through the same empty-window corroboration as any other read.
-const LEDGER_SCOPE_EMPTY_NOT_ESTABLISHED: &str = "ledger_scope_empty_not_established";
+pub(super) const LEDGER_SCOPE_EMPTY_NOT_ESTABLISHED: &str = "ledger_scope_empty_not_established";
 /// A ledger-scoped row without a line on the ledger: the scoped read did not do what it was
 /// admitted for, so nothing it returned is summed.
-const LEDGER_SCOPE_ROW_WITHOUT_LINE: &str = "ledger_scope_row_without_line";
+pub(super) const LEDGER_SCOPE_ROW_WITHOUT_LINE: &str = "ledger_scope_row_without_line";
 
 /// Why a movement read went to the book's window though a ledger was named: a closed set of
 /// reasons that hold no data from Tally or the caller, each with the sentence the result carries
 /// beside it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum WholeBookReason {
+pub(super) enum WholeBookReason {
     NameOutsideScopedAlphabet,
     NameHoldsFormulaWord,
     PlanNeedsDaySplit,
@@ -23,7 +23,7 @@ enum WholeBookReason {
 }
 
 impl WholeBookReason {
-    const fn code(self) -> &'static str {
+    pub(super) const fn code(self) -> &'static str {
         match self {
             Self::NameOutsideScopedAlphabet => "ledger_name_outside_scoped_alphabet",
             Self::NameHoldsFormulaWord => "ledger_name_holds_formula_word",
@@ -60,7 +60,7 @@ impl WholeBookReason {
 }
 
 /// The scope a catalogue ledger name reads by, or the reason it reads the book's window instead.
-fn scope_name_of(name: &str) -> Result<LedgerScopeName, WholeBookReason> {
+pub(super) fn scope_name_of(name: &str) -> Result<LedgerScopeName, WholeBookReason> {
     LedgerScopeName::new(name).map_err(|refusal| match refusal {
         LedgerScopeNameError::FormulaWord => WholeBookReason::NameHoldsFormulaWord,
         LedgerScopeNameError::Empty

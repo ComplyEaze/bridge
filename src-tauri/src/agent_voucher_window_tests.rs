@@ -8206,20 +8206,23 @@ mod ledger_window {
     }
 
     /// What the party detail does with each result of the scoped read of its ledger (#1356): it
-    /// uses only an admitted read of at least one voucher, each with a line on the party's ledger,
-    /// and reads the book's window as before in every other case but a failure of its own.
+    /// uses an admitted read of at least one voucher, each with a line on the party's ledger. A
+    /// read that found nothing, and a day needing an AlterID split, leave the company window's
+    /// refusal standing with their reason. A row with no party line, a read not admitted against
+    /// its census and every other failure are the ledger read's own refusals, code kept.
     #[tokio::test]
     async fn the_detail_uses_only_an_admitted_ledger_read_of_the_partys_vouchers() {
-        use crate::agent::bill_trail::{ledger_outcome, LedgerOutcome};
-        let outcome = |read| ledger_outcome(read, "DN Sales").map(|(outcome, _)| outcome);
+        use crate::agent::bill_trail::{ledger_outcome, LedgerOutcome, NotByLedger};
+        let outcome = |read, party| ledger_outcome(read, party).map(|(outcome, _)| outcome);
         let (read, _) = read_day(dense_day(), eighty_two_a_read()).await;
-        assert!(matches!(outcome(read), Ok(LedgerOutcome::Use(rows)) if rows.len() == 82));
+        assert!(
+            matches!(outcome(read, "DN Sales"), Ok(LedgerOutcome::Use(rows)) if rows.len() == 82)
+        );
         // The same read, taken for a party whose ledger none of its vouchers carries a line on.
         let (read, _) = read_day(dense_day(), eighty_two_a_read()).await;
-        assert!(matches!(
-            ledger_outcome(read, "DN Party 001").map(|(outcome, _)| outcome),
-            Ok(LedgerOutcome::Window)
-        ));
+        let refused = outcome(read, "DN Party 001").unwrap_err();
+        assert_eq!(refused.code, "ledger_scope_row_without_line");
+        assert!(refused.evidence.is_some(), "the reads made are kept");
         // An empty census: every span of the day answered empty, and the read an empty collection
         // (the captured empty answer of the same book and run).
         let mut empty = dense_day();
@@ -8227,25 +8230,36 @@ mod ledger_window {
         empty[4].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice();
         let (read, left) = read_day(empty, eighty_two_a_read()).await;
         assert_eq!(left, 0);
-        assert!(matches!(outcome(read), Ok(LedgerOutcome::Window)));
+        assert!(matches!(
+            outcome(read, "DN Sales"),
+            Ok(LedgerOutcome::NotByLedger(
+                NotByLedger::ScopedReadFoundNothing
+            ))
+        ));
         // A day that only a part never observed ledger-scoped could divide.
         let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
         let (read, _) = read_day(dense_day(), limits).await;
         let (decided, evidence) = ledger_outcome(read, "DN Sales").unwrap();
-        assert!(matches!(decided, LedgerOutcome::Window));
+        assert!(matches!(
+            decided,
+            LedgerOutcome::NotByLedger(NotByLedger::PlanNeedsDaySplit)
+        ));
         assert!(evidence.is_some(), "the census reads made are kept");
-        // A read not admitted against its window.
-        let mut stray = dense_day();
-        stray[4].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml").as_slice();
-        let (read, _) = read_day(stray, eighty_two_a_read()).await;
-        let (decided, evidence) = ledger_outcome(read, "DN Sales").unwrap();
-        assert!(matches!(decided, LedgerOutcome::Window));
-        assert!(evidence.is_some(), "the reads made are kept");
-        // A census Tally did not answer within its span is the detail's own refusal.
+        // A read not admitted against its census keeps its own code and cause.
+        let mut drift = dense_day();
+        drift[0].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice();
+        let (read, _) = read_day(drift, eighty_two_a_read()).await;
+        let refused = outcome(read, "DN Sales").unwrap_err();
+        assert_eq!(refused.code, PART_NOT_ADMITTED);
+        assert_eq!(refused.cause, Some(PART_CENSUS_MISMATCH));
+        // A census Tally did not answer within its span is the ledger read's own refusal too.
         let mut wrong = dense_day();
         wrong[1].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml").as_slice();
         let (read, _) = read_day(wrong, eighty_two_a_read()).await;
-        assert_eq!(outcome(read).unwrap_err().code, VOLUME_UNESTIMATED);
+        assert_eq!(
+            outcome(read, "DN Sales").unwrap_err().code,
+            VOLUME_UNESTIMATED
+        );
     }
 
     #[test]

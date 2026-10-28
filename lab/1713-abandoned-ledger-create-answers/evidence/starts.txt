@@ -1,0 +1,3 @@
+﻿2026-10-28T19:47:55.626Z bulk.ps1 -First 1 -Last 96: started; log <lab folder>\1713\evidence\bulk\bulk-answers.txt
+2026-10-28T20:01:20.013Z bulk.ps1 -First 97 -Last 192: started; log <lab folder>\1713\evidence\bulk\bulk-answers.txt
+2026-10-28T20:20:38.252Z row.ps1 -Row L1: started; log <lab folder>\1713\evidence\L1\times.txt

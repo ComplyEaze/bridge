@@ -1,0 +1,5 @@
+﻿row L5; evidence <lab folder>\1713\evidence\L5; HALT file: HALT in this script's folder
+A: busy-year.xml, limit 20 (0 = none), at T0
+B: l5-create.xml, limit 20, when A's curl has exited; netstat 10 s after B is sent
+C: ledgers.xml, no limit, at T0 + 26 s or 1 s after B's curl has exited, whichever is later; sent again 30 s apart after curl exit 7 until D + 10 minutes after the first C, and at most 5 times after exit 52 or 56
+observation: LEDGERS, MARKS and netstat at C answered + 1, + 5, + 15 and + 30 minutes

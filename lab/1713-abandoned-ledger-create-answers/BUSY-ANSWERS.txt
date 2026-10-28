@@ -1,0 +1,4 @@
+# BUSY answers; they stay on the lab PC. sha256, bytes, VOUCHER rows (read.py busy), name.
+4b443d870c007dafec53a92a82e5822e5ecc41cea834d98eddeee1e8a1fa6be0  119036974  24000  evidence/m0/m0-busy.xml
+3f8661b8d3470e81332826c4d512602b506344e5f1b05cce0c9ee1393f62bf62  238211294  48000  evidence/m1/m1-busy.xml
+6358662986a91980356a2ce1d2108baa9faa70fbcf07bc13ec069c1153fc38e0  238211294  48000  evidence/L1/A.xml

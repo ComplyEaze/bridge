@@ -1,0 +1,3 @@
+﻿bulk: bulk-001.xml to bulk-096.xml (96 files of 250 Journals), one at a time, to http://127.0.0.1:9001
+answers: <lab folder>\1713\evidence\bulk; one line each in <lab folder>\1713\evidence\bulk\bulk-answers.txt
+screenshot pause after bulk-001 and after bulk-096 (files GO-bulk-001, GO-bulk-096); HALT file: HALT in this script's folder

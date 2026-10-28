@@ -1,0 +1,17 @@
+﻿row L1; evidence <lab folder>\1713\evidence\L1; HALT file: HALT in this script's folder
+A: busy-year.xml, limit 0 (0 = none), at T0
+B: l1-create.xml, limit 0 (0 = none), at T0 + 5 s; netstat 10 s after B is sent
+C: none
+observation: none (LEDGERS and MARKS by hand after the row)
+2026-10-28T20:20:38.305Z D 187 s; M1 238211294 bytes, 48000 rows; company 5f4825c4-5d89-47fa-9872-6397cca3a591
+2026-10-28T20:20:38.632Z netstat before exit=0
+2026-10-28T20:20:39.006Z queue A (busy-year.xml, sha256 ok, limit 0)
+2026-10-28T20:20:44.182Z queue B (l1-create.xml, sha256 ok, limit 0)
+2026-10-28T20:20:54.632Z netstat b-plus10 exit=0
+2026-10-28T20:20:48.262Z start B
+2026-10-28T20:23:23.363Z end B at 2026-10-28T20:23:22.892Z exit=0 curl: 200 538 1004 0.022583 154.539004 154.540826 content-length=538
+2026-10-28T20:23:24.125Z read B: import ok CREATED 1 LASTVCHID 0 LASTMID 0
+2026-10-28T20:20:40.748Z start A
+2026-10-28T20:23:24.522Z end A at 2026-10-28T20:23:24.426Z exit=0 curl: 200 238211294 1826 0.005139 161.567999 163.549734 content-length=238211294
+2026-10-28T20:23:24.557Z HALT: B ended before A ended; the run owner decides on L1B
+2026-10-28T20:23:24.580Z row ended by HALT: nothing more was sent

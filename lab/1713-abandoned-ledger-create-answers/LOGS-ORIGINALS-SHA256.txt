@@ -1,0 +1,11 @@
+# Originals kept on the lab PC; the branch holds copies with the lab folder path written <lab folder>, the
+# sheet's capital halt word written HALT and its name for who decides written "run owner", or (netstat) the :9001 lines only.
+# sha256, bytes, name.
+e5edfe2a3dd9818f3e313faac14249d53ab1229ce41b9439b47ff538ad66f5a3  9493  evidence/L1/netstat-b-plus10.txt
+c1d5c16be7e70841dee9ddc873738eae280fa19b34838995acec14428f5da0b0  9182  evidence/L1/netstat-before.txt
+6b713ea7020fde61def734bd7bc9a0a819c1dafa058d2c55741ea52d82a1b7d2  1225  evidence/L1/times.txt
+7a37bb2aac8250ae0ea846d0f556828e00e13b27d669b9f6588b4692c8d97758  57651  evidence/bulk/bulk-answers.txt
+6764ecec1c76c68b6eaac2580cdfde505de8d2fc20d3f84ec8b3f782eb6959c1  336  evidence/starts.txt
+56268f330aa12542cbc9eb74e15990376f8d5895588e5642edc34a63b53d8630  521  s0/dry-L2.txt
+6e2c7e65e8ba33580dc06ba1e6cfe724a314d47a78ed2e3c76c4f1ea72cf86b6  524  s0/dry-L5.txt
+5a19f1d0b9cad26161c72e0980f6ec7ec85c6796c56a3af1cc240f68dd68475f  344  s0/dry-bulk.txt

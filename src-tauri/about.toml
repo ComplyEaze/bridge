@@ -29,7 +29,10 @@ private = { ignore = true }
 # openssl-src is a wrapper crate (MIT OR Apache-2.0) that carries and builds the OpenSSL
 # source, which is under the Apache License 2.0 alone. The report names the licence of the
 # code the Windows build compiles, with the licence file that ships beside that source.
-# The checksum pins the file: a new openssl-src release with a different file fails the
-# generation until the entry is read against it.
+# The checksum pins the file. A mismatch (a new openssl-src release with a different file)
+# does not stop the generation: cargo-about only logs a warning and the report falls back to
+# "MIT OR Apache-2.0" for the crate. scripts/check-license-metadata.mjs (license:all, run by
+# CI) fails when the committed report does not name "License: Apache-2.0" for the locked
+# openssl-src version, so a fallback in a regenerated report cannot be committed.
 [openssl-src]
 clarify = { license = "Apache-2.0", files = [{ path = "openssl/LICENSE.txt", checksum = "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a", license = "Apache-2.0" }] }

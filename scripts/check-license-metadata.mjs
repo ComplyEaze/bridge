@@ -65,6 +65,14 @@ if (!frontendNotices.includes("lucide-react") || !/\breact \d+\.\d+\.\d+/.test(f
 if (!rustNotices.includes("Mozilla Public License 2.0")) {
   failures.push("native third-party report");
 }
+// The Windows build compiles OpenSSL (Apache-2.0) from the openssl-src crate, whose own licence is the wrapper's
+// "MIT OR Apache-2.0". src-tauri/about.toml clarifies the entry, but cargo-about only warns when the clarification no
+// longer applies and then prints the wrapper's licence, so the committed report is checked for the locked version
+// (#2049).
+const opensslSrcVersion = cargoLock.match(/\[\[package\]\]\nname = "openssl-src"\nversion = "([^"]+)"\n/)?.[1];
+if (!opensslSrcVersion || !rustNotices.includes(`\nopenssl-src ${opensslSrcVersion}\nLicense: Apache-2.0\n`)) {
+  failures.push("native third-party report licence for openssl-src");
+}
 
 const portableFiles = [license, notice, readme, frontendNotices, rustNotices];
 const localPath = /(?:[A-Za-z]:\\(?:Users|dev)\\|\/Users\/[^/]+\/)/i;

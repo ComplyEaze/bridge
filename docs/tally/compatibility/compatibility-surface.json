@@ -549,6 +549,14 @@
       "reason": "Tests pinning the allocation reader to its captured answer, its typed reasons and its refusals on mutations of that capture."
     },
     {
+      "path": "src-tauri/src/agent_voucher_goods_lines.rs",
+      "reason": "Voucher goods lines: reads each invoice ledger entry's item, quantities, rate, amount and godown and batch rows from the vouchers answer; a defect hides, doubles or misattributes a line, or shows a split that does not add up as read."
+    },
+    {
+      "path": "src-tauri/src/agent_voucher_goods_lines_tests.rs",
+      "reason": "Tests pinning the goods-line reader to its captured answers, its typed reasons and its refusals on mutations of the capture."
+    },
+    {
       "path": "src-tauri/src/agent_voucher_parse.rs"
     },
     {

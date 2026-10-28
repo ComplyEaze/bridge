@@ -20,6 +20,35 @@ fn missing_opening_is_partial_even_at_book_start() {
     assert_eq!(row["closing"], Value::Null);
 }
 
+/// The root parent the readers hold (the decoders' working marker) is shown as
+/// Tally sent it; a group a user named Primary is shown as it is.
+#[test]
+fn a_ledger_under_the_reserved_root_shows_the_root_as_tally_sent_it() {
+    let shown = |parent: &str| {
+        let (row, _) = ledger_movement_row(
+            LedgerMovementRow {
+                name: "Ledger".into(),
+                parent: Some(parent.into()),
+                opening: Some("0".into()),
+                debit: "0".into(),
+                credit: "0".into(),
+                vouchers_touching: 0,
+            },
+            Redaction::None,
+        )
+        .unwrap();
+        row["parent"].clone()
+    };
+    assert_eq!(
+        shown(&format!(
+            "{} Primary",
+            bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER
+        )),
+        "&#4; Primary"
+    );
+    assert_eq!(shown("Primary"), "Primary");
+}
+
 #[test]
 fn movement_emptiness_uses_raw_presence_before_accounting_exclusions() {
     for (cancelled, optional) in [(true, false), (false, true), (true, true)] {

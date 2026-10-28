@@ -724,7 +724,11 @@ impl Server {
                 .into_iter()
                 .skip(offset)
                 .take(limit)
-                .map(|ledger| redact_value(ledger.clone(), self.settings.redaction))
+                .map(|ledger| {
+                    let mut row = ledger.clone();
+                    show_root_parent(&mut row);
+                    redact_value(row, self.settings.redaction)
+                })
                 .collect::<Vec<_>>();
             let truncated = offset.saturating_add(page.len()) < total;
             let mut result = json!({"items": page, "offset": offset, "total": total, "fields": fields, "compliance": if compliance {"paired_party_ledger_master_source"} else {"not_requested"}});

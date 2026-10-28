@@ -435,3 +435,22 @@ fn under_mask_parties_a_ledger_and_a_parent_the_book_named_are_masked_and_a_pred
     );
     assert_eq!(masked["counter_ledgers"][0]["group"], "Fixed Assets");
 }
+
+/// A counter ledger directly under Tally's root shows the root as Tally sent it, and
+/// `mask_parties` leaves it as it is, where it masked it into a fragment of the marker.
+#[test]
+fn a_parent_that_is_tally_root_is_shown_as_tally_sent_it_and_is_not_masked() {
+    let mut index = captured_index();
+    let totals = fold(&index, &captured_rows()).unwrap();
+    index.by_name.get_mut("GS1 Computer").unwrap().parent = Some(format!(
+        "{} Primary",
+        bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER
+    ));
+    for redaction in [Redaction::None, Redaction::MaskParties] {
+        let result = gst_by_ledger_result(&index, &totals, redaction);
+        assert_eq!(
+            result["counter_ledgers"][0]["parent"], "&#4; Primary",
+            "{redaction:?}"
+        );
+    }
+}

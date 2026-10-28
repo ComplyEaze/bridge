@@ -862,6 +862,9 @@ fn the_census_request_is_an_admitted_light_collection_export() {
 // --- Through the simulator --------------------------------------------------
 
 const GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
+/// A page that asked for neither bank allocations nor goods lines.
+const WITHHELD: (BankAllocationsShown, GoodsLinesShown) =
+    (BankAllocationsShown::Withheld, GoodsLinesShown::Withheld);
 
 fn mark_xml(guid: &str, altvchid: &str) -> String {
     format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{guid}</GUID>{altvchid}<ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>")
@@ -6055,8 +6058,7 @@ fn page_items_masks_the_party_names_of_every_row_it_cuts() {
     let directory = tempfile::tempdir().unwrap();
     let address: std::net::SocketAddr = "127.0.0.1:9".parse().unwrap();
     let masked = server_with(address, directory.path(), Redaction::MaskParties);
-    let page =
-        super::super::vouchers::page_items(&masked, &rows, (1, 1), BankAllocationsShown::Withheld);
+    let page = super::super::vouchers::page_items(&masked, &rows, (1, 1), WITHHELD);
     assert_eq!(page.len(), 1);
     let text = serde_json::to_string(&page).unwrap();
     assert!(
@@ -6069,7 +6071,7 @@ fn page_items_masks_the_party_names_of_every_row_it_cuts() {
         &plain,
         &rows,
         (1, 1),
-        BankAllocationsShown::Withheld,
+        WITHHELD,
     ))
     .unwrap();
     assert!(
@@ -6620,27 +6622,15 @@ async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_rem
         selected_ledger: None,
         placements: None,
     };
-    let body = vouchers::render_page_body(
-        &one.server,
-        &rows,
-        Some(&request),
-        (0, 500),
-        BankAllocationsShown::Withheld,
-    )
-    .expect("renders");
+    let body = vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500), WITHHELD)
+        .expect("renders");
     assert_eq!(body.items.len(), 3, "{:?}", body.items);
     assert_eq!(body.total, 4);
     assert!(body.truncated);
     // Under a budget that holds everything the page is whole.
     one.server.settings.max_bytes = 200_000;
-    let whole = vouchers::render_page_body(
-        &one.server,
-        &rows,
-        Some(&request),
-        (0, 500),
-        BankAllocationsShown::Withheld,
-    )
-    .expect("renders");
+    let whole = vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500), WITHHELD)
+        .expect("renders");
     assert_eq!(whole.items.len(), 4);
     assert!(!whole.truncated);
 }

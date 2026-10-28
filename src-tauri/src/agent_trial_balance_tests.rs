@@ -188,6 +188,35 @@ mod listing {
         let _ = one.requests();
     }
 
+    /// The captured Profit & Loss A/c row has Tally's reserved root as its
+    /// parent, sent as `&#4; Primary`. The answer shows Tally's text, not the
+    /// decoders' working marker (U+FFFD then `#4; Primary`), and every other
+    /// row's parent is a group name as read.
+    #[tokio::test]
+    async fn the_profit_and_loss_row_shows_the_reserved_root_as_tally_sent_it() {
+        let one = OneServer::spawn(first_page_plans(14));
+        let response = one
+            .call(json!({"company_guid":GUID,"from":"2026-04-01","to":"2026-09-02","limit":50}))
+            .await;
+        let rows = result(&response)["ledgers"].as_array().unwrap();
+        let roots: Vec<_> = rows
+            .iter()
+            .filter(|row| {
+                row["parent"]
+                    .as_str()
+                    .is_some_and(|p| p.contains("Primary"))
+            })
+            .collect();
+        assert_eq!(roots.len(), 1, "{rows:?}");
+        assert_eq!(roots[0]["ledger"], "Profit & Loss A/c");
+        assert_eq!(roots[0]["parent"], "&#4; Primary");
+        assert!(
+            !response.to_string().contains('\u{fffd}'),
+            "no replacement character reaches the answer"
+        );
+        let _ = one.requests();
+    }
+
     /// Page 2 costs the identity read and one extent read, and continues the
     /// same report: its rows follow page 1's, and the frame is the same.
     #[tokio::test]

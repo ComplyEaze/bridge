@@ -4210,6 +4210,33 @@ mod through_the_tool {
         }
     }
 
+    /// A ledger directly under Tally's root shows the root as Tally sent it, not
+    /// as the decoders' working marker, under either field set and with a group
+    /// filter (which still walks the chain from the held, marked parent).
+    #[tokio::test]
+    async fn a_ledger_under_the_reserved_root_shows_the_root_as_tally_sent_it() {
+        for (fields, plans) in [
+            ("basic", basic_plans_reading(period_opening(), None)),
+            ("compliance", compliance_plans(masters(), balances())),
+        ] {
+            let (response, _) = call(plans, json!({"company_guid":GUID,"fields":fields})).await;
+            let rows = items(&response);
+            let roots = rows
+                .iter()
+                .filter(|row| {
+                    row["parent"]
+                        .as_str()
+                        .is_some_and(|p| p.contains("Primary"))
+                })
+                .collect::<Vec<_>>();
+            assert!(!roots.is_empty(), "{fields}");
+            for row in roots {
+                assert_eq!(row["parent"], "&#4; Primary", "{fields}");
+            }
+            assert!(!response.to_string().contains('\u{fffd}'), "{fields}");
+        }
+    }
+
     /// Ancestry scope needs the group collection, not the compliance fields:
     /// `fields=basic` (also the default) reads it once, paired, inside the
     /// ledger export's bracket, and its rows stay basic.

@@ -1,5 +1,6 @@
 //! Thin MCP presentation of the shared native report operation.
 use super::*;
+use bridge_tally_protocol::tally_root_as_sent;
 
 impl Server {
     pub(super) async fn trial_balance(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -44,7 +45,7 @@ impl Server {
                     .map(|row| {
                         json!({
                             "ledger": party_name(row.name), "guid": row.guid,
-                            "parent": row.parent, "opening": row.opening,
+                            "parent": row.parent.returned_text().map(tally_root_as_sent), "opening": row.opening,
                             "debit": row.debit, "credit": row.credit, "closing": row.closing,
                         })
                     })

@@ -206,6 +206,17 @@ fn party_name_value(value: String) -> Value {
     serde_json::to_value(party_name(value)).unwrap_or_default()
 }
 
+/// A row's `parent`, shown as Tally sent the root (`tally_root_as_sent`). Call it on the
+/// row an answer carries, never on one a later step reads back: some listings walk the
+/// group chain from the held row's parent, which must stay the decoders' form.
+fn show_root_parent(row: &mut Value) {
+    let Some(Value::String(parent)) = row.get("parent") else {
+        return;
+    };
+    let shown = bridge_tally_protocol::tally_root_as_sent(parent).into_owned();
+    row["parent"] = Value::String(shown);
+}
+
 fn mark_party_field(value: &mut Value, field: &str) {
     let Some(object) = value.as_object_mut() else {
         return;

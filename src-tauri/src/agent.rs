@@ -216,9 +216,42 @@ fn mark_party_field(value: &mut Value, field: &str) {
     object.insert(field.to_string(), party_name_value(name));
 }
 
+/// Marks a text field only when it holds text: an address Tally returned empty
+/// stays empty, not "…".
+fn mark_party_field_if_text(value: &mut Value, field: &str) {
+    let has_text = value
+        .get(field)
+        .and_then(Value::as_str)
+        .is_some_and(|text| !text.is_empty());
+    if has_text {
+        mark_party_field(value, field);
+    }
+}
+
 fn mark_compliance_party_names(mut compliance: Value) -> Value {
     for field in ["name_on_pan", "bank_account_holder_name", "bank_details"] {
         mark_party_field(&mut compliance, field);
+    }
+    // The flat address and every mailing address line can repeat the party's
+    // name (a "C/o" or a firm name on its first line), so they are masked like
+    // the name (#1490). The PIN code, state and country stay readable.
+    mark_party_field_if_text(&mut compliance, "address");
+    // A mailing entry's `mailing_name` is the party's name as Tally prints it on its
+    // address block (#1490): masked like the row's own name, or it would carry it out.
+    if let Some(entries) = compliance
+        .pointer_mut("/mailing_details/entries")
+        .and_then(Value::as_array_mut)
+    {
+        for entry in entries {
+            mark_party_field(entry, "mailing_name");
+            if let Some(lines) = entry.get_mut("address_lines").and_then(Value::as_array_mut) {
+                for line in lines {
+                    if let Some(text) = line.as_str().filter(|text| !text.is_empty()) {
+                        *line = party_name_value(text.to_string());
+                    }
+                }
+            }
+        }
     }
     compliance
 }
@@ -1194,6 +1227,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "ledger_masters_gst_details_requires_compliance" => Some(
             "`include_gst_details` adds each ledger's dated GST rate details, which only \
              fields=compliance reads. Pass fields=compliance, or drop `include_gst_details`.",
+        ),
+        "ledger_masters_mailing_details_requires_compliance" => Some(
+            "`include_mailing_details` adds each ledger's dated mailing details (address \
+             lines, PIN code, state, country), which only fields=compliance reads. Pass \
+             fields=compliance, or drop `include_mailing_details`.",
+        ),
+        "ledger_masters_mailing_details_with_gst_details_not_captured" => Some(
+            "`include_mailing_details` and `include_gst_details` were both asked for. The \
+             request that names both has not been captured from a real Tally, so ComplyEaze \
+             Bridge does not send it. Ask for one of them, then the other in a second call.",
         ),
         // A cause, reached through `ledger_export_invalid` (#675).
         "foreign_currency_ledger_balance" => Some(

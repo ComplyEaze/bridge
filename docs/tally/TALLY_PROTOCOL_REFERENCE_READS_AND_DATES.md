@@ -791,3 +791,39 @@ written as an import-time rule.
 **Not established:** whether these six spellings hold across Tally versions or localisations. The
 captures are one instance. An unrecognised value is therefore surfaced, never guessed.
 
+### 8.4 A party's dated mailing details are in `LEDMAILINGDETAILS.LIST`, which the `FETCH` must name — **VERIFIED 2026-10-12; TallyPrime 7.1, one synthetic book**
+
+**Scope: TallyPrime 7.1 Silver, licensed, one synthetic company, one `List of Ledgers` read of eight ledgers.** The
+request and the answer are retained, byte for byte, as
+`tests/fixtures/agent/native-party-masters-mailing-details.request.utf16le.xml` and
+`tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml` (sizes and SHA-256 in
+`native-party-masters-mailing-details.PROVENANCE.md`). The request is the production party-master request (§8.1's
+fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the end of its `FETCH`.
+
+- **The address is in the dated list, not in the flat elements. VERIFIED.** For the party that holds an address, the
+  answer's `LEDADDRESS.LIST`, `LEDPINCODE` and `LEDGSTPINCODE` are empty (`LEDADDRESS.LIST` is a whitespace-only
+  placeholder) and `STATENAME` is absent, although the request names all four. The address is in that row's
+  `LEDMAILINGDETAILS.LIST`: an `ADDRESS.LIST` of two `ADDRESS` lines, then `APPLICABLEFROM` (`YYYYMMDD`), `PINCODE`,
+  `MAILINGNAME`, `STATE` and `COUNTRY`. An address line repeats inside `ADDRESS.LIST`; no other child repeated.
+- **Absence is a whitespace-only placeholder, in every row. VERIFIED.** The other seven ledgers (two more parties and five
+  that are not parties) carry `<LEDMAILINGDETAILS.LIST>` holding only whitespace, so a ledger with no address is an
+  element with no children, not a missing element.
+- **A `FETCH` that does not name the list does not get it. VERIFIED on this book.** The earlier read of the same book, whose
+  request differed from this one only by not naming `LEDMAILINGDETAILS.LIST` (1,744 bytes against 1,792), returned the
+  same eight ledgers with every other element the same and no mailing list on any row. Its answer is retained as
+  `tests/fixtures/agent/native-party-masters-without-mailing-details.utf16le.xml`; its request is not retained (it is the
+  request above without `, LEDMAILINGDETAILS.LIST`), and its size and hash are recorded in the provenance note, not
+  shown by a file.
+- **The element makes every row longer. VERIFIED on this book.** The answer is 20,896 bytes against 19,094 for the read
+  that did not name it. By ledger row (UTF-16 bytes, counted by structure): the one party that holds an address grew
+  from 3,010 to 3,958 (its mailing element is 934 bytes), and each of the other seven rows by 122 (an empty element is
+  108 bytes). A second entry per party is not measured. Bridge's per-ledger budget for a read that names the list is
+  4,700 bytes against 3,750 for one that does not (UNVERIFIED: no populated book has been read). `ledger_masters` sends it only when asked (`include_mailing_details`, refused with `include_gst_details` because the request naming both has not been captured).
+- **Not shown.** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
+  sends them, is not measured: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), a party with two
+  mailing rows, an entry with no `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers.
+
+Bridge reads the list into a dated history (`compliance.mailing_details` of `ledger_masters` with `include_mailing_details`, and the mailing columns of
+the party/ledger master workbook) and leaves the flat fields as returned. A response that carries no such element is
+reported as not observed, which is not the same as an empty history.
+

@@ -1502,7 +1502,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         .expect("extension description");
     for phrase in [
         "goes to your AI provider",
-        "can only shorten party and ledger names and bank account numbers or drop narrations",
+        "can only shorten party and ledger names, bank account numbers and ledger address lines, or drop narrations",
     ] {
         assert!(
             extension.contains(phrase),

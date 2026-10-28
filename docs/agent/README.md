@@ -48,7 +48,7 @@ Before requesting financial data through an MCP client, the client may send the 
 Tally result to its AI provider, including company
 identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
-names and bank account numbers to their first two and last two characters (a name of
+names, bank account numbers and the address lines of a ledger's details to their first two and last two characters (a name of
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
 and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
@@ -188,7 +188,7 @@ A compliance ledger read (`ledger_masters fields=compliance`) whose company's ma
 mark puts the estimated response over Bridge's budget has its ledgers counted first with a
 balance-free catalogue read (a stable pair, bound to the company by name and GUID) (#637, #668,
 #679). A count that fits is read whole. A count that does not is read in parts: the catalogue's
-parent groups are packed by ledger count into parts of at most 4,266 ledgers (2,000 with `include_gst_details`) and 200 parents, and
+parent groups are packed by ledger count into parts of at most 4,266 ledgers (3,404 with `include_mailing_details`, 2,000 with `include_gst_details`) and 200 parents, and
 each part is one filtered master and balance read, all inside the one extent bracket. Every ledger
 the catalogue named must come back exactly once, in its own part, with the name and parent the
 catalogue gave it; otherwise the whole call is refused and nothing partial is returned. A part
@@ -203,7 +203,7 @@ whose name cannot sit in a filter, such as one with a control character, are rea
 last part, the complement: a filter that excludes every named parent (`NOT (...)`, at most 200
 parents per formula, all applied together), and the same coverage proof applies to it. A book
 that cannot be split is refused before any master request: one parent group, or the ledgers
-under unnameable parents, over 4,266 ledgers (2,000 with `include_gst_details`; `parent_over_budget`), more than 12 named parts
+under unnameable parents, over 4,266 ledgers (3,404 with `include_mailing_details`, 2,000 with `include_gst_details`; `parent_over_budget`), more than 12 named parts
 (`parent_partition_too_many_parts`), a complement filter over 256 KiB
 (`parent_complement_over_budget`), a ledger with no parent (`ledger_without_parent`), every
 ledger under an unnameable parent name (`parent_name_unsupported`, which carries
@@ -238,6 +238,37 @@ estimated past `limit_bytes`; a response past the transport's cap is cut off mid
 company with fewer ledgers may be refused. The limits are unverified against a live Tally beyond a
 two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
 these books.
+`ledger_masters fields=compliance` takes an argument, `include_mailing_details` (a JSON boolean, default false), which
+adds each ledger's dated mailing details (`compliance.mailing_details`, #1490). With any other `fields`, a true value
+is refused before any read as `ledger_masters_mailing_details_requires_compliance`; together with `include_gst_details`
+it is refused as `ledger_masters_mailing_details_with_gst_details_not_captured`, because the request that names both has
+not been captured from a real Tally; a value that is not a boolean is `argument_invalid:include_mailing_details`.
+Without it (absent or false) no request names the mailing details, the read is the production request, sized at
+3,750 bytes a ledger, and no row has a `mailing_details` key. With it, the master read names every ledger's
+`LEDMAILINGDETAILS.LIST` and each row's `compliance.mailing_details` has `observation` `entries` (each dated entry, oldest
+first, with `applicable_from`, `address_lines`, `pin_code`, `state`, `country`, `mailing_name` (present only when Tally
+sent one) and `other_content_skipped`, true when the entry held content that was not read, so its address lines may be
+incomplete; an empty list is a ledger with no mailing details), `not_observed` (the response held no such list) or
+`unreadable` (a `defect`, for that ledger only). For a date, use the entry in force on it, the latest on or before it.
+The flat `compliance.address`, `pin_code`, `gst_pin_code` and `state` fields are Tally's older elements: TallyPrime 7.1
+returned them empty or absent for a party that held an address in the one synthetic book measured, so read the address
+from `mailing_details`; other books may fill the flat fields. `mask_parties` shortens the entry's `mailing_name` and each
+of its address lines (and the flat `address`) like a party name, to their first two and last two characters, so a house
+number or a town at either end of a line can stay readable; the mailing entry's PIN code, state and country reach the
+assistant's provider under every redaction mode (the flat `pin_code`, `gst_pin_code` and `state` already go on every
+compliance read, unchanged); for a party that is an individual, such as a proprietor, the flat PIN code and state sent
+on every compliance read, and the mailing entry's PIN code, state and country when asked for, can point to the
+locality of a home address. The read is admitted at 4,700 bytes a ledger instead of 3,750, from the one growth
+measured (948 bytes for one populated party row; UNVERIFIED for a populated book), so a read holds at most 3,404 ledgers
+(the 16 MB budget over the constant, not measured); a book that fits a standard read may come back in more parts, or be
+refused as `parent_over_budget`, never truncated. A held listing is served only to a page that asks for the same mode, so
+repeat `include_mailing_details` on later pages. Measured on one synthetic book; a second dated entry, a party with two
+mailing rows and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
+local file, names the mailing details only where the book's master-alteration mark is at most 3,404 (the
+whole read fits their bound) and otherwise sends the standard request, as before #1490, so a book that exported
+before is never refused for the larger estimate; its header then says that no ledger's mailing details were
+observed and the status column reads not observed. Where it reads them it shows only the entry in force on its
+Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields`, a true value is refused before any read as `ledger_masters_gst_details_requires_compliance`,
 and a value that is not a boolean is `argument_invalid:include_gst_details`. Without it (absent or false) every

@@ -1,0 +1,16 @@
+# Captures; they stay on the lab PC. sha256, bytes, name.
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  c10-gateway.png
+cf6bff3d91afea12abdcc7a7b313f004db66638069bbe007d2c94c31e9b05467  72614  c10-no-company.png
+02dd00140bfa6e1cc83d9c4036c292a4e8c0d6e5b6b93337bac313039f4327bb  76085  s0-about.png
+3b86f6557e4cb64ceaca736c9cf1d863fb507354c4833626a91e3fe6c40371af  46321  s0-gateway-loaded.png
+cf6bff3d91afea12abdcc7a7b313f004db66638069bbe007d2c94c31e9b05467  72614  s0-select-company.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s2-gateway-before-sends.png
+9a1a26c6e1b50041e66faf58e26a2318b50a983d1f867dd13c04f37afc3712db  51174  s2-stock-query-as-opened.png
+20e3483561e3ecda8f72354251ca8903c053b5f76c83d0b8221455fd1faa8d63  53547  s2-stock-query-fy25.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s3-after-r-1-stock-summary.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s3-after-r-2-unknown-id.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s3-after-r-3-stock-query.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s3-after-r-4-stock-query-stockitemname.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s3-after-r-5-stock-query-svstockitem.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s3-after-r-6-stock-query-probe-variable.png
+a63a47ad2300a796cd31a90eac9f59a7a0b91b24310975d1b2fa1b122d0c4cc0  46328  s3-after-r-7-stock-query-probe-item.png

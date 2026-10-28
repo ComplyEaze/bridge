@@ -1,0 +1,9 @@
+2026-10-28T14:18:19Z exe sha256 4c9bace38a82f77471d9b30d88e20ac92d3472a187b744cfeaf15537edf2df44 ok; launch-env.json sha256 11d75e714fbdfb3730cc50a7f58b957d6c8c12c55bbf3e5f6af9fc7c297aff2c; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-28T14:18:19Z launched pid 4616; stderr to server-stderr-20261028T141819Z.log
+2026-10-28T14:18:20Z initialized {'name': 'bridge-tally', 'version': '0.6.0'}
+2026-10-28T14:18:25Z 000-tools-list.json tool=list secs=0.011 isError=None error=None saved_sha256=a030d8b2549db0a5718897c23e5c0a233b2daebd5be36f9d97054c657aa364a1
+2026-10-28T14:18:26Z 001-list_companies.json tool=list_companies secs=0.075 isError=False error=None saved_sha256=1ffc77057719e9f860ff2179d35be9f762a3d17613efc32df917ef45de792c0a
+2026-10-28T14:18:29Z 002-s1-ledger_masters.json tool=ledger_masters secs=1.594 isError=False error=None saved_sha256=6c3fee3df926770538067048db24f623e1719e6f61e5d303e3b8e1c165595ba5
+2026-10-28T14:20:16Z 003-before-raw-ledger_masters.json tool=ledger_masters secs=1.571 isError=False error=None saved_sha256=b6cd15309eb0e3f3c29ffc50cb92388539007df815b9c784f415a39b71e05495
+2026-10-28T14:21:17Z 004-after-raw-ledger_masters.json tool=ledger_masters secs=1.486 isError=False error=None saved_sha256=bc0fd7cb4caefea6171a4b62c47df0b608088c8614a2a8e86f9cb91b1476c6ce
+2026-10-28T14:21:29Z session ended; server pid 4616 exit code 0

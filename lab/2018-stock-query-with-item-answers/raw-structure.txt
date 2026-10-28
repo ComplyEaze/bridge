@@ -1,0 +1,39 @@
+== raw/r-1-stock-summary: 1370 B
+  root ENVELOPE
+  DSPACCNAME: DSPDISPNAME='Finished Kits'
+  DSPSTKINFO: DSPSTKCL/DSPCLQTY='<empty>', DSPSTKCL/DSPCLRATE='<empty>', DSPSTKCL/DSPCLAMTA='18750.00'
+  DSPACCNAME: DSPDISPNAME='Packaging'
+  DSPSTKINFO: DSPSTKCL/DSPCLQTY='<empty>', DSPSTKCL/DSPCLRATE='<empty>', DSPSTKCL/DSPCLAMTA='14500.00'
+  DSPACCNAME: DSPDISPNAME='Raw Chemicals'
+  DSPSTKINFO: DSPSTKCL/DSPCLQTY='<empty>', DSPSTKCL/DSPCLRATE='<empty>', DSPSTKCL/DSPCLAMTA='-30249.99'
+== raw/r-2-unknown-id: 434 B
+  root ENVELOPE
+  STATUS '0'
+  LINEERROR "Could not find Report 'Bridge Probe Unknown'!"
+  HEADER: VERSION='1', STATUS='0'
+  BODY: DATA/LINEERROR="Could not find Report 'Bridge Probe Unknown'!"
+== raw/r-3-stock-query: 46 B
+  root ENVELOPE
+== raw/r-4-stock-query-stockitemname: 1354 B
+  root ENVELOPE
+  STQPURCDATE '24-Apr-25'
+  STQPURCPARTY 'Chem Supplier 2'
+  STQPURCVCHQTY '666.667 Kgs'
+  STQPURCVCHRATE '30.00'
+  STQPURCVCHDISC '<empty>'
+  STQPURCVCHAMOUNT '-20000.00'
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '150.000 Kgs'
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'H-2504-A'
+  STQGODOWNQTY '300.000 Kgs'
+  STQGODOWNNAME 'Factory Floor'
+  STQBATCHNAME 'H-2504-B'
+  STQGODOWNQTY '366.667 Kgs'
+== raw/r-5-stock-query-svstockitem: 46 B
+  root ENVELOPE
+== raw/r-6-stock-query-probe-variable: 46 B
+  root ENVELOPE
+== raw/r-7-stock-query-probe-item: 46 B
+  root ENVELOPE

@@ -1,0 +1,14 @@
+2026-10-28T14:20:21.078Z req=r-1-stock-summary.utf16le.xml req_sha256=17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8 curl_exit=0 printed='200 1370' content_length=1370 bytes=1370 sha256=862c3206e5f22922cea932380da07d2170591085da7ef8227f4c911452bfe9a4
+2026-10-28T14:20:21.426Z answered r-1-stock-summary exit=0
+2026-10-28T14:20:22.253Z req=r-2-unknown-id.utf16le.xml req_sha256=103f686bed40b37dabfca8d87f57570fd362a3ed479e3d47f3669d4396ded89c curl_exit=0 printed='200 434' content_length=434 bytes=434 sha256=09b30fb7a073de8f2373d0589e1275f7da3db9779d41e7a42e200893cb78e744
+2026-10-28T14:20:22.394Z answered r-2-unknown-id exit=0
+2026-10-28T14:20:22.539Z req=r-3-stock-query.utf16le.xml req_sha256=de7408067d9140f3bf7aa7d516635441f4ec5f0efb0aa450b3dd838ce0225696 curl_exit=0 printed='200 46' content_length=46 bytes=46 sha256=8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+2026-10-28T14:20:22.690Z answered r-3-stock-query exit=0
+2026-10-28T14:20:31.857Z req=r-4-stock-query-stockitemname.utf16le.xml req_sha256=fff4e42cb65b14100e0c271579a8e35b05d65f0a96e987b92407318f0261119d curl_exit=0 printed='200 1354' content_length=1354 bytes=1354 sha256=c23c6d414d47f1d87b779a4a0afca47e4a0712ad2ce5b129a0e44ba41c66f213
+2026-10-28T14:20:32.100Z answered r-4-stock-query-stockitemname exit=0
+2026-10-28T14:20:42.706Z req=r-5-stock-query-svstockitem.utf16le.xml req_sha256=e9ad07d65dac4b06b911bc109448aa171a539351c62b46975efac39e4b98434b curl_exit=0 printed='200 46' content_length=46 bytes=46 sha256=8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+2026-10-28T14:20:42.939Z answered r-5-stock-query-svstockitem exit=0
+2026-10-28T14:20:52.539Z req=r-6-stock-query-probe-variable.utf16le.xml req_sha256=18cc0bf31457ff150017e7fa7dbf003319cc144adee7e56fbd48500f60f17a90 curl_exit=0 printed='200 46' content_length=46 bytes=46 sha256=8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+2026-10-28T14:20:52.776Z answered r-6-stock-query-probe-variable exit=0
+2026-10-28T14:21:02.766Z req=r-7-stock-query-probe-item.utf16le.xml req_sha256=98c06d132ddf2347690a532c4b5760134db202531c5b5b9d6dbb5a0be7e04263 curl_exit=0 printed='200 46' content_length=46 bytes=46 sha256=8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+2026-10-28T14:21:03.170Z answered r-7-stock-query-probe-item exit=0

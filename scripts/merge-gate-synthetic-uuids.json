@@ -156,6 +156,10 @@
     {
       "uuid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
       "note": "company identifier of the synthetic lab company BRIDGE CORPUS DENSE (about 30,000 vouchers), as Tally returned it in the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml on master and in the marks read of the ledger-scoped census run (TallyPrime 7.2 Silver, 28 October 2026, lab branch lab/485-ledger-census-spans-answers at ba180df99d4595c9e4e12121b58b6a577151e0c3); the identifiers of that company's vouchers in its captures carry it as a prefix"
+    },
+    {
+      "uuid": "f91ddf34-cdc1-48a2-84ae-d25f2efb2f88",
+      "note": "REMOTEID of the one Journal in the two requests of the #2062 cancel capture on the synthetic lab company BRIDGE SHAPE LAB (28 October 2026): minted as a version 4 UUID for that row and rendered into both requests by ComplyEaze Bridge's native renderer and its candidate cancel renderer (lab branch lab/2062-cancel-capture at 22ef7ff6403624181bbe2e44e4c01f4e8c7ab279; answers at lab/2062-cancel-capture-answers f91d20034f4bb691ef70aa5bda7c3914dc421e2f); the book was restored from its backup after the run"
     }
   ]
 }

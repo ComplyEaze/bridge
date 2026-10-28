@@ -60,6 +60,7 @@ mod standard_ledger_catalog;
 mod stock_tax_details;
 mod text_encoding;
 mod tolerant_xml;
+mod voucher_removal;
 pub mod xml_read_profiles;
 /// The one shared XML text-escaping routine every request renderer in this
 /// crate (and the app crate, via a `use` alias) now calls. See its module
@@ -95,6 +96,10 @@ pub use text_encoding::{
     StreamDecodedTallyText, TallyTextDecodeError, TallyTextEncoding, TallyTextStreamDecoder,
 };
 pub use tolerant_xml::mark_forbidden_numeric_references;
+pub use voucher_removal::{
+    CancelOutcome, DeleteOutcome, ImportCounter, OneAlteredCounted, OneDeletedCounted,
+    RemovalRefusal,
+};
 
 pub const BRIDGE_LEDGER_EXPORT_SCHEMA: &str = "bridge.tally.ledgers/1";
 pub const MAX_INTERACTIVE_DISCOVERY_COMPANIES: usize = 100;

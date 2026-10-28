@@ -1,0 +1,39 @@
+Part A: collection CLOSINGBALANCE against the signed sum of Stock Query lines
+  Caustic Soda Flakes to 20250401: collection opening ' 200.000 Kgs' closing ' 200.000 Kgs' base 'Kgs'; a-04 320 B lines [('Main Location', 'Primary Batch', '200.000 Kgs')]; sum (Decimal('200.000'), 'Kgs'); equal
+  Caustic Soda Flakes to 20250501: collection opening ' 200.000 Kgs' closing ' 400.000 Kgs' base 'Kgs'; a-05 1094 B lines [('Main Location', 'Primary Batch', '200.000 Kgs'), ('Main Location', 'B-2504-A', '200.000 Kgs')]; sum (Decimal('400.000'), 'Kgs'); equal
+  Soda Ash Light to 20250401: collection opening ' 300.000 Kgs' closing ' 500.000 Kgs' base 'Kgs'; a-06 1340 B lines [('Main Location', 'Primary Batch', '500.000 Kgs')]; sum (Decimal('500.000'), 'Kgs'); equal
+  Soda Ash Light to 20250501: collection opening ' 300.000 Kgs' closing ' 1300.000 Kgs' base 'Kgs'; a-07 3152 B lines [('Main Location', 'Primary Batch', '1350.000 Kgs'), ('Factory Floor', 'Primary Batch', '-50.000 Kgs')]; sum (Decimal('1300.000'), 'Kgs'); equal
+  Cleaning Kit A to 20250401: collection opening ' 25 Nos' closing ' 25 Nos' base 'Nos'; a-08 310 B lines [('Main Location', 'Primary Batch', '25 Nos')]; sum (Decimal('25'), 'Nos'); equal
+  Cleaning Kit A to 20250501: collection opening ' 25 Nos' closing ' 12 Nos' base 'Nos'; a-09 1086 B lines [('Main Location', 'Primary Batch', '25 Nos'), ('Main Location', 'K-2504-A', '-13 Nos')]; sum (Decimal('12'), 'Nos'); equal
+  Zero Stock Item to 20250401: collection opening '' closing '0.000 Kgs' base 'Kgs'; a-10 46 B lines []; sum None; equal as zero (no lines, collection 0)
+  Zero Stock Item to 20250501: collection opening '' closing '-50.000 Kgs' base 'Kgs'; a-11 848 B lines [('Main Location', 'Primary Batch', '-50.000 Kgs')]; sum (Decimal('-50.000'), 'Kgs'); equal
+  Hydrochloric Acid 33pc to 20250401: collection opening ' 150.000 Kgs' closing ' 150.000 Kgs' base 'Kgs'; a-12 320 B lines [('Main Location', 'Primary Batch', '150.000 Kgs')]; sum (Decimal('150.000'), 'Kgs'); equal
+  Hydrochloric Acid 33pc to 20250501: collection opening ' 150.000 Kgs' closing ' 816.667 Kgs' base 'Kgs'; a-13 1354 B lines [('Main Location', 'Primary Batch', '150.000 Kgs'), ('Main Location', 'H-2504-A', '300.000 Kgs'), ('Factory Floor', 'H-2504-B', '366.667 Kgs')]; sum (Decimal('816.667'), 'Kgs'); equal
+a-03 (20260331) against the earlier row's Stock Query sums
+  Caustic Soda Flakes: collection (Decimal('400.000'), 'Kgs'); earlier sum 400; equal
+  Soda Ash Light: collection (Decimal('1300.000'), 'Kgs'); earlier sum 1300; equal
+  Cleaning Kit A: collection (Decimal('12'), 'Nos'); earlier sum 12; equal
+  Zero Stock Item: collection (Decimal('-50.000'), 'Kgs'); earlier sum -50; equal
+  Hydrochloric Acid 33pc: collection (Decimal('816.667'), 'Kgs'); earlier sum 816.667; equal
+collection across the three ends (CLOSINGBALANCE)
+  Carton Box Small: 20250401 ' 100 Box' | 20250501 ' 100 Box' | 20260331 ' 100 Box'
+  Caustic Soda Flakes: 20250401 ' 200.000 Kgs' | 20250501 ' 400.000 Kgs' | 20260331 ' 400.000 Kgs'
+  Cleaning Kit A: 20250401 ' 25 Nos' | 20250501 ' 12 Nos' | 20260331 ' 12 Nos'
+  Cleaning Kit B: 20250401 '' | 20250501 '' | 20260331 ''
+  Descaler Concentrate: 20250401 '' | 20250501 '' | 20260331 ''
+  HDPE Drum 50L: 20250401 ' 40 Nos' | 20250501 ' 40 Nos' | 20260331 ' 40 Nos'
+  Hydrochloric Acid 33pc: 20250401 ' 150.000 Kgs' | 20250501 ' 816.667 Kgs' | 20260331 ' 816.667 Kgs'
+  Label Roll: 20250401 '' | 20250501 '' | 20260331 ''
+  Soda Ash Light: 20250401 ' 500.000 Kgs' | 20250501 ' 1300.000 Kgs' | 20260331 ' 1300.000 Kgs'
+  Sulphuric Acid 98pc: 20250401 ' 100.000 Kgs' | 20250501 ' 100.000 Kgs' | 20260331 ' 100.000 Kgs'
+  Zero Stock Item: 20250401 '0.000 Kgs' | 20250501 '-50.000 Kgs' | 20260331 '-50.000 Kgs'
+Part W: created items, Stock Query lines against the collection (w-01)
+  Kit & Co Item w-02 (f1): 310 B lines [('Main Location', 'Primary Batch', '11 Nos')]; collection closing ' 11 Nos' parent ' Primary'; equal
+  Gauge (Test) 50L w-03 (f1): 310 B lines [('Main Location', 'Primary Batch', '12 Nos')]; collection closing ' 12 Nos' parent ' Primary'; equal
+  Owner's Item w-04 (f1): 310 B lines [('Main Location', 'Primary Batch', '13 Nos')]; collection closing ' 13 Nos' parent ' Primary'; equal
+  Owner's Item w-05 (f2): 310 B lines [('Main Location', 'Primary Batch', '13 Nos')]; collection closing ' 13 Nos' parent ' Primary'; equal
+  Quote "Q" Item w-06 (f1): 310 B lines [('Main Location', 'Primary Batch', '14 Nos')]; collection closing ' 14 Nos' parent ' Primary'; equal
+  Quote "Q" Item w-07 (f2): 310 B lines [('Main Location', 'Primary Batch', '14 Nos')]; collection closing ' 14 Nos' parent ' Primary'; equal
+  Alt Unit Item w-08 (f1): 310 B lines [('Main Location', 'Primary Batch', '30 Nos')]; collection closing ' 30 Nos' parent ' Primary'; equal
+  Mix 5% / Set, Large w-09 (f1): 310 B lines [('Main Location', 'Primary Batch', '16 Nos')]; collection closing ' 16 Nos' parent ' Primary'; equal
+  Dash-Item 7 w-10 (f1): 310 B lines [('Main Location', 'Primary Batch', '17 Nos')]; collection closing ' 17 Nos' parent ' Primary'; equal

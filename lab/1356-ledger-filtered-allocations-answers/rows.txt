@@ -1,0 +1,6 @@
+raw/t02_vouchers_fy: 249288 B; parses; rows {'VOUCHER': 7}; with GUID, ALTERID and MASTERID non-empty: 7
+raw/t03_ledger_vouchers_p1_fy: 21904 B; parses; rows {'VOUCHER': 7}; with GUID, ALTERID and MASTERID non-empty: 7
+raw/t04_ledger_vouchers_p1_fy_entries: 239294 B; parses; rows {'VOUCHER': 7}; with GUID, ALTERID and MASTERID non-empty: 7
+raw/d02_vouchers_20250515: 2900742 B; parses; rows {'VOUCHER': 82}; with GUID, ALTERID and MASTERID non-empty: 82
+raw/d03_ledger_vouchers_dn_sales_20250515: 226626 B; parses; rows {'VOUCHER': 82}; with GUID, ALTERID and MASTERID non-empty: 82
+raw/d05_ledger_vouchers_dn_sales_20250515_entries: 2785026 B; parses; rows {'VOUCHER': 82}; with GUID, ALTERID and MASTERID non-empty: 82

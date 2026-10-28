@@ -1,0 +1,10 @@
+ground truth: 7 VOUCHER rows, 7 with a 'Lab Party P1' entry
+candidate:    7 VOUCHER rows, 7 with a 'Lab Party P1' entry
+equal                 9ab5002c-e910-4242-83e4-a27cc490600b-00000001  1 'Lab Party P1' entry
+equal                 9ab5002c-e910-4242-83e4-a27cc490600b-00000002  1 'Lab Party P1' entry
+equal                 9ab5002c-e910-4242-83e4-a27cc490600b-00000003  1 'Lab Party P1' entry
+equal                 9ab5002c-e910-4242-83e4-a27cc490600b-00000004  1 'Lab Party P1' entry
+equal                 9ab5002c-e910-4242-83e4-a27cc490600b-00000005  1 'Lab Party P1' entry
+equal                 9ab5002c-e910-4242-83e4-a27cc490600b-00000006  1 'Lab Party P1' entry
+equal                 9ab5002c-e910-4242-83e4-a27cc490600b-00000007  1 'Lab Party P1' entry
+RESULT: all 7 equal

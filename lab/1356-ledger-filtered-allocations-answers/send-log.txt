@@ -1,0 +1,48 @@
+2026-10-27T21:20:32.107Z req=r01_marks.request.utf16le.xml req_sha256=501c3094407612a082bd1518518276bcdd97af77ddcc358d4b7da2387fc84910 curl_exit=0 printed='200 3400' content_length=3400 bytes=3400 sha256=0fe9f835a74656c10a6a0d75331a445a29e6d960be0a40d2a6c300a433b8342c
+2026-10-27T21:20:32.317Z req=r04_ledger_outstandings_p1_to_20260331.request.utf16le.xml req_sha256=f560dba1651ca4b4d89359feffd8e4f6058ee15ae380c05929cca072313d95dc curl_exit=0 printed='200 5878' content_length=5878 bytes=5878 sha256=063b3c7684b4fe416a0749c114e3b454fe59d71eb6e9bd0e01c9db25bb86de5b
+2026-10-27T21:20:32.770Z req=r05_ledger_outstandings_p1_to_20250731.request.utf16le.xml req_sha256=7c093656c55f14dd9f0164d6b9cd4806aafb3e5139a7d315f79794a3263942ad curl_exit=0 printed='200 3926' content_length=3926 bytes=3926 sha256=f505ba966c106ecd6674bffb390187e6a1e8c52ffc33d173ed87bbdd3ec88091
+2026-10-27T21:20:33.071Z req=r04_ledger_outstandings_p1_to_20260331.request.utf16le.xml req_sha256=f560dba1651ca4b4d89359feffd8e4f6058ee15ae380c05929cca072313d95dc curl_exit=0 printed='200 5878' content_length=5878 bytes=5878 sha256=063b3c7684b4fe416a0749c114e3b454fe59d71eb6e9bd0e01c9db25bb86de5b
+2026-10-27T21:23:05.591Z req=r02_vouchers_fy_unfiltered.request.utf16le.xml req_sha256=de90752d735e696032512d49bb3c3cedb1cf2500411d690bd7b34408606e038b curl_exit=0 printed='200 249288' content_length=249288 bytes=249288 sha256=80c7896485de91655fb9ec872550cbd6a56a650702186e5187f4289d26dd87e8
+2026-10-27T21:23:06.895Z req=r03_vouchers_fy_party_term.request.utf16le.xml req_sha256=3b07b07af806078155bc344380af1970b0ee9faad330d30d9b5ef6126e035345 curl_exit=0 printed='200 150284' content_length=150284 bytes=150284 sha256=1b18f7bd5c918d75fce07be53706ba1e0f1ec7301344760d5cdb8f39d931fa0b
+2026-10-27T21:25:59.008Z req=r01_marks.request.utf16le.xml req_sha256=501c3094407612a082bd1518518276bcdd97af77ddcc358d4b7da2387fc84910 curl_exit=0 printed='200 3400' content_length=3400 bytes=3400 sha256=0fe9f835a74656c10a6a0d75331a445a29e6d960be0a40d2a6c300a433b8342c
+2026-10-27T21:30:14.807Z req=r01_marks.request.utf16le.xml req_sha256=501c3094407612a082bd1518518276bcdd97af77ddcc358d4b7da2387fc84910 curl_exit=0 printed='200 3400' content_length=3400 bytes=3400 sha256=ccc4d0cf407811204c5a53f51d57a15e265e81b461ad3cea7ae906d68b9791aa
+2026-10-27T21:30:15.099Z req=r02_vouchers_fy_unfiltered.request.utf16le.xml req_sha256=de90752d735e696032512d49bb3c3cedb1cf2500411d690bd7b34408606e038b curl_exit=0 printed='200 283556' content_length=283556 bytes=283556 sha256=cb0115bab0215ff425b67e80046e04060eb1b85429751293a520834dcef1a70f
+2026-10-27T21:30:16.183Z req=r03_vouchers_fy_party_term.request.utf16le.xml req_sha256=3b07b07af806078155bc344380af1970b0ee9faad330d30d9b5ef6126e035345 curl_exit=0 printed='200 150284' content_length=150284 bytes=150284 sha256=9e0421e0725a53a7b80fc66687a1b347da0cb281262f6200a6b158d1ea235d49
+2026-10-27T21:33:43.426Z req=r01_marks.request.utf16le.xml req_sha256=501c3094407612a082bd1518518276bcdd97af77ddcc358d4b7da2387fc84910 curl_exit=0 printed='200 3400' content_length=3400 bytes=3400 sha256=0fe9f835a74656c10a6a0d75331a445a29e6d960be0a40d2a6c300a433b8342c
+2026-10-27T21:33:43.632Z req=r02_vouchers_fy_unfiltered.request.utf16le.xml req_sha256=de90752d735e696032512d49bb3c3cedb1cf2500411d690bd7b34408606e038b curl_exit=0 printed='200 249288' content_length=249288 bytes=249288 sha256=80c7896485de91655fb9ec872550cbd6a56a650702186e5187f4289d26dd87e8
+2026-10-28T13:56:33.714Z send t01_marks bound=8192
+2026-10-28T13:56:34.387Z req=t01_marks.request.utf16le.xml req_sha256=501c3094407612a082bd1518518276bcdd97af77ddcc358d4b7da2387fc84910 curl_exit=0 printed='200 3400' content_length=3400 bytes=3400 sha256=0fe9f835a74656c10a6a0d75331a445a29e6d960be0a40d2a6c300a433b8342c
+2026-10-28T13:56:35.553Z answered t01_marks exit=0
+2026-10-28T13:56:56.840Z send t02_vouchers_fy bound=500000
+2026-10-28T13:56:57.180Z req=t02_vouchers_fy.request.utf16le.xml req_sha256=de90752d735e696032512d49bb3c3cedb1cf2500411d690bd7b34408606e038b curl_exit=0 printed='200 249288' content_length=249288 bytes=249288 sha256=80c7896485de91655fb9ec872550cbd6a56a650702186e5187f4289d26dd87e8
+2026-10-28T13:56:57.542Z answered t02_vouchers_fy exit=0
+2026-10-28T13:56:57.574Z send t03_ledger_vouchers_p1_fy bound=200000
+2026-10-28T13:56:57.598Z req=t03_ledger_vouchers_p1_fy.request.utf16le.xml req_sha256=8225fbe136172213209aaf80e5b1f9f3183982259c37a2ce06e28a30f23977f5 curl_exit=0 printed='200 21904' content_length=21904 bytes=21904 sha256=9a90cab54f0415c1ef46915a0be13ec927191c033fc82338bf79c4ce54a1598f
+2026-10-28T13:56:57.835Z answered t03_ledger_vouchers_p1_fy exit=0
+2026-10-28T13:57:06.775Z GET /status before t04_ledger_vouchers_p1_fy_entries curl_exit=0 printed=200 51
+2026-10-28T13:57:06.812Z send t04_ledger_vouchers_p1_fy_entries bound=600000
+2026-10-28T13:57:07.129Z req=t04_ledger_vouchers_p1_fy_entries.request.utf16le.xml req_sha256=6a5ee4a9ec54980cd8b7c0cc137d6e7d1f42c1ce1a700670cbf3fcbb996da97d curl_exit=0 printed='200 239294' content_length=239294 bytes=239294 sha256=c5e1413c5b112ab114add489d48a811c85a7953da4a8f3dca664c2704fb0384a
+2026-10-28T13:57:07.470Z answered t04_ledger_vouchers_p1_fy_entries exit=0
+2026-10-28T13:57:07.549Z GET /status after t04_ledger_vouchers_p1_fy_entries curl_exit=0 printed=200 51
+2026-10-28T13:57:32.420Z send t01_marks bound=8192
+2026-10-28T13:57:32.774Z req=t01_marks.request.utf16le.xml req_sha256=501c3094407612a082bd1518518276bcdd97af77ddcc358d4b7da2387fc84910 curl_exit=0 printed='200 3400' content_length=3400 bytes=3400 sha256=0fe9f835a74656c10a6a0d75331a445a29e6d960be0a40d2a6c300a433b8342c
+2026-10-28T13:57:32.934Z answered t01_marks exit=0
+2026-10-28T13:58:50.020Z send d01_marks bound=8192
+2026-10-28T13:58:50.430Z req=d01_marks.request.utf16le.xml req_sha256=040ac47754c40a4e2e736f8be2b3f37cac924213ea66c8c4f0074222f9a00280 curl_exit=0 printed='200 3406' content_length=3406 bytes=3406 sha256=fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+2026-10-28T13:58:50.628Z answered d01_marks exit=0
+2026-10-28T13:58:58.519Z send d02_vouchers_20250515 bound=6000000
+2026-10-28T13:58:58.877Z req=d02_vouchers_20250515.request.utf16le.xml req_sha256=5ad19b7ed7e3758c5719da3c29146d31048b273a429a5bff66716948dc6c63d7 curl_exit=0 printed='200 2900742' content_length=2900742 bytes=2900742 sha256=9d72ea3c342187937a0126a400de210840fc877b3961e50282626dca40dd6f1d
+2026-10-28T13:58:59.872Z answered d02_vouchers_20250515 exit=0
+2026-10-28T13:58:59.964Z GET /status before d03_ledger_vouchers_dn_sales_20250515 curl_exit=0 printed=200 51
+2026-10-28T13:58:59.976Z send d03_ledger_vouchers_dn_sales_20250515 bound=1000000
+2026-10-28T13:59:00.003Z req=d03_ledger_vouchers_dn_sales_20250515.request.utf16le.xml req_sha256=64033cb5bd8da26a8ec5c31d395b913ad7cb86c3b4877382cfe39e0a938a008d curl_exit=0 printed='200 226626' content_length=226626 bytes=226626 sha256=e400170a6fdc92885f5b894c589742583233a612ee63e6cc8a6ae4e665ae0f3e
+2026-10-28T13:59:00.305Z answered d03_ledger_vouchers_dn_sales_20250515 exit=0
+2026-10-28T13:59:00.375Z GET /status after d03_ledger_vouchers_dn_sales_20250515 curl_exit=0 printed=200 51
+2026-10-28T13:59:09.600Z GET /status before d05_ledger_vouchers_dn_sales_20250515_entries curl_exit=0 printed=200 51
+2026-10-28T13:59:09.640Z send d05_ledger_vouchers_dn_sales_20250515_entries bound=6000000
+2026-10-28T13:59:09.951Z req=d05_ledger_vouchers_dn_sales_20250515_entries.request.utf16le.xml req_sha256=6f499dc678f59f1c5faf702601964f19cd7ddb757b7d9af577294440a16b5ff5 curl_exit=0 printed='200 2785026' content_length=2785026 bytes=2785026 sha256=1b7b21735e8ada02227d2ac304aee9e88a48b62c9bc47f224555af8e236fec6e
+2026-10-28T13:59:10.783Z answered d05_ledger_vouchers_dn_sales_20250515_entries exit=0
+2026-10-28T13:59:10.879Z GET /status after d05_ledger_vouchers_dn_sales_20250515_entries curl_exit=0 printed=200 51
+2026-10-28T13:59:32.438Z send d01_marks bound=8192
+2026-10-28T13:59:32.803Z req=d01_marks.request.utf16le.xml req_sha256=040ac47754c40a4e2e736f8be2b3f37cac924213ea66c8c4f0074222f9a00280 curl_exit=0 printed='200 3406' content_length=3406 bytes=3406 sha256=fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+2026-10-28T13:59:32.978Z answered d01_marks exit=0

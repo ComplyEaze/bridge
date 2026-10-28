@@ -1,0 +1,18 @@
+2026-10-28T13:11:53Z exe sha256 bf8cdf82e10bf22f693d3c5d6d89bd074b35b2dbf6dc2cbad748ac8609916f46 ok; launch-env.json sha256 257a39999243a1775d299ad1b3bda47a5ec72e01c87f98e21b4da450c1b0905e; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-28T13:11:53Z launched pid 22228; stderr to server-stderr-20261028T131153Z.log
+2026-10-28T13:11:53Z initialized {'name': 'bridge-tally', 'version': '0.6.0'}
+2026-10-28T13:11:56Z 000-list_companies.json tool=list_companies secs=0.098 isError=False error=None saved_sha256=4d25ccc4f9593cc3cea812d7e34e86d665a516479dfb3299509494d7c8718a02
+2026-10-28T13:12:10Z 001-read-0-ledger_masters.json tool=ledger_masters secs=0.734 isError=False error=None saved_sha256=546d1b9b3edf6361725df42134a41aa109caa6a0d780369000a4f3990d18752b
+2026-10-28T13:12:12Z 002-read-0-gst_status-sales.json tool=gst_status secs=1.283 isError=False error=None saved_sha256=9c2340b7a762f81a783385ac33df7c9941b2fa3faa93cb33f421fd4410d90607
+2026-10-28T13:12:14Z 003-read-0-gst_status-receipt.json tool=gst_status secs=1.238 isError=False error=None saved_sha256=8572e070e66cc6541c8eac16f8084abbcc8bb629ee55bce0b1798af296028984
+2026-10-28T13:14:01Z 004-read-0b-ledger_masters.json tool=ledger_masters secs=0.790 isError=False error=None saved_sha256=2543bcca39ba8017e44e7a70ee5009764127d8b6a979d2f033be310ea60e2503
+2026-10-28T13:14:55Z 005-read-1-ledger_masters.json tool=ledger_masters secs=0.783 isError=False error=None saved_sha256=087e35575be5697fa85ae5477e3694857be7b695f3f4df7801b9f04661956590
+2026-10-28T13:14:56Z 006-read-1-gst_status-sales.json tool=gst_status secs=1.271 isError=False error=None saved_sha256=b640eaaec86884e970d0fc2b462811a0d8105f718ea28800d53b3d1ab95029cc
+2026-10-28T13:14:58Z 007-read-1-gst_status-receipt.json tool=gst_status secs=1.267 isError=False error=None saved_sha256=78521cf7afdfeae2b43ada693b48148511b6bf6e58ea886f0a4c5a8dd51dab38
+2026-10-28T13:17:43Z 008-read-2-ledger_masters.json tool=ledger_masters secs=0.809 isError=False error=None saved_sha256=2d13dd38bedb26b32af2f2784cd99cf838678eef499f5943332911c6c8120547
+2026-10-28T13:17:46Z 009-read-2-gst_status-sales.json tool=gst_status secs=1.321 isError=False error=None saved_sha256=c8a6b7b7aef4cf3071fec4e2a746e83df0623ff7f60a1629797aef723d90b2b6
+2026-10-28T13:17:48Z 010-read-2-gst_status-receipt.json tool=gst_status secs=1.314 isError=False error=None saved_sha256=d20961a1d331736263cd802e7037da9f8a1018602e762ebeec30be075ea5d747
+2026-10-28T13:22:50Z 011-read-3-ledger_masters.json tool=ledger_masters secs=0.860 isError=False error=None saved_sha256=214133d012a2adf3bff58392a336ddcea71da7c482b2856bf21ba9e2d7ccc5be
+2026-10-28T13:22:52Z 012-read-3-gst_status-sales.json tool=gst_status secs=1.297 isError=False error=None saved_sha256=64f9cb20979c97911cea6163e1e4dabc7ad09bde34c40c0fb21746ef84a2c12c
+2026-10-28T13:22:54Z 013-read-3-gst_status-receipt.json tool=gst_status secs=1.286 isError=False error=None saved_sha256=91aace2e0a4640972476a4c301357e04c001db64d3a1dcb5b66045836918158a
+2026-10-28T13:23:13Z session ended; server pid 22228 exit code 0

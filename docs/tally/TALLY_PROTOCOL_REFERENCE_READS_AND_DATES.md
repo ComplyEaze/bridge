@@ -188,6 +188,31 @@ zero: the captured opening corpus has an opening net of `-49833.50`. Report that
 difference separately; do not manufacture a balancing ledger. Numeric column
 sums must disclose any empty observations excluded from arithmetic.
 
+**A Closing Stock ledger's closing is not opening plus movements (verified once on each of
+two synthetic TallyPrime 7.2 Silver books, 28 October 2026).** A ledger under Stock-in-Hand
+whose closing balance was keyed on Tally's screen keeps its opening as `TBALCLOSING`, and the
+change shows only in `DEBITTOTALS`: on a book not integrated with inventory, opening -1000.00,
+debit -400.00, credit empty, closing -1000.00 (keyed closing 1,400.00); on an integrated book,
+the same figures (Tally offers the closing-balance field on both). Tally's own Trial Balance
+screen shows the ledger as an Opening Stock line. On the non-integrated book its Profit and Loss
+and Balance Sheet used the keyed 1,400.00; on the integrated book they valued the stock from the
+stock item (1,200.00, 12 Nos) (that book's report figures are from screenshots kept on the lab
+machine, not a committed answer). Bridge returns the row as sent and adds `movements_differ_by`
+(closing minus opening, debit and credit, exactly, in Tally's sign, at the amounts' own number of
+decimal places) when that is not zero, counting an empty amount as zero, as the statements' row
+check does. That check is the same code: `profit_and_loss` and `balance_sheet` refuse a read
+(`statement_trial_balance_row_inconsistent`) where it differs. Every row of the committed Trial
+Balance captures adds up (known lab 6 rows, opening-year 8, dense month 123, year 7, stock book 9,
+several-currency 10). The raw XML of the two lab rows is not committed (the lab kept the tool
+answers), so the shape is pinned on the answers' values and on committed captures edited in one
+element. Other readers of `TBALCLOSING`, named and not changed here: `bridge-tax-audit`
+`book.rs` (`closing_paise` is read from `TBALCLOSING` and `movement_paise` is closing minus
+opening, so such a ledger shows no movement there; `financial_statements.rs` recomputes the
+closing stock from opening and movements and counts such ledgers as stale, and its text says the
+quirk occurs only on books not integrated with inventory, which the integrated book above
+contradicts; `stock.rs` `books_close_tb` still takes the raw closing) and the desktop Trial
+Balance workbook.
+
 The export includes dormant ledger masters that Tally's rendered report may
 omit. Stable paired bytes and bracketed company/mode/book-extent observations
 are bounded source evidence, not an atomic snapshot or a completeness proof.

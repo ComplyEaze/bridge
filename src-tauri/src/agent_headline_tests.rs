@@ -905,3 +905,43 @@ fn restating_the_rows_of_a_response_leaves_a_batch_headline_as_it_was() {
     restate_rows(&mut response, 0);
     assert_eq!(response["headline"], before);
 }
+
+/// Ledgers that do not add up (#2068) are counted in the lead of every page of the read, whole
+/// or partial, and a read with none says nothing about it.
+#[test]
+fn ledgers_that_do_not_add_up_are_counted_on_every_page_and_only_then() {
+    let none = basis(vec![]).headline(&company(), page(0, 14, 14));
+    assert!(!none.lead.contains("not add up"), "{}", none.lead);
+    for (count, words) in [
+        (1, "1 ledger does not add up"),
+        (3, "3 ledgers do not add up"),
+    ] {
+        for (offset, shown) in [(0, 5), (5, 5), (10, 4)] {
+            let headline = basis(vec![])
+                .with_movements_differ(count)
+                .headline(&company(), page(offset, shown, 14));
+            assert!(headline.lead.contains(words), "{}", headline.lead);
+            assert!(
+                headline.lead.contains("movements_differ_by"),
+                "{}",
+                headline.lead
+            );
+        }
+    }
+    let partial = basis(vec![Gap::BaseCurrencyLedgersOnly {
+        foreign: 1,
+        mixed: 0,
+    }])
+    .with_movements_differ(2)
+    .headline(&company(), page(0, 5, 5));
+    assert!(
+        partial.lead.starts_with("Partial trial balance"),
+        "{}",
+        partial.lead
+    );
+    assert!(
+        partial.lead.contains("2 ledgers do not add up"),
+        "{}",
+        partial.lead
+    );
+}

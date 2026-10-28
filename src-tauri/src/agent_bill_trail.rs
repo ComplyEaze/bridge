@@ -787,7 +787,6 @@ pub(super) fn window_too_large(
     kind: DetailKind,
     reference: Option<&str>,
 ) -> ToolFailure {
-    const TOO_MANY_READS: &str = "voucher_window_too_many_reads";
     if failure.code == TOO_MANY_READS {
         failure.code = match (kind, reference) {
             (DetailKind::BillTrail, None) => "trail_window_too_large",
@@ -800,39 +799,25 @@ pub(super) fn window_too_large(
     failure
 }
 
-/// Words a TDL formula reads as operators. `CHILDOF` takes a formula, and no ledger name holding
-/// one has been read there (protocol reference section 11c.6), so such a name reads the book's
-/// window. The list errs wide: a name it catches costs only the old, larger read.
-const FORMULA_WORDS: [&str; 15] = [
-    "and", "or", "not", "is", "in", "contains", "like", "between", "starting", "ending", "with",
-    "equal", "greater", "less", "than",
-];
-
-/// The ledger a party detail reads by (#1356), or `None` to read the book's window as before. Only
-/// on a book the window read cannot take in one request, and only for a ledger matched alone (no
-/// other shares its name but for case or spaces), whose vouchers carry its name as stored (`party`),
-/// and whose name a ledger-scoped request admits and holds no formula word.
-pub(super) fn ledger_scope_for(
+/// The ledger a party detail reads by (#1356), after `refusal` of the book's window, or `None` to
+/// let that refusal stand. Only when the window needed more requests than one call may spend (the
+/// one refusal a narrower read can answer), and only for a ledger matched alone (no other shares
+/// its name but for case or spaces), whose vouchers carry its name as stored (`party`), and whose
+/// name a ledger-scoped request admits ([`LedgerScopeName`] refuses any character outside its
+/// alphabet and any formula word). Every window the book's read answers is answered by it,
+/// unchanged.
+pub(super) fn ledger_scope_after(
+    refusal: &ToolFailure,
     resolved: &LedgerMatch,
     party: &str,
-    high_water: u64,
-    limits: WindowReadLimits,
 ) -> Option<LedgerScopeName> {
-    if skips_census(high_water, limits) || party != resolved.name() {
+    if refusal.code != TOO_MANY_READS || party != resolved.name() {
         return None;
     }
     if let LedgerMatch::Exact { similar, .. } = resolved {
         if !similar.is_empty() {
             return None;
         }
-    }
-    let formula_word = party.split(' ').any(|word| {
-        FORMULA_WORDS
-            .iter()
-            .any(|operator| word.eq_ignore_ascii_case(operator))
-    });
-    if formula_word {
-        return None;
     }
     LedgerScopeName::new(party).ok()
 }
@@ -843,40 +828,38 @@ pub(super) enum LedgerOutcome {
     /// The party's vouchers, read by its ledger and admitted: the detail is built from them.
     Use(Vec<Value>),
     /// The ledger read cannot stand in for the book's window: read the window as before.
-    /// `counted` is how many of the party's vouchers the census counted, at least, when that was
-    /// the reason.
-    Window { counted: Option<u64> },
+    Window,
 }
 
-/// Decide what a ledger-scoped read's result means for the party detail (#1356). Only a read whose
-/// vouchers are admitted against its census, at least one, each with a line on the party's ledger
-/// (a cancelled or optional one aside, which keeps no lines), is used. An empty census (a party with
-/// no voucher in the window, or a name the collection did not resolve: not told apart), a read not
-/// admitted against its census, and more vouchers than one request carries all read the book's
-/// window instead, so the detail answers as it did before. Any other failure is the detail's own.
-/// The evidence of every read made is returned beside it, either way.
+/// Decide what the scoped window read of the party's ledger means for the detail (#1356). Only a
+/// read admitted against the ledger's census, of at least one voucher, each with a line on the
+/// party's ledger (a cancelled or optional one aside, which keeps no lines), is used. A read that
+/// found nothing (a party with no voucher in the window, or a name the collection did not resolve:
+/// not told apart), one not admitted against its census, and a plan that needs a part never
+/// observed ledger-scoped (a day divided by AlterID) all read the book's window instead, so the
+/// detail answers as it did before. Any other failure is the detail's own. The evidence of every
+/// read made is returned beside it, either way.
 pub(super) fn ledger_outcome(
-    read: Result<LedgerWindowRead<Value>, ToolFailure>,
+    read: Result<WindowReadOutcome<Value>, ToolFailure>,
     party: &str,
 ) -> Result<(LedgerOutcome, Option<Evidence>), ToolFailure> {
     match read {
-        Ok(LedgerWindowRead::Read { rows, evidence }) => {
+        Ok(read) => {
+            let evidence = read.all_evidence();
+            let rows = read.rows;
             let outcome = if !rows.is_empty() && every_row_has_a_line_for(&rows, party).is_ok() {
                 LedgerOutcome::Use(rows)
             } else {
-                LedgerOutcome::Window { counted: None }
+                LedgerOutcome::Window
             };
             Ok((outcome, Some(evidence)))
         }
-        Ok(LedgerWindowRead::TooLarge { counted, evidence }) => Ok((
-            LedgerOutcome::Window {
-                counted: Some(counted),
-            },
-            Some(evidence),
-        )),
-        Err(mut failure) if failure.code == PART_NOT_ADMITTED => {
+        Err(mut failure)
+            if failure.code == PART_NOT_ADMITTED
+                || failure.code == LEDGER_SCOPE_NEEDS_DAY_SPLIT =>
+        {
             let evidence = failure.evidence.take().map(|evidence| *evidence);
-            Ok((LedgerOutcome::Window { counted: None }, evidence))
+            Ok((LedgerOutcome::Window, evidence))
         }
         Err(failure) => Err(failure),
     }
@@ -903,6 +886,9 @@ pub(super) fn every_row_has_a_line_for(rows: &[Value], party: &str) -> Result<()
         Err(TrailRefusal("party_voucher_without_party_line"))
     }
 }
+
+/// The window read's refusal of a window that needs more data requests than one call may spend.
+const TOO_MANY_READS: &str = "voucher_window_too_many_reads";
 
 /// What `outstandings` was asked for beyond the book-wide figures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1010,37 +996,38 @@ impl Server {
         // and no other ledger shares it but for case or spaces. When they do not
         // fit one request, or the name is not admitted, the window read takes
         // the book as before, and its refusal says how many the party has.
-        let ledger = ledger_scope_for(&resolved, &party, opening.vouchers(), limits.window);
-        let mut by_ledger = None;
-        let mut party_counted = None;
-        if let Some(ledger) = ledger {
-            let read = read_ledger_window(
-                &AgentReader(self),
+        let book = self
+            .read_voucher_window(
                 identity,
                 &company.name,
-                &ledger,
-                (&from, as_of),
-                opening.vouchers(),
+                &from,
+                as_of,
+                VoucherReadShape::EntryWildcard,
+                WindowPlanSource::Estimate {
+                    known_marks: Some(opening),
+                },
                 limits.window,
                 |xml| parse_agent_rows(xml, identity.company_guid()),
             )
             .await;
-            let (outcome, read) =
-                ledger_outcome(read, &party).map_err(|failure| refused(failure, &evidence))?;
-            if let Some(read) = read {
-                evidence = combine_evidence(evidence, read);
+        let (rows, count_key) = match book {
+            Ok(read) => {
+                evidence = combine_evidence(evidence, read.all_evidence());
+                (read.rows, "company_vouchers_read")
             }
-            match outcome {
-                LedgerOutcome::Use(rows) => by_ledger = Some(rows),
-                LedgerOutcome::Window { counted } => party_counted = counted,
-            }
-        }
-        let (rows, count_key) = match by_ledger {
-            Some(rows) => (rows, "party_vouchers_read"),
-            None => {
+            // The book's window needs more requests than one call may spend: only then is the
+            // party read by its own ledger (#1356). Anything else is refused as before.
+            Err(mut refusal) => {
+                let Some(ledger) = ledger_scope_after(&refusal, &resolved, &party) else {
+                    return Err(refused(refusal, &evidence));
+                };
+                if let Some(book) = refusal.evidence.take() {
+                    evidence = combine_evidence(evidence, *book);
+                }
                 let read = self
-                    .read_voucher_window(
+                    .read_scoped_voucher_window(
                         identity,
+                        WindowScope::Ledger(&ledger),
                         &company.name,
                         &from,
                         as_of,
@@ -1051,16 +1038,18 @@ impl Server {
                         limits.window,
                         |xml| parse_agent_rows(xml, identity.company_guid()),
                     )
-                    .await
-                    .map_err(|failure| {
-                        let failure = refused(failure, &evidence);
-                        match party_counted {
-                            Some(counted) => failure.with_party_vouchers(counted),
-                            None => failure,
-                        }
-                    })?;
-                evidence = combine_evidence(evidence, read.all_evidence());
-                (read.rows, "company_vouchers_read")
+                    .await;
+                let (outcome, read) =
+                    ledger_outcome(read, &party).map_err(|failure| refused(failure, &evidence))?;
+                if let Some(read) = read {
+                    evidence = combine_evidence(evidence, read);
+                }
+                match outcome {
+                    LedgerOutcome::Use(rows) => (rows, "party_vouchers_read"),
+                    // The ledger read cannot stand in: the book's refusal stands, with every
+                    // read made for both.
+                    LedgerOutcome::Window => return Err(refused(refusal, &evidence)),
+                }
             }
         };
         // `opening` was read before the statement of open bills, which came before the

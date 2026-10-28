@@ -2151,52 +2151,55 @@ fn the_ledger_read_gives_the_party_the_allocations_the_window_read_gives() {
     );
 }
 
-/// A party detail reads by its ledger only on a book too large for one request, under a name a
-/// ledger-scoped request admits, matched to one ledger alone (#1356).
+/// A party detail reads by its ledger only after the book's window was refused as needing more
+/// requests than one call may spend, under a name a ledger-scoped request admits, matched to one
+/// ledger alone (#1356). Every other refusal stands, and every window the book's read answers is
+/// answered by it.
 #[test]
-fn a_detail_reads_by_its_ledger_only_where_the_book_is_large_and_the_name_is_admitted() {
-    use super::bill_trail::ledger_scope_for;
-    let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+fn a_detail_reads_by_its_ledger_only_after_the_books_window_needed_too_many_reads() {
+    use super::bill_trail::ledger_scope_after;
+    let too_many = ToolFailure::from("voucher_window_too_many_reads".to_string());
     let exact = |name: &str| LedgerMatch::Exact {
         name: name.to_string(),
         similar: Vec::new(),
     };
-    let scope = |resolved: &LedgerMatch, mark| {
-        ledger_scope_for(resolved, resolved.name(), mark, limits)
-            .map(|name| name.as_str().to_string())
+    let scope = |refusal: &ToolFailure, resolved: &LedgerMatch| {
+        ledger_scope_after(refusal, resolved, resolved.name()).map(|name| name.as_str().to_string())
     };
-    // 42 vouchers fit one request at the planner's figure; 43 do not.
-    assert_eq!(scope(&exact("DN Party 001"), 42), None);
     assert_eq!(
-        scope(&exact("DN Party 001"), 43).as_deref(),
+        scope(&too_many, &exact("DN Party 001")).as_deref(),
         Some("DN Party 001")
     );
-    assert_eq!(
-        scope(&exact("DN Party 001"), 29_900).as_deref(),
-        Some("DN Party 001")
-    );
+    // Any other refusal of the book's window stands.
+    for code in [
+        "voucher_window_book_too_large",
+        "voucher_window_volume_unestimated",
+        "voucher_window_changed_during_read",
+        "trail_window_too_large",
+    ] {
+        assert_eq!(
+            scope(&ToolFailure::from(code.to_string()), &exact("DN Party 001")),
+            None
+        );
+    }
     let close = LedgerMatch::CaseOrSpacing {
         name: "DN Party 001".to_string(),
     };
-    assert_eq!(scope(&close, 29_900).as_deref(), Some("DN Party 001"));
-    // A name outside the admitted alphabet, or one another ledger shares but for case or spaces,
-    // reads the book's window as before.
-    assert_eq!(scope(&exact("M/s. Party & Co"), 29_900), None);
+    assert_eq!(scope(&too_many, &close).as_deref(), Some("DN Party 001"));
+    // A name outside the admitted alphabet, or one another ledger shares but for case or spaces.
+    assert_eq!(scope(&too_many, &exact("M/s. Party & Co")), None);
     let twins = LedgerMatch::Exact {
         name: "DN Party 001".to_string(),
         similar: vec!["DN PARTY 001".to_string()],
     };
-    assert_eq!(scope(&twins, 29_900), None);
-    // Vouchers that carry the ledger in another spelling than its stored name read the window.
+    assert_eq!(scope(&too_many, &twins), None);
+    // Vouchers that carry the ledger in another spelling than its stored name.
+    assert_eq!(ledger_scope_after(&too_many, &close, "DN PARTY 001"), None);
+    // A name holding a word a TDL formula reads as an operator.
+    assert_eq!(scope(&too_many, &exact("Sharma and Sons")), None);
+    assert_eq!(scope(&too_many, &exact("A OR B Traders")), None);
     assert_eq!(
-        ledger_scope_for(&close, "DN PARTY 001", 29_900, limits),
-        None
-    );
-    // A name holding a word a TDL formula reads as an operator reads the window.
-    assert_eq!(scope(&exact("Sharma and Sons"), 29_900), None);
-    assert_eq!(scope(&exact("A OR B Traders"), 29_900), None);
-    assert_eq!(
-        scope(&exact("Andheri Traders"), 29_900).as_deref(),
+        scope(&too_many, &exact("Andheri Traders")).as_deref(),
         Some("Andheri Traders")
     );
 }

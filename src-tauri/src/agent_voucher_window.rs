@@ -142,6 +142,24 @@ impl VoucherReadShape {
     }
 }
 
+/// Whose vouchers a window read plans and reads (#485): the book's, or those of one ledger.
+///
+/// A ledger enters only as a [`LedgerScopeName`], which `ledger_movement` and the `outstandings`
+/// party detail (#1356) build once, from the catalogue's own spelling of a ledger they resolved. Everything planned from a ledger-scoped census
+/// counts that ledger's vouchers alone, so such a read is never a count of the book: it earns no
+/// [`BracketedCount`], and its census is not a scan of the book.
+#[derive(Clone, Copy)]
+pub(super) enum WindowScope<'a> {
+    Book,
+    Ledger(&'a LedgerScopeName),
+}
+
+/// A ledger-scoped plan that needs a part the lab has not observed ledger-scoped (an AlterID span
+/// within one day, or a shape other than the movement read and the window read's fields). Refused
+/// before any such request is rendered; `ledger_movement` and the `outstandings` party detail answer
+/// it by reading the book's window instead.
+pub(super) const LEDGER_SCOPE_NEEDS_DAY_SPLIT: &str = "ledger_scope_plan_needs_day_split";
+
 /// An AlterID range `(after, through]`. Within one day it divides a day too
 /// heavy for one read; in a census it bounds each census request by
 /// construction, since with distinct AlterIDs it cannot return more than
@@ -1645,9 +1663,43 @@ impl Server {
         T: WindowRow,
         P: FnMut(&str) -> Result<Vec<T>, String>,
     {
-        read_voucher_window_with(
+        self.read_scoped_voucher_window(
+            identity,
+            WindowScope::Book,
+            company,
+            from,
+            to,
+            shape,
+            source,
+            limits,
+            parse,
+        )
+        .await
+    }
+
+    /// [`Self::read_voucher_window`] for the vouchers of `scope`. See
+    /// [`read_scoped_voucher_window_with`].
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn read_scoped_voucher_window<T, P>(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        scope: WindowScope<'_>,
+        company: &str,
+        from: &TallyDate,
+        to: &TallyDate,
+        shape: VoucherReadShape,
+        source: WindowPlanSource,
+        limits: WindowReadLimits,
+        parse: P,
+    ) -> Result<WindowReadOutcome<T>, ToolFailure>
+    where
+        T: WindowRow,
+        P: FnMut(&str) -> Result<Vec<T>, String>,
+    {
+        read_scoped_voucher_window_with(
             &AgentReader(self),
             identity,
+            scope,
             company,
             from,
             to,
@@ -1699,6 +1751,44 @@ where
     T: WindowRow,
     P: FnMut(&str) -> Result<Vec<T>, String>,
 {
+    read_scoped_voucher_window_with(
+        reader,
+        identity,
+        WindowScope::Book,
+        company,
+        from,
+        to,
+        shape,
+        source,
+        limits,
+        parse,
+    )
+    .await
+}
+
+/// [`read_voucher_window_with`] for the vouchers of `scope`: the book's, or one ledger's (#485).
+/// A ledger-scoped read plans from a census of that ledger's vouchers and sends only parts the lab
+/// has observed ledger-scoped; a plan that needs another is refused with
+/// [`LEDGER_SCOPE_NEEDS_DAY_SPLIT`], never sent. Every admission and the closing bracket are the
+/// book-wide read's.
+#[allow(clippy::too_many_arguments)]
+pub(super) async fn read_scoped_voucher_window_with<R, T, P>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    shape: VoucherReadShape,
+    source: WindowPlanSource,
+    limits: WindowReadLimits,
+    parse: P,
+) -> Result<WindowReadOutcome<T>, ToolFailure>
+where
+    R: WindowReader,
+    T: WindowRow,
+    P: FnMut(&str) -> Result<Vec<T>, String>,
+{
     reader.begin_window();
     if reader.seals_its_reads()
         && !matches!(source, WindowPlanSource::Estimate { known_marks: None })
@@ -1707,7 +1797,7 @@ where
     }
     let timed = TimedReader::new(reader, from, to);
     let read = read_voucher_window_timed(
-        &timed, identity, company, from, to, shape, source, limits, parse,
+        &timed, identity, scope, company, from, to, shape, source, limits, parse,
     )
     .await;
     let timings = timed.into_timings();
@@ -1731,6 +1821,7 @@ where
 async fn read_voucher_window_timed<R, T, P>(
     reader: &TimedReader<'_, R>,
     identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
@@ -1801,6 +1892,7 @@ where
                 WindowPlanSource::Estimate { known_marks } => estimate_window_volume(
                     reader,
                     identity,
+                    scope,
                     company,
                     (from, to),
                     (first, last),
@@ -1893,8 +1985,14 @@ where
                 .into_failure());
             }
             dispatched += 1;
-            let request =
-                voucher_window_part_read(shape, company, &part.from, &part.to, part.span)?;
+            let request = match scope {
+                WindowScope::Book => {
+                    voucher_window_part_read(shape, company, &part.from, &part.to, part.span)?
+                }
+                WindowScope::Ledger(ledger) => {
+                    ledger_part_read(shape, company, ledger, &part.from, &part.to, part.span)?
+                }
+            };
             match reader
                 .read(identity, request, WindowReadKind::Part(part.clone()))
                 .await
@@ -2043,6 +2141,7 @@ where
     // one: it is itself the second read. A reader that does not seal closes
     // only a divided read, so closing the marks is what says the read was divided.
     let bracketed = (!replaying
+        && matches!(scope, WindowScope::Book)
         && !reader.seals_its_reads()
         && closed_on_opening_marks
         && census.as_ref().is_some_and(WindowCensus::names_every_guid))
@@ -2137,6 +2236,7 @@ pub(super) async fn count_window_only<R: WindowReader>(
     let estimate = estimate_window_volume(
         reader,
         identity,
+        WindowScope::Book,
         company,
         (from, to),
         days,
@@ -2233,6 +2333,7 @@ async fn read_marks<R: WindowReader>(
 async fn estimate_window_volume<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
     company: &str,
     window: (&TallyDate, &TallyDate),
     days: (NaiveDate, NaiveDate),
@@ -2262,7 +2363,7 @@ async fn estimate_window_volume<R: WindowReader>(
         });
     }
     let rows = census_window(
-        reader, identity, company, window, days, high_water, limits, preflight, boundary,
+        reader, identity, scope, company, window, days, high_water, limits, preflight, boundary,
     )
     .await?;
     let census = WindowCensus::from_census_rows(rows)
@@ -2281,7 +2382,7 @@ async fn estimate_window_volume<R: WindowReader>(
 /// Whether a window read of a book whose voucher mark is `high_water` sends no
 /// census: the mark bounds the book and it fits one request, or the book has never
 /// held a voucher. [`census_read_count`] states the same rule beforehand.
-pub(super) fn skips_census(high_water: u64, limits: WindowReadLimits) -> bool {
+fn skips_census(high_water: u64, limits: WindowReadLimits) -> bool {
     let fits_one_request =
         high_water.saturating_mul(limits.default_bytes_per_voucher) <= limits.budget_bytes;
     high_water == 0 || (fits_one_request && limits.small_books == SmallBooks::Skip)
@@ -2308,6 +2409,7 @@ pub(super) fn census_read_count(
 async fn census_window<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
     company: &str,
     (from, to): (&TallyDate, &TallyDate),
     days: (NaiveDate, NaiveDate),
@@ -2316,6 +2418,7 @@ async fn census_window<R: WindowReader>(
     preflight: &mut Option<Evidence>,
     boundary: &mut Option<DateBoundaryProfile>,
 ) -> Result<Vec<CensusRow>, ToolFailure> {
+    let unestimated = || ToolFailure::from(VOLUME_UNESTIMATED.to_string());
     let spans = census_spans(high_water, limits.census_capacity())
         .map_err(|code| ToolFailure::from(code.to_string()))?;
     // The first plan reads at most this many vouchers a request (the default
@@ -2327,16 +2430,44 @@ async fn census_window<R: WindowReader>(
     let mut spans = spans.peekable();
     let mut rows = Vec::new();
     while let Some(span) = spans.next() {
-        let request = voucher_census_read(company, from, to, span)?;
+        // A ledger census is always spanned, the one form observed: a book that fits
+        // one census request is asked over (0, high_water], the same rows.
+        let span = match scope {
+            WindowScope::Book => span,
+            WindowScope::Ledger(_) => Some(span.unwrap_or(AlterIdSpan {
+                after: 0,
+                through: high_water,
+            })),
+        };
+        let request = match (scope, span) {
+            (WindowScope::Ledger(ledger), Some(span)) => {
+                ledger_census_read(company, ledger, from, to, span)?
+            }
+            _ => voucher_census_read(company, from, to, span)?,
+        };
         let (xml, evidence) = match reader.read(identity, request, WindowReadKind::Census).await {
             Ok((xml, evidence, observed)) => {
                 observe_boundary(boundary, observed);
                 (xml, evidence)
             }
-            Err(failure) => return Err(census_not_served(failure)),
+            Err(failure) if census_failure(&failure.code) == CensusFailure::Refuse => {
+                // A census bounded by construction that Tally still could not
+                // serve is not divided further or retried: the gateway may
+                // still be building it. Keep what the attempt observed, and
+                // which of the two it was.
+                let mut refused = unestimated();
+                refused.cause = census_refusal_cause(&failure.code);
+                refused.evidence = failure.evidence;
+                return Err(refused);
+            }
+            Err(failure) => return Err(failure),
         };
         fold_evidence(preflight, evidence);
-        rows.extend(parse_voucher_census(&xml, days, span).map_err(|code| census_not_read(&code))?);
+        rows.extend(parse_voucher_census(&xml, days, span).map_err(|code| {
+            let mut refused = unestimated();
+            refused.cause = census_refusal_cause(&code);
+            refused
+        })?);
         let counted = rows.len() as u64;
         if per_read > 0 && counted > plannable && spans.peek().is_some() {
             // The caller adds the census's evidence, as for any refusal here.
@@ -2350,28 +2481,6 @@ async fn census_window<R: WindowReader>(
     Ok(rows)
 }
 
-/// A census request that failed. One bounded by construction that Tally still
-/// could not serve is not divided further or retried: the gateway may still be
-/// building it. It is refused as [`VOLUME_UNESTIMATED`], keeping what the
-/// attempt observed and which of the two it was; any other failure is its own.
-fn census_not_served(failure: ToolFailure) -> ToolFailure {
-    if census_failure(&failure.code) != CensusFailure::Refuse {
-        return failure;
-    }
-    let mut refused = ToolFailure::from(VOLUME_UNESTIMATED.to_string());
-    refused.cause = census_refusal_cause(&failure.code);
-    refused.evidence = failure.evidence;
-    refused
-}
-
-/// A census answer that does not describe what was asked, refused as
-/// [`VOLUME_UNESTIMATED`] with its cause.
-fn census_not_read(code: &str) -> ToolFailure {
-    let mut refused = ToolFailure::from(VOLUME_UNESTIMATED.to_string());
-    refused.cause = census_refusal_cause(code);
-    refused
-}
-
 /// Why a census refused its window as unestimated, as a data-free cause beside
 /// [`VOLUME_UNESTIMATED`].
 fn census_refusal_cause(code: &str) -> Option<&'static str> {
@@ -2382,119 +2491,6 @@ fn census_refusal_cause(code: &str) -> Option<&'static str> {
         _ if is_window_too_large_code(code) => Some("census_deadline_exceeded"),
         _ => None,
     }
-}
-
-/// What a ledger-scoped read of a window found (#1356).
-pub(super) enum LedgerWindowRead<T> {
-    /// The ledger's vouchers in the window, read in one request and admitted
-    /// against the ledger's own census, voucher by voucher.
-    Read { rows: Vec<T>, evidence: Evidence },
-    /// The census counted more of the ledger's vouchers than one request may
-    /// carry, so nothing was read: a ledger-scoped read in parts has not been
-    /// observed. `counted` is a lower bound when the census stopped early.
-    TooLarge { counted: u64, evidence: Evidence },
-}
-
-/// Read one ledger's vouchers in `window` (#1356): a ledger-scoped census in
-/// AlterID spans across `(0, high_water]`, then, when its count fits one
-/// request, one ledger-scoped read of the whole window with the window read's
-/// own fields.
-///
-/// The read is admitted only if it returns exactly the vouchers the census
-/// counted, by AlterID and GUID on each day ([`admit_part`]), with every GUID and
-/// master ID unique; a census that names one AlterID twice is not admitted. The
-/// census and the read are the same collection, so this proves the read returned
-/// every voucher the collection lists, not that the collection lists every
-/// voucher of the ledger: that rests on the lab's comparisons with the
-/// book-wide read (protocol reference section 11c.6, VERIFIED once, two
-/// synthetic books, TallyPrime 7.2 Silver). A census that counts nothing is read
-/// no further, and the caller decides what that means. Both are bracketed by the
-/// caller's marks, read before the census and again after the read.
-///
-/// Every shape is one observed live (protocol reference section 11c.6): the
-/// spanned ledger census and the ledger-scoped read with the window fields.
-#[allow(clippy::too_many_arguments)]
-pub(super) async fn read_ledger_window<R, T, P>(
-    reader: &R,
-    identity: &VerifiedCompanyIdentity,
-    company: &str,
-    ledger: &LedgerScopeName,
-    (from, to): (&TallyDate, &TallyDate),
-    high_water: u64,
-    limits: WindowReadLimits,
-    parse: P,
-) -> Result<LedgerWindowRead<T>, ToolFailure>
-where
-    R: WindowReader,
-    T: WindowRow,
-    P: FnOnce(&str) -> Result<Vec<T>, String>,
-{
-    let days = (day_of(from)?, day_of(to)?);
-    if days.0 > days.1 {
-        return Err("invalid_date_range".to_string().into());
-    }
-    let spans = ledger_census_spans(high_water, limits.census_capacity())
-        .map_err(|code| ToolFailure::from(code.to_string()))?;
-    let per_read = vouchers_per_read(limits.budget_bytes, limits.default_bytes_per_voucher);
-    let mut preflight = None;
-    let mut counted = Vec::new();
-    for span in spans {
-        let request = ledger_census_read(company, ledger, from, to, span)
-            .map_err(|code| with_prior(code.into(), &preflight, &None))?;
-        let (xml, evidence, _) = reader
-            .read(identity, request, WindowReadKind::Census)
-            .await
-            .map_err(|failure| with_prior(census_not_served(failure), &preflight, &None))?;
-        fold_evidence(&mut preflight, evidence);
-        counted.extend(
-            parse_voucher_census(&xml, days, Some(span))
-                .map_err(|code| with_prior(census_not_read(&code), &preflight, &None))?,
-        );
-        if counted.len() as u64 > per_read {
-            break;
-        }
-    }
-    let evidence = preflight
-        .clone()
-        .ok_or_else(|| ToolFailure::from(VOLUME_UNESTIMATED.to_string()))?;
-    if counted.len() as u64 > per_read {
-        return Ok(LedgerWindowRead::TooLarge {
-            counted: counted.len() as u64,
-            evidence,
-        });
-    }
-    if counted.is_empty() {
-        return Ok(LedgerWindowRead::Read {
-            rows: Vec::new(),
-            evidence,
-        });
-    }
-    let duplicated = || {
-        let mut failure = ToolFailure::from(PART_NOT_ADMITTED.to_string());
-        failure.cause = Some(PART_ROW_DUPLICATED);
-        with_prior(failure, &preflight, &None)
-    };
-    let census = WindowCensus::from_census_rows(counted).ok_or_else(duplicated)?;
-    let part = WindowPart {
-        from: from.clone(),
-        to: to.clone(),
-        span: None,
-    };
-    let request = ledger_vouchers_read(company, ledger, from, to)
-        .map_err(|code| with_prior(code.into(), &preflight, &None))?;
-    let mut data = None;
-    let (xml, evidence, _) = reader
-        .read(identity, request, WindowReadKind::Part(part.clone()))
-        .await
-        .map_err(|failure| with_prior(failure, &preflight, &None))?;
-    fold_evidence(&mut data, evidence);
-    let refused = |failure: ToolFailure| with_prior(failure, &preflight, &data);
-    let rows = parse(&xml).map_err(|code| refused(code.into()))?;
-    admit_part(&part, (from, to), &rows, Some(&census)).map_err(refused)?;
-    admit_union(&rows).map_err(|code| refused(code.into()))?;
-    let evidence = chronological(&preflight, &data, &None)
-        .expect("the census and the read each left evidence");
-    Ok(LedgerWindowRead::Read { rows, evidence })
 }
 
 /// Record the boundary profile one read observed. Education seen on any read
@@ -2600,18 +2596,6 @@ impl Iterator for CensusSpans {
         self.done = through >= self.high_water;
         Some(Some(span))
     }
-}
-
-/// [`census_spans`] for a ledger-scoped census (#1356), which is always read in
-/// AlterID spans: an unspanned ledger census has not been observed. A mark of at
-/// most `capacity` is the one span `(0, mark]`.
-pub(super) fn ledger_census_spans(
-    high_water: u64,
-    capacity: u64,
-) -> Result<impl Iterator<Item = AlterIdSpan>, &'static str> {
-    let mut spans = census_spans(high_water, capacity)?;
-    spans.whole = false;
-    Ok(spans.flatten())
 }
 
 /// Admit one part's rows against the part and, when the window was counted,

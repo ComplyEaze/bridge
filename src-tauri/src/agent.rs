@@ -813,10 +813,6 @@ struct ReadDetail {
     /// The ledger a group summary could not place (#1230). Shown as a party name, so `mask_parties`
     /// masks it; a group is never named (its name is in the book's groups, and only the ledger is known).
     unplaced_ledger: Option<String>,
-    /// How many vouchers, at least, a party detail's ledger census counted (#1356), when they were
-    /// too many for one ledger-scoped read and the book's window read was then refused too. A count
-    /// only: the census stops once the count passes one read.
-    party_vouchers: Option<u64>,
 }
 
 /// See [`ReadDetail::bill_row`].
@@ -837,13 +833,6 @@ impl ToolFailure {
         self.read_detail
             .get_or_insert_with(Box::default)
             .planned_reads = Some(reads);
-        self
-    }
-
-    fn with_party_vouchers(mut self, counted: u64) -> Self {
-        self.read_detail
-            .get_or_insert_with(Box::default)
-            .party_vouchers = Some(counted);
         self
     }
 
@@ -2644,18 +2633,16 @@ impl Server {
                 }
                 // The partial read's own reason, under the same budget rule:
                 // a few codes, kept beside the refusal's code.
-                let (incomplete_read, planned_reads, bill_row, unplaced_ledger, party_vouchers) =
-                    read_detail
-                        .map(|detail| {
-                            (
-                                detail.incomplete_read,
-                                detail.planned_reads,
-                                detail.bill_row,
-                                detail.unplaced_ledger,
-                                detail.party_vouchers,
-                            )
-                        })
-                        .unwrap_or_default();
+                let (incomplete_read, planned_reads, bill_row, unplaced_ledger) = read_detail
+                    .map(|detail| {
+                        (
+                            detail.incomplete_read,
+                            detail.planned_reads,
+                            detail.bill_row,
+                            detail.unplaced_ledger,
+                        )
+                    })
+                    .unwrap_or_default();
                 if let Some(ledger) = unplaced_ledger {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["ledger"] = party_name_value(ledger);
@@ -2680,11 +2667,6 @@ impl Server {
                             "needed_at_least": reads.needed_at_least,
                             "allowed": reads.allowed,
                         });
-                    }
-                }
-                if let Some(counted) = party_vouchers {
-                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
-                        error["party_vouchers_at_least"] = json!(counted);
                     }
                 }
                 if let Some(counts) = counts {

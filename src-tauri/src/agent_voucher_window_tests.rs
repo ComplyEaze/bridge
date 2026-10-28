@@ -7795,6 +7795,209 @@ mod ledger_scoped {
         );
         assert_eq!(refused.unwrap_err(), "window_not_honoured");
     }
+
+    const DENSE_GUID: &str = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
+
+    /// Answers a window read from a script and keeps every request it was sent, in order. A
+    /// request past the script is a failure, so a test sees what was asked after the last answer.
+    struct Scripted {
+        answers: std::sync::Mutex<std::collections::VecDeque<String>>,
+        sent: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl Scripted {
+        fn new(answers: Vec<String>) -> Self {
+            Self {
+                answers: std::sync::Mutex::new(answers.into()),
+                sent: std::sync::Mutex::default(),
+            }
+        }
+
+        fn sent(&self) -> Vec<String> {
+            self.sent.lock().unwrap().clone()
+        }
+    }
+
+    impl WindowReader for Scripted {
+        fn evidence_copies(&self) -> u64 {
+            1
+        }
+
+        async fn read(
+            &self,
+            _identity: &VerifiedCompanyIdentity,
+            request: ReadRequest,
+            _kind: WindowReadKind,
+        ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
+            self.sent.lock().unwrap().push(request.as_str().to_string());
+            let answer = self.answers.lock().unwrap().pop_front();
+            match answer {
+                Some(xml) => Ok((
+                    xml,
+                    crate::agent::agent_import::local_evidence("scripted"),
+                    DateBoundaryProfile::ModeAgnostic,
+                )),
+                None => Err("scripted_answers_exhausted".to_string().into()),
+            }
+        }
+    }
+
+    fn dense() -> VerifiedCompanyIdentity {
+        VerifiedCompanyIdentity::test_fixture(COMPANY, DENSE_GUID)
+    }
+
+    async fn read_scoped(
+        reader: &Scripted,
+        scope: WindowScope<'_>,
+        (from, to): (&str, &str),
+        source: WindowPlanSource,
+    ) -> Result<WindowReadOutcome<serde_json::Value>, ToolFailure> {
+        read_scoped_voucher_window_with(
+            reader,
+            &dense(),
+            scope,
+            COMPANY,
+            &tally_date(from),
+            &tally_date(to),
+            VoucherReadShape::Movement,
+            source,
+            WindowReadLimits::for_shape(VoucherReadShape::Movement),
+            |xml| parse_agent_changed_rows(xml, DENSE_GUID),
+        )
+        .await
+    }
+
+    /// A book that fits one request is not counted: the window is read in the one movement request
+    /// the lab observed, and the 21 vouchers come back. Such a read is not a count of the book, so
+    /// it earns no bracketed count.
+    #[tokio::test]
+    async fn a_ledger_window_that_fits_one_request_is_sent_as_the_observed_movement_read() {
+        let party = ledger("DN Party 001");
+        let reader = Scripted::new(vec![utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml"))]);
+        let read = read_scoped(
+            &reader,
+            WindowScope::Ledger(&party),
+            ("20250501", "20250531"),
+            WindowPlanSource::Estimate {
+                known_marks: Some(CompanyMarks::new(Some(3), 7)),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            reader.sent(),
+            vec![sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml"))]
+        );
+        assert_eq!(read.rows.len(), 21);
+        assert!(read.bracketed.is_none());
+    }
+
+    /// A book too large to send whole is counted first, by a census of the ledger's vouchers in the
+    /// observed spanned form, and the data part is the ledger's, never the book's.
+    #[tokio::test]
+    async fn a_large_books_ledger_window_is_counted_by_the_ledger_census_first() {
+        let party = ledger("DN Party 001");
+        let reader = Scripted::new(vec![utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml"))]);
+        let refused = read_scoped(
+            &reader,
+            WindowScope::Ledger(&party),
+            ("20250401", "20260331"),
+            WindowPlanSource::Estimate {
+                known_marks: Some(CompanyMarks::new(Some(8192), 7)),
+            },
+        )
+        .await
+        .err()
+        .expect("the read is refused");
+        // The script ends after the census: the request after it is the failure.
+        assert_eq!(refused.code, "scripted_answers_exhausted");
+        let requests = reader.sent();
+        assert_eq!(requests.len(), 2, "{requests:?}");
+        assert_eq!(
+            requests[0],
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.request.utf16le.xml"))
+        );
+        assert_eq!(
+            requests[1],
+            render_agent_ledger_vouchers(
+                COMPANY,
+                &party,
+                LedgerVoucherFields::Movement,
+                &tally_date("20250401"),
+                &tally_date("20260331"),
+            )
+            .unwrap()
+        );
+    }
+
+    /// A part with an AlterID span is not a form the lab observed ledger-scoped: it is refused
+    /// before it is rendered, by the code `ledger_movement` answers with the book's window.
+    #[tokio::test]
+    async fn a_spanned_part_is_never_sent_ledger_scoped() {
+        let party = ledger("DN Party 001");
+        let reader = Scripted::new(vec![]);
+        let refused = read_scoped(
+            &reader,
+            WindowScope::Ledger(&party),
+            ("20250501", "20250501"),
+            WindowPlanSource::replay_of(
+                vec![WindowPart {
+                    from: tally_date("20250501"),
+                    to: tally_date("20250501"),
+                    span: Some(span(0, 8192)),
+                }],
+                Some(WindowWitness {
+                    marks: CompanyMarks::new(Some(8192), 7),
+                    census: None,
+                }),
+            ),
+        )
+        .await
+        .err()
+        .expect("the read is refused");
+        assert_eq!(refused.code, LEDGER_SCOPE_NEEDS_DAY_SPLIT);
+        assert!(reader.sent().is_empty());
+    }
+
+    #[test]
+    fn only_the_movement_and_window_reads_without_a_span_are_offered_ledger_scoped() {
+        let party = ledger("DN Party 001");
+        let (from, to) = (tally_date("20250501"), tally_date("20250531"));
+        for shape in [
+            VoucherReadShape::ImportVerification,
+            VoucherReadShape::ClassEntryWildcard,
+        ] {
+            assert_eq!(
+                ledger_part_read(shape, COMPANY, &party, &from, &to, None).unwrap_err(),
+                LEDGER_SCOPE_NEEDS_DAY_SPLIT
+            );
+        }
+        assert_eq!(
+            ledger_part_read(
+                VoucherReadShape::Movement,
+                COMPANY,
+                &party,
+                &from,
+                &to,
+                Some(span(0, 8192)),
+            )
+            .unwrap_err(),
+            LEDGER_SCOPE_NEEDS_DAY_SPLIT
+        );
+        assert_eq!(
+            ledger_part_read(
+                VoucherReadShape::Movement,
+                COMPANY,
+                &party,
+                &from,
+                &to,
+                None
+            )
+            .unwrap()
+            .as_str(),
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml"))
+        );
+    }
 }
 
 // The ledger-scoped read of a party detail (#1356): a ledger census in AlterID spans, then one
@@ -7919,16 +8122,21 @@ mod ledger_window {
     async fn read_day(
         exchanges: Vec<Exchange>,
         limits: WindowReadLimits,
-    ) -> (Result<LedgerWindowRead<Value>, ToolFailure>, usize) {
+    ) -> (Result<WindowReadOutcome<Value>, ToolFailure>, usize) {
         let reader = Captured(Mutex::new(exchanges));
         let day = tally_date("20250515");
-        let read = read_ledger_window(
+        let sales = LedgerScopeName::new("DN Sales").unwrap();
+        let read = read_scoped_voucher_window_with(
             &reader,
-            &identity(),
+            &VerifiedCompanyIdentity::test_fixture(DENSE, DENSE_GUID),
+            WindowScope::Ledger(&sales),
             DENSE,
-            &LedgerScopeName::new("DN Sales").unwrap(),
-            (&day, &day),
-            DENSE_MARK,
+            &day,
+            &day,
+            VoucherReadShape::EntryWildcard,
+            WindowPlanSource::Estimate {
+                known_marks: Some(CompanyMarks::new(Some(DENSE_MARK), 328)),
+            },
             limits,
             |xml| parse_agent_rows(xml, DENSE_GUID),
         )
@@ -7937,33 +8145,16 @@ mod ledger_window {
         (read, left)
     }
 
-    #[test]
-    fn a_ledger_census_is_always_spanned_and_its_spans_are_the_ones_the_lab_sent() {
-        let capacity =
-            WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
-        assert_eq!(capacity, 8192);
-        let spans = |mark| {
-            ledger_census_spans(mark, capacity)
-                .unwrap()
-                .map(|span| (span.after, span.through))
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(
-            spans(DENSE_MARK),
-            [(0, 8192), (8192, 16384), (16384, 24576), (24576, 29900)]
-        );
-        // A book's census of a mark this small is one unspanned request; a ledger's is spanned.
-        assert_eq!(spans(7), [(0, 7)]);
-        assert!(census_spans(7, capacity).unwrap().eq([None]));
-    }
-
     #[tokio::test]
     async fn the_dense_day_is_counted_in_four_spans_then_read_once_and_admitted() {
+        assert_eq!(
+            WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity(),
+            8192,
+            "the spans the lab sent are the production ones"
+        );
         let (read, left) = read_day(dense_day(), eighty_two_a_read()).await;
         assert_eq!(left, 0, "every captured request was sent, and no other");
-        let LedgerWindowRead::Read { rows, .. } = read.unwrap() else {
-            panic!("the day fits one read under these limits")
-        };
+        let rows = read.unwrap().rows;
         let parse = |value: &str| NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
         let census = parse_voucher_census(
             &utf16(scoped!("census-dn-sales-day-span1.answer")),
@@ -7986,15 +8177,15 @@ mod ledger_window {
         );
     }
 
+    /// Under the planner's own figure the day's 82 vouchers are more than one read carries (42),
+    /// and one day can be divided only by AlterID, a part never observed ledger-scoped: the plan is
+    /// refused after the census, before any data part is sent.
     #[tokio::test]
-    async fn under_the_planners_figure_the_day_is_too_large_and_the_census_stops_at_once() {
+    async fn under_the_planners_figure_the_day_needs_a_part_never_observed_and_none_is_sent() {
         let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
         let (read, left) = read_day(dense_day(), limits).await;
-        let LedgerWindowRead::TooLarge { counted, .. } = read.unwrap() else {
-            panic!("82 vouchers are more than the 42 one read may carry")
-        };
-        assert_eq!(counted, 82);
-        assert_eq!(left, 4, "only the first span was sent, and no read");
+        assert_eq!(read.err().unwrap().code, LEDGER_SCOPE_NEEDS_DAY_SPLIT);
+        assert_eq!(left, 1, "the four census spans were sent, and no read");
     }
 
     #[tokio::test]
@@ -8010,8 +8201,8 @@ mod ledger_window {
 
     /// A read is held to its window's dates before its census: another ledger's month, from the same
     /// book and run as the census, none of whose vouchers is on that day, is not admitted. (A read
-    /// on the right day with other vouchers meets the census comparison of [`admit_part`], whose
-    /// own tests show it; no captured answer of that day other than the ledger's own exists.)
+    /// on the right day with other vouchers meets the census comparison of `admit_part`, whose own
+    /// tests show it; no captured answer of that day other than the ledger's own exists.)
     #[tokio::test]
     async fn a_read_whose_vouchers_lie_outside_the_window_is_not_admitted() {
         let mut exchanges = dense_day();
@@ -8023,9 +8214,22 @@ mod ledger_window {
         assert_eq!(left, 0);
     }
 
-    /// What the party detail does with each result of the ledger read (#1356): it uses only an
-    /// admitted read of at least one voucher, each with a line on the party's ledger, and reads the
-    /// book's window as before in every other case but a failure of its own.
+    /// A read on the census's own day that returns vouchers the census did not count is not
+    /// admitted: here every span of the day answered empty and the read returned the day's 82.
+    #[tokio::test]
+    async fn a_read_that_is_not_the_census_vouchers_is_not_admitted() {
+        let mut exchanges = dense_day();
+        exchanges[0].1 = scoped!("census-dn-sales-day-span2.answer");
+        let (read, left) = read_day(exchanges, eighty_two_a_read()).await;
+        let failure = read.err().unwrap();
+        assert_eq!(failure.code, PART_NOT_ADMITTED);
+        assert_eq!(failure.cause, Some(PART_CENSUS_MISMATCH));
+        assert_eq!(left, 0);
+    }
+
+    /// What the party detail does with each result of the scoped read of its ledger (#1356): it
+    /// uses only an admitted read of at least one voucher, each with a line on the party's ledger,
+    /// and reads the book's window as before in every other case but a failure of its own.
     #[tokio::test]
     async fn the_detail_uses_only_an_admitted_ledger_read_of_the_partys_vouchers() {
         use crate::agent::bill_trail::{ledger_outcome, LedgerOutcome};
@@ -8036,31 +8240,28 @@ mod ledger_window {
         let (read, _) = read_day(dense_day(), eighty_two_a_read()).await;
         assert!(matches!(
             ledger_outcome(read, "DN Party 001").map(|(outcome, _)| outcome),
-            Ok(LedgerOutcome::Window { counted: None })
+            Ok(LedgerOutcome::Window)
         ));
-        // An empty census: every span of the day answered empty, and nothing read.
+        // An empty census: every span of the day answered empty, and the read an empty collection
+        // (the captured empty answer of the same book and run).
         let mut empty = dense_day();
         empty[0].1 = scoped!("census-dn-sales-day-span2.answer");
-        empty.truncate(4);
+        empty[4].1 = scoped!("census-dn-sales-day-span2.answer");
         let (read, left) = read_day(empty, eighty_two_a_read()).await;
         assert_eq!(left, 0);
-        assert!(matches!(
-            outcome(read),
-            Ok(LedgerOutcome::Window { counted: None })
-        ));
-        // More than one request carries.
+        assert!(matches!(outcome(read), Ok(LedgerOutcome::Window)));
+        // A day that only a part never observed ledger-scoped could divide.
         let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
         let (read, _) = read_day(dense_day(), limits).await;
-        assert!(matches!(
-            outcome(read),
-            Ok(LedgerOutcome::Window { counted: Some(82) })
-        ));
+        let (decided, evidence) = ledger_outcome(read, "DN Sales").unwrap();
+        assert!(matches!(decided, LedgerOutcome::Window));
+        assert!(evidence.is_some(), "the census reads made are kept");
         // A read not admitted against its window.
         let mut stray = dense_day();
         stray[4].1 = scoped!("movement-dn-party-month.answer");
         let (read, _) = read_day(stray, eighty_two_a_read()).await;
         let (decided, evidence) = ledger_outcome(read, "DN Sales").unwrap();
-        assert!(matches!(decided, LedgerOutcome::Window { counted: None }));
+        assert!(matches!(decided, LedgerOutcome::Window));
         assert!(evidence.is_some(), "the reads made are kept");
         // A census Tally did not answer within its span is the detail's own refusal.
         let mut wrong = dense_day();
@@ -8071,29 +8272,40 @@ mod ledger_window {
 
     #[test]
     fn the_party_detail_read_is_the_request_the_lab_sent_byte_for_byte() {
-        let request = |company: &str, ledger: &str, from: &str, to: &str| {
-            ledger_vouchers_read(
+        let part = |company: &str, ledger: &str, from: &str, to: &str, span| {
+            ledger_part_read(
+                VoucherReadShape::EntryWildcard,
                 company,
                 &LedgerScopeName::new(ledger).unwrap(),
                 &tally_date(from),
                 &tally_date(to),
+                span,
             )
-            .unwrap()
-            .as_str()
-            .to_string()
+            .map(|request| request.as_str().to_string())
         };
         assert_eq!(
-            request(
+            part(
                 "BRIDGE BILLTRAIL LAB",
                 "Lab Party P1",
                 "20250401",
-                "20260331"
-            ),
+                "20260331",
+                None
+            )
+            .unwrap(),
             utf16(filtered!("billtrail-ledger-p1-fy-entries.request"))
         );
         assert_eq!(
-            request(DENSE, "DN Sales", "20250515", "20250515"),
+            part(DENSE, "DN Sales", "20250515", "20250515", None).unwrap(),
             utf16(filtered!("dense-ledger-dn-sales-20250515-entries.request"))
+        );
+        // Never sent with an AlterID span, which was not observed ledger-scoped.
+        let span = Some(AlterIdSpan {
+            after: 0,
+            through: 8192,
+        });
+        assert_eq!(
+            part(DENSE, "DN Sales", "20250515", "20250515", span).unwrap_err(),
+            LEDGER_SCOPE_NEEDS_DAY_SPLIT
         );
     }
 }

@@ -1038,6 +1038,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(negative_ledgers.code());
         }
+        if let Some(trial_balance) = cause
+            .downcast_ref::<bridge_tally_protocol::native_trial_balance::NativeTrialBalanceError>()
+        {
+            return Some(trial_balance.code());
+        }
         if let Some(check) =
             cause.downcast_ref::<crate::reports::cash_flow::CashFlowCheckError>()
         {
@@ -1980,6 +1985,16 @@ fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
         })
 }
 
+/// The next step for a Trial Balance read that was refused and has none of its own. It is
+/// tried after the code's, the cause's and the unanswered reason's (Tally not reachable), so
+/// none of those is hidden behind it. The cause (when the refusal has one) says which rule or
+/// check failed; the step does not claim a retry is pointless, because a cause such as a
+/// changed book is not.
+const TRIAL_BALANCE_READ_FAILED_REMEDIATION: &str = "No Trial Balance figures were returned for \
+    this window. Tell the user what the cause says (when the refusal names none, that the Trial \
+    Balance could not be read), and that no figure was derived. Do not repeat this same read in \
+    a loop; another window or another read is a different request and is the user's call.";
+
 /// The next step for a cause of `native_outstandings_read_failed` (bridge#1091). It is chosen
 /// only under that code: the same cause codes reach other tools through `?` sites that never
 /// read the Bills report, and the text below would be wrong for them. A refusal is whole:
@@ -2390,6 +2405,8 @@ impl Server {
                     .or_else(|| {
                         unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
                     })
+                    .or((code == "trial_balance_read_failed")
+                        .then_some(TRIAL_BALANCE_READ_FAILED_REMEDIATION))
                 {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);

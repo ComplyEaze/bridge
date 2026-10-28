@@ -1490,6 +1490,66 @@
       "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
       "sha256": "10f6c8127f5373ebf3a88e8691230e15368993c66a18ddf735047ce66e3a10b9",
       "size": 3310
+    },
+    {
+      "blob": "f15b161fab9c4fc1a1aa73e9843b396cea02429d",
+      "capture_id": "statement_balance_sheet_opening_difference_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_balance_sheet_opening_difference_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "01113e741c2a22ced9e7aa2471a518a2b3931f2ff39579dc7e8e4d8efd7a61f8",
+      "size": 1850
+    },
+    {
+      "blob": "5c6eb2ace2767958ba7a64c00cf97d0851158b02",
+      "capture_id": "statement_balance_sheet_opening_difference_fy_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_balance_sheet_opening_difference_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "140d2c4b42d0bf097108101eb9639fa80aab373a6011dbae7beeeab0d2f2fbc7",
+      "size": 756
+    },
+    {
+      "blob": "371e3a8863aa69ac5a315a2aefbe20928e1c5f21",
+      "capture_id": "statement_profit_and_loss_opening_difference_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_difference_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "4278ab03fd46f83350ac45b005d81aff1ae4a41d0242b06257f5a5ba624fb1e4",
+      "size": 1624
+    },
+    {
+      "blob": "0c4707779c8c59d5efbee1b459d4190c132bd152",
+      "capture_id": "statement_profit_and_loss_opening_difference_fy_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_difference_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ff2275a33834338811b0791778f46c0da0d6e479d2471689dd5e441d65267089",
+      "size": 760
+    },
+    {
+      "blob": "87ba0b33d89fcfb55c7942252de608b1c3350942",
+      "capture_id": "statement_trial_balance_opening_difference_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_trial_balance_opening_difference_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5a1d6ffbf61211d000217e91a1a7fa76bea0bcc6a9e429d25be05607540a40c2",
+      "size": 11128
+    },
+    {
+      "blob": "5adce8e8bcb3602834832f96858cc025daafd11a",
+      "capture_id": "statement_trial_balance_opening_difference_fy_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_trial_balance_opening_difference_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "71978ac472922d01e16864b61bb65ecf342e7070bb0ebbea068dd52abdad2559",
+      "size": 1142
     }
   ]
 }

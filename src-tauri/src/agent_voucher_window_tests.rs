@@ -3912,6 +3912,296 @@ async fn call_vouchers_over(plans: Vec<ScenarioPlan>) -> Value {
     response
 }
 
+/// The `vouchers` tool over a counted book whose window is empty, then the
+/// empty-window corroboration (#1240): its own census of the window widened by
+/// a day each side, whose answer is `corroboration_census`, and, when that
+/// holds no voucher, the company's mark. Returns the response and the requests
+/// Bridge sent.
+async fn empty_window_over_a_counted_book(
+    corroboration_census: String,
+) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>) {
+    let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+    let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
+    plans.extend(paired(&mark(limits.census_capacity())));
+    // the window's census and its read: both empty
+    plans.extend(paired(&xml_plan(empty_collection())));
+    plans.extend(paired(&xml_plan(empty_collection())));
+    // the corroboration's census of the widened window, then the mark when it holds nothing
+    let holds_nothing = corroboration_census == empty_collection();
+    plans.extend(paired(&xml_plan(corroboration_census)));
+    if holds_nothing {
+        plans.extend(paired(&mark(limits.census_capacity())));
+    }
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let response = server_at(simulator.address(), directory.path())
+        .call_tool(
+            "vouchers",
+            json!({"company_guid": GUID, "from": "20260801", "to": "20260831"}),
+        )
+        .await;
+    simulator.cancel();
+    let sent = simulator
+        .finish()
+        .unwrap()
+        .into_iter()
+        .filter(|request| !request.method.is_empty())
+        .collect();
+    (response, sent)
+}
+
+/// The requests that asked for the widened window's vouchers, whole.
+fn widened_window_reads(sent: &[tally_protocol_simulator::ObservedRequest]) -> usize {
+    let wider = render_agent_vouchers(
+        &company(),
+        &tally_date("20260731"),
+        &tally_date("20260901"),
+        None,
+    )
+    .unwrap();
+    sent.iter()
+        .filter(|request| request.request_body_sha256 == request_sha(&wider))
+        .count()
+}
+
+fn widened_census_reads(sent: &[tally_protocol_simulator::ObservedRequest]) -> usize {
+    let census = render_agent_voucher_census(
+        &company(),
+        &tally_date("20260731"),
+        &tally_date("20260901"),
+        None,
+    )
+    .unwrap();
+    sent.iter()
+        .filter(|request| request.request_body_sha256 == request_sha(&census))
+        .count()
+}
+
+/// #1240: a voucher on the day beside an empty window leave it `partial`,
+/// `empty_window_wider_read_nonempty`, and the corroboration sends its own census of
+/// the widened window and no read of that window's vouchers.
+#[tokio::test]
+async fn an_empty_window_beside_a_voucher_is_corroborated_by_a_census_alone() {
+    let (response, sent) =
+        empty_window_over_a_counted_book(relabelled(&vouchers_kept(1), &[(1, "20260731")])).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{response}");
+    assert_eq!(
+        result["reason"], "empty_window_wider_read_nonempty",
+        "{response}"
+    );
+    assert_eq!(
+        widened_census_reads(&sent),
+        2,
+        "one paired census of the widened window"
+    );
+    assert_eq!(widened_window_reads(&sent), 0);
+    // 4 prelude legs, then the marks, the window's census, the window and the
+    // corroboration's census, each a pair of 6.
+    assert_eq!(sent.len(), 4 + 4 * 6);
+}
+
+/// #1240: a voucher inside the window that the window's own census did not
+/// count contradicts the empty answer: the corroboration's census is its own
+/// read, not the first read's count again.
+#[tokio::test]
+async fn the_corroborations_census_is_its_own_read() {
+    let (response, sent) =
+        empty_window_over_a_counted_book(relabelled(&vouchers_kept(1), &[(1, "20260815")])).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "window_contradicted",
+        "{response}"
+    );
+    assert_eq!(widened_census_reads(&sent), 2);
+    assert_eq!(widened_window_reads(&sent), 0);
+}
+
+/// #1240: the corroboration's census, divided into two spans on a book whose
+/// mark is just past one, is bracketed as a divided window read is: the marks
+/// are read again after its last request, and marks that moved refuse it.
+/// `closing_mark` is the mark read after the census.
+async fn empty_window_over_a_two_span_book(closing_mark: u64, hit: Option<&str>) -> Value {
+    let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
+    let opened = capacity + 1;
+    let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
+    plans.extend(paired(&mark(opened)));
+    // the window's census (two spans) and its read, all empty
+    plans.extend(paired(&xml_plan(empty_collection())));
+    plans.extend(paired(&xml_plan(empty_collection())));
+    plans.extend(paired(&xml_plan(empty_collection())));
+    // the corroboration's census (two spans), then the marks read after it
+    plans.extend(paired(&xml_plan(empty_collection())));
+    // a voucher the second span counted, on the day beside the window or inside it
+    plans.extend(paired(&xml_plan(match hit {
+        Some(day) => relabelled(&vouchers_kept(1), &[(opened, day)]),
+        None => empty_collection(),
+    })));
+    plans.extend(paired(&mark(closing_mark)));
+    if closing_mark == opened && hit.is_none() {
+        // nothing moved and the widened window is empty: the company's mark decides
+        plans.extend(paired(&mark(opened)));
+    }
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let response = server_at(simulator.address(), directory.path())
+        .call_tool(
+            "vouchers",
+            json!({"company_guid": GUID, "from": "20260801", "to": "20260831"}),
+        )
+        .await;
+    simulator.cancel();
+    simulator.finish().unwrap();
+    response
+}
+
+#[tokio::test]
+async fn a_divided_corroboration_census_is_bracketed_by_the_company_marks() {
+    let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
+    let moved = empty_window_over_a_two_span_book(capacity + 3, None).await;
+    assert_eq!(
+        moved["structuredContent"]["result"]["error"]["code"], WINDOW_CHANGED_DURING_READ,
+        "{moved}"
+    );
+    let steady = empty_window_over_a_two_span_book(capacity + 1, None).await;
+    let result = &steady["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{steady}");
+    assert_eq!(result["reason"], "empty_uncorroborated", "{steady}");
+}
+
+/// #1240: a divided census that counts a voucher on the day beside the window, with the
+/// marks steady, leaves the window `partial` with the wider read's reason; a voucher it counts
+/// inside the window refuses the read, and marks that moved refuse it first.
+#[tokio::test]
+async fn a_divided_corroboration_census_with_a_hit_is_labelled_by_where_the_hit_is() {
+    let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
+    let steady = capacity + 1;
+    let beside = empty_window_over_a_two_span_book(steady, Some("20260731")).await;
+    let result = &beside["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{beside}");
+    assert_eq!(
+        result["reason"], "empty_window_wider_read_nonempty",
+        "{beside}"
+    );
+    let inside = empty_window_over_a_two_span_book(steady, Some("20260815")).await;
+    assert_eq!(
+        inside["structuredContent"]["result"]["error"]["code"], "window_contradicted",
+        "{inside}"
+    );
+    let moved = empty_window_over_a_two_span_book(steady + 2, Some("20260815")).await;
+    assert_eq!(
+        moved["structuredContent"]["result"]["error"]["code"], WINDOW_CHANGED_DURING_READ,
+        "{moved}"
+    );
+}
+
+/// #1240: a small book's corroboration that had to take the company's marks
+/// itself reports that read in its evidence, as the window read it replaced did.
+#[tokio::test]
+async fn a_small_books_corroboration_reports_the_marks_it_had_to_take() {
+    async fn evidence_bytes(known: Option<CompanyMarks>) -> usize {
+        let mut plans = Vec::new();
+        if known.is_none() {
+            plans.extend(paired(&mark(3)));
+        }
+        plans.extend(paired(&xml_plan(empty_collection())));
+        plans.extend(paired(&mark(3)));
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let (evidence, partial, reason) = server_at(simulator.address(), directory.path())
+            .corroborate_empty_voucher_read(
+                &identity(),
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260831"),
+                known,
+            )
+            .await
+            .unwrap();
+        simulator.finish().unwrap();
+        assert!(partial);
+        assert_eq!(reason, Some("empty_uncorroborated"));
+        evidence.bytes
+    }
+    let given = evidence_bytes(Some(marks_of(3))).await;
+    let taken = evidence_bytes(None).await;
+    assert!(
+        taken > given,
+        "{taken} bytes with the marks read, {given} without"
+    );
+}
+
+/// #1240: nothing in the widened window leaves it `empty_uncorroborated`
+/// after the census and the company's mark; before, the same book also paid
+/// for a read of the widened window's vouchers.
+#[tokio::test]
+async fn an_empty_widened_window_costs_a_census_and_the_mark() {
+    let (response, sent) = empty_window_over_a_counted_book(empty_collection()).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{response}");
+    assert_eq!(result["reason"], "empty_uncorroborated", "{response}");
+    assert_eq!(widened_census_reads(&sent), 2);
+    assert_eq!(widened_window_reads(&sent), 0);
+    assert_eq!(sent.len(), 4 + 5 * 6);
+}
+
+/// #1240: under Education, an empty window on days Education serves (the 1st
+/// to the 31st) whose widened day either side it does not serve (the 30th) is
+/// refused at the corroboration's own census, before that census is sent: on a
+/// counted book the widened read's own census gave the same refusal, and the
+/// census-only corroboration cannot take a census Education answered empty as
+/// a corroboration.
+#[tokio::test]
+async fn education_refuses_the_corroboration_census_of_a_widened_window_it_cannot_serve() {
+    let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+    let mut plans = vec![
+        education_company_plan(),
+        status_plan(),
+        education_company_plan(),
+        status_plan(),
+    ];
+    plans.extend(education_paired(&mark(limits.census_capacity())));
+    // the window's census and its read, on days Education serves
+    plans.extend(education_paired(&xml_plan(empty_collection())));
+    plans.extend(education_paired(&xml_plan(empty_collection())));
+    // the corroboration's census of 30 April to 1 June: refused at the guard,
+    // so only its opening identity leg is spent
+    plans.push(education_company_plan());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let response = server_at(simulator.address(), directory.path())
+        .call_tool(
+            "vouchers",
+            json!({"company_guid": GUID, "from": "20260501", "to": "20260531"}),
+        )
+        .await;
+    simulator.cancel();
+    let sent: Vec<_> = simulator
+        .finish()
+        .unwrap()
+        .into_iter()
+        .filter(|request| !request.method.is_empty())
+        .collect();
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "window_part_boundary_unsupported_in_education",
+        "{response}"
+    );
+    let widened = render_agent_voucher_census(
+        &company(),
+        &tally_date("20260430"),
+        &tally_date("20260601"),
+        None,
+    )
+    .unwrap();
+    assert!(sent
+        .iter()
+        .all(|request| request.request_body_sha256 != request_sha(&widened)));
+    // 4 prelude legs, the marks read, the window's census and its read (six each),
+    // then the corroboration census's opening identity leg alone: the refusal is
+    // at the corroboration, not earlier.
+    assert_eq!(sent.len(), 4 + 3 * 6 + 1);
+}
+
 /// #985, #1029: one rule labels the window. A window the census counted is
 /// `complete`, and the `vouchers` tool counts every book that has held a
 /// voucher, including one whose mark alone shows it fits a request, so both
@@ -7197,4 +7487,34 @@ fn a_ledger_name_with_colons_survives_the_trip_through_the_refusal_string() {
         failure.read_detail.unwrap().unplaced_ledger.as_deref(),
         Some("Acme: North, Ltd: Unit 2")
     );
+}
+
+/// #1240: a counted voucher on either end day of the window is inside it, a voucher on the day
+/// before or after is not, and an empty census holds nothing.
+#[test]
+fn a_census_holds_a_voucher_between_two_days_including_both_ends() {
+    let (from, to) = (
+        TallyDate::parse("20260802").unwrap(),
+        TallyDate::parse("20260804").unwrap(),
+    );
+    for (days, expected) in [
+        (vec![("20260802", 1)], true),
+        (vec![("20260803", 2)], true),
+        (vec![("20260804", 1)], true),
+        (vec![("20260801", 3), ("20260805", 1)], false),
+        (vec![], false),
+    ] {
+        let census = census_of(&days);
+        assert_eq!(
+            census.holds_a_voucher_between(&from, &to).unwrap(),
+            expected,
+            "{days:?}"
+        );
+        assert_eq!(census.is_empty(), days.is_empty(), "{days:?}");
+    }
+    // a window that ends before it starts is refused, not a panic in the range
+    let census = census_of(&[("20260803", 1)]);
+    assert!(census.holds_a_voucher_between(&from, &to).unwrap());
+    let failure = census.holds_a_voucher_between(&to, &from).unwrap_err();
+    assert_eq!(failure.code, "invalid_date_range");
 }

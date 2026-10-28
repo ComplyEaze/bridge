@@ -625,22 +625,28 @@ pub(super) struct TransferFacts {
     pub(super) retired_skips: usize,
     /// Skips whose row a batch holds as a voucher, and that are not retired.
     pub(super) held: Vec<HeldSkip>,
+    /// The company's batches a recorded rollback covers (#1050): any row that
+    /// names one is marked restored.
+    pub(super) restored: BTreeSet<String>,
     /// Statement Contras left out because they are not two ledgers with equal
     /// positive amounts, or have no leg on the statement's bank.
     // Counted for the tests; no tool reports it, since the coverage rule already
-    // withholds `not_found` where such a Contra sits.
+    // withholds `not_found` and `tally_unchecked` (the row reads `not_established`)
+    // where such a Contra sits.
     #[cfg_attr(not(test), allow(dead_code))]
     pub(super) contras_not_two_leg: usize,
     /// Contras of a lineage that holds statement facts, with no facts entry in
     /// any of its builds: not seen, and the days they sit on are not cover.
     // Counted for the tests; no tool reports it, since the coverage rule already
-    // withholds `not_found` where such a Contra sits.
+    // withholds `not_found` and `tally_unchecked` (the row reads `not_established`)
+    // where such a Contra sits.
     #[cfg_attr(not(test), allow(dead_code))]
     pub(super) contras_without_facts: usize,
     /// Contras of a build never sent and never found, whose row a sent or found
     /// batch of another lineage holds.
     // Counted for the tests; no tool reports it, since the coverage rule already
-    // withholds `not_found` where such a Contra sits.
+    // withholds `not_found` and `tally_unchecked` (the row reads `not_established`)
+    // where such a Contra sits.
     #[cfg_attr(not(test), allow(dead_code))]
     pub(super) contras_superseded: usize,
     /// The skips, kept or held elsewhere, that some build of the company which
@@ -675,6 +681,11 @@ pub(super) struct HeldSkip {
     /// the first found posted that did not record the withdrawal.
     pub(super) holder: BatchId,
     pub(super) by: HeldBy,
+    /// Whether the skip is judged against the Contras when a person names it
+    /// in `withdraw_skips`. Not for a skip held only because a recorded
+    /// rollback covers the batch that would have retired it (#1050): master
+    /// retired it, so it pairs with nothing and is no skip to withdraw.
+    pub(super) pairs: bool,
 }
 
 /// A batch as the journal leaves it.
@@ -684,12 +695,18 @@ struct Batch {
     facts: Option<(ValidFacts, DateTime<FixedOffset>)>,
     status: String,
     sent: bool,
+    /// Ever read `posted_verified`, and not covered by a recorded rollback.
     found: bool,
+    /// Ever read `posted_verified`, covered or not.
+    ever_found: bool,
+    /// A recorded rollback covers it (#1050): its vouchers may have been
+    /// removed, so it is neither found nor verified, whatever its statuses.
+    covered: bool,
 }
 
 impl Batch {
     fn is_verified(&self) -> bool {
-        self.status == POSTED_VERIFIED
+        self.status == POSTED_VERIFIED && !self.covered
     }
 
     fn endpoint(&self) -> Result<&str, TransferFactsError> {
@@ -756,6 +773,7 @@ fn admit_facts(
 fn fold_batches(
     events: Vec<JournalEvent>,
     company_guid: &str,
+    covered: &BTreeSet<String>,
 ) -> Result<Vec<Batch>, TransferFactsError> {
     let mut batches: Vec<Batch> = Vec::new();
     let mut index: BTreeMap<String, usize> = BTreeMap::new();
@@ -775,6 +793,7 @@ fn fold_batches(
                         }
                         // the batch keeps its place, and its content is the latest record's
                         batch.found |= line.status == POSTED_VERIFIED;
+                        batch.ever_found |= line.status == POSTED_VERIFIED;
                         batch.status = line.status.clone();
                         batch.facts = admit_facts(&line)?;
                         batch.line = *line;
@@ -787,9 +806,11 @@ fn fold_batches(
                         batches.push(Batch {
                             status: line.status.clone(),
                             found: line.status == POSTED_VERIFIED,
+                            ever_found: line.status == POSTED_VERIFIED,
                             line,
                             facts,
                             sent: false,
+                            covered: false,
                         });
                     }
                 }
@@ -803,10 +824,17 @@ fn fold_batches(
                 if let Some(&at) = index.get(&batch_id) {
                     let batch = &mut batches[at];
                     batch.found |= status == POSTED_VERIFIED;
+                    batch.ever_found |= status == POSTED_VERIFIED;
                     batch.sent |= sent;
                     batch.status = status;
                 }
             }
+        }
+    }
+    for batch in &mut batches {
+        if covered.contains(&batch.line.batch_id) {
+            batch.covered = true;
+            batch.found = false;
         }
     }
     Ok(batches)
@@ -1173,9 +1201,10 @@ pub(super) fn build_transfer_facts(
     events: Vec<JournalEvent>,
     skip_records: Vec<SkipOnlyRecord>,
     company_guid: &str,
+    covered: &BTreeSet<String>,
 ) -> Result<TransferFacts, TransferFactsError> {
     let company = CompanyGuid::new(canonical_batch_guid(company_guid));
-    let batches = fold_batches(events, company_guid)?;
+    let batches = fold_batches(events, company_guid, covered)?;
     let mut lineages: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
     for (at, batch) in batches.iter().enumerate() {
         lineages
@@ -1336,15 +1365,30 @@ pub(super) fn build_transfer_facts(
         match holders.get(mention.row.as_str()) {
             None => skips.push(mention.fact),
             Some(holding) => {
-                let contradicting = holding.batches.iter().copied().find(|&at| {
-                    batches[at].found
-                        && withdrawn_at
-                            .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
-                            .is_none_or(|recorded| !withdrawal_counts(recorded, &mention.built))
-                });
+                let unwithdrawn = |at: usize| {
+                    withdrawn_at
+                        .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
+                        .is_none_or(|recorded| !withdrawal_counts(recorded, &mention.built))
+                };
+                let contradicting = holding
+                    .batches
+                    .iter()
+                    .copied()
+                    .find(|&at| batches[at].found && unwithdrawn(at));
                 let any_posted = holding.batches.iter().any(|&at| batches[at].found);
-                match (contradicting, any_posted) {
-                    (None, true) => {
+                // What the skip would be with no rollback covering a holder,
+                // every batch ever read posted counting as found (#1050): a
+                // rollback never retires a skip that would otherwise be held,
+                // and a skip retired then stays out of every admission.
+                let retired_without_cover =
+                    holding.batches.iter().any(|&at| batches[at].ever_found)
+                        && !holding
+                            .batches
+                            .iter()
+                            .any(|&at| batches[at].ever_found && unwithdrawn(at));
+                let retired_but_for_cover = retired_without_cover && !any_posted;
+                match (contradicting, retired_without_cover && any_posted) {
+                    (_, true) => {
                         retired_skips += 1;
                         continue;
                     }
@@ -1352,12 +1396,30 @@ pub(super) fn build_transfer_facts(
                         fact: mention.fact,
                         holder: BatchId::new(batches[at].line.batch_id.as_str()),
                         by: HeldBy::PostedBatch,
+                        pairs: true,
                     }),
+                    // A batch a recorded rollback covers is named first, so the
+                    // row's restored marker and its batch agree (#1050).
                     (None, false) => held.push(HeldSkip {
                         fact: mention.fact,
-                        holder: BatchId::new(batches[holding.latest].line.batch_id.as_str()),
+                        holder: BatchId::new(
+                            batches[holding
+                                .batches
+                                .iter()
+                                .rev()
+                                .copied()
+                                .find(|&at| batches[at].covered)
+                                .unwrap_or(holding.latest)]
+                            .line
+                            .batch_id
+                            .as_str(),
+                        ),
                         by: HeldBy::UnverifiedBatch,
+                        pairs: !retired_but_for_cover,
                     }),
+                }
+                if retired_but_for_cover {
+                    continue;
                 }
             }
         }
@@ -1413,12 +1475,18 @@ pub(super) fn build_transfer_facts(
             coverage.add(company.clone(), endpoint, bank_ledger, window)?;
         }
     }
+    let restored = batches
+        .iter()
+        .filter(|batch| batch.covered)
+        .map(|batch| batch.line.batch_id.clone())
+        .collect();
     Ok(TransferFacts {
         skips,
         contras: kept,
         coverage,
         retired_skips,
         held,
+        restored,
         contras_not_two_leg,
         contras_without_facts,
         contras_superseded,

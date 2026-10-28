@@ -1,0 +1,58 @@
+# fixture: agent/gst-ledger-l1/s6-08nov-w-1.utf16le.xml
+# parser: parse_agent_rows(GST_LEDGER_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(6),
+        "amounts": Array [
+            Object {
+                "amount": String("-10000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("GS1 Professional Fees"),
+            },
+            Object {
+                "amount": String("-1800.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Input IGST"),
+            },
+            Object {
+                "amount": String("1000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("GS1 TDS Payable"),
+            },
+            Object {
+                "amount": String("10800.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("10800.00"),
+                        "bill_date": String("20251108"),
+                        "bill_type": String("New Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("V4b"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SYN GS1 Supplier"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20251108"),
+        "guid": String("aae372c5-a894-491c-8843-5532e43d2d2f-00000006"),
+        "is_invoice": Bool(false),
+        "master_id": String("6"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("SYN GS1 Supplier"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Journal"),
+        "voucher_number": String("2"),
+        "voucher_type": String("Journal"),
+        "voucher_type_guid": String("aae372c5-a894-491c-8843-5532e43d2d2f-00000026"),
+        "voucher_type_reserved_name": String("Journal"),
+    },
+])

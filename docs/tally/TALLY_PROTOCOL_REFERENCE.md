@@ -159,6 +159,9 @@ base revision.
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)
+<a id="84-a-partys-dated-mailing-details-are-in-ledmailingdetailslist-which-the-fetch-must-name--verified-2026-10-12-tallyprime-71-one-synthetic-book"></a>
+
+[8.4 A party's dated mailing details are in `LEDMAILINGDETAILS.LIST`, which the `FETCH` must name — **VERIFIED 2026-10-12; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#84-a-partys-dated-mailing-details-are-in-ledmailingdetailslist-which-the-fetch-must-name--verified-2026-10-12-tallyprime-71-one-synthetic-book)
 <a id="9-writes-import"></a>
 
 [9. Writes (import)](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#9-writes-import)

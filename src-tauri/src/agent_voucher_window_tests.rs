@@ -756,18 +756,13 @@ fn an_unobservable_high_water_mark_is_not_read_as_an_empty_book() {
     let guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
     assert_eq!(
         company_marks(&mark_xml(guid, "<ALTVCHID>42</ALTVCHID>"), guid),
-        Ok(CompanyMarks {
-            vouchers: 42,
-            masters: 7
-        })
+        Ok(CompanyMarks::new(Some(42), 7))
     );
-    // Tally omits ALTVCHID for a company that has never held a voucher.
+    // Tally omits ALTVCHID for a company that has never held a voucher: a mark
+    // of 0 for every comparison, recorded as not reported.
     assert_eq!(
         company_marks(&mark_xml(guid, ""), guid),
-        Ok(CompanyMarks {
-            vouchers: 0,
-            masters: 7
-        })
+        Ok(CompanyMarks::new(None, 7))
     );
     assert_eq!(
         company_marks(&mark_xml(guid, "<ALTVCHID>x</ALTVCHID>"), guid),
@@ -874,10 +869,7 @@ fn mark_xml(guid: &str, altvchid: &str) -> String {
 
 /// The marks `mark(value)` serves: the master mark of `mark_xml` is 7.
 fn marks_of(vouchers: u64) -> CompanyMarks {
-    CompanyMarks {
-        vouchers,
-        masters: 7,
-    }
+    CompanyMarks::new(Some(vouchers), 7)
 }
 
 /// A high-water response carrying both marks.
@@ -990,6 +982,7 @@ fn server_with(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -5438,6 +5431,25 @@ async fn whole_counted_window() -> Vec<Value> {
     let response =
         call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
     page_items_of(&response)
+}
+
+/// #1984: the snapshot of a book whose marks answer omits `ALTVCHID` shows no voucher mark,
+/// not a 0 Tally never sent, while a mark Tally sent as 0 is shown as 0.
+#[tokio::test]
+async fn the_snapshot_shows_no_voucher_mark_only_when_tally_sent_none() {
+    for (altvchid, shown) in [("", Value::Null), ("<ALTVCHID>0</ALTVCHID>", json!(0))] {
+        let mut plans = identity_plans();
+        plans.extend(paired(&xml_plan(mark_xml(GUID, altvchid))));
+        // The window, the day-wider read that corroborates an empty window, and the closing marks.
+        plans.extend(paired(&xml_plan(empty_collection())));
+        plans.extend(paired(&xml_plan(empty_collection())));
+        plans.extend(paired(&xml_plan(mark_xml(GUID, altvchid))));
+        let response = call_vouchers_over(plans).await;
+        assert_ne!(response["isError"], true, "{response}");
+        let snapshot = page_snapshot(&response);
+        assert_eq!(snapshot["voucher_alter_id"], shown, "{snapshot}");
+        assert_eq!(snapshot["master_alter_id"], 7, "{snapshot}");
+    }
 }
 
 #[tokio::test]

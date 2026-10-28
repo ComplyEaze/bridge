@@ -104,7 +104,7 @@ DEFAULT_COMMIT = {
     "commit": {
         "message": "safe commit metadata",
         "author": {"name": "Maintainer", "email": "maintainer@example.invalid"},
-        "committer": {"name": "Maintainer", "email": "maintainer@example.invalid"},
+        "committer": {"name": "Maintainer", "email": "maintainer@example.invalid", "date": "2026-10-01T09:00:00Z"},
     },
     "author": {"login": "author"},
     "committer": {"login": "author"},
@@ -535,6 +535,9 @@ def state():
 
     elif scenario == "changes-the-review-tier":
         set_changes(s, ("modified", "scripts/review-tier-paths.json"))
+
+    elif scenario == "changes-the-attribution-check":
+        set_changes(s, ("modified", "scripts/check-ai-attribution.mjs"))
 
     elif scenario == "changes-a-workflow":
         set_changes(s, ("modified", ".github/workflows/ci.yml"))
@@ -976,7 +979,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\n\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\n"
         )
         s["commits"] = [commit]
 
@@ -985,8 +988,43 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\r\n\r\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\r\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\r\n"
         )
+        s["commits"] = [commit]
+
+    elif scenario in ("attribution-body-plain", "attribution-body-link", "attribution-body-comment", "attribution-title"):
+        # The line the owner banned on 25 Oct 2026, in both of its forms, in the body (visible and inside an HTML comment) and the title.
+        plain = "\U0001F916 Generated with Claude Code"
+        link = "\U0001F916 Generated with [Claude Code](https://claude.com/claude-code)"
+        if scenario == "attribution-title":
+            s["title"] = "Fix a thing " + plain
+        else:
+            s["body"] = DEFAULT_BODY + {"attribution-body-plain": plain, "attribution-body-link": link, "attribution-body-comment": "<!-- " + link + " -->"}[scenario] + "\n"
+
+    elif scenario in ("attribution-body-trailer", "attribution-body-markdown", "attribution-body-with-unproven-commits"):
+        # The body is copied into the commit on master by a squash merge, so a co-author line there counts; Markdown does not hide the line.
+        line = {"attribution-body-trailer": "Co-Authored-By: Claude",
+                "attribution-body-markdown": "Generated with **[Claude Code](https://claude.com/claude-code)**",
+                "attribution-body-with-unproven-commits": "Generated with Claude Code"}[scenario]
+        s["body"] = DEFAULT_BODY + line + "\n"
+        if scenario == "attribution-body-with-unproven-commits":
+            s["commits"] = []
+
+    elif scenario == "attribution-identity":
+        commit = dict(DEFAULT_COMMIT)
+        commit["commit"] = dict(DEFAULT_COMMIT["commit"])
+        commit["commit"]["committer"] = {"name": "Claude", "email": PUBLIC_AGENT_ADDRESS, "date": "2026-10-01T09:00:00Z"}
+        s["commits"] = [commit]
+
+    elif scenario in ("attribution-trailer-after", "attribution-trailer-before", "attribution-trailer-undated", "attribution-trailer-human-after"):
+        commit = dict(DEFAULT_COMMIT)
+        commit["commit"] = dict(DEFAULT_COMMIT["commit"])
+        committer = dict(DEFAULT_COMMIT["commit"]["committer"])
+        co_author = "Co-Authored-By: " + ("A Person <person@example.invalid>" if scenario == "attribution-trailer-human-after" else "Claude <" + PUBLIC_AGENT_ADDRESS + ">")
+        commit["commit"]["message"] = "Keep the ledger-tag refusal typed.\n\n" + co_author + "\n"
+        committer["date"] = {"attribution-trailer-after": "2026-10-25T13:00:00Z", "attribution-trailer-human-after": "2026-10-26T09:00:00Z",
+                             "attribution-trailer-before": "2026-10-25T12:59:59Z", "attribution-trailer-undated": ""}[scenario]
+        commit["commit"]["committer"] = committer
         s["commits"] = [commit]
 
     elif scenario == "customer-coauthor-trailer":
@@ -1042,7 +1080,7 @@ def state():
         extra = "#\tdocs/x.json\n" if scenario == "merge-commit-conflict-comment-block" else "# contact customer" + "@" + "company.test\n"
         commit["commit"]["message"] = (
             "Merge master into the lane branch\n\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\n\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\n\n"
             "# Conflicts:\n" + extra
         )
         s["commits"] = [commit]
@@ -1052,7 +1090,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\n\n"
-            "X-Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\n"
+            "X-Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\n"
         )
         s["commits"] = [commit]
 
@@ -1060,7 +1098,7 @@ def state():
         commit = dict(DEFAULT_COMMIT)
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\n\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\n\n"
             "This is ordinary commit body text, not a trailer footer.\n"
         )
         s["commits"] = [commit]
@@ -1069,7 +1107,7 @@ def state():
         commit = dict(DEFAULT_COMMIT)
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\r\n\r\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\r\n\r\n"
             "This is ordinary commit body text, not a trailer footer.\r\n"
         )
         s["commits"] = [commit]
@@ -1079,7 +1117,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\n\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\r\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\r\n"
         )
         s["commits"] = [commit]
 
@@ -1088,7 +1126,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\n\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + "\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + "\n"
         )
         s["commits"] = [commit]
 
@@ -1097,7 +1135,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\r\n\r\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + "\r\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + "\r\n"
         )
         s["commits"] = [commit]
 
@@ -1106,7 +1144,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\n\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + "> extra\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + "> extra\n"
         )
         s["commits"] = [commit]
 

@@ -19,6 +19,7 @@
 
 mod compute;
 mod date;
+mod group_name_index;
 mod ledger_currency;
 mod model;
 mod request;
@@ -29,6 +30,7 @@ pub use compute::{
     NativeGroupSnapshot, NativeMasterSnapshot,
 };
 pub use date::{parse_native_bill_date, parse_native_due_date};
+pub use group_name_index::{parse_group_name_index, GroupNameIndexError, GroupNameRow, NameShape};
 pub use ledger_currency::{
     classify_ledger_currencies, parse_currency_master_list, BaseCurrencyName, CurrencyMasters,
     ForeignCurrencyLedger, IdentifiedBaseCurrency, LedgerCurrencies, LedgerCurrencyRefusal,
@@ -45,7 +47,9 @@ pub use request::{
     render_native_voucher_export_request, render_native_voucher_type_export_request,
     render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
     render_party_ledger_master_request_for_parents_with_gst_details,
-    render_party_ledger_master_request_with_gst_details, NativeBillsReportKind,
+    render_party_ledger_master_request_for_parents_with_mailing_details,
+    render_party_ledger_master_request_with_gst_details,
+    render_party_ledger_master_request_with_mailing_details, NativeBillsReportKind,
     NativeLedgerExportPeriod, NativeLedgerExportPeriodError, NativeLedgerSnapshotPeriod,
     NativeLedgerSnapshotPeriodError,
 };

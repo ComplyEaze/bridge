@@ -1,6 +1,6 @@
 use super::*;
 
-fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 7] {
+fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 8] {
     [
         ReadOnlyProfile::CompanyListV1,
         ReadOnlyProfile::CompanyListV2,
@@ -8,6 +8,7 @@ fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 7] {
         ReadOnlyProfile::StandardLedgerIdentityV1 { company },
         ReadOnlyProfile::StandardLedgerCatalogV1 { company },
         ReadOnlyProfile::StandardLedgerCatalogV2 { company },
+        ReadOnlyProfile::StandardLedgerCatalogV3 { company },
         ReadOnlyProfile::LedgersV1 { company },
     ]
 }
@@ -142,6 +143,10 @@ fn profile_ids_and_template_hashes_are_stable() {
         (
             ReadOnlyProfileId::StandardLedgerCatalogV2,
             "e93bbf843455db2a4c9f77991c52b16f10b16bbb792af5ecae4909a48216a62e",
+        ),
+        (
+            ReadOnlyProfileId::StandardLedgerCatalogV3,
+            "5bdc4b7c5c1baec328934aa5f090efd72ac821956defe63a58a4cc44909d9462",
         ),
         (
             ReadOnlyProfileId::LedgersV1,
@@ -582,6 +587,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
             | ReadOnlyProfileId::StandardLedgerIdentityV1
             | ReadOnlyProfileId::StandardLedgerCatalogV1
             | ReadOnlyProfileId::StandardLedgerCatalogV2
+            | ReadOnlyProfileId::StandardLedgerCatalogV3
             | ReadOnlyProfileId::LedgersV1
             | ReadOnlyProfileId::AuditCompanyObjectV1
             | ReadOnlyProfileId::InvoiceCompanyHsnV1
@@ -597,6 +603,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         ReadOnlyProfileId::StandardLedgerIdentityV1,
         ReadOnlyProfileId::StandardLedgerCatalogV1,
         ReadOnlyProfileId::StandardLedgerCatalogV2,
+        ReadOnlyProfileId::StandardLedgerCatalogV3,
         ReadOnlyProfileId::LedgersV1,
         ReadOnlyProfileId::AuditCompanyObjectV1,
         ReadOnlyProfileId::InvoiceCompanyHsnV1,
@@ -691,5 +698,79 @@ fn the_v2_catalogue_request_is_v1_plus_the_bill_wise_method() {
     assert_ne!(
         ReadOnlyProfileId::StandardLedgerCatalogV1.template_sha256(),
         ReadOnlyProfileId::StandardLedgerCatalogV2.template_sha256()
+    );
+}
+
+/// V3 is V2 and one more native method, `AlterID`, placed straight after
+/// `IsBillWiseOn` and formatted like it; V2's own bytes are not touched.
+#[test]
+fn the_v3_catalogue_request_is_v2_plus_the_alter_id_method() {
+    let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
+    let v2 = ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render();
+    let v3 = ReadOnlyProfile::StandardLedgerCatalogV3 { company: &company }.render();
+    let method = "<NATIVEMETHOD>AlterID</NATIVEMETHOD>";
+    assert_eq!(v3.matches(method).count(), 1);
+    assert!(!v2.contains(method));
+    assert_eq!(
+        v3.lines()
+            .filter(|line| !line.contains(method))
+            .collect::<Vec<_>>(),
+        v2.lines().collect::<Vec<_>>()
+    );
+    let lines = v3.lines().collect::<Vec<_>>();
+    let bill_wise = lines
+        .iter()
+        .position(|line| line.trim() == "<NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>")
+        .unwrap();
+    assert_eq!(
+        lines[bill_wise + 1],
+        format!("                        {method}")
+    );
+    assert_eq!(
+        ReadOnlyProfileId::StandardLedgerCatalogV3.as_str(),
+        "standard_ledger_catalog_v3"
+    );
+    assert_ne!(
+        ReadOnlyProfileId::StandardLedgerCatalogV2.template_sha256(),
+        ReadOnlyProfileId::StandardLedgerCatalogV3.template_sha256()
+    );
+}
+
+/// The exact bytes V3 sends for a sample company.
+#[test]
+fn the_v3_catalogue_request_renders_these_exact_bytes() {
+    let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
+    let expected = r#"<ENVELOPE>
+    <HEADER>
+        <VERSION>1</VERSION>
+        <TALLYREQUEST>EXPORT</TALLYREQUEST>
+        <TYPE>COLLECTION</TYPE>
+        <ID>List of Ledgers</ID>
+    </HEADER>
+    <BODY>
+        <DESC>
+            <STATICVARIABLES>
+                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+                <SVCURRENTCOMPANY>BRIDGE SYNTHETIC BOOK</SVCURRENTCOMPANY>
+            </STATICVARIABLES>
+            <TDL>
+                <TDLMESSAGE>
+                    <COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">
+                        <NATIVEMETHOD>Name</NATIVEMETHOD>
+                        <NATIVEMETHOD>GUID</NATIVEMETHOD>
+                        <NATIVEMETHOD>Parent</NATIVEMETHOD>
+                        <NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>
+                        <NATIVEMETHOD>AlterID</NATIVEMETHOD>
+                        <COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>
+                        <COMPUTE>BRIDGECOMPANYNAME:##SVCurrentCompany</COMPUTE>
+                    </COLLECTION>
+                </TDLMESSAGE>
+            </TDL>
+        </DESC>
+    </BODY>
+</ENVELOPE>"#;
+    assert_eq!(
+        ReadOnlyProfile::StandardLedgerCatalogV3 { company: &company }.render(),
+        expected
     );
 }

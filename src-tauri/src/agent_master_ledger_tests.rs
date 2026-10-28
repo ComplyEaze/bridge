@@ -90,21 +90,23 @@ fn response_for(batch: &MasterBatch) -> MasterDispatchResponse {
 }
 
 fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict {
-    MasterVerdict {
-        batch_id: batch.batch_id.clone(),
-        batch_sha256: batch.batch_sha256.clone(),
+    MasterVerdict::for_test(
+        batch.batch_id.clone(),
+        batch.batch_sha256.clone(),
         state,
-        items: batch
+        batch
             .items
             .iter()
             .enumerate()
             .map(|(index, item)| VerdictItem {
                 name: item.name.clone(),
-                guid: Some(format!("0000000{index}-aaaa-bbbb-cccc-dddddddddddd")),
+                // A ledger confirmed absent has no GUID to name.
+                guid: (state != MasterVerdictState::ConfirmedAbsent)
+                    .then(|| format!("0000000{index}-aaaa-bbbb-cccc-dddddddddddd")),
                 reason: None,
             })
             .collect(),
-    }
+    )
 }
 
 fn lock() -> ExclusiveAdmission {
@@ -139,6 +141,26 @@ fn read(text: &str) -> Result<MasterJournal, MasterLedgerError> {
 
 fn invalid(reason: Invalid) -> MasterLedgerError {
     MasterLedgerError::Invalid(reason)
+}
+
+/// A batch, its intent and an answer that counted nothing created or altered:
+/// what a terminal `confirmed_absent` may follow.
+fn quiet_prefix(batch: &MasterBatch) -> String {
+    let mut response = response_for(batch);
+    response.counters = Some(MasterCounters {
+        created: 0,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 0,
+    });
+    journal_text(&[
+        MasterRecord::Batch(batch.clone()),
+        MasterRecord::DispatchIntent(intent_for(batch)),
+        MasterRecord::DispatchResponse(response),
+    ])
 }
 
 fn journal_text(records: &[MasterRecord]) -> String {
@@ -992,6 +1014,8 @@ fn an_open_dispatch_blocks_a_new_batch_of_the_same_ledgers() {
         MasterLedgerError::OpenDispatchOverlaps
     );
     // A terminal verdict settles it, and the same ledgers may be sent again.
+    // A verified create rests on Tally's answer, recorded first.
+    records.push(MasterRecord::DispatchResponse(response_for(&first)));
     records.push(MasterRecord::Verdict(verdict_for(
         &first,
         MasterVerdictState::PostedVerified,
@@ -1023,7 +1047,7 @@ fn append_refuses_an_overlapping_intent_and_writes_nothing() {
 #[test]
 fn the_first_terminal_verdict_wins_and_a_later_one_is_refused() {
     let batch = batch(&batch_id());
-    let prefix = journal_text(&full_records(&batch)[..3]);
+    let prefix = quiet_prefix(&batch);
     let verdict = |state| line(&MasterRecord::Verdict(verdict_for(&batch, state)));
     // Verdicts that settle nothing may repeat and may be followed by a terminal one.
     let open = [
@@ -1049,6 +1073,7 @@ fn the_first_terminal_verdict_wins_and_a_later_one_is_refused() {
         MasterVerdictState::PostedVerified,
         MasterVerdictState::PostedIntoExistingMaster,
         MasterVerdictState::MasterWriteLocatedElsewhere,
+        MasterVerdictState::ConfirmedAbsent,
     ] {
         for later in [terminal, open[0], MasterVerdictState::PostedVerified] {
             assert_eq!(
@@ -1059,6 +1084,224 @@ fn the_first_terminal_verdict_wins_and_a_later_one_is_refused() {
     }
     assert!(!MasterVerdictState::ReconciliationRequired.is_terminal());
     assert!(!MasterVerdictState::MastersAfterPostUnconfirmed.is_terminal());
+    assert!(MasterVerdictState::ConfirmedAbsent.is_terminal());
+}
+
+/// A verified create needs Tally's counters, so `posted_verified` is admitted
+/// only after the batch's answer is on record; the other terminal verdicts can
+/// rest on a read-back alone (an answer that was lost).
+#[test]
+fn posted_verified_without_an_answer_on_record_is_refused() {
+    let batch = batch(&batch_id());
+    let without_answer = journal_text(&full_records(&batch)[..2]);
+    let verdict = |state| line(&MasterRecord::Verdict(verdict_for(&batch, state)));
+    assert_eq!(
+        read(&format!(
+            "{without_answer}{}",
+            verdict(MasterVerdictState::PostedVerified)
+        ))
+        .unwrap_err(),
+        invalid(Invalid::VerifiedWithoutResponse)
+    );
+    for state in [
+        MasterVerdictState::PostedIntoExistingMaster,
+        MasterVerdictState::MasterWriteLocatedElsewhere,
+        MasterVerdictState::MastersAfterPostUnconfirmed,
+        MasterVerdictState::ReconciliationRequired,
+    ] {
+        assert!(
+            read(&format!("{without_answer}{}", verdict(state))).is_ok(),
+            "{state:?}"
+        );
+    }
+    assert!(read(&format!(
+        "{without_answer}{}",
+        line(&MasterRecord::Verdict(absent_verdict(&batch)))
+    ))
+    .is_ok());
+    let with_answer = journal_text(&full_records(&batch)[..3]);
+    assert!(read(&format!(
+        "{with_answer}{}",
+        verdict(MasterVerdictState::PostedVerified)
+    ))
+    .is_ok());
+}
+
+/// Absence is never concluded against Tally's own count of a write: a
+/// `confirmed_absent` verdict after an answer counting a create or an
+/// alteration is refused; after an answer counting none, or none on record,
+/// it is admitted.
+#[test]
+fn confirmed_absent_against_counters_that_show_a_write_is_refused() {
+    let batch = batch(&batch_id());
+    let intent = journal_text(&full_records(&batch)[..2]);
+    let absent = line(&MasterRecord::Verdict(absent_verdict(&batch)));
+    assert!(read(&format!("{intent}{absent}")).is_ok());
+    let answered = |created: u64, altered: u64| {
+        let mut response = response_for(&batch);
+        response.counters = Some(MasterCounters {
+            created,
+            altered,
+            deleted: 0,
+            ignored: 0,
+            errors: 0,
+            cancelled: 0,
+            exceptions: 0,
+        });
+        line(&MasterRecord::DispatchResponse(response))
+    };
+    assert!(read(&format!("{intent}{}{absent}", answered(0, 0))).is_ok());
+    for (created, altered) in [(1, 0), (0, 1)] {
+        assert_eq!(
+            read(&format!("{intent}{}{absent}", answered(created, altered))).unwrap_err(),
+            invalid(Invalid::AbsentAgainstCounters),
+            "{created} {altered}"
+        );
+    }
+}
+
+/// `confirmed_absent` as a journal line: no GUID, an optional reason.
+fn absent_verdict(batch: &MasterBatch) -> MasterVerdict {
+    let mut verdict = verdict_for(batch, MasterVerdictState::ConfirmedAbsent);
+    for item in &mut verdict.items {
+        item.reason = Some("not_in_book".into());
+    }
+    verdict
+}
+
+#[test]
+fn confirmed_absent_is_a_snake_case_terminal_verdict_without_a_guid() {
+    let batch = batch(&batch_id());
+    let prefix = quiet_prefix(&batch);
+    let encoded = serde_json::to_string(&MasterVerdictState::ConfirmedAbsent).unwrap();
+    assert_eq!(encoded, "\"confirmed_absent\"");
+    let text = format!(
+        "{prefix}{}",
+        line(&MasterRecord::Verdict(absent_verdict(&batch)))
+    );
+    let journal = read(&text).unwrap();
+    let state = journal.state(&batch.batch_id).unwrap();
+    assert!(state.is_settled());
+    assert_eq!(
+        state.verdict.as_ref().map(|verdict| verdict.state),
+        Some(MasterVerdictState::ConfirmedAbsent)
+    );
+    // It counts as settled in the local-data report.
+    assert_eq!(journal.summary().not_settled, 0);
+    // A GUID on an absent ledger is a contradiction the journal refuses.
+    let mut named = absent_verdict(&batch);
+    named.items[0].guid = Some(crate::synthetic_guid(0xaabb).into());
+    assert_eq!(
+        read(&format!("{prefix}{}", line(&MasterRecord::Verdict(named)))).unwrap_err(),
+        invalid(Invalid::AbsentWithGuid)
+    );
+    // Nothing follows it, not even a verified verdict.
+    for later in [
+        MasterVerdictState::PostedVerified,
+        MasterVerdictState::ConfirmedAbsent,
+        MasterVerdictState::ReconciliationRequired,
+    ] {
+        let text = format!(
+            "{prefix}{}{}",
+            line(&MasterRecord::Verdict(absent_verdict(&batch))),
+            line(&MasterRecord::Verdict(verdict_for(&batch, later)))
+        );
+        assert_eq!(
+            read(&text).unwrap_err(),
+            invalid(Invalid::VerdictAfterTerminal)
+        );
+    }
+}
+
+#[test]
+fn confirmed_absent_stops_blocking_a_new_batch_of_the_same_ledger() {
+    let (first, mut records) = dispatched_batch("Synthetic One");
+    let (_, again) = dispatched_batch("SYNTHETIC-ONE");
+    assert_eq!(
+        read(&journal_text(&[records.clone(), again.clone()].concat())).unwrap_err(),
+        MasterLedgerError::OpenDispatchOverlaps
+    );
+    records.push(MasterRecord::Verdict(absent_verdict(&first)));
+    assert!(read(&journal_text(&[records, again].concat())).is_ok());
+}
+
+/// The two loud terminal verdicts settle a batch as the quiet ones do, so neither
+/// holds its name against a new intent. That is right, and it is the journal's
+/// documented rule (see the module notes): the person is told to check Tally for
+/// both, and what stops a second Create of a name the book now holds is the
+/// absence check against the book, made in the send's own queue, which refuses a
+/// name that exists as `master_name_taken`. Holding would not be safer: a name
+/// held for good by a loud state could never be released by any later call,
+/// because a terminal verdict is the batch's last. Whether a ledger Tally
+/// reported as altered should keep its name held until a person has looked is a
+/// question for the owner, and is not what this pins. Verdicts that leave the
+/// outcome open (`reconciliation_required`, `masters_after_post_unconfirmed`)
+/// still hold, so the test fails if a loud state were mistaken for an open one,
+/// and also if an open one were mistaken for a settled one.
+#[test]
+fn a_batch_that_ended_in_a_loud_state_does_not_hold_its_name_but_an_open_one_does() {
+    use MasterVerdictState::{
+        MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed, PostedIntoExistingMaster,
+        ReconciliationRequired,
+    };
+    for (state, holds) in [
+        (PostedIntoExistingMaster, false),
+        (MasterWriteLocatedElsewhere, false),
+        (ReconciliationRequired, true),
+        (MastersAfterPostUnconfirmed, true),
+    ] {
+        // As a journal read: the same name under a new batch id, by case and by a
+        // separator, is admitted or refused with the open-dispatch overlap.
+        let (first, mut records) = dispatched_batch("Synthetic One");
+        records.push(MasterRecord::Verdict(verdict_for(&first, state)));
+        for name in ["Synthetic One", "SYNTHETIC-ONE"] {
+            let (second, again) = dispatched_batch(name);
+            let text = journal_text(&[records.clone(), again].concat());
+            match read(&text) {
+                Ok(journal) => {
+                    assert!(!holds, "{state:?} should hold {name}");
+                    assert!(journal.state(&first.batch_id).unwrap().is_settled());
+                    assert!(journal.open_dispatch_blockers(&second).is_empty());
+                }
+                Err(error) => {
+                    assert!(holds, "{state:?} should not hold {name}");
+                    assert_eq!(error, MasterLedgerError::OpenDispatchOverlaps);
+                }
+            }
+        }
+        // As the append the post makes under the lock: the new batch's intent is
+        // written, or refused with the same error and nothing written.
+        let directory = tempfile::tempdir().unwrap();
+        let lock = lock();
+        for record in &records {
+            put(directory.path(), &lock, record.clone()).unwrap();
+        }
+        let (second, again) = dispatched_batch("Synthetic One");
+        put(directory.path(), &lock, again[0].clone()).unwrap();
+        let before = std::fs::read(directory.path().join(JOURNAL_FILE)).unwrap();
+        let journal = read_journal(directory.path()).unwrap();
+        assert_eq!(
+            journal.open_dispatch_blockers(&second).is_empty(),
+            !holds,
+            "{state:?}"
+        );
+        let appended = put(directory.path(), &lock, again[1].clone());
+        if holds {
+            assert_eq!(
+                appended.unwrap_err(),
+                MasterLedgerError::OpenDispatchOverlaps
+            );
+            assert_eq!(
+                std::fs::read(directory.path().join(JOURNAL_FILE)).unwrap(),
+                before
+            );
+        } else {
+            appended.unwrap();
+            assert!(read_journal(directory.path())
+                .unwrap()
+                .dispatched(&second.batch_id));
+        }
+    }
 }
 
 #[test]
@@ -1699,6 +1942,7 @@ fn the_summary_counts_open_intents() {
     records.extend(second);
     let (_, never_sent) = dispatched_batch("Synthetic Three");
     records.push(never_sent[0].clone());
+    records.push(MasterRecord::DispatchResponse(response_for(&first)));
     records.push(MasterRecord::Verdict(verdict_for(
         &first,
         MasterVerdictState::PostedVerified,
@@ -1712,4 +1956,42 @@ fn the_summary_counts_open_intents() {
             not_settled: 1
         }
     );
+}
+
+/// Removing a sidecar written for a refused dispatch: present, absent and
+/// unremovable are told apart, and a name that could leave the data dir is
+/// refused.
+#[test]
+fn a_sidecar_is_removed_checked() {
+    let directory = tempfile::tempdir().unwrap();
+    let batch = batch(&batch_id());
+    write_pre_image(directory.path(), &lock(), &batch, &pre_image()).unwrap();
+    let path = directory
+        .path()
+        .join(format!("master-pre-image-{}.json", batch.batch_id));
+    assert!(path.exists());
+    remove_pre_image(directory.path(), &lock(), &batch.batch_id).unwrap();
+    assert!(!path.exists());
+    // Already absent is already removed.
+    remove_pre_image(directory.path(), &lock(), &batch.batch_id).unwrap();
+    // A name that is not a batch id reaches no file.
+    assert_eq!(
+        remove_pre_image(directory.path(), &lock(), "../x"),
+        Err(PreImageError::BadBatchId)
+    );
+    // Not removable (a directory stands where the file would be): reported.
+    std::fs::create_dir(&path).unwrap();
+    let error = remove_pre_image(directory.path(), &lock(), &batch.batch_id).unwrap_err();
+    assert_eq!(error, PreImageError::RemoveFailed);
+    assert_eq!(error.code(), "master_pre_image_remove_failed");
+}
+
+#[test]
+fn two_names_differing_only_by_spaces_or_symbols_may_be_one_master() {
+    let one = |a: &str, b: &str| NameKeys::of(a).may_be_one_master(&NameKeys::of(b));
+    let (dotted, plain) = ("Synthetic Probe Pvt. Ltd.", "Synthetic Probe Pvt Ltd");
+    assert_ne!(canonical_master_key(dotted), canonical_master_key(plain));
+    assert!(one(dotted, plain));
+    assert!(one("Synthetic Fresh Party", "Synthetic FreshParty"));
+    assert!(!one("Synthetic Probe Pvt Ltd", "Synthetic Probe Pvt Ltd 2"));
 }

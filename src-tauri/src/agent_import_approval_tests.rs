@@ -2876,6 +2876,558 @@ async fn a_skip_recorded_after_the_click_is_refused_in_the_redeeming_call_and_wi
     assert_eq!(intents(directory.path()), 0);
 }
 
+// A master approval is a second kind in the same single slot. Everything below
+// is held and redeemed through the same `PostApprovals`; only the kind differs.
+
+mod masters {
+    use super::*;
+    use crate::agent::agent_import::approval::HeldRequest;
+    use crate::agent::agent_import::master_post::MasterPostRequest;
+    use crate::tally::approved_import::PostKind;
+    use crate::tally::ledger_create_item::{
+        AdmittedDutyHead, AdmittedLedgerKind, LedgerCreateItem, MasterName, PartySide,
+        VerifiedGstin,
+    };
+    use crate::tally::VerifiedCompanyIdentity;
+    use bridge_tally_protocol::GstDutyHead;
+
+    const LAB: &str = "BRIDGE MASTERS LAB";
+    fn lab_guid() -> &'static str {
+        crate::synthetic_guid(1)
+    }
+    const GSTIN: &str = "08ZZZZZ0000Z2ZP";
+    const PREVIEW: &str = "Create ledger \"MLab Party\" under Sundry Debtors";
+    const SHA: &str = "a2f4c3ea8b6a8c0d1e0b4f3a96d6e1d3c5b8f7a2e0b4c6d8f1a3b5c7d9e0f2a4";
+    const ORIGIN: &str = "http://127.0.0.1:9000";
+
+    fn company() -> VerifiedCompanyIdentity {
+        VerifiedCompanyIdentity::test_fixture(LAB, lab_guid())
+    }
+
+    fn party(name: &str, gstin: Option<&str>, bill_wise: bool) -> LedgerCreateItem {
+        LedgerCreateItem::new(
+            MasterName::new(name).unwrap(),
+            AdmittedLedgerKind::Party {
+                side: PartySide::SundryDebtors,
+                gstin: gstin.map(|value| VerifiedGstin::new(value).unwrap()),
+                bill_wise,
+            },
+        )
+    }
+
+    fn item() -> LedgerCreateItem {
+        party("MLab Party", Some(GSTIN), true)
+    }
+
+    fn binding(item: &LedgerCreateItem) -> ApprovalBinding {
+        ApprovalBinding::masters(SHA, ORIGIN, &company(), item, PREVIEW)
+    }
+
+    fn marks() -> AgentReadRequest {
+        AgentReadRequest::parse(
+            bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::CompanyListV2.render(),
+        )
+        .unwrap()
+    }
+
+    fn answered() -> Answered {
+        Answered {
+            approved: true,
+            at: std::time::Instant::now(),
+            at_wall: std::time::SystemTime::now(),
+        }
+    }
+
+    /// An approval the masters dialog granted for `item`, with the request it
+    /// was rendered for.
+    fn granted_masters(item: &LedgerCreateItem) -> (ApprovedImport, MasterPostRequest) {
+        (
+            ApprovedImport::approved_masters_for_test(item.clone(), &company(), marks()),
+            MasterPostRequest::render(item.clone(), &company()),
+        )
+    }
+
+    fn hold_masters(approvals: &PostApprovals, batch_id: &str, item: &LedgerCreateItem) {
+        let (request, held) = granted_masters(item);
+        approvals
+            .hold_approved(batch_id, binding(item), request, held, answered())
+            .unwrap();
+    }
+
+    /// A master approval cannot be redeemed for a voucher post, and a voucher
+    /// approval cannot be redeemed for a master post: the kind is refused as a
+    /// changed binding, the approval lapses with a note that is not an approval,
+    /// and the slot is open again.
+    #[tokio::test]
+    async fn a_master_approval_cannot_be_redeemed_for_a_voucher_post_and_the_reverse() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let voucher_binding = binding_of(&line, "Synthetic preview");
+        // The control: each approval is redeemed for its own kind.
+        let (request, held) = granted_masters(&item());
+        approvals
+            .hold_approved(&batch, binding(&item()), request, held, answered())
+            .unwrap();
+        let (taken, redeemed, held) = approvals
+            .take_for_dispatch(&batch, &binding(&item()))
+            .unwrap();
+        assert_eq!(redeemed.post_kind(), PostKind::Masters);
+        let HeldRequest::Masters(held) = held else {
+            panic!("a master approval comes back with its master request");
+        };
+        assert_eq!(held.item(), &item());
+        assert_eq!(
+            held.sha256(),
+            bridge_tally_protocol::sha256_hex(held.xml().as_bytes())
+        );
+        assert!(redeemed.sends_exactly(held.xml()));
+        drop(taken);
+
+        // A master approval, a voucher redemption.
+        hold_masters(&approvals, &batch, &item());
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &voucher_binding)
+                .err()
+                .as_deref(),
+            Some("import_approval_binding_changed")
+        );
+        let note = approvals.lapse_note(&batch).unwrap();
+        assert_eq!(note["reason"], "approval_binding_changed");
+        assert_eq!(note["redeemable"], false);
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+
+        // A voucher approval, a master redemption.
+        let (request, answered_at, native) = granted(&line, 1).await;
+        approvals
+            .hold_approved(
+                &batch,
+                voucher_binding.clone(),
+                request,
+                native,
+                answered_at,
+            )
+            .unwrap();
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &binding(&item()))
+                .err()
+                .as_deref(),
+            Some("import_approval_binding_changed")
+        );
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+    }
+
+    /// The binding of the two kinds is never equal, even for the same batch
+    /// digest, endpoint and preview.
+    #[tokio::test]
+    async fn the_two_kinds_bind_differently_and_name_their_kind() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let voucher = binding_of(&line, PREVIEW);
+        let masters = ApprovalBinding::masters(
+            &line.sha256,
+            line.endpoint_origin.as_deref().unwrap(),
+            &company(),
+            &item(),
+            PREVIEW,
+        );
+        assert_ne!(voucher, masters);
+        assert_eq!(voucher.kind(), PostKind::Vouchers);
+        assert_eq!(masters.kind(), PostKind::Masters);
+    }
+
+    /// The approval is held beside the request it covers, and each of the
+    /// three must be for the kind being posted, by kind: a binding of one
+    /// kind with an approval or a held request of the other is refused, and so
+    /// is a held request whose bytes are not the ones approved.
+    #[tokio::test]
+    async fn a_held_approval_whose_parts_disagree_on_kind_is_refused() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let (voucher_request, voucher_answered, native) = granted(&line, 1).await;
+        let fresh = binding(&item());
+        let (masters_request, masters_held) = granted_masters(&item());
+        let other_held = MasterPostRequest::render(party("Another", None, false), &company());
+
+        // Masters binding, voucher approval.
+        approvals
+            .hold_approved(
+                &batch,
+                fresh.clone(),
+                voucher_request,
+                masters_held.clone(),
+                voucher_answered,
+            )
+            .unwrap();
+        assert_eq!(
+            approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
+            Some("import_approval_binding_changed"),
+            "the approved request is a voucher's"
+        );
+        // Masters binding and approval, voucher held request.
+        approvals
+            .hold_approved(
+                &batch,
+                fresh.clone(),
+                masters_request.clone(),
+                native,
+                answered(),
+            )
+            .unwrap();
+        assert_eq!(
+            approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
+            Some("import_approval_binding_changed"),
+            "the held request is a voucher's"
+        );
+        // Everything a master's, but the held bytes are another request's.
+        approvals
+            .hold_approved(
+                &batch,
+                fresh.clone(),
+                masters_request.clone(),
+                other_held,
+                answered(),
+            )
+            .unwrap();
+        assert_eq!(
+            approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
+            Some("import_approval_binding_changed"),
+            "the held request is not the one approved"
+        );
+        // Voucher binding, master approval and held request.
+        let voucher_binding = binding_of(&line, "Synthetic preview");
+        approvals
+            .hold_approved(
+                &batch,
+                voucher_binding.clone(),
+                masters_request,
+                masters_held,
+                answered(),
+            )
+            .unwrap();
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &voucher_binding)
+                .err()
+                .as_deref(),
+            Some("import_approval_binding_changed"),
+            "the held request is a master's too"
+        );
+        // Voucher binding and held request, master approval: only the approved
+        // request's own kind tells these apart.
+        let (request, _) = granted_masters(&item());
+        approvals
+            .hold_approved(
+                &batch,
+                voucher_binding.clone(),
+                request,
+                native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap(),
+                answered(),
+            )
+            .unwrap();
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &voucher_binding)
+                .err()
+                .as_deref(),
+            Some("import_approval_binding_changed"),
+            "only the approved request is a master's"
+        );
+    }
+
+    /// Redeemed only for what the person was shown: every field of the item,
+    /// the company tuple, the batch digest, the endpoint and the preview. Each
+    /// change is refused, and the approval lapses.
+    #[tokio::test]
+    async fn a_master_redemption_for_anything_else_is_refused_and_lapses() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let base = item();
+        let other_company =
+            VerifiedCompanyIdentity::test_fixture(LAB, "00000000-0000-4000-8000-000000000002");
+        let renamed_company = VerifiedCompanyIdentity::test_fixture("Another Lab", lab_guid());
+        let fresh_bindings: Vec<(&str, ApprovalBinding)> = vec![
+            ("name", binding(&party("MLab Party 2", Some(GSTIN), true))),
+            ("gstin absent", binding(&party("MLab Party", None, true))),
+            (
+                "gstin other",
+                binding(&party("MLab Party", Some("27ZZZZZ0000Z1ZQ"), true)),
+            ),
+            (
+                "bill-wise",
+                binding(&party("MLab Party", Some(GSTIN), false)),
+            ),
+            (
+                "side",
+                binding(&LedgerCreateItem::new(
+                    MasterName::new("MLab Party").unwrap(),
+                    AdmittedLedgerKind::Party {
+                        side: PartySide::SundryCreditors,
+                        gstin: Some(VerifiedGstin::new(GSTIN).unwrap()),
+                        bill_wise: true,
+                    },
+                )),
+            ),
+            (
+                "kind",
+                binding(&LedgerCreateItem::new(
+                    MasterName::new("MLab Party").unwrap(),
+                    AdmittedLedgerKind::Suspense,
+                )),
+            ),
+            (
+                "duty head",
+                binding(&LedgerCreateItem::new(
+                    MasterName::new("MLab Party").unwrap(),
+                    AdmittedLedgerKind::GstDuty {
+                        head: AdmittedDutyHead::new(GstDutyHead::SgstUtgst).unwrap(),
+                    },
+                )),
+            ),
+            (
+                "digest",
+                ApprovalBinding::masters(&"0".repeat(64), ORIGIN, &company(), &base, PREVIEW),
+            ),
+            (
+                "endpoint",
+                ApprovalBinding::masters(SHA, "http://127.0.0.1:1", &company(), &base, PREVIEW),
+            ),
+            (
+                "company guid",
+                ApprovalBinding::masters(SHA, ORIGIN, &other_company, &base, PREVIEW),
+            ),
+            (
+                "company name",
+                ApprovalBinding::masters(SHA, ORIGIN, &renamed_company, &base, PREVIEW),
+            ),
+            (
+                "preview",
+                ApprovalBinding::masters(SHA, ORIGIN, &company(), &base, "Another preview"),
+            ),
+        ];
+        for (case, fresh) in fresh_bindings {
+            assert_ne!(fresh, binding(&base), "{case} must differ from the base");
+            hold_masters(&approvals, &batch, &base);
+            assert_eq!(
+                approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
+                Some("import_approval_binding_changed"),
+                "{case}"
+            );
+            let note = approvals.lapse_note(&batch).unwrap();
+            assert_eq!(note["reason"], "approval_binding_changed", "{case}");
+            assert!(matches!(approvals.begin(&batch), Begin::Ask(_)), "{case}");
+        }
+    }
+
+    /// Spent once, under the lock, before an intent: a second redemption (in
+    /// use, not revoked), a second spend, and a spend after a revocation are
+    /// refused, for a master approval as for a voucher's.
+    #[tokio::test]
+    async fn a_master_approval_is_spent_once_and_never_after_a_revocation() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let fresh = binding(&item());
+        hold_masters(&approvals, &batch, &item());
+        let (taken, _, _) = approvals.take_for_dispatch(&batch, &fresh).unwrap();
+        assert_eq!(
+            approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
+            Some("import_approval_in_use")
+        );
+        approvals.spend(&batch, taken.id()).unwrap();
+        assert_eq!(
+            approvals.spend(&batch, taken.id()).err(),
+            Some(UnderLockRefusal::ApprovalRevoked)
+        );
+        drop(taken);
+        assert!(
+            approvals.lapse_note(&batch).is_none(),
+            "a spent approval leaves no note"
+        );
+        assert!(
+            approvals.take_for_dispatch(&batch, &fresh).is_err(),
+            "nothing is left to redeem again"
+        );
+
+        hold_masters(&approvals, &batch, &item());
+        let (taken, _, _) = approvals.take_for_dispatch(&batch, &fresh).unwrap();
+        approvals.revoke(&batch, "request_cancelled");
+        assert_eq!(
+            approvals.spend(&batch, taken.id()).err(),
+            Some(UnderLockRefusal::ApprovalRevoked)
+        );
+        assert_eq!(
+            approvals.lapse_note(&batch).unwrap()["reason"],
+            "request_cancelled"
+        );
+    }
+
+    /// An approval not redeemed in time lapses with a note, whichever kind it
+    /// is for, and a late redemption is refused as expired.
+    #[tokio::test]
+    async fn an_expired_master_approval_lapses_with_a_note() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_millis(1));
+        hold_masters(&approvals, &batch, &item());
+        std::thread::sleep(Duration::from_millis(5));
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+        let note = approvals.lapse_note(&batch).unwrap();
+        assert_eq!(note["reason"], "approval_expired");
+        assert_eq!(note["redeemable"], false);
+
+        hold_masters(&approvals, &batch, &item());
+        std::thread::sleep(Duration::from_millis(5));
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &binding(&item()))
+                .err()
+                .as_deref(),
+            Some("import_approval_expired")
+        );
+    }
+
+    /// A master approval holds the same single slot: nothing else is held
+    /// beside it, and it does not survive its process.
+    #[tokio::test]
+    async fn a_master_approval_shares_the_one_slot_and_dies_with_its_process() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        hold_masters(&approvals, &batch, &item());
+        let (request, held) = granted_masters(&item());
+        assert_eq!(
+            approvals
+                .hold_approved(OTHER, binding(&item()), request, held, answered())
+                .err()
+                .as_deref(),
+            Some("post_approval_busy")
+        );
+        assert!(matches!(
+            approvals.begin(OTHER),
+            Begin::Busy("post_approval_busy")
+        ));
+        drop(approvals);
+        let restarted = PostApprovals::new(directory.path());
+        assert!(matches!(restarted.begin(&batch), Begin::Ask(_)));
+        assert_eq!(
+            restarted.lapse_note(&batch).unwrap()["reason"],
+            "process_ended"
+        );
+        assert!(restarted
+            .take_for_dispatch(&batch, &binding(&item()))
+            .is_err());
+    }
+
+    /// A master dialog left open is held, joined, and redeemed like a voucher's.
+    #[tokio::test]
+    async fn a_held_master_dialog_is_joined_then_redeemed_for_its_own_kind() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let scripted = ScriptedApproval::approving();
+        let dialog = SCRIPTED_APPROVAL
+            .scope(scripted.clone(), async {
+                PendingPostApproval::ask_masters(item(), company(), PREVIEW.to_string(), marks())
+            })
+            .await;
+        approvals
+            .hold_pending(
+                &batch,
+                binding(&item()),
+                dialog,
+                MasterPostRequest::render(item(), &company()),
+            )
+            .unwrap();
+        let Begin::Join(dialog) = approvals.begin(&batch) else {
+            panic!("a held dialog is joined");
+        };
+        let answer = dialog
+            .answer_within(Duration::from_secs(5))
+            .await
+            .ok()
+            .expect("answered");
+        assert!(matches!(
+            approvals.settle_join(&batch, Ok(answer)),
+            Joined::Approved
+        ));
+        assert_eq!(scripted.masters(), vec![PREVIEW.to_string()]);
+        // Redeemed for a voucher post, refused; the dialog's answer is spent
+        // on the refusal.
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &binding_of(&line, "Synthetic preview"))
+                .err()
+                .as_deref(),
+            Some("import_approval_binding_changed")
+        );
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+    }
+
+    /// A call that names a batch of the other kind withdraws nothing: a voucher
+    /// tool given a master batch id leaves the master approval held, a master
+    /// tool given a voucher batch id leaves the voucher approval held, and each
+    /// kind's own withdrawal still works.
+    #[tokio::test]
+    async fn withdrawing_a_post_of_one_kind_leaves_the_other_kinds_approval() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let held_master = |approvals: &PostApprovals| hold_masters(approvals, &batch, &item());
+        let redeemable =
+            |approvals: &PostApprovals| matches!(approvals.begin(&batch), Begin::Redeem(_));
+
+        // A master approval, withdrawn as a voucher post: kept.
+        held_master(&approvals);
+        approvals.revoke_unredeemed(&batch, "post_refused_before_intent");
+        assert!(redeemable(&approvals), "revoke_unredeemed (voucher)");
+        approvals.revoke(&batch, "batch_already_dispatched");
+        assert!(redeemable(&approvals), "revoke (voucher)");
+        approvals.revoke_of(PostKind::Vouchers, &batch, "request_cancelled");
+        assert!(redeemable(&approvals), "revoke_of (voucher)");
+        // Withdrawn as a master post: gone, with a note.
+        approvals.revoke_unredeemed_of(PostKind::Masters, &batch, "post_refused_before_intent");
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+        assert_eq!(
+            approvals.lapse_note(&batch).unwrap()["reason"],
+            "post_refused_before_intent"
+        );
+        held_master(&approvals);
+        approvals.revoke_of(PostKind::Masters, &batch, "request_cancelled");
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+
+        // A voucher approval, withdrawn as a master post: kept.
+        let (request, answered_at, native) = granted(&line, 1).await;
+        approvals
+            .hold_approved(
+                &batch,
+                binding_of(&line, "Synthetic preview"),
+                request,
+                native,
+                answered_at,
+            )
+            .unwrap();
+        approvals.revoke_unredeemed_of(PostKind::Masters, &batch, "post_refused_before_intent");
+        assert!(redeemable(&approvals), "revoke_unredeemed_of (masters)");
+        approvals.revoke_of(PostKind::Masters, &batch, "request_cancelled");
+        assert!(redeemable(&approvals), "revoke_of (masters)");
+        approvals.revoke_unredeemed(&batch, "post_refused_before_intent");
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+    }
+}
+
 /// A dialog for `vouchers` vouchers, answered as `scripted` decides, that
 /// tells `note` if its box did not fit the screen (#1832).
 async fn dialog_noting(

@@ -277,6 +277,7 @@ async fn movement_read_preserves_observed_count_after_accounting_exclusions() {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         // A caller-held high-water mark small enough to bound the window, so
@@ -287,10 +288,7 @@ async fn movement_read_preserves_observed_count_after_accounting_exclusions() {
                 &observed.name,
                 (date.clone(), date),
                 WindowPlanSource::Estimate {
-                    known_marks: Some(CompanyMarks {
-                        vouchers: 3,
-                        masters: 7,
-                    }),
+                    known_marks: Some(CompanyMarks::new(Some(3), 7)),
                 },
                 None,
             )

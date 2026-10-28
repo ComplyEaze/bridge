@@ -4,7 +4,7 @@ This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
 page was not read again at it, except as said below). Releases 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) and 0.6.1 (tag `mcp-v0.6.1`, 27 October 2026) were
-published after the pull requests named here; this page was not read again at either tag. Six
+published after the pull requests named here; this page was not read again at either tag. Seven
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
@@ -12,7 +12,7 @@ masters read, in sections 1 and 2 (#1398), the note on how long a
 from this repository loads the PDF library from, in section 5 (#1422), the
 statement party written into a bank voucher's narration, in section 2 (#1430), the
 file of skipped bank-statement rows, in section 4 (#1625), and the
-location shown for an import file on a Microsoft Store install of Claude Desktop, in section 4 (#1569). It was written from a reading
+location shown for an import file on a Microsoft Store install of Claude Desktop, in section 4 (#1569), and the mailing details of a party ledger and the masking of its address, in section 2 (#1490). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
@@ -94,8 +94,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   read or a `ledger_movement` read took (no book data), to Claude Desktop.
   Claude Desktop is the host, and it sends tool results to the AI provider you
   use as part of the conversation; that is the host's behaviour, which this
-  repository cannot show. ComplyEaze Bridge can shorten party and ledger names
-  and bank account numbers to their first two and last two characters, or drop
+  repository cannot show. ComplyEaze Bridge can shorten party and ledger names,
+  bank account numbers and, from the release that includes #1490 (not 0.6.1 or
+  earlier), the address printed for a party ledger, to their first two and last two
+  characters, or drop
   narrations (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting; one
   value, not both), but neither hides amounts, company names, PAN, GSTIN, IFSC,
   MSME or Udyam registration numbers, contact details or references, or the last
@@ -114,13 +116,26 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     item names and their parents, godown, stock-group, cost-centre and cost-category
     names and their parents, the category a cost centre belongs to,
     and three fields of a ledger's details: the name on the PAN, the bank account
-    holder's name and the bank details. A name of four characters or fewer is
+    holder's name and the bank details; from the release that includes #1490 (not
+    0.6.1 or earlier) also the name a mailing address is printed under and the
+    address itself (each line of the mailing address, and the flat address field).
+    A line is shortened to its first two and last two characters, so a house number
+    or a town at either end of a line can stay readable. Every `ledger_masters` call
+    with `fields=compliance` reads and returns the older flat fields (the address
+    from `LEDADDRESS.LIST`, the PIN code and the state), as before: under mode `none`
+    (and under dropping narrations, which masks no name) they are in clear, and under
+    `mask_parties` the flat address is shortened and the PIN code and state are not. The dated mailing address (lines, PIN code, state and
+    country) is read from Tally only when the assistant asks for it
+    (`include_mailing_details`); without that argument `ledger_masters` does not read
+    it. The flat PIN code and state, and the mailing entry's PIN code, state and
+    country when asked for, are not masked under any mode: for a party that is an
+    individual, such as a proprietor, they can point to the locality of a home address. A name of four characters or fewer is
     replaced by “…”. The spelling a ledger's vouchers carry, which is returned
     beside its name when the two differ, is left out. It does not mask amounts, company names, the names of
     groups in a group total (shown as the book has them), a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
-    addresses or IFSCs, or the last four digits of a bank statement's account
+    addresses outside a ledger's own address fields, or IFSCs, or the last four digits of a bank statement's account
     number (`account_last4`), and a name written inside a narration or reference
     stays as it is.
   - `drop_narration` removes narrations, and a search of vouchers by a phrase of

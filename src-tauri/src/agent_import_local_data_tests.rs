@@ -402,6 +402,7 @@ fn server_over(directory: &Path) -> crate::agent::Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -788,9 +789,14 @@ fn master_journal_text(verdict: bool, truncated: bool) -> String {
         "items": [{"name": "Synthetic One", "guid": sentinel_uuid(0x15ab).to_string(),
             "reason": null}]
     });
+    // A verified create rests on Tally's answer, recorded before the verdict.
+    let response = serde_json::json!({
+        "record_type": "master_dispatch_response", "batch_id": id, "batch_sha256": sha,
+        "response_sha256": "d".repeat(64), "counters": null
+    });
     let mut text = format!("{batch}\n{intent}\n");
     if verdict {
-        text.push_str(&format!("{verdict_line}\n"));
+        text.push_str(&format!("{response}\n{verdict_line}\n"));
     }
     if truncated {
         text.pop();

@@ -99,6 +99,7 @@ fn contended_post_returns_without_waiting_or_recording_a_dispatch() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     server.append_import_ledger(&line).unwrap();
@@ -814,6 +815,7 @@ fn endpoint_lease_contention_keeps_negative_post_and_cancellation_results_uncert
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     server.append_import_ledger_while_admitted(&line).unwrap();
@@ -924,6 +926,7 @@ async fn received_response_survives_an_injected_response_journal_failure() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     server.append_import_ledger(&line).unwrap();
@@ -2073,6 +2076,7 @@ async fn a_saved_xml_file_that_differs_from_the_record_is_refused_before_tally()
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     server.append_import_ledger(&line).unwrap();
@@ -3893,6 +3897,7 @@ fn records_server(directory: &std::path::Path) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -5455,6 +5460,172 @@ fn a_batch_that_marks_nothing_is_shown_whole() {
             "After a timeout, reconcile this batch; do not rebuild or resend it.",
         ]
         .join("\n")
+    );
+}
+
+// The refusal ladder: the code a caller receives for each typed cause.
+
+fn queued(cause: impl Into<anyhow::Error>) -> anyhow::Error {
+    anyhow::Error::from(crate::tally::approved_import::PreIntentQueueRefusal {
+        source: cause.into(),
+    })
+}
+
+fn admission(error: ApprovedImportAdmissionError) -> anyhow::Error {
+    queued(error)
+}
+
+/// Each master refusal has its own rung: a cause without one would be reported
+/// as the catch-all of its place in the chain, never as itself.
+#[test]
+fn each_master_refusal_reaches_the_caller_under_its_own_code() {
+    use bridge_tally_core::master_name_index::{MasterKind, Via};
+    for (error, code) in [
+        (
+            ApprovedImportAdmissionError::MasterWritesNeedLicensedMode,
+            "master_writes_need_licensed_mode",
+        ),
+        (
+            ApprovedImportAdmissionError::MasterNameTaken {
+                kind: MasterKind::Ledger,
+                via: Via::Alias,
+            },
+            "master_name_taken",
+        ),
+        (
+            ApprovedImportAdmissionError::MasterNameTaken {
+                kind: MasterKind::Group,
+                via: Via::Name,
+            },
+            "master_name_taken",
+        ),
+        (
+            ApprovedImportAdmissionError::MasterLedgerIndexUnavailable {
+                cause: "ledger_catalogue_malformed_response",
+            },
+            "master_ledger_index_unavailable",
+        ),
+    ] {
+        assert_eq!(refusal_code(&admission(error)), code);
+    }
+    // Refused under the lock where the intent would be recorded.
+    for (refusal, code) in [
+        (
+            UnderLockRefusal::PreImageUnrecorded,
+            "master_pre_image_unrecorded",
+        ),
+        (
+            UnderLockRefusal::PreImageWriteFailed,
+            "master_pre_image_write_failed",
+        ),
+        (
+            UnderLockRefusal::MasterOverlapsOpenDispatch,
+            "master_ledger_open_dispatch_overlaps",
+        ),
+        (
+            UnderLockRefusal::PreImageRemoveFailed,
+            "master_pre_image_remove_failed",
+        ),
+        (
+            UnderLockRefusal::MasterJournalRefused,
+            "master_ledger_invalid",
+        ),
+        (
+            UnderLockRefusal::MasterJournalUnavailable,
+            "master_ledger_unavailable",
+        ),
+    ] {
+        assert_eq!(refusal_code(&anyhow::Error::from(refusal)), code);
+    }
+}
+
+/// The codes a master post shares with the voucher path keep theirs.
+#[test]
+fn the_shared_refusals_a_master_post_can_meet_keep_their_codes() {
+    use bridge_tally_protocol::StandardLedgerCatalogError;
+    for (error, code) in [
+        (
+            ApprovedImportAdmissionError::AdmissionInconsistent,
+            "import_post_admission_inconsistent",
+        ),
+        (
+            ApprovedImportAdmissionError::MastersMoved,
+            "post_masters_moved",
+        ),
+        (
+            ApprovedImportAdmissionError::MastersUnconfirmed,
+            "post_masters_unconfirmed",
+        ),
+        (
+            ApprovedImportAdmissionError::CatalogueUnreadable(
+                StandardLedgerCatalogError::MalformedResponse,
+            ),
+            "post_catalogue_unreadable",
+        ),
+        (
+            ApprovedImportAdmissionError::GroupExportInvalid { cause: None },
+            "group_export_invalid",
+        ),
+    ] {
+        assert_eq!(refusal_code(&admission(error)), code);
+    }
+}
+
+/// The two catch-alls, so that a missing rung is visible as one of them.
+#[test]
+fn a_cause_without_a_rung_is_a_queue_refusal_or_an_unknown_outcome() {
+    assert_eq!(
+        refusal_code(&queued(anyhow::anyhow!("a read failed"))),
+        "post_queue_read_failed"
+    );
+    assert_eq!(
+        refusal_code(&anyhow::anyhow!("the send failed")),
+        "import_dispatch_outcome_unknown"
+    );
+}
+
+/// A master admission handed to the voucher recheck is a typed refusal that
+/// records no aim mark, never a panic.
+#[test]
+fn the_voucher_recheck_given_a_masters_admission_refuses_and_aims_nothing() {
+    let (line, _) = batch();
+    let aimed = std::sync::Mutex::new(None::<u64>);
+    let error = recheck_voucher_queue(
+        QueuedAdmission::Masters {
+            item: &crate::tally::ledger_create_item::LedgerCreateItem::new(
+                crate::tally::ledger_create_item::MasterName::new("Some Party").unwrap(),
+                crate::tally::ledger_create_item::AdmittedLedgerKind::Suspense,
+            ),
+            company: &crate::tally::VerifiedCompanyIdentity::test_fixture(
+                "Synthetic Accounts",
+                "00000000-0000-4000-8000-000000000002",
+            ),
+            ledgers_first: "",
+            ledgers_second: "",
+            groups_first: "",
+            groups_second: "",
+            company_marks_at_binding: "",
+            company_marks: "",
+        },
+        &line,
+        &crate::tally::VerifiedCompanyIdentity::test_fixture(
+            "Synthetic Accounts",
+            "00000000-0000-4000-8000-000000000002",
+        ),
+        &aimed,
+        InvoiceIdentity::ByNumber,
+        None,
+        &super::numbering::NumberingAdmission::for_test("00000000-0000-4000-8000-000000000002", 0),
+    )
+    .expect_err("a masters admission is not a voucher admission");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::AdmissionInconsistent)
+    );
+    assert_eq!(*aimed.lock().unwrap(), None);
+    assert_eq!(
+        refusal_code(&queued(error)),
+        "import_post_admission_inconsistent"
     );
 }
 

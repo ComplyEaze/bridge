@@ -32,11 +32,13 @@ pub mod group_ancestry;
 pub mod gst_details;
 pub mod gst_registration;
 pub mod hsn_details;
+pub mod import_envelope;
 mod import_outcome;
 pub mod ledger_census;
 /// One ledger `Create` message. Its one caller today is the lab rebuild;
 /// this crate runs its goldens in every build.
 pub mod ledger_create;
+pub mod mailing_details;
 pub mod native_cash_flow;
 pub mod native_company_features;
 pub mod native_funds_flow;
@@ -79,11 +81,12 @@ pub use native_ledger_collection::{
     NativeLedgerAmountError, PartyLedgerMasterFields, PartyLedgerMasterRecord,
 };
 pub use standard_ledger_catalog::{
-    parse_ledger_census_slice, parse_standard_ledger_catalog,
+    parse_ledger_census_slice, parse_ledger_name_index, parse_standard_ledger_catalog,
     parse_standard_ledger_catalog_v2_with_identities,
     parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
-    BillWiseFlag, StandardLedgerCatalog, StandardLedgerCatalogBinding, StandardLedgerCatalogError,
-    StandardLedgerCatalogV2, StandardLedgerIdentityObservation, MAX_STANDARD_LEDGER_IDENTITY_ROWS,
+    BillWiseFlag, LedgerNameRow, StandardLedgerCatalog, StandardLedgerCatalogBinding,
+    StandardLedgerCatalogError, StandardLedgerCatalogV2, StandardLedgerIdentityObservation,
+    MAX_STANDARD_LEDGER_IDENTITY_ROWS,
 };
 pub use text_encoding::{
     decode_tally_text_bytes_limited, decode_tally_xml_response_bytes_limited, decode_xml_bytes,
@@ -2887,7 +2890,9 @@ fn read_required_identifier_text(
         .ok_or_else(|| anyhow::anyhow!("Tally response contained an empty required value"))
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+/// Lowercase hex SHA-256 of `bytes`. The one digest helper for callers outside
+/// this crate that hash a rendered request.
+pub fn sha256_hex(bytes: &[u8]) -> String {
     let mut encoded = String::with_capacity(64);
     for byte in Sha256::digest(bytes) {
         write!(&mut encoded, "{byte:02x}").expect("writing to a String cannot fail");

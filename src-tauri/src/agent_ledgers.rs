@@ -47,16 +47,24 @@ fn ancestry_gap_code(gap: AncestryGap) -> &'static str {
 }
 
 /// One ledger's `compliance` object: the master fields as serialised, with the
-/// party names marked. `gst_details` is in the object only when the caller asked
-/// for the dated GST details (`include_gst_details`): without the flag no request
-/// asks for the list, so every row would carry `{"observation":"not_observed"}`
-/// (bridge#1520). It is removed here and not on the type, because a read that
-/// asked for it must report "asked, none returned" as `not_observed`.
-fn compliance_json(fields: PartyLedgerMasterFields, gst_details: bool) -> Value {
+/// party names marked. `gst_details` and `mailing_details` are in the object only
+/// when the caller asked for them (`include_gst_details`,
+/// `include_mailing_details`): without the flag no request asks for the list, so
+/// every row would carry `{"observation":"not_observed"}` (bridge#1520). They are
+/// removed here and not on the type, because a read that asked for one must report
+/// "asked, none returned" as `not_observed`.
+fn compliance_json(
+    fields: PartyLedgerMasterFields,
+    gst_details: bool,
+    mailing_details: bool,
+) -> Value {
     let mut compliance = serde_json::to_value(fields).unwrap_or_default();
     if let Value::Object(object) = &mut compliance {
         if !gst_details {
             object.remove("gst_details");
+        }
+        if !mailing_details {
+            object.remove("mailing_details");
         }
     }
     mark_compliance_party_names(compliance)
@@ -363,6 +371,32 @@ fn requested_gst_details(args: &Value) -> Result<bool, String> {
     Ok(include)
 }
 
+/// Whether the caller asked for each ledger's dated mailing details
+/// (`include_mailing_details`, default false): address lines, PIN code, state and
+/// country, with their dates. Like the GST details they are read only with
+/// fields=compliance, so the flag is refused with any other `fields`, and not
+/// together with `include_gst_details`: the request naming both has not been
+/// captured live (bridge#1490).
+fn requested_mailing_details(args: &Value, gst_details: bool) -> Result<bool, String> {
+    let Some(include) = optional_bool(args, "include_mailing_details")? else {
+        return Ok(false);
+    };
+    let fields = optional_string(args, "fields")?.unwrap_or_else(|| "basic".to_string());
+    if include && !ledger_master_fields(&fields)? {
+        return Err("ledger_masters_mailing_details_requires_compliance".to_string());
+    }
+    if include && gst_details {
+        return Err("ledger_masters_mailing_details_with_gst_details_not_captured".to_string());
+    }
+    Ok(include)
+}
+
+/// What a result with `include_mailing_details` says about the rows it adds.
+const MAILING_DETAILS_LIMITATIONS: [&str; 2] = [
+    "compliance.mailing_details holds each ledger's dated mailing details as Tally sent them: every entry with its date, mailing name, address lines, PIN code, state and country, oldest first; the flat address, pin_code and state fields can be empty for a party that holds an address here. Under mask_parties the mailing name, every address line and the flat address are shortened like a party name; the PIN code, state and country are returned under every mode.",
+    "Measured on one synthetic book of TallyPrime 7.1 Silver (one party with one dated entry); a second dated entry, an entry with no date and other releases are not measured. The read is admitted at 4,700 bytes a ledger instead of 3,750, from the one growth measured (948 bytes for one populated party row), not a measured ratio; a large book may be read in more parts or refused as too large.",
+];
+
 /// What a result with `include_gst_details` says about the rows it adds, so
 /// that a caller does not read more into them than the one capture behind
 /// them shows.
@@ -375,17 +409,19 @@ const GST_DETAILS_LIMITATIONS: [&str; 6] = [
     "The read is admitted at 8,000 bytes a ledger instead of 3,750, a margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element), not a measured ratio; a large book may be read in more parts or refused as too large.",
 ];
 
-/// The frame with the GST details' limitations added when the rows hold them,
-/// and unchanged otherwise.
-fn gst_details_limitations_frame(frame: Value, gst_details: bool) -> Value {
-    if !gst_details {
-        return frame;
-    }
+/// The frame with the limitations of the details the rows hold added, and
+/// unchanged when they hold neither.
+fn details_limitations_frame(frame: Value, gst_details: bool, mailing_details: bool) -> Value {
+    let limitations: &[&str] = match (gst_details, mailing_details) {
+        (true, _) => &GST_DETAILS_LIMITATIONS,
+        (false, true) => &MAILING_DETAILS_LIMITATIONS,
+        (false, false) => return frame,
+    };
     let mut frame = match frame {
         Value::Object(frame) => frame,
         _ => serde_json::Map::new(),
     };
-    frame.insert("limitations".to_owned(), json!(GST_DETAILS_LIMITATIONS));
+    frame.insert("limitations".to_owned(), json!(limitations));
     Value::Object(frame)
 }
 
@@ -413,7 +449,8 @@ pub(super) const LISTING_SNAPSHOT_MAX_BYTES: usize = 64 * 1024 * 1024;
 /// stock summary by its date; a compliance listing by the date its rows'
 /// `party_gstin` was read as of (#653), since that date is rendered into the
 /// rows it holds, and by whether the rows hold each ledger's GST details
-/// (`include_gst_details`), which a read without them cannot serve.
+/// (`include_gst_details`) or mailing details (`include_mailing_details`),
+/// which a read without them cannot serve.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ListingKind {
     Basic,
@@ -423,6 +460,8 @@ pub(super) enum ListingKind {
         /// Whether the rows hold each ledger's dated GST details, which a read
         /// without them cannot serve.
         gst_details: bool,
+        /// Likewise for the dated mailing details.
+        mailing_details: bool,
     },
     TrialBalance {
         from: TallyDate,
@@ -641,6 +680,7 @@ impl Server {
         // Before any read: a refused `as_of` costs no Tally request.
         let requested_as_of = requested_gstin_as_of(args)?;
         let gst_details = requested_gst_details(args)?;
+        let mailing_details = requested_mailing_details(args, gst_details)?;
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
             let fields = optional_string(args, "fields")?.unwrap_or_else(|| "basic".to_string());
@@ -655,6 +695,7 @@ impl Server {
                 (true, _) => ListingKind::Compliance {
                     gstin_as_of: requested_as_of.clone().unwrap_or_else(tally_host_today),
                     gst_details,
+                    mailing_details,
                 },
                 (false, true) => ListingKind::BasicWithGroups,
                 (false, false) => ListingKind::Basic,
@@ -805,8 +846,9 @@ impl Server {
             ListingKind::Compliance {
                 gstin_as_of,
                 gst_details,
+                mailing_details,
             } => {
-                let gst_details = *gst_details;
+                let (gst_details, mailing_details) = (*gst_details, *mailing_details);
                 let today = TallyDate::parse(tally_host_today())
                     .map_err(|_| ToolFailure::from("current_date_invalid".to_string()))?;
                 let listing = self
@@ -815,10 +857,10 @@ impl Server {
                         self.tally_config(),
                         identity,
                         today,
-                        if gst_details {
-                            ComplianceRead::WithGstDetails
-                        } else {
-                            ComplianceRead::Standard
+                        match (gst_details, mailing_details) {
+                            (true, _) => ComplianceRead::WithGstDetails,
+                            (false, true) => ComplianceRead::WithMailingDetails,
+                            (false, false) => ComplianceRead::Standard,
                         },
                     )
                     .await
@@ -848,7 +890,7 @@ impl Server {
                             "parent": parent,
                             "opening_balance": record.ledger.opening_balance,
                             "opening_balance_as_of": &opening_as_of,
-                            "compliance": compliance_json(record.fields, gst_details),
+                            "compliance": compliance_json(record.fields, gst_details, mailing_details),
                             "ancestry": ancestry_json(&chain),
                         });
                         if let Value::Object(fields) = &mut row {
@@ -864,7 +906,7 @@ impl Server {
                     ),
                     listing.count_cross_check,
                 );
-                let frame = gst_details_limitations_frame(frame, gst_details);
+                let frame = details_limitations_frame(frame, gst_details, mailing_details);
                 (rows, Some(groups), listing.extent, listing.evidence, frame)
             }
             ListingKind::BasicWithGroups => {

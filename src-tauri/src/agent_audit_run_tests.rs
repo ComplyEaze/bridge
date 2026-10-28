@@ -42,6 +42,7 @@ fn serve_with(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled,
     });
     OneServer {
@@ -685,7 +686,7 @@ fn a_result_past_the_bounds_is_refused_and_never_cut_short() {
 #[tokio::test]
 async fn the_tool_is_absent_and_refused_while_its_setting_is_off() {
     let listed = |audit| {
-        catalog::listed_tool_definitions(false, false, audit)
+        catalog::listed_tool_definitions(false, false, audit, false)
             .as_array()
             .unwrap()
             .iter()

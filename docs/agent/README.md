@@ -48,7 +48,7 @@ Before requesting financial data through an MCP client, the client may send the 
 Tally result to its AI provider, including company
 identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
-names and bank account numbers to their first two and last two characters (a name of
+names, bank account numbers and the address lines of a ledger's details to their first two and last two characters (a name of
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
 and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
@@ -188,7 +188,7 @@ A compliance ledger read (`ledger_masters fields=compliance`) whose company's ma
 mark puts the estimated response over Bridge's budget has its ledgers counted first with a
 balance-free catalogue read (a stable pair, bound to the company by name and GUID) (#637, #668,
 #679). A count that fits is read whole. A count that does not is read in parts: the catalogue's
-parent groups are packed by ledger count into parts of at most 4,266 ledgers (2,000 with `include_gst_details`) and 200 parents, and
+parent groups are packed by ledger count into parts of at most 4,266 ledgers (3,404 with `include_mailing_details`, 2,000 with `include_gst_details`) and 200 parents, and
 each part is one filtered master and balance read, all inside the one extent bracket. Every ledger
 the catalogue named must come back exactly once, in its own part, with the name and parent the
 catalogue gave it; otherwise the whole call is refused and nothing partial is returned. A part
@@ -203,7 +203,7 @@ whose name cannot sit in a filter, such as one with a control character, are rea
 last part, the complement: a filter that excludes every named parent (`NOT (...)`, at most 200
 parents per formula, all applied together), and the same coverage proof applies to it. A book
 that cannot be split is refused before any master request: one parent group, or the ledgers
-under unnameable parents, over 4,266 ledgers (2,000 with `include_gst_details`; `parent_over_budget`), more than 12 named parts
+under unnameable parents, over 4,266 ledgers (3,404 with `include_mailing_details`, 2,000 with `include_gst_details`; `parent_over_budget`), more than 12 named parts
 (`parent_partition_too_many_parts`), a complement filter over 256 KiB
 (`parent_complement_over_budget`), a ledger with no parent (`ledger_without_parent`), every
 ledger under an unnameable parent name (`parent_name_unsupported`, which carries
@@ -238,6 +238,37 @@ estimated past `limit_bytes`; a response past the transport's cap is cut off mid
 company with fewer ledgers may be refused. The limits are unverified against a live Tally beyond a
 two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
 these books.
+`ledger_masters fields=compliance` takes an argument, `include_mailing_details` (a JSON boolean, default false), which
+adds each ledger's dated mailing details (`compliance.mailing_details`, #1490). With any other `fields`, a true value
+is refused before any read as `ledger_masters_mailing_details_requires_compliance`; together with `include_gst_details`
+it is refused as `ledger_masters_mailing_details_with_gst_details_not_captured`, because the request that names both has
+not been captured from a real Tally; a value that is not a boolean is `argument_invalid:include_mailing_details`.
+Without it (absent or false) no request names the mailing details, the read is the production request, sized at
+3,750 bytes a ledger, and no row has a `mailing_details` key. With it, the master read names every ledger's
+`LEDMAILINGDETAILS.LIST` and each row's `compliance.mailing_details` has `observation` `entries` (each dated entry, oldest
+first, with `applicable_from`, `address_lines`, `pin_code`, `state`, `country`, `mailing_name` (present only when Tally
+sent one) and `other_content_skipped`, true when the entry held content that was not read, so its address lines may be
+incomplete; an empty list is a ledger with no mailing details), `not_observed` (the response held no such list) or
+`unreadable` (a `defect`, for that ledger only). For a date, use the entry in force on it, the latest on or before it.
+The flat `compliance.address`, `pin_code`, `gst_pin_code` and `state` fields are Tally's older elements: TallyPrime 7.1
+returned them empty or absent for a party that held an address in the one synthetic book measured, so read the address
+from `mailing_details`; other books may fill the flat fields. `mask_parties` shortens the entry's `mailing_name` and each
+of its address lines (and the flat `address`) like a party name, to their first two and last two characters, so a house
+number or a town at either end of a line can stay readable; the mailing entry's PIN code, state and country reach the
+assistant's provider under every redaction mode (the flat `pin_code`, `gst_pin_code` and `state` already go on every
+compliance read, unchanged); for a party that is an individual, such as a proprietor, the flat PIN code and state sent
+on every compliance read, and the mailing entry's PIN code, state and country when asked for, can point to the
+locality of a home address. The read is admitted at 4,700 bytes a ledger instead of 3,750, from the one growth
+measured (948 bytes for one populated party row; UNVERIFIED for a populated book), so a read holds at most 3,404 ledgers
+(the 16 MB budget over the constant, not measured); a book that fits a standard read may come back in more parts, or be
+refused as `parent_over_budget`, never truncated. A held listing is served only to a page that asks for the same mode, so
+repeat `include_mailing_details` on later pages. Measured on one synthetic book; a second dated entry, a party with two
+mailing rows and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
+local file, names the mailing details only where the book's master-alteration mark is at most 3,404 (the
+whole read fits their bound) and otherwise sends the standard request, as before #1490, so a book that exported
+before is never refused for the larger estimate; its header then says that no ledger's mailing details were
+observed and the status column reads not observed. Where it reads them it shows only the entry in force on its
+Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields`, a true value is refused before any read as `ledger_masters_gst_details_requires_compliance`,
 and a value that is not a boolean is `argument_invalid:include_gst_details`. Without it (absent or false) every
@@ -1651,7 +1682,10 @@ snapshot, instead of serving the older read as current. Redaction and party
 marking are applied to each page as it is served. The result carries `snapshot`
 (`id`, `master_alter_id`, `voucher_alter_id`, `read_at`, `reused`); a served
 page's `window` timings and `read_at` are the first page's, and its `evidence`
-covers only the identity and marks reads it sent.
+covers only the identity and marks reads it sent. `voucher_alter_id` is null
+when Tally's answer carried no voucher mark, which it omits for a company that
+has never held a voucher, as `ledger_masters` reports it; a number, 0 included,
+is the mark Tally sent.
 
 - **A named snapshot is loud.** A later page that passes the first page's
   `snapshot_id` is refused as `listing_snapshot_changed` (cause
@@ -2690,7 +2724,160 @@ releases the stop a sent Sales invoice that is not verified posted puts on its
 company (`invoice_company_stopped`), after the person has checked Tally, in the
 same dialog the model cannot answer.
 
-Both switches accept `true`/`false` or `1`/`0`; any other value stops startup, except that an empty `BRIDGE_AGENT_ENABLE_WRITES`, or the extension's unresolved placeholder for it, reads as off. No model-supplied argument can grant approval. Claude controls
+`prepare_ledger_creates` and `post_ledger_creates` are in the source and are not in
+a published build yet. The create path and the rule that refuses a near name were
+measured on TallyPrime 7.1 Silver, on one synthetic book; other releases and
+editions are not measured.
+
+`BRIDGE_AGENT_ENABLE_MASTER_WRITES=true`, together with
+`BRIDGE_AGENT_ENABLE_WRITES=true`, lists two more tools, which are not among the
+ordinary default tools above: `prepare_ledger_creates` and `post_ledger_creates`.
+Together they create ONE new ledger (a party under Sundry Debtors or Sundry
+Creditors, a Suspense ledger, or a GST duty ledger whose head has been measured)
+from typed fields: ComplyEaze Bridge builds the request itself, accepts no XML,
+and can set no opening balance or parent. `prepare_ledger_creates` reads the
+company's ledger and group names once, refuses a name that already exists as a
+ledger, a group or an alias (`master_name_taken`), saves the request in the
+local masters journal and returns a `batch_id` with the preview the person will
+be shown (under `mask_parties` the ledger's name in it is masked; the dialog
+shows it whole); it writes nothing to Tally. `post_ledger_creates` takes that
+`batch_id`, asks the local user in a native dialog (whose first line says what each
+answer does, as the post dialog's does), and sends the create once;
+its approval, pending and approved answers behave as `post_import`'s do. A batch
+already sent is never sent again: a later call reads the book back, or reports
+what was recorded for a batch already settled.
+With the setting off, posting off, or the retired `BRIDGE_AGENT_ENABLE_BATCH_POST`
+still set, neither tool is listed and a call to either
+is refused `master_writes_disabled`. A name that differs from an existing one
+only in case, spaces or symbols is refused too, because TallyPrime can take such
+a Create for the existing ledger and change it. If the ledger names TallyPrime
+returns cannot be read, `prepare_ledger_creates` refuses
+`master_ledger_index_unavailable` and nothing is created. After the one send
+ComplyEaze Bridge reads the book back (the master marks of the loaded companies,
+the paired ledger and group names, and the new ledger's parent, tax fields, GSTIN
+and opening balance) and answers with one state: `posted_verified` (exactly one
+ledger of the name, new, with the parent, tax fields, GSTIN and opening balance
+as sent; bill-wise is not read back; no ledger or group that existed before
+changed; no other loaded company's master mark moved),
+`posted_into_existing_master` or `master_write_located_elsewhere` (loud: check
+Tally, do not retry), `confirmed_absent` (only from a later call: its read found
+the name absent and the company's master mark unmoved; a create that Tally
+rejected reaches it too, and it does not show that Tally will not still run a
+create that ComplyEaze Bridge stopped waiting for, so make sure Tally is idle and
+answering before a new batch is prepared, which needs a new approval),
+`masters_after_post_unconfirmed` (the book could
+not be read back; call again, which only reads), plain `posted_unverified`
+(Tally answered, with any counters it gave, but the read-back could not be
+attempted, so nothing was judged; see its `next_step`, never send again, check
+Tally) or
+`reconciliation_required` (with reasons). The answer of the call in which Tally
+answered, and an answer that reports a read-back (it has `verification.moment`),
+carry `answer_recorded`; a failure answer does not. False means ComplyEaze Bridge
+has no record of Tally's answer on file (it could not be recorded, or Tally never
+answered). In the answer of the call in which Tally answered, the counters shown
+are then the only record to rely on, and a later call may have none and cannot
+reach `posted_verified`: keep them and check the ledger in Tally. A later call
+that finds no answer on file shows no counters.
+`verdict_recorded` says whether the verdict was written to the journal, and
+`settled` is true only when the state is final and the verdict is recorded. With
+`verdict_recorded` false the state was judged but is not settled: call
+`post_ledger_creates` with the same `batch_id` again, which reads the book back and
+sends nothing. A later call for a sent batch never sends. It repeats the
+read-back unless the batch already has a terminal verdict (it then answers from
+the journal alone), another dispatch is using the Tally endpoint (the book is
+then not read, and the answer is `masters_after_post_unconfirmed` with the reason
+`endpoint_dispatch_busy`), or the batch's company cannot be matched to a loaded
+company (it then answers from the journal and says what stopped the read-back).
+
+Refusals and answer fields not named above include these.
+`master_writes_need_licensed_mode` refuses a book in TallyPrime's Education mode,
+before the person is asked, because no master write has been measured there.
+`group_export_invalid` says the group names TallyPrime returned could not be read,
+with a `cause` when one is known. `post_catalogue_unreadable` says the ledger and
+group names read again after the approval differ between the two readings or
+cannot be indexed. `master_approval_declined`, `master_approval_unavailable` and
+`master_approval_timed_out` say the person declined the dialog, the dialog could
+not be shown, or the person did not answer in time; each says nothing was sent,
+and a declined or timed-out answer's `next_step` says that the next call with the
+same `batch_id` opens a new dialog. In an answer,
+`verification.verdict_written` is true when this call appended the verdict (an
+open verdict already on file in the same words is not appended again);
+`verification.verdict_record_error` is the code of why the verdict was not
+recorded; `verification.answer_record_error` is the code of why Tally's answer was
+not recorded, in the `posted_unverified` answer given when the book could not be
+read back; `verification.counters_note` says why no counters are shown; and
+`verification.not_read_back` lists `bill_wise` when the ledger asked for
+bill-wise, which the read-back does not fetch. An answer made from the journal
+alone (a batch with a terminal verdict, or a book that could not be read back) has
+a `journal` object with `response_recorded`, `counters` and `verdict`, takes its
+`state` from the verdict (or is `posted_unverified` when only Tally's answer is on
+file, and `reconciliation_required` when neither is), and, for a book that was not
+read back, has `verification.attempted` false with the code that stopped it.
+
+A create whose outcome is not settled holds its ledger name, and every name that
+may be the same ledger, against a new create in every company this data folder
+holds batches for, not only its own. `post_ledger_creates` refuses such a name
+with `master_ledger_open_dispatch_overlaps` before it asks the person when it can
+read its journal just before that check. When that read fails the check is
+skipped, and the refusal then comes from the check under the journal's lock: after
+the approval, and still before anything is sent. The check under the journal's
+lock stays in every case, so a refusal can still come after an approval, and then
+the approval lapses and the next call asks the person again. The refusal says this call sent
+nothing. Its `error.hold` says what the journal showed: `held` (it names
+`blocking_batch_ids`, the batches of the refused batch's own company that hold the
+name, and `blocking_batches_other_companies`, each with its `batch_id` and
+`company_guid`), `settled_meanwhile`, which only the check under the lock gives (the
+holder settled since the call began: post this batch again), or `journal_unread`,
+which either check can give (the journal could not be read just now, or did not
+show this batch: call again). When the check before the dialog finds a send of this
+batch recorded since the call began by another call, and when a held-name refusal
+finds it in the journal read that follows, the answer is `import_already_attempted`
+with `error.hold` `send_of_this_batch_recorded_since`: call again later, which
+only reads, and create nothing by hand. The check under the journal's lock
+answers the same code without the `hold` field, as an outcome that may have been
+sent: call again, which reads the book back when the send is on file, and create
+nothing by hand meanwhile. For a held name, call `post_ledger_creates` with
+each blocking `batch_id`. For a batch of another company, `list_companies` shows
+only the companies loaded in Tally, so a `company_guid` not found there belongs to a
+company that is not loaded; the call reads that book back and sends nothing if the
+company is loaded, and otherwise answers to load the same companies and call again.
+Post this batch again when they are settled, and create nothing in Tally by hand
+meanwhile, because the earlier create may still be waiting in Tally and would
+overwrite it.
+
+Later calls cannot settle these states, and their batches keep holding the name: a
+read that found the name absent while the company's master mark moved; a ledger
+present with no counters, or with a field that differs; a create Tally rejected,
+once the mark moves; and the reasons `pre_image_master_missing`,
+`pre_image_unreadable` and `master_index_not_usable`. A later call judges the book
+as it then is, so a state stays unsettled only while the book stays as it was read.
+A company that is not loaded or was renamed is not read back until the same
+companies are loaded under the same names; the next call then reads the book back
+and judges it. A book whose set of loaded companies changed is read and judged:
+the answer is `reconciliation_required` with `company_scope_changed` among its
+reasons, and it says to load the same companies and call again; a read that shows
+a changed existing master or another company's mark moved keeps the state for
+that. A read-back that read the book,
+found the name absent and did not settle says that ComplyEaze Bridge cannot settle
+the batch now, because a create it sent may still be waiting in Tally; the name
+stays held, and a later call sends nothing, reads the book back, shows whether a
+ledger of the name now exists and judges one that has appeared. No answer tells the
+person to create the ledger in Tally by hand. An unconfirmed answer
+and the answer given when the book could not be read back after Tally answered
+say to call again later, which only reads, and to create nothing in Tally by hand
+meanwhile. A failure answer that says the create may have been sent says the same.
+When the journal could not be read for that answer, it says it is not known
+whether a send was recorded: call `post_ledger_creates` with the same `batch_id`
+again, which reads the book back and sends nothing if a send is on file,
+otherwise asks for approval again before anything is sent, and is refused as
+`master_batch_not_found`, sending nothing, if ComplyEaze Bridge holds no such batch; create nothing in Tally by hand
+meanwhile. Of the party fields the read-back fetches, no PAN, bank detail, e-mail
+address or phone number is put in an answer or a record; a GSTIN the caller
+supplied, which contains the party's PAN, is in the preview and in the batch's
+local record. The setting is a command-line setting only and is not in the MCPB
+extension.
+
+All three switches accept `true`/`false` or `1`/`0`; any other value stops startup, except that an empty `BRIDGE_AGENT_ENABLE_WRITES`, or the extension's unresolved placeholder for it, reads as off. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**
 for the user. That client permission does not approve an accounting entry.
 

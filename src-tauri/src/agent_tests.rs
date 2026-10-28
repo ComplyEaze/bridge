@@ -159,6 +159,7 @@ fn settings(address: std::net::SocketAddr, data_dir: PathBuf) -> Settings {
         redaction: Redaction::MaskParties,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     }
 }
@@ -798,6 +799,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "Supplier Two",
         "PAN Holder",
         "Entry Ledger",
+        "Mailing Firm",
         "Cost Centre One",
         "Cost Category One",
     ];
@@ -821,7 +823,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ),
         (
             "ledger_masters",
-            json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder"}))}]}),
+            json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder","address":"Mailing Firm","mailing_details":{"observation":"entries","entries":[{"applicable_from":"20260401","mailing_name":"Mailing Firm","address_lines":["C/o Mailing Firm","1 Test Street"],"pin_code":"560001","state":"Karnataka","country":"India","other_content_skipped":false}]}}))}]}),
         ),
         (
             "ledger_movement",
@@ -919,10 +921,14 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // months, amounts and the report's name; `statement_tie_out` returns two
     // dates, three signed gaps and fixed sentences, and never a ledger name;
     // `voucher_read_cost` returns only a voucher mark, counts, seconds and
-    // constant text, and the company's own name; `audit_test_run` returns only
-    // figure and finding ids, numbers, the admitted test's fixed wording and the
-    // codes and counts of failed book checks (its own test replays a book and
-    // looks for every group, ledger and company name in the result).
+    // constant text, and the company's own name; the two master tools return
+    // the batch id, the caller's own proposed ledger name inside the preview
+    // (masked there under `mask_parties`), the company's own name and Bridge's
+    // own states, and no name read from the book (a name that exists is
+    // refused by code); `audit_test_run` returns only figure and finding ids,
+    // numbers, the admitted test's fixed wording and the codes and counts of
+    // failed book checks (its own test replays a book and looks for every
+    // group, ledger and company name in the result).
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut without_a_sample = vec![
         "acknowledge_post_review",
@@ -932,6 +938,8 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "gst_status",
         "local_data_report",
         "month_register",
+        "post_ledger_creates",
+        "prepare_ledger_creates",
         "statement_tie_out",
         "voucher_read_cost",
     ];
@@ -1115,6 +1123,7 @@ async fn malformed_tool_name_is_in_band_and_the_same_session_serves_the_next_req
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
@@ -1169,6 +1178,7 @@ async fn egress_receipt_uses_the_final_jsonrpc_replacement_when_only_the_envelop
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     };
     let unframed = Server::new(base_settings.clone())
@@ -1255,6 +1265,7 @@ async fn tools_call_notifications_are_refused_and_receipted_without_dispatch() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
@@ -1316,6 +1327,7 @@ async fn pagination_rejects_present_invalid_values_in_helpers_and_row_tools() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server.call_tool("egress_log", json!({"limit": "10"})).await;
@@ -1570,6 +1582,7 @@ async fn stored_evidence_records_have_individual_timestamps_and_durations() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     server.call_tool("voucher_schema", json!({})).await;
@@ -2167,6 +2180,7 @@ async fn imports_are_hidden_and_refused_without_explicit_live_evidence_opt_in() 
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server.call_tool("build_import_xml", json!({})).await;
@@ -2194,6 +2208,7 @@ async fn a_batch_mixing_a_journal_with_a_bank_voucher_says_how_to_split_it() {
         redaction: Redaction::None,
         import_enabled: true,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let mixed = json!({"company_guid":"00000000-0000-4000-8000-000000000001","vouchers":[
@@ -2471,6 +2486,7 @@ async fn simulator_company_read_records_evidence_while_down_endpoint_is_typed() 
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let down_response = down.call_tool("tally_status", json!({})).await;
@@ -2802,6 +2818,7 @@ fn evidence_reads_disclose_requested_limits_and_permanent_retention_eviction() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     assert!(!server.read_evidence(&json!({"limit":1})).unwrap().truncated);
@@ -2865,6 +2882,7 @@ async fn diagnostic_history_reads_honor_the_configured_global_row_cap() {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         for index in 0..3 {

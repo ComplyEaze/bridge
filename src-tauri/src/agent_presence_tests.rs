@@ -23,6 +23,7 @@ fn offline_server(directory: &std::path::Path) -> Server {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -860,6 +861,7 @@ async fn a_small_book_window_is_counted_so_a_proposal_nothing_resembles_is_absen
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -934,6 +936,7 @@ async fn an_uncounted_nonempty_window_issues_no_absent() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -990,6 +993,7 @@ async fn a_nonempty_window_counted_by_its_census_can_issue_absent() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -1048,6 +1052,7 @@ async fn a_narration_marker_decides_a_present_from_a_nonempty_window() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -1249,6 +1254,7 @@ async fn a_ledger_missing_from_the_catalogue_fails_closed() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -1301,6 +1307,7 @@ async fn a_party_with_too_many_identifiers_costs_no_read() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -1485,6 +1492,7 @@ async fn replay_the_twenty_invoice_engagement() {
         import_enabled: false,
         // Read-only, and stated in the settings rather than only in a comment.
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
 
@@ -1915,6 +1923,7 @@ async fn a_batch_id_the_writer_could_not_have_made_is_refused() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     for (batch, refused) in [
@@ -1980,6 +1989,7 @@ async fn a_transaction_label_outside_the_published_nested_schema_is_refused_befo
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     // A space is the case the writer rejects and the declared pattern names.
@@ -2037,6 +2047,7 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -2108,6 +2119,7 @@ fn presence_server(simulator: &SequenceSimulator, directory: &std::path::Path) -
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }

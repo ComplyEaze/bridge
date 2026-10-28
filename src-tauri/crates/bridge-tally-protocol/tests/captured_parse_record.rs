@@ -2567,6 +2567,10 @@ const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDG
      agent/whole-day-read-transfer-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
+const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRANSFER LAB and \
+     BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
+     yet, and the pull request that renders the census as a span replays it and changes this \
+     reason; agent/spanned-census-two-books/PROVENANCE.md says what each file is";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
@@ -3262,6 +3266,39 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/unit_a_invalid_char_ref_live.xml",
         "only the pre-parse sanitizer reads it (src/tolerant_xml_tests.rs): a NAME/PARENT-only \
          ledger collection with no GUID, company or balance, which no parser of this crate binds",
+    ),
+    // The span read's answers on two synthetic books (#899).
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-m1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-c1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-c2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-m2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-m1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-c1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-c2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-m2.utf16le.xml",
+        SPANNED_CENSUS,
     ),
 ];
 

@@ -1,0 +1,137 @@
+== raw/r-00-stock-summary: 1370 B
+  root ENVELOPE
+  DSPACCNAME: DSPDISPNAME='Finished Kits'
+  DSPSTKINFO: DSPSTKCL/DSPCLQTY='<empty>', DSPSTKCL/DSPCLRATE='<empty>', DSPSTKCL/DSPCLAMTA='18750.00'
+  DSPACCNAME: DSPDISPNAME='Packaging'
+  DSPSTKINFO: DSPSTKCL/DSPCLQTY='<empty>', DSPSTKCL/DSPCLRATE='<empty>', DSPSTKCL/DSPCLAMTA='14500.00'
+  DSPACCNAME: DSPDISPNAME='Raw Chemicals'
+  DSPSTKINFO: DSPSTKCL/DSPCLQTY='<empty>', DSPSTKCL/DSPCLRATE='<empty>', DSPSTKCL/DSPCLAMTA='-30249.99'
+== raw/r-01-stock-query-carton-box-small: 312 B
+  root ENVELOPE
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '100 Box'
+== raw/r-02-stock-query-caustic-soda-flakes: 1094 B
+  root ENVELOPE
+  STQPURCDATE '21-Apr-25'
+  STQPURCPARTY 'Chem Supplier 1'
+  STQPURCVCHQTY '200.000 Kgs'
+  STQPURCVCHRATE '50.00'
+  STQPURCVCHDISC '<empty>'
+  STQPURCVCHAMOUNT '-10000.00'
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '200.000 Kgs'
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'B-2504-A'
+  STQGODOWNQTY '200.000 Kgs'
+== raw/r-03-stock-query-cleaning-kit-a: 1086 B
+  root ENVELOPE
+  STQSALESDATE '23-Apr-25'
+  STQSALESVCHNO 'Shape Buyer 1'
+  STQSALESVCHQTY '13 Nos'
+  STQSALESVCHRATE '750.00'
+  STQSALESVCHDISC '<empty>'
+  STQSALESVCHAMOUNT '10000.00'
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '25 Nos'
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'K-2504-A'
+  STQGODOWNQTY '-13 Nos'
+== raw/r-04-stock-query-cleaning-kit-b: 46 B
+  root ENVELOPE
+== raw/r-05-stock-query-descaler-concentrate: 46 B
+  root ENVELOPE
+== raw/r-06-stock-query-hdpe-drum-50l: 310 B
+  root ENVELOPE
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '40 Nos'
+== raw/r-07-stock-query-hydrochloric-acid-33pc: 1354 B
+  root ENVELOPE
+  STQPURCDATE '24-Apr-25'
+  STQPURCPARTY 'Chem Supplier 2'
+  STQPURCVCHQTY '666.667 Kgs'
+  STQPURCVCHRATE '30.00'
+  STQPURCVCHDISC '<empty>'
+  STQPURCVCHAMOUNT '-20000.00'
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '150.000 Kgs'
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'H-2504-A'
+  STQGODOWNQTY '300.000 Kgs'
+  STQGODOWNNAME 'Factory Floor'
+  STQBATCHNAME 'H-2504-B'
+  STQGODOWNQTY '366.667 Kgs'
+== raw/r-08-stock-query-label-roll: 46 B
+  root ENVELOPE
+== raw/r-09-stock-query-soda-ash-light: 3152 B
+  root ENVELOPE
+  STQPURCDATE '15-Apr-25'
+  STQPURCPARTY 'Chem Supplier 4'
+  STQPURCVCHQTY '100.000 Kgs'
+  STQPURCVCHRATE '25.00'
+  STQPURCVCHDISC '<empty>'
+  STQPURCVCHAMOUNT '-2500.00'
+  STQPURCDATE '14-Apr-25'
+  STQPURCPARTY 'Chem Supplier 4'
+  STQPURCVCHQTY '100.000 Kgs'
+  STQPURCVCHRATE '25.00'
+  STQPURCVCHDISC '<empty>'
+  STQPURCVCHAMOUNT '-2500.00'
+  STQPURCDATE '13-Apr-25'
+  STQPURCPARTY 'Chem Supplier 4'
+  STQPURCVCHQTY '100.000 Kgs'
+  STQPURCVCHRATE '25.00'
+  STQPURCVCHDISC '<empty>'
+  STQPURCVCHAMOUNT '-2500.00'
+  STQPURCDATE '12-Apr-25'
+  STQPURCPARTY 'Chem Supplier 4'
+  STQPURCVCHQTY '100.000 Kgs'
+  STQPURCVCHRATE '25.00'
+  STQPURCVCHDISC '<empty>'
+  STQPURCVCHAMOUNT '-2500.00'
+  STQPURCDATE '11-Apr-25'
+  STQPURCPARTY 'Chem Supplier 4'
+  STQPURCVCHQTY '100.000 Kgs'
+  STQPURCVCHRATE '25.00'
+  STQPURCVCHDISC '<empty>'
+  STQPURCVCHAMOUNT '-2500.00'
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '1350.000 Kgs'
+  STQGODOWNNAME 'Factory Floor'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '-50.000 Kgs'
+== raw/r-10-stock-query-sulphuric-acid-98pc: 320 B
+  root ENVELOPE
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '100.000 Kgs'
+== raw/r-11-stock-query-zero-stock-item: 848 B
+  root ENVELOPE
+  STQSALESDATE '20-Apr-25'
+  STQSALESVCHNO 'Shape Buyer 6'
+  STQSALESVCHQTY '50.000 Kgs'
+  STQSALESVCHRATE '30.00'
+  STQSALESVCHDISC '<empty>'
+  STQSALESVCHAMOUNT '1500.00'
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '-50.000 Kgs'
+== raw/r-12-stock-query-hcl-to-20250401: 320 B
+  root ENVELOPE
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '150.000 Kgs'
+== raw/r-13-stock-query-zero-stock-item-to-20250401: 46 B
+  root ENVELOPE
+== raw/r-14-stock-query-cleaning-kit-a-to-20250401: 310 B
+  root ENVELOPE
+  STQGODOWNNAME 'Main Location'
+  STQBATCHNAME 'Primary Batch'
+  STQGODOWNQTY '25 Nos'
+== raw/r-15-stock-query-unknown-item: 46 B
+  root ENVELOPE

@@ -1,0 +1,32 @@
+2026-10-28T14:48:01.479Z req=r-00-stock-summary.utf16le.xml req_sha256=17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8 curl_exit=0 printed='200 1370' content_length=1370 bytes=1370 sha256=862c3206e5f22922cea932380da07d2170591085da7ef8227f4c911452bfe9a4
+2026-10-28T14:48:01.814Z answered r-00-stock-summary exit=0
+2026-10-28T14:48:02.717Z req=r-07-stock-query-hydrochloric-acid-33pc.utf16le.xml req_sha256=fff4e42cb65b14100e0c271579a8e35b05d65f0a96e987b92407318f0261119d curl_exit=0 printed='200 1354' content_length=1354 bytes=1354 sha256=c23c6d414d47f1d87b779a4a0afca47e4a0712ad2ce5b129a0e44ba41c66f213
+2026-10-28T14:48:02.894Z answered r-07-stock-query-hydrochloric-acid-33pc exit=0
+2026-10-28T14:48:12.629Z req=r-12-stock-query-hcl-to-20250401.utf16le.xml req_sha256=5096cf0d56c9c931f3134feb94fd9a0c6247a904bc421319e4890b179add6797 curl_exit=0 printed='200 320' content_length=320 bytes=320 sha256=6e8d7e5e2418f30dc2d2e89f3f4435dab784e9e17e510bdeb2ffe5230197fe55
+2026-10-28T14:48:13.028Z answered r-12-stock-query-hcl-to-20250401 exit=0
+2026-10-28T14:48:13.856Z req=r-14-stock-query-cleaning-kit-a-to-20250401.utf16le.xml req_sha256=ad79239d98ef3692e8d0605465aada99a811d2ce737b09920f22f7a6933a8256 curl_exit=0 printed='200 310' content_length=310 bytes=310 sha256=b78d85c0160f1c6426ed78ead117121ea245b1acb2fce81bdd6e6777a0c548fb
+2026-10-28T14:48:14.036Z answered r-14-stock-query-cleaning-kit-a-to-20250401 exit=0
+2026-10-28T14:48:14.255Z req=r-13-stock-query-zero-stock-item-to-20250401.utf16le.xml req_sha256=5ddadc4080f9f593a012a9e1a85c733910c0f46e1111049b55b259b67f7921d9 curl_exit=0 printed='200 46' content_length=46 bytes=46 sha256=8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+2026-10-28T14:48:14.432Z answered r-13-stock-query-zero-stock-item-to-20250401 exit=0
+2026-10-28T14:48:24.934Z req=r-02-stock-query-caustic-soda-flakes.utf16le.xml req_sha256=a3ede12af36a1daca85527f43082919e07db9ee0511f819faf03cfaa747b22ae curl_exit=0 printed='200 1094' content_length=1094 bytes=1094 sha256=ece7ccb544e832c89e52cde0b0425ba7941ff1a8e005511c546756668b1d674f
+2026-10-28T14:48:25.181Z answered r-02-stock-query-caustic-soda-flakes exit=0
+2026-10-28T14:48:25.908Z req=r-03-stock-query-cleaning-kit-a.utf16le.xml req_sha256=8f948a388098391ac2012e38fcc2ee49b45f73ebe41d8c479d8baba08b5216b9 curl_exit=0 printed='200 1086' content_length=1086 bytes=1086 sha256=b4d01f265a2af3f8b4f9ebc2a876ebfcfd2773fa8112388d6dea85087310ee24
+2026-10-28T14:48:26.117Z answered r-03-stock-query-cleaning-kit-a exit=0
+2026-10-28T14:48:26.284Z req=r-10-stock-query-sulphuric-acid-98pc.utf16le.xml req_sha256=a90a6a12d9b6a473906ef7d4ee4d59594c3340912c915c4e310d09e443d116b1 curl_exit=0 printed='200 320' content_length=320 bytes=320 sha256=92214a041b5f1edf79f5ec51e4769ce8cb9e5ac289517dcf584ddf3ebe6347b2
+2026-10-28T14:48:26.434Z answered r-10-stock-query-sulphuric-acid-98pc exit=0
+2026-10-28T14:48:26.581Z req=r-09-stock-query-soda-ash-light.utf16le.xml req_sha256=75f8b60cd19b79268d680288ee1d6060556363068e030de25fbf375580e74798 curl_exit=0 printed='200 3152' content_length=3152 bytes=3152 sha256=592f19e8057e6e759b92f8423cfbe568beee74ad676b22a25f7b4a3184cb4dbe
+2026-10-28T14:48:26.748Z answered r-09-stock-query-soda-ash-light exit=0
+2026-10-28T14:48:26.910Z req=r-01-stock-query-carton-box-small.utf16le.xml req_sha256=dc2b3afe5c542e1305868148facd0ca453796abf2cbb5c78ae1346b79e4be812 curl_exit=0 printed='200 312' content_length=312 bytes=312 sha256=53fe972f6a9abb14465495afbaf55af9cb934fe9b7fb309fa926925ba7ae4c9c
+2026-10-28T14:48:27.078Z answered r-01-stock-query-carton-box-small exit=0
+2026-10-28T14:48:27.220Z req=r-06-stock-query-hdpe-drum-50l.utf16le.xml req_sha256=94c0221a85ec1aa32b525767c9e4455a6dd0476a5bee7ecd3fef6bdcdf8834da curl_exit=0 printed='200 310' content_length=310 bytes=310 sha256=d87aefbc7e4b28ff6b3e3b5d6f4d1dbcb0e1fe6bfd80f2a43e077a94aa6fe0c2
+2026-10-28T14:48:27.370Z answered r-06-stock-query-hdpe-drum-50l exit=0
+2026-10-28T14:48:34.993Z req=r-05-stock-query-descaler-concentrate.utf16le.xml req_sha256=87ed0a0cd26df66060766b13758ad962bbfd07bd261e3dd12e8b61da945e9874 curl_exit=0 printed='200 46' content_length=46 bytes=46 sha256=8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+2026-10-28T14:48:35.209Z answered r-05-stock-query-descaler-concentrate exit=0
+2026-10-28T14:48:35.907Z req=r-04-stock-query-cleaning-kit-b.utf16le.xml req_sha256=8729c40c156f7089fb6e73455d5bcd765c39171179c3ecaf24c20c460559433c curl_exit=0 printed='200 46' content_length=46 bytes=46 sha256=8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+2026-10-28T14:48:36.041Z answered r-04-stock-query-cleaning-kit-b exit=0
+2026-10-28T14:48:36.196Z req=r-08-stock-query-label-roll.utf16le.xml req_sha256=f340547ec0614693c272c5163a33ed3fb4b9a2feaacd50503d3804d82efc33ce curl_exit=0 printed='200 46' content_length=46 bytes=46 sha256=8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+2026-10-28T14:48:36.335Z answered r-08-stock-query-label-roll exit=0
+2026-10-28T14:48:36.510Z req=r-11-stock-query-zero-stock-item.utf16le.xml req_sha256=0ed3e1e9197132c8d56561aa71f11df2595dc8b91a4b4460f9ca2dfcb079ecd2 curl_exit=0 printed='200 848' content_length=848 bytes=848 sha256=83acc28947d35ddca4c4b49973b466b9d686882aeea3857fe2afb11f93f12d30
+2026-10-28T14:48:36.664Z answered r-11-stock-query-zero-stock-item exit=0
+2026-10-28T14:48:36.783Z req=r-15-stock-query-unknown-item.utf16le.xml req_sha256=98c06d132ddf2347690a532c4b5760134db202531c5b5b9d6dbb5a0be7e04263 curl_exit=0 printed='200 46' content_length=46 bytes=46 sha256=8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+2026-10-28T14:48:36.932Z answered r-15-stock-query-unknown-item exit=0

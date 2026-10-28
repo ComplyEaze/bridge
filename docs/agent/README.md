@@ -417,6 +417,14 @@ Negative values are debits; positive values are credits. No empty value is
 converted to zero. `totals` sums numeric observations across all returned ledgers
 and carries an `empty_count` for each column. A fully observed nonzero opening
 net is the difference in opening balances; Bridge does not add a balancing row.
+A ledger whose closing is not its opening plus its debit and credit totals (an empty amount
+counted as zero) carries `movements_differ_by` (the exact difference, closing minus the three, in
+Tally's sign), the first line says how many do not add up, and a limitation explains. The row is
+as Tally sent it and nothing is corrected. Measured on a Closing Stock ledger whose closing
+balance was keyed on Tally's screen: Tally kept the opening as its closing and showed the change
+only in the debit total. On the book not integrated with inventory Tally's Profit and Loss and
+Balance Sheet used the keyed figure; on the integrated book they valued the stock from the stock
+item, so the ledger's `closing` is not necessarily the figure those statements use.
 
 `offset` and `limit` restrict output, not the source read. A first page captures a
 fresh report and holds it in memory; a later page continues from it while the book's extent is

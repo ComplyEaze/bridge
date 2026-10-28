@@ -601,3 +601,26 @@ async fn a_profit_and_loss_whose_own_statement_cannot_be_read_is_refused() {
     let (response, _, _) = call("profit_and_loss", plans).await;
     assert_eq!(response["isError"], true, "{response}");
 }
+
+/// The Trial Balance parser's reason reaches a `profit_and_loss` or `balance_sheet` refusal as
+/// its `cause` (#2071, #2080). Tally's answer to the Trial Balance request is a captured
+/// company list, which is not one.
+#[tokio::test]
+async fn an_unusable_trial_balance_answer_names_its_cause_on_both_statements() {
+    for tool in ["profit_and_loss", "balance_sheet"] {
+        let mut plans = plans("-4950.00");
+        // The answer to the Trial Balance request is the 16th to 19th request (a pair).
+        for at in [15, 17] {
+            plans[at] = xml(companies());
+        }
+        // The refusal ends the call at the Trial Balance pair (19 requests in).
+        plans.truncate(19);
+        let (response, _, _) = call(tool, plans).await;
+        assert_eq!(response["isError"], true, "{tool}: {response}");
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(
+            error["cause"], "trial_balance_source_identity_missing",
+            "{tool}: {error}"
+        );
+    }
+}

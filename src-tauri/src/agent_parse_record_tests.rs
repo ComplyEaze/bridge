@@ -45,6 +45,7 @@ const WR2_LAB: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const REGISTER_LAB: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const GST_LEDGER_LAB: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+const BANKREF_LAB: &str = "8fb5f4db-478d-4084-b1e5-5b8f5d3fef60";
 const OUTSTANDINGS_LAB: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const STOCK_LAB: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 /// The empty book of the marks capture in `COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md`.
@@ -599,6 +600,11 @@ fn rows() -> Vec<Row> {
         "voucher_cost_centre_allocations_shape_lab_live.utf16le.xml",
         "parse_agent_rows(SHAPE_LAB)",
         |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
+        "parse_agent_rows(BANKREF_LAB)",
+        |_, t| agent_rows(t, BANKREF_LAB)
     ));
     rows.push(row!(
         "vouchers_agst_ref_reopen_live.utf16le.xml",

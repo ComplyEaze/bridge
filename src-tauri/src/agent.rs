@@ -284,6 +284,43 @@ fn mark_entry_party_names(entry: &mut Value) {
     }
 }
 
+/// Whether an answer that returns a voucher's entries shows their bank allocations (#1231).
+/// Only `vouchers` called with `bank_allocations: true` shows them; the parse always reads them,
+/// for the readers inside ComplyEaze Bridge that use them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum BankAllocationsShown {
+    Withheld,
+    Shown,
+}
+
+impl BankAllocationsShown {
+    /// From the `bank_allocations` argument: absent or false withholds them.
+    pub(super) fn from_args(args: &Value) -> Result<Self, String> {
+        Ok(match optional_bool(args, "bank_allocations")? {
+            Some(true) => Self::Shown,
+            Some(false) | None => Self::Withheld,
+        })
+    }
+}
+
+/// An entry as an answer that did not ask for bank allocations shows it: without them.
+fn withhold_entry_bank_allocations(entry: &mut Value) {
+    if let Some(entry) = entry.as_object_mut() {
+        entry.remove("bank_allocations");
+        entry.remove("bank_allocations_unreadable");
+    }
+}
+
+/// A voucher's entries without their bank allocations, unless `shown` asks for them.
+fn present_voucher_bank_allocations(mut voucher: Value, shown: BankAllocationsShown) -> Value {
+    if shown == BankAllocationsShown::Withheld {
+        if let Some(entries) = voucher.get_mut("amounts").and_then(Value::as_array_mut) {
+            entries.iter_mut().for_each(withhold_entry_bank_allocations);
+        }
+    }
+    voucher
+}
+
 fn mark_voucher_party_names(mut voucher: Value) -> Value {
     for field in ["party", "party_ledger_name"] {
         mark_party_field(&mut voucher, field);

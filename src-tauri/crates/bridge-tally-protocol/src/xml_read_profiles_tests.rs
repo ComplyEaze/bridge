@@ -1,6 +1,6 @@
 use super::*;
 
-fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 8] {
+fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 7] {
     [
         ReadOnlyProfile::CompanyListV1,
         ReadOnlyProfile::CompanyListV2,
@@ -9,7 +9,6 @@ fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 8] {
         ReadOnlyProfile::StandardLedgerCatalogV1 { company },
         ReadOnlyProfile::StandardLedgerCatalogV2 { company },
         ReadOnlyProfile::StandardLedgerCatalogV3 { company },
-        ReadOnlyProfile::LedgersV1 { company },
     ]
 }
 
@@ -58,14 +57,14 @@ fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
             assert!(!upper.contains(&format!("<TALLYREQUEST>{forbidden}")));
         }
     }
-    let ledger = ReadOnlyProfile::LedgersV1 { company: &company }.render();
+    let ledger = ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render();
     assert!(ledger.contains("BRIDGE &amp; &lt;SYNTHETIC&gt; &quot;BOOK&quot;"));
     assert!(!ledger.contains("BRIDGE & <SYNTHETIC>"));
 
     let injection =
         ValidatedCompanyName::new("X</SVCURRENTCOMPANY><TALLYREQUEST>IMPORT</TALLYREQUEST>")
             .unwrap();
-    let escaped = ReadOnlyProfile::LedgersV1 {
+    let escaped = ReadOnlyProfile::StandardLedgerCatalogV2 {
         company: &injection,
     }
     .render();
@@ -149,10 +148,6 @@ fn profile_ids_and_template_hashes_are_stable() {
             "5bdc4b7c5c1baec328934aa5f090efd72ac821956defe63a58a4cc44909d9462",
         ),
         (
-            ReadOnlyProfileId::LedgersV1,
-            "259b8159eb7c5a503c96f2760996db992127298781d5a332699a090cea90301b",
-        ),
-        (
             ReadOnlyProfileId::AuditCompanyObjectV1,
             "ff023f06940b80c8e922d8b238772cd77e18f220b2fd7a4be7af667029948acf",
         ),
@@ -199,10 +194,6 @@ fn compatibility_renderers_preserve_validated_profile_bytes() {
     assert_eq!(
         compatibility::standard_ledger_catalog_request(company.as_str()),
         ReadOnlyProfile::StandardLedgerCatalogV1 { company: &company }.render()
-    );
-    assert_eq!(
-        compatibility::ledgers_request(company.as_str()),
-        ReadOnlyProfile::LedgersV1 { company: &company }.render()
     );
 }
 
@@ -588,7 +579,6 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
             | ReadOnlyProfileId::StandardLedgerCatalogV1
             | ReadOnlyProfileId::StandardLedgerCatalogV2
             | ReadOnlyProfileId::StandardLedgerCatalogV3
-            | ReadOnlyProfileId::LedgersV1
             | ReadOnlyProfileId::AuditCompanyObjectV1
             | ReadOnlyProfileId::InvoiceCompanyHsnV1
             | ReadOnlyProfileId::AuditLedgersV1
@@ -604,7 +594,6 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         ReadOnlyProfileId::StandardLedgerCatalogV1,
         ReadOnlyProfileId::StandardLedgerCatalogV2,
         ReadOnlyProfileId::StandardLedgerCatalogV3,
-        ReadOnlyProfileId::LedgersV1,
         ReadOnlyProfileId::AuditCompanyObjectV1,
         ReadOnlyProfileId::InvoiceCompanyHsnV1,
         ReadOnlyProfileId::AuditLedgersV1,
@@ -628,8 +617,7 @@ fn education_refuses_exactly_the_profiles_that_render_a_spaced_function_argument
         );
         refused.extend(hazard.map(|h| (id.as_str(), h)));
     }
-    let ledgers = spaced("NumItems", "BRIDGE Ledger Collection V1");
-    assert_eq!(refused, [("ledgers_v1", ledgers)]);
+    assert!(refused.is_empty(), "{refused:?}");
 }
 
 /// `$$name:argument`, assembled at run time: a literal would itself be a hit

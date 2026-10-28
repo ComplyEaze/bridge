@@ -1,0 +1,17 @@
+2026-10-28T00:23:35Z exe sha256 92a899a21f904f88cb2d13ce44b1417d5aecaf333caad5230de598bf54d89524 ok; launch-env.json sha256 da81bca13a5488e27d70b0b0af79d37bc4ad4e7cee92ada585016b86971e6f85; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-28T00:23:35Z launched pid 15416; stderr to server-stderr-20261028T002335Z.log
+2026-10-28T00:23:35Z initialized {'name': 'bridge-tally', 'version': '0.6.0'}
+2026-10-28T00:23:35Z 000-list-companies-pre-keying.json tool=list_companies secs=0.093 isError=False error=None saved_sha256=7d9271ef2b6d55660ef323d630b9b5a8e2f61264446455f577d1145e4ce13997
+2026-10-28T00:23:45Z 001-marks-pre-keying.json tool=ledger_masters secs=0.723 isError=True error=None saved_sha256=06047214d74d9d14e3add88ac6a1c553bdc4b65ce51003ea39e80973c962da11
+2026-10-28T00:23:54Z 002-marks-pre-keying-compliance.json tool=ledger_masters secs=1.474 isError=False error=None saved_sha256=90a4679be41835cdb13eaa3517f7e784de45fa3d130196e2ef91dfc5cdac0d55
+2026-10-28T00:42:27Z 003-step1-list-companies.json tool=list_companies secs=0.097 isError=False error=None saved_sha256=eaa52681e576d92b5e6e50610f979c253be7d9ed8027aef4570fce94b27245bb
+2026-10-28T00:42:28Z 004-step1-status.json tool=tally_status secs=0.093 isError=False error=None saved_sha256=fb17912e967706698eb32c2912c91d39a4544adea3c4583388f0d8c3c24ca749
+2026-10-28T00:42:30Z 005-step1-marks.json tool=ledger_masters secs=1.330 isError=True error=None saved_sha256=26873c506421762d5465b4101b97a32e71ade6515bd1d2d26c3ac88d4b0019ca
+2026-10-28T00:42:40Z 006-step2-tb.json tool=trial_balance secs=0.741 isError=True error=None saved_sha256=8eef0512b12798797f59f5ebb12e70ba5be9e4aa5962e84e3051ec3a372ab525
+2026-10-28T00:42:43Z 007-step2-out.json tool=outstandings secs=1.867 isError=True error=None saved_sha256=bcb331c567bce215cd777a45c0240d664c088740eff2bcec1671061b17c02222
+2026-10-28T00:46:29Z 008-step4-tb.json tool=trial_balance secs=0.976 isError=True error=None saved_sha256=ada169cf69a29970be2fc65d52152e41d88a3cf678ad4587d9c2e37412c2094a
+2026-10-28T00:46:31Z 009-step4-out.json tool=outstandings secs=2.070 isError=True error=None saved_sha256=0dec2a68bddf67113f58c95174801dc2645445904cdf55ca50ed0ad02697f771
+2026-10-28T00:49:52Z 010-step5-tb.json tool=trial_balance secs=0.718 isError=True error=None saved_sha256=b667300c753386b91b172c4f37c48a0182bf02caa16059bf21bf1632e8a76fae
+2026-10-28T00:51:12Z 011-step6-status.json tool=tally_status secs=0.116 isError=False error=None saved_sha256=a8d875139db216b866277ce8173f2c9a47c68ad811d338d22d675778c1b6ea5a
+2026-10-28T00:55:18Z 012-after-restore-marks.json tool=ledger_masters secs=1.439 isError=False error=None saved_sha256=81f2770b42f8004661d2e59ca1ee38833adb2655ec25ba9e664aa8b9151dbff3
+2026-10-28T00:55:34Z session ended; server pid 15416 exit code 0

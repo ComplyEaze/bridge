@@ -587,7 +587,7 @@ async fn a_review_naming_another_company_is_refused_before_any_read() {
     let line = saved(&server, "Journal");
     sent_unanswered(&server, &line);
     let mut elsewhere = review_args(&line);
-    elsewhere["company_guid"] = json!("00000000-0000-4000-8000-000000000099");
+    elsewhere["company_guid"] = json!("00000000-0000-4000-8000-000000000002");
     let approval = ScriptedApproval::approving();
     let response = release(&server, elsewhere, approval.clone()).await;
     assert_eq!(

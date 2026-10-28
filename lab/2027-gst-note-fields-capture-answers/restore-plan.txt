@@ -1,0 +1,8 @@
+restore-plan (#2027 note fields, BK1)
+backup folder: 2027-notes\backups\bk1 (one file)
+backup file: TDBK1800_100084.001, 38,476 B, sha256 e264a4cafef9d97dd275e36cd6025cc37dc18e8e7cfb1bb5881c120308db3f87, taken 28-10-2026 17:33 local
+company: BRIDGE NOTES LAB, number 100084
+Restore Data Path: Tally's data folder (TallyPrimeEditLog\data)
+source: Specify Path, the backup's folder
+prompts expected: "Accept ?" = Yes; "Company data folder (100084) already exists ... Replace will overwrite the existing folder." = Replace
+after: load THE COMPANY alone; ledger_masters first (EXPECT 215 / 4, M0' and V0'), then list_companies; the Day Book for 3 to 6 June 2025 empty (never Enter on a line)

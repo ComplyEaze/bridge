@@ -142,6 +142,36 @@
       "size": 2568786
     },
     {
+      "blob": "9e1b4fd9f76862d853db15b5d5f97b7533097b45",
+      "capture_id": "native-party-masters-mailing-details.request.utf16le.xml",
+      "company": "Bridge Lab Win 0.5.1",
+      "lab_ref": "branch lab/1490-mailing-answers at b01ac6ded",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-mailing-details.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see native-party-masters-mailing-details.PROVENANCE.md",
+      "sha256": "1bf17a26c209253cb85a1725037cbf6000df4c6bc5ba77bfdd41ff65ab1ae8fa",
+      "size": 1792
+    },
+    {
+      "blob": "f163663784cddac319bfe329cb52785465ec282d",
+      "capture_id": "native-party-masters-mailing-details.utf16le.xml",
+      "company": "Bridge Lab Win 0.5.1",
+      "lab_ref": "branch lab/1490-mailing-answers at b01ac6ded",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml",
+      "seed_basis": "synthetic lab book; see native-party-masters-mailing-details.PROVENANCE.md",
+      "sha256": "ceaa6d789d1ce9a41c7bcf233e5d26cbe383dcd261e57fb804935d8845cc75d5",
+      "size": 20896
+    },
+    {
+      "blob": "6e912c80f9c90431628c009b63ce916f11b3222a",
+      "capture_id": "native-party-masters-without-mailing-details.utf16le.xml",
+      "company": "Bridge Lab Win 0.5.1",
+      "lab_ref": "branch lab/1490-mailing-answers at b01ac6ded",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-without-mailing-details.utf16le.xml",
+      "seed_basis": "synthetic lab book; see native-party-masters-mailing-details.PROVENANCE.md",
+      "sha256": "3c0d8c5b74d575fc192c5c8607b33463d692b49d75a0147e1c2223cb0d9d1915",
+      "size": 19094
+    },
+    {
       "blob": "f4d3821b01103737293d15993cba4e032cb15028",
       "capture_id": "builtin_negative_ledgers_bridge_lab_win_fy_live.utf16le.xml",
       "company": "Bridge Lab Win 0.5.1",

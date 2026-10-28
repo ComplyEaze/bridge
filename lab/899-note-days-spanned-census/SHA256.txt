@@ -1,0 +1,13 @@
+# sha256  bytes  file  (source)
+030fd76873c0331517a34e7b659a1ff1f661c4271948a68f35d3b3f5746e012c  63  .gitattributes  byte for byte from lab/485-ledger-filtered-vouchers-run-sheet at 4e769a9c
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md  byte for byte from lab/485-ledger-filtered-vouchers-run-sheet at 4e769a9c
+8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py  byte for byte from lab/485-ledger-filtered-vouchers-run-sheet at 4e769a9c
+e07dce37dd00eaeb930f49186ccaf49abe9f6c9d7b6e373b2b8188bc93729568  6399  RUN-SHEET.md
+b605bd009884e3b095330151aa638d8791f048ec4c9fdcdecf924455e66545fa  3995  compare899.py
+f556551d09682fd94d41b40bcf539d5d34bf06260d6da4bb44ad7023c598fcb1  976  requests/m_marks.request.utf16le.xml  byte for byte: note-days/shape_lab_company_marks_request.utf16le.xml
+433a524c8e76343dbb991e7fcd270be1d56825e73a1b9473f6acebe6b831e804  1436  requests/d0428_c1_unspanned.request.utf16le.xml  byte for byte: note-days/debit_note_day_voucher_census_request.utf16le.xml
+0e73d2fd878bad5ca32f488d86367676e1a4842df8a20bb7ebcf7148c1a3b429  1522  requests/d0428_c2_spanned_0_111.request.utf16le.xml  c1 with the span (0, 111]; byte-equal to the code's rendering (fix/899-census-always-spanned, request dump)
+5793fcabdb94f48c005c77cd31d5dac4c548f372e5161f761b40774d7ccfed01  1436  requests/d0429_c1_unspanned.request.utf16le.xml  byte for byte: note-days/credit_note_day_voucher_census_request.utf16le.xml
+7d87182578c6a8860809219dc33e40838baab177f22851f8155109a0aa517aca  1522  requests/d0429_c2_spanned_0_111.request.utf16le.xml  c1 with the span (0, 111]; byte-equal to the code's rendering (fix/899-census-always-spanned, request dump)
+27a22111f294ee36efc81c0f7c69683408c596cf94938d47d311792511b7ae54  1436  requests/d0703_c1_unspanned.request.utf16le.xml  byte for byte: note-days/cancelled_purchase_day_voucher_census_request.utf16le.xml
+91d7b64727592034585cc63adf019f147e4e85c027609ca44c7b0adb7a95c284  1522  requests/d0703_c2_spanned_0_111.request.utf16le.xml  c1 with the span (0, 111]; byte-equal to the code's rendering (fix/899-census-always-spanned, request dump)

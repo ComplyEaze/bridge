@@ -1080,41 +1080,132 @@ async fn a_batch_posted_elsewhere_releases_its_hold() {
 
 /// `post_import` over the stdio path every agent post takes, cancelled once
 /// `simulator` has received `after` requests when that is given, and failed
-/// if it has not ended within `bound`.
+/// if it has not ended within `bound`. A post that ends before that request
+/// arrives is not waited for: nothing is left to cancel, and its answer goes
+/// to the caller's assertions (#2093). One that has not ended within `bound`
+/// fails saying where it stood.
 async fn post_over_stdio(
     server: &Server,
     args: &Value,
     cancel: Option<(&SequenceSimulator, usize)>,
     bound: Duration,
 ) -> ToolCallEnd {
+    let started = std::time::Instant::now();
+    let ended = std::cell::Cell::new(false);
     let (client, source) = tokio::io::duplex(1 << 16);
     let (_client_read, mut client_write) = tokio::io::split(client);
     let (source_read, mut source_write) = tokio::io::split(source);
     let mut reader = BufReader::new(source_read);
-    let post = SCRIPTED_APPROVAL.scope(ScriptedApproval::approving(), async {
-        run_post(
-            server,
-            &json!(7),
-            args,
-            &mut reader,
-            &mut Framer::default(),
-            &mut std::collections::VecDeque::new(),
-            &mut source_write,
-        )
-        .await
-    });
+    let post = async {
+        let end = SCRIPTED_APPROVAL
+            .scope(ScriptedApproval::approving(), async {
+                run_post(
+                    server,
+                    &json!(7),
+                    args,
+                    &mut reader,
+                    &mut Framer::default(),
+                    &mut std::collections::VecDeque::new(),
+                    &mut source_write,
+                )
+                .await
+            })
+            .await;
+        ended.set(true);
+        end
+    };
     let canceller = async {
         if let Some((simulator, after)) = cancel {
             while simulator.received() <= after {
+                if ended.get() {
+                    return;
+                }
                 tokio::time::sleep(Duration::from_millis(2)).await;
             }
             client_write.write_all(CANCEL_7).await.unwrap();
         }
     };
-    let (outcome, ()) = tokio::time::timeout(bound, async { tokio::join!(post, canceller) })
-        .await
-        .unwrap();
+    let Ok((outcome, ())) =
+        tokio::time::timeout(bound, async { tokio::join!(post, canceller) }).await
+    else {
+        panic!(
+            "the post had not ended {:?} after it started (bound {bound:?}): the simulator had \
+             received {:?} requests, and the cancel was to follow request {:?}",
+            started.elapsed(),
+            cancel.map(|(simulator, _)| simulator.received()),
+            cancel.map(|(_, after)| after),
+        );
+    };
     outcome.unwrap()
+}
+
+/// How a post over stdio ended, for a failed assertion: its answer, cut short.
+fn described(outcome: &ToolCallEnd) -> String {
+    match outcome {
+        ToolCallEnd::Answered(response) => format!(
+            "answered: {}",
+            response
+                .value
+                .to_string()
+                .chars()
+                .take(2_000)
+                .collect::<String>()
+        ),
+        ToolCallEnd::Withdrawn { .. } => "withdrawn as cancelled".into(),
+    }
+}
+
+/// A post that ends before the request the cancel waits for is answered, not
+/// waited on until its bound (#2093): here the cancel is to follow a request
+/// the post never makes, and the post runs to its end.
+#[tokio::test]
+async fn a_post_that_ends_before_the_held_request_is_not_waited_for() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let never = usize::MAX - 1;
+    let outcome = post_over_stdio(
+        &server,
+        &args,
+        Some((&simulator, never)),
+        Duration::from_secs(20),
+    )
+    .await;
+    let _ = sent(simulator);
+    assert!(
+        matches!(outcome, ToolCallEnd::Answered(_)),
+        "{}",
+        described(&outcome)
+    );
+    assert_eq!(intents(directory.path()), 1, "it posted, uncancelled");
+}
+
+/// A post that has not ended within its bound fails saying where it stood:
+/// how far into it the bound ran out, the requests the simulator had received
+/// and the one the cancel was to follow (#2093). Its first read is answered
+/// only after 300 milliseconds, so it cannot end within the 50 of its bound.
+#[tokio::test]
+#[should_panic(expected = "requests, and the cancel was to follow request Some(0)")]
+async fn a_post_that_has_not_ended_within_its_bound_says_where_it_stood() {
+    let mut plans = before_approval();
+    plans[0] = plans[0]
+        .clone()
+        .with_delivery(Delivery::SlowHeaders(Duration::from_millis(300)));
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let _ = post_over_stdio(
+        &server,
+        &args,
+        Some((&simulator, 0)),
+        Duration::from_millis(50),
+    )
+    .await;
 }
 
 /// A cancellation that lands inside the queue's lease operation, through the
@@ -1123,8 +1214,8 @@ async fn post_over_stdio(
 /// written and no POST is sent, and the approval lapses as cancelled. Run with
 /// each of the lease's reads before the POST held in turn. The control, the
 /// same run never cancelled, posts: so the cancellation is what stopped it.
-#[tokio::test]
-async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
+#[test]
+fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
     let lease_reads = after_approval(xml(created_one())).len() - 1;
     async fn one_case(held_at: Option<usize>, bound: Duration) {
         let mut plans = before_approval();
@@ -1152,7 +1243,8 @@ async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() 
         if let Some(held_at) = held_at {
             assert!(
                 matches!(outcome, ToolCallEnd::Withdrawn { .. }),
-                "{held_at}: answered as cancelled"
+                "{held_at}: answered as cancelled, but {}",
+                described(&outcome)
             );
             assert_eq!(intents(directory.path()), 0, "{held_at}");
             assert_eq!(
@@ -1172,48 +1264,74 @@ async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() 
                 "{held_at}"
             );
         } else {
-            assert!(matches!(outcome, ToolCallEnd::Answered(_)));
+            assert!(
+                matches!(outcome, ToolCallEnd::Answered(_)),
+                "the control: {}",
+                described(&outcome)
+            );
             assert_eq!(intents(directory.path()), 1, "the control posts");
             assert!(observed.len() > post_at);
         }
     }
 
-    // A case has its own simulator (on its own port), directory, server and
-    // approvals, and spends its time waiting on that simulator, so the cases
-    // run side by side on this thread, a group at a time. A group is no wider
-    // than this, so that the cancellation of a case is never held back by the
-    // others for more than a small part of the 300 milliseconds a held read
-    // lasts. Every case is joined, and a panic in any of them is passed on
-    // after the others have finished, with the case named.
-    //
-    // The cases of a group share one thread, and the synchronous work of each
-    // runs while the others wait, so on a loaded runner a late case of a group
-    // can end only after the others: a case's bound is one case's allowance
-    // for every case of its group, not a fixed time.
-    const AT_ONCE: usize = 11;
-    const ONE_CASE: Duration = Duration::from_secs(20);
+    // Each case runs on a thread and a runtime of its own, as a separate
+    // process would, with its own simulator (on its own port), directory,
+    // server, approvals and bound: a case that is slow, or blocks its thread,
+    // holds back no other (#2093). Every case is joined, and a panic in any of
+    // them is passed on after the others have finished, with the case named.
+    // A case whose thread is blocked, so that its own bound cannot fire, fails
+    // by name once the cases have had their bound and a margin.
+    const ONE_CASE: Duration = Duration::from_secs(60);
+    const MARGIN: Duration = Duration::from_secs(30);
     let cases = (0..lease_reads).map(Some).chain([None]).collect::<Vec<_>>();
-    for group in cases.chunks(AT_ONCE) {
-        let bound = ONE_CASE * u32::try_from(group.len()).unwrap();
-        let local = tokio::task::LocalSet::new();
-        local
-            .run_until(async {
-                let running = group
-                    .iter()
-                    .map(|&held_at| (held_at, tokio::task::spawn_local(one_case(held_at, bound))))
-                    .collect::<Vec<_>>();
-                let mut panicked = None;
-                for (held_at, case) in running {
-                    if let Err(error) = case.await {
-                        eprintln!("case {held_at:?} failed");
-                        panicked.get_or_insert(error);
+    let (finished, ends) = std::sync::mpsc::channel();
+    let running = cases
+        .iter()
+        .map(|&held_at| {
+            let finished = finished.clone();
+            let case = std::thread::Builder::new()
+                .name(format!("case {held_at:?}"))
+                .spawn(move || {
+                    // Sent however the case ends, a panic included.
+                    struct Ended(Option<usize>, std::sync::mpsc::Sender<Option<usize>>);
+                    impl Drop for Ended {
+                        fn drop(&mut self) {
+                            let _ = self.1.send(self.0);
+                        }
                     }
-                }
-                if let Some(error) = panicked {
-                    std::panic::resume_unwind(error.into_panic());
-                }
-            })
-            .await;
+                    let _ended = Ended(held_at, finished);
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap()
+                        .block_on(Box::pin(one_case(held_at, ONE_CASE)));
+                })
+                .unwrap();
+            (held_at, case)
+        })
+        .collect::<Vec<_>>();
+    let started = std::time::Instant::now();
+    let mut pending = cases.clone();
+    while !pending.is_empty() {
+        let left = (ONE_CASE + MARGIN).saturating_sub(started.elapsed());
+        match ends.recv_timeout(left) {
+            Ok(held_at) => pending.retain(|case| *case != held_at),
+            Err(_) => panic!(
+                "cases {pending:?} had not ended {:?} after they started: a case's thread is \
+                 blocked, so its own bound could not fire",
+                started.elapsed()
+            ),
+        }
+    }
+    let mut panicked = None;
+    for (held_at, case) in running {
+        if let Err(error) = case.join() {
+            eprintln!("case {held_at:?} failed");
+            panicked.get_or_insert(error);
+        }
+    }
+    if let Some(error) = panicked {
+        std::panic::resume_unwind(error);
     }
 }
 

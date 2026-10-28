@@ -2561,6 +2561,10 @@ const AUDIT_READ_LIVE: &str = "an answer of the audit read's live sittings on th
      read (src/agent_audit_read.rs) and the tax-audit crate parse it, and src/agent_audit_read_tests.rs \
      (live_pilot_lab) serves it in the reader's order and pins the book admitted from it; \
      agent/audit-read-pilot-lab/PROVENANCE.md says what each file is";
+const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDGE TRANSFER LAB \
+     (26 Oct 2026, #1392), with no row here: no parser or test reads it yet, and the pull request \
+     that adds the day reader replays it and changes this reason; \
+     agent/whole-day-read-transfer-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
@@ -3182,6 +3186,63 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/vouchers_ageing_corpus_live.utf16le.xml",
         VOUCHER_EXPORT_NO_PARSER,
+    ),
+    // The whole-day read's answers on BRIDGE TRANSFER LAB (#1392).
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/m1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml",
+        WHOLE_DAY_READ,
     ),
     // Built-in reports no parser reads.
     (

@@ -1,0 +1,32 @@
+# Captures; they stay on the lab PC. sha256, bytes, name.
+3ae8538180fd2cc405e48920f8fd87bcf44369fa1efa27208d1fa563f357f1f9  52081  bk1-before-accept.png
+76e0f9b88563f10de65b9b2c73ec6adb776b17385d2188974cf6d90a0f0f54cc  40106  k1-create-before-accept.png
+ad5f834bf3abff2ae97f514fd1c6cba3a6e3d6c7b74a1486727debc977ad28fc  82505  k1-features-after.png
+196a329c7c0883ab73b53e2e44ab5899f65094e8c51e2d8fa9b0f6b0d7b1c0e3  82074  k1-features-before.png
+0d3719e6076edc358c15ba204abedc87d53d5d463617b5cc6ba496a9820e92f5  47840  k2-unit-before-accept.png
+55c8b183589e2c6dd9589bcf00d4333016fc7c56e41372538191b59d6a945dbb  33420  k3-after-last-ledger-total-opening.png
+d801c3e492e28b7d497a12e4bc1073f4557b8119136fda59674066b1ac62a87b  34035  k3-closingstock-before-accept.png
+2da6056b830eb963597abe84f34b2beac9774be742d3a90062700d2848e3c5a1  34198  k3-closingstock-group-chosen.png
+42de834590011f6d18ffba03b7f82db32edab72aad2d0b85986149488c1a9401  39592  k3-customer-before-accept.png
+d42d59ff4560e3a51f3167096bf42fd0aeefc09cfc496a76bb271c7012357436  35859  k3-labcapital-before-accept.png
+2026bc7098339249cfe3cc5fa65686c982afb0e78bcdbde1341550eda44350a5  34522  k3-purchases-before-accept.png
+3862112dbff913e98192cfbb3a3e29bab825cdd30fddbcd7b7fdd4084624cb9c  34230  k3-sales-before-accept.png
+99fb11ec5881da310732630f437a91985b60371ae53b79359c7a47ffe7f26e96  40438  k3-supplier-before-accept.png
+c3a574fa50f51638b1b72c4d900d7d4eadbd72e71df2e8884cf0a5ab36ea8e2b  50652  k4-item-before-accept.png
+eabfd76c5bdce91fd45fc76ca28d6959c4709e99c4fb63696c6d9b79f05eb21b  27235  k5a-before-accept.png
+33489e09ee0518ddad9b0a3086707a0b34130d504f8239fe16e2c4cb85e31149  43213  k5a-billwise.png
+311c12d485419f418bb3c942417cfa4f511c500991ddbfc47efafdf40f2991f4  35204  k5a-receipt-details.png
+e60132e6fa7c6ad3e6c0fafcbd681d2d0d57b7e1e37f0172936d8d7a1371ab54  26120  k5b-before-accept.png
+61b6f7abe098d31aa6aaaccf9f497c964d35451c71a55006c90c9db3acc86be9  42165  k5b-billwise.png
+76feb0294d1a0c52c9afebf577dd6df665727190b7f6ad76aa44897f51ff9e57  48044  k6a-alter-closing-field-offered.png
+0342492d4131a2e40b58eaef76092d80b0bf4fee7abf8d7f07d05e55599af113  49252  k6a-closing-before-accept.png
+16d456acdcc760f7a4e971b436a2aece068364e07309734c2963ed4c963e86cd  32689  k6b-stockjournal-before-accept.png
+efb48cf3631b644bce81a3bb36bd451139af005fae906af7ba2252869b8b20cd  34438  r-bs.png
+eaa6fdefb90cfe26135bf07db9c1147beac57853a2c12323900d7334da6fa8eb  34750  r-pl.png
+91ea6d553653e9df2b758f2a12ac903666c96e8dd165b2072afbd4daa0d2bf98  26311  r-stock-summary.png
+16960c15c82caddfe92529e6d945729438c470201f644b5cde08100bcf3e1a1a  29162  r-tb-groupwise.png
+7483b5467bb59d57cf17a87daef55ec2296d7129c9fba1f621932e914f629a02  28165  r-tb-ledgerwise.png
+cf6bff3d91afea12abdcc7a7b313f004db66638069bbe007d2c94c31e9b05467  72614  s0-tally.png
+b28cdfa0bc399da0207e0387058380898715822976678329af3fc93b220a6ee8  57874  slip-currency-blank-before-quit.png
+# Backup, stays on the lab PC
+06c9478ffeaa805a602cc1c093141fcdac0b448f12d2b6069a319f1e0691dca0  23030  TDBK1800_100095.001 (BK1)

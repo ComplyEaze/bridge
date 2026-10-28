@@ -3,8 +3,8 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Release 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) was
-published after the pull requests named here; this page was not read again at that tag. Six
+page was not read again at it, except as said below). Releases 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) and 0.6.1 (tag `mcp-v0.6.1`, 27 October 2026) were
+published after the pull requests named here; this page was not read again at either tag. Six
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
@@ -105,7 +105,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - `mask_parties` shortens, to their first two and last two characters, the
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase
-    register, bank-statement proposals, voucher totals by ledger, the party ledger of
+    register, the GST totals per counter ledger, bank-statement proposals, voucher totals by ledger, the party ledger of
     each voucher `gst_uncertain_vouchers` lists, the ledgers
     listed under a group total, the ledger named when a group total cannot be
     given, the list of bill-wise ledgers waiting for approval, the suspense ledger
@@ -135,7 +135,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
-  - A tax-audit test run (`audit_test_run`, in source and not yet in a published build) sends the AI
+  - A tax-audit test run (`audit_test_run`, added in release 0.6.1 and listed only when its setting is on) sends the AI
     provider the test's figures and findings: amounts in paise, figure and finding ids, the test's
     fixed wording, and the code and count of any failed book check. It names no ledger, group,
     party or voucher, and it is refused while `mask_parties` or `drop_narration` is on, because
@@ -177,8 +177,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       shortened under `mask_parties`; the flags are not names. In the answers
       captured they carry no amounts and no narrations. How a voucher was
       allocated to a cost centre is not returned in 0.5.0, 0.5.1 and 0.6.0 (Tally's
-      answer to the vouchers read carries it, and those releases drop it); in
-      source and not yet in a published build, the voucher reads return it (see
+      answer to the vouchers read carries it, and those releases drop it); from
+      release 0.6.1 the voucher reads return it (see
       "What the reads added since 0.5.0 send").
     - The list of bill-wise ledgers waiting for your approval sends each
       ledger's name (shortened under `mask_parties`), the date, voucher type,
@@ -220,6 +220,12 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       post-dated and what its status flags read) and whether it was accepted
       as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
+    - The GST-by-ledger read (`gst_by_counter_ledger`) sends the company, the
+      dates, each counter ledger's name, Tally GUID, group and parent with its
+      voucher count and its GST totals per head, and for each set-aside reason its totals and
+      up to 100 vouchers by number, date, type, class and Tally's identifier.
+      It sends no party names and no narrations; `mask_parties` shortens the
+      ledger names and does not mask the GUID, which names no party.
     - The negative ledgers read (`negative_ledgers`) sends the company name and
       its identifier and the dates, and for each ledger on Tally's Negative
       Ledgers list, the ledger's name (shortened under `mask_parties`), the side
@@ -236,17 +242,21 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       amounts to the assistant. `mask_parties` shortens the party names in
       it and does not shorten the amounts. It holds no narrations and no
       ledger entries of the voucher.
-    - Cost-centre allocations of a voucher's ledger entries (in source and not
-      yet in a published build): each entry that carries them sends, for each
-      allocation, the name of its cost category, the name of its cost centre and
-      the amount. The reads that return a voucher's entries carry them: the
+    - Cost-centre allocations of a voucher's ledger entries (added in release
+      0.6.1): each entry that carries them sends, for each allocation, the name
+      of its cost category, the name of its cost centre and the amount. The reads that return a voucher's entries carry them: the
       vouchers read and its search, and the entries the purchase and sales
       registers list. The two names are shortened under
       `mask_parties`, like the cost centre and cost category lists; the amount
       is not a name and is sent under every setting. An entry whose allocations
-      cannot be read whole says so with a reason and sends none of them; an
-      allocation in a shape the read does not recognise is not sent and is not
-      flagged.
+      cannot be read whole says so with a reason and sends none of them, an
+      allocation in a shape the read does not recognise included. On an item
+      invoice the read returns the sales or purchase ledger as a ledger entry
+      with the goods line nested under it: an allocation list directly under
+      that entry is read and sent like any other, and one inside the goods line
+      is flagged as in a shape the read does not recognise. No captured item
+      invoice carries allocations, so where Tally prints them there is not
+      measured.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

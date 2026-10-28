@@ -1141,6 +1141,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              no such voucher, or read it with `vouchers`. Retrying the same window refuses \
              again.",
         ),
+        "gst_by_ledger_window_partial" => Some(
+            "The voucher window was read but could not be checked against a separate count of its \
+             vouchers, so gst_by_counter_ledger gives no totals for it rather than totals that may \
+             be short. purchase_register for the same window returns the rows it read, marked \
+             partial.",
+        ),
         "register_master_mark_unavailable" => Some(
             "Tally did not report the company's master-alteration mark, which the purchase and sales \
              registers need to bind the ledger masters to the voucher window. It cannot be answered \
@@ -2687,6 +2693,7 @@ impl Server {
             "cash_flow" => self.cash_flow(args).await,
             "company_features" => self.company_features(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
+            "gst_by_counter_ledger" => self.gst_by_counter_ledger(args).await,
             "gst_status" => self.gst_status(args).await,
             "gst_uncertain_vouchers" => self.gst_uncertain_vouchers(args).await,
             "ledger_masters" => self.ledger_masters(args).await,

@@ -1433,7 +1433,8 @@ async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_referen
     assert_eq!(section["skips_open"], 1, "{again}");
     assert_eq!(
         open_rows(section),
-        vec![open_row(skipped_row(), "not_found", None)],
+        // no day of Tally has been read, so the absence is not claimed
+        vec![open_row(skipped_row(), "tally_unchecked", None)],
         "{again}"
     );
     // and the paired row is not one to withdraw

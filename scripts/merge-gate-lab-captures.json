@@ -1160,6 +1160,26 @@
       "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
       "sha256": "c412f89ed1fcf9b70d4476d57f7fdea988e3311c23effad29431547953933129",
       "size": 3398
+    },
+    {
+      "blob": "51f7f4123adaa8fa3e58aaaeb2578d5ceaa19e92",
+      "capture_id": "company_marks_empty_company_no_voucher_mark_request.utf16le.xml",
+      "company": "BRIDGE HANDIMPORT LAB",
+      "lab_ref": "branch lab/sitting4-w2-answers at 9ed022285",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_marks_empty_company_no_voucher_mark_request.utf16le.xml",
+      "seed_basis": "synthetic lab book loaded empty; see COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md",
+      "sha256": "7ec76ad8d35e7c931ce920b400a275fba07e99de3d9b7d7d8f9d2da4c69577b4",
+      "size": 1650
+    },
+    {
+      "blob": "dcea4da9befdfe77e96a0ce1d7f2fea740f4ac83",
+      "capture_id": "company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
+      "company": "BRIDGE HANDIMPORT LAB",
+      "lab_ref": "branch lab/sitting4-w2-answers at 9ed022285",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
+      "seed_basis": "synthetic lab book loaded empty; see COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md",
+      "sha256": "30ad5317b6fe566b420e435df73274286c21e365934227bc53cfcd8a232a7e88",
+      "size": 4818
     }
   ]
 }

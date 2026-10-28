@@ -1,0 +1,26 @@
+2026-10-28T20:35:10.777Z req=a-00-stock-summary.utf16le.xml req_sha256=17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8 curl_exit=0 printed='200 1370' content_length=1370 bytes=1370 sha256=862c3206e5f22922cea932380da07d2170591085da7ef8227f4c911452bfe9a4
+2026-10-28T20:35:11.307Z answered a-00-stock-summary exit=0
+2026-10-28T20:35:11.859Z req=a-01-items-fy.utf16le.xml req_sha256=dacd47b0b96772f220b97abf3714650c760a98f4e54197b681ba35cd69c9edab curl_exit=0 printed='200 16904' content_length=16904 bytes=16904 sha256=7a76a52474b6b56357d687474d3f916f7a43618e3d57d5454cf11de0f9eea467
+2026-10-28T20:35:12.014Z answered a-01-items-fy exit=0
+2026-10-28T20:36:24.648Z req=a-02-stock-query-carton-box-small.utf16le.xml req_sha256=dc2b3afe5c542e1305868148facd0ca453796abf2cbb5c78ae1346b79e4be812 curl_exit=0 printed='200 312' content_length=312 bytes=312 sha256=53fe972f6a9abb14465495afbaf55af9cb934fe9b7fb309fa926925ba7ae4c9c
+2026-10-28T20:36:24.742Z answered a-02-stock-query-carton-box-small exit=0
+2026-10-28T20:36:24.919Z req=a-03-stock-query-unknown-item.utf16le.xml req_sha256=98c06d132ddf2347690a532c4b5760134db202531c5b5b9d6dbb5a0be7e04263 curl_exit=0 printed='200 46' content_length=46 bytes=46 sha256=8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+2026-10-28T20:36:24.974Z answered a-03-stock-query-unknown-item exit=0
+2026-10-28T20:38:58.180Z req=a-00-stock-summary.utf16le.xml req_sha256=17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8 curl_exit=0 printed='200 1370' content_length=1370 bytes=1370 sha256=862c3206e5f22922cea932380da07d2170591085da7ef8227f4c911452bfe9a4
+2026-10-28T20:38:58.444Z answered a-00-stock-summary-s2after exit=0
+2026-10-28T20:38:58.851Z req=a-01-items-fy.utf16le.xml req_sha256=dacd47b0b96772f220b97abf3714650c760a98f4e54197b681ba35cd69c9edab curl_exit=0 printed='200 17000' content_length=17000 bytes=17000 sha256=e3af8e9cab97d5e4846ee5fecc8c035a8d27912203f32211fa090be325181cd7
+2026-10-28T20:38:58.950Z answered a-01-items-fy-s2after exit=0
+2026-10-28T20:39:19.837Z req=a-02-stock-query-carton-box-small.utf16le.xml req_sha256=dc2b3afe5c542e1305868148facd0ca453796abf2cbb5c78ae1346b79e4be812 curl_exit=0 printed='200 312' content_length=312 bytes=312 sha256=53fe972f6a9abb14465495afbaf55af9cb934fe9b7fb309fa926925ba7ae4c9c
+2026-10-28T20:39:20.080Z answered a-02-stock-query-carton-box-small-s2after exit=0
+2026-10-28T20:46:16.204Z req=a-04-stock-query-alt-unit-probe-a.utf16le.xml req_sha256=9281993e15efd9726d2e8edc8c95607a9b7de093b7e5af04e08860e3999ec2ca curl_exit=0 printed='200 310' content_length=310 bytes=310 sha256=7c5c66de1c6cf7903c37ebe39158ad8abb5b13f46eefc5d7995370c852cbc03e
+2026-10-28T20:46:16.508Z answered a-04-stock-query-alt-unit-probe-a exit=0
+2026-10-28T20:46:17.166Z req=a-05-stock-query-alt-unit-probe-b.utf16le.xml req_sha256=e5d0ca8857f85289f4c7dc400306dcaff7764449b865f63b1699190481b6b433 curl_exit=0 printed='200 310' content_length=310 bytes=310 sha256=8754cc09a4f0662596c9e4b8d6a30a80953d8f4c3ae57ca9dcb79fbfb6bc6553
+2026-10-28T20:46:17.337Z answered a-05-stock-query-alt-unit-probe-b exit=0
+2026-10-28T20:46:17.833Z req=a-01-items-fy.utf16le.xml req_sha256=dacd47b0b96772f220b97abf3714650c760a98f4e54197b681ba35cd69c9edab curl_exit=0 printed='200 19820' content_length=19820 bytes=19820 sha256=4e33bf81b19643b2494a8f52bae592c79d63c4bd0021363276c63b972308ab86
+2026-10-28T20:46:17.955Z answered a-01-items-fy-s4 exit=0
+2026-10-28T20:46:18.321Z req=a-02-stock-query-carton-box-small.utf16le.xml req_sha256=dc2b3afe5c542e1305868148facd0ca453796abf2cbb5c78ae1346b79e4be812 curl_exit=0 printed='200 312' content_length=312 bytes=312 sha256=53fe972f6a9abb14465495afbaf55af9cb934fe9b7fb309fa926925ba7ae4c9c
+2026-10-28T20:46:18.493Z answered a-02-stock-query-carton-box-small-s4 exit=0
+2026-10-28T20:46:18.821Z req=a-00-stock-summary.utf16le.xml req_sha256=17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8 curl_exit=0 printed='200 2306' content_length=2306 bytes=2306 sha256=cbcba8e3cd42bce16bfb6c4170ef4645b5b832bd7408188cad5e6104c681a98b
+2026-10-28T20:46:19.020Z answered a-00-stock-summary-s4 exit=0
+2026-10-28T20:53:42.910Z req=a-00-stock-summary.utf16le.xml req_sha256=17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8 curl_exit=0 printed='200 1370' content_length=1370 bytes=1370 sha256=862c3206e5f22922cea932380da07d2170591085da7ef8227f4c911452bfe9a4
+2026-10-28T20:53:43.298Z answered a-00-stock-summary-s7 exit=0

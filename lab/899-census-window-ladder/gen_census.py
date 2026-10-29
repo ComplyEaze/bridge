@@ -10,15 +10,17 @@ spanned to an AlterID range; o-m.request: the company high-water read). Only fou
     forming a real calendar date are admitted, and the from-date may not be after the to-date; any day of the month, as a
     licensed TallyPrime accepts and the product sends; this sheet runs in licensed mode only);
   - the span (lo, hi]: non-negative integers, lo < hi, and hi - lo at most 8192, the product's own census capacity.
-`aligned` prints the span the product itself sends for a given AlterID: (k * 8192, min((k + 1) * 8192, mark)], the k-th of
-`census_spans` in agent_voucher_window.rs, and with --after the next one. It prints the two bounds: they stay on the screen.
+`aligned` prints a span the product itself sends, one of `census_spans` in agent_voucher_window.rs ((k * 8192, (k + 1) * 8192],
+the last one ending at the mark): with --newest the newest one that is a full 8192 wide, with --before LO the full one that ends
+at LO, with --after HI the one that starts at HI. It prints the two bounds: they stay on the screen.
 Nothing read from Tally chooses the report, the collection, the fetch list or the formula.
 
   python -I gen_census.py --check
   python -I gen_census.py census --company-file F --from 20250401 --to 20260331 --lo N --hi N --out PATH
   python -I gen_census.py marks --company-file F --out PATH
-  python -I gen_census.py aligned --mark V --at N         (the product span holding AlterID N)
-  python -I gen_census.py aligned --mark V --after HI     (the product span after (.., HI])
+  python -I gen_census.py aligned --mark V --newest       (the newest full product span)
+  python -I gen_census.py aligned --mark V --before LO    (the full product span ending at LO)
+  python -I gen_census.py aligned --mark V --after HI     (the product span starting at HI)
 
 `census` and `marks` print only the size in bytes of the file written. `aligned` prints `lo hi` only.
 """
@@ -73,18 +75,19 @@ def window(frm, to):
     return frm, to
 
 
-def aligned(mark, at=None, after=None):
-    if mark < 1 or (at is None) == (after is None):
-        raise SystemExit("aligned needs a mark of at least 1 and exactly one of --at and --after")
-    if at is not None:
-        if not 1 <= at <= mark:
-            raise SystemExit("--at is not an AlterID of the book (1 to the mark)")
-        lo = (at - 1) // PRODUCT_CAPACITY * PRODUCT_CAPACITY
-    else:
-        if after % PRODUCT_CAPACITY != 0 or after >= mark:
-            raise SystemExit("--after is not the upper bound of a product span below the mark")
-        lo = after
-    return lo, min(lo + PRODUCT_CAPACITY, mark)
+def aligned(mark, newest=False, before=None, after=None):
+    if mark <= PRODUCT_CAPACITY or [newest, before is not None, after is not None].count(True) != 1:
+        raise SystemExit("aligned needs a mark above 8192 (below it the product sends no span) and exactly one of --newest, --before and --after")
+    if newest:
+        hi = mark // PRODUCT_CAPACITY * PRODUCT_CAPACITY
+        return hi - PRODUCT_CAPACITY, hi
+    if before is not None:
+        if before % PRODUCT_CAPACITY != 0 or not PRODUCT_CAPACITY <= before <= mark:
+            raise SystemExit("--before is not the lower bound of a product span above the first")
+        return before - PRODUCT_CAPACITY, before
+    if after % PRODUCT_CAPACITY != 0 or not 0 <= after < mark:
+        raise SystemExit("--after is not the upper bound of a product span below the mark")
+    return after, min(after + PRODUCT_CAPACITY, mark)
 
 
 def company(name):
@@ -100,7 +103,8 @@ def build_census(name, frm, to, lo, hi):
     text = once(text, "<SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY>" % T_COMPANY, "<SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY>" % escape_text(name))
     if text.count(T_FROM) != 2 or text.count(T_TO) != 2:
         raise SystemExit("the template is not the shape this script was written for")
-    text = text.replace(T_FROM, frm).replace(T_TO, to)
+    # One pass, so that a from-date equal to the template's to-date is not replaced a second time.
+    text = re.sub(T_FROM + "|" + T_TO, lambda found: frm if found.group(0) == T_FROM else to, text)
     text = once(text, FORMULA % (T_LO, T_HI), FORMULA % (lo, hi))
     return b"\xff\xfe" + text.encode("utf-16-le")
 
@@ -130,16 +134,19 @@ def check():
         except SystemExit:
             continue
         raise AssertionError("a bad window was admitted")
-    assert aligned(29900, at=3737) == (0, 8192) and aligned(29900, at=8192) == (0, 8192)
-    assert aligned(29900, at=8193) == (8192, 16384) and aligned(29900, after=24576) == (24576, 29900)
-    assert aligned(2000, at=250) == (0, 2000)
-    for args in ({"at": 0}, {"at": 29901}, {"after": 100}, {"after": 32768}, {}):
+    swap = build_census("X", *window(T_TO, "20260731"), 0, 8192)[2:].decode("utf-16-le")
+    assert swap.count(T_TO) == 2 and swap.count("20260731") == 2, "a from-date equal to the template's to-date is replaced twice"
+    assert aligned(29900, newest=True) == (16384, 24576) and aligned(24576, newest=True) == (16384, 24576)
+    assert aligned(8193, newest=True) == (0, 8192) and aligned(29900, before=16384) == (8192, 16384)
+    assert aligned(29900, after=24576) == (24576, 29900) and aligned(29900, after=0) == (0, 8192)
+    for mark, args in ((8192, {"newest": True}), (2000, {"after": 0}), (29900, {"before": 0}), (29900, {"before": 100}),
+                       (29900, {"after": 100}), (29900, {"after": 32768}), (29900, {})):
         try:
-            aligned(29900, **args)
+            aligned(mark, **args)
         except SystemExit:
             continue
         raise AssertionError("a bad span request was admitted")
-    print("gen_census: ok (the census and marks templates reproduced byte for byte; an ampersand and quotes escaped once; the span, dates, a one-day window, the product-aligned spans and parse checked)")
+    print("gen_census: ok (the census and marks templates reproduced byte for byte; an ampersand and quotes escaped once; the span, dates (one pass), a one-day window, the product-aligned spans and parse checked)")
 
 
 def main():
@@ -158,14 +165,15 @@ def main():
     m.add_argument("--out", required=True)
     a = sub.add_parser("aligned")
     a.add_argument("--mark", type=int, required=True)
-    a.add_argument("--at", type=int)
+    a.add_argument("--newest", action="store_true")
+    a.add_argument("--before", type=int)
     a.add_argument("--after", type=int)
     args = parser.parse_args()
     if args.check:
         check()
         return 0
     if args.mode == "aligned":
-        print("%d %d" % aligned(args.mark, args.at, args.after))
+        print("%d %d" % aligned(args.mark, args.newest, args.before, args.after))
         return 0
     if args.mode in ("census", "marks"):
         name = company(open(args.company_file, encoding="utf-8-sig").read().rstrip("\r\n"))

@@ -188,6 +188,10 @@
     {
       "uuid": "4f45d573-697a-4c0a-b3a2-873df57e65a0",
       "note": "the NAME Tally generated for the bank allocation of a post-dated receipt keyed by hand in the synthetic lab company BRIDGE BILLTRAIL LAB, as returned in the read-only captures of #1356 on 28 October 2026 (lab branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9)"
+    },
+    {
+      "uuid": "1bb48be5-baba-45b2-90d8-7593244915a9",
+      "note": "company identifier of the synthetic lab company BRIDGE FOREXGROUP LAB (number 100090), created in the lab on 28 October 2026 with invented masters and vouchers keyed by hand (on 28 and again on 29 October), as Tally returned it in read-only captures on 29 October 2026 (lab branches lab/683-x1-forex-grouping-answers and lab/2071-forex-rerun-answers at 0d7eb0bf5cae)"
     }
   ]
 }

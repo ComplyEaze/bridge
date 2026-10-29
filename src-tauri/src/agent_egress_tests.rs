@@ -499,3 +499,37 @@ async fn egress_log_still_refuses_when_one_receipt_alone_is_over_the_cap() {
         3
     );
 }
+
+/// The response digest of `egress_log` hashes the receipt lines the call read, not the ones it
+/// returned, so on an answer trimmed for size it covers more lines than the answer holds
+/// (`omitted_for_size` counts the difference): the digest is of what was read from the log and
+/// the README says so (#2125).
+#[tokio::test]
+async fn egress_log_digest_covers_every_line_read_even_when_the_answer_is_trimmed() {
+    use serde_json::json;
+    let directory = tempfile::tempdir().unwrap();
+    equal_receipts(&directory, 12, 1_000);
+    let path = directory.path().join("agent-egress.jsonl");
+    let read = read_egress_tail(&path, 12).unwrap();
+    assert_eq!(read.records.len(), 12);
+    let size = server_with_cap(&directory, 1_000_000)
+        .call_tool("egress_log", json!({"limit": 12}))
+        .await
+        .to_string()
+        .len();
+    let trimmed = server_with_cap(&directory, size - 1)
+        .call_tool("egress_log", json!({"limit": 12}))
+        .await;
+    let result = &trimmed["structuredContent"]["result"];
+    let returned = result["records"].as_array().unwrap().len();
+    assert_eq!(returned, 11);
+    assert_eq!(result["omitted_for_size"], 1);
+    let digest = trimmed["structuredContent"]["evidence"]["response_sha256"]
+        .as_str()
+        .unwrap();
+    // The digest is of all twelve lines read, as the call computes it.
+    assert_eq!(digest, super::super::sha256_json(&read.records));
+    // And not of the eleven returned.
+    let returned_lines = read.records[..returned].to_vec();
+    assert_ne!(digest, super::super::sha256_json(&returned_lines));
+}

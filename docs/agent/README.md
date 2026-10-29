@@ -3809,7 +3809,9 @@ Per tool:
 - `egress_log`, `local_data_report`, `parse_bank_statement`, `read_evidence`
   and `voucher_schema` read nothing from Tally. Their request digest hashes the tool's name, and
   their response digest hashes what they return (for `voucher_schema`, the
-  name again).
+  name again), except that of `egress_log`: it hashes every receipt line the call read, which
+  on an answer trimmed for size is more lines than the answer holds (`omitted_for_size` counts
+  the difference).
 
 A refusal made before any request reports a request digest hashing
 `<tool>:<sha256 of the arguments>` and a response digest hashing the refusal
@@ -4221,7 +4223,14 @@ This necessary check cannot detect an omitted subset that itself balances.
 
 Evidence-history and egress-log reads use the smallest of the requested limit,
 `BRIDGE_AGENT_MAX_ROWS`, and the 256-record ceiling. Omitted history sets
-`truncated`; egress-log reads also report omissions from the bounded tail scan. Missing terminal newlines, invalid
+`truncated`; egress-log reads also report omissions from the bounded tail scan.
+An `egress_log` answer names its order (`result.order`, `newest_first`). When the receipts it
+would return are over the response byte cap, it keeps the newest whole receipts that fit the
+cap as the response is really encoded, sets `truncated`, and counts the receipts left out for
+size in `result.omitted_for_size`. This tool has no offset, so the receipts cut for size
+cannot be reached by it; a single receipt that is alone over the cap is refused
+(`agent_response_too_large`). Receipts left out by the bounded tail scan are not counted in
+`omitted_for_size`. Missing terminal newlines, invalid
 UTF-8, or invalid JSON in retained complete rows return `egress_log_incomplete`.
 
 Verification captures the batch journal generation before readback and checks it

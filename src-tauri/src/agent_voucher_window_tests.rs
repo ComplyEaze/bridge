@@ -1000,6 +1000,7 @@ fn three_a_read() -> WindowReadLimits {
         default_bytes_per_voucher: budget,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     }
 }
 
@@ -1200,6 +1201,7 @@ async fn a_single_voucher_over_budget_is_refused_before_any_read() {
                 default_bytes_per_voucher: 1001,
                 max_reads: MAX_PLANNED_READS,
                 small_books: SmallBooks::Skip,
+                read_count_refusal: ReadCountRefusal::AtTheDefault,
             },
             |xml| parse_agent_rows(xml, GUID),
         )
@@ -1679,6 +1681,7 @@ async fn a_census_the_transport_refuses_is_not_divided_but_refused() {
         default_bytes_per_voucher: one,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     assert!(limits.census_capacity() >= 4);
     let (outcome, observed) = read_window(
@@ -2059,6 +2062,7 @@ async fn a_lighter_part_never_loosens_the_plan_for_the_rest() {
         default_bytes_per_voucher: 2 * heavy_len,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     let census = WindowCensus::from_rows(
         [
@@ -2163,6 +2167,7 @@ async fn a_light_first_part_does_not_widen_the_next_beyond_the_floor() {
         default_bytes_per_voucher: 4 * one,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     let census = WindowCensus::from_rows([
         (day("20260801"), 1),
@@ -2379,6 +2384,7 @@ async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
         default_bytes_per_voucher: 16 * 1024,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     let mut plans = vec![
         company_plan(),
@@ -2477,6 +2483,7 @@ async fn a_read_divided_only_by_date_is_bracketed_too() {
         default_bytes_per_voucher: 2 * heavy_len,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     // One census: AlterIDs 2 and 3, one on each day.
     let two = vouchers_kept(2);
@@ -2717,6 +2724,7 @@ async fn a_divided_read_of_a_window_the_caller_counted_does_not_hold_the_bracket
             default_bytes_per_voucher: wire_len(&xml_plan(vouchers_kept(1))),
             max_reads: MAX_PLANNED_READS,
             small_books: SmallBooks::Skip,
+            read_count_refusal: ReadCountRefusal::AtTheDefault,
         },
     )
     .await;
@@ -2923,6 +2931,7 @@ async fn the_read_allowance_is_spent_at_dispatch_including_reactive_splits() {
         let limits = WindowReadLimits {
             max_reads: allowance,
             small_books: SmallBooks::Skip,
+            read_count_refusal: ReadCountRefusal::AtTheDefault,
             ..WindowReadLimits::for_shape(shape)
         };
         let mut plans = oversized();
@@ -4732,6 +4741,7 @@ async fn the_audit_reader_plans_later_parts_at_the_cost_the_agent_reader_measure
         default_bytes_per_voucher: per_voucher,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     let census = || {
         WindowCensus::from_rows([
@@ -5116,6 +5126,7 @@ fn one_read_of(per_read: u64) -> WindowReadLimits {
         default_bytes_per_voucher: WINDOW_READ_BUDGET_BYTES / per_read,
         max_reads: 1,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     }
 }
 
@@ -5309,6 +5320,7 @@ async fn a_replan_refusal_counts_the_requests_already_sent() {
         default_bytes_per_voucher: one / 2,
         max_reads: 2,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     // Day one's voucher is its own part; day two's six are the second.
     let census = WindowCensus::from_rows([
@@ -5342,6 +5354,383 @@ async fn a_replan_refusal_counts_the_requests_already_sent() {
         observed.iter().filter(|request| !request.cancelled).count(),
         6
     );
+}
+
+// -- #2173: a window that cannot be narrowed is refused for its read count only at the floor ------
+
+/// Limits under which a voucher of `one` encoded bytes is one to a read at the
+/// default figure and two to a read at the floor, with `allowed` reads.
+fn default_one_floor_two(one: u64, allowed: usize) -> WindowReadLimits {
+    WindowReadLimits {
+        budget_bytes: 4 * one,
+        default_bytes_per_voucher: 4 * one,
+        max_reads: allowed,
+        small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
+    }
+}
+
+/// Three vouchers on 1 August, AlterIDs 1 to 3, as a counted window.
+fn three_on_one_day() -> WindowCensus {
+    WindowCensus::from_rows([
+        (day("20260801"), 1),
+        (day("20260801"), 2),
+        (day("20260801"), 3),
+    ])
+}
+
+/// The plan at the default figure needs three reads against two allowed, so a
+/// read refusing at the default is refused before any data part, as before
+/// #2173. Refusing at the floor, the same window is read in two: the first part
+/// at the default figure, and, measured light, the rest at the floor.
+#[tokio::test]
+async fn refusing_at_the_floor_reads_a_window_the_default_plan_refuses() {
+    let one = wire_len(&xml_plan(vouchers_kept(1)));
+    let limits = default_one_floor_two(one, 2);
+    // The plan made before any data part, which the read sends nothing ahead of.
+    assert_eq!(
+        first_plan(
+            day("20260801"),
+            day("20260801"),
+            &three_on_one_day(),
+            3,
+            limits
+        ),
+        Err(PlanRefusal::TooManyReads {
+            reads: 3,
+            allowed: 2,
+        })
+    );
+
+    let mut plans = paired(&xml_plan(relabelled(&vouchers_kept(1), &[(1, "20260801")])));
+    plans.extend(paired(&xml_plan(relabelled(
+        &vouchers_kept(2),
+        &[(2, "20260801"), (3, "20260801")],
+    ))));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Counted(three_on_one_day()),
+        limits.refusing_at_the_floor(),
+    )
+    .await;
+    let read = outcome.unwrap();
+    assert_eq!(read.rows.len(), 3);
+    assert_eq!(
+        read.reads.iter().map(|part| part.span).collect::<Vec<_>>(),
+        [
+            Some(AlterIdSpan {
+                after: 0,
+                through: 1
+            }),
+            Some(AlterIdSpan {
+                after: 1,
+                through: 3
+            }),
+        ]
+    );
+    assert_eq!(observed.len(), 12);
+}
+
+/// Refusing at the floor, a window admitted on the floor plan whose first part
+/// measures heavier than the floor is refused on that part's re-plan, after one
+/// data part, with the read counted as a whole.
+#[tokio::test]
+async fn refusing_at_the_floor_refuses_after_a_first_part_heavier_than_the_floor() {
+    // One voucher measures `one`. A read holds one at the default figure, two at
+    // the floor (three quarters of `one`) and one at the measured figure.
+    let one = wire_len(&xml_plan(vouchers_kept(1)));
+    let budget = (3 * one / 2) & !1;
+    let limits = WindowReadLimits {
+        budget_bytes: budget,
+        default_bytes_per_voucher: budget,
+        max_reads: 2,
+        small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheFloor,
+    };
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(relabelled(&vouchers_kept(1), &[(1, "20260801")]))),
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Counted(three_on_one_day()),
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused on the re-plan");
+    assert_eq!(failure.code, "voucher_window_too_many_reads");
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            needed_at_least: 3,
+            allowed: 2,
+        })
+    );
+    // The first part only.
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        6
+    );
+}
+
+/// The floor plan counts every part sent before the first one that can be
+/// measured: here a part of the empty day before the counted one. Two reads
+/// suffice for the vouchers, but three are needed, so the window is refused
+/// before any data part.
+#[test]
+fn refusing_at_the_floor_counts_the_empty_part_before_the_first_measured_one() {
+    let one = wire_len(&xml_plan(vouchers_kept(1)));
+    let limits = default_one_floor_two(one, 2).refusing_at_the_floor();
+    // The plan made before any data part, which the read sends nothing ahead of.
+    assert_eq!(
+        first_plan(
+            day("20260731"),
+            day("20260801"),
+            &three_on_one_day(),
+            3,
+            limits
+        ),
+        Err(PlanRefusal::TooManyReads {
+            reads: 3,
+            allowed: 2,
+        })
+    );
+    // From the counted day, the same window fits: the empty part is the third read.
+    assert!(first_plan(
+        day("20260801"),
+        day("20260801"),
+        &three_on_one_day(),
+        3,
+        limits
+    )
+    .is_ok());
+}
+
+/// Refusing at the floor, the census still stops before its next span once it
+/// has counted more than the fewest reads allowed can carry at the floor: three
+/// vouchers need two reads (one at the default, two at the floor) against one.
+#[tokio::test]
+async fn a_census_past_the_floor_ceiling_stops_before_its_next_span() {
+    let limits = reads_of(1, 1).refusing_at_the_floor();
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(three_vouchers())),
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(limits.census_capacity() + 1)),
+        },
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused");
+    assert_eq!(failure.code, "voucher_window_too_many_reads");
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            needed_at_least: 2,
+            allowed: 1,
+        })
+    );
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        6
+    );
+}
+
+/// With two reads allowed, the same census count stops a read refusing at the
+/// default after its first span (three reads at one a read), and a read
+/// refusing at the floor goes on to its second span and reads the window in
+/// two parts, closed on the marks it opened on.
+#[tokio::test]
+async fn a_census_between_the_default_and_the_floor_ceilings_is_finished_at_the_floor() {
+    let limits = reads_of(1, 2);
+    let high_water = limits.census_capacity() + 1;
+    let counted = relabelled(
+        &three_vouchers(),
+        &[(1, "20260801"), (2, "20260801"), (3, "20260801")],
+    );
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(counted.clone())),
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(high_water)),
+        },
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused at the default");
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            needed_at_least: 3,
+            allowed: 2,
+        })
+    );
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        6
+    );
+
+    let mut plans = paired(&xml_plan(counted));
+    plans.extend(paired(&xml_plan(empty_collection())));
+    plans.extend(paired(&xml_plan(relabelled(
+        &vouchers_kept(1),
+        &[(1, "20260801")],
+    ))));
+    plans.extend(paired(&xml_plan(relabelled(
+        &vouchers_kept(2),
+        &[(2, "20260801"), (3, "20260801")],
+    ))));
+    plans.extend(paired(&mark(high_water)));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(high_water)),
+        },
+        limits.refusing_at_the_floor(),
+    )
+    .await;
+    let read = outcome.unwrap();
+    assert_eq!(read.rows.len(), 3);
+    assert_eq!(read.reads.len(), 2);
+    // Two census spans, two data parts and the closing marks.
+    assert_eq!(observed.len(), 30);
+}
+
+/// Every read but the tax audit's keeps today's refusal point: the limits each
+/// shape starts from, and those that count small books, refuse at the default.
+#[test]
+fn every_shape_refuses_at_the_default_unless_asked() {
+    for shape in [
+        VoucherReadShape::ImportVerification,
+        VoucherReadShape::Movement,
+        VoucherReadShape::EntryWildcard,
+        VoucherReadShape::ClassEntryWildcard,
+    ] {
+        let limits = WindowReadLimits::for_shape(shape);
+        assert_eq!(limits.read_count_refusal, ReadCountRefusal::AtTheDefault);
+        assert_eq!(
+            limits.counting_small_books().read_count_refusal,
+            ReadCountRefusal::AtTheDefault
+        );
+        assert_eq!(
+            limits.refusing_at_the_floor().read_count_refusal,
+            ReadCountRefusal::AtTheFloor
+        );
+    }
+}
+
+/// No read but the tax audit's asks to refuse at the floor. Across every
+/// production source of the app crate, the one call of
+/// [`WindowReadLimits::refusing_at_the_floor`] is the audit window's limits,
+/// and `ReadCountRefusal::AtTheFloor` is named only where it is defined, so
+/// `vouchers`, the registers, `voucher_presence`, `ledger_movement`, the
+/// verification reads and `outstandings` keep the default's refusal point.
+#[test]
+fn only_the_audit_window_refuses_at_the_floor() {
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut calls = Vec::new();
+    let mut named = Vec::new();
+    let mut files = Vec::new();
+    let mut pending = vec![source.clone()];
+    while let Some(directory) = pending.pop() {
+        for entry in std::fs::read_dir(&directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                files.push(path);
+            }
+        }
+    }
+    assert!(
+        files.len() > 100,
+        "the app crate's sources were read: {}",
+        files.len()
+    );
+    for path in files {
+        let name = path
+            .strip_prefix(&source)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        if name.ends_with("_tests.rs") || name.ends_with("/tests.rs") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path).unwrap();
+        calls.extend(
+            text.matches(".refusing_at_the_floor()")
+                .map(|_| name.clone()),
+        );
+        named.extend(
+            text.matches("ReadCountRefusal::AtTheFloor")
+                .map(|_| name.clone()),
+        );
+    }
+    assert_eq!(calls, ["agent_audit_read.rs"]);
+    assert!(
+        named.iter().all(|name| name == "agent_voucher_window.rs"),
+        "{named:?}"
+    );
+}
+
+/// The floor plan at the production figures, through the planner: the issue's
+/// 6,000 vouchers at 25 a day are admitted, and dense days, about one read
+/// each at the floor, refuse below 10,837: 127 days of 82 are admitted
+/// (10,414 vouchers, 128 reads) and 128 days are not (10,496).
+#[test]
+fn the_floor_plan_admits_light_days_and_refuses_dense_days_below_the_ceiling() {
+    let limits =
+        WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).refusing_at_the_floor();
+    let admit = |days: u64, per_day: u64| {
+        let first = day("20250401");
+        let census = WindowCensus::from_rows((0..days).flat_map(|offset| {
+            let date = first.checked_add_days(chrono::Days::new(offset)).unwrap();
+            (1..=per_day).map(move |index| (date, offset * per_day + index))
+        }));
+        let last = first.checked_add_days(chrono::Days::new(days - 1)).unwrap();
+        let ceiling = days * per_day;
+        let plan = plan_window_reads(
+            first,
+            last,
+            &census,
+            None,
+            ceiling,
+            limits.default_bytes_per_voucher,
+            limits.budget_bytes,
+            usize::MAX,
+        )
+        .unwrap();
+        admit_at_the_floor(&plan, last, &census, ceiling, limits)
+    };
+    admit(240, 25).expect("6,000 light vouchers are admitted");
+    admit(127, 82).expect("127 dense days are admitted");
+    assert_eq!(
+        admit(128, 82),
+        Err(PlanRefusal::TooManyReads {
+            reads: 129,
+            allowed: 128,
+        })
+    );
+    // A window the first part covers whole: nothing is left to re-plan.
+    admit(1, 30).expect("one part");
+}
+
+/// The ceilings at the production figures: 42 vouchers a read at the default
+/// and 85 at the floor give 5,376 at the default and 42 + 85 x 127 = 10,837 at
+/// the floor, for 128 reads.
+#[test]
+fn the_entry_wildcard_ceilings_are_5376_at_the_default_and_10837_at_the_floor() {
+    let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+    let max = limits.max_reads as u64;
+    assert_eq!(limits.reads_at_least(5_376), Some(max));
+    assert_eq!(limits.reads_at_least(5_377), Some(max + 1));
+    let floor = limits.refusing_at_the_floor();
+    assert_eq!(floor.reads_at_least(10_837), Some(max));
+    assert_eq!(floor.reads_at_least(10_838), Some(max + 1));
 }
 
 // -- #485: a later page of a complete window is served from its first page's read -----------------

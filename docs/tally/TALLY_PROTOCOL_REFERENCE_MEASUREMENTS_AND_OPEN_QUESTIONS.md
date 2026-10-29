@@ -237,6 +237,17 @@ request is predicted over a budget well below the cap.
      AlterID spans stops as soon as it has counted more vouchers than the allowance can hold at the
      default figure (the allowed requests times the vouchers one request holds at it, which every
      first plan uses), so that certain refusal costs no further census span (#945).
+     The tax audit's read is the exception, because its period cannot be narrowed (#2173). It is
+     refused on the count before any data part only when even the plan it would make after a first
+     part measured at the floor (half the default figure, the lightest it can use) needs more than
+     128 requests: 42 vouchers in the first request and 85 in each after it, at most 10,837
+     entry-wildcard vouchers in the period, and fewer when its days are dense, since a request
+     packs whole days (127 days of 82 vouchers fit; 128 do not). Otherwise it reads the first part and
+     is refused, if at all, when a measured part's re-plan needs too many. Every request keeps the same
+     size bound; only the moment of the refusal moves. Its census stops at that floor bound, not the
+     default's. Under Education the boundary check still covers every part of the plan made at the
+     default figure before the first part is read, so such a period can be refused for an unsupported
+     boundary instead.
    - `voucher_window_book_too_large` — the book's mark needs more than 256 census spans (a mark above
      about 2.1 million). A **product limit**: narrowing the window does not help, because the census
      walks the book's AlterIDs whatever the window.

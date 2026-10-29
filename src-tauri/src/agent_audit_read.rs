@@ -426,6 +426,14 @@ fn evidence_of(parts: &[Collected]) -> Evidence {
         .expect("a read has parts")
 }
 
+/// The limits the audit's window is read under. A book small enough for one
+/// request is counted too: the census is the only count of the window from
+/// outside its own data (ADR 0017). The period cannot be narrowed, so its read
+/// count is refused only when no measurement could fit it (#2173).
+pub(super) const fn audit_window_limits(limits: WindowReadLimits) -> WindowReadLimits {
+    limits.counting_small_books().refusing_at_the_floor()
+}
+
 /// Every part of the read, in order, and the marks it opened and closed on.
 async fn collect_parts(
     runtime: &TallyRuntime,
@@ -523,8 +531,6 @@ async fn collect_parts(
         voucher_types,
     ));
 
-    // A book small enough for one request is counted too: the census is the
-    // only count of the window from outside its own data (ADR 0017).
     let read = AuditWindowReader::new(runtime, config.clone())
         .read_window(
             identity,
@@ -532,7 +538,7 @@ async fn collect_parts(
             period.0,
             period.1,
             VoucherReadShape::EntryWildcard,
-            limits.counting_small_books(),
+            audit_window_limits(limits),
             |xml| parse_agent_rows(xml, guid),
         )
         .await;

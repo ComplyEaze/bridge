@@ -1,0 +1,18 @@
+Pushed copies that differ from the files kept on the lab PC: lab-PC paths replaced by placeholders. Each changed file, with the original's bytes and sha256 and what was replaced.
+answers/003-c0-build.json: original 10675 B sha256 c3025b1b94c755831d2993ef0771699acacea8e4823472d872a003ca472ea493; 2 x -> <lab folder>
+evidence/b3-timeline.txt: original 828 B sha256 2cb5471c41a27a152f2cc57fabbbec1eee65e0a93ead61a85a898d846035af81; 3 x -> <lab folder>
+evidence/b5-processes.txt: original 814 B sha256 eedec3846d0143d02a145196289851ff1aca28e1b3b23b924b4590c85bfe5107; 1 x -> <build folder>; 2 x -> <another build folder>; 2 x -> <desktop client extensions>
+evidence/c-timeline.txt: original 2544 B sha256 adf4187e360f59f50b2badcf407ffeb1aa71cda123330e699e0050092c852e0b; 2 x -> <build folder>; 2 x -> <lab folder>
+evidence/c6-processes.txt: original 814 B sha256 ed511f0a3a10525dc3a92bc0fc17b55d8fcf47776b1642b6b404bfc0319d6b16; 1 x -> <build folder>; 2 x -> <another build folder>; 2 x -> <desktop client extensions>
+evidence/k1-timeline.txt: original 2940 B sha256 72b81b2823e2f7168f884c01d5dd38064bf1c4ea0f84d30c3b72087b41a74189; 6 x -> <lab folder>
+evidence/k1b-timeline.txt: original 2358 B sha256 716a3c03b865d41124278260e2b87c65dc3eba858e128b53d1e80c56914266e4; 4 x -> <lab folder>
+evidence/trace-b3b.txt: original 2506 B sha256 2ed4f9da1123a6c958098a6015b68b32dda6e37d93176d0ababa449d1a843083; 1 x -> <lab folder>
+evidence/trace-c.txt: original 4055 B sha256 e4f4223558a6e79a0dadf190e9f157629aaa780480df58c6187a28a8fbfefcf0; 2 x -> <build folder>
+evidence/trace-k1-late.txt: original 2344 B sha256 d259c902c591a5d53da2a2bf2f7af1ceef74e23ddaccac82a8dc3e059e274a74; 2 x -> <lab folder>
+evidence/trace-k1.txt: original 3287 B sha256 8425739e7e8c2f2f255406648ea78557084ef9d852ca686dfb8ca66ce41082b0; 2 x -> <lab folder>
+evidence/trace-k1b.txt: original 3266 B sha256 7075d9ff266edec578e8d173d351f0796f0ecf39ed6910d23495623faa21d80a; 2 x -> <lab folder>
+scripts/b3.ps1: original 2852 B sha256 106b078c4bd63c07de188ed881e271cefc3515267cc18b07c7c7b4f8d89271be; 1 x -> <lab folder>
+scripts/k-run.ps1: original 8053 B sha256 03bf451fc08ade82bae18dd9fedf03cd88e1a4302bec444d42b15407b74453b3; 1 x -> <lab folder>
+scripts/c-run.ps1: original 8152 B sha256 5d582210f23930245a2e620f361a6969b5084df2755fc1bc495c8375f26a67f6; 1 x -> <lab folder>
+scripts/c4-taskbar.ps1: original 4673 B sha256 7057eddfd12ef3d1135080e6eb83e94a6cbc6314dd662dbcb04039a83b0103c7; 1 x -> <lab folder>
+scripts/control-forms.ps1: original 1706 B sha256 384c4e171f4f02f43383f773e47498c40f8bff5347cb2e48faae786072cab047; 1 x -> <lab folder>

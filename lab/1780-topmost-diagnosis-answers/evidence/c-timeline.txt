@@ -1,0 +1,21 @@
+﻿C1 2026-10-29T05:05:18.613Z visible windows titled with 'ComplyEaze Bridge' before the trace: 0
+C1 trace started 2026-10-29T05:05:19.121Z pid 26092 in its own window: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-c.txt -Seconds 120
+C1 Tally title clicked 2026-10-29T05:05:21.199Z at logical (330,14)
+T0 2026-10-29T05:05:22.264Z queued 004-c1-post_import.json
+T0+8 probe start 2026-10-29T05:05:30.297Z end 2026-10-29T05:05:32.410Z : 3,0,1,19416,ComplyEaze Bridge - post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14
+T0+13 probe start 2026-10-29T05:05:35.262Z end 2026-10-29T05:05:36.413Z : 3,0,1,19416,ComplyEaze Bridge - post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14
+T0+13 shot 2026-10-29T05:05:36.673Z
+C1 trace: FIRST 2026-10-29T05:05:29.170Z box_pid=19416 || PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=6120 || PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+C2 2026-10-29T05:05:36.851Z box 26678580 rect 549,145,1003,741; text saved
+C3 point logical (263,475) = screen tool (249,450); distance from the box 286 px
+C3 click 2026-10-29T05:05:38.264Z at T0+16.02 s
+C+0 probe start 2026-10-29T05:05:38.297Z end 2026-10-29T05:05:39.765Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,19416,ComplyEaze Bridge - post this voucher? | visible_titled_windows,14
+C+0 shot 2026-10-29T05:05:39.910Z
+C+6 probe start 2026-10-29T05:05:44.264Z end 2026-10-29T05:05:45.194Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,19416,ComplyEaze Bridge - post this voucher? | visible_titled_windows,14
+C+6 shot 2026-10-29T05:05:45.305Z
+C4 : box not above Tally (box 4, Tally 3): nothing clicked; the taskbar step is needed
+C4 before the taskbar click 2026-10-29T05:06:25.745Z: box open True visible True z 4, Tally z 3
+C4 taskbar button clicked ONCE 2026-10-29T05:06:26.054Z at logical (756,844) = screen tool (717,800)
+C4 probe after the taskbar click start 2026-10-29T05:06:26.292Z end 2026-10-29T05:06:27.766Z : 3,0,0,13992,TallyPrime:9001 | visible_titled_windows,13
+C4 2026-10-29T05:06:27.830Z box open False; z box -1, Tally 4
+C4 the box is gone after the taskbar click without No: one probe, one capture, nothing more clicked (2026-10-29T05:06:28.103Z)

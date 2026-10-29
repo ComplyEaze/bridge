@@ -1,0 +1,23 @@
+﻿START 2026-10-29T04:56:12.815Z title_part=Tally probe control interval_ms=50 seconds=10
+FIRST 2026-10-29T04:56:12.906Z box_pid=20968
+PROC path=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=18164
+PROC command_line="C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\control-forms.ps1 -Seconds 20 
+PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+T 2026-10-29T04:56:14.138Z fg_hwnd=0x147282e fg_pid=12260 box_pid=20968 windows=8
+W 2026-10-29T04:56:14.138Z hwnd=0x312912 class=WindowsForms10.Window.8.app.0.f5a312_r38_ad1 visible=1 exstyle=0x00050108 topmost=1 thread=24912 owner=0 title=Tally probe control TOPMOST
+W 2026-10-29T04:56:14.138Z hwnd=0x842cbc class=GDI+ Hook Window Class visible=0 exstyle=0x00000000 topmost=0 thread=10480 owner=0 title=GDI+ Window (powershell.exe)
+W 2026-10-29T04:56:14.138Z hwnd=0xd2271a class=WindowsForms10.Window.8.app.0.f5a312_r38_ad1 visible=1 exstyle=0x00050100 topmost=0 thread=24912 owner=0 title=Tally probe control PLAIN
+W 2026-10-29T04:56:14.138Z hwnd=0x1dc28bc class=.NET-BroadcastEventWindow.4.0.0.0.f5a312.0 visible=0 exstyle=0x00000000 topmost=0 thread=24912 owner=0 title=.NET-BroadcastEventWindow.4.0.0.0.f5a312.0
+W 2026-10-29T04:56:14.138Z hwnd=0x1452cfe class=ConsoleWindowClass visible=1 exstyle=0x000c0110 topmost=0 thread=20488 owner=0 title=Windows PowerShell
+W 2026-10-29T04:56:14.138Z hwnd=0x23129a4 class=IME visible=0 exstyle=0x00000000 topmost=0 thread=10480 owner=0x842cbc owner_class=GDI+ Hook Window Class owner_pid=20968 owner_exstyle=0x00000000 owner_topmost=0 title=Default IME
+W 2026-10-29T04:56:14.138Z hwnd=0x135274e class=MSCTFIME UI visible=0 exstyle=0x00000000 topmost=0 thread=24912 owner=0x13a28ba owner_class=IME owner_pid=20968 owner_exstyle=0x00000000 owner_topmost=0 title=MSCTFIME UI
+W 2026-10-29T04:56:14.138Z hwnd=0x13a28ba class=IME visible=0 exstyle=0x00000000 topmost=0 thread=24912 owner=0xd2271a owner_class=WindowsForms10.Window.8.app.0.f5a312_r38_ad1 owner_pid=20968 owner_exstyle=0x00050100 owner_topmost=0 title=Default IME
+H 2026-10-29T04:56:15.181Z unchanged
+H 2026-10-29T04:56:16.215Z unchanged
+H 2026-10-29T04:56:17.230Z unchanged
+H 2026-10-29T04:56:18.249Z unchanged
+H 2026-10-29T04:56:19.266Z unchanged
+H 2026-10-29T04:56:20.300Z unchanged
+H 2026-10-29T04:56:21.332Z unchanged
+H 2026-10-29T04:56:22.377Z unchanged
+END 2026-10-29T04:56:22.915Z

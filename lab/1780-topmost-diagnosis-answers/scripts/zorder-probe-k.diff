@@ -1,0 +1,10 @@
+6c6,7
+< # Only windows whose title contains "ComplyEaze Bridge" or "Tally" are printed, plus the total count.
+---
+> # Only windows whose title contains "ComplyEaze Bridge", "Tally" or "Lab topmost control" are printed, plus the total count.
+> # Lab deviation for part K of row 1780-D: the third title added to the filter; nothing else changed.
+32c33,34
+<                 title.IndexOf("Tally", StringComparison.OrdinalIgnoreCase) >= 0) {
+---
+>                 title.IndexOf("Tally", StringComparison.OrdinalIgnoreCase) >= 0 ||
+>                 title.IndexOf("Lab topmost control", StringComparison.OrdinalIgnoreCase) >= 0) {

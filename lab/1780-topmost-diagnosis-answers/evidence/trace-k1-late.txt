@@ -1,0 +1,29 @@
+﻿START 2026-10-29T05:01:40.296Z title_part=Lab topmost control interval_ms=50 seconds=60
+FIRST 2026-10-29T05:01:40.407Z box_pid=27720
+PROC path=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=19304
+PROC command_line="C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\control-box.ps1 -DelaySeconds 5 -Out <lab folder>\evidence\control-k1.txt 
+PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+T 2026-10-29T05:01:41.913Z fg_hwnd=0x19929de fg_pid=8292 box_pid=27720 windows=4
+W 2026-10-29T05:01:41.913Z hwnd=0x852cbc class=#32770 visible=1 exstyle=0x00010109 topmost=1 thread=12200 owner=0 title=Lab topmost control
+W 2026-10-29T05:01:41.913Z hwnd=0x1462cfe class=ConsoleWindowClass visible=0 exstyle=0x000c0110 topmost=0 thread=27268 owner=0 title=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe
+W 2026-10-29T05:01:41.913Z hwnd=0x1e302de class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=12200 owner=0x23229a4 owner_class=IME owner_pid=27720 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T05:01:41.913Z hwnd=0x23229a4 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=12200 owner=0x852cbc owner_class=#32770 owner_pid=27720 owner_exstyle=0x00010109 owner_topmost=1 title=Default IME
+H 2026-10-29T05:01:42.956Z unchanged
+H 2026-10-29T05:01:43.964Z unchanged
+H 2026-10-29T05:01:44.989Z unchanged
+H 2026-10-29T05:01:46.020Z unchanged
+H 2026-10-29T05:01:47.027Z unchanged
+H 2026-10-29T05:01:48.080Z unchanged
+H 2026-10-29T05:01:49.105Z unchanged
+H 2026-10-29T05:01:50.118Z unchanged
+H 2026-10-29T05:01:51.159Z unchanged
+H 2026-10-29T05:01:52.220Z unchanged
+H 2026-10-29T05:01:53.232Z unchanged
+H 2026-10-29T05:01:54.235Z unchanged
+T 2026-10-29T05:01:54.915Z fg_hwnd=0x19929de fg_pid=8292 box_pid=27720 windows=1
+W 2026-10-29T05:01:54.915Z hwnd=0x1462cfe class=ConsoleWindowClass visible=0 exstyle=0x000c0110 topmost=0 thread=27268 owner=0 title=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe
+T 2026-10-29T05:01:55.040Z fg_hwnd=0x19929de fg_pid=8292 box_pid=27720 windows=0
+H 2026-10-29T05:01:56.064Z unchanged
+H 2026-10-29T05:01:57.111Z unchanged
+GONE 2026-10-29T05:01:58.085Z
+END 2026-10-29T05:01:58.106Z

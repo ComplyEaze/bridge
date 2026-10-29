@@ -1,0 +1,6 @@
+2026-10-29T05:04:03.011Z processes with the flag: 0
+bridge_mcp.exe pid 30204 parent 22180 path <desktop client extensions>\local.mcpb.complyeaze-contributors.bridge-tally\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+bridge_mcp.exe pid 9064 parent 22180 path <another build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+bridge_mcp.exe pid 21456 parent 22180 path <another build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+bridge_mcp.exe pid 19088 parent 22180 path <desktop client extensions>\local.mcpb.complyeaze-contributors.bridge-tally\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+bridge_mcp.exe pid 6120 parent 23384 path <build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe

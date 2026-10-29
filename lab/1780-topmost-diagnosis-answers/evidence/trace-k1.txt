@@ -1,0 +1,60 @@
+﻿START 2026-10-29T04:58:18.895Z title_part=Lab topmost control interval_ms=50 seconds=60
+FIRST 2026-10-29T04:58:26.419Z box_pid=27720
+PROC path=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=19304
+PROC command_line="C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\control-box.ps1 -DelaySeconds 5 -Out <lab folder>\evidence\control-k1.txt 
+PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+T 2026-10-29T04:58:27.357Z fg_hwnd=0x852cbc fg_pid=27720 box_pid=27720 windows=4
+W 2026-10-29T04:58:27.357Z hwnd=0x852cbc class=#32770 visible=1 exstyle=0x00010109 topmost=1 thread=12200 owner=0 title=Lab topmost control
+W 2026-10-29T04:58:27.357Z hwnd=0x1462cfe class=ConsoleWindowClass visible=0 exstyle=0x000c0110 topmost=0 thread=27268 owner=0 title=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe
+W 2026-10-29T04:58:27.357Z hwnd=0x1e302de class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=12200 owner=0x23229a4 owner_class=IME owner_pid=27720 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T04:58:27.357Z hwnd=0x23229a4 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=12200 owner=0x852cbc owner_class=#32770 owner_pid=27720 owner_exstyle=0x00010109 owner_topmost=1 title=Default IME
+H 2026-10-29T04:58:28.371Z unchanged
+H 2026-10-29T04:58:29.406Z unchanged
+H 2026-10-29T04:58:30.435Z unchanged
+H 2026-10-29T04:58:31.452Z unchanged
+H 2026-10-29T04:58:32.490Z unchanged
+H 2026-10-29T04:58:33.508Z unchanged
+H 2026-10-29T04:58:34.554Z unchanged
+H 2026-10-29T04:58:35.591Z unchanged
+H 2026-10-29T04:58:36.643Z unchanged
+H 2026-10-29T04:58:37.677Z unchanged
+H 2026-10-29T04:58:38.723Z unchanged
+H 2026-10-29T04:58:39.743Z unchanged
+H 2026-10-29T04:58:40.795Z unchanged
+H 2026-10-29T04:58:41.810Z unchanged
+H 2026-10-29T04:58:42.829Z unchanged
+H 2026-10-29T04:58:43.857Z unchanged
+H 2026-10-29T04:58:44.878Z unchanged
+H 2026-10-29T04:58:45.893Z unchanged
+H 2026-10-29T04:58:46.921Z unchanged
+H 2026-10-29T04:58:47.941Z unchanged
+H 2026-10-29T04:58:48.971Z unchanged
+H 2026-10-29T04:58:49.975Z unchanged
+H 2026-10-29T04:58:51.018Z unchanged
+H 2026-10-29T04:58:52.034Z unchanged
+H 2026-10-29T04:58:53.066Z unchanged
+H 2026-10-29T04:58:54.112Z unchanged
+H 2026-10-29T04:58:55.125Z unchanged
+H 2026-10-29T04:58:56.189Z unchanged
+H 2026-10-29T04:58:57.191Z unchanged
+H 2026-10-29T04:58:58.246Z unchanged
+H 2026-10-29T04:58:59.288Z unchanged
+H 2026-10-29T04:59:00.345Z unchanged
+H 2026-10-29T04:59:01.376Z unchanged
+H 2026-10-29T04:59:02.444Z unchanged
+H 2026-10-29T04:59:03.505Z unchanged
+H 2026-10-29T04:59:04.517Z unchanged
+H 2026-10-29T04:59:05.574Z unchanged
+H 2026-10-29T04:59:06.610Z unchanged
+H 2026-10-29T04:59:07.638Z unchanged
+H 2026-10-29T04:59:08.676Z unchanged
+H 2026-10-29T04:59:09.721Z unchanged
+H 2026-10-29T04:59:10.755Z unchanged
+H 2026-10-29T04:59:11.800Z unchanged
+H 2026-10-29T04:59:12.816Z unchanged
+H 2026-10-29T04:59:13.836Z unchanged
+H 2026-10-29T04:59:14.888Z unchanged
+H 2026-10-29T04:59:15.936Z unchanged
+H 2026-10-29T04:59:16.989Z unchanged
+H 2026-10-29T04:59:18.021Z unchanged
+END 2026-10-29T04:59:18.990Z

@@ -1,0 +1,25 @@
+7f1e5d2a-0000-4000-8000-000000001780
+1
+Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is
+posted until you answer.
+
+Create ONE Receipt in "BRIDGE BATCH LAB"
+Company GUID: 00000000-0000-0000-0000-000000000000
+Company number: 000000  Books from: 20260401
+Tally: http://127.0.0.1:9001
+Date: 20260914  Voucher number: Tally assigns it  (the voucher's own text: last two lines)
+
+Dr 0.00  "Synthetic Bank Ledger"
+Cr 0.00  "Party A"
+
+Total debit: 0  Total credit: 0
+Checked in Tally: every Dr ledger is bank/cash; every Cr ledger holds no money.
+Batch: bridge-00000000-0000-4000-8000-000000000000
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+Reference: (none)
+Narration: "Lab bisect hand run"

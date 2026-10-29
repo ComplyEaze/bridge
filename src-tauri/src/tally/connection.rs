@@ -1148,17 +1148,23 @@ mod bills_report {
     /// What it covers: the one large synthetic book measured answered its Bills Receivable report
     /// in full at about 29,900 open bills, 13,679,490 bytes on the wire (about 457.5 bytes a bill),
     /// in 41.5 s and 36.7 s (`lab/2119-bills-read-timing-answers`; one sitting, partial), inside
-    /// this limit. If the time keeps growing at the about 1.2 to 1.4 ms a bill of those two runs
-    /// (inferred), this limit reaches about 43,000 to 49,000 bills, so the 32 MiB response cap
-    /// binds first only where a bill costs above about 690 to 780 bytes. An answer over the cap is
-    /// refused as `ResponseTooLarge`, never read in part. A response shorter than its declared
-    /// length is refused as `ResponseTruncated`. A shorter answer that Tally itself declares whole
+    /// this limit. The six reads of that sitting, from about 7,400 to 29,900 bills, took about 1.2
+    /// to 1.6 ms a bill on that one machine; if the time keeps within that rate (inferred), this
+    /// limit reaches about 36,600 to 49,000 bills, so the 32 MiB response cap binds first only
+    /// where a bill costs above about 680 to 920 bytes. An answer over the cap is refused as
+    /// `ResponseTooLarge`, never read in part. A response shorter than its declared length is
+    /// refused as `ResponseTruncated`. A shorter answer that Tally itself declares whole
     /// (implementation guide §2.6, I4) is caught only when the pair's two answers differ.
     pub(crate) const BILLS_REPORT_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
     /// Behind an `Arc`, so a client, held in many futures, grows by one pointer.
     #[derive(Clone)]
-    pub(super) struct BillsReportTransport(Arc<TallyHttpTransport>);
+    pub(super) struct BillsReportTransport {
+        transport: Arc<TallyHttpTransport>,
+        /// The limit of the policy it was built with, kept so a test can read the production one.
+        #[cfg(test)]
+        limit: Duration,
+    }
 
     impl BillsReportTransport {
         /// Built beside the client's ordinary transport, on the same wire gate, retry bound
@@ -1196,26 +1202,50 @@ mod bills_report {
                 request_timeout: limit,
                 ..TransportPolicy::default()
             };
-            Ok(Self(Arc::new(
-                TallyHttpTransport::with_policy(config, policy)?
-                    .with_wire_gate(gate, retry)
-                    .with_send_observer(observer),
-            )))
+            Ok(Self {
+                transport: Arc::new(
+                    TallyHttpTransport::with_policy(config, policy)?
+                        .with_wire_gate(gate, retry)
+                        .with_send_observer(observer),
+                ),
+                #[cfg(test)]
+                limit: policy.request_timeout,
+            })
+        }
+
+        fn with_transport(&self, transport: TallyHttpTransport) -> Self {
+            Self {
+                transport: Arc::new(transport),
+                #[cfg(test)]
+                limit: self.limit,
+            }
         }
 
         pub(super) fn for_operation(&self, budget: WireWaitBudget) -> Self {
-            Self(Arc::new(self.0.for_operation(budget)))
+            self.with_transport(self.transport.for_operation(budget))
         }
 
         pub(super) fn with_send_admission(&self, admission: Arc<dyn SendAdmission>) -> Self {
-            Self(Arc::new(self.0.with_send_admission(admission)))
+            self.with_transport(self.transport.with_send_admission(admission))
         }
 
         pub(super) async fn post(
             &self,
             request: &NativeBillsRequest,
         ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
-            self.0.post_xml_decoded(request.as_str().to_owned()).await
+            self.transport
+                .post_xml_decoded(request.as_str().to_owned())
+                .await
+        }
+
+        #[cfg(test)]
+        pub(super) fn limit(&self) -> Duration {
+            self.limit
+        }
+
+        #[cfg(test)]
+        pub(super) fn wire_budget_remaining(&self) -> Option<Duration> {
+            self.transport.wire_budget_remaining()
         }
     }
 }
@@ -1340,6 +1370,18 @@ impl TallyClient {
             bills_report,
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         }
+    }
+
+    /// Test only: the Bills report transport's limit.
+    #[cfg(test)]
+    pub(crate) fn bills_report_limit(&self) -> std::time::Duration {
+        self.bills_report.limit()
+    }
+
+    /// Test only: what is left of the operation wait budget the Bills report transport draws on.
+    #[cfg(test)]
+    pub(crate) fn bills_report_wire_budget_remaining(&self) -> Option<std::time::Duration> {
+        self.bills_report.wire_budget_remaining()
     }
 
     /// Test seam: `policy` for every request but the Bills report's, which

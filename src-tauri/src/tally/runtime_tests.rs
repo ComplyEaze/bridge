@@ -1713,3 +1713,23 @@ async fn a_read_is_sent_three_times_when_its_connection_closes_after_the_request
     }
     unreachable!("bounded attempts always return")
 }
+
+/// A runtime given only an ordinary test policy keeps the Bills report's production limit
+/// (#2119): the test seam does not drop it to the ordinary one.
+#[test]
+fn a_test_policy_alone_keeps_the_bills_reports_production_limit() {
+    let runtime = TallyRuntime::with_transport_policy(bridge_tally_transport::TransportPolicy {
+        request_timeout: std::time::Duration::from_millis(300),
+        ..bridge_tally_transport::TransportPolicy::default()
+    });
+    let session = runtime
+        .session(TallyConfig {
+            host: "localhost".to_string(),
+            port: 9000,
+        })
+        .expect("runtime session");
+    assert_eq!(
+        session.client.bills_report_limit(),
+        std::time::Duration::from_secs(60)
+    );
+}

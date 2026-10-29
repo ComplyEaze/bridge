@@ -25,6 +25,7 @@ Confidence markers follow `docs/tally/TALLY_PROTOCOL_REFERENCE.md`.
 | Claude Code CLI (`claude -p`), default settings | 2.1.285, macOS | 90, 300, 900 (this server); 150 (earlier server, 30 Sep) | none up to 900 | not reached | n/a: no call was abandoned | not tested: no timeout reached | partial, one run each |
 | Claude Code CLI, per-server `timeout` of 60000 ms in `.mcp.json` | 2.1.285, macOS | none (150 s was cut) | 150 s call cut at 60.0 s, with and without progress every 10 s | `MCP server ... timed out after 60s` | received (reason `SdkError: Request timed out`) | no: progress every 10 s did not reset it | partial, one run each (30 Sep, earlier server, see #703) |
 | Claude Code in the Code tab of the Claude desktop app, default settings | 2.1.284, macOS | 150 (earlier server, 30 Sep) | none up to 150 | not reached | n/a: no call was abandoned | not tested | partial, one run, run by hand |
+| The Claude desktop app's configured servers, served to a Code tab session, default settings | desktop app 4.29.0.0 with Claude Code 2.1.309, Windows | none | 130 s and 90 s calls each cut at 60.0 s; the host then replaced the server process | `Request timed out` | received (reason `SdkError: Request timed out`) | not testable: the calls carried no `_meta`, so no `progressToken` | partial, one run each (`lab/2119-bills-60s-row-answers`, 29 Oct 2026) |
 | Claude Desktop (chat app) | macOS | not measured | | | | | |
 | Claude Desktop (chat app) | Windows | not measured | | | | | |
 | a third-party client | | not measured | | | | | |

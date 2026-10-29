@@ -799,10 +799,11 @@ tokio::task_local! {
     /// One user-level operation's wait for the endpoint wire lock (#697 item
     /// (a)): one MCP tool call, or a desktop command that scopes it (the ones
     /// in `commands.rs` that call `with_operation_wire_budget`), whose host
-    /// gives up after about 60 s. Every runtime operation run in this task
-    /// draws on the one budget the first of them creates, so the call waits at
-    /// most `WireRetryPolicy::total` in all, however many runtime operations
-    /// it makes. A task without it (a spawned snapshot run, a test, and the
+    /// may give up on a long call (`docs/agent/mcp-host-call-timeouts.md`).
+    /// Every runtime operation run in this task draws on the one budget the
+    /// first of them creates, so the call waits at most
+    /// `WireRetryPolicy::total` in all, however many runtime operations it
+    /// makes. A task without it (a spawned snapshot run, a test, and the
     /// desktop commands that do not scope it) gives each runtime operation a
     /// budget of its own: still bounded, never unbounded, but not one budget
     /// for the whole command.

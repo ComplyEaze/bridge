@@ -1772,6 +1772,28 @@ fn the_bills_step_states_the_bills_report_limit() {
     );
 }
 
+/// The outstandings description tells the assistant what to do when its host gives the call up at
+/// about 60 seconds (#2119): the refusal step never reaches it then, only the host's time-out.
+#[test]
+fn the_outstandings_description_says_what_to_do_after_a_host_time_out() {
+    let definitions = crate::agent::tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "outstandings"))
+        .expect("outstandings tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    assert!(
+        description.contains("some hosts give a tool call about 60 seconds. If the host times it out, it will time out again: do not repeat it at once"),
+        "{description}"
+    );
+    assert!(
+        description
+            .contains("wait at least a minute, then call tally_status once before any other read"),
+        "{description}"
+    );
+}
+
 /// Control: the groups report, read between the two Bills reports and cut at the same limit, keeps
 /// the transport's reason and gets no Bills step.
 #[tokio::test]

@@ -362,6 +362,27 @@ async fn a_balance_sheet_that_does_not_tie_is_not_established_at_the_top() {
     );
     let carried = &result["result"]["profit_and_loss"]["carried"];
     assert_eq!(carried["reason"], result["reason"]);
+    // The synthetic statement's two sides differ by one: the tool says so, in the
+    // result and in its first line (#2063).
+    assert_eq!(
+        result["tally_balance_sheet_sides"],
+        json!({"credits": "11027", "debits": "11026"})
+    );
+    let lead = lead(&response);
+    assert!(
+        lead.contains("credit lines add to 11027 and its debit lines to 11026"),
+        "{lead}"
+    );
+}
+
+/// A statement whose sides agree carries no such key.
+#[tokio::test]
+async fn a_balance_sheet_that_balances_carries_no_sides() {
+    let (response, _, _) = call("balance_sheet", plans("-11027.00")).await;
+    assert!(
+        result(&response).get("tally_balance_sheet_sides").is_none(),
+        "{response}"
+    );
 }
 
 #[tokio::test]
@@ -400,6 +421,7 @@ fn every_not_established_reason_is_carried_to_the_top() {
         NotEstablishedReason::ProfitAndLossLedgerNotReturned,
         NotEstablishedReason::TallyBalanceSheetDiffers,
         NotEstablishedReason::TallyProfitAndLossDiffers,
+        NotEstablishedReason::TallyBalanceSheetDoesNotBalance,
     ] {
         assert_eq!(
             top_level(&not_established(reason)),
@@ -600,4 +622,27 @@ async fn a_profit_and_loss_whose_own_statement_cannot_be_read_is_refused() {
     plans.truncate(plans.len() - 8);
     let (response, _, _) = call("profit_and_loss", plans).await;
     assert_eq!(response["isError"], true, "{response}");
+}
+
+/// The Trial Balance parser's reason reaches a `profit_and_loss` or `balance_sheet` refusal as
+/// its `cause` (#2071, #2080). Tally's answer to the Trial Balance request is a captured
+/// company list, which is not one.
+#[tokio::test]
+async fn an_unusable_trial_balance_answer_names_its_cause_on_both_statements() {
+    for tool in ["profit_and_loss", "balance_sheet"] {
+        let mut plans = plans("-4950.00");
+        // The answer to the Trial Balance request is the 16th to 19th request (a pair).
+        for at in [15, 17] {
+            plans[at] = xml(companies());
+        }
+        // The refusal ends the call at the Trial Balance pair (19 requests in).
+        plans.truncate(19);
+        let (response, _, _) = call(tool, plans).await;
+        assert_eq!(response["isError"], true, "{tool}: {response}");
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(
+            error["cause"], "trial_balance_source_identity_missing",
+            "{tool}: {error}"
+        );
+    }
 }

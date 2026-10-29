@@ -421,6 +421,14 @@ Negative values are debits; positive values are credits. No empty value is
 converted to zero. `totals` sums numeric observations across all returned ledgers
 and carries an `empty_count` for each column. A fully observed nonzero opening
 net is the difference in opening balances; Bridge does not add a balancing row.
+A ledger whose closing is not its opening plus its debit and credit totals (an empty amount
+counted as zero) carries `movements_differ_by` (the exact difference, closing minus the three, in
+Tally's sign), the first line says how many do not add up, and a limitation explains. The row is
+as Tally sent it and nothing is corrected. Measured on a Closing Stock ledger whose closing
+balance was keyed on Tally's screen: Tally kept the opening as its closing and showed the change
+only in the debit total. On the book not integrated with inventory Tally's Profit and Loss and
+Balance Sheet used the keyed figure; on the integrated book they valued the stock from the stock
+item, so the ledger's `closing` is not necessarily the figure those statements use.
 
 `offset` and `limit` restrict output, not the source read. A first page captures a
 fresh report and holds it in memory; a later page continues from it while the book's extent is
@@ -496,8 +504,8 @@ Measured on one synthetic book of TallyPrime 7.1 Silver (PARTIAL); a state row o
 `Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured (protocol
 reference §12a.22). A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
-parent that is Tally's reserved root keeps its marker form, as in
-`trial_balance`. Alias names are not returned.
+parent that is Tally's reserved root is written `&#4; Primary`, the text Tally
+sends, as in `trial_balance` (a group a user named Primary is written plain). Alias names are not returned.
 
 A `voucher_types` row also carries `series_numbering`, the numbering of the
 type's number series, which `numbering_method` is not (that is the type-level
@@ -617,8 +625,8 @@ hints (the company's `NUM*` fields), stock-item quantities or values (use `stock
 
 Under `mask_parties`, godown, stock-group, stock-item, cost-centre and cost-category names, their `parent`
 values and a cost centre's `category` are masked like a party name, because a job-work
-godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is a
-fixed marker and is left as it is. Voucher-type, unit and account-group names
+godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is shown as
+`&#4; Primary` and is not masked. Voucher-type, unit and account-group names
 are not masked: they are configuration labels, not counterparties.
 
 ### Cash Flow
@@ -821,7 +829,12 @@ stock items on that list, each as `item`, `quantity`, `rate` and `value`, in Tal
 `{"state": "read", "amount": ..., "unit": ...}` with the sign Tally sent, or `{"state": "empty"}` or
 `{"state": "unread"}` (text that is not `<number> <unit>`); `rate` and `value` are each
 `{"state": "present", "value": ...}` or `{"state": "empty"}` exactly as Tally printed them, and an empty one
-is not zero. The list is Tally's own and no verdict is added: being listed does not make an item negative
+is not zero. A `value`, when present, keeps the sign Tally's export carries, as in the Stock Summary and
+the trial balance: a debit is negative and a credit is positive, and the screen shows a credit as `(-)`
+and a debit unsigned. On the one book measured, the item at -3 Nos and a rate of 120.00 was exported
+with the value `360.00` (a credit) on TallyPrime 7.1 and on 7.2, and the 7.2 screen showed `(-)360.00`
+(the screen was not read on 7.1); the other two short items captured had no value, and the sign of a
+value can change as an item trades (protocol reference §12a.13 and §12a.16). The list is Tally's own and no verdict is added: being listed does not make an item negative
 (on one book Tally also listed items of positive quantity whose closing value was a credit), so read each
 quantity. The rule by which Tally lists an item is not established and is not derived here.
 
@@ -1026,7 +1039,11 @@ parts: purchases on Indirect Expenses, Direct Expenses and Fixed
 Assets ledgers and on two expense ledgers at once, two item invoices whose purchase ledger was among their entries
 (one with freight), journals with input IGST, with a TDS ledger typed Others, a set-off and a reversal with no
 supplier, a debit note, two tax payments (one also paying interest) and a credit note with output tax.
-Not measured: vouchers created by import, Gold and other releases, a book with registered GSTINs, other item-invoice shapes, more than 64 vouchers
+A registered book was read once, by an earlier build that did not yet admit Direct Expenses or Fixed Assets ledgers or name the ledger GUID
+(the same synthetic book after its company and one supplier were registered and December's vouchers keyed, TallyPrime 7.2 Silver): none of
+December's six vouchers was set aside, and a supplier invoice entered twice (the same reference, date and bill) was totalled twice with nothing
+flagged, so the tool does not detect a duplicate invoice. A year of 70 vouchers was read whole in the same run.
+Not measured: vouchers created by import, Gold and other releases, a registered book on this build, other item-invoice shapes, more than 64 vouchers
 in a window.
 
 ### Uncertain vouchers of one voucher type (`gst_uncertain_vouchers`)
@@ -1253,8 +1270,8 @@ company-flags read requires exactly one Company row for the GUID
 
 Under `mask_parties`, an item's `name` and `parent` are masked like a party name,
 because stock-item and stock-group names are free text that can carry a customer's
-or supplier's name; Tally's reserved root as a parent is a fixed marker and is left
-as it is. `guid` is not masked and is the identity the `items` filter uses.
+or supplier's name; Tally's reserved root as a parent is shown as `&#4; Primary` and is
+not masked. `guid` is not masked and is the identity the `items` filter uses.
 
 ### Profit and Loss and Balance Sheet
 
@@ -1286,11 +1303,20 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
     differs, a Tally line with an amount nothing derived matches, or a derived
     line with an amount that Tally does not show, refuses every result as
     `tally_balance_sheet_differs`, with those lines named;
+  - Tally's own Balance Sheet lines sum to zero (each line's amount is the column it
+    carries; a debit is negative). On the one book measured (TallyPrime 7.2, §12a.21),
+    Tally's screen showed a gap in the book's opening balances as `Difference in
+    opening balances`, and the export had no line for it. When the lines do not sum to
+    zero the result carries `tally_balance_sheet_sides` (`credits` and `debits`, as
+    magnitudes), the headline says both totals, and no result is established:
+    `tally_balance_sheet_does_not_balance` when no other reason applies, the other
+    reason when one does;
   - the Profit & Loss A/c ledger is returned in the Trial Balance.
 - **Reasons** a result is `not_established`: `unclassified_ledger_carries_an_amount`,
   `closing_stock_not_derivable_from_trial_balance`,
-  `profit_and_loss_ledger_not_returned`, `tally_balance_sheet_differs`, and for
-  gross and net `tally_profit_and_loss_differs`.
+  `profit_and_loss_ledger_not_returned`, `tally_balance_sheet_differs`,
+  `tally_balance_sheet_does_not_balance`, and for gross and net
+  `tally_profit_and_loss_differs`.
 - **Top-level state.** `result.state` is `observed` only while this tool's
   result is established (`profit_and_loss`: both `gross_result` and
   `net_result`; `balance_sheet`: `carried`). Otherwise it is `not_established`
@@ -1306,10 +1332,11 @@ Sheet for the window, and both read Tally's own Profit and Loss too (#692).
     Balance is read (measured once on the lab's multi-currency book), so an
     unadjusted forex difference (#683) never reaches the gate.
   - A Tally line the derivation has no counterpart for, such as a heading with
-    an amount, refuses the results rather than being guessed at. A difference
-    in opening balances is such a line when Tally shows it; the inventory
-    book's Balance Sheet export did not carry it (§12a.21), which is why the
-    derived lines must also sum to zero before the closing stock is used.
+    an amount, refuses the results rather than being guessed at. On the one
+    book measured the export did not carry Tally's `Difference in opening
+    balances` line (§12a.21), which is why its own lines must sum to zero, and
+    the derived lines too before the closing stock is used. A balanced average-cost
+    book whose rounded lines sum to a paisa off zero has not been measured.
   - Tally's own statements carry no company identity; the company, mode and
     book-extent checks around the read are what bind them.
   - The gate has been measured over one full year on one book and one month on
@@ -2212,6 +2239,65 @@ own amount.
   them in all of them. The presence, bill-trail and summary reads, `verify_import` and
   `ledger_movement` do not return them (`ledger_movement`'s fetch names three entry fields).
 
+### Bank allocations in voucher reads
+
+`vouchers` called with `bank_allocations: true` gives each ledger entry that has a bank allocation `bank_allocations`, a
+list of at most eight, one per allocation as Tally sent it (protocol reference §8.2h; #1231, #1392). Each carries five
+fields, `bank_date` (Tally's `BANKERSDATE`), `instrument_number`, `instrument_date`, `transaction_type` and `status`, and
+each field is `{"state": "absent"}` (the element was not sent), `{"state": "empty"}` (sent with no text) or
+`{"state": "value", "value": "..."}` (trimmed). Without the argument, and in every other answer that returns a voucher's
+entries (the registers), the key is not there; the parse reads the allocations either way.
+
+- **No reconciliation verdict.** Nothing in the list says whether an entry is reconciled. In the one capture, nothing was
+  reconciled: every `bank_date` was empty and every `status` was `No`. A reconciled entry has not been captured, so what
+  those fields read once an entry is reconciled, or cleared again, is not established, and an empty `bank_date` is not
+  shown to mean "unreconciled".
+- A transfer reference typed in the bank allocation of a Contra sits in its `instrument_number`, on both of the voucher's
+  entries, and in no other field the read returns; one typed in the narration is only narration text, and the voucher's
+  own `reference` stayed empty in the capture.
+- An entry with no allocation, or only an allocation element with nothing in it (most entries' answers carry one), has
+  no such key; that does not mean the bank entry has no allocation in Tally.
+- **A list that cannot be read whole does not refuse the read.** The entry carries `bank_allocations_unreadable` with one
+  reason and no partial list: `bank_allocation_field_duplicated`, `bank_allocation_text_undecodable`,
+  `bank_allocation_date_unparsable` (a bank or instrument date that is not `YYYYMMDD`), `bank_allocations_too_many`
+  (more than eight) or `bank_allocation_shape_unrecognised` (an allocation list inside another list of the entry, or an
+  element inside a field that is read).
+- Only those five fields are read. The names and account details an allocation can carry (the payee, bank, branch,
+  account number) are not read or returned. The instrument number is any text typed or sent, usually a cheque number or a transfer
+  reference, and is returned under every redaction mode, as the voucher's own `reference` is (a name typed inside it
+  stays as it is). The `reference` search matches the voucher's own reference only, not this field.
+- Measured on one synthetic book of five Contras keyed by hand (TallyPrime 7.1 Silver); other transaction types, other
+  voucher types, a reconciled entry and other releases are not measured. No request changed.
+
+### Goods lines in voucher reads
+
+`vouchers` called with `goods_lines: true` gives each ledger entry of an invoice voucher that carries goods `goods_lines`,
+one per line as Tally sent it (protocol reference §8.2i; #2015). Each line has `stock_item` and four fields,
+`actual_quantity`, `billed_quantity`, `rate` and `amount`, each `{"state": "absent"}`, `{"state": "empty"}` or
+`{"state": "value", "value": "..."}` (trimmed); a quantity or a rate keeps its unit as Tally wrote it (`666.667 Kgs`,
+`30.00/Kgs`). Where Tally split the line by godown and batch, the line has `batches`, each with `godown`, `batch`, both
+quantities and `amount` in the same form. A Purchase line's amount is negative and a Sales line's positive, the sign of
+its ledger entry. Without the argument, and in every other answer that returns a voucher's entries (the registers), the
+key is not there; the parse reads the lines either way.
+
+- **Invoice vouchers.** In the captures Tally sent a goods line under a ledger entry only on an invoice-mode voucher; the read does not test the voucher's invoice flag and shows the lines of any entry that carries them. A Stock
+  Journal answered an empty entry list in the one read of it (TallyPrime 7.2; that answer is not committed, and no
+  committed capture holds a Stock Journal), and a Delivery Note, Receipt Note, Physical Stock or Manufacturing
+  Journal is not captured, so an entry or a voucher without the key may still have moved stock.
+- **Held pages.** The goods lines are parsed on every voucher read, so they count toward the 64 MiB of a held window
+  (see "What is held" above) whether or not the argument is given: a window rich in goods lines may not be held, and a
+  later page then reads it again.
+- **A list that cannot be read whole does not refuse the read.** The entry carries `goods_lines_unreadable` with one
+  reason and no partial list: `goods_line_batch_amounts_differ` (the batch amounts do not add up to the line's),
+  `goods_line_amount_unparsable`, `goods_line_item_missing`, `goods_line_field_duplicated`,
+  `goods_line_text_undecodable`, `goods_lines_too_many` (more than 1,000 lines on an entry or 100 batch rows on a line,
+  bounds chosen, not measured) or `goods_line_shape_unrecognised` (a line or batch list at another depth, or an element
+  inside a field that is read).
+- Item, godown and batch names are masked under `mask_parties`, as the masters tool masks item and godown names.
+- Measured on Sales and Purchase invoices of two synthetic books (TallyPrime 7.1), one of them also on 7.2; a Credit or
+  Debit Note with items, discounts, additional cost, a bill of materials, a foreign-currency line and a voucher typed on
+  Tally's screen are not measured. No request changed.
+
 ## Voucher-file preparation and verification
 
 The MCPB extension exposes `verify_import` by default as a recovery tool (it
@@ -2831,9 +2917,17 @@ nothing. Its `error.hold` says what the journal showed: `held` (it names
 `blocking_batch_ids`, the batches of the refused batch's own company that hold the
 name, and `blocking_batches_other_companies`, each with its `batch_id` and
 `company_guid`), `settled_meanwhile`, which only the check under the lock gives (the
-holder settled since the call began: post this batch again), or `journal_unread`,
-which either check can give (the journal could not be read just now, or did not
-show this batch: call again). When the check before the dialog finds a send of this
+holder settled since the call began: post this batch again), or `journal_unread`
+(a journal read that did not show this batch: call again). The check under the lock
+reads the journal again for its answer. When that read fails (the journal busy because
+another call is writing to it, or unreadable for any other reason), every refusal the
+lock made after reading the journal (all but `master_journal_unavailable`, which could
+not read it) is answered from the journal the lock read when it refused. It names the
+holders, or the send on file, as they were at the refusal: a send another call has
+recorded since is not in it, so where it shows no send its message says only that this
+call sent nothing and that no send of the batch was on file when it was refused
+(bridge#2083).
+When the check before the dialog finds a send of this
 batch recorded since the call began by another call, and when a held-name refusal
 finds it in the journal read that follows, the answer is `import_already_attempted`
 with `error.hold` `send_of_this_batch_recorded_since`: call again later, which
@@ -2870,8 +2964,8 @@ person to create the ledger in Tally by hand. An unconfirmed answer
 and the answer given when the book could not be read back after Tally answered
 say to call again later, which only reads, and to create nothing in Tally by hand
 meanwhile. A failure answer that says the create may have been sent says the same.
-When the journal could not be read for that answer, it says it is not known
-whether a send was recorded: call `post_ledger_creates` with the same `batch_id`
+When the journal could not be read for that answer, a failure other than a refusal under the
+journal's lock made after the lock read the journal says it is not known whether a send was recorded: call `post_ledger_creates` with the same `batch_id`
 again, which reads the book back and sends nothing if a send is on file,
 otherwise asks for approval again before anything is sent, and is refused as
 `master_batch_not_found`, sending nothing, if ComplyEaze Bridge holds no such batch; create nothing in Tally by hand
@@ -3918,8 +4012,8 @@ composite voucher anywhere in the window fails it (`voucher_amount_invalid`, or
 `bill_allocation_amount_invalid` when the composite is on an allocation). The read is bounded as
 every window read is. It may send at most 128 data requests (each sent twice, as every read is, with its
 census and the company marks besides), and before anything is measured a data request holds at
-most 42 vouchers, so a window of more than 5,376 of the company's vouchers is always
-refused, and a smaller one may be when its parts measure heavier. The refusal comes before any
+most 42 vouchers, so a window of more than 5,376 of the company's vouchers is refused unless
+the party is read by its ledger (below), and a smaller one may be when its parts measure heavier. The refusal comes before any
 data request when the census shows it (the census stops as soon as it has counted more vouchers
 than the allowed requests can hold), and otherwise when a measured part does, as
 `trail_window_too_large` (name a `reference` that `open_bills` lists for the party; the read then
@@ -3935,8 +4029,31 @@ the detail is not available for that party; its vouchers can still be read with 
 allocates to (opening bills) are not counted by it, and a party with very many of them can meet
 the response size refusal (`agent_response_too_large`) instead. A reference neither the vouchers
 nor Tally's report know for the party is refused (`bill_reference_not_found`). The detail ignores
-`direction`, `top`, `offset` and `limit`; `window.company_vouchers_read` counts the company's
-vouchers in the window, not the party's. A named bill's window never starts before the books.
+`direction`, `top`, `offset` and `limit`. The detail reads the company's window, and
+`window.company_vouchers_read` counts the company's vouchers in it, not the party's. Only when that
+read is refused as needing more requests than one call may spend is the party read by its own
+ledger instead (#1356): when its vouchers carry the ledger's name as stored, the name holds only
+ASCII letters, digits and single spaces and no word a TDL formula reads as an operator (`and`,
+`or`, `not` and a few more), and no other ledger shares it but for case or spaces. That is the
+scoped window read `ledger_movement` uses, with the window read's fields (protocol reference
+section 11c.6): a census of the ledger in AlterID spans counts the party's vouchers, the planner
+divides them by date into parts, each part is admitted against the census voucher by voucher, and
+`window.party_vouchers_read` counts the party's vouchers. The detail then carries `window_scope`
+(`basis` `ledger_scoped`, `vouchers_read`, and a `note`: only the vouchers Tally lists under the
+ledger were read, and that list has been compared with a whole-book read only in windows where
+every voucher carried the ledger). Where the ledger is not read, or its read finds nothing or
+needs a day divided by AlterID (a part never observed ledger-scoped), the company window's
+refusal stands and carries `window_scope` with `basis` `whole_book` and the `reason`
+(`ledger_name_outside_scoped_alphabet`, `ledger_name_holds_formula_word`,
+`ledger_vouchers_spell_it_otherwise`, `ledger_name_shared_but_for_case`,
+`ledger_scope_plan_needs_day_split` or `ledger_scope_empty_not_established`). A refusal of the
+ledger read itself keeps its own code, with `window_scope` `basis` `ledger_scoped`: a part not
+admitted against the census (`voucher_window_part_not_admitted`, which is what a book that moved
+between the census and the read looks like), a row with no line on the ledger
+(`party_ledger_row_without_line`), or the party's own vouchers needing too many requests. The
+ledger census costs one request (sent twice, as every read is) per 8,192 of the book's AlterIDs,
+spent after the company window's census, so such a call can take about twice as long; that cost
+is unmeasured. A named bill's window never starts before the books.
 The company's two change marks are read before the statement of open bills and again after the
 voucher window, and a detail whose marks moved between them is refused as
 `voucher_window_changed_during_read` (a voucher entered or saved, a ledger renamed, or a report

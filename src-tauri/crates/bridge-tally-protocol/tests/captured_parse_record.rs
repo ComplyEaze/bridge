@@ -55,8 +55,7 @@ use bridge_tally_protocol::{
     company_list_may_be_in_educational_mode, decode_tally_xml_response_bytes_limited,
     export_status, parse_companies_from_collection, parse_company_gateway_capability_observation,
     parse_import_evidence, parse_import_outcome, parse_import_result, parse_ledger_census_slice,
-    parse_ledger_name_index, parse_ledger_source_records_with_evidence, parse_ledgers,
-    parse_ledgers_with_evidence, parse_native_group_source_records_with_evidence,
+    parse_ledger_name_index, parse_native_group_source_records_with_evidence,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_with_evidence,
     parse_native_voucher_source_records_with_evidence,
@@ -292,6 +291,7 @@ const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
 const MAILING_LAB_GUID: &str = "8e34483e-2bd3-472b-ae37-c4b197e8c15a";
 const TIEOUT_B_GUID: &str = "d64eda55-da7c-4106-a171-3e3cb6cdd331";
+const TIEOUT_D_GUID: &str = "6a9518b2-a88c-417c-a700-40243f9d9119";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
 const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.utf16le.xml";
@@ -1106,6 +1106,35 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_trial_balance",
         parse: |_, text| typed(parse_native_trial_balance(text, TIEOUT_B_GUID)),
+    },
+    // A book whose Balance Sheet export does not balance (BRIDGE TIEOUT D, #2063): src/reports/statements_tests.rs.
+    Row {
+        fixture: "tests/fixtures/statement_balance_sheet_opening_difference_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(BalanceSheet)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::BalanceSheet,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_difference_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_trial_balance_opening_difference_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, TIEOUT_D_GUID)),
     },
     // Native trial balances: src/native_trial_balance/tests.rs; src/reports/statements_tests.rs for
     // the statement captures; the FOREX plain request (FOREX_601D_CAPTURE_PROVENANCE.md) by the
@@ -2386,12 +2415,6 @@ const ROWS: &[Row] = &[
         parse: |_, text| untyped(export_status(text)),
     },
     Row {
-        fixture: "../tally-protocol-simulator/fixtures/export_status_0.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
-    },
-    Row {
         fixture: "../tally-protocol-simulator/fixtures/export_status_missing.xml",
         source: Source::Synthetic,
         parser: "export_status",
@@ -2402,60 +2425,6 @@ const ROWS: &[Row] = &[
         source: Source::Synthetic,
         parser: "export_status",
         parse: |_, text| untyped(export_status(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/normal_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/normal_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/normal_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledger_source_records_with_evidence",
-        parse: |_, text| untyped(parse_ledger_source_records_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/empty_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/duplicate_identity.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/wrong_company.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/record_count_mismatch.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/malformed_export_metadata.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/duplicate_export_metadata.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
     },
     Row {
         fixture: "../tally-protocol-simulator/fixtures/import_counters.xml",
@@ -2474,18 +2443,6 @@ const ROWS: &[Row] = &[
         source: Source::Synthetic,
         parser: "parse_import_result",
         parse: |_, text| untyped(parse_import_result(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/malformed.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/truncated.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
     },
     // src/native_masters_tests.rs: cost centres and cost categories (#1398).
     Row {
@@ -2947,6 +2904,42 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     // Voucher censuses.
     (
+        "tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/billtrail-window-fy.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/agent/d3-batch-voucher-census.utf16le.xml",
         APP_CENSUS,
     ),
@@ -3211,6 +3204,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/voucher_cost_centre_allocations_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

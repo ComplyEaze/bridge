@@ -36,7 +36,7 @@ fn duty() -> AdmittedLedgerKind {
 
 fn destination() -> String {
     format!(
-        "Create ONE ledger in \"BRIDGE MASTERS LAB\"\nCompany GUID: {}\nCompany number: 1  Books from: 20260401\nTally: http://127.0.0.1:9000\n\n",
+        "Create ONE ledger in \"BRIDGE MASTERS LAB\"\nCompany GUID: {}\nCompany number: 1  Books from: 1-Apr-2026\nTally: http://127.0.0.1:9000\n\n",
         guid()
     )
 }

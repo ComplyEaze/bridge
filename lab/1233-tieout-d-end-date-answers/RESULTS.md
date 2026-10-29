@@ -25,7 +25,7 @@ Every read answered 200, with bytes equal to CONTENT-LENGTH and curl exit 0.
 - **Stock Summary.** It opened with the period 1-Apr-25 to 15-Oct-25, and Alt+F2 set the same period. Two readings a minute apart both show Lab Gadget **17 Nos**.
 - **Day Book for 15-Oct-25.** It lists one voucher: Sales, number 2, party Customer.
   - The item's quantity on it is not shown in that view, and the voucher was not opened (Enter opens its Alter screen).
-  - The 26 Oct sitting's screen read 22 Nos to 30 Sep and 17 Nos to 15 Oct, which places a 5 Nos sale between those dates.
+- **Stock Item Vouchers (an added read, display only).** For Lab Gadget, 1-Oct-25 to 15-Oct-25, two readings a minute apart agree: opening 22 Nos; the one voucher, Sales no. 2 of 15-Oct-25, outwards **5 Nos**; closing 17 Nos. The 5 Nos change between 30 Sep and 15 Oct is that end-date voucher (`evidence/stock-item-vouchers-1.txt`, `-2.txt`, quantity columns only).
 - **The Gateway** showed its step 0 period, date and last entry afterwards.
 
 | source | quantity |
@@ -41,15 +41,14 @@ Every read answered 200, with bytes equal to CONTENT-LENGTH and curl exit 0.
   - a month-end date with a voucher on it;
   - more than one voucher on the end date;
   - a Stock Journal or a purchase on the end date;
-  - another book; TallyPrime 7.1;
-  - the sale's own quantity on the screen.
+  - another book; TallyPrime 7.1.
 
 **Confidence:** one sitting, PARTIAL until repeated.
 
 ## Files
 - `evidence/`:
   - every raw answer with its headers, curl's printed fields and its error stream;
-  - `send-log.txt`, `parsed-tables.txt`, `comparison.txt`, `daybook-20251015.txt`;
+  - `send-log.txt`, `parsed-tables.txt`, `comparison.txt`, `daybook-20251015.txt`, `stock-item-vouchers-1.txt` and `-2.txt`;
   - the two transcriptions, with the quantity column only: the rate and value are in the copies kept on the lab PC, by sha256 in `substitutions.txt`;
   - the step 0 and C10 checks.
 - `scripts/send.ps1` and `scripts/parse.py`.

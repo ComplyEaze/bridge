@@ -1,0 +1,5 @@
+Stock Item Vouchers, Lab Gadget, period 1-Oct-25 to 15-Oct-25, reading 2 (07:32:38Z, capture siv-2.png; pushed copy: quantity columns only). Date | particulars | voucher type | number | inwards qty | outwards qty | closing qty
+1-Oct-25 | Opening Balance | | | 22 Nos | | 22 Nos
+15-Oct-25 | Customer | Sales | 2 | | 5 Nos | 17 Nos
+Totals | | | | 22 Nos | 5 Nos | 17 Nos
+Agrees with reading 1.

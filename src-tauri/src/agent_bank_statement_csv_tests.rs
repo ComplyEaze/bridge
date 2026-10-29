@@ -126,6 +126,10 @@ fn broken() -> Vec<(&'static str, Vec<u8>, &'static str)> {
 }
 
 fn server(directory: &Path, import_enabled: bool) -> Server {
+    server_with_budget(directory, import_enabled, 200_000)
+}
+
+fn server_with_budget(directory: &Path, import_enabled: bool, max_bytes: usize) -> Server {
     Server::new(Settings {
         endpoint: TallyEndpointConfig {
             host: "127.0.0.1".to_string(),
@@ -133,7 +137,7 @@ fn server(directory: &Path, import_enabled: bool) -> Server {
         },
         data_dir: directory.join("agent"),
         max_rows: 500,
-        max_bytes: 200_000,
+        max_bytes,
         redaction: Redaction::None,
         import_enabled,
         posting: Posting::Off,
@@ -180,10 +184,12 @@ async fn each_refusal_category_is_its_own_typed_code() {
 
 #[test]
 fn the_categories_the_edge_reader_gives_are_exactly_the_variants_the_tool_maps() {
-    // The crate is the source of truth: each broken file goes through its
-    // reader, and the set of categories it gives must be the variant list, so
-    // a category added there without a variant here fails on the next fixture
-    // written for it, and a variant no file reaches fails here.
+    // Each broken file goes through the crate's own reader, and the set of
+    // categories it gives must be the variant list: a variant no file reaches,
+    // or one renamed away from the crate's spelling, fails here. The crate
+    // exports no list of its categories, so a category it adds later is not
+    // caught here; it is refused at run time as unmapped, which is proved by
+    // `a_category_the_tool_does_not_know_is_refused_as_unmapped_not_forwarded`.
     let mut reached = Vec::new();
     for (category, bytes, _) in broken() {
         let refusal = csv_edge::read_statement(&bytes).expect_err(category);
@@ -291,6 +297,48 @@ async fn controls_source_is_required_and_only_the_three_values_are_admitted() {
     );
 }
 
+/// The tool's own boundary, called directly: the catalogue's enum check would
+/// refuse these values before `from_args` runs, so a call through the tool
+/// cannot tell whether `ControlsSource::parse` admits only the three.
+#[test]
+fn controls_source_parse_admits_exactly_the_three_values_and_nothing_else() {
+    for wrong in [
+        "",
+        "prior",
+        "this",
+        "THIS_FILE",
+        " this_file",
+        "this_file ",
+        "this_file\n",
+        "bank_ledger",
+        "someone_said_so",
+    ] {
+        assert_eq!(ControlsSource::parse(wrong), None, "{wrong:?}");
+    }
+    let path = never_opened_csv();
+    for wrong in ["prior", "THIS_FILE", "someone_said_so"] {
+        let refused =
+            CsvRequest::from_args(&json!({"statement_path": path, "controls_source": wrong}))
+                .err()
+                .expect("a value outside the three is refused");
+        assert_eq!(refused, "argument_invalid:controls_source", "{wrong:?}");
+    }
+    for (text, source) in [
+        ("prior_statement", ControlsSource::PriorStatement),
+        ("bank_ledger_in_tally", ControlsSource::BankLedgerInTally),
+        ("this_file", ControlsSource::ThisFile),
+    ] {
+        let request =
+            CsvRequest::from_args(&json!({"statement_path": path, "controls_source": text}))
+                .expect("a valid value is admitted");
+        assert_eq!(request.controls_source, source);
+        assert_eq!(
+            source.independence_cause(),
+            (source == ControlsSource::ThisFile).then_some(THIS_FILE_CAUSE)
+        );
+    }
+}
+
 fn never_opened_csv() -> String {
     std::env::temp_dir()
         .join("bridge-never-opened-statement.csv")
@@ -305,7 +353,10 @@ async fn a_file_that_reads_is_refused_for_want_of_an_account_line_and_this_file_
     for (source, label) in [
         ("prior_statement", None),
         ("bank_ledger_in_tally", None),
-        ("this_file", Some("this_file: derived, not independent")),
+        (
+            "this_file",
+            Some("controls_this_file_derived_not_independent"),
+        ),
     ] {
         let response = call(
             directory.path(),
@@ -321,6 +372,26 @@ async fn a_file_that_reads_is_refused_for_want_of_an_account_line_and_this_file_
     }
     // Nothing was proposed or written.
     assert!(!directory.path().join("agent").exists());
+}
+
+/// Like every cause and next step, the cause is left out below the response
+/// budget that guidance needs, and the code stays.
+#[tokio::test]
+async fn a_small_response_budget_drops_the_cause_and_keeps_the_code() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = written(directory.path(), "statement.csv", &good());
+    let args = json!({"statement_path": path, "controls_source": "this_file"});
+    let small = server_with_budget(directory.path(), true, REMEDIATION_MIN_RESPONSE_BUDGET - 1)
+        .call_tool("parse_bank_statement_csv", args.clone())
+        .await;
+    assert_eq!(code_of(&small), Some(NO_ACCOUNT_NUMBER_LINE));
+    assert!(error_of(&small).get("cause").is_none(), "{small}");
+    assert!(error_of(&small).get("remediation").is_none(), "{small}");
+    let roomy = server_with_budget(directory.path(), true, REMEDIATION_MIN_RESPONSE_BUDGET)
+        .call_tool("parse_bank_statement_csv", args)
+        .await;
+    assert_eq!(code_of(&roomy), Some(NO_ACCOUNT_NUMBER_LINE));
+    assert_eq!(error_of(&roomy)["cause"].as_str(), Some(THIS_FILE_CAUSE));
 }
 
 #[tokio::test]

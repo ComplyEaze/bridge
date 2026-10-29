@@ -2732,7 +2732,7 @@ Takes `statement_path` (a local file, under the path rules of `parse_bank_statem
 refuses is refused with its category as the error code, `statement_<category>` and `:row_N` where a row is at fault; there
 are fifteen categories, each its own code. A file that reads is still refused, as `statement_no_account_number_line`:
 whether that export prints an account number is not established, so nothing binds a file to an account and nothing is
-proposed. With `controls_source` `this_file` the refusal's `cause` reads "this_file: derived, not independent": the
+proposed. With `controls_source` `this_file` the refusal's `cause` is `controls_this_file_derived_not_independent` and its next step says "derived, not independent": the
 file's first and last balance close any chain of its own, so a truncated export would pass. `controls_source` is
 checked before the file is opened and ComplyEaze Bridge cannot verify the claim. The tool writes no file and returns no
 row value. Part of #1320; the account line and the proposals follow once the export's account line is measured.

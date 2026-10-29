@@ -1088,17 +1088,20 @@ impl ControlsSource {
 
     /// Only the file's own first and last balance is not an independent
     /// control: a chain that starts and ends on them always agrees with itself,
-    /// so a truncated export would pass.
-    fn independence_label(self) -> Option<&'static str> {
-        (self == Self::ThisFile).then_some("this_file: derived, not independent")
+    /// so a truncated export would pass. The cause is a code, like every
+    /// `ToolFailure` cause, and is data-free.
+    fn independence_cause(self) -> Option<&'static str> {
+        (self == Self::ThisFile).then_some(THIS_FILE_CAUSE)
     }
 }
 
 macro_rules! csv_refusals {
     ($($variant:ident = $category:literal),+ $(,)?) => {
         /// The refusal categories of `csv_edge::read_statement`, one variant
-        /// each. A category outside this list is not forwarded: it is refused
-        /// as unmapped, so a new crate category cannot pass as a known one.
+        /// each. The crate exports no list of its categories, so nothing fails
+        /// to compile or test when it adds one: a category outside this list is
+        /// refused at run time as unmapped, never forwarded. The fixtures in
+        /// the tests catch a variant that is dead or renamed.
         #[derive(Clone, Copy, Debug, PartialEq, Eq)]
         pub(super) enum CsvRefusal { $($variant),+ }
 
@@ -1140,6 +1143,9 @@ csv_refusals! {
 /// account and nothing is proposed (#1320).
 pub(super) const NO_ACCOUNT_NUMBER_LINE: &str = "statement_no_account_number_line";
 const CSV_REFUSAL_UNMAPPED: &str = "statement_csv_refusal_unmapped";
+/// The cause of a refusal under `controls_source` `this_file`: the figures to
+/// check against are the file's own, derived, not independent.
+const THIS_FILE_CAUSE: &str = "controls_this_file_derived_not_independent";
 
 pub(super) fn input_schema_csv() -> Value {
     json!({
@@ -1152,7 +1158,7 @@ pub(super) fn input_schema_csv() -> Value {
     })
 }
 
-pub(super) const DESCRIPTION_CSV: &str = "Read a local CSV bank statement in the one layout measured, a private bank's net-banking export (UTF-8, LF line ends, every field double-quoted), and check its shape: the header line, the Sl. No. run, the dates, the amounts, the direction cells and the Closing Balance line, which must equal the last row's balance. Any other file is refused, never guessed: the error code is statement_<category>, with :row_N when a row is at fault (one of fifteen shape categories, such as layout_unknown or closing_balance_differs). controls_source (prior_statement, bank_ledger_in_tally or this_file) says where the figures to check against come from; this_file is derived, not independent, because a chain that starts and ends on the file's own balances always agrees, so a truncated export would pass. This tool proposes nothing yet: whether the export prints an account number is not established, so a file that reads is refused as statement_no_account_number_line (with this_file the refusal's cause reads 'derived, not independent'). No row value is returned.";
+pub(super) const DESCRIPTION_CSV: &str = "Read a local CSV bank statement in the one layout measured, a private bank's net-banking export (UTF-8, LF line ends, every field double-quoted), and check its shape: the header line, the Sl. No. run, the dates, the amounts, the direction cells and the Closing Balance line, which must equal the last row's balance. Any other file is refused, never guessed: the error code is statement_<category>, with :row_N when a row is at fault (one of fifteen shape categories, such as layout_unknown or closing_balance_differs). controls_source (prior_statement, bank_ledger_in_tally or this_file) says where the figures to check against come from; this_file is derived, not independent, because a chain that starts and ends on the file's own balances always agrees, so a truncated export would pass. This tool proposes nothing yet: whether the export prints an account number is not established, so a file that reads is refused as statement_no_account_number_line (with this_file the refusal's cause is controls_this_file_derived_not_independent). No row value is returned.";
 
 /// The admitted arguments of `parse_bank_statement_csv`.
 struct CsvRequest {
@@ -1190,7 +1196,7 @@ fn run_csv(request: &CsvRequest) -> ToolFailure {
     match csv_edge::read_statement(&bytes) {
         Err(refusal) => csv_failure(&refusal),
         Ok(_) => ToolFailure {
-            cause: request.controls_source.independence_label(),
+            cause: request.controls_source.independence_cause(),
             ..NO_ACCOUNT_NUMBER_LINE.to_string().into()
         },
     }

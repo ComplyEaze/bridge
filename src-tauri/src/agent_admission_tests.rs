@@ -1808,7 +1808,7 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// raised by 1,000 bytes once, for both.
 /// On 29 Oct 2026 `parse_bank_statement_csv` (#1320) added about 2,000 bytes to every
 /// list (its description, its two-field schema and its annotations). With it the lists
-/// measured 204,539, 230,042, 232,540 and 237,513 bytes, so each budget was raised to
+/// measured 204,552, 230,055, 232,553 and 237,526 bytes, so each budget was raised to
 /// that measure plus at least 500 bytes, rounded up to a thousand.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.

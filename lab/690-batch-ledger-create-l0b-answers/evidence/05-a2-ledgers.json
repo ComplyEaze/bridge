@@ -1,0 +1,108 @@
+{
+ "LEDGER": [
+  {
+   "name": "Cash",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001f",
+   "alterid": "32",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Cash-in-Hand"
+  },
+  {
+   "name": "L0b Batch 01",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000cf",
+   "alterid": "209",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Sundry Creditors"
+  },
+  {
+   "name": "L0b Batch 02",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d0",
+   "alterid": "210",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Sundry Creditors"
+  },
+  {
+   "name": "L0b Batch 03",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d1",
+   "alterid": "211",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Sundry Creditors"
+  },
+  {
+   "name": "L0b Batch 04",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d2",
+   "alterid": "212",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Sundry Creditors"
+  },
+  {
+   "name": "L0b Batch 05",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d3",
+   "alterid": "213",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Sundry Creditors"
+  },
+  {
+   "name": "L0b Batch 06",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d4",
+   "alterid": "214",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Sundry Creditors"
+  },
+  {
+   "name": "L0b Batch 07",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d5",
+   "alterid": "215",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Sundry Creditors"
+  },
+  {
+   "name": "L0b Batch 08",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d6",
+   "alterid": "216",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Sundry Creditors"
+  },
+  {
+   "name": "L0b Batch 09",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d7",
+   "alterid": "217",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Sundry Creditors"
+  },
+  {
+   "name": "L0b Batch 10",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d8",
+   "alterid": "218",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Sundry Creditors"
+  },
+  {
+   "name": "LBox Suspense",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000ce",
+   "alterid": "208",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Suspense A/c"
+  },
+  {
+   "name": "Profit & Loss A/c",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001e",
+   "alterid": "31",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  }
+ ]
+}

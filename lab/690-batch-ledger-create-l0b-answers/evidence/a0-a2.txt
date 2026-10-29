@@ -1,0 +1,4 @@
+ledgers: a0 3, a2 13; of a0 unchanged 3, another ALTERID [], missing []
+   new in a2: [('L0b Batch 01', 209), ('L0b Batch 02', 210), ('L0b Batch 03', 211), ('L0b Batch 04', 212), ('L0b Batch 05', 213), ('L0b Batch 06', 214), ('L0b Batch 07', 215), ('L0b Batch 08', 216), ('L0b Batch 09', 217), ('L0b Batch 10', 218)]
+groups: a0 28, a2 28; of a0 unchanged 28, another ALTERID [], missing []
+   new in a2: []

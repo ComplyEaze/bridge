@@ -1,0 +1,228 @@
+{
+ "GROUP": [
+  {
+   "name": "Bank Accounts",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000016",
+   "alterid": "23",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Current Assets"
+  },
+  {
+   "name": "Bank OD A/c",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000b",
+   "alterid": "12",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Loans (Liability)"
+  },
+  {
+   "name": "Branch / Divisions",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000007",
+   "alterid": "8",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Capital Account",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000001",
+   "alterid": "2",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Cash-in-Hand",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000015",
+   "alterid": "22",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Current Assets"
+  },
+  {
+   "name": "Current Assets",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000006",
+   "alterid": "7",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Current Liabilities",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000003",
+   "alterid": "4",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Deposits (Asset)",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000012",
+   "alterid": "19",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Current Assets"
+  },
+  {
+   "name": "Direct Expenses",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001a",
+   "alterid": "27",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Direct Incomes",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000019",
+   "alterid": "26",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Duties & Taxes",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000e",
+   "alterid": "15",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Current Liabilities"
+  },
+  {
+   "name": "Fixed Assets",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000004",
+   "alterid": "5",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Indirect Expenses",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001c",
+   "alterid": "29",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Indirect Incomes",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001b",
+   "alterid": "28",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Investments",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000005",
+   "alterid": "6",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Loans & Advances (Asset)",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000013",
+   "alterid": "20",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Current Assets"
+  },
+  {
+   "name": "Loans (Liability)",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000002",
+   "alterid": "3",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Misc. Expenses (ASSET)",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000008",
+   "alterid": "9",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Provisions",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000f",
+   "alterid": "16",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Current Liabilities"
+  },
+  {
+   "name": "Purchase Accounts",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000018",
+   "alterid": "25",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Reserves & Surplus",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000a",
+   "alterid": "11",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Capital Account"
+  },
+  {
+   "name": "Sales Accounts",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000017",
+   "alterid": "24",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Secured Loans",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000c",
+   "alterid": "13",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Loans (Liability)"
+  },
+  {
+   "name": "Stock-in-Hand",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000011",
+   "alterid": "18",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Current Assets"
+  },
+  {
+   "name": "Sundry Creditors",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000010",
+   "alterid": "17",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Current Liabilities"
+  },
+  {
+   "name": "Sundry Debtors",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000014",
+   "alterid": "21",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Current Assets"
+  },
+  {
+   "name": "Suspense A/c",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-00000009",
+   "alterid": "10",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  },
+  {
+   "name": "Unsecured Loans",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000d",
+   "alterid": "14",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Loans (Liability)"
+  }
+ ]
+}

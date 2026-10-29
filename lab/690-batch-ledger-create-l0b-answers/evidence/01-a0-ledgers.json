@@ -1,0 +1,28 @@
+{
+ "LEDGER": [
+  {
+   "name": "Cash",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001f",
+   "alterid": "32",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Cash-in-Hand"
+  },
+  {
+   "name": "LBox Suspense",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-000000ce",
+   "alterid": "208",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Suspense A/c"
+  },
+  {
+   "name": "Profit & Loss A/c",
+   "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001e",
+   "alterid": "31",
+   "altmstid": "",
+   "altvchid": "",
+   "parent": "Primary"
+  }
+ ]
+}

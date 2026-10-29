@@ -225,6 +225,9 @@ base revision.
 <a id="94j-each-gateway-master-write-moved-the-master-mark-by-one-to-the-written-ledgers-alterid"></a>
 
 [9.4j Each gateway master write moved the master mark by one, to the written ledger's `ALTERID`](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94j-each-gateway-master-write-moved-the-master-mark-by-one-to-the-written-ledgers-alterid)
+<a id="94k-three-ledger-creates-in-one-request-one-create-counted-for-each-the-mark-stepped-by-three-in-request-order"></a>
+
+[9.4k Three ledger `Create`s in one request: one create counted for each, the mark stepped by three, in request order](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94k-three-ledger-creates-in-one-request-one-create-counted-for-each-the-mark-stepped-by-three-in-request-order)
 <a id="95-identity-after-write"></a>
 
 [9.5 Identity after write](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#95-identity-after-write)

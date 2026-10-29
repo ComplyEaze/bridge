@@ -1,8 +1,6 @@
 # Row note for `lab/1713-settle-order` (the go-ahead record ORDER-ROWS.md asks for)
 
-Not for merge. This note names what `ORDER-ROWS.md` leaves to the run coordinator. The go-ahead is given only when
-every field below is filled; the two fields marked **RUN COORDINATOR** are not filled by this note, and until they
-are, no row runs.
+Not for merge. This note names what `ORDER-ROWS.md` leaves to the run coordinator, and is the go-ahead it asks for.
 
 ## The sheet
 
@@ -70,6 +68,16 @@ RESULTS says so.
 
 ## Recorded by the run coordinator
 
-- **RUN COORDINATOR:** the OK for this sheet's writes (one ledger per row) and for the download of the R0 build, with
-  its date and where it is recorded.
-- **RUN COORDINATOR:** the owner's word of 28 Oct 2026 for the optional restart row, as recorded.
+The owner's standing instructions, typed and kept word for word in the run coordinator's rules file, under "Owner
+instructions of 28 Oct 2026" and the owner's lines of 29 Oct 2026 that follow it. Quoted as typed.
+
+- **The writes** (one ledger per row, posting and ledger creation on, on a synthetic company), 28 Oct 2026 at about
+  10:30 IST: "lab pc can restart tally and experiment with rows that can freeze it has full authporization, no rule
+  like this anymore, that's why we're using it; it can turn posting on as well, I want the experience automated". The
+  same section records that the lab PC turns posting on (`BRIDGE_AGENT_ENABLE_WRITES` and
+  `BRIDGE_AGENT_ENABLE_MASTER_WRITES`) and answers the approval box itself, on synthetic companies; backups before
+  changes, recording, one request at a time and the evidence rules still bind.
+- **The download of the R0 build**, 29 Oct 2026 at about 10:40 IST: "yes lab can download masters ci bundles from now
+  on". R0's build is the `unsigned-bundle-smoke` artifact of a master run, so it is covered.
+- **The restart row**, the same words of 28 Oct 2026: "lab pc can restart tally and experiment with rows that can
+  freeze it has full authporization".

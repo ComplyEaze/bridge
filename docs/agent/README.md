@@ -2940,7 +2940,10 @@ cannot be indexed. `master_approval_declined`, `master_approval_unavailable` and
 `master_approval_timed_out` say the person declined the dialog, the dialog could
 not be shown, or the person did not answer in time; each says nothing was sent,
 and a declined or timed-out answer's `next_step` says that the next call with the
-same `batch_id` opens a new dialog. In an answer,
+same `batch_id` opens a new dialog. `master_review_too_large` from
+`post_ledger_creates` says the dialog's text was over its limit or, on Windows,
+where the dialog is measured against the screen as the post's is, that it did not
+fit the screen whole; nothing was sent. In an answer,
 `verification.verdict_written` is true when this call appended the verdict (an
 open verdict already on file in the same words is not appended again);
 `verification.verdict_record_error` is the code of why the verdict was not

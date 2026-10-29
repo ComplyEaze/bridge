@@ -1052,25 +1052,33 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     }
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
-    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
-    // no parent HWND is borrowed. No application state is exposed to callbacks.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // As for the post's box (`show_review`): topmost with
-            // MB_SYSTEMMODAL, with No as the default button (#1589, #1780).
-            // This box is not shown through `box_fit`, so it is not measured
-            // against the screen.
-            MB_YESNOCANCEL
-                | MB_DEFBUTTON2
-                | MB_ICONWARNING
-                | MB_SETFOREGROUND
-                | MB_TOPMOST
-                | MB_SYSTEMMODAL,
-        ) == IDYES
-    }
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832). Through `guarded` it is also
+    // brought to the front once it appears, as the post's box is: its first
+    // line tells the person to press Y or N, and in one lab run on Windows 10
+    // MB_SETFOREGROUND alone did not give it the keyboard when it opened
+    // seconds after the last input went to Tally (#1780).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and no parent HWND is borrowed.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
 }"#;
 
 const POST_DIALOG: &str = r#"#[cfg(not(windows))]
@@ -1854,6 +1862,9 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     )
     .await
     {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed, as for the post's box (#1832).
+        Ok(answer) if answer.box_did_not_fit => Err("master_review_too_large".into()),
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1. A clean exit without the
         // token is an executable that is not this dialog.
@@ -2077,6 +2088,11 @@ fn each_dialog_answers_only_on_its_positive_button() {
             "",
             1,
         ),
+        source.replacen(
+            "        Ok(answer) if answer.box_did_not_fit => Err(\"master_review_too_large\".into()),\n",
+            "",
+            1,
+        ),
         source.replacen("super::box_fit::guarded(|| {", "(|| {", 1),
         replace_last(&source, "super::box_fit::guarded(|| {", "(|| {"),
         source.replacen(
@@ -2159,7 +2175,7 @@ fn each_dialog_answers_only_on_its_positive_button() {
         ),
         source.replacen(
             MASTERS_DIALOG_WINDOWS,
-            &MASTERS_DIALOG_WINDOWS.replacen(") == IDYES", ") != IDNO", 1),
+            &MASTERS_DIALOG_WINDOWS.replacen("answer == IDYES", "answer != IDNO", 1),
             1,
         ),
         // The one-ledger dialog's title reads as the post's, or its count

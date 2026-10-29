@@ -1,0 +1,5 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+evidence/c10-netstat.txt: original 9498 B sha256 c75ae8dbfe7119e9989c340e51820d8ca32f32ca8e2de7e64cc285f27beb000b; only the port-9001 LISTENING lines kept
+evidence/s0-netstat.txt: original 9492 B sha256 6101541f871af160f2f7350889718f08040e2c3995ca6186e8fa2d5386d4cd0a; only the port-9001 LISTENING lines kept
+scripts/call.py: original 1207 B sha256 29504c3acb6ec0c69a4aa4628200b1a084dc559ae359ee5139691c002a91a4b5; 1 x -> <lab folder>
+scripts/step0.ps1: original 2346 B sha256 18757640d4ad2c2252e71fd9c15f6c5ab9fcc552c264804ac14b4222f1d4a537; 1 x -> <lab folder>; 1 x -> <capture helper>

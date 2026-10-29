@@ -1,0 +1,7 @@
+Build for #1709-settle (downloaded 2026-10-29 on the owner's yes in the lab's own chat: "Yes, download #2150's unsigned-bundle-smoke-windows-latest artifact from its CI run at head ed0f5fc5 and run #1709-settle."; the same OK was given to the run lead about 14:3x IST and passed on to the lab).
+PR #2150 head ed0f5fc599acaa8a21d166c4963c79f438843cdd (branch fix/1709-settle-not-created). Bridge CI run 40834023243 (completed, success).
+Artifact 12880706328 unsigned-bundle-smoke-windows-latest: zip 57,101,815 B, sha256 f14786e06470b78637d534b4b24d17986ae4ece3ca06498b12f65635a1138366 (equal to GitHub's digest).
+bridge-tally.mcpb 15,554,512 B sha256 1423584995fafa25c69467c5fe6e2912e5832194d58632a9d9da73e3999f38c3 (= mcpb-smoke.json archive_sha256).
+bin/x86_64-pc-windows-msvc/bridge_mcp.exe 32,607,744 B sha256 e95269fb9ab2d72676902891615d733e2cb13e12cc003b483afbc0c0110d9a58 (= binary_sha256).
+bin/x86_64-pc-windows-msvc/pdfium.dll sha256 79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118 (= pdfium_library_sha256).
+mcpb-smoke.json: server_version 0.6.1, default_tool_count 32, opt_in_tool_count 34. The whole bundle extracted to the build folder's mcpb\.

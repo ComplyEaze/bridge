@@ -1,0 +1,6 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC: whole-screen captures show other windows.
+c10-tally.png 72674 B ab36f3425c8c83b6a6dc21daa897a739f86b9b0a593b3adbaeeecf35a29b57cf
+s0-tally.png 46321 B 3b86f6557e4cb64ceaca736c9cf1d863fb507354c4833626a91e3fe6c40371af
+s1-1-journal-numbering-before.png 56074 B cd63543ac2e9b9579c9f275a46b2568a2249973129a4cb7b37256efa539a2f12
+s1-2-journal-numbering-after-no.png 56074 B cd63543ac2e9b9579c9f275a46b2568a2249973129a4cb7b37256efa539a2f12
+s1-2-numbering-change-prompt.png 57315 B 596a08d5817ac75918bbe3c57a16e66e645e156b0db3328192cdcec563d809ba

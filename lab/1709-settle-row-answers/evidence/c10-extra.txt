@@ -1,0 +1,5 @@
+exe end 32607744 e95269fb9ab2d72676902891615d733e2cb13e12cc003b483afbc0c0110d9a58
+bridge_mcp pid 30204 started 10/27/2026 11:17:29 from this row's build: False
+bridge_mcp pid 9064 started 10/27/2026 11:17:29 from this row's build: False
+bridge_mcp pid 21456 started 10/27/2026 11:17:33 from this row's build: False
+bridge_mcp pid 19088 started 10/27/2026 11:17:34 from this row's build: False

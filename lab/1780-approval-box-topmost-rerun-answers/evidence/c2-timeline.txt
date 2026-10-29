@@ -1,0 +1,18 @@
+T0 2026-10-29T04:18:27.745Z queued 005-c1-post_import.json
+T0+3 probe start 2026-10-29T04:18:30.739Z end 2026-10-29T04:18:31.479Z : 3,0,1,13992,TallyPrime:9001 | visible_titled_windows,13
+T0+8 probe start 2026-10-29T04:18:35.744Z end 2026-10-29T04:18:36.604Z : 3,0,1,25028,ComplyEaze Bridge — post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14
+T0+13 probe start 2026-10-29T04:18:40.751Z end 2026-10-29T04:18:41.476Z : 3,0,1,25028,ComplyEaze Bridge — post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14
+T0+13 shot 2026-10-29T04:18:41.503Z
+C2 2026-10-29T04:18:41.757Z box 8595832 rect 549,145,1003,741; text saved
+C3 point logical (263,475) = screen tool (249,450); distance from the box 286 px
+C3 click 2026-10-29T04:18:43.772Z at T0+16.05 s
+C+0 probe start 2026-10-29T04:18:43.781Z end 2026-10-29T04:18:44.556Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,25028,ComplyEaze Bridge — post this voucher? | visible_titled_windows,14
+C+0 shot 2026-10-29T04:18:44.684Z
+C+6 probe start 2026-10-29T04:18:49.776Z end 2026-10-29T04:18:50.507Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,25028,ComplyEaze Bridge — post this voucher? | visible_titled_windows,14
+C+6 shot 2026-10-29T04:18:50.598Z
+C+6 box line [4,0,0,25028,ComplyEaze Bridge — post this voucher?] Tally line [3,0,1,13992,TallyPrime:9001]
+C3b Down pressed once 2026-10-29T04:18:50.640Z
+C3b shot 2026-10-29T04:18:50.726Z
+C4 box not above Tally (box 4, Tally 3): nothing clicked; the taskbar step is needed
+C4 taskbar button of the box clicked once (screen tool (767,798) in its 1456 x 819 frame) by 2026-10-29T04:19:28.141Z
+C4 probe after the taskbar click start 2026-10-29T04:19:28.303Z end 2026-10-29T04:19:30.155Z : 3,0,0,13992,TallyPrime:9001 | visible_titled_windows,13

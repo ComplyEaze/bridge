@@ -2143,10 +2143,13 @@ fn outstandings_unanswered_remediation(reason: &str) -> Option<&'static str> {
     match reason {
         "request_deadline_exceeded" => Some(
             "Tally took longer to answer one request of its Bills Receivable or Payable report at \
-             this date than ComplyEaze Bridge waits, so no figures were returned. On a large book \
-             that report grows with the bills open at the date. Do not repeat the same call in a \
-             loop: tell the user, and say that an earlier `as_of` reads fewer open bills, which \
-             is their call.",
+             this date than ComplyEaze Bridge waits (20 seconds), so no figures were returned. On \
+             the one large book measured, that report's time grew with the bills open at the date: \
+             with about 15,000 open bills it answered, with about 22,500 it did not, and the same \
+             date was refused again when the call was repeated. Do not repeat the same call: tell \
+             the user. On that book an earlier `as_of`, with fewer bills open, answered; whether \
+             one does here depends on how many bills were open then, and choosing it is the \
+             user's call.",
         ),
         _ => None,
     }

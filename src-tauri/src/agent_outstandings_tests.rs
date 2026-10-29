@@ -1497,14 +1497,19 @@ fn a_bills_report_past_the_request_limit_is_not_retried_in_a_loop() {
     let error = refused("outstandings", "native_outstandings_read_failed");
     assert_eq!(error["code"], "native_outstandings_read_failed", "{error}");
     assert_eq!(error["cause"], "request_deadline_exceeded", "{error}");
-    let text = error["remediation"].as_str().expect("a next step");
-    assert!(
-        text.contains("Do not repeat the same call in a loop"),
-        "{text}"
-    );
-    assert!(
-        text.contains("an earlier `as_of` reads fewer open bills"),
-        "{text}"
+    // #2119: every clause is one the lab measured (lab/2119-bills-read-timing-answers):
+    // the open-bill counts either side of the limit, the repeat refused, an earlier date answered.
+    assert_eq!(
+        error["remediation"],
+        "Tally took longer to answer one request of its Bills Receivable or Payable report at \
+         this date than ComplyEaze Bridge waits (20 seconds), so no figures were returned. On \
+         the one large book measured, that report's time grew with the bills open at the date: \
+         with about 15,000 open bills it answered, with about 22,500 it did not, and the same \
+         date was refused again when the call was repeated. Do not repeat the same call: tell \
+         the user. On that book an earlier `as_of`, with fewer bills open, answered; whether \
+         one does here depends on how many bills were open then, and choosing it is the \
+         user's call.",
+        "{error}"
     );
     // Another tool's read past the same limit does not get the Bills report's step.
     let other = refused("trial_balance", "trial_balance_read_failed");

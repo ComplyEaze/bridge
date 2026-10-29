@@ -786,9 +786,9 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
             );
             assert!(
                 limit.contains(
-                    "fewer when the newest receipt lines do not fit in the log read's size bound"
+                    "fewer past a size bound; `omitted_for_size` counts those cut for the reply"
                 ),
-                "{name}: limit names the size bound: {limit:?}"
+                "{name}: limit names the size bound and the count: {limit:?}"
             );
         }
     }

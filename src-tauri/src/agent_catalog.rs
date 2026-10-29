@@ -672,7 +672,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                             "Use it when the user asks what ComplyEaze Bridge has done, or to show a reviewer which calls ran, on which company and when. ",
                             "Reading the log changes nothing in it; this call's own receipt lines are added after the read, like every call's."
                         ),
-                        json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"default":20,"description":"How many of the most recent receipt lines to return (each completed call writes two): default 20, at most 256 (or the configured row limit, BRIDGE_AGENT_MAX_ROWS, if lower, which can cap the default too), and fewer when the newest receipt lines do not fit in the log read's size bound."}}}),
+                        json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"default":20,"description":"How many of the most recent receipt lines to return (each completed call writes two): default 20, at most 256 (or the configured row limit, BRIDGE_AGENT_MAX_ROWS, if lower, which can cap the default too), and fewer past a size bound; `omitted_for_size` counts those cut for the reply."}}}),
                     ),
                     "gst_by_counter_ledger" => (
                         super::register::gst_by_ledger::DESCRIPTION,

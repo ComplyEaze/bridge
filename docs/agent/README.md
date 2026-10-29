@@ -4135,9 +4135,10 @@ The read of Tally's Bills Receivable and Payable reports comes before any party 
 large book it can be the step that fails: on one synthetic book of about 30,000 vouchers, at the
 end of its first year (31 March 2026), one of its requests was held past the 20-second limit and
 the whole call was refused as `native_outstandings_read_failed`, with no figure returned, while the
-same book three months into the year answered (#1356). A Bills report request cut at the limit has
-its own cause, `native_bills_report_deadline_exceeded` (#2119); another request of the read cut the
-same way keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to
+same book three months into the year answered (#1356). The two Bills report requests now have a
+60-second limit of their own; every other request keeps 20 seconds (#2119). A Bills report request
+cut at its limit has its own cause, `native_bills_report_deadline_exceeded`; another request of the
+read cut at its limit keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to
 repeat the call. Tally can go on building the report after the limit (a read sent straight after
 was refused for time too), so it also says to wait and let `tally_status` answer before the next
 read, and that an earlier `as_of` with fewer open bills answered on that book. Where the limit

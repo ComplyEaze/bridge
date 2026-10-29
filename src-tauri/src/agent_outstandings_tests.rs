@@ -1515,7 +1515,7 @@ fn the_bills_remediation_is_chosen_only_under_the_outstandings_code() {
 /// answered; 22,500 and 29,900 refused) and an earlier date answering; and a read sent straight
 /// after a cut refused for time as well (`lab/0.7.0-master-live-checks-answers`).
 const BILLS_REPORT_DEADLINE_STEP: &str = "Tally took longer to answer one request of its Bills \
-    Receivable or Payable report at this date than ComplyEaze Bridge waits (20 seconds), so no \
+    Receivable or Payable report at this date than ComplyEaze Bridge waits (60 seconds), so no \
     figures were returned. On the one large book measured, that report's time grew with the bills \
     open at the date: with about 15,000 open bills it answered, and with about 22,500 and about \
     29,900 it did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \
@@ -1598,10 +1598,12 @@ fn only_a_bills_report_post_cut_at_the_limit_gets_the_bills_step() {
 
 /// One `outstandings` call on the ageing book under a short request limit (and, when given, a
 /// tool cancellation), with the `held` request answered late: past that limit, or past the
-/// cancellation. Returns the response and how many requests Bridge sent.
+/// cancellation. The Bills report requests keep their own limit unless `bills_limit` gives one.
+/// Returns the response and how many requests Bridge sent.
 async fn ageing_outstandings_holding(
     held: impl FnOnce(AgeingBillsPosts) -> usize,
     limit: std::time::Duration,
+    bills_limit: Option<std::time::Duration>,
     cancel_when_held: bool,
 ) -> (Value, usize) {
     let (mut plans, posts) = ageing_plans(
@@ -1619,12 +1621,16 @@ async fn ageing_outstandings_holding(
     let simulator = tally_protocol_simulator::SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let mut server = ageing_server(simulator.address().port(), directory.path());
-    server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
+    let runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
         bridge_tally_transport::TransportPolicy {
             request_timeout: limit,
             ..Default::default()
         },
     );
+    server.runtime = match bills_limit {
+        Some(bills_limit) => runtime.with_bills_report_limit(bills_limit),
+        None => runtime,
+    };
     let cancellation = tokio_util::sync::CancellationToken::new();
     let call = crate::tally::runtime::TOOL_CANCELLATION.scope(
         cancellation.clone(),
@@ -1645,9 +1651,9 @@ async fn ageing_outstandings_holding(
     (response, sent)
 }
 
-/// A Bills Receivable or Payable post cut at the request limit is refused with the Bills report's
-/// own cause and next step, through the real read (#2119). A cut on the pair's second post keeps
-/// the first post's body in the refusal's evidence.
+/// A Bills Receivable or Payable post cut at its own request limit is refused with the Bills
+/// report's own cause and next step, through the real read (#2119). A cut on the pair's second
+/// post keeps the first post's body in the refusal's evidence.
 #[tokio::test]
 async fn a_bills_post_cut_at_the_limit_is_refused_with_its_own_cause() {
     let limit = std::time::Duration::from_millis(300);
@@ -1657,7 +1663,7 @@ async fn a_bills_post_cut_at_the_limit_is_refused_with_its_own_cause() {
         AgeingBillsPosts::receivable_second,
         AgeingBillsPosts::payable,
     ] {
-        let (response, _) = ageing_outstandings_holding(held, limit, false).await;
+        let (response, _) = ageing_outstandings_holding(held, limit, Some(limit), false).await;
         assert_eq!(response["isError"], true, "{response}");
         let error = &response["structuredContent"]["result"]["error"];
         assert_eq!(
@@ -1684,6 +1690,81 @@ async fn a_bills_post_cut_at_the_limit_is_refused_with_its_own_cause() {
     );
 }
 
+/// The Bills report posts have a longer limit than every other request (#2119): held past the
+/// ordinary limit, each of them is still answered and the read completes. The same hold on the
+/// groups post, the control below, is refused.
+#[tokio::test]
+async fn a_bills_post_held_past_the_ordinary_limit_is_answered() {
+    for held in [
+        AgeingBillsPosts::receivable as fn(AgeingBillsPosts) -> usize,
+        AgeingBillsPosts::receivable_second,
+        AgeingBillsPosts::payable,
+    ] {
+        let (response, _) = ageing_outstandings_holding(
+            held,
+            std::time::Duration::from_millis(300),
+            None,
+            false,
+        )
+        .await;
+        assert_eq!(response["isError"], false, "{response}");
+        assert!(
+            response["structuredContent"]["result"]["error"].is_null(),
+            "{response}"
+        );
+    }
+}
+
+/// A Bills report post waits for the wire lock on the call's one shared budget (#697, #2119), as
+/// every other send does: with nothing left of it, a busy lock on the Receivable post is refused
+/// at once instead of waited out on a budget of the post's own.
+#[tokio::test]
+async fn a_bills_post_waits_for_the_wire_on_the_calls_shared_budget() {
+    let wait = std::time::Duration::from_secs(2);
+    let (plans, posts) = ageing_plans(
+        None,
+        ageing_ledgers_with_currency("Ageing Customer A"),
+        &json!({}),
+    );
+    let busy = posts.receivable();
+    let simulator = tally_protocol_simulator::SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = ageing_server(simulator.address().port(), directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .busy_at_send(busy, wait),
+    );
+    let started = std::time::Instant::now();
+    let response = crate::tally::runtime::with_operation_wire_budget_of(
+        std::time::Duration::ZERO,
+        server.call_tool("outstandings", ageing_arguments(&json!({}))),
+    )
+    .await;
+    let took = started.elapsed();
+    let sent = simulator.received();
+    simulator.cancel();
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "tally_endpoint_busy",
+        "{response}"
+    );
+    assert_eq!(sent, busy, "the Receivable post was not sent: {response}");
+    assert!(took < wait, "the post waited a budget of its own: {took:?}");
+}
+
+/// The Bills report's limit, as its next step states it, is the one its transport keeps.
+#[test]
+fn the_bills_step_states_the_bills_report_limit() {
+    let seconds = crate::tally::connection::BILLS_REPORT_REQUEST_TIMEOUT.as_secs();
+    assert_eq!(seconds, 60);
+    assert!(
+        BILLS_REPORT_DEADLINE_STEP.contains(&format!("({seconds} seconds)")),
+        "{BILLS_REPORT_DEADLINE_STEP}"
+    );
+}
+
 /// Control: the groups report, read between the two Bills reports and cut at the same limit, keeps
 /// the transport's reason and gets no Bills step.
 #[tokio::test]
@@ -1691,6 +1772,7 @@ async fn a_groups_post_cut_at_the_limit_does_not_blame_the_bills_report() {
     let (response, _) = ageing_outstandings_holding(
         AgeingBillsPosts::groups,
         std::time::Duration::from_millis(300),
+        None,
         false,
     )
     .await;
@@ -1717,6 +1799,7 @@ async fn a_withdrawn_call_sends_nothing_after_the_bills_post_in_flight() {
     let (response, sent) = ageing_outstandings_holding(
         AgeingBillsPosts::receivable,
         bridge_tally_transport::DEFAULT_REQUEST_TIMEOUT,
+        None,
         true,
     )
     .await;

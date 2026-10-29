@@ -1947,3 +1947,51 @@ fn a_details_read_is_partitioned_by_its_own_ledger_bound() {
         assert!(part.ledger_count() <= with.max_ledgers_per_part);
     }
 }
+
+/// A Bills report answer shorter than the length it declares is refused as `ResponseTruncated`
+/// at once (#2119): under the Bills report's longer limit, a short answer is neither waited out
+/// to that limit nor read in part, and the pair's second post is never sent.
+#[tokio::test]
+async fn a_bills_report_body_shorter_than_its_declared_length_is_truncated() {
+    use bridge_tally_protocol::native_outstandings::{
+        render_native_bills_request, NativeBillsReportKind,
+    };
+    use bridge_tally_transport::{TallyTransportError, DEFAULT_REQUEST_TIMEOUT};
+    use tally_protocol_simulator::{
+        Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+
+    let plan = ScenarioPlan::new(Fixture::ExportStatusOne).with_encoding(WireEncoding::Utf16Le);
+    let whole = plan.response_bytes().len();
+    let simulator = SequenceSimulator::spawn(vec![plan.with_framing(
+        ResponseFraming::DeclaredContentLength { bytes: whole + 17 },
+    )])
+    .unwrap();
+    let client = super::TallyClient::new(super::TallyConfig {
+        host: "127.0.0.1".into(),
+        port: simulator.address().port(),
+    })
+    .unwrap();
+    let request = render_native_bills_request(
+        NativeBillsReportKind::Receivable,
+        "Bridge Billwise Lab",
+        &TallyDate::parse("20250401").unwrap(),
+        &TallyDate::parse("20260331").unwrap(),
+    );
+    let started = std::time::Instant::now();
+    let error = match client.fetch_native_bills_report_paired(&request).await {
+        Ok(_) => panic!("a truncated Bills answer must be refused"),
+        Err(error) => error,
+    };
+    let post = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<super::PairedNativeReportResponseFailure>())
+        .expect("the Bills post's own failure");
+    assert_eq!(
+        post.transport_error(),
+        Some(&TallyTransportError::ResponseTruncated),
+        "{error:?}"
+    );
+    assert!(started.elapsed() < DEFAULT_REQUEST_TIMEOUT);
+    assert_eq!(simulator.finish().unwrap().len(), 1);
+}

@@ -52,6 +52,16 @@ addressable window exceeds the per-request budget. This is not a tuning problem.
 **Do not raise the deadline in response.** A longer deadline walks into the 32 MiB cap and
 I4's invisible truncation — trading a loud, correct failure for a silent wrong answer.
 
+**Deviation, 29 October 2026 (owner-accepted, #2119).** The two requests of Tally's native Bills
+Receivable and Bills Payable reports have a 60-second limit; every other request keeps 20 seconds.
+The ruling's premise does not carry to them: one of these answers costs about 457 bytes a bill
+against about 20,650 a voucher row here, so the 32 MiB cap binds before 60 seconds only above
+about 768 bytes a bill, and Bridge never parses a partial body (an over-cap answer is
+`ResponseTooLarge`, a short one `ResponseTruncated`). A date split cannot bound them: Tally
+ignored `SVFROMDATE` in these reports when it was measured (#2119). Only a `NativeBillsRequest`, which only the Bills
+renderer makes, reaches the transport with the longer limit. I4 still holds: a truncation Tally
+declares whole is caught only when the pair's two answers differ.
+
 ---
 
 ## Required work

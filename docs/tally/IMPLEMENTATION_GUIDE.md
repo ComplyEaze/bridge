@@ -207,6 +207,10 @@ addressable window exceeds the budget.
 **Do not respond to this by raising the deadline.** A longer deadline walks into the 32 MiB
 cap and I4's invisible truncation, which is a silently-wrong result rather than a loud one.
 
+(Deviation, 29 October 2026, owner-accepted under ruling 2, #2119: the native Bills Receivable and
+Bills Payable report requests alone have a 60-second limit, enforced by their own request type;
+`UNIT_A_RULING_2.md` records why. Every other request keeps 20 seconds.)
+
 **The escape hatch is `AlterID` range segmentation**, which §10.1 already verifies works
 server-side: `$AlterID > N AND $AlterID <= M` partitions a book at arbitrary granularity,
 independent of the calendar, and has no floor.

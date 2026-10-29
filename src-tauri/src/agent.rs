@@ -2253,8 +2253,9 @@ const TRIAL_BALANCE_READ_FAILED_REMEDIATION: &str = "No Trial Balance figures we
 /// read the Bills report, and the text below would be wrong for them. A refusal is whole:
 /// leaving one bill out would change the totals, so nothing is returned.
 ///
-/// A Bills report request cut at the 20-second limit (#1356, #2119) has its own cause, so this step
-/// is never given for another request of the read cut the same way. Measured on one dense synthetic
+/// A Bills report request cut at its own 60-second limit (#1356, #2119; every other request keeps
+/// 20 seconds) has its own cause, so this step is never given for another request of the read cut
+/// at its limit. Measured on one dense synthetic
 /// book at year-end dates (`lab/2119-bills-read-timing-answers`): the report's time grew with the
 /// bills open at the date. On that book a read sent straight after a cut was refused for time too,
 /// since Tally goes on building an answer after the request is given up
@@ -2263,7 +2264,7 @@ fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
     match cause {
         crate::tally::runtime::BillsReportDeadlineExceeded::SAFE_CODE => Some(
             "Tally took longer to answer one request of its Bills Receivable or Payable report at \
-             this date than ComplyEaze Bridge waits (20 seconds), so no figures were returned. On \
+             this date than ComplyEaze Bridge waits (60 seconds), so no figures were returned. On \
              the one large book measured, that report's time grew with the bills open at the date: \
              with about 15,000 open bills it answered, and with about 22,500 and about 29,900 it \
              did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \

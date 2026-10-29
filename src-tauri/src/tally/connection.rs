@@ -41,7 +41,7 @@ use bridge_tally_protocol::{
         render_party_ledger_master_request_for_parents_with_mailing_details,
         render_party_ledger_master_request_with_gst_details,
         render_party_ledger_master_request_with_mailing_details, BaseCurrencyName,
-        ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
+        ForeignCurrencyLedger, LedgerSnapshotEntry, NativeBillsRequest, NativeLedgerExportPeriod,
         NativeLedgerSnapshotPeriod, NativeOutstandingsError,
     },
     outstandings_shared::{
@@ -1126,9 +1126,119 @@ impl GatewayProductModeEvidence {
     }
 }
 
+/// The transport of Tally's Bills Receivable and Bills Payable report requests, and of nothing
+/// else (#2119). It is the only transport given a longer per-request limit than the default, and
+/// its only send takes a [`NativeBillsRequest`], which only the protocol crate's Bills renderer
+/// makes; the transport it wraps cannot be reached from outside this module.
+mod bills_report {
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use bridge_tally_protocol::native_outstandings::NativeBillsRequest;
+    use bridge_tally_transport::{
+        SendAdmission, SendObserver, TallyDecodedHttpResponse, TallyEndpointConfig,
+        TallyHttpTransport, TallyTransportError, TallyWireGate, TransportPolicy, WireRetryPolicy,
+        WireWaitBudget,
+    };
+
+    /// How long one Bills report request may take; every other request keeps the transport's
+    /// 20-second default. Accepted on 29 Oct 2026 as a recorded exception to ruling 2
+    /// (`docs/tally/UNIT_A_RULING_2.md`), for these two requests only.
+    ///
+    /// What it covers: the one large book measured answered its Bills Receivable report in full
+    /// at about 29,900 open bills, about 13.7 MB on the wire (about 457.5 bytes a bill), inside
+    /// this limit. The 32 MiB response cap binds before this limit only above about 768 bytes a
+    /// bill; an answer over the cap is refused as `ResponseTooLarge`, never read in part. A
+    /// response shorter than its declared length is refused as `ResponseTruncated`. A shorter
+    /// answer that Tally itself declares whole (implementation guide §2.6, I4) is caught only
+    /// when the pair's two answers differ.
+    pub(crate) const BILLS_REPORT_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+
+    #[derive(Clone)]
+    pub(super) struct BillsReportTransport(TallyHttpTransport);
+
+    impl BillsReportTransport {
+        /// Built beside the client's ordinary transport, on the same wire gate, retry bound
+        /// and send observer, so a Bills request takes the same wire lock as any other.
+        pub(super) fn new(
+            config: TallyEndpointConfig,
+            gate: Arc<dyn TallyWireGate>,
+            retry: WireRetryPolicy,
+            observer: Arc<dyn SendObserver>,
+        ) -> Result<Self, TallyTransportError> {
+            Self::with_limit(config, gate, retry, observer, BILLS_REPORT_REQUEST_TIMEOUT)
+        }
+
+        /// Test seam: a shorter Bills limit, so a test can cut a Bills request without
+        /// waiting the production limit.
+        #[cfg(test)]
+        pub(super) fn with_test_limit(
+            config: TallyEndpointConfig,
+            gate: Arc<dyn TallyWireGate>,
+            retry: WireRetryPolicy,
+            observer: Arc<dyn SendObserver>,
+            limit: Duration,
+        ) -> Result<Self, TallyTransportError> {
+            Self::with_limit(config, gate, retry, observer, limit)
+        }
+
+        fn with_limit(
+            config: TallyEndpointConfig,
+            gate: Arc<dyn TallyWireGate>,
+            retry: WireRetryPolicy,
+            observer: Arc<dyn SendObserver>,
+            limit: Duration,
+        ) -> Result<Self, TallyTransportError> {
+            let policy = TransportPolicy {
+                request_timeout: limit,
+                ..TransportPolicy::default()
+            };
+            Ok(Self(
+                TallyHttpTransport::with_policy(config, policy)?
+                    .with_wire_gate(gate, retry)
+                    .with_send_observer(observer),
+            ))
+        }
+
+        pub(super) fn for_operation(&self, budget: WireWaitBudget) -> Self {
+            Self(self.0.for_operation(budget))
+        }
+
+        pub(super) fn with_send_admission(&self, admission: Arc<dyn SendAdmission>) -> Self {
+            Self(self.0.with_send_admission(admission))
+        }
+
+        pub(super) async fn post(
+            &self,
+            request: &NativeBillsRequest,
+        ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
+            self.0.post_xml_decoded(request.as_str().to_owned()).await
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) use bills_report::BILLS_REPORT_REQUEST_TIMEOUT;
+
+/// One request of a paired native report read, by the transport that sends it.
+enum PairedNativeReportRequest<'a> {
+    Ordinary(String),
+    BillsReport(&'a NativeBillsRequest),
+}
+
+impl PairedNativeReportRequest<'_> {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Ordinary(xml) => xml,
+            Self::BillsReport(request) => request.as_str(),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct TallyClient {
     http: TallyHttpTransport,
+    bills_report: bills_report::BillsReportTransport,
     observed_encoding: Arc<AtomicU8>,
 }
 
@@ -1149,11 +1259,16 @@ impl TallyClient {
 
     /// As [`Self::new`], gating every send on `wire`'s root and retry bound.
     pub(crate) fn with_wire(config: TallyConfig, wire: &WireGateConfig) -> anyhow::Result<Self> {
+        let gate = wire.gate_for(&config);
+        let observer = crate::request_trail::observer();
         let http = TallyHttpTransport::new(config.clone())?
-            .with_wire_gate(wire.gate_for(&config), wire.retry())
-            .with_send_observer(crate::request_trail::observer());
+            .with_wire_gate(Arc::clone(&gate), wire.retry())
+            .with_send_observer(Arc::clone(&observer));
+        let bills_report =
+            bills_report::BillsReportTransport::new(config, gate, wire.retry(), observer)?;
         Ok(Self {
             http,
+            bills_report,
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         })
     }
@@ -1163,9 +1278,15 @@ impl TallyClient {
     /// waits at most that long however many sends it makes. The observation
     /// counters stay shared, as for any clone.
     pub(crate) fn for_operation(&self, budget: bridge_tally_transport::WireWaitBudget) -> Self {
+        let Self {
+            http,
+            bills_report,
+            observed_encoding,
+        } = self;
         Self {
-            http: self.http.for_operation(budget),
-            ..self.clone()
+            http: http.for_operation(budget.clone()),
+            bills_report: bills_report.for_operation(budget),
+            observed_encoding: Arc::clone(observed_encoding),
         }
     }
 
@@ -1179,41 +1300,68 @@ impl TallyClient {
                 !self.0.is_cancelled()
             }
         }
+        let Self {
+            http,
+            bills_report,
+            observed_encoding,
+        } = self;
+        let admission: Arc<dyn bridge_tally_transport::SendAdmission> =
+            Arc::new(NotWithdrawn(token));
         Self {
-            http: self.http.with_send_admission(Arc::new(NotWithdrawn(token))),
-            ..self.clone()
+            http: http.with_send_admission(Arc::clone(&admission)),
+            bills_report: bills_report.with_send_admission(admission),
+            observed_encoding: Arc::clone(observed_encoding),
         }
     }
 
     #[cfg(test)]
     fn with_http_builder(config: TallyConfig, builder: reqwest::ClientBuilder) -> Self {
         let wire = WireGateConfig::default();
+        let gate = wire.gate_for(&config);
+        let observer = crate::request_trail::observer();
         let http = TallyHttpTransport::with_builder(
             config.clone(),
             bridge_tally_transport::TransportPolicy::default(),
             builder,
         )
         .expect("build synthetic Tally HTTP transport")
-        .with_wire_gate(wire.gate_for(&config), wire.retry())
-        .with_send_observer(crate::request_trail::observer());
+        .with_wire_gate(Arc::clone(&gate), wire.retry())
+        .with_send_observer(Arc::clone(&observer));
+        let bills_report =
+            bills_report::BillsReportTransport::new(config, gate, wire.retry(), observer)
+                .expect("build synthetic Tally Bills report transport");
         Self {
             http,
+            bills_report,
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         }
     }
 
+    /// Test seam: `policy` for every request but the Bills report's, which
+    /// keeps `bills_report_limit`.
     #[cfg(test)]
     pub(crate) fn with_transport_policy(
         config: TallyConfig,
         policy: bridge_tally_transport::TransportPolicy,
+        bills_report_limit: std::time::Duration,
         wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
+        let gate = wire.gate_for(&config);
+        let observer = crate::request_trail::observer();
         let http =
             TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?
-                .with_wire_gate(wire.gate_for(&config), wire.retry())
-                .with_send_observer(crate::request_trail::observer());
+                .with_wire_gate(Arc::clone(&gate), wire.retry())
+                .with_send_observer(Arc::clone(&observer));
+        let bills_report = bills_report::BillsReportTransport::with_test_limit(
+            config,
+            gate,
+            wire.retry(),
+            observer,
+            bills_report_limit,
+        )?;
         Ok(Self {
             http,
+            bills_report,
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         })
     }
@@ -1638,10 +1786,32 @@ impl TallyClient {
         xml: String,
     ) -> anyhow::Result<(String, usize, String)> {
         let response = self.http.post_xml_decoded(xml).await?;
+        Ok(self.with_encoded_bytes(response))
+    }
+
+    async fn post_paired_request(
+        &self,
+        request: &PairedNativeReportRequest<'_>,
+    ) -> anyhow::Result<(String, usize, String)> {
+        match request {
+            PairedNativeReportRequest::Ordinary(xml) => {
+                self.post_xml_with_encoded_bytes(xml.clone()).await
+            }
+            PairedNativeReportRequest::BillsReport(request) => {
+                let response = self.bills_report.post(request).await?;
+                Ok(self.with_encoded_bytes(response))
+            }
+        }
+    }
+
+    fn with_encoded_bytes(
+        &self,
+        response: bridge_tally_transport::TallyDecodedHttpResponse,
+    ) -> (String, usize, String) {
         let encoded_bytes = response.encoded_bytes();
         let encoded_sha256 = response.encoded_sha256().to_string();
         self.record_observed_encoding(response.encoding());
-        Ok((response.into_text(), encoded_bytes, encoded_sha256))
+        (response.into_text(), encoded_bytes, encoded_sha256)
     }
 
     /// Discovers companies through Tally's documented `Company` collection
@@ -2430,10 +2600,29 @@ impl TallyClient {
         &self,
         request_xml: String,
     ) -> anyhow::Result<NativePairedRead> {
-        match self
-            .fetch_native_report_paired_with_evidence(request_xml)
-            .await
-        {
+        Self::native_paired_read(
+            self.fetch_paired(PairedNativeReportRequest::Ordinary(request_xml))
+                .await,
+        )
+    }
+
+    /// [`Self::fetch_native_report_paired`] for Tally's Bills Receivable or
+    /// Payable report: both posts go through the Bills report transport and its
+    /// longer limit (#2119); the health checks keep the default.
+    pub(crate) async fn fetch_native_bills_report_paired(
+        &self,
+        request: &NativeBillsRequest,
+    ) -> anyhow::Result<NativePairedRead> {
+        Self::native_paired_read(
+            self.fetch_paired(PairedNativeReportRequest::BillsReport(request))
+                .await,
+        )
+    }
+
+    fn native_paired_read(
+        read: anyhow::Result<(String, usize, String)>,
+    ) -> anyhow::Result<NativePairedRead> {
+        match read {
             Ok((body, encoded_bytes, encoded_sha256)) => Ok(NativePairedRead::Stable {
                 body,
                 encoded_bytes,
@@ -2458,28 +2647,34 @@ impl TallyClient {
         &self,
         request_xml: String,
     ) -> anyhow::Result<(String, usize, String)> {
+        self.fetch_paired(PairedNativeReportRequest::Ordinary(request_xml))
+            .await
+    }
+
+    async fn fetch_paired(
+        &self,
+        request: PairedNativeReportRequest<'_>,
+    ) -> anyhow::Result<(String, usize, String)> {
         let (first, first_bytes, first_sha256) = self
-            .post_xml_with_encoded_bytes(request_xml.clone())
+            .post_paired_request(&request)
             .await
             .map_err(|error| anyhow::Error::new(PairedNativeReportResponseFailure::new(error)))?;
         let mut evidence =
-            RuntimeReadEvidence::single(&request_xml, first_sha256.clone(), first_bytes);
+            RuntimeReadEvidence::single(request.as_str(), first_sha256.clone(), first_bytes);
         let result = async {
             self.http
                 .get_status_decoded()
                 .await
                 .context("Tally health check between paired native report reads failed")?;
-            let (second, second_bytes, second_sha256) = self
-                .post_xml_with_encoded_bytes(request_xml.clone())
-                .await
-                .map_err(|error| {
+            let (second, second_bytes, second_sha256) =
+                self.post_paired_request(&request).await.map_err(|error| {
                     anyhow::Error::new(PairedNativeReportResponseFailure::new(error))
                 })?;
             if first_bytes == second_bytes && first_sha256 == second_sha256 {
                 evidence.bytes = evidence.bytes.saturating_add(second_bytes);
             } else {
                 evidence = evidence.clone().combine(RuntimeReadEvidence::single(
-                    &request_xml,
+                    request.as_str(),
                     second_sha256.clone(),
                     second_bytes,
                 ));

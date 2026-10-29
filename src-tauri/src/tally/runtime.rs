@@ -2472,12 +2472,13 @@ impl TallySession {
         endpoint: EndpointKey,
         config: TallyConfig,
         policy: bridge_tally_transport::TransportPolicy,
+        bills_report_limit: std::time::Duration,
         wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             session_id: uuid::Uuid::new_v4().to_string(),
             endpoint,
-            client: TallyClient::with_transport_policy(config, policy, wire)?,
+            client: TallyClient::with_transport_policy(config, policy, bills_report_limit, wire)?,
             sequence: AtomicU64::new(0),
             active_requests: Mutex::new(HashMap::new()),
             health: Mutex::new(SessionHealth::default()),
@@ -2643,6 +2644,8 @@ pub struct TallyRuntime {
     terms: Option<Arc<crate::desktop_terms::DesktopTerms>>,
     #[cfg(test)]
     transport_policy: Option<bridge_tally_transport::TransportPolicy>,
+    #[cfg(test)]
+    bills_report_limit: Option<std::time::Duration>,
 }
 
 /// Opaque, owner-bound authority over one fresh reviewed probe.
@@ -2771,6 +2774,8 @@ impl TallyRuntime {
             terms: None,
             #[cfg(test)]
             transport_policy: None,
+            #[cfg(test)]
+            bills_report_limit: None,
         }
     }
 
@@ -2789,6 +2794,14 @@ impl TallyRuntime {
             transport_policy: Some(policy),
             ..Self::default()
         }
+    }
+
+    /// Test only: give the Bills report requests `limit` in place of their
+    /// production limit, so a test can cut one without waiting that long.
+    #[cfg(test)]
+    pub(crate) fn with_bills_report_limit(mut self, limit: std::time::Duration) -> Self {
+        self.bills_report_limit = Some(limit);
+        self
     }
 
     /// Share `wire`'s root (another runtime's, or a test's), or shorten its
@@ -2838,11 +2851,16 @@ impl TallyRuntime {
             }
         }
         #[cfg(test)]
-        let session = Arc::new(match self.transport_policy {
-            Some(policy) => {
-                TallySession::with_transport_policy(endpoint.clone(), config, policy, &self.wire)?
-            }
-            None => TallySession::new(endpoint.clone(), config, &self.wire)?,
+        let session = Arc::new(match (self.transport_policy, self.bills_report_limit) {
+            (None, None) => TallySession::new(endpoint.clone(), config, &self.wire)?,
+            (policy, bills_report_limit) => TallySession::with_transport_policy(
+                endpoint.clone(),
+                config,
+                policy.unwrap_or_default(),
+                bills_report_limit
+                    .unwrap_or(crate::tally::connection::BILLS_REPORT_REQUEST_TIMEOUT),
+                &self.wire,
+            )?,
         });
         #[cfg(not(test))]
         let session = Arc::new(TallySession::new(endpoint.clone(), config, &self.wire)?);
@@ -4396,7 +4414,7 @@ impl TallyRuntime {
                         |kind| render_native_bills_request(kind, company, &books_from, &as_of);
                     let receivable_request = read(NativeBillsReportKind::Receivable);
                     let receivable = client
-                        .fetch_native_report_paired(receivable_request.as_str().to_owned())
+                        .fetch_native_bills_report_paired(&receivable_request)
                         .await
                         .map_err(mark_bills_report_deadline)?;
                     let (receivable_body, encoded_bytes, encoded_sha256) = match receivable {
@@ -4451,7 +4469,7 @@ impl TallyRuntime {
 
                     let payable_request = read(NativeBillsReportKind::Payable);
                     let payable = client
-                        .fetch_native_report_paired(payable_request.as_str().to_owned())
+                        .fetch_native_bills_report_paired(&payable_request)
                         .await
                         .map_err(mark_bills_report_deadline)?;
                     let (payable_body, encoded_bytes, encoded_sha256) = match payable {

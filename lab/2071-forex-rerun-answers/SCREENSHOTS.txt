@@ -1,0 +1,12 @@
+Captures and files kept on the lab PC (never pushed): name, bytes, sha256.
+  k1-before-accept.png 27419 fe04482169a3af1119769cb01244313068d26665b9bf746076d90ad612bca608
+  k2-before-accept.png 28058 b5ce61ba31eb7a6eac9c3ba7c2603222af7d80d7236260ec78a6a516a6555d78
+  k3-before-accept.png 31757 bf41dd8fd07e1bee9ae49df46a2d3ee29c710864e3a360960d85b7bc06b62c74
+  k4-before-accept.png 27869 f98b024533cb2c765adbc5ade24b9fbfdb5e31ef73a995adc982ed6c866d1fd7
+  s1-about.png 76998 00550f5e88ec910cbb261b3d61cc526effc1bc978859553ca06c6c27ceb1eca9
+  s1-gateway-no-vouchers.png 45683 98cdb1576932e26200d92a65b83bb547db4368cc67c103c340c8f1625b4834e4
+  s5-currency-list.png 23423 2a3d3e12dd49089e4dceffc091f157c3fa7fc9f818787a7362411a49eded5e08
+  s6-party-ledger-april-2025.png 35379 a9bedca7ff70d679fc95215d940135c1c97f90e06a027394d1c7beb9947b2be3
+  s7-no-company.png 72674 ab36f3425c8c83b6a6dc21daa897a739f86b9b0a593b3adbaeeecf35a29b57cf
+  s1-netstat-full.txt 9592 87a49f553cde6836f6ec8ca4403990d0b0b494afa2f1b0eb81d172d8e7bcb149
+  s7-netstat-full.txt 8739 1c478ff47efad8d27d513d02e8f1df59b006e8f203e21918b99cb1514c91ddab

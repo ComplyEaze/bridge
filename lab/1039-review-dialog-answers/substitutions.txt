@@ -1,0 +1,9 @@
+Pushed copies that differ from the files kept on the lab PC: each change, with the original's bytes and sha256.
+checks/c10-getnettcp.txt: original 189 B sha256 25563831ed087ba871cea6122027afe8b8383766d225e228e1da18ba7b9256a4; 1 x -> (line endings / BOM)
+checks/c10-status.txt: original 33 B sha256 e583b996e74cecf6cc477a3ad3b4ed79423890aaa8279216902c3dd5875a3f45; 1 x -> (line endings / BOM)
+checks/c10-tasklist.txt: original 59 B sha256 ba14ddd288ad0119ec31642dec82a0deebcde36be0b9800f660e205fb8e5588f; 1 x -> (line endings / BOM)
+checks/s0-getnettcp.txt: original 189 B sha256 25563831ed087ba871cea6122027afe8b8383766d225e228e1da18ba7b9256a4; 1 x -> (line endings / BOM)
+checks/listing-data-before.txt: original 2246 B sha256 08dc591330ecf3ba16645766cba066e0191236c92ae0efc972ab33879f74167e; 1 x -> (line endings / BOM)
+checks/listing-r1-data.txt: original 2246 B sha256 08dc591330ecf3ba16645766cba066e0191236c92ae0efc972ab33879f74167e; 1 x -> (line endings / BOM)
+checks/s0-status.txt: original 33 B sha256 e583b996e74cecf6cc477a3ad3b4ed79423890aaa8279216902c3dd5875a3f45; 1 x -> (line endings / BOM)
+checks/s0-tasklist.txt: original 59 B sha256 5a5e3f1b3a7ed1f6bc417e564eee9f4768d80497f01b6d7ae204c1d07a7764b0; 1 x -> (line endings / BOM)

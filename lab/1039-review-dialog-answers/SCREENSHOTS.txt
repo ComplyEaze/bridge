@@ -1,0 +1,10 @@
+Captures and files kept on the lab PC (never pushed): name, bytes, sha256.
+  c10-gateway-before-shut.png 44203 c3167a8655965ebbfe909aa9d4274b1d3e16301ab953d021f611594b1087059f
+  c10-no-company.png 72685 867e9f17cc2d057121a4c914a3d9a6feabdb9b7d4b1c214834c929b9a9e266dc
+  s0-gateway-loaded.png 45273 70cc26e6cebe803fb273cd575ce584f49d689de8e1953e9b73d8dc22c94a1e90
+  s21-review-decline-window.png 23975 b99d31dd690e7006c6a38b0adfb68a946c043905cb90f60b02acc25d3928d317
+  s31-review-approve-window.png 23975 b99d31dd690e7006c6a38b0adfb68a946c043905cb90f60b02acc25d3928d317
+  s0-netstat-full.txt 9123 5edb0ac5ac202eb650a306c7df8db610d21bb2706008f7a00b92a090be2b5c31
+  c10-netstat-full.txt 9189 28ede173eed9f590ba74dcc1443dfdb3ef44bb91a3969e7fd19b6916db44b415
+  s0-process-list.txt 929 f2a832f198f88c23c7e8ab2634e1e313a741e5b5f7e62725a939d68364e9f4ec
+  R1 data folder journal at the close: agent-import-ledger.jsonl 19951 dfc8075031d53745fab7a6e83f4a44400d8b850e78438c936718be1b1c03fcc6

@@ -1,0 +1,21 @@
+TITLE	ComplyEaze Bridge — record that you reviewed these 50 vouchers?
+CHILD	Button	722,627,802,653	&Yes
+CHILD	Button	810,627,890,653	&No
+CHILD	Button	898,627,978,653	Cancel
+CHILD	Static	578,270,610,302	
+CHILD	Static	618,270,964,591	Press Y (or click Yes) to record that you reviewed these 50 vouchers. Press N (or click No) to
+cancel. Nothing is recorded until you answer.
+
+THIS RECORDS ONLY THAT YOU CHECKED THESE VOUCHERS IN TALLY.
+It changes nothing in Tally, does not mark the batch posted, and does not let its rows be posted
+again.
+
+Company: BRIDGE CONCUR LAB
+Batch: bridge-a4eb06f8-cf9a-43a6-9255-3920518cf325
+Sent to Tally: 50 vouchers (50 Receipt), dated 20250421.
+ComplyEaze Bridge cannot tell which Tally vouchers this post created: its match of the post to the
+Tally vouchers it created was refused (span_step_not_created).
+The read just now found, for 50 of the 50 vouchers sent, a voucher in the book with the same date,
+voucher type and ledger entries.
+
+Confirm only if you have checked these vouchers in Tally yourself.

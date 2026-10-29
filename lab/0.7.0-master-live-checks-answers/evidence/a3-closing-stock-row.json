@@ -1,0 +1,1 @@
+{"closing_stock_row": {"closing": {"state": "present", "value": "-1000.00"}, "credit": {"state": "present_empty"}, "debit": {"state": "present", "value": "-400.00"}, "guid": "567653b1-c8be-4deb-b4fc-3ea5de801884-000000d3", "ledger": "Closing Stock", "movements_differ_by": "400.00", "opening": {"state": "present", "value": "-1000.00"}, "parent": "Stock-in-Hand"}}

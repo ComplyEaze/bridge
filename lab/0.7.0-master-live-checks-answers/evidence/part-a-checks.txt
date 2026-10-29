@@ -1,0 +1,16 @@
+A3 004-a3-trial_balance.json 0.829s isError False file 10688 B sha256 d3ad7d844b8e037ee51e6727bbe123fb98cd0592deee84ec826fb01b2d086422
+A3 rows 8; rows with movements_differ_by: ['Closing Stock']
+A3 Closing Stock row keys ['closing', 'credit', 'debit', 'guid', 'ledger', 'movements_differ_by', 'opening', 'parent']
+A3 movements_differ_ledgers None
+A3 headline lead holds the text: True
+A3 limitations[0:2] begin: ['1 ledger(s) carry movements_differ_by: their closing is not ', 'Not voucher-level reconciliation or an atomic snapshot']
+A3 evidence {"bytes": 47542, "duration_ms": 724, "read_at": "2026-10-29T05:30:45.122Z", "request_sha256": "85f9af571df7882c80a1e4227ccca9d9abed6056cbcd5b1edd4753934decbc79", "response_sha256": "0f49fd5283ab4da9ee1daf692cc913d1d8efe55b8c4675d18c81122047aff843", "state": "complete"}
+A4 005-a4-profit_and_loss.json 1.044s isError True file 3175 B sha256 6fe508417118f76ce7fb658b82cdd769916aa2f475e21f7f025391aa16b4ab47
+A4 code profit_and_loss_read_failed (want profit_and_loss_read_failed); cause statement_trial_balance_row_inconsistent; ledger 'Closing Stock'; gap equals A3 movements_differ_by: True
+A4 remediation begins as cited: True
+A4 evidence bytes 163042 request_sha256 aa95872ac986831a1a1cfeae0da4b82b64c08c48b46ac1d2af93974fe5261685 response_sha256 b51136a0610eec75fec79bb064c4f288d27b872caf9b139b01b78048f65d8d5c; A3 trial_balance evidence bytes 47542 response_sha256 0f49fd5283ab4da9ee1daf692cc913d1d8efe55b8c4675d18c81122047aff843
+A5 006-a5-balance_sheet.json 0.969s isError True file 3165 B sha256 579fa3f15330ab1017d5b8356c2d0781b06fd980f767271689bdc0a009401e39
+A5 code balance_sheet_read_failed (want balance_sheet_read_failed); cause statement_trial_balance_row_inconsistent; ledger 'Closing Stock'; gap equals A3 movements_differ_by: True
+A5 remediation begins as cited: True
+A5 evidence bytes 163042 request_sha256 aa95872ac986831a1a1cfeae0da4b82b64c08c48b46ac1d2af93974fe5261685 response_sha256 b51136a0610eec75fec79bb064c4f288d27b872caf9b139b01b78048f65d8d5c; A3 trial_balance evidence bytes 47542 response_sha256 0f49fd5283ab4da9ee1daf692cc913d1d8efe55b8c4675d18c81122047aff843
+A6 007-a6-marks.json marks M 215 V 3 reused False

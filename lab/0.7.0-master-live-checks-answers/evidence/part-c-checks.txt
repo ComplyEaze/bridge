@@ -1,0 +1,8 @@
+c1 lines before 60; 015-c1-egress_log.json 0.121s isError False; file 199106 B sha256 8b0b423109969069054b004510423cd08f61b6406ac43b23cffbcf55187369b8; answer text 90559 B
+c1 truncated True (text True); order newest_first; records 40; omitted_for_size None; sum 40 (want 40)
+c1 first ts 2026-10-29T01:58:41.659Z; newest first: True; first is max: True; error null
+c1 result keys ['order', 'records']
+c2 lines before 62; 016-c2-egress_log.json 0.118s isError False; file 188804 B sha256 61a1220103a56b2fb8f76bfb90bf7e9e8378a36178f320effd257a6717f16f58; answer text 85974 B
+c2 truncated True (text True); order newest_first; records 41; omitted_for_size 21; sum 62 (want 62)
+c2 first ts 2026-10-29T05:33:25.807Z; newest first: True; first is max: True; error null
+c2 result keys ['omitted_for_size', 'order', 'records']

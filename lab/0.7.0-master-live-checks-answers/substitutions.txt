@@ -1,0 +1,18 @@
+Pushed copies that differ from the files kept on the lab PC: GUID-shaped strings other than the three synthetic company GUIDs shown as <guid>, and lab-PC paths as placeholders. Each changed file, with the original's bytes and sha256 and what was replaced.
+answers/003-a1-marks.json: original 3958 B sha256 f9acf0e3c9e5d023e375f59c854b3912e359db6d0618838f3a5119df6f0380ee; 2 x GUID -> <guid>
+answers/004-a3-trial_balance.json: original 10688 B sha256 d3ad7d844b8e037ee51e6727bbe123fb98cd0592deee84ec826fb01b2d086422; 2 x GUID -> <guid>
+answers/007-a6-marks.json: original 3958 B sha256 dafc69cac617e07128e29f5d9bc22bc81a0ae7be94592761202b8f07b74723a3; 2 x GUID -> <guid>
+answers/010-b1-marks.json: original 3976 B sha256 49837a5a7070e74639c062f3c211bc4e3b2d68396dc6e17ee2311aa9e433a12c; 2 x GUID -> <guid>
+answers/011-b3-trial_balance.json: original 10725 B sha256 623ce147d73dfb952b357ae14cfc65c597f0e33276dc8f211cf4527f5166398d; 2 x GUID -> <guid>
+answers/014-b6-marks.json: original 3977 B sha256 9da69a81dfc7dff3a5d955f15b693b1055e9a3d4076af70e274a55e002b9f5ad; 2 x GUID -> <guid>
+answers/015-c1-egress_log.json: original 199106 B sha256 8b0b423109969069054b004510423cd08f61b6406ac43b23cffbcf55187369b8; 106 x GUID -> <guid>
+answers/016-c2-egress_log.json: original 188804 B sha256 61a1220103a56b2fb8f76bfb90bf7e9e8378a36178f320effd257a6717f16f58; 106 x GUID -> <guid>
+answers/019-d1-marks.json: original 32039 B sha256 1b033317a99e0e49d8f5c8d34ab2a41e14c5c3675b3ddb364db35ac552328033; 2 x GUID -> <guid>
+evidence/c0-listing-copy.txt: original 3970 B sha256 52f92c7636ece837614153eddabc23ad6059c4dab84ef0307671bc15f6951c1c; 18 x GUID -> <guid>
+evidence/c0-listing-kept.txt: original 3970 B sha256 52f92c7636ece837614153eddabc23ad6059c4dab84ef0307671bc15f6951c1c; 18 x GUID -> <guid>
+evidence/c3-listing-copy.txt: original 3970 B sha256 e04b33930cf3442656d4f691d5358651bae2a729a255324639a902eb9aba8cdf; 18 x GUID -> <guid>
+evidence/c3-listing-kept.txt: original 3970 B sha256 52f92c7636ece837614153eddabc23ad6059c4dab84ef0307671bc15f6951c1c; 18 x GUID -> <guid>
+scripts/part-ab.py: original 4108 B sha256 d02e79a82cfe94bc929f2b09e514930c95e14cc2fccb1556c708186fa3fbaac9; 1 x -> '<lab folder>'
+scripts/step0.ps1: original 2193 B sha256 8d26233fb354a76b14ab9786557bdd16dd513140d86df0f54b72a54f0630d30a; 1 x GUID -> <guid>; 1 x -> <lab folder>; 1 x -> <capture helper folder>
+evidence/s0-netstat.txt: original 9802 B sha256 0d2cfe3cac48c775830b08f7e2af534f8df5361a04681b384f043dd22ac7af8c; only the port-9001 LISTENING lines kept
+evidence/e-netstat.txt: original 9494 B sha256 a78c3f7c95977410694d06fe746f1c7215b32e1e7b0c61b27b1d181a44746601; only the port-9001 LISTENING lines kept

@@ -1,0 +1,4 @@
+D2 020-d2-outstandings.json round trip 21.997s isError True; file 2490 B sha256 73c7b9c2cd97f35ec24d11afe10b382316420aef67f4a0e3c06947eee5bb26ab
+D2 code native_outstandings_read_failed; cause request_deadline_exceeded; remediation present True
+D2 remediation begins as master: True; carries "(20 seconds)": False
+D2 remediation: Tally took longer to answer one request of its Bills Receivable or Payable report at this date than ComplyEaze Bridge waits, so no figures were returned. On a large book that report grows with the bills open at the date. Do not repeat the same call in a loop: tell the user, and say that an earlier `as_of` reads fewer open bills, which is their call.

@@ -1097,7 +1097,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "post_import",
-            "acknowledge_post_review doubt content_only unless its code is span_identity_reused (it settles nothing), and does not rebuild it",
+            "acknowledge_post_review doubt content_only, unless span_identity_reused; it settles nothing) and does not rebuild it",
             "the record of that check settles nothing, and the batch is never rebuilt",
         ),
         (

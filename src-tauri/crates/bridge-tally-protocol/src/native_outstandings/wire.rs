@@ -532,8 +532,8 @@ fn classify_snapshot_rows(
         if foreign_names.contains(&row.name) {
             continue;
         }
-        if crate::native_trial_balance::is_currency_composite(&row.opening_text)
-            || crate::native_trial_balance::is_currency_composite(&row.closing_text)
+        if crate::currency_composite::is_balance_composite(&row.opening_text)
+            || crate::currency_composite::is_balance_composite(&row.closing_text)
         {
             mixed.push(row.name);
             continue;
@@ -2053,3 +2053,7 @@ mod company_currency_tests;
 #[cfg(test)]
 #[path = "wire_group_tests.rs"]
 mod group_tests;
+
+#[cfg(test)]
+#[path = "wire_unspaced_tests.rs"]
+mod unspaced_tests;

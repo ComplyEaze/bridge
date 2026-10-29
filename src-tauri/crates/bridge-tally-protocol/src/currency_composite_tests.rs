@@ -566,3 +566,149 @@ fn a_digit_grouped_composite_is_accepted_by_the_loose_classifier_and_not_the_str
     // The typed parse has no layout for it either: it is refused, never read.
     assert!(parse(&grouped).is_err(), "{grouped}");
 }
+
+// ---- the 7.2 layout (#683, #2071) ----------------------------------------------------------
+
+fn decode_72(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// Every value in the two 7.2 captures that holds an ` @ `.
+fn composites_of_the_72_captures() -> Vec<String> {
+    let mut found = Vec::new();
+    for (capture, tags) in [
+        (
+            decode_72(include_bytes!(
+                "../tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml"
+            )),
+            &["OPENINGBALANCE", "CLOSINGBALANCE"][..],
+        ),
+        (
+            decode_72(include_bytes!(
+                "../tests/fixtures/native/trial_balance_forex_unspaced_composite.utf16le.xml"
+            )),
+            &["TBALOPENING", "DEBITTOTALS", "CREDITTOTALS", "TBALCLOSING"][..],
+        ),
+    ] {
+        for tag in tags {
+            for tail in capture.split(&format!("<{tag} ")).skip(1) {
+                let (Some(start), Some(end)) = (tail.find('>'), tail.find(&format!("</{tag}>")))
+                else {
+                    continue;
+                };
+                let text = &tail[start + 1..end];
+                if text.contains(" @ ") {
+                    found.push(text.to_string());
+                }
+            }
+        }
+    }
+    found
+}
+
+/// Each composite the two 7.2 captures hold is the 7.2 layout and not the 7.1 one, is a balance
+/// composite, and is nothing a voucher's amount is read through.
+#[test]
+fn every_composite_in_the_72_captures_is_the_unspaced_layout_and_only_that() {
+    let found = composites_of_the_72_captures();
+    // Four closing balances of the snapshot and eight values of the Trial Balance.
+    assert_eq!(found.len(), 12, "{found:?}");
+    let distinct = found
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(distinct.len(), 6, "{distinct:?}");
+    for composite in &found {
+        assert!(is_unspaced_currency_composite(composite), "{composite}");
+        assert!(is_balance_composite(composite), "{composite}");
+        assert!(!is_currency_composite(composite), "{composite}");
+    }
+}
+
+/// The 7.1 captures keep their layout: none of them is the 7.2 one, so nothing that was read
+/// through `is_currency_composite` changes meaning.
+#[test]
+fn the_71_captured_composites_are_not_the_unspaced_layout() {
+    let captured = captured_composites();
+    assert!(!captured.is_empty());
+    for composite in &captured {
+        assert!(is_currency_composite(composite), "{composite}");
+        assert!(is_balance_composite(composite), "{composite}");
+        assert!(!is_unspaced_currency_composite(composite), "{composite}");
+    }
+}
+
+/// The 7.2 layout is admitted as far as the captures show and no further: each change below is a
+/// shape no capture holds, and is refused.
+#[test]
+fn a_change_to_the_72_layout_that_no_capture_shows_is_not_a_composite() {
+    for text in [
+        // the other layout's spaces
+        "$ 100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87/$  = \u{20b9} 8700.00",
+        // a rate with decimals, or without a number but with a point
+        "$100.00 @ \u{20b9} 87.5/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87./$ = \u{20b9} 8700.00",
+        // amounts without two decimals
+        "$100 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.0 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.000",
+        // the base amount against its symbol, or its symbol missing
+        "$100.00 @ \u{20b9} 87/$ = \u{20b9}8700.00",
+        "$100.00 @ \u{20b9} 87/$ = 8700.00",
+        // a sign in the wrong place or doubled
+        "$-100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00",
+        "--$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00",
+        "-$100.00 @ \u{20b9} 87/$ = \u{20b9}- 8700.00",
+        // symbols that disagree, or are the same
+        "$100.00 @ \u{20b9} 87/\u{20ac} = \u{20b9} 8700.00",
+        "$100.00 @ \u{20ac} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ $ 87/$ = $ 8700.00",
+        // a missing part
+        "$100.00 \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87/$ \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87 = \u{20b9} 8700.00",
+        // doubled, padded or trailing text
+        "$100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        " $100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00 ",
+        // no digit after the symbol
+        "$ @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        // a non-ASCII digit
+        "$\u{0661}00.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "",
+    ] {
+        assert!(!is_unspaced_currency_composite(text), "{text:?}");
+        // None of them is a balance composite by the other layout either, except the spaced
+        // ones, which are the 7.1 layout and keep being read as it.
+        if !is_currency_composite(text) {
+            assert!(!is_balance_composite(text), "{text:?}");
+        }
+    }
+}
+
+/// The empty rate of a zero total, in both captured places, and the zero composite as the lab
+/// wrote it.
+#[test]
+fn the_zero_total_with_an_empty_rate_is_the_unspaced_layout() {
+    assert!(is_unspaced_currency_composite(
+        "$0.00 @ \u{20b9} /$ = \u{20b9} 0.00"
+    ));
+}
+
+/// Reading a composite into its parts is unchanged and still the 7.1 layout alone: the 7.2
+/// layout is classified, not read, until a capture shows the arithmetic the parse needs.
+#[test]
+fn the_composite_parse_still_refuses_the_unspaced_layout() {
+    let base = BaseCurrencyName::among_several_for_tests("\u{20b9}");
+    assert_eq!(
+        parse_currency_composite("-$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00", &base),
+        Err(CompositeRefusal::NotComposite)
+    );
+}

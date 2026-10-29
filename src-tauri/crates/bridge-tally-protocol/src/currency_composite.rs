@@ -70,6 +70,53 @@ pub fn is_currency_composite(text: &str) -> bool {
     rate.base == base.symbol && rate.per == foreign.symbol && foreign.symbol != base.symbol
 }
 
+/// Whether `text` is exactly one composite in the layout TallyPrime 7.2 wrote a ledger's balance
+/// in (the lab's `ledger_snapshot_forex_unspaced_composite` and
+/// `trial_balance_forex_unspaced_composite`): `<amount> @ <rate> = <amount>` with the foreign
+/// amount's symbol directly against its digits (`$100.00`, where [`is_currency_composite`]'s
+/// layout has `$ 100.00`), the base amount keeping a space after its symbol, and a single space
+/// before ` = ` (the 7.1 layout has two).
+///
+/// Admitted only as far as the two captures show: the foreign and the base amount have exactly
+/// two decimal places, the rate is a whole number or empty, and the symbols agree as in the other
+/// layout. A rate with decimals, a base amount written against its symbol, a second space before
+/// ` = `, or any other change is not this layout, so its caller refuses it. The two layouts never
+/// both match one string: this one needs the foreign amount unspaced and the other needs it spaced.
+pub fn is_unspaced_currency_composite(text: &str) -> bool {
+    let Some((foreign, rest)) = split_once_exact(text, " @ ") else {
+        return false;
+    };
+    let Some((rate, base)) = split_once_exact(rest, " = ") else {
+        return false;
+    };
+    // Exactly one space before ` = `: the rate does not end in a space.
+    if rate.ends_with(' ') {
+        return false;
+    }
+    let (Some(foreign), Some(rate), Some(base)) = (
+        unspaced_amount(foreign),
+        rate_symbols(rate),
+        symbol_amount(base),
+    ) else {
+        return false;
+    };
+    rate.whole_or_empty
+        && has_two_decimals(foreign.digits)
+        && has_two_decimals(base.digits)
+        && rate.base == base.symbol
+        && rate.per == foreign.symbol
+        && foreign.symbol != base.symbol
+}
+
+/// Whether `text` is a currency composite as a ledger's balance is written: in the layout of the
+/// 7.1 captures ([`is_currency_composite`]) or of the 7.2 captures
+/// ([`is_unspaced_currency_composite`]). The ledger snapshot and the Trial Balance set such a row
+/// aside by name and never read its value. A voucher's amount is not read through this: no 7.2
+/// voucher answer is committed, so the voucher parse keeps the 7.1 layout alone.
+pub fn is_balance_composite(text: &str) -> bool {
+    is_currency_composite(text) || is_unspaced_currency_composite(text)
+}
+
 fn split_once_exact<'a>(text: &'a str, separator: &str) -> Option<(&'a str, &'a str)> {
     let (left, right) = text.split_once(separator)?;
     (!right.contains(separator)).then_some((left, right))
@@ -77,25 +124,51 @@ fn split_once_exact<'a>(text: &'a str, separator: &str) -> Option<(&'a str, &'a 
 
 struct SymbolAmount<'a> {
     symbol: &'a str,
+    /// The amount as written after the symbol.
+    digits: &'a str,
+}
+
+/// `[-]<symbol><amount>` with no space between: the symbol is everything before the first ASCII
+/// digit.
+fn unspaced_amount(text: &str) -> Option<SymbolAmount<'_>> {
+    let text = text.strip_prefix('-').unwrap_or(text);
+    let first_digit = text.find(|c: char| c.is_ascii_digit())?;
+    let (symbol, digits) = text.split_at(first_digit);
+    (is_symbol(symbol) && is_ascii_decimal(digits)).then_some(SymbolAmount { symbol, digits })
+}
+
+fn has_two_decimals(amount: &str) -> bool {
+    amount
+        .split_once('.')
+        .is_some_and(|(_, fraction)| fraction.len() == 2)
 }
 
 fn symbol_amount(text: &str) -> Option<SymbolAmount<'_>> {
     let text = text.strip_prefix('-').unwrap_or(text);
     let (symbol, amount) = text.split_once(' ')?;
-    (is_symbol(symbol) && is_ascii_decimal(amount)).then_some(SymbolAmount { symbol })
+    (is_symbol(symbol) && is_ascii_decimal(amount)).then_some(SymbolAmount {
+        symbol,
+        digits: amount,
+    })
 }
 
 /// The rate's two symbols: the base it is quoted in, and the foreign unit.
 struct RateSymbols<'a> {
     base: &'a str,
     per: &'a str,
+    /// The rate is empty or digits alone (no decimal point).
+    whole_or_empty: bool,
 }
 
 fn rate_symbols(text: &str) -> Option<RateSymbols<'_>> {
     let (base, rest) = text.split_once(' ')?;
     let (number, per) = rest.split_once('/')?;
     (is_symbol(base) && (number.is_empty() || is_ascii_decimal(number)) && is_symbol(per))
-        .then_some(RateSymbols { base, per })
+        .then_some(RateSymbols {
+            base,
+            per,
+            whole_or_empty: number.bytes().all(|b| b.is_ascii_digit()),
+        })
 }
 
 fn is_symbol(text: &str) -> bool {

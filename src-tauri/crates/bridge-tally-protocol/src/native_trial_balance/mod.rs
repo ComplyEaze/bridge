@@ -8,6 +8,8 @@ use std::fmt;
 mod scalar;
 mod wire;
 // One classifier for every reader, shared with `vouchers` (bridge#674).
+pub(crate) use crate::currency_composite::is_balance_composite;
+#[cfg(test)]
 pub(crate) use crate::currency_composite::is_currency_composite;
 pub(crate) use wire::guid_suffix_is_valid;
 pub use wire::{parse_native_trial_balance, parse_native_trial_balance_with_currency};
@@ -186,3 +188,6 @@ fn render_trial_balance_collection(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod unspaced_tests;

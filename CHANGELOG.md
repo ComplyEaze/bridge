@@ -62,7 +62,7 @@ These changes are in ComplyEaze Bridge 0.7.0. Most lines name the pull requests 
   `settled_by_person`, outside `not_settled`. A later `posted_verified`, a later answer from Tally, a binding or a
   rollback of the book voids it. It is a new kind of import journal record: a build older than this one refuses the
   whole journal once one is written, so do not downgrade after recording one (part of #1709).
-  On Windows its box opens system-modal like the other approval boxes. After a settlement, the dialog counts only matches in the accounts and each voucher's next step no longer asks for it again.
+  On Windows its box opens system-modal like the other approval boxes. Before a settlement, its dialog counts only the matching vouchers that are in the accounts; after one, a voucher's next step no longer asks for the settlement, and says not to import the voucher's file through Tally's Import menu.
 - `gst_by_counter_ledger` totals, for a period, the GST the books record on ledgers under Duties & Taxes per counter
   ledger (the one Purchase Accounts, Direct Expenses, Indirect Expenses or Fixed Assets ledger on a purchase, debit
   note, journal or payment with a supplier on it, named with its GUID), debit and credit side apart, per head, and sets

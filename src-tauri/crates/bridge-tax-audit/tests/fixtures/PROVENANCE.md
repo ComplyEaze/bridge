@@ -430,8 +430,12 @@ existing output to be a declared difference that names the invented book which e
   it now says "the Stock-in-Hand ledger balance the client recorded in the books". The meaning is
   unchanged. The compared field is `limits_sha256_16` (parity-spec section 3); `limits_text` is
   context and is not compared.
-- **The book.** The synthetic read's two `financial_statements` goldens, with and without report
-  totals, are that invented book: both are a book not integrated with inventory.
+- **The book.** The invented book is the unit-test book of `src/financial_statements.rs`, which
+  has no stock items and so takes the ledger basis. The test
+  `financial_statements::tests::a_ledger_stock_book_says_its_closing_stock_is_what_the_client_recorded`
+  asserts the finding's two limits whole, in order, with and without a report part to tie to, so it
+  fails if the sentence or the basis branch changes. The synthetic read's two `financial_statements`
+  goldens, with and without report totals, are the same kind of book and carry the new sentence.
 - **The goldens.** Each carries the new sentence and a `limits_sha256_16` recomputed by hand with
   the hash `canonical.rs` uses (the old hashes were reproduced first, to check the method). Nothing
   else in either golden changed. They are no longer the reference's own dump for this one finding.

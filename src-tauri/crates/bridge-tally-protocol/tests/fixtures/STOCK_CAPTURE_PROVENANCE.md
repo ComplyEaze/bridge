@@ -84,3 +84,20 @@ Every file is a live capture, never hand-written.
 |---|---|---|---|
 | `stock_items_negative_sale_lab_live.utf16le.xml` | 5464 | `5ab16aff408fc8744211bebd6351ac09aec3ed3b8a5a28b624a8ba3ac4fc5646` | stock items, 2 rows |
 | `stock_summary_report_negative_sale_lab_live.utf16le.xml` | 946 | `5d3a01b4a3a833b85283432c0cfed5aa88458a8bbec31ded395a67231717a2be` | Stock Summary, 2 lines |
+
+## Stock groups nested three deep (captured 2026-10-27)
+
+- **What:** the company's inventory flags and stock item count, the stock items collection and the plain Stock Summary of one synthetic lab company, `BRIDGE NESTED STOCK LAB`, keyed by hand on Tally's screens for this capture: two units, three stock groups nested three deep, eight stock items (one directly under the root, the rest at depths one to three) and two Stock Journals. Protocol reference §12a.13 records what they show against Tally's own screen.
+- **Host / gateway:** TallyPrime **Silver**, 7.2, a lab instance on port 9001, one request at a time.
+- **Sender:** curl, sending the bytes of each request file below once each. Those bytes are the production builders' output for this company and the period 20250401 to 20260331 (`the_nested_books_requests_are_the_builders_bytes_for_that_company` in `src/native_stock_summary_tests.rs` asserts it). The marks read before and after the reads were equal, and a second read of the stock items was byte-identical to the first.
+- **Source:** lab branch `lab/1233-nested-groups-capture-answers` at `c1a82ddd16cb`: `raw/n1-a.xml`, `raw/n2-a.xml`, `raw/n3-b.xml` and the filled request `n3-company-flags.utf16le.xml`, with `requests/n1-*` and `requests/n2-*` from its request folder. Each sha256 below equals the lab's send-log line for that file.
+- **Encoding:** responses are BOM-less UTF-16LE exactly as received, with the HTTP header removed; requests are the bytes sent, UTF-16LE with a BOM. Nothing is edited.
+
+| file | bytes | sha256 | content |
+|---|---|---|---|
+| `company_inventory_flags_nested_lab_request.utf16le.xml` | 1654 | `bf5197c0ddac03788a1de135b1b99315b2fe612f6bc858e7e88307ae6b1b2640` | request, flags |
+| `company_inventory_flags_nested_lab_live.utf16le.xml` | 4920 | `425bfe9724052a00034755b5463db70a446f8c0586db41e9b4c8e58370865b5c` | flags, 1 row, item count 8 |
+| `stock_items_nested_lab_fy_request.utf16le.xml` | 1272 | `7c6770b2e18f146fd69c71d4f381bde63833366da99d69a0d54ef8e304d01b07` | request, stock items |
+| `stock_items_nested_lab_fy_live.utf16le.xml` | 13954 | `ba77d8a0dc343b8eaf767803bbc4ee2cf5c4de2e22c4b0cee5a3527c3758fd41` | stock items, 8 rows at depths 0 to 3 |
+| `stock_summary_report_nested_lab_fy_request.utf16le.xml` | 772 | `d7d0b8c17f3c93f2f656baf3ec51cc1d37aabd601d4677632465aa4e7810c3f0` | request, Stock Summary |
+| `stock_summary_report_nested_lab_fy_live.utf16le.xml` | 948 | `338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937` | Stock Summary, 2 lines (the top group, the item under the root) |

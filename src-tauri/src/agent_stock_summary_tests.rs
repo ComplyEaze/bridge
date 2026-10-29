@@ -24,7 +24,7 @@ const AS_OF: &str = "20260331";
 const BOOKS_FROM: &str = "20250401";
 /// The end of the basis of a read whose value total matched: exactly what was
 /// compared, and what was not.
-const MATCHED_SENTENCE: &str = "The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and a quantity is returned only where Tally's own Stock Summary shows the same one (`closing.quantity`).";
+const MATCHED_SENTENCE: &str = "The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and a quantity is compared only for an item under the root, against Tally's own Stock Summary (`closing.quantity`).";
 /// The part of a basis that is the same whatever Tally reported.
 const UNMEASURED_USE: &str =
     "how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured";
@@ -437,10 +437,11 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "`no_stock_items`: Tally's own stock item count is 0, the item list is empty and the Stock Summary is empty",
         "`not_established`: no item is returned (`items` is null)",
         "`remediation` says what to do next",
-        "A closing quantity is returned only where Tally's own plain Stock Summary shows the same item by name",
-        "`checks` says per field what is `checked`, `checked_per_item` or `not_checked`",
-        "`closing` holds `value` exactly as Tally sends it, and `quantity` (a `state`, with `amount` and `unit` when it is `agreed`)",
-        "`inside_stock_group`, `report_has_no_line`, `report_name_not_unique`, `report_differs`",
+        "A closing quantity of an item under the root is returned only where Tally's own plain Stock Summary shows the same item by name",
+        "so its quantity is its own row's in the item list, not compared (`inside_stock_group`, with `item_list_amount` and `item_list_unit`",
+        "`checks` says per field what is `checked`, `checked_where_agreed` or `not_checked`",
+        "`closing` holds `value` exactly as Tally sends it, and `quantity` (a `state`, with `amount` and `unit` when `agreed`, `item_list_amount` and `item_list_unit` when `inside_stock_group`)",
+        "`parent_not_resolved` for a parent reading Primary without Tally's root marker, `report_has_no_line`, `report_name_not_unique`, `report_differs`",
         "tally_stock_summary_shows_no_value",
         "stock_values_not_comparable",
         "only Tally's own stock item count vouches for it",
@@ -549,7 +550,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
             "closing_value_total": "checked",
             "item_list_complete": "not_checked",
             "closing_value_each": "not_checked",
-            "closing_quantity": "checked_per_item",
+            "closing_quantity": "checked_where_agreed",
             "name_parent_unit": "not_checked",
             "as_of_honoured": "not_checked",
         })
@@ -582,22 +583,24 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         json!({
             "name": "Carton Box Small", "guid": format!("{GUID}-00000110"),
             "parent": "Packaging", "base_unit": "Box",
-            "closing": {"value": "2500.00", "quantity": {"state": "inside_stock_group"}},
+            "closing": {"value": "2500.00", "quantity": {"state": "inside_stock_group", "item_list_amount": "100", "item_list_unit": "Box"}},
         })
     );
     // This book's report lists three stock groups and no item: every item sits inside
-    // one, so none has a line of its own and no quantity leaves, and each says why (the
-    // items with no quantity say that Tally sent none).
+    // one, so none has a line of its own. Each carries its row's own figure under the
+    // item-list keys, or says that Tally sent none, and none is an agreed quantity.
     for item in page["items"].as_array().unwrap() {
-        let state = item["closing"]["quantity"]["state"].as_str().unwrap();
-        assert!(
-            ["inside_stock_group", "none_sent"].contains(&state),
-            "{item}"
-        );
-        assert!(
-            item["closing"]["quantity"].get("amount").is_none(),
-            "{item}"
-        );
+        let quantity = &item["closing"]["quantity"];
+        let keys = quantity.as_object().unwrap().keys().collect::<Vec<_>>();
+        match quantity["state"].as_str().unwrap() {
+            "inside_stock_group" => assert_eq!(
+                keys,
+                ["item_list_amount", "item_list_unit", "state"],
+                "{item}"
+            ),
+            "none_sent" => assert_eq!(keys, ["state"], "{item}"),
+            other => panic!("{other}: {item}"),
+        }
     }
     assert_eq!(
         page["totals"],
@@ -631,7 +634,9 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         assert!(limitations.iter().any(|found| found == line), "{line}");
     }
     for line in [
-        "A closing quantity is returned only where Tally's own plain Stock Summary shows the same item by name with the same quantity, unit and amount: `closing.quantity.state` is `agreed`, with `amount` and `unit`. Every other item says why not: `none_sent` (Tally sent none, which is not zero), `unread` (a compound unit, or a unit with a space in it; also counted in `totals.closing_quantity_unread_count`, and the read is not refused), `inside_stock_group` (the item's own parent is not the root, that is a stock group; in the captures the report listed only what sits directly under the root, so it is taken to have no line of its own), `report_has_no_line` (the item sits under the root and no line of the report carries its name: it has nothing to show, or the report names it differently; also given when Tally sent no parent, whatever a line shows), `report_name_not_unique` or `report_differs`",
+        "A closing quantity of an item under the root is returned only where Tally's own plain Stock Summary shows the same item by name with the same quantity, unit and amount: `closing.quantity.state` is `agreed`, with `amount` and `unit`",
+        "That report has no line for an item inside a stock group, so such an item's closing quantity is its own row's in the stock item list, which nothing compared: `inside_stock_group`, with `item_list_amount` and `item_list_unit`, never `amount` and `unit`. On one synthetic book (TallyPrime 7.2, groups three deep, two units, one negative quantity), each such quantity equalled Tally's Stock Summary screen with every level expanded; no other book or release was measured. Neither the value total nor the item count checks a quantity, and an item with an empty or zero value adds nothing to the value total, so nothing in this read vouches for a nested quantity",
+        "Every other item says why no quantity is returned: `none_sent` (Tally sent none, which is not zero), `unread` (a compound unit, or a unit with a space in it; also counted in `totals.closing_quantity_unread_count`, and the read is not refused), `parent_not_resolved` (the item's parent reads `Primary` without Tally's root marker, or carries a marker anywhere else: it may be a group a person named Primary, so it is neither compared nor taken for a group), `report_has_no_line` (the item sits under the root and no line of the report carries its name: it has nothing to show, or the report names it differently; also given when Tally sent no parent, whatever a line shows), `report_name_not_unique` or `report_differs`",
         "The Stock Summary does not say whether a line is a stock group or an item: a line is tied to an item by its name, quantity, unit and amount and by the item sitting directly under the root",
         "Item names, parents and base units come from one source and are not checked against another",
     ] {
@@ -645,7 +650,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     assert_eq!(page["snapshot"]["reused"], true);
     // A later page of a matched read says what its first page said.
     assert_eq!(page["state"], "value_total_matched");
-    assert_eq!(page["checks"]["closing_quantity"], "checked_per_item");
+    assert_eq!(page["checks"]["closing_quantity"], "checked_where_agreed");
     assert!(page["items"]
         .as_array()
         .unwrap()
@@ -963,7 +968,7 @@ async fn a_single_value_sums_to_itself_at_its_own_scale() {
     assert_eq!(page["total"], 1);
     assert_eq!(
         page["items"][0]["closing"],
-        json!({"value": "2500.00", "quantity": {"state": "inside_stock_group"}})
+        json!({"value": "2500.00", "quantity": {"state": "inside_stock_group", "item_list_amount": "100", "item_list_unit": "Box"}})
     );
     assert_eq!(page["totals"]["value_sum"], "2500.00");
     assert_eq!(page["tie_out"]["total"], "2500.00");
@@ -1723,6 +1728,6 @@ async fn a_quantity_the_report_agrees_with_is_returned_through_the_tool() {
         by_name("Lab Item POS")["closing"],
         json!({"value": "-186.00", "quantity": {"state": "agreed", "amount": "18", "unit": "Nos"}})
     );
-    assert_eq!(page["checks"]["closing_quantity"], "checked_per_item");
+    assert_eq!(page["checks"]["closing_quantity"], "checked_where_agreed");
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }

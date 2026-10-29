@@ -2611,11 +2611,10 @@ impl CensusPlan {
 
     /// The span of each request, in order.
     pub(super) fn spans(&self) -> impl Iterator<Item = Option<AlterIdSpan>> {
-        let (ledger, through) = (self.ledger, self.high_water);
-        self.spans.clone().map(move |span| match span {
-            None if ledger => Some(AlterIdSpan { after: 0, through }),
-            span => span,
-        })
+        let through = self.high_water;
+        self.spans
+            .clone()
+            .map(move |span| Some(span.unwrap_or(AlterIdSpan { after: 0, through })))
     }
 }
 

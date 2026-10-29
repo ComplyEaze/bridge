@@ -1,0 +1,5 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed (product names are written as the desktop client and the Code tab CLI):
+evidence/d-c10-netstat.txt: original 9834 B sha256 5b00445c4bc2e8af6c5a5f9e9b6aebbe43cbfbca83ac813d61c2995ac52013d5; only the port-9001 LISTENING lines kept
+evidence/d-s0-netstat.txt: original 9020 B sha256 8b7f6c617fe8c3a985572977aac698db781269b94f75482b5c848f63fbb7bb19; only the port-9001 LISTENING lines kept
+scripts/ladder.py: original 8084 B sha256 d8632ea3d53bfe016de5a6c71a6211c5b7a7033052baf8cdd703d17925222c64; 1 x -> <lab folder>; 8 x -> stop
+scripts/step0.ps1: original 2376 B sha256 95947c0d0d1342b418103e85b19221ee5a0d79efac69ae89d4960f170d992d2d; 2 x -> <lab folder>

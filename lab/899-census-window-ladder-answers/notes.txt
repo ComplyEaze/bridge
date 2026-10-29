@@ -1,0 +1,9 @@
+#899-P Part D notes (UTC). Sheet lab/899-census-window-ladder at c24c3d6a1ba2238c2b4c2f5ccef3cdbb6c8d39de: SHA256.txt 7 of 7 equal; gen_census.py --check printed its expected line.
+2026-10-29T18:16:41Z Step 0 with no company loaded: capture; one tally.exe owns 9001; /status 200.
+2026-10-29T18:17Z Step 1: BRIDGE CORPUS DENSE loaded alone (Down 13 from the demo row, the highlight read before Enter). Gateway: Current Period 1-Apr-25 to 31-Mar-26, current date 31-Mar-2026, last entry 31-Mar-26. company.txt written. Windows: W1 20260331 (the last-entry day), W2 20260301 to 20260331, W3 20250401 to 20260331.
+2026-10-29T18:17:54Z Step 2: M0: V0 29900, M0 328; V0 above 2097152 no; at most 8192 no. Step 3: first span (16384, 24576].
+2026-10-29T18:17:57Z W1: 0 rows, 0.452 s. 18:18:03Z W2: 0 rows, 2.950 s. 18:18:13Z W3: 8192 rows, 19925970 B, 24.991 s: above 20 s, the ladder ends.
+2026-10-29T18:18:45Z S2: WIDEST = W2 (month); second span (8192, 16384], full, before the first: 0 rows, 0.976 s. 18:18:48Z R1 (W1's file, sha256 checked): 0 rows, 0.107 s.
+2026-10-29T18:18:51Z M1: V1 29900, M1 328: equal to M0/V0.
+2026-10-29T18:19Z C10: shut from the Company menu; Select Company, none loaded; 18:19:38Z one tally.exe owns 9001; /status 200. No XML after the shut.
+Every send: capture of Tally's window after it (no dialog) and GET /status 200.

@@ -1,0 +1,36 @@
+marks request: request written (982 bytes); sha256 040ac47754c40a4e2e736f8be2b3f37cac924213ea66c8c4f0074222f9a00280
+m0 request_bytes=982 start=2026-10-29T18:17:54.030Z end=2026-10-29T18:17:54.268Z curl_exit=0 printed="200 3406 982 0.004625 0.011939 0.015198" content_length=3406 bytes=3406 sha256=fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+m0 GET /status 2026-10-29T18:17:56.670Z exit 0 printed 200 51 in 0.047 s
+m0: one COMPANY row; V=29900 M=328
+V0 above 2097152: no; V0 at most 8192: no
+first span (newest full product span): lo 16384 hi 24576
+w1 window 20260331..20260331: request written (1540 bytes); sha256 363f3d2a0ce2764553675720646371999a486dae565a654fb38dd36447c5cd89
+w1 request_bytes=1540 start=2026-10-29T18:17:57.554Z end=2026-10-29T18:17:58.141Z curl_exit=0 printed="200 3022 1540 0.004593 0.450287 0.451680" content_length=3022 bytes=3022 sha256=947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+w1 GET /status 2026-10-29T18:18:02.965Z exit 0 printed 200 51 in 0.203 s
+w1 census_read exit 0: census ok bytes 3022 rows 0 rows_missing_a_field 0 rows_outside_span 0 rows_outside_dates 0 repeated_guids 0 min_alterid_offset none max_alterid_offset none
+w1: rows 0; bytes per row n/a; time_starttransfer 0.450287; time_total 0.45168
+w2 window 20260301..20260331: request written (1540 bytes); sha256 d562aee99b480aaaa5e9e037ee41745bc8807657d0e4b8bd9703279a5d585560
+w2 request_bytes=1540 start=2026-10-29T18:18:03.958Z end=2026-10-29T18:18:07.274Z curl_exit=0 printed="200 3022 1540 0.007252 2.948428 2.949892" content_length=3022 bytes=3022 sha256=947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+w2 GET /status 2026-10-29T18:18:12.765Z exit 0 printed 200 51 in 0.157 s
+w2 census_read exit 0: census ok bytes 3022 rows 0 rows_missing_a_field 0 rows_outside_span 0 rows_outside_dates 0 repeated_guids 0 min_alterid_offset none max_alterid_offset none
+w2: rows 0; bytes per row n/a; time_starttransfer 2.948428; time_total 2.949892
+w3 window 20250401..20260331: request written (1540 bytes); sha256 ef8e670a72d244678af0c006b0a8d3c79b2292e6f03a360d42ad7e4d5197a7e1
+w3 request_bytes=1540 start=2026-10-29T18:18:13.662Z end=2026-10-29T18:18:39.412Z curl_exit=0 printed="200 19925970 1540 0.002699 24.740718 24.991245" content_length=19925970 bytes=19925970 sha256=8d0b0c7470d6db7bc1fa8f72e7efb50f555b98fe3b710e2bceda98a363342d2c
+w3 GET /status 2026-10-29T18:18:41.684Z exit 0 printed 200 51 in 0.125 s
+w3 census_read exit 0: census ok bytes 19925970 rows 8192 rows_missing_a_field 0 rows_outside_span 0 rows_outside_dates 0 repeated_guids 0 min_alterid_offset 1 max_alterid_offset 8192
+w3: rows 8192; bytes per row 2432.369384765625; time_starttransfer 24.740718; time_total 24.991245
+w3: time_total above 20 s: the ladder ends
+s2 second span lo 8192 hi 16384 (full (before the first)); WIDEST w2 20260301..20260331: request written (1538 bytes); sha256 1b7ca062d79b583933217fb1f860d9267701190d1f124f74e8f5ef5bdcd39b1d
+s2 request_bytes=1538 start=2026-10-29T18:18:45.527Z end=2026-10-29T18:18:46.593Z curl_exit=0 printed="200 3022 1538 0.003121 0.975136 0.976400" content_length=3022 bytes=3022 sha256=947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+s2 GET /status 2026-10-29T18:18:48.589Z exit 0 printed 200 51 in 0.047 s
+s2 census_read exit 0: census ok bytes 3022 rows 0 rows_missing_a_field 0 rows_outside_span 0 rows_outside_dates 0 repeated_guids 0 min_alterid_offset none max_alterid_offset none
+s2: rows 0; bytes per row n/a; time_starttransfer 0.975136; time_total 0.9764
+r1 request_bytes=1540 start=2026-10-29T18:18:48.859Z end=2026-10-29T18:18:49.087Z curl_exit=0 printed="200 3022 1540 0.002475 0.105592 0.107363" content_length=3022 bytes=3022 sha256=947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+r1 GET /status 2026-10-29T18:18:50.856Z exit 0 printed 200 51 in 0.062 s
+r1 census_read exit 0: census ok bytes 3022 rows 0 rows_missing_a_field 0 rows_outside_span 0 rows_outside_dates 0 repeated_guids 0 min_alterid_offset none max_alterid_offset none
+r1: rows 0; time_starttransfer 0.105592; time_total 0.107363
+m1 request_bytes=982 start=2026-10-29T18:18:51.177Z end=2026-10-29T18:18:51.291Z curl_exit=0 printed="200 3406 982 0.004155 0.007908 0.009167" content_length=3406 bytes=3406 sha256=fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+m1 GET /status 2026-10-29T18:18:53.039Z exit 0 printed 200 51 in 0.078 s
+m1: one COMPANY row; V=29900 M=328
+marks: V1 equal to V0, M1 equal to M0
+LADDER DONE

@@ -415,3 +415,22 @@ fn a_vouchers_page_shows_gst_details_only_when_asked() {
     assert!(!page(GstDetailsShown::Withheld).contains("gst_details"));
     assert!(page(GstDetailsShown::Shown).contains("\"gst_details\""));
 }
+
+/// A per-unit rate that is not a decimal leaves the entry with a reason, as a rate does.
+#[test]
+fn a_per_unit_rate_that_is_not_a_decimal_is_unreadable() {
+    let xml = captured();
+    let field = "<GSTRATEPERUNIT>0</GSTRATEPERUNIT>";
+    let at = xml.find(field).expect("the capture holds a per-unit rate");
+    let changed = format!(
+        "{}<GSTRATEPERUNIT>0,5</GSTRATEPERUNIT>{}",
+        &xml[..at],
+        &xml[at + field.len()..]
+    );
+    let entry = entry_with(&changed);
+    assert_eq!(
+        entry["gst_details_unreadable"],
+        "gst_details_rate_not_decimal"
+    );
+    assert!(entry.get("gst_details").is_none());
+}

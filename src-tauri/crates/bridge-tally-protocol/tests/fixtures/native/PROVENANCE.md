@@ -50,9 +50,9 @@ read the same before and after each read.
 Each SHA-256 equals the lab's own `send-log.txt` line for that answer. What
 Tally's statements did with the keyed figure differs by book (the lab's
 `RESULTS.md`): on the non-integrated book its Profit and Loss and Balance
-Sheet used 1,400.00 (raw answers on the same branch); on the integrated book
-they valued the stock from the stock item, 1,200.00 (screenshots kept on the
-lab machine, not committed). These captures establish the row, not either
+Sheet used 1,400.00; on the integrated book they valued the stock from the
+stock item, 1,200.00. Both are in raw Profit and Loss answers on the same
+branches (`n-r1`). These captures establish the row, not either
 figure. One observation each.
 
 The following files were normalised by Git on their first commit. Their original

@@ -298,9 +298,17 @@ mod listing {
             assert_eq!(rows.len(), 8, "{company}");
             let flagged = rows
                 .iter()
-                .filter(|row| row.get("movements_differ_by").is_some())
+                .filter(|(_, differs)| *differs)
+                .map(|(json, _)| json)
                 .collect::<Vec<_>>();
             assert_eq!(flagged.len(), 1, "{rows:?}");
+            assert_eq!(
+                rows.iter()
+                    .filter(|(json, _)| json.get("movements_differ_by").is_some())
+                    .count(),
+                1,
+                "the key is on the flagged row only"
+            );
             // Unwrapped from the party-name marker when the server renders the answer.
             assert_eq!(flagged[0]["ledger"][PARTY_NAME_MARKER], "Closing Stock");
             assert_eq!(flagged[0]["movements_differ_by"], "400.00");

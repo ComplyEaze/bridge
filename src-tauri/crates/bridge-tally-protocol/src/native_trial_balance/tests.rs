@@ -634,8 +634,8 @@ fn the_difference_is_exact_and_signed_in_tallys_sign() {
     );
 }
 
-/// No row of the committed Trial Balance captures differs, so the check names none of their
-/// ledgers: the 6 rows of the known lab, the 8 of the opening-year book and the base rows of the
+/// No row of these three committed Trial Balance captures differs (the two of #2068 each have
+/// one, pinned above), so the check names none of their ledgers: the 6 rows of the known lab, the 8 of the opening-year book and the base rows of the
 /// several-currency book. The statements' own tests run the same check over the dense month (123
 /// rows), the year, and the stock book, and refuse any read where it differs.
 #[test]

@@ -15,6 +15,7 @@
 use super::voucher_window::{
     company_marks, AuditWindowFailure, AuditWindowReader, CompanyMarks, RetainedWindowRead,
     VoucherReadShape, WindowReadKind, WindowReadLimits, WINDOW_CHANGED_DURING_READ,
+    WINDOW_DIVIDED_BY_ALTERID,
 };
 use super::*;
 use crate::tally::agent_read_request::AgentReadRequest;
@@ -33,9 +34,6 @@ use std::io::Cursor;
 /// The assessment year the crate's rules exist for (`rules_for` refuses any other).
 const ASSESSMENT_YEAR: &str = "2026-27";
 
-/// A window plan that divides a day by AlterID span cannot become a read: the
-/// crate's windows must tile the period by date (C7).
-const WINDOW_DIVIDED_BY_ALTERID: &str = "audit_window_divided_by_alterid";
 const MARKS_MISSING: &str = "audit_window_marks_missing";
 const BOOK_UNUSABLE: &str = "audit_book_refused";
 const PART_UNPARSABLE: &str = "audit_part_unparsable";

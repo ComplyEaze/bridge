@@ -5379,58 +5379,72 @@ fn three_on_one_day() -> WindowCensus {
     ])
 }
 
-/// The plan at the default figure needs three reads against two allowed, so a
-/// read refusing at the default is refused before any data part, as before
-/// #2173. Refusing at the floor, the same window is read in two: the first part
-/// at the default figure, and, measured light, the rest at the floor.
+/// One voucher on 1 August and two on each of 2 and 3 August, AlterIDs 1 to 5:
+/// a window whose first day one read carries at the default figure and whose
+/// later days one read each carries at the floor.
+fn one_then_two_a_day() -> WindowCensus {
+    WindowCensus::from_rows([
+        (day("20260801"), 1),
+        (day("20260802"), 2),
+        (day("20260802"), 3),
+        (day("20260803"), 4),
+        (day("20260803"), 5),
+    ])
+}
+
+/// The plan at the default figure needs five reads against three allowed (each
+/// later day divided in two), so a read refusing at the default is refused by
+/// its first plan, before any data part, as before #2173. Refusing at the
+/// floor, the same window is read in three whole days: the first at the default
+/// figure, and, measured light, each later day in one read at the floor.
 #[tokio::test]
 async fn refusing_at_the_floor_reads_a_window_the_default_plan_refuses() {
     let one = wire_len(&xml_plan(vouchers_kept(1)));
-    let limits = default_one_floor_two(one, 2);
-    // The plan made before any data part, which the read sends nothing ahead of.
+    let limits = default_one_floor_two(one, 3);
+    let (first, last) = (day("20260801"), day("20260803"));
     assert_eq!(
-        first_plan(
-            day("20260801"),
-            day("20260801"),
-            &three_on_one_day(),
-            3,
-            limits
-        ),
+        first_plan(first, last, &one_then_two_a_day(), 5, limits),
         Err(PlanRefusal::TooManyReads {
-            reads: 3,
-            allowed: 2,
+            reads: 5,
+            allowed: 3,
         })
     );
 
     let mut plans = paired(&xml_plan(relabelled(&vouchers_kept(1), &[(1, "20260801")])));
     plans.extend(paired(&xml_plan(relabelled(
         &vouchers_kept(2),
-        &[(2, "20260801"), (3, "20260801")],
+        &[(2, "20260802"), (3, "20260802")],
+    ))));
+    plans.extend(paired(&xml_plan(relabelled(
+        &vouchers_kept(2),
+        &[(4, "20260803"), (5, "20260803")],
     ))));
     let (outcome, observed) = read_window(
         plans,
-        ("20260801", "20260801"),
+        ("20260801", "20260803"),
         VoucherReadShape::EntryWildcard,
-        WindowPlanSource::Counted(three_on_one_day()),
+        WindowPlanSource::Counted(one_then_two_a_day()),
         limits.refusing_at_the_floor(),
     )
     .await;
     let read = outcome.unwrap();
-    assert_eq!(read.rows.len(), 3);
+    assert_eq!(read.rows.len(), 5);
     assert_eq!(
-        read.reads.iter().map(|part| part.span).collect::<Vec<_>>(),
+        read.reads
+            .iter()
+            .map(|part| (
+                part.from.as_str().to_string(),
+                part.to.as_str().to_string(),
+                part.span
+            ))
+            .collect::<Vec<_>>(),
         [
-            Some(AlterIdSpan {
-                after: 0,
-                through: 1
-            }),
-            Some(AlterIdSpan {
-                after: 1,
-                through: 3
-            }),
+            ("20260801".to_string(), "20260801".to_string(), None),
+            ("20260802".to_string(), "20260802".to_string(), None),
+            ("20260803".to_string(), "20260803".to_string(), None),
         ]
     );
-    assert_eq!(observed.len(), 12);
+    assert_eq!(observed.len(), 18);
 }
 
 /// Refusing at the floor, a window admitted on the floor plan whose first part
@@ -5449,11 +5463,16 @@ async fn refusing_at_the_floor_refuses_after_a_first_part_heavier_than_the_floor
         small_books: SmallBooks::Skip,
         read_count_refusal: ReadCountRefusal::AtTheFloor,
     };
+    let census = WindowCensus::from_rows([
+        (day("20260801"), 1),
+        (day("20260802"), 2),
+        (day("20260802"), 3),
+    ]);
     let (outcome, observed) = read_window(
         paired(&xml_plan(relabelled(&vouchers_kept(1), &[(1, "20260801")]))),
-        ("20260801", "20260801"),
+        ("20260801", "20260802"),
         VoucherReadShape::EntryWildcard,
-        WindowPlanSource::Counted(three_on_one_day()),
+        WindowPlanSource::Counted(census),
         limits,
     )
     .await;
@@ -5473,35 +5492,60 @@ async fn refusing_at_the_floor_refuses_after_a_first_part_heavier_than_the_floor
     );
 }
 
-/// The floor plan counts every part sent before the first one that can be
-/// measured: here a part of the empty day before the counted one. Two reads
-/// suffice for the vouchers, but three are needed, so the window is refused
-/// before any data part.
+/// Refusing at the floor, a day certain to be divided by AlterID span is
+/// refused by the first plan, before any data part: the first day holding
+/// vouchers, over what one read holds at the default figure (three against
+/// one), or any later day over what one holds at the floor (three against two).
+/// The tax audit's read must tile its period by whole days.
 #[test]
-fn refusing_at_the_floor_counts_the_empty_part_before_the_first_measured_one() {
+fn refusing_at_the_floor_refuses_a_day_no_read_carries_whole() {
     let one = wire_len(&xml_plan(vouchers_kept(1)));
-    let limits = default_one_floor_two(one, 2).refusing_at_the_floor();
-    // The plan made before any data part, which the read sends nothing ahead of.
+    let limits = default_one_floor_two(one, 128).refusing_at_the_floor();
     assert_eq!(
         first_plan(
-            day("20260731"),
+            day("20260801"),
             day("20260801"),
             &three_on_one_day(),
             3,
             limits
         ),
-        Err(PlanRefusal::TooManyReads {
-            reads: 3,
-            allowed: 2,
+        Err(PlanRefusal::DayDividedBySpan {
+            day: day("20260801")
         })
     );
-    // From the counted day, the same window fits: the empty part is the third read.
+    let later = WindowCensus::from_rows([
+        (day("20260731"), 9),
+        (day("20260801"), 1),
+        (day("20260801"), 2),
+        (day("20260801"), 3),
+    ]);
+    assert_eq!(
+        first_plan(day("20260731"), day("20260801"), &later, 9, limits),
+        Err(PlanRefusal::DayDividedBySpan {
+            day: day("20260801")
+        })
+    );
+    // Two on that later day, which one read at the floor holds, are admitted,
+    // and the empty day before the first voucher day joins its part.
+    let fits = WindowCensus::from_rows([
+        (day("20260731"), 9),
+        (day("20260801"), 1),
+        (day("20260801"), 2),
+    ]);
+    let (plan, unmeasured) =
+        first_plan(day("20260730"), day("20260801"), &fits, 9, limits).unwrap();
+    assert_eq!(
+        unmeasured, 1,
+        "only the first part is sent before a measurement"
+    );
+    assert_eq!(plan[0].from, day("20260730"));
+    // The same windows refusing at the default are planned as before: divided.
     assert!(first_plan(
         day("20260801"),
         day("20260801"),
         &three_on_one_day(),
         3,
-        limits
+        default_one_floor_two(one, 128)
     )
     .is_ok());
 }
@@ -5537,12 +5581,13 @@ async fn a_census_past_the_floor_ceiling_stops_before_its_next_span() {
     );
 }
 
-/// With two reads allowed, the same census count stops a read refusing at the
-/// default after its first span (three reads at one a read), and a read
-/// refusing at the floor goes on to its second span and reads the window in
-/// two parts, closed on the marks it opened on.
+/// With two reads allowed and three vouchers on one day, a read refusing at
+/// the default is stopped by its census after the first span (three reads at
+/// one a read). A read refusing at the floor finishes the census and is then
+/// refused before any data part, because that day is certain to be divided by
+/// AlterID span: every request it sent is a census request.
 #[tokio::test]
-async fn a_census_between_the_default_and_the_floor_ceilings_is_finished_at_the_floor() {
+async fn a_census_between_the_ceilings_of_a_day_no_read_carries_sends_only_the_census() {
     let limits = reads_of(1, 2);
     let high_water = limits.census_capacity() + 1;
     let counted = relabelled(
@@ -5574,15 +5619,6 @@ async fn a_census_between_the_default_and_the_floor_ceilings_is_finished_at_the_
 
     let mut plans = paired(&xml_plan(counted));
     plans.extend(paired(&xml_plan(empty_collection())));
-    plans.extend(paired(&xml_plan(relabelled(
-        &vouchers_kept(1),
-        &[(1, "20260801")],
-    ))));
-    plans.extend(paired(&xml_plan(relabelled(
-        &vouchers_kept(2),
-        &[(2, "20260801"), (3, "20260801")],
-    ))));
-    plans.extend(paired(&mark(high_water)));
     let (outcome, observed) = read_window(
         plans,
         ("20260801", "20260801"),
@@ -5593,11 +5629,43 @@ async fn a_census_between_the_default_and_the_floor_ceilings_is_finished_at_the_
         limits.refusing_at_the_floor(),
     )
     .await;
-    let read = outcome.unwrap();
-    assert_eq!(read.rows.len(), 3);
-    assert_eq!(read.reads.len(), 2);
-    // Two census spans, two data parts and the closing marks.
-    assert_eq!(observed.len(), 30);
+    let failure = outcome.err().expect("refused before any data part");
+    assert_eq!(failure.code, WINDOW_DIVIDED_BY_ALTERID);
+    let census = [
+        render_agent_voucher_census(
+            &company(),
+            &tally_date("20260801"),
+            &tally_date("20260801"),
+            Some(AlterIdSpan {
+                after: 0,
+                through: limits.census_capacity(),
+            }),
+        ),
+        render_agent_voucher_census(
+            &company(),
+            &tally_date("20260801"),
+            &tally_date("20260801"),
+            Some(AlterIdSpan {
+                after: limits.census_capacity(),
+                through: high_water,
+            }),
+        ),
+    ]
+    .map(|request| request_sha(&request.unwrap()));
+    // Every voucher request sent is one of the two census spans, each sent
+    // twice; the rest are the paired reads' identity brackets and status probes.
+    let vouchers = observed
+        .iter()
+        .filter(|request| {
+            captured_utf16(&request.request_body).contains("<ID>Bridge Agent Voucher")
+        })
+        .map(|request| request.request_body_sha256.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vouchers,
+        [&census[0], &census[0], &census[1], &census[1]].map(|sha| sha.to_string())
+    );
+    assert_eq!(observed.len(), 12);
 }
 
 /// Every read but the tax audit's keeps today's refusal point: the limits each
@@ -5624,16 +5692,15 @@ fn every_shape_refuses_at_the_default_unless_asked() {
 }
 
 /// No read but the tax audit's asks to refuse at the floor. Across every
-/// production source of the app crate, the one call of
-/// [`WindowReadLimits::refusing_at_the_floor`] is the audit window's limits,
-/// and `ReadCountRefusal::AtTheFloor` is named only where it is defined, so
-/// `vouchers`, the registers, `voucher_presence`, `ledger_movement`, the
-/// verification reads and `outstandings` keep the default's refusal point.
+/// production source of the app crate, the only call of
+/// `refusing_at_the_floor` (in any form) and of `audit_window_limits` is the
+/// audit window's, and `AtTheFloor` is named nowhere but the window module,
+/// where it is defined, so `vouchers`, the registers, `voucher_presence`,
+/// `ledger_movement`, the verification reads and `outstandings` keep the
+/// default's refusal point.
 #[test]
 fn only_the_audit_window_refuses_at_the_floor() {
     let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut calls = Vec::new();
-    let mut named = Vec::new();
     let mut files = Vec::new();
     let mut pending = vec![source.clone()];
     while let Some(directory) = pending.pop() {
@@ -5651,72 +5718,100 @@ fn only_the_audit_window_refuses_at_the_floor() {
         "the app crate's sources were read: {}",
         files.len()
     );
+    let mut calls = Vec::new();
+    let mut named = Vec::new();
     for path in files {
+        let file_name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if file_name == "tests.rs" || file_name.ends_with("_tests.rs") {
+            continue;
+        }
         let name = path
             .strip_prefix(&source)
             .unwrap()
             .to_string_lossy()
             .into_owned();
-        if name.ends_with("_tests.rs") || name.ends_with("/tests.rs") {
-            continue;
-        }
         let text = std::fs::read_to_string(&path).unwrap();
         calls.extend(
-            text.matches(".refusing_at_the_floor()")
-                .map(|_| name.clone()),
+            text.matches("refusing_at_the_floor(")
+                .chain(text.matches("audit_window_limits("))
+                .map(|call| (name.clone(), call.to_string())),
         );
-        named.extend(
-            text.matches("ReadCountRefusal::AtTheFloor")
-                .map(|_| name.clone()),
-        );
+        named.extend(text.matches("AtTheFloor").map(|_| name.clone()));
     }
-    assert_eq!(calls, ["agent_audit_read.rs"]);
+    calls.sort();
+    assert_eq!(
+        calls,
+        [
+            ("agent_audit_read.rs", "audit_window_limits("),
+            ("agent_audit_read.rs", "audit_window_limits("),
+            ("agent_audit_read.rs", "refusing_at_the_floor("),
+            ("agent_voucher_window.rs", "refusing_at_the_floor("),
+        ]
+        .map(|(file, call)| (file.to_string(), call.to_string()))
+    );
     assert!(
         named.iter().all(|name| name == "agent_voucher_window.rs"),
         "{named:?}"
     );
 }
 
-/// The floor plan at the production figures, through the planner: the issue's
-/// 6,000 vouchers at 25 a day are admitted, and dense days, about one read
-/// each at the floor, refuse below 10,837: 127 days of 82 are admitted
-/// (10,414 vouchers, 128 reads) and 128 days are not (10,496).
+/// The floor plan at the production figures, through the planner. Refusing at
+/// the floor, a read holds 42 vouchers at the default figure and 85 at the
+/// floor. The issue's 6,000 vouchers at 25 a day are admitted. A first day of
+/// 40 and then 127 days of 85 (10,835 vouchers, 128 reads) are admitted, and
+/// 128 such days are not (129 reads). A day of 82 first, or a later day of 86,
+/// is refused before any count: the audit cannot read it whole.
 #[test]
-fn the_floor_plan_admits_light_days_and_refuses_dense_days_below_the_ceiling() {
+fn the_floor_plan_admits_whole_days_up_to_the_ceiling_and_refuses_a_divided_day() {
     let limits =
         WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).refusing_at_the_floor();
-    let admit = |days: u64, per_day: u64| {
-        let first = day("20250401");
-        let census = WindowCensus::from_rows((0..days).flat_map(|offset| {
-            let date = first.checked_add_days(chrono::Days::new(offset)).unwrap();
-            (1..=per_day).map(move |index| (date, offset * per_day + index))
-        }));
-        let last = first.checked_add_days(chrono::Days::new(days - 1)).unwrap();
-        let ceiling = days * per_day;
-        let plan = plan_window_reads(
-            first,
-            last,
-            &census,
-            None,
-            ceiling,
-            limits.default_bytes_per_voucher,
-            limits.budget_bytes,
-            usize::MAX,
-        )
-        .unwrap();
-        admit_at_the_floor(&plan, last, &census, ceiling, limits)
+    let first = day("20250401");
+    let admit = |per_day: &[u64]| {
+        let mut next = 0;
+        let census =
+            WindowCensus::from_rows(per_day.iter().enumerate().flat_map(|(offset, count)| {
+                let date = first
+                    .checked_add_days(chrono::Days::new(offset as u64))
+                    .unwrap();
+                let ids = (next + 1..=next + count)
+                    .map(move |id| (date, id))
+                    .collect::<Vec<_>>();
+                next += count;
+                ids
+            }));
+        let last = first
+            .checked_add_days(chrono::Days::new(per_day.len() as u64 - 1))
+            .unwrap();
+        let ceiling = per_day.iter().sum();
+        first_plan(first, last, &census, ceiling, limits)
+            .map(|(plan, unmeasured)| (plan.len(), unmeasured))
     };
-    admit(240, 25).expect("6,000 light vouchers are admitted");
-    admit(127, 82).expect("127 dense days are admitted");
+    assert_eq!(admit(&[25; 240]).map(|(_, unmeasured)| unmeasured), Ok(1));
+    let mut dense = vec![40];
+    dense.extend([85; 127]);
+    assert!(admit(&dense).is_ok());
+    dense.push(85);
     assert_eq!(
-        admit(128, 82),
+        admit(&dense),
         Err(PlanRefusal::TooManyReads {
             reads: 129,
             allowed: 128,
         })
     );
+    assert_eq!(
+        admit(&[82; 127]),
+        Err(PlanRefusal::DayDividedBySpan { day: first })
+    );
+    let mut later = vec![40, 85];
+    later.push(86);
+    assert_eq!(
+        admit(&later),
+        Err(PlanRefusal::DayDividedBySpan {
+            day: first.checked_add_days(chrono::Days::new(2)).unwrap()
+        })
+    );
     // A window the first part covers whole: nothing is left to re-plan.
-    admit(1, 30).expect("one part");
+    assert_eq!(admit(&[30]), Ok((1, 1)));
 }
 
 /// The ceilings at the production figures: 42 vouchers a read at the default

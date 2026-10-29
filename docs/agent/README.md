@@ -980,7 +980,8 @@ and Tally may still be building its answer: nothing was sent. ComplyEaze Bridge 
 clear that, so the refusal stays until ComplyEaze Bridge is restarted; look at Tally first), `C6-moved`
 and `voucher_window_changed_during_read` (someone changed the book during the read: it may be tried
 again), `audit_window_divided_by_alterid` (a day too heavy for one request: the read is refused, because
-the engine's windows must tile the period by date), `BIND-GROUP-UNKNOWN` (a group named in `cash_groups`
+the engine's windows must tile the period by date; refused before any voucher is read when the count
+shows it, over 42 vouchers on the first day that holds any or over 85 on a later day), `BIND-GROUP-UNKNOWN` (a group named in `cash_groups`
 or `bank_groups` is not in the book: check the spelling against `masters` with `kind=groups`), the
 engine's other rule codes for a read it does not admit (`C1-...` to `C11-...`, `CFG-...`), and the
 tool's own: `audit_test_refused` (the test refused the book without a rule code), `audit_book_refused`,

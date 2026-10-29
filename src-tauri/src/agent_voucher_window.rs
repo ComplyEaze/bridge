@@ -239,6 +239,10 @@ pub(super) enum PlanRefusal {
     /// The window divides, but into more reads than one call may spend:
     /// `reads` needed (at least) against the `allowed` allowance.
     TooManyReads { reads: usize, allowed: usize },
+    /// Refusing at the floor, `day` holds more vouchers than any read of it
+    /// can carry, so every plan divides it by AlterID span, which a read whose
+    /// parts must tile its window by date cannot use (#2173).
+    DayDividedBySpan { day: NaiveDate },
 }
 
 impl PlanRefusal {
@@ -246,6 +250,7 @@ impl PlanRefusal {
         match self {
             Self::VoucherOverBudget { .. } => "voucher_window_part_over_budget",
             Self::TooManyReads { .. } => "voucher_window_too_many_reads",
+            Self::DayDividedBySpan { .. } => WINDOW_DIVIDED_BY_ALTERID,
         }
     }
 
@@ -258,10 +263,16 @@ impl PlanRefusal {
                 needed_at_least: reads,
                 allowed,
             }),
-            Self::VoucherOverBudget { .. } => failure,
+            Self::VoucherOverBudget { .. } | Self::DayDividedBySpan { .. } => failure,
         }
     }
 }
+
+/// A window plan that divides a day by AlterID span cannot become the tax
+/// audit's read: its windows must tile the period by date (C7). Refused before
+/// any data part when the census makes it certain (#2173), and after the read
+/// when a measured part makes it so.
+pub(super) const WINDOW_DIVIDED_BY_ALTERID: &str = "audit_window_divided_by_alterid";
 
 /// Neither the high-water mark nor a census could describe the window, so no
 /// prediction exists. Refused rather than sent: an unestimated read is exactly
@@ -727,13 +738,17 @@ fn rest_after(
 /// reads than the limits allow at their refusal point. Refusing at the floor,
 /// the plan at the default figure is only how the first part is read, and the
 /// read count is admitted against the plan that follows it (#2173).
+///
+/// With the plan comes how many of its parts may be sent before one is
+/// measured: the whole allowance at the default; at the floor, only the parts
+/// the admission counted up to the first that holds vouchers.
 fn first_plan(
     first: NaiveDate,
     last: NaiveDate,
     census: &WindowCensus,
     ceiling: u64,
     limits: WindowReadLimits,
-) -> Result<Vec<PlannedRead>, PlanRefusal> {
+) -> Result<(Vec<PlannedRead>, usize), PlanRefusal> {
     let allowed = match limits.read_count_refusal {
         ReadCountRefusal::AtTheDefault => limits.max_reads,
         ReadCountRefusal::AtTheFloor => usize::MAX,
@@ -748,10 +763,13 @@ fn first_plan(
         limits.budget_bytes,
         allowed,
     )?;
-    if limits.read_count_refusal == ReadCountRefusal::AtTheFloor {
-        admit_at_the_floor(&plan, last, census, ceiling, limits)?;
-    }
-    Ok(plan)
+    let unmeasured = match limits.read_count_refusal {
+        ReadCountRefusal::AtTheDefault => limits.max_reads,
+        ReadCountRefusal::AtTheFloor => {
+            admit_at_the_floor(&plan, (first, last), census, ceiling, limits)?
+        }
+    };
+    Ok((plan, unmeasured))
 }
 
 /// Refusing at the floor (#2173): admit a window planned at the default figure
@@ -762,22 +780,44 @@ fn first_plan(
 /// re-plan a first measurement at or under the floor makes, so a refusal here
 /// is certain. A window admitted here can still be refused later, when a part
 /// measures heavier than the floor.
+///
+/// Before the count, a day certain to be divided by AlterID span is refused:
+/// the first day that holds vouchers, over what one read holds at the default
+/// figure, or any later day over what one holds at the floor. Returns how many
+/// parts are sent up to and including the first measured one.
 fn admit_at_the_floor(
     plan: &[PlannedRead],
-    last: NaiveDate,
+    (first, last): (NaiveDate, NaiveDate),
     census: &WindowCensus,
     ceiling: u64,
     limits: WindowReadLimits,
-) -> Result<(), PlanRefusal> {
+) -> Result<usize, PlanRefusal> {
+    let at_default = vouchers_per_read(limits.budget_bytes, limits.default_bytes_per_voucher);
+    let at_floor = vouchers_per_read(
+        limits.budget_bytes,
+        planning_figure(limits.default_bytes_per_voucher, 0),
+    );
+    let mut voucher_days = census
+        .days
+        .range(first..=last)
+        .filter(|(_, ids)| !ids.is_empty())
+        .map(|(day, ids)| (*day, ids.len() as u64));
+    let first_day = voucher_days.next();
+    if let Some((day, _)) = first_day
+        .filter(|(_, vouchers)| *vouchers > at_default)
+        .or_else(|| voucher_days.find(|(_, vouchers)| *vouchers > at_floor))
+    {
+        return Err(PlanRefusal::DayDividedBySpan { day });
+    }
     let Some(measured) = plan.iter().position(|read| read.vouchers > 0) else {
-        return Ok(());
+        return Ok(plan.len());
     };
     let sent = measured + 1;
     let first = &plan[measured];
     let Some((rest, resume_after)) =
         rest_after(first.to, first.span, ceiling).filter(|(rest, _)| *rest <= last)
     else {
-        return finish(plan[..sent].to_vec(), limits.max_reads).map(|_| ());
+        return finish(plan[..sent].to_vec(), limits.max_reads).map(|_| sent);
     };
     plan_window_reads(
         rest,
@@ -789,7 +829,7 @@ fn admit_at_the_floor(
         limits.budget_bytes,
         limits.max_reads.saturating_sub(sent),
     )
-    .map(|_| ())
+    .map(|_| sent)
     .map_err(|refusal| match refusal {
         PlanRefusal::TooManyReads { reads, .. } => PlanRefusal::TooManyReads {
             reads: sent + reads,
@@ -1005,7 +1045,9 @@ pub(super) enum ReadCountRefusal {
     /// Before any data part only when even the plan the read would make after
     /// a first part measured at the floor needs too many; otherwise after the
     /// first measured part, when its re-plan does. For a window that cannot be
-    /// narrowed: the tax audit's period.
+    /// narrowed: the tax audit's period. That read's parts must also tile it by
+    /// date, so a day no read can carry whole is refused before any data part
+    /// too ([`PlanRefusal::DayDividedBySpan`]).
     AtTheFloor,
 }
 
@@ -1989,6 +2031,8 @@ where
     let mut boundary: Option<DateBoundaryProfile> = None;
     let mut census = None;
     let mut ceiling = 0;
+    // How many parts may be sent before one is measured ([`first_plan`]).
+    let mut unmeasured = limits.max_reads;
     let mut bytes_per_voucher = limits.default_bytes_per_voucher;
     // A stack whose pops are in order and whose parts always tile the part
     // of the window not yet read, so the rows arrive in order.
@@ -2073,8 +2117,9 @@ where
                     ceiling = marks
                         .map_or(0, |marks| marks.vouchers())
                         .max(counted.max_alter_id());
-                    let plan = first_plan(first, last, &counted, ceiling, limits)
+                    let (plan, admitted) = first_plan(first, last, &counted, ceiling, limits)
                         .map_err(|refusal| with_prior(refusal.into_failure(), &preflight, &None))?;
+                    unmeasured = admitted;
                     census = Some(counted);
                     stack_of(&plan).map_err(|failure| with_prior(failure, &preflight, &None))?
                 }
@@ -2111,7 +2156,9 @@ where
             // plan is made: a part divided after Tally could not serve it, or
             // split because a sibling could not be served, costs a request
             // no plan counted.
-            if dispatched >= limits.max_reads {
+            // Refusing at the floor, a read sends no more than its admission
+            // counted before a part is measured (#2173).
+            if dispatched >= limits.max_reads || (!measured && dispatched >= unmeasured) {
                 return Err(PlanRefusal::TooManyReads {
                     reads: dispatched + 1 + pending.len(),
                     allowed: limits.max_reads,

@@ -1,0 +1,10 @@
+# sha256  bytes  file
+dbd1ec276034954ab8be2d4a51b09c877ca9ce4fe65c0cb94571b7f0bbd427d7  61  .gitattributes
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+12055130a6a054d2263591f66e44dd190b8950df8b6b627c34988721e630c2a5  8792  README.md
+8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py
+8a527cab50a05dbbe5e12cd7c65ce42a3baa2fea9a7066558aa0cfe7963d3f63  1272  requests/n1-stock-items-to-20250831.utf16le.xml
+ac2818c36086ade4d9cfb28720f4d2b96b0b6f607278c5466bf076cc43bd70c6  1272  requests/n1-stock-items-to-20250930.utf16le.xml
+b56c6bdc058f3c066116d11ace14b52381a9d31e22705b040c1c3fe9bf87353b  772  requests/n2-stock-summary-report-to-20250831.utf16le.xml
+cbdd7658148f83352f33d54560eab3c99fdab604b9c1460774686f5cbca01909  772  requests/n2-stock-summary-report-to-20250930.utf16le.xml
+bf5197c0ddac03788a1de135b1b99315b2fe612f6bc858e7e88307ae6b1b2640  1654  requests/n3-company-flags.utf16le.xml

@@ -12,6 +12,7 @@
 - The answer holds 40 `<VOUCHER` tags in 139,664 bytes: about 3,492 bytes per row on the wire, or 85 % of 4,096, about 1,746 bytes in UTF-8.
 - That is about 0.16 rows per id.
 - These figures did not come from `census_read.py`, and the envelope is not separated out.
+- Added after review: the text pattern was `<VOUCHER[ >]`, so the count is at most 40 rows (a CMPINFO count line or a VOUCHER element that is not a row could be in it), and 3,492 bytes per row is a lower bound. The answer was deleted at step 9 before a re-read with the `UDF` prefix bound could be made.
 
 Reads only. The marks M1 equal M0 (voucher and master marks both equal; same company). THE BOOK was the only company loaded.
 

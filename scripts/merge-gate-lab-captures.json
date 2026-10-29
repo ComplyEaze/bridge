@@ -2080,6 +2080,166 @@
       "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
       "sha256": "52c33f519c9e5ee390d44ef30223ad46f8b3bbbe2c71e02a5c995e0672043df3",
       "size": 3434
+    },
+    {
+      "blob": "3b400a2333e01603da8d510e821540da376b8b63",
+      "capture_id": "stock_items_nested_lab_fy_request.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_nested_lab_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7c6770b2e18f146fd69c71d4f381bde63833366da99d69a0d54ef8e304d01b07",
+      "size": 1272
+    },
+    {
+      "blob": "cd7d4f52061edeadbbd33060594883be16d3070d",
+      "capture_id": "stock_items_nested_lab_fy_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_nested_lab_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ba77d8a0dc343b8eaf767803bbc4ee2cf5c4de2e22c4b0cee5a3527c3758fd41",
+      "size": 13954
+    },
+    {
+      "blob": "d6b2e4108c2eaabe9f88a078e60106404a896ba8",
+      "capture_id": "stock_summary_report_nested_lab_fy_request.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_nested_lab_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d7d0b8c17f3c93f2f656baf3ec51cc1d37aabd601d4677632465aa4e7810c3f0",
+      "size": 772
+    },
+    {
+      "blob": "5a9b158e0912573133721a0b8f100687d0cbb62a",
+      "capture_id": "stock_summary_report_nested_lab_fy_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_nested_lab_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937",
+      "size": 948
+    },
+    {
+      "blob": "62dcf13aa440ba0f653336dd614cd56783fa7492",
+      "capture_id": "company_inventory_flags_nested_lab_request.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_nested_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "bf5197c0ddac03788a1de135b1b99315b2fe612f6bc858e7e88307ae6b1b2640",
+      "size": 1654
+    },
+    {
+      "blob": "c838c4114efa89a5c1d9a0a3feb7f621e05a595b",
+      "capture_id": "company_inventory_flags_nested_lab_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_nested_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "425bfe9724052a00034755b5463db70a446f8c0586db41e9b4c8e58370865b5c",
+      "size": 4920
+    },
+    {
+      "blob": "fdab673ab710f752b1ea7531cd7992392a0c4295",
+      "capture_id": "company_inventory_flags_tieout_d_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_tieout_d_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "19a29941331fec29e44557eb964bd50623d0b7307d9951d987defc03dd5e1905",
+      "size": 1638
+    },
+    {
+      "blob": "2500c34db81ff612ebf08cd1df3c86b7327e8705",
+      "capture_id": "company_inventory_flags_tieout_d_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_tieout_d_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "84e0a5be2487af5d65029b3eb736c5fca7381de186d10bc3f0d7a9e29bf34104",
+      "size": 4886
+    },
+    {
+      "blob": "6fe14cd168bdd03664819e193d890563689deb55",
+      "capture_id": "stock_items_tieout_d_to_20250930_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_tieout_d_to_20250930_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "45445f60dfd7f10c668b8a0748bf90256d004572778e3fcceaeaaa525a90603a",
+      "size": 1256
+    },
+    {
+      "blob": "cf8bc2c76aa4387468caf82bebaebd355d35b358",
+      "capture_id": "stock_items_tieout_d_to_20250930_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_tieout_d_to_20250930_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "2a85a2a3487cad003696f3ca893c024a53bfc8a7ae6f53b10c194053d3cd2c4a",
+      "size": 4356
+    },
+    {
+      "blob": "4225d6a447c0c7751aa06e4ccfc480da5598ec5f",
+      "capture_id": "stock_summary_report_tieout_d_to_20250930_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_tieout_d_to_20250930_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d621a687e49f41574c7d137f9a8d586d3a8027ceefa086cbf593a77ab654fccc",
+      "size": 756
+    },
+    {
+      "blob": "37cbdb257b75ebe4e430507e5530302be906ba8e",
+      "capture_id": "stock_summary_report_tieout_d_to_20250930_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_tieout_d_to_20250930_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6ea369d19adb9d08bf3883d186744d6d705e625e21516d876df131f0881516a7",
+      "size": 510
+    },
+    {
+      "blob": "988f42e6b3e92cbaa9bd446389679744ec260b1c",
+      "capture_id": "stock_items_tieout_d_to_20250531_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_tieout_d_to_20250531_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "47072bc7f8c1484953bde1e71d395d3611867c4800980a7f47e3836a4f02e384",
+      "size": 1256
+    },
+    {
+      "blob": "f67187aadcc0e2c211294302cc2cef6b68c1461e",
+      "capture_id": "stock_items_tieout_d_to_20250531_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_tieout_d_to_20250531_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c6414fcc1f628395d0a82cd474a548504655c77776799f9f707576cda996c3fc",
+      "size": 4356
+    },
+    {
+      "blob": "e5736cc433b2a17ca22b7bb027911042050588f0",
+      "capture_id": "stock_summary_report_tieout_d_to_20250531_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_tieout_d_to_20250531_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "db9f85b3a8aff078fba801f0fc8e1a6a37b68dd3841dee29c45536445e275c3e",
+      "size": 756
+    },
+    {
+      "blob": "fdbd7c8e208bde8649f112380956d381dcf3204e",
+      "capture_id": "stock_summary_report_tieout_d_to_20250531_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_tieout_d_to_20250531_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "64f67059e3a921e4c96cd7bf059b7397e18ddea71cd79b4b4f715da7b68efe71",
+      "size": 510
     }
   ]
 }

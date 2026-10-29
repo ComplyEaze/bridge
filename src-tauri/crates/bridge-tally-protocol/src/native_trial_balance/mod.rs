@@ -23,7 +23,11 @@ pub enum NativeTrialBalanceAmount {
     PresentEmpty,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+/// Not `Serialize`, so a row cannot be written by derive: the desktop writes it only through its
+/// presenter, which also says whether its own columns add up
+/// ([`NativeTrialBalanceRow::movements`]). The MCP answer and the statements build their own
+/// JSON from the fields and run the same check (#2068).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeTrialBalanceRow {
     pub name: String,
     pub guid: String,
@@ -86,7 +90,8 @@ impl NativeTrialBalanceRow {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+/// Not `Serialize`, for the reason [`NativeTrialBalanceRow`] gives.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeTrialBalance {
     pub rows: Vec<NativeTrialBalanceRow>,
 }

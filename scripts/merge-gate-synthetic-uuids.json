@@ -206,6 +206,10 @@
       "note": "company identifier of the synthetic lab company BRIDGE CORPUS FOREX, created in the lab with invented masters, as Tally returned it in the several-currency captures committed in September 2026 (FOREX_601D_CAPTURE_PROVENANCE.md and the other FOREX captures under the protocol crate's test fixtures); the tests use it as that company's identifier"
     },
     {
+      "uuid": "4b6094e2-d6db-46b6-a4ad-90c283cd1b52",
+      "note": "company identifier of the synthetic lab company BRIDGE NESTED STOCK LAB (number 100086), created in the lab on 27 October 2026 with invented units, stock groups and stock items and two Stock Journal vouchers keyed by hand, as Tally returned it in read-only captures that day (lab branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb); the stock item identifiers in the same capture carry it as a prefix, which the scan reads as the same value"
+    },
+    {
       "uuid": "ddf3a557-704c-4f61-ae8d-46a3380062a1",
       "note": "company identifier of the synthetic lab company BRIDGE COST KEY LAB, created in the lab on 27 October 2026 with invented masters and two vouchers keyed by hand, as Tally returned it in read-only captures of that day (lab branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536); the voucher identifiers in the same captures are this value with a suffix"
     },

@@ -5,11 +5,6 @@ use bridge_tally_protocol::native_trial_balance::{
 };
 use bridge_tally_protocol::tally_root_as_sent;
 
-/// The first limitation when a ledger's closing is not its opening plus its debit and credit
-/// totals (#2068). Measured on a Closing Stock ledger with a closing balance keyed on Tally's
-/// screen, on two synthetic TallyPrime 7.2 books (one integrated with inventory, one not).
-const MOVEMENTS_DIFFER_LIMITATION: &str = "{count} ledger(s) carry movements_differ_by: their closing is not their opening plus their debit and credit totals, counting an empty amount as zero. Each is returned as Tally sent it and nothing is corrected. On the books measured this was a Closing Stock ledger whose closing balance was keyed on Tally's screen: Tally kept the opening as the closing and showed the change only in the debit total. The closing of such a ledger is not necessarily the figure Tally's statements use: on the book not integrated with inventory they used the keyed figure, and on the integrated one they valued the stock from the stock item. The column totals include the closing as sent.";
-
 /// One ledger of the answer, as Tally sent it, and whether its own columns do not add up. Such a
 /// row also carries `movements_differ_by`: closing minus opening, debit and credit (#2068).
 fn ledger_row(row: NativeTrialBalanceRow) -> (Value, bool) {
@@ -221,7 +216,8 @@ impl Server {
             let at = usize::from(frame["scope_label"].is_string());
             list.insert(
                 at,
-                json!(MOVEMENTS_DIFFER_LIMITATION.replace("{count}", &count.to_string())),
+                json!(crate::reports::trial_balance::MOVEMENTS_DIFFER_LIMITATION
+                    .replace("{count}", &count.to_string())),
             );
         }
         result["limitations"] = limitations;

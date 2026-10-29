@@ -1,6 +1,8 @@
 //! Renders a completed native Trial Balance observation; it never contacts Tally.
 
-use bridge_tally_protocol::native_trial_balance::NativeTrialBalanceAmount;
+use bridge_tally_protocol::native_trial_balance::{
+    NativeTrialBalanceAmount, NativeTrialBalanceMovements,
+};
 use rust_xlsxwriter::{Format, Workbook, XlsxError};
 
 use super::party_statement_xlsx::amount_to_f64;
@@ -26,7 +28,19 @@ pub enum TrialBalanceXlsxError {
 pub fn render_trial_balance_xlsx(
     read: &TrialBalanceRead,
 ) -> Result<Vec<u8>, TrialBalanceXlsxError> {
-    if read.report.rows.len().saturating_add(19) > EXCEL_MAX_ROWS {
+    // A ledger whose columns do not add up (#2068) adds one line above the table and a column;
+    // a read with none renders exactly as before.
+    let movements_differ =
+        crate::reports::trial_balance::movements_differ_limitation(&read.report.rows);
+    let extra_rows = usize::from(movements_differ.is_some());
+    if read
+        .report
+        .rows
+        .len()
+        .saturating_add(19)
+        .saturating_add(extra_rows)
+        > EXCEL_MAX_ROWS
+    {
         return Err(TrialBalanceXlsxError::RowLimit);
     }
     let partial = match &read.ledger_scope {
@@ -112,6 +126,14 @@ pub fn render_trial_balance_xlsx(
         sheet.set_row_height(row, 120)?;
         row += 1;
     }
+    if let Some(limitation) = &movements_differ {
+        sheet.write_string_with_format(row, 0, "Ledgers that do not add up", &bold)?;
+        sheet.write_string_with_format(row, 1, limitation, &wrapped)?;
+        // About 660 characters: at the 270-character, six-line calibration of the limitation row
+        // above, about fifteen lines.
+        sheet.set_row_height(row, 225)?;
+        row += 1;
+    }
     row += 1;
 
     for (column, label) in [
@@ -128,6 +150,9 @@ pub fn render_trial_balance_xlsx(
     {
         sheet.write_string_with_format(row, column as u16, label, &bold)?;
     }
+    if movements_differ.is_some() {
+        sheet.write_string_with_format(row, 7, "movements_differ_by (source signed)", &bold)?;
+    }
     let header = row;
     row += 1;
     for item in &read.report.rows {
@@ -141,6 +166,10 @@ pub fn render_trial_balance_xlsx(
             (6, &item.closing),
         ] {
             write_amount(sheet, row, column, value, &amount)?;
+        }
+        // Closing minus opening, debit and credit, in Tally's sign, on a row that does not add up.
+        if let NativeTrialBalanceMovements::Differ(gap) = item.movements() {
+            sheet.write_number_with_format(row, 7, decimal(&gap)?, &amount)?;
         }
         row += 1;
     }
@@ -214,12 +243,13 @@ pub fn render_trial_balance_xlsx(
         )?;
     }
 
+    let last_amount_column = if movements_differ.is_some() { 7 } else { 6 };
     sheet.set_freeze_panes(header + 1, 1)?;
-    sheet.autofilter(header, 0, last_ledger_row, 6)?;
+    sheet.autofilter(header, 0, last_ledger_row, last_amount_column)?;
     sheet.set_column_width(0, 34)?;
     sheet.set_column_width(1, 48)?;
     sheet.set_column_width(2, 28)?;
-    for column in 3..=6 {
+    for column in 3..=last_amount_column {
         sheet.set_column_width(column, 22)?;
     }
     if let Some((base_name, foreign, mixed)) = partial {

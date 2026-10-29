@@ -7,8 +7,9 @@
 - **The sheet's reading:** "F0 to F4 all read 1": the lab's parents do not reproduce C1. **Go on to D.**
 - **Part D: not run: needs the owner at the PC.**
 - **R1:** no field the reader reads separates C1's child from the cells that read 1.
+- **Added cell F1d (forward commit): a lab parent loses the bit too, when Tally had the last input.** F1's exact command, run after an 8 s wait, with Tally's title clicked once after the parent's console window was up and no input until the box: **F1d-2 and F1d-3 both read 0** (0x00010101 from the first block), with the same spawn context as F1, which read 1. The first try, F1d, read 1, but its Tally click came before the console window opened, so the console held the foreground. By the requester's reading, a 0 here puts the cause on the foreground lock or input recency, not on the spawner. See "Cell F1d" below.
 
-Nothing was posted. The marks were 224/87 before and after. Every box but one was answered No by mouse. The one exception, part R's box, ended when its taskbar thumbnail was clicked; neither No nor Yes was pressed. No key was pressed while a box existed.
+Nothing was posted. The marks were 224/87 before and after. Every box but one in parts F, G and T was answered No by mouse. Part R's box ended when its taskbar thumbnail was clicked, with neither No nor Yes pressed. F1d-2's and F1d-3's boxes were ended by spawn-parent's own 60 s bound (the sheet's carve-out), unanswered. No key was pressed while a box existed.
 
 The sheet is `lab/1780-topmost-spawn` at ac1d9da957856332718a912512e903a4fb3cb502. `SHA256.txt` matched for every file before P0.
 
@@ -150,6 +151,31 @@ Their integrity, appcontainer, session, wow64 and desktop are the same in all te
 - **The pids are right; only the names are one step off.**
 - **A correction to the lab's own first reading:** read as written, the chain suggested a second bridge_mcp.exe as the server's parent. That was this shift; the server's parent is python.exe.
 
+## Cell F1d: F1 with Tally holding the last input (added 29 Oct, after the first push)
+The recipe:
+- F1's exact spawn-parent line (child, tokio, interactive), run from a `.cmd` whose first line is `powershell -NoProfile -Command Start-Sleep -Seconds 8`;
+- Tally's title clicked once after the start;
+- no other input until the box, then the usual T0+14 click, probes, and No or the taskbar.
+
+| cell | title click | spawn-parent, its parent | box | first block: exstyle, topmost, fg_pid | T0+8 and +11 (box; Tally) | after the T0+14 click | end | reads |
+|---|---|---|---|---|---|---|---|---|
+| F1d | 43 ms after the start, before the console window opened | powershell.exe 7536, cmd.exe 4988 | 11496 | 0x00010109, 1, the box | 1,1,1; 5,0,0 | box 1,1,0 above Tally | No by mouse, T0+29.32 s | 1 |
+| F1d-2 | 4.06 s after the start, the console window up | powershell.exe 15700, cmd.exe 21160 | 26788 | **0x00010101, 0**, the box | **3,0,1**; 4,0,0 | Tally 3,0,1 above the box 4,0,0 | not answered: the 60 s bound, `killed_after_timeout` | **0** |
+| F1d-3 | 4.14 s after the start | powershell.exe 25388, cmd.exe 18036 | 13948 | **0x00010101, 0**, the box | **3,0,1**; 4,0,0 | Tally above the box; one taskbar click at (756,844) raised the reader's own PowerShell window, not the box | not answered: the 60 s bound | **0** |
+
+- **The context is the same as F1's.** F1d-2's and F1d-3's ctx lines equal F1's for the child (in_job False, integrity 0x2000, startf 0x100, show_window 0, WinSta0\Default) and for its parent (startf 0x0, show_window 1). F1 read 1, and F1d-2 and F1d-3 read 0.
+- **What changed between F1 and F1d-2:**
+  - the last input before the box: in F1d-2 it was a click on Tally, 8 s before the spawn;
+  - the wait between the parent's start and the spawn.
+- **The box still took the foreground at its first block** in both 0 cells (fg_pid = the box), yet without the topmost bit, at z 3 under two other windows.
+- **F1d did not test the point.** Its title click came before the parent's console window opened, and that console then held the foreground until the box. It is kept as run, reading 1.
+- **The trace cannot see** which window had the foreground before the box's first block.
+
+**A correction this cell brought to light.** The traces show where the T0+14 click landed:
+- **The interactive cells (F0, F1, G1, T, F1d):** the click at logical (263,475) landed on the parent's own console window, which lay over Tally there. fg_pid moved to the cell's cmd.exe, not to Tally.
+- **The hidden and launcher cells (F2, F3, F4, G2, G3):** the click landed on Tally (fg_pid 13992).
+- **The readings stand:** they come from the box's exstyle, not from the click.
+
 ## Deviations
 1. **Working folder:** a new folder on the lab PC, not the sheet's `1780f` folder, which already holds an earlier row's files. Pushed copies say `<lab folder>`.
 2. **B5's first run listed 3 processes:** the lab's own shell, whose command line held the markers, because it ran B5, B3 and B3c in one line. Run alone, it listed 0.
@@ -164,6 +190,11 @@ Their integrity, appcontainer, session, wow64 and desktop are the same in all te
    - The lab then clicked the box's thumbnail ONCE at (756,747) to bring it up for the No, and the box ended at that click.
    - No Yes was pressed by click or key, and nothing was dispatched (egress, local report, marks).
    - The box ended when activated from the taskbar without being answered, which matches row 1780-E's taskbar click. The child's stderr was discarded by the server, so its fit line is not known.
+7. **F1d's 8 s wait is the `.cmd`'s first line,** not typed in the console before F1's line. The lab types nothing into a console. The spawn-parent line is F1's, byte for byte.
+8. **F1d-2's and F1d-3's boxes were not answered No.** Each lay below Tally after the T0+14 click.
+   - In F1d-2 the runner's 30 s wait for a taskbar position ran out, and nothing was clicked.
+   - In F1d-3 one taskbar click at (756,844) raised the reader's PowerShell window, not the box.
+   - Both children were ended by spawn-parent's 60 s bound (`killed_after_timeout`), the sheet's named carve-out. No Yes was pressed; in part F a Yes posts nothing.
 
 ## Reading
 - **F0 to F4 all read 1:** the lab's parents do not reproduce C1, and the sheet says go on to D.
@@ -171,6 +202,7 @@ Their integrity, appcontainer, session, wow64 and desktop are the same in all te
 - **C1 read 0 again:** this sitting agrees with 1780-E.
 - **T4 was not reached:** the box stayed above Tally. Part T therefore says nothing about the taskbar close. Part R's box ended at a taskbar activation again.
 - **Part D: not run: needs the owner at the PC.**
+- **F1d-2 and F1d-3 read 0:** F1's context loses the bit when Tally had the last input, 8 s before the spawn. By the requester's reading, the cause is the foreground lock or input recency, not the spawner. Two runs, one sitting.
 
 **FAIL checks:**
 - No Yes; no post; marks unchanged.

@@ -1,11 +1,15 @@
 Pushed copies that differ from the files kept on the lab PC: lab-PC paths replaced by placeholders (<lab folder> is the row's working folder, <build folder> BUILD-T's folder, <path> an install folder under the signed-in user's profile). Each changed file, with the original's bytes and sha256 and what was replaced. The originals stay on the lab PC.
 answers/003-c0-build.json: original 10677 B sha256 b3394fd5c6c21a25753ac92e738e8771d294f0e1c41ba44f252b99a9895a1110; 2 x -> <lab folder>
 evidence/b3-timeline.txt: original 837 B sha256 94b14b2fb697d8c8f6c495b49fa6482d49b9fdaafbf0219c723bf6b696f5d80a; 3 x -> <lab folder>
+evidence/b5-after-f1d.txt: original 447 B sha256 9da02a0314362fa17d52782bd1358a0fd958620e0ab683b05c3b271dc420ac68; 3 x -> <lab folder>
 evidence/c-timeline.txt: original 3180 B sha256 9340b26e76ddf7d13b81d4f907d3550fab2dc99d305fc3e1892d2c95c184127e; 2 x -> <build folder>; 4 x -> <lab folder>
 evidence/ctx-c1.txt: original 2063 B sha256 48c833ee0938a0553332dbd2f454ef754c50a13977ff083d9dc525c74a5d08a3; 2 x -> <build folder>; 1 x -> <path>\; 3 x -> <desktop client>
 evidence/ctx-check.txt: original 1080 B sha256 8b4e84f28b7361f6660db125aecd12a6985ec7f42713b3901a015804543b04aa; 1 x -> <lab folder>
 evidence/ctx-f0.txt: original 1838 B sha256 5498c18e86859cdfe848fe6860a8428b335bb9a5d6fa201eac4ffa47dc5c45e6; 2 x -> <build folder>; 3 x -> <lab folder>
 evidence/ctx-f1.txt: original 1836 B sha256 c073ceecb4984fa52b9cc232ae481a0d731f62a16ee15c34b3c5fa5d47d72e09; 2 x -> <build folder>; 3 x -> <lab folder>
+evidence/ctx-f1d-2.txt: original 1875 B sha256 ff780811fe7e723d0c679a0afaf2bca99e1e10e44f1e3687ff08023740309f4d; 2 x -> <build folder>; 3 x -> <lab folder>
+evidence/ctx-f1d-3.txt: original 1876 B sha256 cf5933d21e5489a0b2fcbb1878034ac1abb60ccc6dcd8c1cfcf4d2e96b2a229b; 2 x -> <build folder>; 3 x -> <lab folder>
+evidence/ctx-f1d.txt: original 1867 B sha256 8ebdf16e0896e7092f6da13d0c9689e578056efda3fcb57e7781f509397c4b9f; 2 x -> <build folder>; 3 x -> <lab folder>
 evidence/ctx-f2.txt: original 1813 B sha256 d8af80e4f56528ec824e0d6a612ed973e3b1b55260856f34d31a5e89531e1398; 2 x -> <build folder>; 3 x -> <lab folder>
 evidence/ctx-f3.txt: original 1812 B sha256 cd0245581479c3c34eae4aa59f287a7667862633b770ddfc957659d92821699d; 2 x -> <build folder>; 3 x -> <lab folder>
 evidence/ctx-f4.txt: original 1924 B sha256 dd218d75fd7e31d596838d3f826aac94429b806ef678167584f7304e53219d4c; 2 x -> <build folder>; 3 x -> <lab folder>; 1 x -> <desktop client>
@@ -17,6 +21,12 @@ evidence/f0-timeline.txt: original 3719 B sha256 ce2894b45307ec5f980456eb967c285
 evidence/f0.txt: original 384 B sha256 74f938f0005f5919b5b22838903fde149afd5360415dda05775f8c8d00ee86ca; 1 x -> <build folder>
 evidence/f1-timeline.txt: original 3574 B sha256 f71c3225b20cb1f26e9d4f841216c3e290665e144d80505d5fc683dc5e82eb6a; 2 x -> <build folder>; 9 x -> <lab folder>
 evidence/f1.txt: original 383 B sha256 c87291bf985b110daeb43ccdc4d4def972e1193555164f20bfd75c34a97967ba; 1 x -> <build folder>
+evidence/f1d-2-timeline.txt: original 3415 B sha256 cc1721d683e335cc385ff7ebb2fabc32a61b0309c8826cf186824661877b7fed; 1 x -> <build folder>; 10 x -> <lab folder>
+evidence/f1d-2.txt: original 403 B sha256 68bd1dcbde7b6bec7629c6460c8c16410dd3c0a414ff4ad300125146864fea73; 1 x -> <build folder>
+evidence/f1d-3-timeline.txt: original 3546 B sha256 178ece4e7c60e535808d3885c22976453c1e1de99b0ebabbf3edf8896ef61736; 1 x -> <build folder>; 10 x -> <lab folder>
+evidence/f1d-3.txt: original 403 B sha256 d097ece83babf933ea25bee6a8464ad0092dbf7d288266a9420744f4ee9e3c5d; 1 x -> <build folder>
+evidence/f1d-timeline.txt: original 3673 B sha256 461f7c2f0934f49c466f620a8fe14fff58ec835291bc66eb319d92f1cc72105b; 2 x -> <build folder>; 9 x -> <lab folder>
+evidence/f1d.txt: original 383 B sha256 df3e807a7c10e32938f7804be92404c71e5120096889a1145130c50a48615d05; 1 x -> <build folder>
 evidence/f2-timeline.txt: original 3624 B sha256 ff0e08353e7c33a13dae0a1eb218a45656d5dd95693d2fd137afb823833e4873; 2 x -> <build folder>; 8 x -> <lab folder>
 evidence/f2.launcher.txt: original 606 B sha256 4d68e5a32647608d88949c3746ebe70b4d6d28a4e946e68488c2ada1c1e46b24; 1 x -> <build folder>; 4 x -> <lab folder>
 evidence/f2.txt: original 383 B sha256 878975d7218756ff4f34d07b75c53a50be43e472a0f3c76af3b31eb9cd9b36ed; 1 x -> <build folder>
@@ -40,15 +50,18 @@ evidence/trace-b3b.txt: original 2505 B sha256 1921d6fc9258e765ee8789524217382a9
 evidence/trace-c1.txt: original 5813 B sha256 b5153a40374ade3e78dd0387f5684d972c307fbb91532aebf15bbdd74da91c4b; 2 x -> <build folder>
 evidence/trace-f0.txt: original 2952 B sha256 b21e74521ec88e7494e3fb75efeab15844b06f71080cba753a711870663dca91; 2 x -> <build folder>
 evidence/trace-f1.txt: original 2987 B sha256 8ab9fb80b53b3761f88c3af28ec86cffe331db3016bc48a4a6f05fa53fb9097a; 2 x -> <build folder>
+evidence/trace-f1d-2.txt: original 4167 B sha256 106cd9bbe89222e009567fa387dc843a5889a926cfacaacb1406657a06a5184b; 2 x -> <build folder>
+evidence/trace-f1d-3.txt: original 5836 B sha256 ba9ec44c923a48570007d5ecb6969dea537d9181e53e7a937fb47e96e5b3051a; 2 x -> <build folder>
+evidence/trace-f1d.txt: original 3217 B sha256 1482469b64e0c2ca96c75a0beca0e64c6b571c059ce4ced45c2ac3c1e11a40fd; 2 x -> <build folder>
 evidence/trace-f2.txt: original 2802 B sha256 8c0cf33ac5704d109a111375ad73da90e54137ba7dbab5bd9bad272f99978bd4; 2 x -> <build folder>
 evidence/trace-f3.txt: original 2893 B sha256 a5aef59178ade4931fe4b45b85dc8b2c95c7ffab50f641a3dc8b4ebcca4ecf94; 2 x -> <build folder>
 evidence/trace-f4.txt: original 2988 B sha256 c7e388743995a2c2ec6d52191e2ed20702b5e3e975455556b98cd0cec3a3bf0c; 2 x -> <build folder>
 evidence/trace-g1.txt: original 2899 B sha256 3c64ef953fef95147b9c66cfba0d46da3d2926014b363e50242dd909d7326784; 2 x -> <lab folder>
 evidence/trace-g2.txt: original 3049 B sha256 9edb1e2a4b0870f45ff4720c4f5a9b43a0c8e729f9e0109024cae8f8c877be87; 2 x -> <lab folder>
 evidence/trace-g3.txt: original 3123 B sha256 436c48726c36624af12c4c2f70627169129e8a0ec10ddf5d90b88b4599024785; 2 x -> <lab folder>
-evidence/trace-summary.txt: original 11432 B sha256 db4cb9f975cdc8610a70690c0cc4b2bea9507e8c453142f44677186fdf82e699; 14 x -> <build folder>; 7 x -> <lab folder>
+evidence/trace-summary.txt: original 14313 B sha256 3a4a6bf86323236556abf69d9f1eebfbff46fb5c656e1d1d0f61edb3b9bba8d6; 20 x -> <build folder>; 7 x -> <lab folder>
 evidence/trace-t.txt: original 3115 B sha256 be77528ebfbc91b4c6adc7a7c07f241b3190581ca027977b6b462cc2cc454619; 2 x -> <build folder>
-scripts/cell-run.ps1: original 12025 B sha256 ffb24eb2972b09c4ef19ff0660b09505171b74be17ccfd472f5e6ab612f8674a; 1 x -> <build folder>; 1 x -> <lab folder>
+scripts/cell-run.ps1: original 12740 B sha256 11e26604ac8caba62424738b60273c1b42cbe5a381d7269a76bd46b02563645c; 1 x -> <build folder>; 1 x -> <lab folder>
 scripts/launcher.py: original 1881 B sha256 22dd18deaf11114ff34cf4650695a134db5a3509f65b8054a6963465bfc88703; 1 x -> <lab folder>
 scripts/leftover.ps1: original 2085 B sha256 227f5adf68f1d1d92b6fa7bdc4f9be4d5ace2e28077424d7887eb0321a036ee9; 1 x -> <lab folder>
 scripts/b3.ps1: original 3076 B sha256 a87e63b3a6f3c9a0de0de92b5ff1c7d711dec9625a067cf0fa019a0a4e446a19; 1 x -> <lab folder>
@@ -58,6 +71,9 @@ scripts/trace-sum.py: original 3008 B sha256 823b7671042c85f88d4cf9faa4964b045ff
 scripts/r1-table.py: original 3011 B sha256 6baa451b873702a8d07de75d87b9b0f96169bc97c4ce3c01100278340b9b1c49; 1 x -> <lab folder>
 scripts/cmd/f0.cmd: original 341 B sha256 3f942a0fa267587d59030cc899d0e338c94ad402a67e2df2169cc6c410dae384; 1 x -> <build folder>; 3 x -> <lab folder>
 scripts/cmd/f1.cmd: original 341 B sha256 8e84f831c466fef0df86ba1ae85f1ed72b1c7606cb260ab24dce6a3cc68d161f; 1 x -> <build folder>; 3 x -> <lab folder>
+scripts/cmd/f1d-2.cmd: original 400 B sha256 6ab1df44b4418b95bae4a1a37cfba23fd407425ef543ba12d577cd6e8f3301f2; 1 x -> <build folder>; 3 x -> <lab folder>
+scripts/cmd/f1d-3.cmd: original 400 B sha256 20a8bf90bd96ba99d30d490121c0a2b20db57800f89df12ecd2dd8330fe94b3d; 1 x -> <build folder>; 3 x -> <lab folder>
+scripts/cmd/f1d.cmd: original 398 B sha256 9d2b58cdd72c95c08ad6f9bca27c535ed98bee38f0e7059ab352467dc4c3d49f; 1 x -> <build folder>; 3 x -> <lab folder>
 scripts/cmd/g1.cmd: original 260 B sha256 9f861e37bc71eac50cd82f092cf247066c69ff0e415f30bab3ec749f37fae78e; 3 x -> <lab folder>
 scripts/cmd/t.cmd: original 340 B sha256 443f1a48697371e32d4d6c149f270871e00297589574e2a473b6e7330a72ac3d; 1 x -> <build folder>; 3 x -> <lab folder>
 scripts/control-forms.ps1: original 1725 B sha256 adc491bf31fc0c25bec909cdb6ec2d80fe2b72b2f093cefb75881cca141bef06; 1 x -> <lab folder>

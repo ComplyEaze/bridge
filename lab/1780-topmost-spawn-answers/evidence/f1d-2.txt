@@ -1,0 +1,4 @@
+﻿SPAWN 2026-10-29T08:09:53.921Z parent_pid=15700 target=child stdio=tokio creation_flags=0x400 startf=0x100 timeout_s=60
+SPAWN command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+SPAWN 2026-10-29T08:09:54.033Z child_pid=26788
+SPAWN 2026-10-29T08:10:54.071Z pid=26788 exit_code=killed_after_timeout stdout_bytes_read=0 elapsed_s=60.1

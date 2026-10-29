@@ -10,7 +10,12 @@
 #   launcher     python -I launcher.py (the lab launcher with its command replaced), started with -NoNewWindow from this runner
 param([Parameter(Mandatory = $true)][string]$Cell, [Parameter(Mandatory = $true)][ValidateSet('child', 'control')][string]$Target,
       [Parameter(Mandatory = $true)][ValidateSet('tokio', 'files')][string]$Stdio,
-      [Parameter(Mandatory = $true)][ValidateSet('interactive', 'hidden', 'launcher')][string]$Kind, [int]$Px = 263, [int]$Py = 475)
+      [Parameter(Mandatory = $true)][ValidateSet('interactive', 'hidden', 'launcher')][string]$Kind, [int]$Px = 263, [int]$Py = 475,
+      [int]$DelaySeconds = 0, [int]$TitleClickAfterMs = 0)
+# -TitleClickAfterMs (cell F1d-2): the one click on Tally's title after the start comes that long after it, once the parent's
+# console window is up, instead of at once.
+# -DelaySeconds (cell F1d, interactive only): the .cmd first runs powershell Start-Sleep for that long, then the cell's own line,
+# so the parent's tree is F1's and Tally, clicked once after the start, has the foreground when the box appears.
 $rd = '<lab folder>'; $ev = "$rd\evidence"; $c = $Cell.ToLower(); $log = "$ev\$c-timeline.txt"
 $title = if ($Target -eq 'child') { 'ComplyEaze Bridge' } else { 'Lab topmost control' }
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
@@ -71,9 +76,10 @@ Start-Sleep -Milliseconds 700
 $cmdLine = "powershell -NoProfile -ExecutionPolicy Bypass -File $rd\requests\spawn-parent.ps1 $spArgs"
 if ($Kind -eq 'interactive') {
     $cmdFile = "$rd\cmd\$c.cmd"
-    [IO.File]::WriteAllText($cmdFile, "@$cmdLine`r`n", (New-Object Text.ASCIIEncoding))
+    $delayLine = if ($DelaySeconds -gt 0) { "@powershell -NoProfile -Command Start-Sleep -Seconds $DelaySeconds`r`n" } else { '' }
+    [IO.File]::WriteAllText($cmdFile, "$delayLine@$cmdLine`r`n", (New-Object Text.ASCIIEncoding))
     $pp = Start-Process explorer.exe -ArgumentList "`"$cmdFile`"" -PassThru
-    L "$Cell parent started $(Stamp): explorer.exe `"$cmdFile`" (explorer pid $($pp.Id)); the .cmd holds: $cmdLine"
+    L "$Cell parent started $(Stamp): explorer.exe `"$cmdFile`" (explorer pid $($pp.Id)); the .cmd holds: $($delayLine.Trim()) | $cmdLine"
 } elseif ($Kind -eq 'hidden') {
     $pp = Start-Process powershell -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File $rd\requests\spawn-parent.ps1 $spArgs" -PassThru
     L "$Cell parent started $(Stamp): Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File $rd\requests\spawn-parent.ps1 $spArgs' (pid $($pp.Id), parent this runner $PID)"
@@ -82,6 +88,7 @@ if ($Kind -eq 'interactive') {
     $pp = Start-Process python -ArgumentList $lArgs -NoNewWindow -PassThru
     L "$Cell parent started $(Stamp): python $lArgs (launcher pid $($pp.Id), parent this runner $PID)"
 }
+if ($TitleClickAfterMs -gt 0) { Start-Sleep -Milliseconds $TitleClickAfterMs }
 [CR]::ClickAt($tx, $ty); L "$Cell Tally title clicked $(Stamp)"
 # T0: the stamp on the SPAWN ... child_pid= line.
 $deadline = (Get-Date).AddSeconds(60); $t0 = $null

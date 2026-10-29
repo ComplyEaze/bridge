@@ -1,0 +1,6 @@
+﻿C10 after F1d 2026-10-29T08:14:11Z
+"tally.exe","13992","Console","5","2,20,688 K"
+TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       13992
+TCP    [::]:9001              [::]:0                 LISTENING       13992
+status 200 51 B
+hash bridge_mcp.exe 31804416 3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974

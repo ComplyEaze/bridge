@@ -1,0 +1,21 @@
+﻿F1d-2 target=child stdio=tokio kind=interactive; Tally window 13379766; runner pid 9464
+F1d-2 trace pre-armed 2026-10-29T08:09:38.517Z pid 12648: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-f1d-2.txt -Seconds 100
+F1d-2 reader pre-armed 2026-10-29T08:09:38.687Z pid 9036: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\ctx-reader.ps1 -SpawnFile <lab folder>\evidence\f1d-2.txt -DelaySeconds 6 -Out <lab folder>\evidence\ctx-f1d-2.txt
+F1d-2 Tally title clicked 2026-10-29T08:09:40.957Z
+F1d-2 parent started 2026-10-29T08:09:42.069Z: explorer.exe "<lab folder>\cmd\f1d-2.cmd" (explorer pid 18684); the .cmd holds: @powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target child -Stdio tokio -Out <lab folder>\evidence\f1d-2.txt -TimeoutSeconds 60 -ChildExe <build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -InputFile <lab folder>\requests\confirm-input.txt
+F1d-2 Tally title clicked 2026-10-29T08:09:46.128Z
+F1d-2-T0 2026-10-29T08:09:54.033Z from: SPAWN 2026-10-29T08:09:54.033Z child_pid=26788
+F1d-2 spawn-parent pid 15700 image powershell.exe, its parent pid 21160 image cmd.exe
+F1d-2-T0+8 sheet probe 2026-10-29T08:10:02.069Z to 2026-10-29T08:10:04.031Z : 3,0,1,26788,ComplyEaze Bridge — post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,16 ;; K probe 2026-10-29T08:10:04.081Z to 2026-10-29T08:10:06.037Z : 3,0,1,26788,ComplyEaze Bridge — post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,16
+F1d-2-T0+11 sheet probe 2026-10-29T08:10:06.114Z to 2026-10-29T08:10:08.876Z : 3,0,1,26788,ComplyEaze Bridge — post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,16 ;; K probe 2026-10-29T08:10:08.894Z to 2026-10-29T08:10:11.047Z : 3,0,1,26788,ComplyEaze Bridge — post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,16
+F1d-2-T0+11 shot 2026-10-29T08:10:11.445Z
+F1d-2 box 17508288 rect 549,145,1003,741
+F1d-2 point logical (263,475) = screen tool (249,450); distance from the box 286 px
+F1d-2 click into Tally 2026-10-29T08:10:11.732Z at T0+17.7 s
+F1d-2 C+0 sheet probe 2026-10-29T08:10:11.918Z to 2026-10-29T08:10:14.393Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,26788,ComplyEaze Bridge — post this voucher? | visible_titled_windows,16 ;; K probe 2026-10-29T08:10:14.416Z to 2026-10-29T08:10:17.170Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,26788,ComplyEaze Bridge — post this voucher? | visible_titled_windows,16
+F1d-2 C+0 shot 2026-10-29T08:10:17.596Z
+F1d-2 C+6 sheet probe 2026-10-29T08:10:17.735Z to 2026-10-29T08:10:19.697Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,26788,ComplyEaze Bridge — post this voucher? | visible_titled_windows,16 ;; K probe 2026-10-29T08:10:19.753Z to 2026-10-29T08:10:21.798Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,26788,ComplyEaze Bridge — post this voucher? | visible_titled_windows,16
+F1d-2 C+6 shot 2026-10-29T08:10:22.124Z
+F1d-2 z positions: box 4, Tally 3
+F1d-2 the box is below Tally; waiting for <lab folder>\cmd\f1d-2-taskbar.txt 2026-10-29T08:10:22.225Z
+F1d-2 no taskbar position given in 30 s: nothing clicked

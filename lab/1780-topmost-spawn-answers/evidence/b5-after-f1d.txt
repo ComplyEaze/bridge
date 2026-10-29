@@ -1,0 +1,4 @@
+﻿B5 after-f1d 2026-10-29T08:08:33.990Z
+processes: 1
+  pid 24888 parent 10712 start 10/29/2026 13:37:34 image C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe cmd "C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\ctx-reader.ps1 -SpawnFile <lab folder>\evidence\f1d.txt -DelaySeconds 6 -Out <lab folder>\evidence\ctx-f1d.txt 
+windows: 0

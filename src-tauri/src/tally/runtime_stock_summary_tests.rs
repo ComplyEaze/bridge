@@ -375,6 +375,11 @@ fn the_period_is_the_financial_year_containing_as_of_or_the_books_start_if_later
         admitted("20250930", "20240401", "20260930"),
         pair("20250401", "20250930")
     );
+    // April's end is the first month end of its own year, not of the year before.
+    assert_eq!(
+        admitted("20250430", "20240401", "20260930"),
+        pair("20250401", "20250430")
+    );
     assert_eq!(
         admitted("20260131", "20240401", "20260930"),
         pair("20250401", "20260131")

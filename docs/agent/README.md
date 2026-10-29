@@ -1102,9 +1102,9 @@ accounts. `as_of` must be a month's last day, the shape of every period end
 measured for stock, and not before the book's start or after today. Any other
 date is refused as `stock_summary_as_of_not_measured` before any request, and
 retrying the same date refuses again. Month ends inside the year were measured on
-two synthetic TallyPrime 7.2 books (one Sales voucher dated on the end date was
-counted); February's end, several vouchers or a Stock Journal or purchase on the
-end date, 7.1 at such a date and a company whose year does not start on 1 April
+two synthetic TallyPrime 7.2 books (a voucher dated on the end date was counted
+on a 15 October read, not at a month end); February's end, a month end with a
+voucher on it, several vouchers or a Stock Journal or purchase on the end date, 7.1 at such a date and a company whose year does not start on 1 April
 were not. A month end before the book's start or after today is refused as
 `stock_summary_as_of_before_books` or `stock_summary_as_of_in_future`, after the
 status, company and extent reads. The period runs from 1 April of the year

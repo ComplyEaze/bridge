@@ -419,7 +419,7 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
     assert!(description.contains(&format!("{mark}")));
     for phrase in [
         "must be a month's last day",
-        "Month ends inside the year were measured on TallyPrime 7.2, one Sales voucher on the end date included",
+        "Month ends inside the year were measured on TallyPrime 7.2; a voucher dated on the end date was counted on a 15 October read, not at a month end; the company's own year start is not read",
         "null with `partial` true whenever any item's closing value is empty",
         "written at the scale of the values it adds",
         "stock_summary_too_large",
@@ -565,7 +565,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         .unwrap()
         .iter()
         .any(|line| line.as_str().unwrap().starts_with(
-            "`as_of` is a month's last day. Measured on TallyPrime 7.2 at 31 May, 31 August and 30 September 2025 on two synthetic books (one item under the root; groups three deep) and at 31 March 2026: the items and Tally's Stock Summary each follow `as_of`, including one Sales voucher dated on it, and not the company's own current period. The period starts on 1 April: a company whose financial year starts in another month is read from 1 April all the same. Not measured: February's end, several vouchers or a Stock Journal or purchase dated on `as_of`, TallyPrime 7.1 at a date other than 31 March, a year after the company's current period, and a book that starts mid-year"
+            "`as_of` is a month's last day. Measured on TallyPrime 7.2 at 31 May, 31 August and 30 September 2025 on two synthetic books (one item under the root; groups three deep) and at 31 March 2026: the items and Tally's Stock Summary each follow `as_of`, not the company's own current period. A read to the date of one Sales voucher (15 October 2025, not a month end) counted that voucher. The period starts on 1 April: a company whose financial year starts in another month is read from 1 April all the same. Not measured: February's end, a month end with a voucher on it, several vouchers or a Stock Journal or purchase dated on `as_of`, TallyPrime 7.1 at a date other than 31 March, a year after the company's current period, and a book that starts mid-year"
         )));
     assert_eq!(first["structuredContent"]["truncated"], true);
     assert_eq!(page["snapshot"]["reused"], false);

@@ -1,7 +1,7 @@
 # sha256  bytes  file  (source, for a copy)
 030fd76873c0331517a34e7b659a1ff1f661c4271948a68f35d3b3f5746e012c  63  .gitattributes
 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md  byte for byte from lab/0.7.0-write-pass at 493e6c0ab6ba1e226490b1919bebf97b7b75392a
-b808cece7e71ddb95b760a2dfc55fc5f75adaf7aa33d41e38b2606df3ed09760  29863  README.md
+442085c539418281b4a46117211c39a70b84c71d4dc4eb77ef3040c518e26270  30142  README.md
 fa77b982b8d79006d0f59d76cf5e70e4271dc6755f50cef23f0ca53b24006832  12086  src/1650/RUN-SHEET.md  byte for byte from lab/1650-ledger-create-box-row at adae9d8cd005d0669caa1f1a24c8061c48d5dcff
 a1bd8158fbb15a89cc281aac2126ea0979db0cab3ee5c9153a88eb56840240d1  20379  src/1780h/RUN-SHEET.md  byte for byte from lab/1780-system-modal-box at 693a04f5258cb14592b197b966de5aa1e60c0572
 ba77881a146117276f563163213458ee3593692679e4823573f98daecceb6826  7381  src/1780h/requests/box-trace-early.ps1  byte for byte from lab/1780-system-modal-box at 693a04f5258cb14592b197b966de5aa1e60c0572

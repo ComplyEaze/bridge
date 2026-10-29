@@ -44,6 +44,7 @@ VERSION:     <to fill>    (as the exe's `initialize` reports it)
 #2105 dates in the boxes (b089e4963):                <to fill>
 #2116 dates in the boxes, follow-up (917ec73d2):     <to fill>
 #2107 boxes system-modal (621233407):                <to fill>
+#2171 ledger box shown as the post's box (1677b0b26): <to fill>
 #2149 cost-centre summary (134f58b6a):               <to fill>
 #2150 settle a batch created none, with its settle box system-modal: <to fill>
 #2158 Bills report 60 s:                             <to fill>
@@ -83,7 +84,7 @@ The lab does every step of R1, R2, R3, R4 (steps 0 to 4 and 7), R5 and R7 on the
 
 - **Build.** The BUILD block above. `#1650` and `#2166` must both read `in`; otherwise R2 does not start and the run coordinator decides. #2166 sends a ledger create whose master mark stepped by more than one to reconciliation (it fixes #2165), so the verdict the row checks is the corrected one. Its `tools/list` must name `prepare_ledger_creates` and `post_ledger_creates` (absent = STOP). Data folder `C:\bridge-lab\rc070\r2\data\`; backup folder `C:\bridge-lab\rc070\r2\backups\bk1\`.
 - **Who acts.** As "Who acts" above: the lab sets both write keys and answers the box by mouse. The source sheet's rule 6 (one Tally) and rule 7 (click only) stand.
-- **The fit check (correction).** The source sheet says the one-ledger box is measured against the screen when it opens. On master the ledger-create box is shown without that check (its dialog path does not pass through the fit check), so `master_review_too_large` can come only from the text's size. Step 5's FINDING line stands as written: such an answer, or `master_approval_unavailable`, while the box was whole on the screen, is the row's finding.
+- **The fit check.** With `#2171` in the build, the one-ledger box is shown as the post's box is: brought to the front once when it opens and measured against the screen, as the source sheet says; a box that does not fit answers `master_review_too_large` with nothing sent. Without `#2171`, the box is shown without that check and `master_review_too_large` can come only from the text's size. Either way step 5's FINDING line stands as written: such an answer, or `master_approval_unavailable`, while the box was whole on the screen, is the row's finding. With `#2171` in the build, also record whether the box held the keyboard when it opened (its title bar active).
 - **Steps 3 and 5 (added).** With #2105 in the build, EXPECT the preview's company line to read `Books from: 1-Apr-2025` (rule 6).
 - **Step 6 (added).** The verdict is `posted_verified` only for a master-mark step of exactly one (#2165). EXPECT `posted_verified` as the sheet says; step 7 checks M1 = M0′ + 1. Any other final state is recorded whole, as the sheet says.
 - **Step 7 (changed).** If `ledger_masters` gives no GUID for the new row, record "GUID not shown" in place of the prefix check; it is not a STOP (run CI found the tool returns none).

@@ -1,29 +1,41 @@
 # Lab helper for the #2142 row (not product code): send the one read, or none, and time GET /status
 # beside it, one probe at a time. No shell: every curl is a list of arguments.
 #
-# Usage: python -I probe.py --block NAME --out FOLDER [--read FILE] [--cut-after 20]
-#   --block      the step's name (A1, B1 ...), used in file names
-#   --out        a folder that exists; the log, headers and answer are written there
-#   --read       the request file to send by C3's line; left out, only probes are sent (a block at rest)
-#   --cut-after  give the read curl's --max-time in seconds (a block that cuts the read); left out, none
+# Usage, run from the sheet's folder:
+#   python -I probe.py --block NAME --out FOLDER [--read FILE --read-sha256 HEX] [--cut-after 20]
+#   --block        the step's name (A1, B1 ...), used in file names
+#   --out          a folder that exists; the log, headers, answer and probe bodies are written there
+#   --read         the request file to send by C3's line; left out, only probes are sent (a block at rest)
+#   --read-sha256  the request file's sha256; another sha256 refuses the block before anything is sent
+#   --cut-after    give the read curl's --max-time in seconds (a block that cuts the read); left out, none
 #
-# Probes: GET /status by C2 c's line with time_total added to -w, no --max-time. The first starts
-# 2 s after the read starts (or at once at rest); each next one starts 2 s after the previous ended,
-# so at most one probe is in flight. Probing ends when the read curl has exited and 3 probes in a row
-# sent after it exited answered 200 in under 1.000 s. At rest it ends after 10 probes.
-# The block STOPS (exit 2, logged) on: a probe exit that is not 0 or a status that is not 200; a
-# probe without an answer in 600 s (that curl is left running); 200 probes; 900 s in all.
-# The log is JSON lines: one per event, with the UTC time, the seconds since the block started,
-# and curl's exit code and -w fields as printed.
+# The read is reaped by a thread the moment it ends, so `read_ended` is logged when the read ends,
+# not when a probe in flight returns. `read_end_t` is `read_sent`'s t plus the read's own time_total,
+# the end as curl measured it.
+#
+# Probes: GET /status by the sheet's line, no --max-time. The first starts 2 s after the read starts
+# (or at once at rest); each next one starts 2 s after the previous ended, so at most one probe is in
+# flight. A probe counts as answered only with exit 0, status 200 and 51 bytes. Probing ends when the
+# read has ended and 3 probes in a row sent after its end answered in under 1.000 s; at rest, after
+# 10 probes.
+#
+# Exit 0: the block ended as designed. Exit 2: a STOP, whose reason is the log's last line, which also
+# says whether the read curl is still running (it is never killed). A STOP is: a whole read that did not
+# answer 200 with bytes; a probe that did not answer as above; a probe without an answer in 600 s (that
+# curl is left running); 200 probes; 900 s in all. A cut read that answered whole is logged as a result
+# (`read_answered_before_cut`), not a STOP.
 import argparse
 import datetime
+import hashlib
 import json
 import os
 import subprocess
 import sys
+import threading
 import time
 
 PORT = 'http://127.0.0.1:9001'
+STATUS_BYTES = '51'
 QUICK_SECONDS = 1.0
 QUICK_IN_A_ROW = 3
 GAP_SECONDS = 2.0
@@ -31,6 +43,7 @@ REST_PROBES = 10
 MAX_PROBES = 200
 MAX_BLOCK_SECONDS = 900
 PROBE_WAIT_SECONDS = 600
+CURL_TIMEOUT_EXIT = 28
 
 
 def utc():
@@ -42,25 +55,57 @@ def main():
     parser.add_argument('--block', required=True)
     parser.add_argument('--out', required=True)
     parser.add_argument('--read')
+    parser.add_argument('--read-sha256')
     parser.add_argument('--cut-after', type=int)
     args = parser.parse_args()
     if not os.path.isdir(args.out):
         sys.exit('probe: --out must be a folder that exists')
+    if bool(args.read) != bool(args.read_sha256):
+        sys.exit('probe: --read and --read-sha256 go together')
     if args.cut_after is not None and not args.read:
         sys.exit('probe: --cut-after needs --read')
-    log_path = os.path.join(args.out, f'{args.block}-log.jsonl')
-    if os.path.exists(log_path):
-        sys.exit(f'probe: {log_path} exists; a block is never run twice into one log')
-    log = open(log_path, 'w', encoding='utf-8', newline='\n')
+    if args.read:
+        with open(args.read, 'rb') as request:
+            found = hashlib.sha256(request.read()).hexdigest()
+        if found != args.read_sha256.lower():
+            sys.exit(f'probe: {args.read} has sha256 {found}, not the one given; nothing sent')
+    log = open(os.path.join(args.out, f'{args.block}-log.jsonl'), 'x', encoding='utf-8', newline='\n')
+    lock = threading.Lock()
     start = time.monotonic()
 
     def record(event, **fields):
-        line = {'utc': utc(), 't': round(time.monotonic() - start, 3), 'event': event, **fields}
-        log.write(json.dumps(line) + '\n')
-        log.flush()
-        print(json.dumps(line))
+        with lock:
+            line = {'utc': utc(), 't': round(time.monotonic() - start, 3), 'event': event, **fields}
+            log.write(json.dumps(line) + '\n')
+            log.flush()
+            print(json.dumps(line), flush=True)
 
     read = None
+    read_state = {'ended': False, 'failed': False}
+    read_ended = threading.Event()
+
+    def reap(process, sent_t):
+        out, err = process.communicate()
+        fields = out.strip().split()
+        total = float(fields[2]) if len(fields) > 2 else None
+        record('read_ended', exit=process.returncode, printed=out.strip(), stderr=err.strip(),
+               read_end_t=round(sent_t + total, 3) if total is not None else None)
+        if args.cut_after is None:
+            whole = (process.returncode == 0 and len(fields) > 1 and fields[0] == '200'
+                     and fields[1] != '0')
+            read_state['failed'] = not whole
+        elif process.returncode != CURL_TIMEOUT_EXIT:
+            record('read_answered_before_cut' if process.returncode == 0 else 'read_ended_otherwise',
+                   exit=process.returncode)
+        read_state['ended'] = True
+        read_ended.set()
+
+    def stop(reason, **fields):
+        running = read is not None and read.poll() is None
+        record('stop', reason=reason, read_still_running=running,
+               read_pid=read.pid if read is not None else None, **fields)
+        return 2
+
     if args.read:
         command = ['curl.exe', '-sS', '-w', '%{http_code} %{size_download} %{time_total}',
                    '--data-binary', '@' + args.read,
@@ -69,50 +114,45 @@ def main():
                    PORT, '-o', os.path.join(args.out, f'{args.block}-read-answer.xml')]
         if args.cut_after is not None:
             command[1:1] = ['--max-time', str(args.cut_after)]
-        record('read_sent', command=command)
+        sent_t = round(time.monotonic() - start, 3)
         read = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        time.sleep(GAP_SECONDS)
-    read_done = read is None
+        record('read_sent', command=command, pid=read.pid, read_sent_t=sent_t)
+        threading.Thread(target=reap, args=(read, sent_t), daemon=True).start()
+        read_ended.wait(GAP_SECONDS)
     quick_after_read = 0
     probes = 0
     while True:
-        if read is not None and not read_done and read.poll() is not None:
-            out, err = read.communicate()
-            record('read_ended', exit=read.returncode, printed=out.strip(), stderr=err.strip())
-            read_done = True
+        if read_state['failed']:
+            return stop('read_failed')
         if read is None and probes >= REST_PROBES:
             record('end', reason='rest_probes_done')
             return 0
-        if read_done and read is not None and quick_after_read >= QUICK_IN_A_ROW:
+        if read_state['ended'] and quick_after_read >= QUICK_IN_A_ROW:
             record('end', reason='quick_in_a_row_after_read')
             return 0
         if probes >= MAX_PROBES or time.monotonic() - start > MAX_BLOCK_SECONDS:
-            record('stop', reason='probe_or_time_cap')
-            return 2
-        sent_after_read = read_done
+            return stop('probe_or_time_cap')
+        after_read = read_state['ended'] if read is not None else None
         probes += 1
-        status_file = os.path.join(args.out, f'{args.block}-probe-{probes:03d}.body')
+        body = os.path.join(args.out, f'{args.block}-probe-{probes:03d}.body')
         command = ['curl.exe', '-sS', '-w', '%{http_code} %{size_download} %{time_total}',
-                   '-o', status_file, PORT + '/status']
-        record('probe_sent', n=probes, after_read=sent_after_read)
+                   '-o', body, PORT + '/status']
+        record('probe_sent', n=probes, after_read=after_read)
         probe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
             out, err = probe.communicate(timeout=PROBE_WAIT_SECONDS)
         except subprocess.TimeoutExpired:
-            # C3: a request without an answer is left running and never sent again. The curl
-            # is not killed; the block stops and sends nothing more.
-            record('stop', reason='probe_unanswered', n=probes, left_running_pid=probe.pid)
-            return 2
+            # C3: a request without an answer is left running and never sent again.
+            return stop('probe_unanswered', n=probes, probe_pid=probe.pid)
         printed = out.strip()
         fields = printed.split()
         record('probe_ended', n=probes, exit=probe.returncode, printed=printed,
-               stderr=err.strip(), after_read=sent_after_read)
-        if probe.returncode != 0 or not fields or fields[0] != '200':
-            record('stop', reason='probe_failed', n=probes)
-            return 2
-        seconds = float(fields[2]) if len(fields) > 2 else float('inf')
-        if sent_after_read:
-            quick_after_read = quick_after_read + 1 if seconds < QUICK_SECONDS else 0
+               stderr=err.strip(), after_read=after_read)
+        if (probe.returncode != 0 or len(fields) < 3 or fields[0] != '200'
+                or fields[1] != STATUS_BYTES):
+            return stop('probe_failed', n=probes)
+        if after_read:
+            quick_after_read = quick_after_read + 1 if float(fields[2]) < QUICK_SECONDS else 0
         time.sleep(GAP_SECONDS)
 
 

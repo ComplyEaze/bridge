@@ -23,7 +23,7 @@ These changes are in ComplyEaze Bridge 0.7.0. Most lines name the pull requests 
 - **If you read stock, statements or a ledger's movement: yes.** `stock_summary` now reads as of the last day of any month, not only 31 March, and gives the quantity of an item inside a stock group (#1233). `ledger_movement` reads only the named ledger's vouchers, so a large book no longer fails as too large for a ledger with a small share of it (#485). A Trial Balance row that does not add up is marked, and `profit_and_loss` and `balance_sheet` name its ledger and gap when they refuse (#2068, #692).
 - **If you use posting:** what Bridge writes into Tally is still only what you approve in the approval window, and the kinds of voucher it posts are the same as in 0.6.1 (Journal, Payment, Receipt and Contra). On Windows the approval boxes now stay above Tally when you click into Tally while one is open, and show dates as Tally does, for example `14-Sep-2026` (#1780, #2101). A post's answer that reported `STATUS` 0 no longer counts toward the voucher mark it proved (#2035), and a date that names no calendar day is refused in four checks (#2009).
 - **If you want Bridge to create a ledger:** it can now create one ledger at a time, through its own approval box, only when `BRIDGE_AGENT_ENABLE_MASTER_WRITES` and posting are both on. The desktop extension has no setting for the first, so a default install does not offer it (#690).
-- **Before you upgrade:** once 0.7.0 has recorded a person's check of a post matched by content only (`acknowledge_post_review` with `doubt` `content_only`), do not go back to 0.6.1: an older build refuses the whole import journal once that record is written (#1039).
+- **Before you upgrade:** once 0.7.0 has recorded a person's check of a post matched by content only (`acknowledge_post_review` with `doubt` `content_only`), or a person's settlement of a post Tally answered as creating none of its vouchers (`doubt` `not_created`), do not go back to 0.6.1: an older build refuses the whole import journal once either record is written (#1039, #1709).
 - **Everyone else:** nothing else needs doing. Install steps are the same as for 0.6.1: [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md); after installing, check the extension shows 0.7.0, the Terms setting is ticked and the posting setting is as you want it; quit Claude Desktop completely and reopen it.
 
 **What you can do now**
@@ -54,6 +54,15 @@ These changes are in ComplyEaze Bridge 0.7.0. Most lines name the pull requests 
   `not_settled_reviewed_not_attributed`. A later `posted_verified`, a later answer from Tally or a rollback of the book
   voids it. It is a new kind of import journal record: a build older than this one refuses the whole journal once one is
   written, so do not downgrade after recording one (part of #1039).
+- `acknowledge_post_review` with `doubt` set to `not_created` lets a person settle a native post that Tally answered
+  as creating none of its vouchers, in its own native dialog, once they say each voucher is in the book or will not be
+  posted. ComplyEaze Bridge never sends those vouchers again. The record changes nothing in Tally and no status or
+  verdict; the rows stay held, so they are never built or posted again, and a Sales invoice keeps its stop until the
+  separate release. `verify_import` reports it as `person_settlement`, and `local_data_report` counts the batch as
+  `settled_by_person`, outside `not_settled`. A later `posted_verified`, a later answer from Tally, a binding or a
+  rollback of the book voids it. It is a new kind of import journal record: a build older than this one refuses the
+  whole journal once one is written, so do not downgrade after recording one (part of #1709).
+  On Windows its box opens system-modal like the other approval boxes. After a settlement, the dialog counts only matches in the accounts and each voucher's next step no longer asks for it again.
 - `gst_by_counter_ledger` totals, for a period, the GST the books record on ledgers under Duties & Taxes per counter
   ledger (the one Purchase Accounts, Direct Expenses, Indirect Expenses or Fixed Assets ledger on a purchase, debit
   note, journal or payment with a supplier on it, named with its GUID), debit and credit side apart, per head, and sets
@@ -269,6 +278,7 @@ These changes are in ComplyEaze Bridge 0.7.0. Most lines name the pull requests 
 - The Bills report refusal past the 20-second limit (#2119): measured on one synthetic book of about 30,000 vouchers; the new cause was tested with a simulated Tally.
 - `vouchers` with `bank_allocations`, `goods_lines` and `summarise_by: cost_centre` (#1231, #2015): measured on saved raw answers of synthetic books; the cost-centre summary through the tool: <the release-candidate row, to fill at the cut>.
 - A ledger asked for by its alias (#1688): <the release-candidate row, to fill at the cut>.
+- Settling a native post Tally answered as creating none of its vouchers (#1709): <the release-candidate row R3, to fill at the cut; if Tally gives no whole refusal there, the dialog is covered by tests only>.
 - Not run on a live TallyPrime for this build, with only captures or tests behind them: a post answer reporting `STATUS` 0 (#2035), an impossible calendar date (#2009), the `outstandings` party detail of a book that moved during the read (#1960), the desktop Trial Balance screen and workbook (#2132), a withdrawn `outstandings` call (#2119).
 
 **Live pass of writes:** <the live write pass of the release-candidate sitting, to fill at the cut: build, company, date and what each check showed>.

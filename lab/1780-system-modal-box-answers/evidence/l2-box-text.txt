@@ -1,0 +1,19 @@
+TITLE	ComplyEaze Bridge — create one ledger?
+RECT	713,370,1228,740
+EXSTYLE	0x00010108
+CHILD	Button	898,689,992,718	&Yes
+CHILD	Button	1003,689,1097,718	&No
+CHILD	Button	1105,689,1199,718	Cancel
+CHILD	Static	749,438,789,478	
+CHILD	Static	800,438,1183,652	Press Y (or click Yes) to create this ledger in Tally. Press N (or click No) to cancel. Nothing is
+created until you answer.
+
+Create ONE ledger in "BRIDGE BATCH LAB"
+Company GUID: a30f23c3-4819-4334-96ab-ffa6fba70976
+Company number: 100050  Books from: 1-Apr-2026
+Tally: http://127.0.0.1:9001
+
+Create ledger "Lab Topmost Suspense" under Suspense A/c
+no GST, bill-by-bill No
+
+Do not create or rename ledgers in Tally until this is done.

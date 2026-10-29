@@ -1,0 +1,18 @@
+S9 runner pid 10180; Tally window 1777070; Full=False; batch bridge-554b8c2b-85af-495c-b8b4-c91727d4010c
+S9 trace pre-armed 2026-10-29T12:27:37.045Z pid 15640: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-s9.txt -Seconds 150
+S9 Tally title clicked ONCE 2026-10-29T12:27:40.122Z; fg 0x1b1dae pid 13252 'TallyPrime:9001'
+S9-T0 2026-10-29T12:27:40.965Z: post_import queued as inbox\005-s9-post.json (company_guid and batch_id)
+S9-T0+3 probe 2026-10-29T12:27:43.961Z to 2026-10-29T12:27:44.943Z : 3,0,1,13252,TallyPrime:9001 | visible_titled_windows,11
+S9-T0+8 probe 2026-10-29T12:27:48.972Z to 2026-10-29T12:27:50.495Z : 1,1,1,23684,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,12
+S9 box 40835948 found 2026-10-29T12:27:50.607Z at T0+9.66 s; rect physical 688,181,1252,926; exstyle 0x00010108; No button 15608030
+S9-T0+13 probe 2026-10-29T12:27:53.959Z to 2026-10-29T12:27:55.167Z : 1,1,1,23684,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,12
+S9-T0+13 shot 2026-10-29T12:27:55.487Z; fg 0x26f1b6c pid 23684 'ComplyEaze Bridge — post this voucher?'
+S9 click point physical (329,594) = screen tool (249,450); distance from the box 359 px
+S9 click into Tally 2026-10-29T12:27:56.981Z at T0+16.03 s; fg 0x1b1dae pid 13252 'TallyPrime:9001'
+S9 C+0 probe 2026-10-29T12:27:57.009Z to 2026-10-29T12:27:58.388Z : 1,1,0,23684,ComplyEaze Bridge — post this voucher? | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,12
+S9 C+0 shot 2026-10-29T12:27:58.607Z
+S9 C+6 probe 2026-10-29T12:28:03.023Z to 2026-10-29T12:28:04.322Z : 1,1,0,23684,ComplyEaze Bridge — post this voucher? | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,12
+S9 C+6 fg 0x1b1dae pid 13252 'TallyPrime:9001'
+S9 T0+30: No clicked 2026-10-29T12:28:11.000Z at T0+30.05 s, physical (1061,886) = screen tool (805,672)
+S9 answer 005-s9-post.json at 2026-10-29T12:28:11.676Z: {"server_info": {"name": "bridge-tally", "version": "0.6.1"}, "server_pid": 29604, "tool": "post_import", "arguments": {"company_guid": "a30f23c3-4819-4334-96ab-ffa6fba70976", "batch_id": "bridge-554b8c2b-85af-495c-b8b4-c91727d4010c"}, "call_sent_utc": "2026-10-29T12:27:41Z", "round_trip_seconds": 30.035, "response": {"id": 7, "jsonrpc": "2.0", "result": {"content": [{"text": "{\"company\":{\"state\":\"not_company_scoped\"},\"evidence\":{\"bytes\":473251,\"duration_ms\":29941,\"read_at\":\"2026-10-29T12:28:11.087Z\",\"reason_code\":\"import_approval_declined\",\"request_sha256\":\"7fac8716dacec7e65736f59f50ebe3f40f0047e21a21affa08505594c1498806\",\"response_sha256\":\"3a911e3458a8214d6d084b99047162c11dca2872df5a949a17f64c4e9a4ef8fd\",\"state\":\"partial\"},\"read_at\":\"2026-10-29T12:27:41.145Z\",\"result\":{\"attempt_recorded\":false,\"batch_id\":\"bridge-554b8c2b-85af-495c-b8b4-c91727d4010c\",\"dispatch_response\":null,\"error\":{\"code\":\"import_approval_declined\",\"message\":\"No posting attempt was recorded. Review the error before requesting approval again.\"}},\"truncated\":false}", "type": "text"}], "isError": true, "structuredContent": {"company": {"state": "not_company_scoped"}, "evidence": {"bytes": 473251, "duration_ms": 29941, "read_at": "2026-10-29T12:28:11.087Z", "reason_code": "import_approval_declined", "request_sha256": "7fac8716dacec7e65736f59f50ebe3f40f0047e21a21affa08505594c1498806", "response_sha256": "3a911e3458a8214d6d084b99047162c11dca2872df5a949a17
+S9 DONE 2026-10-29T12:28:11.699Z

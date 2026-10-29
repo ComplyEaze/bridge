@@ -1,0 +1,30 @@
+TITLE	ComplyEaze Bridge — post this voucher?
+RECT	550,145,1001,741
+EXSTYLE	0x00010108
+CHILD	Button	721,696,801,722	&Yes
+CHILD	Button	809,696,889,722	&No
+CHILD	Button	897,696,977,722	Cancel
+CHILD	Static	580,202,612,234	
+CHILD	Static	620,202,962,660	Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is
+posted until you answer.
+
+Create ONE Receipt in "BRIDGE BATCH LAB"
+Company GUID: a30f23c3-4819-4334-96ab-ffa6fba70976
+Company number: 100050  Books from: 1-Apr-2026
+Tally: http://127.0.0.1:9001
+Date: 14-Sep-2026  Voucher number: Tally assigns it  (the voucher's own text: last two lines)
+
+Dr 141.00  "Synthetic Bank Ledger"
+Cr 141.00  "Party A"
+
+Total debit: 141  Total credit: 141
+Checked in Tally: every Dr ledger is bank/cash; every Cr ledger holds no money.
+Batch: bridge-554b8c2b-85af-495c-b8b4-c91727d4010c
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+Reference: (none)
+Narration: "Lab topmost probe 1"

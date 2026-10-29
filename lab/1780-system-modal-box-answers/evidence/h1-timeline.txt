@@ -1,0 +1,22 @@
+H1 runner pid 26744; Tally window 1777070; NoClickInto=False NoAt=0
+H1 trace pre-armed 2026-10-29T12:18:32.320Z pid 1076: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-h1.txt -Seconds 100
+H1 Tally title clicked (Tally in front) 2026-10-29T12:18:34.437Z
+H1 started 2026-10-29T12:18:35.403Z: explorer.exe "<lab folder>\cmd\h1.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target child -ChildExe <build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -InputFile <lab folder>\requests\confirm-input.txt -Stdio files -Out <lab folder>\evidence\h1.txt -TimeoutSeconds 60
+H1 Tally title clicked ONCE 2026-10-29T12:18:39.483Z (4.1 s after the start)
+H1-T0 2026-10-29T12:18:46.817Z from: SPAWN 2026-10-29T12:18:46.817Z child_pid=28980
+H1 spawn-parent pid 10376 image powershell.exe, its parent pid 2756 image cmd.exe
+H1-T0+8 probe 2026-10-29T12:18:54.858Z to 2026-10-29T12:18:55.963Z : 1,1,1,28980,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,13 ;; K probe 2026-10-29T12:18:56.007Z to 2026-10-29T12:18:57.484Z : 1,1,1,28980,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+H1 box 4662868 found 2026-10-29T12:18:57.632Z rect logical 549,145,1003,741; exstyle 0x00010108; No button 33433786
+H1-T0+11 probe 2026-10-29T12:18:57.825Z to 2026-10-29T12:18:59.366Z : 1,1,1,28980,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,13 ;; K probe 2026-10-29T12:18:59.393Z to 2026-10-29T12:19:01.408Z : 1,1,1,28980,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+H1-T0+11 shot 2026-10-29T12:19:01.815Z
+H1 click point logical (263,475) = screen tool (249,450); distance from the box 286 px
+H1 click into Tally 2026-10-29T12:19:01.984Z at T0+15.17 s; fg 0x1b1dae pid 13252 'TallyPrime:9001'
+H1 C+0 probe 2026-10-29T12:19:02.329Z to 2026-10-29T12:19:04.050Z : 1,1,0,28980,ComplyEaze Bridge — post this voucher? | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,13 ;; K probe 2026-10-29T12:19:04.065Z to 2026-10-29T12:19:05.758Z : 1,1,0,28980,ComplyEaze Bridge — post this voucher? | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,13
+H1 C+0 shot 2026-10-29T12:19:05.912Z
+H1 C+6 probe 2026-10-29T12:19:08.000Z to 2026-10-29T12:19:09.691Z : 1,1,0,28980,ComplyEaze Bridge — post this voucher? | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,13 ;; K probe 2026-10-29T12:19:09.714Z to 2026-10-29T12:19:11.330Z : 1,1,0,28980,ComplyEaze Bridge — post this voucher? | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,13
+H1 C+6 shot 2026-10-29T12:19:11.539Z; fg 0x1b1dae pid 13252 'TallyPrime:9001'
+H1 READY-FOR-COMMANDS 2026-10-29T12:19:11.575Z T0+24.8 s; box a window True
+H1 T0+48 fallback (no command answered the box): No clicked 2026-10-29T12:19:34.960Z at T0+48.15 s, logical (850,709) = screen tool (806,672)
+H1 spawn file: SPAWN 2026-10-29T12:18:46.705Z parent_pid=10376 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || SPAWN 2026-10-29T12:18:46.817Z child_pid=28980 || SPAWN 2026-10-29T12:19:35.204Z pid=28980 exit_code=1 stdout_bytes_read=0 elapsed_s=48.4
+H1 stderr: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true || box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+H1 DONE 2026-10-29T12:19:35.521Z

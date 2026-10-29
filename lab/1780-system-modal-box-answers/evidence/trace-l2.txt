@@ -1,0 +1,42 @@
+START 2026-10-29T12:29:23.231Z title_part=ComplyEaze Bridge interval_ms=50 seconds=150
+FIRST 2026-10-29T12:29:34.265Z box_pid=29416
+T 2026-10-29T12:29:34.301Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=29416 windows=3
+W 2026-10-29T12:29:34.301Z hwnd=0xd82768 class=#32770 visible=1 exstyle=0x00010108 topmost=1 thread=14356 owner=0 title=ComplyEaze Bridge — create one ledger?
+W 2026-10-29T12:29:34.301Z hwnd=0x2b4299a class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=14356 owner=0x18e209a owner_class=IME owner_pid=29416 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T12:29:34.301Z hwnd=0x18e209a class=IME visible=0 exstyle=0x00000008 topmost=1 thread=14356 owner=0xd82768 owner_class=#32770 owner_pid=29416 owner_exstyle=0x00010108 owner_topmost=1 title=Default IME
+PROC path=<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=15532
+PROC command_line="<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-masters
+PROC sha256=a946979561b61f51e6dab3539d3de98fd48c8f103f61d2e3abe787acf3240c23 bytes=32463872
+H 2026-10-29T12:29:35.670Z unchanged
+H 2026-10-29T12:29:36.708Z unchanged
+H 2026-10-29T12:29:37.753Z unchanged
+H 2026-10-29T12:29:38.759Z unchanged
+H 2026-10-29T12:29:39.796Z unchanged
+H 2026-10-29T12:29:40.823Z unchanged
+H 2026-10-29T12:29:41.837Z unchanged
+H 2026-10-29T12:29:42.896Z unchanged
+H 2026-10-29T12:29:43.934Z unchanged
+H 2026-10-29T12:29:44.941Z unchanged
+H 2026-10-29T12:29:45.980Z unchanged
+H 2026-10-29T12:29:46.999Z unchanged
+H 2026-10-29T12:29:48.067Z unchanged
+H 2026-10-29T12:29:49.075Z unchanged
+H 2026-10-29T12:29:50.132Z unchanged
+H 2026-10-29T12:29:51.145Z unchanged
+H 2026-10-29T12:29:52.160Z unchanged
+H 2026-10-29T12:29:53.190Z unchanged
+H 2026-10-29T12:29:54.222Z unchanged
+H 2026-10-29T12:29:55.260Z unchanged
+H 2026-10-29T12:29:56.276Z unchanged
+H 2026-10-29T12:29:57.298Z unchanged
+H 2026-10-29T12:29:58.341Z unchanged
+H 2026-10-29T12:29:59.371Z unchanged
+H 2026-10-29T12:30:00.391Z unchanged
+H 2026-10-29T12:30:01.465Z unchanged
+H 2026-10-29T12:30:02.510Z unchanged
+T 2026-10-29T12:30:02.836Z fg_hwnd=0x0 fg_pid=0 box_pid=29416 windows=0
+T 2026-10-29T12:30:02.954Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=29416 windows=0
+H 2026-10-29T12:30:03.971Z unchanged
+H 2026-10-29T12:30:04.971Z unchanged
+GONE 2026-10-29T12:30:05.897Z
+END 2026-10-29T12:30:05.905Z

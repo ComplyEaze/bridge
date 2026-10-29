@@ -1,0 +1,4 @@
+command: curl.exe GET /status
+time: 2026-10-29T12:31:13.447Z
+exit: 0
+printed: 200 51

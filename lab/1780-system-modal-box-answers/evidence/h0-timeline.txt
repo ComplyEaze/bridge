@@ -1,0 +1,13 @@
+H0 runner pid 2244; Tally window 1777070; NoClickInto=True NoAt=10
+H0 trace pre-armed 2026-10-29T12:17:46.351Z pid 12436: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-h0.txt -Seconds 100
+H0 Tally title clicked (Tally in front) 2026-10-29T12:17:48.432Z
+H0 started 2026-10-29T12:17:49.463Z: explorer.exe "<lab folder>\cmd\h0.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target child -ChildExe <build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -InputFile <lab folder>\requests\confirm-input.txt -Stdio files -Out <lab folder>\evidence\h0.txt -TimeoutSeconds 60
+H0 Tally title clicked ONCE 2026-10-29T12:17:53.564Z (4.11 s after the start)
+H0-T0 2026-10-29T12:18:01.964Z from: SPAWN 2026-10-29T12:18:01.964Z child_pid=10200
+H0 spawn-parent pid 1476 image powershell.exe, its parent pid 5792 image cmd.exe
+H0-T0+8 probe 2026-10-29T12:18:10.016Z to 2026-10-29T12:18:10.963Z : 1,1,1,10200,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,13 ;; K probe 2026-10-29T12:18:11.030Z to 2026-10-29T12:18:12.263Z : 1,1,1,10200,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+H0 box 9905802 found 2026-10-29T12:18:12.395Z rect logical 549,145,1003,741; exstyle 0x00010108; No button 33368250
+H0 T0+10: No clicked 2026-10-29T12:18:12.488Z at T0+10.53 s, logical (850,709) = screen tool (806,672)
+H0 spawn file: SPAWN 2026-10-29T12:18:01.388Z parent_pid=1476 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || SPAWN 2026-10-29T12:18:01.964Z child_pid=10200 || SPAWN 2026-10-29T12:18:12.640Z pid=10200 exit_code=1 stdout_bytes_read=0 elapsed_s=11.2
+H0 stderr: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+H0 DONE 2026-10-29T12:18:12.953Z

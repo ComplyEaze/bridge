@@ -1,0 +1,24 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+answers/003-s3-build.json: original 10676 B sha256 ce58172d2425c3b2bb8a10ef5abbcea96f6adf33644c1c3c4aabe4aa4d4ac0d9; 2 x -> <lab folder>
+evidence/c10-netstat.txt: original 9872 B sha256 adff99088c9d76958ee1bf570d0f128ac3e250b8b236136c13b505ccc731d0f0; only the port-9001 LISTENING lines kept
+evidence/h0-timeline.txt: original 2179 B sha256 46f79a4024029baad5a5d515b58b68358be09879e1a145de7924cd082b851f94; 2 x -> <build folder>; 6 x -> <lab folder>
+evidence/h0.txt: original 368 B sha256 471308e86314bfeddeb83b46e9c0110f395c61a660b143ffd8561e318c1b2a96; 1 x -> <build folder>
+evidence/h1-timeline.txt: original 3781 B sha256 e3bb22fe6802d16e74837f3630b83e080e68f09c007bcd7f15178341d95ffffa; 2 x -> <build folder>; 6 x -> <lab folder>
+evidence/h1.txt: original 369 B sha256 310163a320b646c030e8762aa01b43a21f973a6c98a4ee698b0de7b5f8c6126a; 1 x -> <build folder>
+evidence/h2-timeline.txt: original 3748 B sha256 33431a1072a1d9c1a1c70544d05998f8a980abe468663bd2c49139f6b352056b; 2 x -> <build folder>; 6 x -> <lab folder>
+evidence/h2.txt: original 369 B sha256 03f9a017ec8a073544bee5d7647881baea56e215275fe685f1125d324e3f0f7a; 1 x -> <build folder>
+evidence/l2-timeline.txt: original 3672 B sha256 57280adf1c82f7e64c8fc352bde41357e501097b81181ff113f510b67a9d7e5a; 2 x -> <lab folder>
+evidence/s1-timeline.txt: original 4013 B sha256 480b0603382aa884c8454be25dce4aec870426d70e56930a13fd07f5a50a03d4; 2 x -> <lab folder>
+evidence/s9-timeline.txt: original 3617 B sha256 a0eb70b88933fc52cb6600bc129516ac8532f5c140b40fdc5e5a489924b7e796; 2 x -> <lab folder>
+evidence/trace-h0.txt: original 1589 B sha256 c9d2c041da30d5a3de7abba6c2cdfe4fc6ed6f8e5e71ce48db9a5478c45eec8c; 2 x -> <build folder>
+evidence/trace-h1.txt: original 4314 B sha256 60bd8cd0946f19b4695bb69f37e4ae349c7c27e2b8cb30d7c8a84a2cdbdf7122; 2 x -> <build folder>
+evidence/trace-h2.txt: original 3294 B sha256 dc9e3fccef6180e54257305428bc74a91d9220d08c2fe59ecdcbd93be6ef4b06; 2 x -> <build folder>
+evidence/trace-l2.txt: original 2429 B sha256 7745ec9bd5ef31ee7cc407657e6286bad94c97616357d062d528251dd60394be; 2 x -> <build folder>
+evidence/trace-s1.txt: original 3024 B sha256 b5724dcdc75a76045f52dbbd6a5b5696e01885196bba56d0ae2d3386779ddcc1; 2 x -> <build folder>
+evidence/trace-s9.txt: original 2868 B sha256 9466e57b055cc1af27b904d32345076123c20ba2c11e345d725f049cfff64da8; 2 x -> <build folder>
+scripts/h-cell.ps1: original 13291 B sha256 df6e2e87b60d70b257d767665ba306cc5fdca52f672ca41d1b50a155c7e6fa9f; 1 x -> <lab folder>
+scripts/s-run.ps1: original 12255 B sha256 d7f77f4682269745903bb665cc16387b19c9a3392042d5da05c6d463d538370a; 1 x -> <lab folder>
+scripts/leftover.ps1: original 2109 B sha256 7e5cbe96861684f00f765affb2a61ef493948f4c2456bd270bf5d7f6295e6651; 1 x -> <lab folder>
+scripts/b3.ps1: original 2162 B sha256 9ccdff0edbdcb4c8ffd985abd3b19b1858f8305ec97df90312590a21cbb3d43c; 1 x -> <lab folder>
+scripts/taskbar-shot.ps1: original 848 B sha256 2144141823d2da4b1c7344eab4ee2a5546e06c156f8c8c91330883049a056faf; 1 x -> <lab folder>
+scripts/call.py: original 1209 B sha256 16e15acfa2952ba53c7155a2ba7f0285d7aec30b580680f812ad3364f659428b; 1 x -> <lab folder>

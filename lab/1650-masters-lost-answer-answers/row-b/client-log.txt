@@ -1,0 +1,24 @@
+2026-10-29T01:11:22Z exe sha256 be79cf12056e4da3cfdb941aa98b5ace3a002a82f3b7f775326c27d329479fe3 ok; launch-env.json sha256 82bfd989cd2d7339c317d0de82eb3596d97cc1cdf8cf7944bc83fab927c7f5b3; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_MASTER_WRITES', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; WRITES True MASTER_WRITES True port 9001
+2026-10-29T01:11:22Z launched pid 4804; stderr to server-stderr-20261029T011122Z.log
+2026-10-29T01:11:23Z initialized {'name': 'bridge-tally', 'version': '0.6.1'}
+2026-10-29T01:11:33Z 000-tools-list.json tool=list secs=0.011 isError=None error=None saved_sha256=a414aa0431f4edf7aa5bb7548e4c8d7d22df9e713417b1851e01e7d84d5e861d
+2026-10-29T01:11:34Z 001-list-companies.json tool=list_companies secs=0.082 isError=False error=None saved_sha256=be5e4deba2f4c81ce0ca6ec975738bef765b71502a5397bf3dc5b27367bc8cb0
+2026-10-29T01:11:42Z 002-m0-basic.json tool=ledger_masters secs=0.724 isError=False error=None saved_sha256=96778636548888290c150267c2bbf958f5b11e9dc3c9ba593b1698296dba5e31
+2026-10-29T01:13:04Z 003-m0p-basic.json tool=ledger_masters secs=0.778 isError=False error=None saved_sha256=043cbd1462ef701795557bdf50a87786065f2cdc2b801fa1c89b5104450e4014
+2026-10-29T01:13:07Z 004-prepare-bb.json tool=prepare_ledger_creates secs=1.274 isError=False error=None saved_sha256=751eab42bf030395bd84625385751753c32b2adf668d50bd83e6c0924b3c4a25
+2026-10-29T01:13:34Z 005-b1-after-prepare.json tool=ledger_masters secs=1.168 isError=False error=None saved_sha256=952aef785ee967614046e66d9ac3e1f9125b2a2896b228690c80e35e64c703b7
+2026-10-29T01:14:42Z 006-b2-post-1.json tool=post_ledger_creates secs=40.067 isError=False error=None saved_sha256=5d9fa8b5afb419c6d3540f32575131a98eb183d385804e02fe346041c2fc63bf
+2026-10-29T01:16:14Z 007-b2-post-1b.json tool=post_ledger_creates secs=0.062 isError=True error=None saved_sha256=84b8cd80fe7f9f2764280b2aadcab5032140f254ea018e12a56ebd9a9d1b75ae
+2026-10-29T01:17:18Z 008-b2-post-1c.json tool=post_ledger_creates secs=40.104 isError=False error=None saved_sha256=abb1a7ba4eaed536f9b8954fa6d9ed45feb7d9470b6b087c7e173c1f9edeeaf5
+2026-10-29T01:22:13Z exe sha256 be79cf12056e4da3cfdb941aa98b5ace3a002a82f3b7f775326c27d329479fe3 ok; launch-env.json sha256 82bfd989cd2d7339c317d0de82eb3596d97cc1cdf8cf7944bc83fab927c7f5b3; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_MASTER_WRITES', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; WRITES True MASTER_WRITES True port 9001
+2026-10-29T01:22:13Z launched pid 15032; stderr to server-stderr-20261029T012213Z.log
+2026-10-29T01:22:13Z initialized {'name': 'bridge-tally', 'version': '0.6.1'}
+2026-10-29T01:22:23Z 009-b3-after-busy-1.json tool=ledger_masters secs=0.745 isError=False error=None saved_sha256=5a0b40ff2ac84015ce58f69aee104488e1a2c31bd8aa1be59fbc801a4d802aa0
+2026-10-29T01:23:22Z 010-b2a2-post-1.json tool=post_ledger_creates secs=40.069 isError=False error=None saved_sha256=c0ee655e8972e53bf39bd779f04d7a185adf21867ed39eab728285b3c7e5cdbf
+2026-10-29T01:23:58Z 011-b2-post-2-busy2.json tool=post_ledger_creates secs=20.270 isError=True error=None saved_sha256=4ed1026cb9ae5ce6996bab446083fcad32e7676b0b8bd733f7c9cde198237951
+2026-10-29T01:27:30Z 012-b3-after-busy-2.json tool=ledger_masters secs=0.797 isError=False error=None saved_sha256=9d1ebadd4f4dfe6818097be0d335c1a36c5fe796b93a2e68e23aeb49a73fe818
+2026-10-29T01:28:47Z 013-b4-post-1.json tool=post_ledger_creates secs=40.119 isError=False error=None saved_sha256=3d1051e48e292e0bbd3082dfecb33be6f15a415a16eaa44565ec92b681547b20
+2026-10-29T01:29:09Z 014-b2-post-2-b4.json tool=post_ledger_creates secs=5.971 isError=False error=None saved_sha256=7eaa0b7352f8be3fd5abe3e57a7038f8fe444b9213bcb08f868215f902d3f5e5
+2026-10-29T01:29:24Z 015-b4-m1.json tool=ledger_masters secs=0.800 isError=False error=None saved_sha256=702ea8fb4c3f9004ab372585588e7e9c5799d944780d9d543707d8476b205f17
+2026-10-29T01:29:25Z 016-b5-egress.json tool=egress_log secs=0.091 isError=False error=None saved_sha256=3f3dd0bd53598f2bc77c4f740d255232c5e58dd54ee9893a8c11f03952666b87
+2026-10-29T01:29:41Z session ended; server pid 15032 exit code 0

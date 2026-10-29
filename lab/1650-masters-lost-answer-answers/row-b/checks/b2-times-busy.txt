@@ -1,0 +1,6 @@
+2026-10-29T01:16:16.023Z HALT: 007-b2-post-1b.json is not pending
+2026-10-29T01:17:20.538Z pending answer at 01:17:18.104Z (sent 2026-10-29T01:16:38Z + 40.104 s); retry_after_s 15; BUSY at pending + 14.5 s
+2026-10-29T01:17:32.738Z 1. BUSY started: curl pid 17228, request sha256 ad2d4aa96d98041cd69cc52b4d2d280feeaab561a9558f4190e8b64db30ee749
+2026-10-29T01:17:32.765Z 2. clicked Yes at 755,562
+2026-10-29T01:17:33.024Z 3. post_ledger_creates queued: 
+2026-10-29T01:17:33.468Z box still open after the click: False

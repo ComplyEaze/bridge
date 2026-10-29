@@ -1,0 +1,2 @@
+"tally.exe","13992","Console","5","3,47,424 K"
+exit 0

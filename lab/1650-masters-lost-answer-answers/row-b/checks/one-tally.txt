@@ -1,0 +1,9 @@
+2026-10-29T01:14:01.273Z one-tally before B2 post 1: tasklist ["tally.exe","13992","Console","5","4,17,868 K"] exit 0; 9001 Listen owner(s) 13992
+2026-10-29T01:16:13.655Z one-tally before B2 post 1b: tasklist ["tally.exe","13992","Console","5","4,11,428 K"]; 9001 Listen owner(s) 13992
+2026-10-29T01:16:15.306Z one-tally before B2 post 2: tasklist ["tally.exe","13992","Console","5","4,11,428 K"]; 9001 Listen owner(s) 13992
+2026-10-29T01:16:37.945Z one-tally before B2 post 1c: tasklist ["tally.exe","13992","Console","5","4,11,428 K"]; 9001 Listen owner(s) 13992
+2026-10-29T01:17:19.888Z one-tally before B2 post 2: tasklist ["tally.exe","13992","Console","5","4,11,428 K"]; 9001 Listen owner(s) 13992
+2026-10-29T01:22:41.618Z one-tally before B2 attempt 2, post 1: tasklist ["tally.exe","13992","Console","5","8,87,952 K"]; 9001 Listen owner(s) 13992
+2026-10-29T01:23:23.564Z one-tally before B2 attempt 2, post 2: tasklist ["tally.exe","13992","Console","5","8,88,020 K"]; 9001 Listen owner(s) 13992
+2026-10-29T01:28:06.820Z one-tally before B4 post 1: tasklist ["tally.exe","13992","Console","5","8,78,224 K"]; 9001 Listen owner(s) 13992
+2026-10-29T01:28:48.612Z one-tally before B4 post 2: tasklist ["tally.exe","13992","Console","5","8,78,248 K"]; 9001 Listen owner(s) 13992

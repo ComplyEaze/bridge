@@ -1,0 +1,5 @@
+2026-10-29T01:28:49.228Z pending answer at 01:28:47.119Z (sent 2026-10-29T01:28:07Z + 40.119 s); retry_after_s 15; BUSY at pending + 15.5 s
+2026-10-29T01:29:02.683Z 1. no BUSY (step B4)
+2026-10-29T01:29:02.704Z 2. clicked Yes at 755,562
+2026-10-29T01:29:03.555Z 3. post_ledger_creates queued: 014-b2-post-2-b4.json queued 2026-10-29T01:29:03.528Z
+2026-10-29T01:29:03.989Z box still open after the click: False

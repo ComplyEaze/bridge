@@ -1,0 +1,46 @@
+Captures and files kept on the lab PC (never pushed): name, bytes, sha256.
+Row L screenshots and box captures:
+  bk1-before-accept.png 51992 430e2ced9ec73c56b56788cc696063b2c2eb7858912cb5b57f3e23c3491fd5cb
+  c10-no-company.png 72685 867e9f17cc2d057121a4c914a3d9a6feabdb9b7d4b1c214834c929b9a9e266dc
+  r-c10-no-company.png 72674 ab36f3425c8c83b6a6dc21daa897a739f86b9b0a593b3adbaeeecf35a29b57cf
+  r-s0-gateway-loaded.png 45488 ce5cd2719dec979df7f7fbdb1b0c7618e62e612551e4e4ee4ec1731e61eb70a8
+  r-s1-relay-console.png 15947 c5c81befc9002c47b836c29fb9e829fb3ff2b2bdb04acec5782ebe26ef756145
+  s0-about.png 76998 00550f5e88ec910cbb261b3d61cc526effc1bc978859553ca06c6c27ceb1eca9
+  s0-no-lostans-in-list.png 34817 b3b9eda34d1bb7ed908bb04b01439ea79ba7f2f45aee070a5bd3964926c4a6ed
+  s0-start.png 72674 ab36f3425c8c83b6a6dc21daa897a739f86b9b0a593b3adbaeeecf35a29b57cf
+  s1-company-creation-before-accept.png 40950 0a7e29fffb5cf5ea7184337ffd1ae7ae401f74f6238bc375ee640b71a9ac2ac5
+  s1-features.png 85385 4affa856519af3f89e160d5d43f240430930216776c20a4102b6c0ed5bb79d87
+  s1-relay-console.png 15846 1e75b1d0ff3e58f6b3676614a42d3b00c5ad082ebfecbbbe62aa339bdedc654d
+  s6-after-create.png 44420 1f0a728f03d5e9a77ec2478aa0da4a197c821bb7277dd3c423e761f4f63003d3
+Row B screenshots and box captures:
+  b0-gateway-loaded.png 45176 feb4dde63edc3037f8d3eeec54c128489f1e4deca926b12f33d610d94b501768
+  b2-box-1-0.png 21440 6c1d3b888a9518e3275bdf2d44c4cbe1f8e0a26cc85e21421863cf0d58efb8af
+  b3-after-busy.png 45176 feb4dde63edc3037f8d3eeec54c128489f1e4deca926b12f33d610d94b501768
+  b3b-after-busy2.png 44113 4317569e9e310825f67383da1183bec6e2ecee8e6f0702f3912b5008718a98b0
+  bk1-before-accept.png 52096 eef03f705ba9169cc32b3156d2c0ef369bf01e594c69560254449dd722dc1b59
+  c10-no-company.png 72685 867e9f17cc2d057121a4c914a3d9a6feabdb9b7d4b1c214834c929b9a9e266dc
+Backups:
+  TDBK1800_100097.001 23390 8304321d5afb36d3ba9c2ac2a76c79a8d37f255a8b8ba7e27cee91e83236c269
+  TDBK1800_100096.001 13255549 6b375e1fc84119cc9084fbacdd1ef35219926dd0425a051accb2c5d59f312f3a
+Row B BUSY answers (48,000 VOUCHER rows each, by structure):
+  busy-answer.xml 238211254 71987a0edffce48a5759a728fd194f7c5bb92ce23394805e661b630a1671288e
+  busy2-answer.xml 238211254 71987a0edffce48a5759a728fd194f7c5bb92ce23394805e661b630a1671288e
+Full netstat output, process lists, folder listings, launch files and data folders:
+  l-evidence-c10-netstat-full.txt 13953 2615b40a1feb0f5e59a3e7503ffd360f8a2e33d2b5a481594547afd4079cdb48
+  l-evidence-r-c10-netstat-full.txt 13122 74e59106e69489447b69af9699154971f37d5b794437c62980cd01c88904f375
+  l-evidence-r-s0-netstat-full.txt 12251 020f93201f3d2527859f72862414e530ceba5d15a07dc88fee28903005e72086
+  l-evidence-s0-netstat-full.txt 11718 677650e54c3246fc7300066676234151e0160f036bf2b30daf4ba6a294be7829
+  l-evidence-r-s1-process-list.txt 1082 fbb38594f1006eb9fe7cb0e3260a3139937fbf743bde97def1c5bb017a699b08
+  l-evidence-s0-process-list.txt 1001 c8e98b43786cabd17b925b8ca4016088de5c7f56382176b6d1a432b6be3b97c4
+  l-evidence-s1-process-list.txt 1082 4b1e7b882683dc1826c412be3bb949b0de97e770308f588b4c842228703799bf
+  l-evidence-bk1-listing-after.txt 112 c45d567f6e9f7f0dc8e6108a8e625f80d55ea54c15c35a2b6e031930f09a7b2d
+  l-evidence-bk1-listing-before.txt 15 715add31ba42e4402a8e8c5fe501c8060e9f2af8ee899b143bb8bdf5620a8bbd
+  b-evidence-b0-netstat-full.txt 9423 3148d64ebb67eea5033feaefdd0f4817bf89a1f705951a0f0078f00edc8d48d9
+  b-evidence-c10-netstat-full.txt 9349 53a62baa4d9ee3c22ddb6df0fa5a2d38cda2162f6afe4b7cab38ece50871d436
+  b-evidence-b0-process-list.txt 1082 e460c0708b0dcd3c11f3c8586a35f78972d73b5c9bad2fb8541e5847e5f2b7d1
+  b-evidence-bk1-listing-after.txt 115 207c55e6206dbc747609051093699e6b690edfb1bae7fd4b24ae45211e2e0312
+  b-evidence-bk1-listing-before.txt 15 715add31ba42e4402a8e8c5fe501c8060e9f2af8ee899b143bb8bdf5620a8bbd
+  l-launch-env.json 185 a84b7c33f4d6978b68519884ab3192493637c4af4898df8b36d321578db4aaa2
+  b-launch-env.json 185 1467f96fd02d6aba45b6bc639685b14107608166c706fb175463d530399dae1e
+  l-data-agent-egress.jsonl 43937 8b6dbc708e1caefbd9492530f4ea9a1fd1facd544280d7a5ccdd2ef0b4a228cf
+  b-data-agent-egress.jsonl 45633 a6d0cb981196131f228a649e120118eafd5478d9b8943f1264cdeda0a3ccdd9d

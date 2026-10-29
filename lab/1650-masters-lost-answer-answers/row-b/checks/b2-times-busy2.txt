@@ -1,0 +1,5 @@
+2026-10-29T01:23:24.362Z pending answer at 01:23:22.069Z (sent 2026-10-29T01:22:42Z + 40.069 s); retry_after_s 15; BUSY at pending + 14.5 s
+2026-10-29T01:23:36.634Z 1. BUSY started: curl pid 15176, request sha256 ad2d4aa96d98041cd69cc52b4d2d280feeaab561a9558f4190e8b64db30ee749
+2026-10-29T01:23:36.666Z 2. clicked Yes at 755,562
+2026-10-29T01:23:37.547Z 3. post_ledger_creates queued: 011-b2-post-2-busy2.json queued 2026-10-29T01:23:37.520Z
+2026-10-29T01:23:37.990Z box still open after the click: False

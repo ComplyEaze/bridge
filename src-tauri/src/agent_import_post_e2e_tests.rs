@@ -4414,6 +4414,8 @@ fn a_pending_mark_never_erases_a_doubt() {
 mod ack_tests;
 #[path = "agent_import_approval_tests.rs"]
 mod approval_tests;
+#[path = "agent_import_settle_tests.rs"]
+mod settle_tests;
 #[path = "agent_import_stop_tests.rs"]
 mod stop_tests;
 #[path = "agent_import_w18_replay_tests.rs"]
@@ -5575,8 +5577,10 @@ fn assert_reported_not_created(posted: &Value) {
     for phrase in [
         "Tally reported this voucher as not created",
         "will not send this saved voucher again",
-        "nothing in ComplyEaze Bridge puts it in the book yet",
         "do not import it again through Tally's Import menu",
+        // The person settles the batch; it is never sent again (#1709).
+        "call acknowledge_post_review with doubt not_created",
+        "a dialog you cannot answer",
     ] {
         assert!(next_step.contains(phrase), "{phrase}: {next_step}");
     }

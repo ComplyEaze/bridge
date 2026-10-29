@@ -256,7 +256,7 @@ fn sent_requests() -> [String; 3] {
     let company = ValidatedCompanyName::new(name.as_str()).unwrap();
     let range = ValidatedDateRange::new("20250401", "20260331").unwrap();
     [
-        render_company_inventory_flags_request(&name, GUID).unwrap(),
+        render_company_inventory_flags_request(&name, &crate::tally::test_company_guid(GUID)),
         ReadOnlyProfile::AuditStockItemsV1 {
             company: &company,
             period: &range,
@@ -368,6 +368,25 @@ fn the_period_is_the_financial_year_containing_as_of_or_the_books_start_if_later
     assert_eq!(
         admitted("20260331", "20240401", "20260331"),
         pair("20250401", "20260331")
+    );
+    // A month end inside the year reads from that year's 1 April, January and
+    // February from the 1 April of the calendar year before.
+    assert_eq!(
+        admitted("20250930", "20240401", "20260930"),
+        pair("20250401", "20250930")
+    );
+    // April's end is the first month end of its own year, not of the year before.
+    assert_eq!(
+        admitted("20250430", "20240401", "20260930"),
+        pair("20250401", "20250430")
+    );
+    assert_eq!(
+        admitted("20260131", "20240401", "20260930"),
+        pair("20250401", "20260131")
+    );
+    assert_eq!(
+        admitted("20260228", "20240401", "20260930"),
+        pair("20250401", "20260228")
     );
     // Before the books, and after today, refuse.
     assert!(matches!(

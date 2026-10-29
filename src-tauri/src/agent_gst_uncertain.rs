@@ -164,7 +164,7 @@ impl Server {
         args: &Value,
     ) -> Result<ToolOutcome, ToolFailure> {
         let arguments = status_arguments(args)?;
-        let (from, to, type_name) = (&arguments.from, &arguments.to, arguments.type_name);
+        let (from, to, type_name) = (&arguments.from, &arguments.to, &arguments.type_name);
         let gate = self.status_gate(arguments.guid).await?;
 
         // The first read is the status read of `gst_status`, which counts the window's
@@ -262,7 +262,7 @@ impl Server {
                     uncertain,
                     &dashed(from),
                     &dashed(to),
-                    type_name
+                    type_name.as_str()
                 )),
             )
         };
@@ -270,7 +270,7 @@ impl Server {
             "state": state,
             "basis": "tally_voucher_gst_status_party_amount_one_voucher_type_one_window",
             "window": {"from": from.as_str(), "to": to.as_str()},
-            "voucher_type_name": type_name,
+            "voucher_type_name": type_name.as_str(),
             "total": total,
             "counts": counts_json(&counts, unread),
             "items": items,

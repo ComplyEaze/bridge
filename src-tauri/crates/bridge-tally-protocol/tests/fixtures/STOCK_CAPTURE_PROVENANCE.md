@@ -84,3 +84,56 @@ Every file is a live capture, never hand-written.
 |---|---|---|---|
 | `stock_items_negative_sale_lab_live.utf16le.xml` | 5464 | `5ab16aff408fc8744211bebd6351ac09aec3ed3b8a5a28b624a8ba3ac4fc5646` | stock items, 2 rows |
 | `stock_summary_report_negative_sale_lab_live.utf16le.xml` | 946 | `5d3a01b4a3a833b85283432c0cfed5aa88458a8bbec31ded395a67231717a2be` | Stock Summary, 2 lines |
+
+## Stock groups nested three deep (captured 2026-10-27)
+
+- **What:** the company's inventory flags and stock item count, the stock items collection and the plain Stock Summary of one synthetic lab company, `BRIDGE NESTED STOCK LAB`, keyed by hand on Tally's screens for this capture: two units, three stock groups nested three deep, eight stock items (one directly under the root, the rest at depths one to three) and two Stock Journals. Protocol reference §12a.13 records what they show against Tally's own screen.
+- **Host / gateway:** TallyPrime **Silver**, 7.2, a lab instance on port 9001, one request at a time.
+- **Sender:** curl, sending the bytes of each request file below once each. Those bytes are the production builders' output for this company and the period 20250401 to 20260331 (`the_nested_books_requests_are_the_builders_bytes_for_that_company` in `src/native_stock_summary_tests.rs` asserts it). The marks read before and after the reads were equal, and a second read of the stock items was byte-identical to the first.
+- **Source:** lab branch `lab/1233-nested-groups-capture-answers` at `c1a82ddd16cb`: `raw/n1-a.xml`, `raw/n2-a.xml`, `raw/n3-b.xml` and the filled request `n3-company-flags.utf16le.xml`, with `requests/n1-*` and `requests/n2-*` from its request folder. Each sha256 below equals the lab's send-log line for that file.
+- **Encoding:** responses are BOM-less UTF-16LE exactly as received, with the HTTP header removed; requests are the bytes sent, UTF-16LE with a BOM. Nothing is edited.
+
+| file | bytes | sha256 | content |
+|---|---|---|---|
+| `company_inventory_flags_nested_lab_request.utf16le.xml` | 1654 | `bf5197c0ddac03788a1de135b1b99315b2fe612f6bc858e7e88307ae6b1b2640` | request, flags |
+| `company_inventory_flags_nested_lab_live.utf16le.xml` | 4920 | `425bfe9724052a00034755b5463db70a446f8c0586db41e9b4c8e58370865b5c` | flags, 1 row, item count 8 |
+| `stock_items_nested_lab_fy_request.utf16le.xml` | 1272 | `7c6770b2e18f146fd69c71d4f381bde63833366da99d69a0d54ef8e304d01b07` | request, stock items |
+| `stock_items_nested_lab_fy_live.utf16le.xml` | 13954 | `ba77d8a0dc343b8eaf767803bbc4ee2cf5c4de2e22c4b0cee5a3527c3758fd41` | stock items, 8 rows at depths 0 to 3 |
+| `stock_summary_report_nested_lab_fy_request.utf16le.xml` | 772 | `d7d0b8c17f3c93f2f656baf3ec51cc1d37aabd601d4677632465aa4e7810c3f0` | request, Stock Summary |
+| `stock_summary_report_nested_lab_fy_live.utf16le.xml` | 948 | `338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937` | Stock Summary, 2 lines (the top group, the item under the root) |
+
+## Period ends inside the year (captured 2026-10-26 and 2026-10-29)
+
+- **What:** the stock items collection, the plain Stock Summary and the company's flags of two synthetic lab companies, read to a month end inside the financial year:
+  - `BRIDGE TIEOUT D` (one item under the root), to 30 September and 31 May 2025;
+  - `BRIDGE NESTED STOCK LAB` (the nested book above), to 31 August and 30 September 2025, either side of its Stock Journal of 15 September.
+  Protocol reference §12a.13 records what they show against Tally's own screen.
+- **Host / gateway:** TallyPrime **Silver**, 7.2, a lab instance on port 9001, one request at a time.
+- **Sender:** curl, sending each request file below once. The requests are the production builders' output for each company and period, as `the_month_end_requests_are_the_builders_bytes_for_each_book_and_date` (`src/native_stock_summary_tests.rs`) asserts. The nested book's flags request is the committed `company_inventory_flags_nested_lab_request.utf16le.xml`. In each sitting, the marks read before and after the reads were byte-identical.
+- **Source:**
+  - `BRIDGE TIEOUT D`: lab branch `lab/1233-stock-mid-year-answers` at `ba3b55cf1bc5` (answers `01`, `02` to `05`; requests from `lab/1233-stock-mid-year-requests`).
+  - The nested book: answers from `lab/1233-nested-as-of-answers` at `a2ff6c015524` (`evidence/a1`, `a2`, `b1`, `b2`, `n3-a`), requests from `lab/1233-nested-as-of` at `c42cfeff5497`.
+  Each sha256 below equals the lab's send-log line for that file.
+- **Encoding:** responses are BOM-less UTF-16LE exactly as received, with the HTTP header removed; requests are the bytes sent, UTF-16LE with a BOM. Nothing is edited. `stock_summary_report_nested_lab_to_20250930_live` is byte-identical to `stock_summary_report_nested_lab_fy_live`, because nothing in that book moves between 30 September and 31 March.
+
+| file | bytes | sha256 | content |
+|---|---|---|---|
+| `company_inventory_flags_tieout_d_request.utf16le.xml` | 1638 | `19a29941331fec29e44557eb964bd50623d0b7307d9951d987defc03dd5e1905` | request |
+| `company_inventory_flags_tieout_d_live.utf16le.xml` | 4886 | `84e0a5be2487af5d65029b3eb736c5fca7381de186d10bc3f0d7a9e29bf34104` | flags, 1 row |
+| `stock_items_tieout_d_to_20250930_request.utf16le.xml` | 1256 | `45445f60dfd7f10c668b8a0748bf90256d004572778e3fcceaeaaa525a90603a` | request |
+| `stock_items_tieout_d_to_20250930_live.utf16le.xml` | 4356 | `2a85a2a3487cad003696f3ca893c024a53bfc8a7ae6f53b10c194053d3cd2c4a` | stock items |
+| `stock_summary_report_tieout_d_to_20250930_request.utf16le.xml` | 756 | `d621a687e49f41574c7d137f9a8d586d3a8027ceefa086cbf593a77ab654fccc` | request |
+| `stock_summary_report_tieout_d_to_20250930_live.utf16le.xml` | 510 | `6ea369d19adb9d08bf3883d186744d6d705e625e21516d876df131f0881516a7` | Stock Summary |
+| `stock_items_tieout_d_to_20250531_request.utf16le.xml` | 1256 | `47072bc7f8c1484953bde1e71d395d3611867c4800980a7f47e3836a4f02e384` | request |
+| `stock_items_tieout_d_to_20250531_live.utf16le.xml` | 4356 | `c6414fcc1f628395d0a82cd474a548504655c77776799f9f707576cda996c3fc` | stock items |
+| `stock_summary_report_tieout_d_to_20250531_request.utf16le.xml` | 756 | `db9f85b3a8aff078fba801f0fc8e1a6a37b68dd3841dee29c45536445e275c3e` | request |
+| `stock_summary_report_tieout_d_to_20250531_live.utf16le.xml` | 510 | `64f67059e3a921e4c96cd7bf059b7397e18ddea71cd79b4b4f715da7b68efe71` | Stock Summary |
+| `company_inventory_flags_nested_lab_as_of_live.utf16le.xml` | 4918 | `847d99be63bf40a84dc9378f38b02d57ddcb1fc74937dab0d7991be26166c083` | flags, 1 row |
+| `stock_items_nested_lab_to_20250831_request.utf16le.xml` | 1272 | `8a527cab50a05dbbe5e12cd7c65ce42a3baa2fea9a7066558aa0cfe7963d3f63` | request |
+| `stock_items_nested_lab_to_20250831_live.utf16le.xml` | 13952 | `1f012bcb94bb4fe3271590da85b42c6af0309daa6b83a1685201de94fb8928e4` | stock items |
+| `stock_summary_report_nested_lab_to_20250831_request.utf16le.xml` | 772 | `b56c6bdc058f3c066116d11ace14b52381a9d31e22705b040c1c3fe9bf87353b` | request |
+| `stock_summary_report_nested_lab_to_20250831_live.utf16le.xml` | 948 | `0ab20c1536d48bd75faacaf3ab45cea38ee6ba7e463e7fc443f7ca3eb553a365` | Stock Summary |
+| `stock_items_nested_lab_to_20250930_request.utf16le.xml` | 1272 | `ac2818c36086ade4d9cfb28720f4d2b96b0b6f607278c5466bf076cc43bd70c6` | request |
+| `stock_items_nested_lab_to_20250930_live.utf16le.xml` | 13952 | `53aa65c8e27e84aa9af0cffe29f2fd3679c7c44518ea89e8c90fbb59ed86e74e` | stock items |
+| `stock_summary_report_nested_lab_to_20250930_request.utf16le.xml` | 772 | `cbdd7658148f83352f33d54560eab3c99fdab604b9c1460774686f5cbca01909` | request |
+| `stock_summary_report_nested_lab_to_20250930_live.utf16le.xml` | 948 | `338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937` | Stock Summary |

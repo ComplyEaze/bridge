@@ -26,10 +26,21 @@ on:
     - cron: '17 3 * * *'
 
 concurrency:
-  # A pull request's newer push supersedes its older run. Every other run (a
-  # master push, a manual dispatch) gets a group of its own, so none is
-  # cancelled mid-run or dropped while pending behind another.
-  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  # A pull request's newer push supersedes its older run. Master pushes share one group
+  # and never cancel a run that has started: a push whose run is still waiting for the
+  # group is replaced by the next push's run (GitHub keeps one pending run per group), so
+  # a burst of merges runs the tip and the run in progress, not every commit at once
+  # (each of them holds two macOS jobs and the merge queue waits behind them). The tip
+  # always runs, but after the run in progress finishes: master pushes no longer run side
+  # by side. A replaced commit gets no push run of its own, and two checks that read a
+  # push's before..after range then skip it: the push-mode acknowledgement check
+  # (scripts/check-surface-ack.mjs; every commit that landed through the merge queue was
+  # checked in merge_group mode first) and the Cargo, toolchain and workflow triggers that
+  # force a full run (scripts/master-push-reuse.mjs). The daily run covers neither: it
+  # checks the acknowledgement files only and runs both systems for every job. Every other
+  # run (the merge queue, a scheduled or manual run) gets a group of its own, so none is
+  # cancelled or dropped.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.event_name == 'push' && 'master-push' || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -231,7 +242,11 @@ jobs:
       # tried again instead of burning the job. Only this download is retried, never a test.
       - name: Read the Playwright version
         id: playwright-version
-        run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+          # The runner image the job is on. The packages cached below are the ones apt chose on that image; an image
+          # without this variable shares one key, which is safe (see the install step) and only costs a re-download.
+          echo "image=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
       # Restored here and saved by the "Save Playwright browsers" step after the install, not by the combined cache action,
       # so that only a push, manual or scheduled run writes the cache: a pull-request ref's copy is readable by that ref
       # alone (15 Oct 2026: five such copies, 1.8 GiB of a 10 GiB cap).
@@ -241,9 +256,22 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      # The system packages Playwright needs are about 115 MB from the runner's apt mirror, and in the two bursts of
+      # 26 and 27 Oct 2026 that mirror gave 8 to 80 kB/s: 45 of 512 install steps (22 of them in the merge queue) used
+      # all three attempts and failed (bridge#2056). The downloaded .deb files are cached like the browsers, by
+      # Playwright version and runner image, restored here and saved after a successful install by a push, manual or
+      # scheduled run only, so that no pull-request or merge-queue run can write what the next run installs from.
+      - name: Restore Playwright system packages
+        id: apt-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-debs
+          key: playwright-debs-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-${{ steps.playwright-version.outputs.image }}
       - name: Install Playwright browsers and system dependencies
         env:
           CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+          DEBS_HIT: ${{ steps.apt-cache.outputs.cache-hit }}
+          APT_ARCHIVES: /var/cache/apt/archives
         run: |
           # The system packages are installed by apt, as root, so the `timeout` that limits them runs as root too. On
           # 2 Oct 2026 a `timeout` run as the runner user stopped Playwright but could not signal the root apt-get that
@@ -260,6 +288,36 @@ jobs:
           # Two of them, a slow third that succeeds, a browser cache miss and three timed-out downloads take about
           # 44 minutes; the job's own time limit (40 minutes, see its header) then ends it, as loudly as `exit 1`.
           printf '%s\n' 'DPkg::Lock::Timeout "150";' 'Dpkg::Use-Pty "0";' | sudo tee /etc/apt/apt.conf.d/99-bridge-lock-timeout > /dev/null
+          # Cached packages go into apt's own archive directory, where apt takes them in place of a download, and only
+          # after each one is checked against the package index, which the runner's signed release files vouch for.
+          # The index is updated first (limited to 120 s, because apt's own timeout restarts on every byte); if that
+          # fails nothing is copied and the install downloads as it does on a miss. A file is copied only if it is a
+          # regular file (not a link) named name_version_architecture.deb in the form apt gives its downloads, and its
+          # SHA-256 equals one the index lists for that package, version and architecture; every other file is
+          # deleted. So a cache that holds a changed, cut-off or stale package costs a download and nothing more.
+          # What apt itself does with a cached file of the right name and size has not been measured (bridge#2056).
+          marker="$(mktemp)"
+          if [ "$DEBS_HIT" = "true" ] && sudo timeout --kill-after=10 120 apt-get update -qq; then
+            for deb in "$HOME"/apt-debs/*.deb; do
+              if [ ! -f "$deb" ] || [ -L "$deb" ]; then continue; fi
+              file="${deb##*/}"
+              base="${file%.deb}"
+              name="${base%%_*}"
+              rest="${base#*_}"
+              version="${rest%%_*}"
+              arch="${rest#*_}"
+              version="${version//\%3a/:}"
+              if [[ "$base" =~ ^[a-z0-9][a-z0-9+.-]*_[A-Za-z0-9.+:~%-]+_[a-z0-9-]+$ ]]; then
+                digest="$(sha256sum "$deb" | cut -d' ' -f1)"
+                if { apt-cache show "$name:$arch=$version" || apt-cache show "$name=$version"; } 2>/dev/null | grep -qx "SHA256: $digest"; then
+                  sudo cp "$deb" "$APT_ARCHIVES/"
+                  continue
+                fi
+              fi
+              echo "Not using the cached package $file: it does not match the package index"
+              rm -f "$deb"
+            done
+          fi
           for attempt in 1 2 3; do
             if sudo timeout --kill-after=10 600 "$(command -v node)" node_modules/@playwright/test/cli.js install-deps chromium webkit; then
               break
@@ -271,6 +329,17 @@ jobs:
             # `|| true` hides that; it is harmless, because the next apt attempt waits for the lock (up to 150 s).
             sudo dpkg --configure -a || true
           done
+          # A miss keeps what this install downloaded: the .deb files that came into the archive directory after the
+          # marker. They are chosen by inode change time, not modification time, because apt gives a downloaded file
+          # the mirror's Last-Modified time, which is old. An empty directory is removed, so that nothing is saved for
+          # the key (a saved key is never replaced). The save step below runs only for a push, manual or scheduled run;
+          # here the files are only copied, which every run may do.
+          if [ "$DEBS_HIT" != "true" ]; then
+            mkdir -p "$HOME/apt-debs"
+            sudo /usr/bin/find "$APT_ARCHIVES" -maxdepth 1 -type f -name '*.deb' -cnewer "$marker" -exec cp {} "$HOME/apt-debs/" \;
+            rmdir "$HOME/apt-debs" 2>/dev/null || true
+          fi
+          rm -f "$marker"
           # The browser download is what hung until the job's time limit about eight times in two days, so it is the
           # part that keeps a short limit and a bounded number of attempts. It runs no apt and holds no lock.
           # This block ends the step (exit 0 or exit 1 inside it): add nothing after it without checking that.
@@ -283,6 +352,12 @@ jobs:
             done
             exit 1
           fi
+      - name: Save Playwright system packages
+        if: ${{ steps.apt-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-debs
+          key: playwright-debs-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-${{ steps.playwright-version.outputs.image }}
       - name: Save Playwright browsers
         if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -358,6 +433,7 @@ jobs:
       - run: node --test scripts/check-conflict-markers.test.mjs
       - run: node --test scripts/collect-macos-test-crashes.test.mjs scripts/retain-macos-test-binaries.test.mjs
       - run: node --test scripts/fetch-pdfium.test.mjs
+      - run: node --test scripts/check-ai-attribution.test.mjs
       # merge-gate.test.py takes about 6.5 of this job's 7.5 minutes and tests the merge gate and what it reads. A
       # pull request that changes nothing under scripts/, .github/ or docs/tally/compatibility/ (or the files that
       # pin the toolchain and attributes) skips it; the merge queue, a push to master, the nightly run and a manual
@@ -911,7 +987,7 @@ jobs:
     permissions:
       contents: read
       actions: write
-    # Master runs overlap, and prunes must not run at once. queue: max keeps every
+    # Master runs can overlap (a push and the daily run), and prunes must not run at once. queue: max keeps every
     # waiting prune instead of cancelling the older one, so a cancelled prune
     # means a real cancellation or a timeout, and required-checks fails on it.
     concurrency:

@@ -210,11 +210,12 @@ fn the_renderer_reproduces_the_wide_request_the_lab_sent_character_for_character
     let sent = decode_utf16(WIDE_REQUEST);
     let sent = sent.strip_prefix('\u{feff}').expect("a byte order mark");
     let (from, to) = (tally_date("20260801"), tally_date("20260831"));
+    let lab_type = read_profiles::GstStatusTypeName::parse(LAB_TYPE).unwrap();
     let rendered =
-        read_profiles::render_gst_uncertain_window(LAB_COMPANY, &from, &to, LAB_TYPE).unwrap();
+        read_profiles::render_gst_uncertain_window(LAB_COMPANY, &from, &to, &lab_type).unwrap();
     assert_eq!(rendered, sent);
     // The read built for the tool is the same text, and it goes out as the lab's bytes.
-    let request = read_profiles::gst_uncertain_read(LAB_COMPANY, &from, &to, LAB_TYPE).unwrap();
+    let request = read_profiles::gst_uncertain_read(LAB_COMPANY, &from, &to, &lab_type).unwrap();
     assert_eq!(request.into_xml(), sent);
     assert_eq!(
         sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
@@ -239,13 +240,14 @@ fn the_wide_request_is_the_narrow_one_with_the_party_and_the_amount_added() {
     );
 }
 
+/// The wide renderer takes the same parsed name, so a name that could break
+/// the string literal cannot reach it either.
 #[test]
-fn a_type_name_that_could_break_the_string_literal_is_refused_by_the_wide_renderer_too() {
-    let (from, to) = (tally_date("20260801"), tally_date("20260831"));
+fn a_type_name_that_could_break_the_string_literal_cannot_reach_the_wide_renderer() {
     for name in ["BRIDGE \"Sales", "BRIDGE\\Sales", "a&b", " Sales", ""] {
         assert_eq!(
-            read_profiles::render_gst_uncertain_window(LAB_COMPANY, &from, &to, name),
-            Err("gst_status_type_name_invalid".to_string()),
+            read_profiles::GstStatusTypeName::parse(name),
+            None,
             "{name:?}"
         );
     }
@@ -674,6 +676,7 @@ fn tool_server(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }

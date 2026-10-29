@@ -8,7 +8,7 @@
 //! party's ledger (`Café Naïve Traders` holds -102.02); none names a bill.
 use super::*;
 use crate::agent::bill_trail::{DetailKind, DetailLimits};
-use crate::agent::voucher_window::{SmallBooks, VoucherReadShape, WindowReadLimits};
+use crate::agent::voucher_window::{CompanyMarks, SmallBooks, VoucherReadShape, WindowReadLimits};
 use crate::tally::{ExposureDirection, OpenBillRow, UnallocatedComposition, UnallocatedParty};
 
 /// The outstandings' as-of date, as the bill trail is handed it.
@@ -51,7 +51,6 @@ fn company_and_catalogue() -> Vec<ScenarioPlan> {
 fn detail_plans(window: ScenarioPlan) -> Vec<ScenarioPlan> {
     let cycle = import_cycle_plans();
     let mut plans = company_and_catalogue();
-    plans.extend(cycle[10..16].iter().cloned());
     plans.extend([
         cycle[0].clone(),
         window.clone(),
@@ -60,8 +59,13 @@ fn detail_plans(window: ScenarioPlan) -> Vec<ScenarioPlan> {
         cycle[1].clone(),
         cycle[0].clone(),
     ]);
+    // The closing read of the company's marks, the same answer as the pre-flight's.
+    plans.extend(cycle[10..16].iter().cloned());
     plans
 }
+
+/// The marks the detail's handler is given: those the captured pre-flight reads.
+const OPENING_MARKS: CompanyMarks = CompanyMarks::new(Some(10), 7);
 
 fn native_bill(reference: &str) -> OpenBillRow {
     OpenBillRow {
@@ -136,6 +140,7 @@ async fn run(
         redaction: call.redaction,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let (mut company, identity, _) = server.verified_company(CAPTURED_GUID).await.unwrap();
@@ -154,6 +159,7 @@ async fn run(
                     call.reference,
                     &call.open_bills,
                     &call.unallocated,
+                    OPENING_MARKS,
                 )
                 .await
         }
@@ -169,6 +175,7 @@ async fn run(
                     &call.open_bills,
                     &call.unallocated,
                     limits,
+                    OPENING_MARKS,
                 )
                 .await
         }
@@ -186,9 +193,19 @@ async fn run(
 }
 
 /// The evidence one detail read carries: both bodies of each paired read it
-/// made, the catalogue, the high-water mark and the window, in that order.
+/// made, the catalogue, the high-water mark, the window and the closing marks, in that order.
 fn detail_evidence_bytes(plans: &[ScenarioPlan]) -> u64 {
-    2 * [5, 11, 17]
+    let closing_marks = plans.len() - 5;
+    2 * [5, 11, closing_marks]
+        .iter()
+        .map(|index| response_bytes(&plans[*index]).len() as u64)
+        .sum::<u64>()
+}
+
+/// The evidence of a detail refused before its window is read: both bodies of the
+/// catalogue, the high-water mark and the census.
+fn evidence_bytes_before_the_window(plans: &[ScenarioPlan]) -> u64 {
+    2 * [5, 11]
         .iter()
         .map(|index| response_bytes(&plans[*index]).len() as u64)
         .sum::<u64>()
@@ -352,7 +369,6 @@ async fn a_company_without_a_books_from_date_is_refused_before_the_window_read()
 async fn a_refused_window_read_fails_the_detail_with_its_transport_cause() {
     let cycle = import_cycle_plans();
     let mut plans = company_and_catalogue();
-    plans.extend(cycle[10..16].iter().cloned());
     plans.extend([cycle[0].clone(), captured_window().with_http_status(500)]);
     let (result, _) = run(plans, Call::new(DetailKind::Unadjusted)).await;
     let failure = result.unwrap_err();
@@ -403,7 +419,6 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
     ] {
         let cycle = import_cycle_plans();
         let mut plans = company_and_catalogue();
-        plans.extend(cycle[10..16].iter().cloned());
         plans.extend([
             cycle[0].clone(),
             captured_window(),
@@ -412,7 +427,7 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
             cycle[1].clone(),
             cycle[0].clone(),
         ]);
-        let expected_bytes = detail_evidence_bytes(&plans);
+        let expected_bytes = evidence_bytes_before_the_window(&plans);
         let mut call = Call::new(kind);
         call.limits = Some(DetailLimits { rows: 500, window });
         call.reference = reference;
@@ -443,12 +458,66 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
             "{code}"
         );
         // The company, the catalogue, the marks and the census: no data part.
-        assert_eq!(served, 22, "{code}");
+        assert_eq!(served, 16, "{code}");
         assert!(
             crate::agent::refusal_remediation(code).is_some(),
             "{code} names its next step"
         );
+        // The party's name is outside what a read by a ledger sends, so its ledger is not read
+        // and the company window's refusal stands, saying why (#1356).
+        let scope = failure
+            .window_scope()
+            .expect("the refusal says why the ledger was not read");
+        assert_eq!(scope.basis, "whole_book", "{code}");
+        assert_eq!(
+            scope.reason,
+            Some("ledger_name_outside_scoped_alphabet"),
+            "{code}"
+        );
     }
+}
+
+/// A party the company window cannot be read for, whose ledger name a read by a ledger sends, is
+/// read by its ledger (#1356): its census, served the captured three vouchers, which all carry
+/// that ledger. Under these limits the party's own plan needs as many requests as the company's,
+/// so the read by the ledger is refused in turn, as its own refusal and said to be so.
+#[tokio::test]
+async fn a_party_whose_window_is_refused_is_read_by_its_ledger_and_its_refusal_says_so() {
+    let window = WindowReadLimits {
+        budget_bytes: crate::agent::WINDOW_READ_BUDGET_BYTES,
+        default_bytes_per_voucher: crate::agent::WINDOW_READ_BUDGET_BYTES,
+        max_reads: 2,
+        small_books: SmallBooks::Skip,
+    };
+    let cycle = import_cycle_plans();
+    let census = || {
+        [
+            cycle[0].clone(),
+            captured_window(),
+            cycle[1].clone(),
+            captured_window(),
+            cycle[1].clone(),
+            cycle[0].clone(),
+        ]
+    };
+    let mut plans = company_and_catalogue();
+    plans.extend(census());
+    // The ledger's census: one span of the book's mark.
+    plans.extend(census());
+    let mut call = Call::new(DetailKind::BillTrail);
+    call.party = "WR2 Sales";
+    call.limits = Some(DetailLimits { rows: 500, window });
+    let (result, served) = run(plans, call).await;
+    let failure = result.unwrap_err();
+    assert_eq!(failure.code, "trail_window_too_large");
+    assert_eq!(failure.cause, Some("voucher_window_too_many_reads"));
+    let scope = failure
+        .window_scope()
+        .expect("the refusal says which read it was");
+    assert_eq!(scope.basis, "ledger_scoped");
+    assert_eq!(scope.reason, None);
+    // The company, the catalogue, the marks and the company census, then the ledger's census.
+    assert_eq!(served, 22);
 }
 
 /// Any other refusal of the window read is passed through unchanged.
@@ -625,4 +694,140 @@ async fn an_unknown_party_is_refused_before_any_voucher_request() {
     let miss = refusal.candidates.and_then(|candidates| candidates.miss);
     assert_eq!(miss.map(|miss| miss.listing.as_str()), Some("none"));
     assert_eq!(served, 10, "only the company and the catalogue were read");
+}
+
+/// The detail's plans with the company's marks, read again after the window, answering
+/// `vouchers` and `masters`: the read the handler checks against the marks it was given.
+fn detail_plans_closing_on(window: ScenarioPlan, vouchers: u64, masters: u64) -> Vec<ScenarioPlan> {
+    let mut plans = detail_plans(window);
+    let marks = plan_of_text(&format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{CAPTURED_GUID}</GUID><ALTVCHID>{vouchers}</ALTVCHID><ALTMSTID>{masters}</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+    ));
+    let closing_pair = plans.len() - 5;
+    plans[closing_pair] = marks.clone();
+    plans[closing_pair + 2] = marks;
+    plans
+}
+
+fn plan_of_text(xml: &str) -> ScenarioPlan {
+    ScenarioPlan::new(Fixture::SyntheticXml(xml.to_string()))
+        .with_encoding(WireEncoding::Utf16Le)
+        .with_framing(ResponseFraming::ContentLength)
+}
+
+/// A rename of a ledger (the master mark moves) between the marks the call opened on and
+/// the window's end is refused, not answered as a finding: the statement, the catalogue
+/// and the vouchers were read under different spellings. The same for a voucher entered.
+#[tokio::test]
+async fn a_book_that_moved_between_the_opening_marks_and_the_window_is_refused() {
+    for (vouchers, masters) in [(10, 8), (11, 7), (11, 8)] {
+        let mut call = Call::new(DetailKind::Unadjusted);
+        call.unallocated = vec![residual("102.02")];
+        let plans = detail_plans_closing_on(captured_window(), vouchers, masters);
+        let (result, served) = run(plans, call).await;
+        let failure = result.unwrap_err();
+        assert_eq!(
+            failure.code, "voucher_window_changed_during_read",
+            "{vouchers} {masters}"
+        );
+        assert_eq!(served, 22, "every read was made before the check");
+        assert!(
+            failure.evidence.is_some(),
+            "the reads before the refusal keep their evidence"
+        );
+        assert!(crate::agent::refusal_remediation("voucher_window_changed_during_read").is_some());
+    }
+}
+
+/// The same marks at the end, as at the start, are no drift.
+#[tokio::test]
+async fn a_book_that_did_not_move_is_answered() {
+    let mut call = Call::new(DetailKind::Unadjusted);
+    call.unallocated = vec![residual("102.02")];
+    let plans = detail_plans_closing_on(captured_window(), 10, 7);
+    let (result, served) = run(plans, call).await;
+    assert!(
+        result.is_ok(),
+        "{:?}",
+        result.err().map(|failure| failure.code)
+    );
+    assert_eq!(served, 22);
+}
+
+/// The steps after the vouchers were read (#1356): when the party was read by its ledger, a
+/// refusal from them, here a book that moved before the closing marks read, keeps its own code
+/// and says in `window_scope` that it came after that read; when the company's window was read,
+/// it carries none.
+#[tokio::test]
+async fn a_refusal_after_the_ledger_read_says_it_came_after_that_read() {
+    use crate::agent::bill_trail::LEDGER_SCOPED_LATER_REFUSAL;
+    let window = {
+        let bytes = include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+        );
+        let words = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&words).unwrap()
+    };
+    for by_ledger in [true, false] {
+        // The verified company (its first four legs), then the closing marks read, which
+        // answers a voucher mark of 11 against the opening 10.
+        let cycle = import_cycle_plans();
+        let mut plans = cycle[..4].to_vec();
+        let moved = plan_of_text(&format!(
+            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{CAPTURED_GUID}</GUID><ALTVCHID>11</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+        ));
+        let mut closing = cycle[10..16].to_vec();
+        closing[1] = moved.clone();
+        closing[3] = moved;
+        plans.extend(closing);
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = Server::new(Settings {
+            endpoint: TallyEndpointConfig {
+                host: simulator.address().ip().to_string(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().to_path_buf(),
+            max_rows: 500,
+            max_bytes: 200_000,
+            redaction: Redaction::None,
+            import_enabled: false,
+            posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
+            audit_enabled: false,
+        });
+        let (company, identity, evidence) = server.verified_company(CAPTURED_GUID).await.unwrap();
+        let rows = crate::agent::voucher_parse::parse_agent_rows(&window, CAPTURED_GUID).unwrap();
+        let resolved = crate::agent::LedgerMatch::Exact {
+            name: "WR2 Sales".to_string(),
+            similar: Vec::new(),
+        };
+        let result = server
+            .finish_party_detail(
+                &identity,
+                &company,
+                &tally_date(AS_OF),
+                &tally_date("20260401"),
+                &resolved,
+                "WR2 Sales",
+                (DetailKind::BillTrail, None),
+                (&[], &[]),
+                500,
+                OPENING_MARKS,
+                (rows, by_ledger),
+                evidence,
+            )
+            .await;
+        simulator.cancel();
+        let failure = result.unwrap_err();
+        assert_eq!(
+            failure.code, "voucher_window_changed_during_read",
+            "{by_ledger}"
+        );
+        let expected = by_ledger.then_some(LEDGER_SCOPED_LATER_REFUSAL);
+        assert_eq!(failure.window_scope(), expected, "{by_ledger}");
+    }
 }

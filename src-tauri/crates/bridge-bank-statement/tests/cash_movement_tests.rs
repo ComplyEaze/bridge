@@ -593,15 +593,15 @@ fn each_question_offers_every_answer_of_its_direction_and_none_other() {
 fn every_not_built_reason_names_the_product_in_full() {
     assert_eq!(
         CashAnswer::PaidToSomeone.not_built(),
-        Some("cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; record it by hand, or answer dont_know so it posts to suspense for the CA")
+        Some("cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move")
     );
     assert_eq!(
         CashAnswer::OwnCashBox.not_built(),
-        Some("a deposit from the cash box is a Contra that can drive the cash book negative, and ComplyEaze Bridge cannot yet check the cash book's balance first; record it by hand, or answer dont_know so it posts to suspense for the CA")
+        Some("a deposit from the cash box is a Contra that can drive the cash book negative, and ComplyEaze Bridge cannot yet check the cash book's balance first; answer dont_know and the line is built to the suspense ledger, marked for the CA to move")
     );
     assert_eq!(
         CashAnswer::UnbookedCashSales.not_built(),
-        Some("record those cash sales or collections in Tally first; the deposit itself is then a Contra from the cash box, which ComplyEaze Bridge does not build yet")
+        Some("the cash sales or collections behind this deposit are not in the books, and ComplyEaze Bridge does not build those sales, or the Contra from the cash box, yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move")
     );
     for movement in [CashMovement::Withdrawal, CashMovement::Deposit] {
         for answer in movement.question().1 {

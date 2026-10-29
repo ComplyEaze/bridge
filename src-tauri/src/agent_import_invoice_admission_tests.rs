@@ -78,6 +78,7 @@ fn server_over(mut plans: Vec<ScenarioPlan>, company_list: &str, guid: &str) -> 
         redaction: super::super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let companies = bridge_tally_protocol::parse_companies_from_collection(company_list).unwrap();
@@ -1012,10 +1013,9 @@ fn plan_of_in(
     control: &ledger::NumberControl,
     catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
 ) -> InvoiceReadPlan {
-    let guid = pilot_lab_guid();
+    let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(PILOT, pilot_lab_guid());
     InvoiceJudge {
-        company_name: PILOT,
-        company_guid: &guid,
+        identity: &identity,
         voucher,
         catalogue,
         control,
@@ -1213,10 +1213,9 @@ fn the_judge_asks_for_the_marks_first_and_a_ledger_count_only_over_the_gate() {
     let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
     let catalogue = pilot_catalogue();
     let control = ledger::NumberControl::NoneStanding;
-    let guid = pilot_lab_guid();
+    let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(PILOT, pilot_lab_guid());
     let judge = InvoiceJudge {
-        company_name: PILOT,
-        company_guid: &guid,
+        identity: &identity,
         voucher: &voucher,
         catalogue: &catalogue,
         control: &control,
@@ -1253,14 +1252,13 @@ fn the_queue_refuses_a_plan_that_does_not_fit_before_judging_any_answer() {
         marks: Some(pilot_marks(25_001, 223)),
         ..InvoiceAnswers::default()
     };
-    let guid = pilot_lab_guid();
+    let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(PILOT, pilot_lab_guid());
     let never = ledger::NumberControl::NoneStanding;
     let known = known_control();
     let admit = |carried: &InvoiceReadPlan, control: &ledger::NumberControl| {
         invoice::admit_queued_invoice(
             &voucher,
-            PILOT,
-            &guid,
+            &identity,
             &catalogue,
             control,
             &today(),
@@ -1483,7 +1481,7 @@ async fn the_queue_holds_a_warned_invoice_to_the_warning_the_build_recorded() {
     use crate::tally::approved_import::{
         ApprovedImportAdmissionError::InvoiceMastersChanged, QueuedInvoice,
     };
-    let guid = pilot_lab_guid();
+    let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(PILOT, pilot_lab_guid());
     let catalogue = pilot_catalogue();
     let control = ledger::NumberControl::NoneStanding;
     let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
@@ -1493,8 +1491,7 @@ async fn the_queue_holds_a_warned_invoice_to_the_warning_the_build_recorded() {
     // What the build records of each.
     let observed_of = |answers: &InvoiceAnswers| {
         InvoiceJudge {
-            company_name: PILOT,
-            company_guid: &guid,
+            identity: &identity,
             voucher: &voucher,
             catalogue: &catalogue,
             control: &control,
@@ -1514,8 +1511,7 @@ async fn the_queue_holds_a_warned_invoice_to_the_warning_the_build_recorded() {
         saved.invoice.as_mut().unwrap().observed = Some(recorded.clone());
         invoice::admit_queued_invoice(
             &saved,
-            PILOT,
-            &guid,
+            &identity,
             &catalogue,
             &control,
             &today(),
@@ -1538,4 +1534,52 @@ async fn the_queue_holds_a_warned_invoice_to_the_warning_the_build_recorded() {
     let mut moved = recorded_warned.clone();
     moved.hsn_warnings[0].characters += 1;
     assert_eq!(queue(&moved, &warned), changed);
+}
+
+/// The two number reads are built only from an `InvoiceNumber`, so a number its
+/// TDL literal cannot hold never becomes a request: the invoice's own number is
+/// refused as `invoice_number_invalid`, and a journal control whose number is
+/// not one is `invoice_number_control_unreadable`. The codes a caller sees are
+/// pinned here.
+#[test]
+fn a_number_the_literal_cannot_hold_is_refused_before_either_number_read() {
+    let catalogue = pilot_catalogue();
+    let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(PILOT, pilot_lab_guid());
+    let none = ledger::NumberControl::NoneStanding;
+    let mut voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    voucher.voucher_number = Some("A B".to_string());
+    let judge = InvoiceJudge {
+        identity: &identity,
+        voucher: &voucher,
+        catalogue: &catalogue,
+        control: &none,
+    };
+    match judge.request(invoice::Need::Number) {
+        Err(invoice::Verdict::Refused(refusals)) => {
+            assert_eq!(refusals.len(), 1);
+            assert_eq!(refusals[0].code, "invoice_number_invalid");
+        }
+        other => panic!("{other:?}"),
+    }
+    let ledger::NumberControl::Known { batch_id, date, .. } = known_control() else {
+        panic!("the fixture control is a known one");
+    };
+    let control = ledger::NumberControl::Known {
+        batch_id,
+        number: "A\"B".to_string(),
+        date,
+    };
+    let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    let judge = InvoiceJudge {
+        identity: &identity,
+        voucher: &voucher,
+        catalogue: &catalogue,
+        control: &control,
+    };
+    match judge.request(invoice::Need::NumberControl) {
+        Err(invoice::Verdict::Failed(code)) => {
+            assert_eq!(code, "invoice_number_control_unreadable");
+        }
+        other => panic!("{other:?}"),
+    }
 }

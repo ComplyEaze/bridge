@@ -192,8 +192,8 @@ impl TallyRuntime {
 
                     let request = render_company_inventory_flags_request(
                         identity.display_name(),
-                        identity.company_guid(),
-                    )?;
+                        identity.company_guid_value(),
+                    );
                     let (xml, bytes, hash) = client
                         .fetch_native_report_paired(request.clone())
                         .await?

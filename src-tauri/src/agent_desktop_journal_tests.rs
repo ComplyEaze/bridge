@@ -264,6 +264,7 @@ fn service_debiting(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     // Fixture construction exclusively owns this temporary directory. Avoid a
@@ -373,6 +374,62 @@ async fn a_saved_journal_refused_for_its_text_says_to_build_it_again() {
          that cannot be posted, and a saved batch cannot be changed. Correct the text, build \
          the batch again, then post the new one."
     );
+}
+
+/// A Journal whose approval window is too large to show whole is refused with a
+/// message that says what that means and what to do, not that no attempt was
+/// recorded and to review the error (#1780).
+#[tokio::test]
+async fn a_journal_whose_approval_window_is_too_large_says_so() {
+    let directory = tempfile::tempdir().unwrap();
+    let (service, mut line) = service(directory.path().join("agent"));
+    line.batch_id = "bridge-00000000-0000-4000-8000-000000000004".into();
+    line.ledger_identities = Some(Vec::new());
+    line.cash_in_hand_ledgers = Some(Vec::new());
+    let leg = |side: &str, amount: &str| {
+        serde_json::from_value::<ImportEntry>(json!({"ledger":"Cash","amount":amount,"side":side}))
+            .unwrap()
+    };
+    // Far more legs than the window can show whole.
+    line.vouchers[0].entries = (0..15)
+        .flat_map(|_| [leg("Dr", "1.00"), leg("Cr", "1.00")])
+        .collect();
+    let rendered = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+    line.sha256 = sha256_hex(rendered.as_bytes());
+    service
+        .server
+        .append_import_ledger_while_admitted(&line)
+        .unwrap();
+    std::fs::write(
+        service
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        rendered,
+    )
+    .unwrap();
+    let operation = service
+        .post(&line.batch_id, &line.sha256, &line.company_guid)
+        .await;
+    let result = &operation.result["result"];
+    assert_eq!(
+        result["error"]["code"], "import_review_too_large",
+        "{result}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{result}");
+    let message = result["error"]["message"].as_str().unwrap();
+    assert!(
+        message.starts_with(
+            "Nothing was sent. The approval window for this saved batch is too large to show whole"
+        ),
+        "{message}"
+    );
+    assert!(
+        message.contains("larger or less magnified screen"),
+        "{message}"
+    );
+    assert!(!message.contains("Review the error"), "{message}");
 }
 
 #[tokio::test]

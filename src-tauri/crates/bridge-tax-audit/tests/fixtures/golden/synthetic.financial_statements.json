@@ -443,10 +443,10 @@
       "evidence": [],
       "title_sha256_16": "0fa15d56429c7ece",
       "title_text": "Net profit (and closing stock, where the report carries it) tied to Tally's own P&L/Balance Sheet report",
-      "limits_sha256_16": "5a5264b879fa370c",
+      "limits_sha256_16": "ab64ee2afa5e2fbb",
       "limits_text": [
         "The gross profit ratio uses the stock values in the books (balance-sheet basis) at both ends. A ratio on Tally's item-level Stock Summary values is not shown here; if one is wanted, both opening and closing stock must be taken on that same basis.",
-        "Closing stock is the client's own manually-entered Stock-in-Hand ledger value (accounts not integrated with inventory), not an independently counted or valued physical stock figure; the books cannot show whether it was actually verified."
+        "Closing stock is the Stock-in-Hand ledger balance the client recorded in the books (accounts not integrated with inventory), not an independently counted or valued physical stock figure; the books cannot show whether it was actually verified."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []

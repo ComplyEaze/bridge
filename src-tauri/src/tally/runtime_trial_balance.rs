@@ -25,6 +25,9 @@ pub struct TrialBalanceRead {
     pub from: TallyDate,
     pub to: TallyDate,
     pub currency: CompanyCurrency,
+    /// Each row as Tally sent it; on the desktop a row whose columns do not add up also carries
+    /// `movements_differ_by` (#2068).
+    #[serde(serialize_with = "crate::reports::trial_balance::serialize_report_with_movements")]
     pub report: NativeTrialBalance,
     pub totals: crate::reports::trial_balance::TrialBalanceTotals,
     pub read_at: String,
@@ -310,13 +313,18 @@ impl TallyRuntime {
         let Some(ExtraSources::Statement(sources)) = sources else {
             return Err(anyhow::anyhow!("statement_sources_not_read"));
         };
+        // A refused derivation keeps the evidence of every read already made
+        // (the Trial Balance, the group tree and Tally's statements).
         let derived = crate::reports::statements::derive_statements(
             &sources.trial_balance,
             &sources.groups,
             &sources.balance_sheet,
             sources.profit_and_loss.as_ref(),
             sources.inventory,
-        )?;
+        )
+        .map_err(|error| {
+            with_read_evidence(anyhow::Error::new(error), trial_balance.evidence.clone())
+        })?;
         Ok(StatementsRead {
             trial_balance,
             derived,
@@ -612,8 +620,8 @@ impl TallyRuntime {
                                 let flags_read: anyhow::Result<_> = async {
                                     let request = render_company_inventory_flags_request(
                                         identity.display_name(),
-                                        identity.company_guid(),
-                                    )?;
+                                        identity.company_guid_value(),
+                                    );
                                     let (xml, bytes, hash) = client
                                         .fetch_native_report_paired(request.clone())
                                         .await?

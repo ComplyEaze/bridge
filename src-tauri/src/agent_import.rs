@@ -16,6 +16,7 @@ use bridge_tally_core::master_binding::{
 };
 use bridge_tally_core::text::draws_nothing;
 use bridge_tally_core::{ExactDecimal, TallyDate};
+use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
@@ -28,6 +29,10 @@ use std::io::{Seek, SeekFrom, Write};
 
 #[path = "agent_import_bill_wise.rs"]
 mod bill_wise;
+// Candidate requests that remove a voucher Bridge posted (#2062): nothing sends them yet.
+#[cfg_attr(not(test), allow(dead_code))]
+#[path = "agent_import_cancel.rs"]
+mod cancel;
 #[path = "agent_import_cash_bank.rs"]
 mod cash_bank;
 use cash_bank::{CashBankState, LegRequirement, ObservedMasters};
@@ -59,16 +64,28 @@ mod approval;
 pub(super) mod ledger;
 #[path = "agent_import_local_data.rs"]
 pub(super) mod local_data;
-// The master write journal; a building block no caller reaches yet.
+// The master write journal. The read-back piece, which follows the tools,
+// reads the parts of it the tools do not yet (the sidecar read, the verdict).
 #[cfg_attr(not(test), allow(dead_code))]
 #[path = "agent_master_ledger.rs"]
 mod master_ledger;
+// The master post's queue recheck.
+#[path = "agent_master_post.rs"]
+mod master_post;
+// The one-ledger dialog's preview.
+#[path = "agent_master_review.rs"]
+mod master_review;
+// `prepare_ledger_creates` and `post_ledger_creates`.
+#[path = "agent_master_tools.rs"]
+mod master_tools;
 #[path = "agent_import_persistence.rs"]
 mod persistence;
 #[path = "agent_import_post.rs"]
 mod post;
 /// The post's next step for a numbering refusal, for the refusal table.
 pub(super) use post::numbering::POST_NEXT_STEP as POST_NUMBERING_NEXT_STEP;
+#[path = "agent_import_content_review.rs"]
+mod content_review;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
 #[path = "agent_import_statement_facts.rs"]
@@ -518,37 +535,75 @@ pub(super) struct CashInHandLedger {
 /// A requested name and every live ledger whose stored name folds equal to it
 /// under either of the binding module's folds (`twin_fold_keys`: case, NFC,
 /// dashes, quotes, whitespace including CR and LF, and `/` as a space), when
-/// there are at least two (bridge#626). Tally's import lookup also matches
-/// names loosely (§9.4d), and which of two such ledgers it would post to is
-/// not established, so a build naming either is refused.
+/// there are at least two (bridge#626). A ledger also answers to its aliases,
+/// so one whose alias folds equal to the name is in the family too (#1688).
+/// Tally's import lookup also matches names loosely (§9.4d), and which of two
+/// such ledgers it would post to is not established, so a build naming either
+/// is refused.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FoldedTwins {
     requested: String,
     live: Vec<(String, Option<String>)>,
+    /// For a live ledger in the family only through an alias of it: that alias.
+    through_alias: BTreeMap<String, String>,
 }
 
 /// The requested names that fold equal to two or more live ledgers, in the
-/// order requested. Each lists its live ledgers in catalogue order.
+/// order requested. Each lists its live ledgers in catalogue order. `aliases`
+/// pairs each alias with the row spelling of the ledger that carries it; an
+/// alias is keyed under its ledger, so a ledger whose alias folds equal to its
+/// own name is still one ledger, and a family counts ledgers, not names.
 fn folded_twins<'a>(
     requested: &[String],
     catalogue: impl Iterator<Item = (&'a str, Option<&'a str>)>,
+    aliases: impl Iterator<Item = (&'a str, &'a str)>,
 ) -> Vec<FoldedTwins> {
     let catalogue = catalogue.collect::<Vec<_>>();
     let mut by_key: [BTreeMap<String, Vec<usize>>; 3] = Default::default();
+    let mut by_alias_key: [BTreeMap<String, Vec<(usize, &str)>>; 3] = Default::default();
     for (index, (name, _)) in catalogue.iter().enumerate() {
         for (keys, key) in by_key.iter_mut().zip(twin_fold_keys(name)) {
             keys.entry(key).or_default().push(index);
+        }
+    }
+    // Row names are unique in a catalogue (a repeat is refused when it is
+    // parsed), so an owner's name finds its index once, not once per alias.
+    let index_of = catalogue
+        .iter()
+        .enumerate()
+        .map(|(index, (name, _))| (*name, index))
+        .collect::<BTreeMap<_, _>>();
+    for (owner, alias) in aliases {
+        let Some(&index) = index_of.get(owner) else {
+            continue;
+        };
+        for (keys, key) in by_alias_key.iter_mut().zip(twin_fold_keys(alias)) {
+            keys.entry(key).or_default().push((index, alias));
         }
     }
     requested
         .iter()
         .filter_map(|name| {
             let mut family = BTreeSet::new();
-            for (keys, key) in by_key.iter().zip(twin_fold_keys(name)) {
+            let mut aliased = BTreeMap::new();
+            for ((keys, alias_keys), key) in
+                by_key.iter().zip(&by_alias_key).zip(twin_fold_keys(name))
+            {
                 if let Some(found) = keys.get(&key) {
                     family.extend(found.iter().copied());
                 }
+                if let Some(found) = alias_keys.get(&key) {
+                    for (index, alias) in found {
+                        aliased.entry(*index).or_insert(*alias);
+                    }
+                }
             }
+            let through_alias = aliased
+                .iter()
+                .filter(|(index, _)| !family.contains(*index))
+                .map(|(index, alias)| (catalogue[*index].0.to_string(), alias.to_string()))
+                .collect::<BTreeMap<_, _>>();
+            family.extend(aliased.keys().copied());
             (family.len() > 1).then(|| FoldedTwins {
                 requested: name.clone(),
                 live: family
@@ -558,6 +613,7 @@ fn folded_twins<'a>(
                         (name.to_string(), parent.map(str::to_string))
                     })
                     .collect(),
+                through_alias,
             })
         })
         .collect()
@@ -567,7 +623,16 @@ fn folded_live_ledgers_json(twins: &FoldedTwins) -> Value {
     json!(twins
         .live
         .iter()
-        .map(|(name, parent)| json!({"name": party_name(name.clone()), "parent": parent}))
+        .map(|(name, parent)| {
+            let mut ledger = json!({
+                "name": party_name(name.clone()),
+                "parent": parent.as_deref().map(bridge_tally_protocol::tally_root_as_sent),
+            });
+            if let Some(alias) = twins.through_alias.get(name) {
+                ledger["through_alias"] = json!(party_name(alias.clone()));
+            }
+            ledger
+        })
         .collect::<Vec<_>>())
 }
 
@@ -578,8 +643,9 @@ fn annotate_folded_twins<'a>(
     report: &mut [Value],
     requested: &[String],
     catalogue: impl Iterator<Item = (&'a str, Option<&'a str>)>,
+    aliases: impl Iterator<Item = (&'a str, &'a str)>,
 ) {
-    let twins = folded_twins(requested, catalogue);
+    let twins = folded_twins(requested, catalogue, aliases);
     for (entry, name) in report.iter_mut().zip(requested) {
         if let Some(found) = twins.iter().find(|twins| &twins.requested == name) {
             entry["folded_twins"] = folded_live_ledgers_json(found);
@@ -590,7 +656,39 @@ fn annotate_folded_twins<'a>(
     }
 }
 
-const FOLDED_TWIN_NEXT_STEP: &str = "No file was written. Each ledger in ledger_twins has at least one other live ledger whose name differs from it only by case, spacing, dashes, slashes or quotes, or a trailing line break. Tally's import also matches names loosely, and which of them it would post to is not established, so ComplyEaze Bridge names none of them. Have an operator rename ledgers in Tally until no two in each group fold equal, then run validate_masters and build again.";
+/// Marks each `missing` or `near_miss` entry whose requested name is, byte for
+/// byte, an alias of exactly one live ledger with `alias_of`: that ledger's row
+/// spelling, the one an exact match and `exact_live_spelling` use (#1688). The
+/// build still refuses the name and no alias is ever sent. An `exact` or
+/// `identifier` entry is left as it is (an identifier that disagrees with an
+/// alias is not settled here), and so is one with `folded_twins`, a name equal
+/// to a live ledger's own spelling, and a name that is an alias of two ledgers.
+fn annotate_alias_of(
+    report: &mut [Value],
+    requested: &[String],
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) {
+    for (entry, name) in report.iter_mut().zip(requested) {
+        if !matches!(entry["match_state"].as_str(), Some("missing" | "near_miss"))
+            || entry.get("folded_twins").is_some()
+            || catalogue.names().any(|live| live == name)
+        {
+            continue;
+        }
+        let mut owners = catalogue
+            .aliases()
+            .filter(|(_, alias)| alias == name)
+            .map(|(owner, _)| owner)
+            .collect::<BTreeSet<_>>();
+        if owners.len() == 1 {
+            if let Some(owner) = owners.pop_first() {
+                entry["alias_of"] = json!(party_name(owner.to_string()));
+            }
+        }
+    }
+}
+
+const FOLDED_TWIN_NEXT_STEP: &str = "No file was written. Each ledger in ledger_twins has at least one other live ledger whose name differs from it only by case, spacing, dashes, slashes or quotes, or a trailing line break. Tally's import also matches names loosely, and which of them it would post to is not established, so ComplyEaze Bridge names none of them. Have an operator rename ledgers in Tally until no two in each group fold equal (a ledger listed with through_alias is in its group only because of an alias of it: change or remove that alias), then run validate_masters and build again.";
 
 /// One ledger name and the GUID it was bound to at build time.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -710,10 +808,22 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     } else {
         "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it."
     };
+    let mut summary = summary.to_string();
+    // A refusal by the mark's step or the span's count says what was observed
+    // and what can do that, as examples, after the line that says what to
+    // check (#1633).
+    if report["state"] == "refused" {
+        if let Some(line) = report["code"]
+            .as_str()
+            .and_then(span_identity::concurrent_change_line_for)
+        {
+            summary.push(' ');
+            summary.push_str(line);
+        }
+    }
     // A check that recorded a restore while its own post reads intact names
     // it: the restore reaches other posts of the company, and the posts it
     // covers keep their status until each is verified again (#1050).
-    let mut summary = summary.to_string();
     if report["rollback_recorded"] == true && report["state"] != "book_rolled_back" {
         let count = report["other_batches_covered"]["count"]
             .as_u64()
@@ -872,7 +982,13 @@ impl Server {
                     evidence.clone(),
                 ))
             })?;
-        annotate_folded_twins(&mut report, &names, ledger_masters.catalog().parents());
+        annotate_folded_twins(
+            &mut report,
+            &names,
+            ledger_masters.catalog().parents(),
+            ledger_masters.catalog().aliases(),
+        );
+        annotate_alias_of(&mut report, &names, ledger_masters.catalog());
         let hash = sha256_json(&catalogue);
         Ok(ToolOutcome {
             payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"masters": report, "catalogue_evidence_sha256": hash}}),
@@ -1401,7 +1517,7 @@ impl Server {
                     (&date_from, &date_to),
                     super::WindowPlanSource::Estimate {
                         known_marks: mark.value.zip(mark.master_value).map(
-                            |(vouchers, masters)| super::CompanyMarks { vouchers, masters },
+                            |(vouchers, masters)| super::CompanyMarks::new(Some(vouchers), masters),
                         ),
                     },
                 )
@@ -1982,7 +2098,7 @@ impl Server {
             let window_voucher_mark = observed_read
                 .witness
                 .as_ref()
-                .map(|witness| witness.marks.vouchers);
+                .map(|witness| witness.marks.vouchers());
             let corroboration_proof = match super::SecondRead::of(
                 observed_read.reads,
                 observed_read.witness,
@@ -2287,6 +2403,17 @@ impl Server {
                     .and_then(|imports| ack::operator_review(&imports, &line, &observed.rows, span.bindings.as_deref()))
                 {
                     proof["operator_review"] = review;
+                }
+            }
+            // A person's standing record that they checked this batch, matched
+            // by content only, in Tally (#1039). Beside the verdict, never
+            // instead of it. Standing is the journal's rule, as for
+            // `local_data_report`: a rollback voids it once its record is
+            // written. A journal that cannot be read reports none and fails
+            // nothing here.
+            if dispatched {
+                if let Ok(Some(reviewed)) = self.import_content_review(&line.batch_id) {
+                    proof["content_review"] = content_review::report(reviewed);
                 }
             }
             *observed_rows = Some(observed.rows.clone());
@@ -2599,9 +2726,15 @@ impl Server {
         let outcome = response.and_then(|response| response.outcome.as_ref());
         // After a create of N, the mark never again reads below before + N, nor
         // below a mark read after the post, unless the book was rolled back
-        // (a backup restored, or another copy put in its place).
+        // (a backup restored, or another copy put in its place). N is what the
+        // post proved, as the journal's own floor counts it: the vouchers it
+        // bound, else those its answer proves landed.
+        let proved = match &journaled {
+            Some(ledger::PostSpanVerdict::Bound(bindings)) => bindings.len() as u64,
+            _ => outcome.map_or(0, ledger::landed_count),
+        };
         let floor = before
-            .saturating_add(outcome.map_or(0, |outcome| outcome.counters().created))
+            .saturating_add(proved)
             .max(after_post_mark.unwrap_or(0));
         if current < floor {
             return PostSpanDecision {
@@ -3292,7 +3425,10 @@ impl Server {
     }
 }
 
-const AMENDMENT_WARNING: &str = "This file amends an earlier batch. Each voucher carries that batch's REMOTEID, so importing it alters the vouchers already in the book in place instead of creating new ones: Tally should report them as altered, not created. ComplyEaze Bridge compared those vouchers with what it built only as the book stood during this build, and only these fields: the date, a bank voucher's effective date when Tally returned one, the voucher type, the voucher number when the batch set one, each entry's ledger, amount and side, and the narration. It did not compare a voucher's reference, its bill-wise or cost-centre allocations, or which ledger Tally records as its party, because the verification read does not fetch them; instead it refused any voucher whose ALTERID has moved since ComplyEaze Bridge first verified it, which catches an edit to those fields made after that verification, provided a Tally edit advances the voucher's ALTERID (measured over the gateway; on Tally's own screens, saving a voucher unchanged and cancelling it moved it, and so did changing a bill allocation's reference, adding a cost-centre allocation and setting a bank-reconciliation date, each seen in one run). An edit made before that first verification is not caught, so verify right after every import. An in-place alteration replaces a voucher's entries rather than merging them (measured over the gateway), and this file's entries carry no allocations, so allocations made in Tally, including those ComplyEaze Bridge advises adding after an import, are expected to be lost; that loss, and what happens to a reference, were not measured directly. An edit made in Tally between this build and the import is overwritten without warning. Import promptly, and build the amendment again if anyone may have changed these vouchers. Import and verify each amendment before building the next one for the same voucher: two amendments built from the same state overwrite each other, and the later import wins. In-place alteration with changed content was measured over the XML gateway on licensed TallyPrime 7.1 Silver for Journal, Payment, Receipt and Contra, with requests that copy this file's shape; an import through Tally's own Import menu was not measured.";
+// The reference sentence rests on TALLY_PROTOCOL_REFERENCE §9.14 (an import
+// that omits REFERENCE keeps the stored value, VERIFIED) and on
+// `Lineage::admit_proposal`, which refuses any reference change (#1941).
+const AMENDMENT_WARNING: &str = "This file amends an earlier batch. Each voucher carries that batch's REMOTEID, so importing it alters the vouchers already in the book in place instead of creating new ones: Tally should report them as altered, not created. ComplyEaze Bridge compared those vouchers with what it built only as the book stood during this build, and only these fields: the date, a bank voucher's effective date when Tally returned one, the voucher type, the voucher number when the batch set one, each entry's ledger, amount and side, and the narration. It did not compare a voucher's reference, its bill-wise or cost-centre allocations, or which ledger Tally records as its party, because the verification read does not fetch them; instead it refused any voucher whose ALTERID has moved since ComplyEaze Bridge first verified it, which catches an edit to those fields made after that verification, provided a Tally edit advances the voucher's ALTERID (measured over the gateway; on Tally's own screens, saving a voucher unchanged and cancelling it moved it, and so did changing a bill allocation's reference, adding a cost-centre allocation and setting a bank-reconciliation date, each seen in one run). An edit made before that first verification is not caught, so verify right after every import. An in-place alteration replaces a voucher's entries rather than merging them (measured over the gateway), and this file's entries carry no allocations, so allocations made in Tally, including those ComplyEaze Bridge advises adding after an import, are expected to be lost; that loss was not measured directly. An amendment never changes a voucher's reference, and an import that leaves the reference out keeps the one stored (measured over the gateway). An edit made in Tally between this build and the import is overwritten without warning. Import promptly, and build the amendment again if anyone may have changed these vouchers. Import and verify each amendment before building the next one for the same voucher: two amendments built from the same state overwrite each other, and the later import wins. In-place alteration with changed content was measured over the XML gateway on licensed TallyPrime 7.1 Silver for Journal, Payment, Receipt and Contra, with requests that copy this file's shape; an import through Tally's own Import menu was not measured.";
 
 /// Whether a batch holds an invoice: the one gate for every read of the journal's
 /// unsettled batches, so a bank batch never takes its lock for the number rule.
@@ -3305,7 +3441,7 @@ fn holds_an_invoice(line: &ImportLedgerLine) -> bool {
 /// Why no file was written for a row another batch already sent (#876), and what
 /// to do instead. It never offers a hand import of this row: that is the second
 /// post the refusal exists to stop.
-const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and ComplyEaze Bridge cannot build the rest of that day from the statement yet), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so, and never build it again under a new bridge_txn_id to retry it.";
+const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and ComplyEaze Bridge cannot build the rest of that day from the statement yet), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so, and never build it again under a new bridge_txn_id to retry it. The same holds when verify_import reports that batch book_rolled_back: the company's voucher mark was seen below that batch's, which a book restored from a backup or replaced by another copy shows, and its voucher may be gone, but ComplyEaze Bridge cannot tell whether it is, so tell the user that too.";
 
 /// The code of the refusal that stops an invoice build while voucher posting
 /// is off (see `build_import_xml`); its text is in agent.rs.
@@ -4468,7 +4604,9 @@ fn unbindable_masters(
         &mut report,
         requested_names,
         ledger_masters.catalog().parents(),
+        ledger_masters.catalog().aliases(),
     );
+    annotate_alias_of(&mut report, requested_names, ledger_masters.catalog());
     let company_guid = Some(company_guid.to_string());
     if report.iter().any(|value| value["match_state"] != "exact") {
         let report = in_batch_order(
@@ -4491,7 +4629,11 @@ fn unbindable_masters(
         }));
     }
     let twins = in_batch_order(
-        folded_twins(requested_names, ledger_masters.catalog().parents()),
+        folded_twins(
+            requested_names,
+            ledger_masters.catalog().parents(),
+            ledger_masters.catalog().aliases(),
+        ),
         vouchers,
         |twins| twins.requested.as_str(),
     );
@@ -4938,17 +5080,23 @@ fn master_recovery_guidance(report: &[Value]) -> String {
         .iter()
         .any(|master| master.get("folded_twins").is_some())
     {
-        guidance.push("A requested ledger folds equal to another live ledger (folded_twins: the same name apart from case, spacing, dashes, slashes or quotes, or a trailing line break), and which of them Tally's import would post to is not established, so neither is importable; have an operator rename one of them in Tally, then run validate_masters again.");
+        guidance.push("A requested ledger folds equal to another live ledger (folded_twins: the same name apart from case, spacing, dashes, slashes or quotes, or a trailing line break), and which of them Tally's import would post to is not established, so neither is importable; have an operator rename one of them in Tally (a ledger listed with through_alias is in the group only because of an alias of it: change or remove that alias), then run validate_masters again.");
+    }
+    // The name is an alias of a live ledger: the remedy is that ledger's own
+    // spelling, not a new ledger (Tally refuses one named as another's alias)
+    // and not a candidate to select. No alias is sent (#1688).
+    if report.iter().any(|master| master.get("alias_of").is_some()) {
+        guidance.push("A requested name is an alias of a live ledger (alias_of names that ledger as Tally lists it); ComplyEaze Bridge never sends an alias. Have an operator confirm that this is the ledger meant, then replace the name with the spelling in alias_of and run validate_masters again; do not substitute it automatically.");
     }
     if report
         .iter()
-        .any(|master| master["match_state"] == "missing")
+        .any(|master| master["match_state"] == "missing" && master.get("alias_of").is_none())
     {
         guidance.push("For missing ledgers, correct the source spelling or have an operator create the legitimate ledger externally, then run validate_masters again.");
     }
     if report
         .iter()
-        .any(|master| master["match_state"] == "near_miss")
+        .any(|master| master["match_state"] == "near_miss" && master.get("alias_of").is_none())
     {
         guidance.push("For near-misses, have an operator explicitly select the intended ledger and run validate_masters again; do not copy a candidate automatically.");
     }
@@ -4961,10 +5109,15 @@ fn render_import_xml(company: &str, vouchers: &[ImportVoucher], batch_id: &str) 
         .iter()
         .map(|voucher| {
             let identity = import_identity(batch_id, &voucher.bridge_txn_id);
-            render_voucher_xml(voucher, identity, NarrationAttribution::Tagged(identity))
+            render_voucher_xml(
+                voucher,
+                identity,
+                NarrationAttribution::Tagged(identity),
+                VoucherAction::Create,
+            )
         })
         .collect::<String>();
-    render_import_envelope(company, &messages)
+    render_import_envelope(company, ImportReport::Vouchers, &messages)
 }
 
 /// The native post's request: each voucher paired with its own REMOTEID. The
@@ -4981,12 +5134,38 @@ fn render_native_vouchers_xml<'a>(
     company: &str,
     vouchers_with_remote_ids: impl Iterator<Item = (&'a ImportVoucher, Uuid)>,
 ) -> String {
+    render_native_vouchers_as(VoucherAction::Create, company, vouchers_with_remote_ids)
+}
+
+/// The native request with `action` on every voucher; nothing else depends on it.
+fn render_native_vouchers_as<'a>(
+    action: VoucherAction,
+    company: &str,
+    vouchers_with_remote_ids: impl Iterator<Item = (&'a ImportVoucher, Uuid)>,
+) -> String {
     let messages: String = vouchers_with_remote_ids
         .map(|(voucher, remote_id)| {
-            render_voucher_xml(voucher, remote_id, NarrationAttribution::Untagged)
+            render_voucher_xml(voucher, remote_id, NarrationAttribution::Untagged, action)
         })
         .collect();
-    render_import_envelope(company, &messages)
+    render_import_envelope(company, ImportReport::Vouchers, &messages)
+}
+
+/// A rendered voucher's `ACTION`. Every post sends `Create`; `Cancel` is the
+/// candidate of #2062, which nothing sends yet.
+#[derive(Clone, Copy)]
+enum VoucherAction {
+    Create,
+    Cancel,
+}
+
+impl VoucherAction {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Create => "Create",
+            Self::Cancel => "Cancel",
+        }
+    }
 }
 
 /// Whether a rendered voucher's narration carries Bridge's `[BRIDGE:…]` tag.
@@ -4996,10 +5175,6 @@ fn render_native_vouchers_xml<'a>(
 enum NarrationAttribution {
     Tagged(Uuid),
     Untagged,
-}
-
-fn render_import_envelope(company: &str, messages: &str) -> String {
-    format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES></REQUESTDESC><REQUESTDATA>{messages}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>", xml_escape(company))
 }
 
 /// The narration a post sends for `voucher`, and the one its approval dialog
@@ -5014,6 +5189,7 @@ fn render_voucher_xml(
     voucher: &ImportVoucher,
     remote_id: Uuid,
     attribution: NarrationAttribution,
+    action: VoucherAction,
 ) -> String {
     let text = posted_narration(voucher).unwrap_or("");
     let narration = match attribution {
@@ -5039,7 +5215,7 @@ fn render_voucher_xml(
         // An invoice reaches here only after the build recorded what it
         // observed (`admit_saved_voucher_integrity` refuses one that has not).
         // An unobserved one renders as nothing rather than as a guess.
-        return invoice::render_sales_invoice_xml(voucher, remote_id, &date, &narration)
+        return invoice::render_sales_invoice_xml(voucher, remote_id, &date, &narration, action)
             .unwrap_or_default();
     }
     let shape = voucher.voucher_type.bank_shape();
@@ -5087,7 +5263,7 @@ fn render_voucher_xml(
     // The qualified human-import slice uses Create + stable client REMOTEID;
     // native posting uses a separate private REMOTEID and no supplied number.
     // See docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.8 for scope and limits.
-    format!("<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{}\" VCHTYPE=\"{}\" ACTION=\"Create\" OBJVIEW=\"Accounting Voucher View\"><DATE>{date}</DATE>{effective_date}<VOUCHERTYPENAME>{}</VOUCHERTYPENAME>{party}{voucher_number}{narration}{reference}{entries}</VOUCHER></TALLYMESSAGE>", remote_id, voucher.voucher_type.as_str(), voucher.voucher_type.as_str())
+    format!("<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{}\" VCHTYPE=\"{}\" ACTION=\"{}\" OBJVIEW=\"Accounting Voucher View\"><DATE>{date}</DATE>{effective_date}<VOUCHERTYPENAME>{}</VOUCHERTYPENAME>{party}{voucher_number}{narration}{reference}{entries}</VOUCHER></TALLYMESSAGE>", remote_id, voucher.voucher_type.as_str(), action.as_str(), voucher.voucher_type.as_str())
 }
 
 /// The voucher mark to record when Tally omitted it twice in one verification. The company is read as

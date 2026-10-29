@@ -1127,6 +1127,7 @@ fn server(directory: &std::path::Path, port: Option<std::net::SocketAddr>) -> Se
         redaction: Redaction::None,
         import_enabled: false,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -1735,6 +1736,10 @@ async fn a_company_that_is_not_loaded_is_refused_whatever_the_file_says() {
             response["structuredContent"]["result"]["error"]["code"],
             "company_identity_not_found"
         );
+        let remediation = response["structuredContent"]["result"]["error"]["remediation"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(remediation.contains("list_companies"), "{response}");
     }
 }
 

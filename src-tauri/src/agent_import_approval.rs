@@ -17,11 +17,19 @@
 //! batch's next call, which does not ask the person again: for as long as an
 //! approval would be kept, at most `MAX_KEPT_REFUSALS` at once, and not across
 //! a withdrawal of the batch or a restart.
+//!
+//! A batch whose box with the voucher lines did not fit the screen (#1832) is
+//! refused as before, and remembered in the same way: its next ask shows the
+//! totals only, as an ordinary ask of that text. Nothing is shown twice in one
+//! call, and no call chooses the form.
+use super::master_post::MasterPostRequest;
 use super::post::NativePostRequest;
 use super::{sha256_hex, write_private, ImportCompanyTuple, ImportLedgerLine};
 use crate::tally::approved_import::{
-    Answered, ApprovedImport, PendingPostApproval, UnderLockRefusal,
+    Answered, ApprovedImport, PendingPostApproval, PostKind, UnderLockRefusal,
 };
+use crate::tally::ledger_create_item::LedgerCreateItem;
+use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_protocol::StandardLedgerCatalogBinding;
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{json, Value};
@@ -110,14 +118,42 @@ fn call_withdrawn() -> bool {
 /// What the person was shown and what it is about, fixed when the dialog is
 /// asked. A redemption whose fresh checks produce a different binding is
 /// refused: the approval covered something else.
+///
+/// It is for one kind of post, and the kind is part of what is compared: a
+/// voucher binding and a master binding are never equal, whatever else they
+/// share.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct ApprovalBinding {
+    form: PreviewForm,
     batch_sha256: String,
     endpoint_origin: Option<String>,
-    company: Option<ImportCompanyTuple>,
-    voucher_count: usize,
     preview_sha256: String,
-    ledgers: Vec<(String, String)>,
+    subject: BindingSubject,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum BindingSubject {
+    Vouchers {
+        company: Option<ImportCompanyTuple>,
+        voucher_count: usize,
+        ledgers: Vec<(String, String)>,
+    },
+    /// One ledger `Create`: the verified company's tuple and the whole item,
+    /// which holds the name, the kind with its side, GSTIN, duty head and
+    /// bill-by-bill flag, and so the parent derived from it.
+    Masters {
+        company: MasterCompanyTuple,
+        item: LedgerCreateItem,
+    },
+}
+
+/// The verified company a master approval is for, as the person was shown it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MasterCompanyTuple {
+    name: String,
+    guid: String,
+    company_number: String,
+    books_from: String,
 }
 
 impl ApprovalBinding {
@@ -125,18 +161,94 @@ impl ApprovalBinding {
         line: &ImportLedgerLine,
         preview: &str,
         ledgers: &StandardLedgerCatalogBinding,
+        form: PreviewForm,
     ) -> Self {
         Self {
+            form,
             batch_sha256: line.sha256.clone(),
             endpoint_origin: line.endpoint_origin.clone(),
-            company: line.company.clone(),
-            voucher_count: line.vouchers.len(),
             preview_sha256: sha256_hex(preview.as_bytes()),
-            ledgers: ledgers
-                .pairs()
-                .map(|(name, guid)| (name.to_string(), guid.to_ascii_lowercase()))
-                .collect(),
+            subject: BindingSubject::Vouchers {
+                company: line.company.clone(),
+                voucher_count: line.vouchers.len(),
+                ledgers: ledgers
+                    .pairs()
+                    .map(|(name, guid)| (name.to_string(), guid.to_ascii_lowercase()))
+                    .collect(),
+            },
         }
+    }
+
+    /// The binding of one ledger `Create`: the batch digest, the endpoint,
+    /// the verified company tuple, every field of the item, and the preview
+    /// the person was shown.
+    pub(super) fn masters(
+        batch_sha256: &str,
+        endpoint_origin: &str,
+        company: &VerifiedCompanyIdentity,
+        item: &LedgerCreateItem,
+        preview: &str,
+    ) -> Self {
+        Self {
+            // A ledger create has the one form: its box lists the item.
+            form: PreviewForm::Listed,
+            batch_sha256: batch_sha256.to_string(),
+            endpoint_origin: Some(endpoint_origin.to_string()),
+            preview_sha256: sha256_hex(preview.as_bytes()),
+            subject: BindingSubject::Masters {
+                company: MasterCompanyTuple {
+                    name: company.display_name().to_string(),
+                    guid: company.company_guid().to_string(),
+                    company_number: company.company_number().to_string(),
+                    books_from: company.books_from_yyyymmdd().to_string(),
+                },
+                item: item.clone(),
+            },
+        }
+    }
+
+    pub(super) fn kind(&self) -> PostKind {
+        match self.subject {
+            BindingSubject::Vouchers { .. } => PostKind::Vouchers,
+            BindingSubject::Masters { .. } => PostKind::Masters,
+        }
+    }
+
+    /// The vouchers this binding covers; masters have none.
+    fn voucher_count(&self) -> Option<usize> {
+        match self.subject {
+            BindingSubject::Vouchers { voucher_count, .. } => Some(voucher_count),
+            BindingSubject::Masters { .. } => None,
+        }
+    }
+}
+
+/// The request an approval is held with, by kind. An approval taken for a post
+/// returns this, so the caller cannot receive a voucher request for a master
+/// approval or the reverse without matching on it.
+pub(super) enum HeldRequest {
+    Vouchers(NativePostRequest),
+    Masters(MasterPostRequest),
+}
+
+impl HeldRequest {
+    pub(super) fn kind(&self) -> PostKind {
+        match self {
+            Self::Vouchers(_) => PostKind::Vouchers,
+            Self::Masters(_) => PostKind::Masters,
+        }
+    }
+}
+
+impl From<NativePostRequest> for HeldRequest {
+    fn from(native: NativePostRequest) -> Self {
+        Self::Vouchers(native)
+    }
+}
+
+impl From<MasterPostRequest> for HeldRequest {
+    fn from(request: MasterPostRequest) -> Self {
+        Self::Masters(request)
     }
 }
 
@@ -146,30 +258,48 @@ enum Held {
     Pending {
         binding: ApprovalBinding,
         dialog: Option<PendingPostApproval>,
-        native: NativePostRequest,
+        held: HeldRequest,
     },
     /// The person approved, and no call has redeemed it yet.
     Approved {
         binding: ApprovalBinding,
         id: Uuid,
         request: Box<ApprovedImport>,
-        native: NativePostRequest,
+        held: HeldRequest,
         answered: Answered,
     },
     /// Taken by the call posting it; spent when that call's intent is admitted.
     Redeeming { id: Uuid, answered: Answered },
 }
 
+/// Which text of a batch an ask shows. Only [`PostApprovals::begin`] makes
+/// [`PreviewForm::TotalsOnly`]: a batch whose box with the voucher lines did
+/// not fit the screen, asked again. It never applies to one voucher.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PreviewForm {
+    /// The voucher lines, when they fit the dialog's caps, else the totals.
+    Listed,
+    /// The totals only, the text a batch gets when its voucher lines do not fit.
+    TotalsOnly,
+}
+
+/// A batch whose box with the voucher lines did not fit the screen, and when
+/// it was seen not to: kept as long as an approval would be.
+struct ListedDidNotFit {
+    batch_id: String,
+    seen: Answered,
+}
+
 /// What a `post_import` call finds held for its batch.
 pub(super) enum Begin {
-    /// Nothing held: check the batch and ask.
-    Ask,
+    /// Nothing held: check the batch and ask, showing this form.
+    Ask(PreviewForm),
     /// A dialog for this batch is open and this call may wait on it.
     Join(PendingPostApproval),
     /// Another call is already waiting on this batch's dialog.
     Waiting,
-    /// This batch is approved: check it afresh and redeem.
-    Redeem,
+    /// This batch is approved, bound to this form: check it afresh and redeem.
+    Redeem(PreviewForm),
     /// Something else is held; refused with this code.
     Busy(&'static str),
     /// This batch's dialog ended in a refusal no call has read: returned now.
@@ -202,6 +332,15 @@ impl Drop for Redemption<'_> {
     fn drop(&mut self) {
         self.approvals
             .release_unspent(&self.batch_id, self.id, "post_refused_before_intent");
+    }
+}
+
+/// The kind of post a held approval or dialog is for. A taken approval carries
+/// no binding and has none.
+fn held_kind(held: &Held) -> Option<PostKind> {
+    match held {
+        Held::Pending { binding, .. } | Held::Approved { binding, .. } => Some(binding.kind()),
+        Held::Redeeming { .. } => None,
     }
 }
 
@@ -247,6 +386,11 @@ pub(in crate::agent) struct PostApprovals {
     /// the person again (#725). They block no other batch. Locked only while
     /// `held` is.
     refusals: Mutex<std::collections::VecDeque<KeptRefusal>>,
+    /// Batches whose listed box did not fit the screen, one per batch, oldest
+    /// first, noted from the dialog's own task (#1832). The note takes only
+    /// this lock; `begin` and `revoke` take it while they hold `held`, never
+    /// the other way round.
+    listed_did_not_fit: std::sync::Arc<Mutex<std::collections::VecDeque<ListedDidNotFit>>>,
     ttl: Duration,
     measured_post: Duration,
     measured_redeem: Duration,
@@ -258,6 +402,7 @@ impl PostApprovals {
             imports: data_dir.join("imports"),
             held: Mutex::new(None),
             refusals: Mutex::new(std::collections::VecDeque::new()),
+            listed_did_not_fit: std::sync::Arc::default(),
             ttl: APPROVAL_TTL,
             measured_post: MEASURED_POST,
             measured_redeem: MEASURED_REDEEM,
@@ -351,6 +496,43 @@ impl PostApprovals {
         refusals
     }
 
+    /// The batches whose listed box did not fit, those still in their time.
+    fn listed_did_not_fit(
+        &self,
+    ) -> std::sync::MutexGuard<'_, std::collections::VecDeque<ListedDidNotFit>> {
+        let mut facts = self
+            .listed_did_not_fit
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        facts.retain(|fact| !self.expired(&fact.seen));
+        facts
+    }
+
+    /// What the dialog task of an ask of `batch_id`'s listed form calls if its
+    /// box did not fit the screen: the batch's next ask shows the totals. Given
+    /// only for a batch asked in its listed form; the totals form has none.
+    pub(super) fn note_listed_did_not_fit(&self, batch_id: &str) -> Box<dyn FnOnce() + Send> {
+        let facts = std::sync::Arc::clone(&self.listed_did_not_fit);
+        let batch_id = batch_id.to_string();
+        Box::new(move || {
+            let mut facts = facts
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            facts.retain(|fact| fact.batch_id != batch_id);
+            facts.push_back(ListedDidNotFit {
+                batch_id,
+                seen: Answered {
+                    approved: false,
+                    at: std::time::Instant::now(),
+                    at_wall: SystemTime::now(),
+                },
+            });
+            while facts.len() > MAX_KEPT_REFUSALS {
+                facts.pop_front();
+            }
+        })
+    }
+
     /// Keep `batch_id`'s refusal, given at `answered`, for its next call, in
     /// place of any earlier one. One already past its time is not kept, so it
     /// never pushes a live one out.
@@ -427,7 +609,7 @@ impl PostApprovals {
     /// 2.0). Only this batch's approval, still in its time, lets it go on:
     /// anything else is refused, and nothing is asked, so such a call can
     /// never show a second dialog.
-    pub(super) fn begin_redeem(&self, batch_id: &str) -> Result<(), String> {
+    pub(super) fn begin_redeem(&self, batch_id: &str) -> Result<PreviewForm, String> {
         let mut slot = self.slot();
         let expired = matches!(
             slot.as_ref(),
@@ -439,11 +621,27 @@ impl PostApprovals {
             return Err("import_approval_expired".into());
         }
         match slot.as_ref() {
-            Some((held_batch, Held::Approved { .. })) if held_batch == batch_id => Ok(()),
+            Some((held_batch, Held::Approved { binding, .. })) if held_batch == batch_id => {
+                Ok(binding.form)
+            }
             Some((held_batch, Held::Redeeming { .. })) if held_batch == batch_id => {
                 Err("import_approval_in_use".into())
             }
             _ => Err("import_approval_revoked".into()),
+        }
+    }
+
+    /// The form an ask of `batch_id` shows: the totals only when its listed
+    /// box did not fit the screen and that is still remembered.
+    fn form_to_ask(&self, batch_id: &str) -> PreviewForm {
+        if self
+            .listed_did_not_fit()
+            .iter()
+            .any(|fact| fact.batch_id == batch_id)
+        {
+            PreviewForm::TotalsOnly
+        } else {
+            PreviewForm::Listed
         }
     }
 
@@ -456,7 +654,7 @@ impl PostApprovals {
             return Begin::Refused(code);
         }
         let Some((held_batch, held)) = slot.as_mut() else {
-            return Begin::Ask;
+            return Begin::Ask(self.form_to_ask(batch_id));
         };
         if *held_batch != batch_id {
             return Begin::Busy("post_approval_busy");
@@ -466,7 +664,7 @@ impl PostApprovals {
                 Some(dialog) => Begin::Join(dialog),
                 None => Begin::Waiting,
             },
-            Held::Approved { .. } => Begin::Redeem,
+            Held::Approved { binding, .. } => Begin::Redeem(binding.form),
             Held::Redeeming { .. } => Begin::Busy("import_approval_in_use"),
         }
     }
@@ -509,7 +707,7 @@ impl PostApprovals {
         batch_id: &str,
         binding: ApprovalBinding,
         dialog: PendingPostApproval,
-        native: NativePostRequest,
+        held: impl Into<HeldRequest>,
     ) -> Result<(), String> {
         let mut slot = self.slot();
         // Checked under the lock: a withdrawal cancels before it revokes, so
@@ -526,7 +724,7 @@ impl PostApprovals {
             Held::Pending {
                 binding,
                 dialog: Some(dialog),
-                native,
+                held: held.into(),
             },
         ));
         Ok(())
@@ -558,16 +756,10 @@ impl PostApprovals {
                 Joined::Refused(code)
             }
             Ok((Ok(request), answered)) => {
-                let Some((
-                    _,
-                    Held::Pending {
-                        binding, native, ..
-                    },
-                )) = slot.take()
-                else {
+                let Some((_, Held::Pending { binding, held, .. })) = slot.take() else {
                     unreachable!("matched as pending above");
                 };
-                let held = approved(binding, request, native, answered);
+                let held = approved(binding, request, held, answered);
                 if self.expired(&answered) {
                     self.lapse(batch_id, held, "approval_expired");
                     return Joined::Refused("import_approval_expired".into());
@@ -585,7 +777,7 @@ impl PostApprovals {
         batch_id: &str,
         binding: ApprovalBinding,
         request: ApprovedImport,
-        native: NativePostRequest,
+        held: impl Into<HeldRequest>,
         answered: Answered,
     ) -> Result<(), String> {
         let mut slot = self.slot();
@@ -597,19 +789,21 @@ impl PostApprovals {
         }
         *slot = Some((
             batch_id.to_string(),
-            approved(binding, request, native, answered),
+            approved(binding, request, held.into(), answered),
         ));
         Ok(())
     }
 
     /// Take this batch's approval for the call about to post it. Refused, and
-    /// the approval lapsed, when the fresh checks bound anything other than
-    /// what the person was shown, or the approval is for another count.
+    /// the approval lapsed, when the fresh checks are for another kind of post
+    /// than the approval is (decided by kind, never by a count), bound anything
+    /// other than what the person was shown, or the approval is for another
+    /// voucher count.
     pub(super) fn take_for_dispatch(
         &self,
         batch_id: &str,
         fresh: &ApprovalBinding,
-    ) -> Result<(Redemption<'_>, ApprovedImport, NativePostRequest), String> {
+    ) -> Result<(Redemption<'_>, ApprovedImport, HeldRequest), String> {
         let mut slot = self.slot();
         let expired = matches!(
             slot.as_ref(),
@@ -627,11 +821,22 @@ impl PostApprovals {
                     binding,
                     id,
                     request,
-                    native,
+                    held,
                     answered,
                 },
             )) if held_batch == batch_id => {
-                if binding != *fresh || request.voucher_count() != fresh.voucher_count {
+                // The kind first: the binding, the approved request and the
+                // held request must each be for the kind being posted. Then
+                // everything the person was shown, and for vouchers only, the
+                // count they were asked about.
+                let wanted = fresh.kind();
+                if binding.kind() != wanted
+                    || request.post_kind() != wanted
+                    || held.kind() != wanted
+                    || !held_matches_approved(&held, &request)
+                    || binding != *fresh
+                    || request.voucher_count() != fresh.voucher_count()
+                {
                     self.write_lapse_note(batch_id, answered, "approval_binding_changed");
                     return Err("import_approval_binding_changed".into());
                 }
@@ -643,7 +848,7 @@ impl PostApprovals {
                         id,
                     },
                     *request,
-                    native,
+                    held,
                 ))
             }
             other => {
@@ -691,12 +896,28 @@ impl PostApprovals {
         }
     }
 
-    /// Withdraw whatever is held for `batch_id`: an open dialog is closed, an
-    /// approval, redeemed or not, can no longer be spent, and an unread refusal
-    /// is dropped, so the next call asks again.
+    /// Withdraw whatever is held for `batch_id` as a voucher post: see
+    /// [`Self::revoke_of`].
     pub(in crate::agent) fn revoke(&self, batch_id: &str, reason: &str) {
+        self.revoke_of(PostKind::Vouchers, batch_id, reason);
+    }
+
+    /// Withdraw whatever is held for `batch_id` as a post of `kind`: an open
+    /// dialog is closed, an approval, redeemed or not, can no longer be spent,
+    /// and an unread refusal is dropped, so the next call asks again. An
+    /// approval held for the other kind of post is left as it is: a call that
+    /// names a batch of the other kind (a voucher batch id given to the master
+    /// tool, or the reverse) cannot withdraw it.
+    pub(in crate::agent) fn revoke_of(&self, kind: PostKind, batch_id: &str, reason: &str) {
         let mut slot = self.slot();
+        if slot.as_ref().is_some_and(|(held_batch, held)| {
+            held_batch == batch_id && held_kind(held).is_some_and(|held| held != kind)
+        }) {
+            return;
+        }
         self.refusals().retain(|kept| kept.batch_id != batch_id);
+        self.listed_did_not_fit()
+            .retain(|fact| fact.batch_id != batch_id);
         if slot
             .as_ref()
             .is_some_and(|(held_batch, _)| held_batch == batch_id)
@@ -707,21 +928,29 @@ impl PostApprovals {
         }
     }
 
-    /// Withdraw `batch_id`'s approval if it was given and not taken: a call
-    /// that was to redeem it was refused before taking it. That is an
-    /// approval a call has collected (`Approved`), and one clicked while no call
-    /// waited, whose dialog still sits in the slot with its answer. An open or
-    /// declined dialog, one a call is waiting on, a taken approval and another
-    /// batch's hold are left as they are.
+    /// [`Self::revoke_unredeemed_of`] for a voucher post.
     pub(super) fn revoke_unredeemed(&self, batch_id: &str, reason: &str) {
+        self.revoke_unredeemed_of(PostKind::Vouchers, batch_id, reason);
+    }
+
+    /// Withdraw `batch_id`'s approval of a post of `kind` if it was given and
+    /// not taken: a call that was to redeem it was refused before taking it.
+    /// That is an approval a call has collected (`Approved`), and one clicked
+    /// while no call waited, whose dialog still sits in the slot with its
+    /// answer. An open or declined dialog, one a call is waiting on, a taken
+    /// approval, another batch's hold and an approval of the other kind of post
+    /// are left as they are.
+    pub(super) fn revoke_unredeemed_of(&self, kind: PostKind, batch_id: &str, reason: &str) {
         let mut slot = self.slot();
         if matches!(
             slot.as_ref(),
-            Some((held_batch, Held::Approved { .. })) if held_batch == batch_id
+            Some((held_batch, held @ Held::Approved { .. }))
+                if held_batch == batch_id && held_kind(held) == Some(kind)
         ) || matches!(
             slot.as_ref(),
-            Some((held_batch, Held::Pending { dialog: Some(dialog), .. }))
+            Some((held_batch, held @ Held::Pending { dialog: Some(dialog), .. }))
                 if held_batch == batch_id
+                    && held_kind(held) == Some(kind)
                     && dialog.answered().is_some_and(|answered| answered.approved)
         ) {
             if let Some((_, held)) = slot.take() {
@@ -800,17 +1029,27 @@ impl Drop for PostApprovals {
     }
 }
 
+/// A master approval is held with the request it was rendered for: the bytes
+/// the approval would send are the bytes held beside it. A voucher request has
+/// no such pair to compare.
+fn held_matches_approved(held: &HeldRequest, approved: &ApprovedImport) -> bool {
+    match held {
+        HeldRequest::Vouchers(_) => true,
+        HeldRequest::Masters(request) => approved.sends_exactly(request.xml()),
+    }
+}
+
 fn approved(
     binding: ApprovalBinding,
     request: ApprovedImport,
-    native: NativePostRequest,
+    held: HeldRequest,
     answered: Answered,
 ) -> Held {
     Held::Approved {
         binding,
         id: Uuid::new_v4(),
         request: Box::new(request),
-        native,
+        held,
         answered,
     }
 }

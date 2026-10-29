@@ -40,6 +40,7 @@ fn server(path: &Path) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -650,6 +651,38 @@ fn the_aim_mark_is_read_only_from_exactly_one_target_row() {
     assert_eq!(mark(&[target.clone(), other.clone()]), Some(1795));
     assert_eq!(mark(&[other]), None, "no target row");
     assert_eq!(mark(&[target.clone(), target]), None, "two target rows");
+}
+
+/// #1945: the aim mark comes only from a read that observed the voucher mark. A captured marks
+/// answer gives its mark; the same answer with the voucher-mark element removed gives none (so the
+/// post refuses as `post_mark_unrecorded` before anything is sent), never a mark of zero.
+#[test]
+fn an_omitted_voucher_mark_in_the_aim_snapshot_is_no_mark_not_zero() {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/note-days/shape_lab_company_marks_response.utf16le.xml"
+    );
+    let marks = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let guid = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+    let aimed =
+        |xml: &str, name: &str| post::location_aimed_voucher_mark_for_tests(xml, guid, name);
+    assert_eq!(aimed(&marks, "BRIDGE SHAPE LAB"), Some(111));
+    let omitted = marks.replacen("<ALTVCHID TYPE=\"Number\"> 111</ALTVCHID>", "", 1);
+    assert_ne!(
+        omitted, marks,
+        "the capture no longer carries the voucher mark"
+    );
+    assert_eq!(aimed(&omitted, "BRIDGE SHAPE LAB"), None);
+    // The read the marks were taken from still parses the row as zero: the aim reads it as none.
+    let rows = crate::agent::change_parse::parse_all_company_marks(&omitted).unwrap();
+    assert_eq!(rows[0].vouchers, 0);
+    // Another company's name is no target, whatever the mark.
+    assert_eq!(aimed(&marks, "Another Company"), None);
 }
 
 /// A verification records its verdict only against the journal it read: if

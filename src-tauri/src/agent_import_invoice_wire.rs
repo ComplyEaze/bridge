@@ -18,6 +18,8 @@
 //! GST registration, each GUID the company's GUID with a suffix, the
 //! registration's dated rows under `GSTREGISTRATIONDETAILS.LIST`.
 
+use super::InvoiceNumber;
+use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use quick_xml::events::Event;
 use std::collections::BTreeMap;
@@ -364,7 +366,7 @@ pub(super) fn resolve_voucher_type(
     }
     // The GUID goes into the read-back's formula: checked here, at the build,
     // so a post never finds it unusable after the voucher is in the book.
-    if !guid_literal_safe(&target.guid) {
+    if VoucherTypeGuid::parse(&target.guid).is_none() {
         return Err("invoice_voucher_type_guid_unusable");
     }
     // The series-level method decides what an import's supplied number does,
@@ -393,11 +395,24 @@ pub(super) fn resolve_voucher_type(
     })
 }
 
-/// A GUID is put inside a TDL string literal. Its alphabet is closed (hex and
-/// hyphen), unlike a ledger's name, so nothing a ledger is called can alter the
-/// formula.
-pub(super) fn guid_literal_safe(guid: &str) -> bool {
-    !guid.is_empty() && guid.len() <= 64 && guid.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
+/// A voucher type's GUID as the read-back puts it inside a TDL string literal.
+/// Its alphabet is closed (hex and hyphen, at most 64 characters), unlike a
+/// ledger's name, so nothing a ledger is called can alter the formula. Parsed
+/// once; the read-back takes only this.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::agent) struct VoucherTypeGuid(String);
+
+impl VoucherTypeGuid {
+    pub(in crate::agent) fn parse(guid: &str) -> Option<Self> {
+        let admitted = !guid.is_empty()
+            && guid.len() <= 64
+            && guid.chars().all(|c| c.is_ascii_hexdigit() || c == '-');
+        admitted.then(|| Self(guid.to_string()))
+    }
+
+    pub(in crate::agent) fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 /// The vouchers of the financial year that carry this number, whatever their
@@ -410,20 +425,14 @@ pub(super) fn guid_literal_safe(guid: &str) -> bool {
 /// hand-keyed invoice read used) and the class compute.
 pub(in crate::agent) fn render_invoice_number_request(
     company: &str,
-    number: &str,
-    (from, to): (&str, &str),
-) -> Option<String> {
-    if !super::invoice_number_safe(number)
-        || ![from, to]
-            .iter()
-            .all(|date| date.len() == 8 && date.bytes().all(|b| b.is_ascii_digit()))
-    {
-        return None;
-    }
-    Some(format!(
+    number: &InvoiceNumber,
+    (from, to): (&TallyDate, &TallyDate),
+) -> String {
+    let (number, from, to) = (number.as_str(), from.as_str(), to.as_str());
+    format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED</FETCH><COMPUTE>{SALES_CLASS_TAG}:$$IsSales:$VoucherTypeName</COMPUTE><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
-    ))
+    )
 }
 
 /// The element the Sales class compute answers in (the name the voucher reads
@@ -474,22 +483,16 @@ pub(super) fn control_row_found(xml: &str, number: &str, date: &str) -> Result<b
 /// fixtures).
 pub(in crate::agent) fn render_invoice_readback_request(
     company: &str,
-    type_guid: &str,
-    number: &str,
-    (from, to): (&str, &str),
-) -> Option<String> {
-    if !guid_literal_safe(type_guid)
-        || !super::invoice_number_safe(number)
-        || ![from, to]
-            .iter()
-            .all(|date| date.len() == 8 && date.bytes().all(|b| b.is_ascii_digit()))
-    {
-        return None;
-    }
-    Some(format!(
+    type_guid: &VoucherTypeGuid,
+    number: &InvoiceNumber,
+    (from, to): (&TallyDate, &TallyDate),
+) -> String {
+    let (type_guid, number) = (type_guid.as_str(), number.as_str());
+    let (from, to) = (from.as_str(), to.as_str());
+    format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
-    ))
+    )
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -818,9 +821,9 @@ pub(super) fn parse_company_registration(
 /// code sends", says what the lab has and has not answered of it. `window` is
 /// the financial year's start and the invoice date, as the request that was
 /// measured carried them (a ledger's rate rows came back whole; whether the
-/// window changes them was not tried). `None` when a date is not eight digits.
+/// window changes them was not tried).
 #[cfg(test)]
-fn render_ledger_rates_request(company: &str, window: (&str, &str)) -> Option<String> {
+fn render_ledger_rates_request(company: &str, window: (&TallyDate, &TallyDate)) -> String {
     render_ledger_rates(company, window, None)
 }
 
@@ -830,28 +833,24 @@ fn render_ledger_rates_request(company: &str, window: (&str, &str)) -> Option<St
 /// is the unfiltered request's, unchanged.
 pub(in crate::agent) fn render_ledger_rates_request_for_parents(
     company: &str,
-    window: (&str, &str),
+    window: (&TallyDate, &TallyDate),
     part: &bridge_tally_protocol::parent_partition::ParentPart,
-) -> Option<String> {
+) -> String {
     render_ledger_rates(company, window, Some(part))
 }
 
 fn render_ledger_rates(
     company: &str,
-    window: (&str, &str),
+    window: (&TallyDate, &TallyDate),
     part: Option<&bridge_tally_protocol::parent_partition::ParentPart>,
-) -> Option<String> {
-    let digits = |date: &str| date.len() == 8 && date.bytes().all(|byte| byte.is_ascii_digit());
-    if !digits(window.0) || !digits(window.1) {
-        return None;
-    }
+) -> String {
     let (formula, filters) = bridge_tally_protocol::native_outstandings::parent_filter_parts(part);
-    Some(format!(
+    format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
-        from = window.0,
-        to = window.1,
-    ))
+        from = window.0.as_str(),
+        to = window.1.as_str(),
+    )
 }
 
 /// One element of an answer with its attributes, text and children, kept

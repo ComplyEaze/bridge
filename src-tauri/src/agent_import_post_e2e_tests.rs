@@ -264,6 +264,7 @@ fn server_redacting(
         redaction,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -1150,6 +1151,50 @@ async fn a_folded_twin_refuses_the_post_before_any_approval() {
         .contains("\"dispatch_intent\""));
 }
 
+/// The same refusal for a twin reached through an alias: an unrelated ledger
+/// that now carries the alias `CASH` folds equal to the named `Cash`. The
+/// pre-approval check reads the catalogue's aliases, so the person is never
+/// asked to approve a batch the queue would then refuse. The alias is a
+/// test-local rewrite of the capture, no evidence of Tally behaviour.
+#[tokio::test]
+async fn an_alias_twin_refuses_the_post_before_any_approval() {
+    let aliased = replaced_once(
+        &catalogue(),
+        "<NAME>Bridge Nested Debtor WR4</NAME>",
+        "<NAME>Bridge Nested Debtor WR4</NAME><NAME>CASH</NAME>",
+    );
+    let mut plans = Vec::new();
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(aliased));
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "ledger_has_folded_twin",
+        "{response}"
+    );
+    assert_ne!(result["attempt_recorded"], json!(true), "{response}");
+    assert_eq!(observed.len(), expected, "nothing after the catalogue read");
+    assert!(scripted.previews().is_empty(), "no approval asked");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+}
+
 /// Declined, the post sends nothing past the pre-approval reads and journals
 /// no intent; the approval was asked once.
 #[tokio::test]
@@ -1270,6 +1315,7 @@ async fn a_dispatch_admission_that_fails_sends_nothing() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::On,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         other.append_import_ledger(&changed).unwrap();
@@ -2342,6 +2388,24 @@ async fn only_the_target_moving_is_reported_as_the_landing() {
     assert_eq!(
         located["target_voucher_step"],
         json!({"before": 10, "after": 11, "step": 1, "reported_created": 1, "matches_created": true}),
+        "{located}"
+    );
+}
+
+/// A snapshot after the post whose target row omits its voucher mark says nothing about where
+/// the post went: it is unavailable, with its cause, never a step to a mark of zero (#1945).
+#[tokio::test]
+async fn an_omitted_voucher_mark_after_the_post_is_an_unavailable_snapshot_not_zero() {
+    let omitted =
+        company_marks(11, 50, "WR2 Unicode Lab").replacen("<ALTVCHID>11</ALTVCHID>", "", 1);
+    assert_ne!(omitted, company_marks(11, 50, "WR2 Unicode Lab"));
+    let located = located_after(omitted).await;
+    assert_eq!(
+        located,
+        json!({
+            "state": "after_snapshot_unavailable",
+            "after_read_failure": "marks_readback_voucher_mark_omitted",
+        }),
         "{located}"
     );
 }
@@ -4662,6 +4726,7 @@ async fn a_tiny_response_budget_keeps_the_code_and_withholds_the_row_list() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let (_line, args) = saved_batch(&server);
@@ -7391,7 +7456,7 @@ fn pilot_refused_in_the_queue(run: &PilotRun, code: &str, requests: usize) -> Va
 async fn a_voucher_type_that_changed_after_the_approval_is_refused_in_the_queue() {
     let run = pilot_post_changed(&[Changed {
         positions: pilot_queue_positions('T'),
-        body: pilot_text('T').replacen("000000ce", "000000cf", 1),
+        body: replaced_once(&pilot_text('T'), "000000ce", "000000cf"),
     }])
     .await;
     let error = pilot_refused_in_the_queue(
@@ -7495,9 +7560,15 @@ async fn a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_r
     let marks = pilot_text('m');
     let count = captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/company-ledger-count.utf16le.xml"
-    ))
-    .replace("BRIDGE SIZE 2K", "BRIDGE PILOT LAB")
-    .replace("f8dab51e-a5d9-49d5-9232-54a16c8b95bb", PILOT_GUID);
+    ));
+    // The company's name occurs twice in the captured answer and its GUID once; an edit that matched fewer
+    // would leave the answer naming another company.
+    assert_eq!(count.matches("BRIDGE SIZE 2K").count(), 2);
+    let count = replaced_once(
+        &count.replace("BRIDGE SIZE 2K", "BRIDGE PILOT LAB"),
+        "f8dab51e-a5d9-49d5-9232-54a16c8b95bb",
+        PILOT_GUID,
+    );
     // The queue's currency read, then the ledger count's paired read (K).
     let start = pilot_queue_start();
     let order = format!("{}eKsKse{}", &PILOT_ORDER[..start], &PILOT_ORDER[start..]);
@@ -7506,7 +7577,7 @@ async fn a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_r
         &[
             Changed {
                 positions: vec![at],
-                body: marks.replacen(" 223</ALTMSTID>", " 5001</ALTMSTID>", 1),
+                body: replaced_once(&marks, " 223</ALTMSTID>", " 5001</ALTMSTID>"),
             },
             Changed {
                 positions: vec![start + 1, start + 3],
@@ -7552,7 +7623,7 @@ async fn a_master_mark_that_moves_after_the_invoice_reads_is_refused_by_the_aim_
     let marks = pilot_text('m');
     let run = pilot_post_changed(&[Changed {
         positions: vec![aim],
-        body: marks.replacen(" 223</ALTMSTID>", " 224</ALTMSTID>", 1),
+        body: replaced_once(&marks, " 223</ALTMSTID>", " 224</ALTMSTID>"),
     }])
     .await;
     pilot_refused_in_the_queue(&run, "post_masters_moved", PILOT_ORDER.find('Z').unwrap());

@@ -170,6 +170,7 @@ async fn call_observed_under(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -825,4 +826,20 @@ async fn the_four_outcomes_of_a_cash_flow_read_the_same_under_every_redaction_an
             }
         }
     }
+}
+
+/// The Trial Balance parser's reason reaches a cash flow refusal as its `cause` (#2071, #2080).
+/// Tally's answer to the Trial Balance request is a captured company list, which is not one.
+#[tokio::test]
+async fn an_unusable_trial_balance_answer_names_its_cause_on_the_cash_flow() {
+    let mut plans = plans_with("-4950.00", |_| companies());
+    // The refusal ends the call at the Trial Balance pair (19 requests in).
+    plans.truncate(19);
+    let (response, _, _) = call(plans, "2026-04-01", "2026-06-30").await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(
+        error["cause"], "trial_balance_source_identity_missing",
+        "{error}"
+    );
 }

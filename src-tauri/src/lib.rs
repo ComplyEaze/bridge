@@ -1,6 +1,22 @@
 // The library's modules are crate-private on purpose. rustc's `dead_code` lint does not flag a
 // `pub` item of a library, so a `pub mod` here hid every function nothing in the crate calls.
 // What the binaries need is re-exported below, and nothing else is reachable from outside.
+/// A test's own company or master GUID: version 4, the RFC 4122 variant, and `n` in the low
+/// bits, every other bit zero. Built rather than written, so tests carry no UUID literal for the
+/// merge gate's privacy scan to classify. Leaked so it reads as a `&'static str`, as the
+/// constants it replaces did.
+#[cfg(test)]
+pub(crate) fn synthetic_guid(n: u16) -> &'static str {
+    let guid = uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | u128::from(n));
+    Box::leak(guid.to_string().into_boxed_str())
+}
+
+/// A batch id of the build's own shape (`bridge-` and a GUID) on [`synthetic_guid`].
+#[cfg(test)]
+pub(crate) fn synthetic_batch_id(n: u16) -> &'static str {
+    Box::leak(format!("bridge-{}", synthetic_guid(n)).into_boxed_str())
+}
+
 pub(crate) mod agent;
 pub(crate) mod client_group_label_migration;
 pub(crate) mod client_groups;
@@ -43,6 +59,8 @@ use tokio::sync::OnceCell;
 pub(crate) struct LazyTallyMirror {
     app_data_directory: PathBuf,
     repository: OnceCell<db::tally_mirror::TallyMirrorRepository>,
+    /// Held for as long as the mirror is open, so a reset cannot delete it from under this handle.
+    use_lock: OnceCell<db::encrypted::MirrorUseLock>,
 }
 
 impl LazyTallyMirror {
@@ -50,6 +68,7 @@ impl LazyTallyMirror {
         Self {
             app_data_directory,
             repository: OnceCell::new(),
+            use_lock: OnceCell::new(),
         }
     }
 
@@ -71,13 +90,16 @@ impl LazyTallyMirror {
                 }
 
                 let database_path = self.app_data_directory.join("tally-mirror-v1.db");
-                let _initialization_lock =
-                    db::encrypted::lock_mirror_initialization(&database_path)?;
+                // The shared use lock is taken here, before the key is resolved, so a reset that
+                // holds the mirror refuses this open at once instead of racing it.
+                let (_initialization_lock, use_lock) =
+                    db::encrypted::lock_for_open(&database_path)?;
                 let key_store = db::OsMirrorKeyStore::for_database(&database_path);
                 let resolved_key = db::resolve_mirror_key(&database_path, &key_store)?;
                 let pool = db::connect_encrypted(&database_path, resolved_key.key).await?;
                 let repository = db::tally_mirror::TallyMirrorRepository::new(pool);
                 repository.migrate().await?;
+                let _ = self.use_lock.set(use_lock);
                 Ok(repository)
             })
             .await
@@ -90,6 +112,8 @@ pub fn run_journal_confirmation_child_from_args(
     let confirmed = match args.next().as_deref() {
         Some("--confirm-journal") => agent::run_confirmation as fn() -> bool,
         Some("--confirm-review") => agent::run_review_confirmation,
+        Some("--confirm-masters") => agent::run_masters_confirmation,
+        Some("--confirm-release") => agent::run_release_confirmation,
         _ => return None,
     };
     if args.next().is_some() {

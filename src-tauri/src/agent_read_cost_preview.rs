@@ -171,7 +171,7 @@ impl Server {
             .await
             .map_err(|failure| failure.with_prior_evidence(prior.clone()))?;
         let evidence = combine_evidence(prior, marks_evidence);
-        let costs = tools().map(|(tool, limits)| (tool, CensusCost::of(marks.vouchers, limits)));
+        let costs = tools().map(|(tool, limits)| (tool, CensusCost::of(marks.vouchers(), limits)));
         let per_tool: serde_json::Map<String, Value> = costs
             .iter()
             .map(|(tool, cost)| ((*tool).to_string(), cost.to_json()))
@@ -181,12 +181,12 @@ impl Server {
             "result": {
                 "state": "observed",
                 "basis": "voucher_mark_read_by_this_call",
-                "voucher_mark": marks.vouchers,
+                "voucher_mark": marks.vouchers(),
                 "per_call": per_tool,
                 "request_spacing_ms": SPACING_MS,
                 "measured": measured(),
                 "host_limits": host_limits(),
-                "say": say(marks.vouchers, &costs),
+                "say": say(marks.vouchers(), &costs),
                 "limitations": LIMITATIONS,
             },
         });

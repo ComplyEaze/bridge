@@ -188,6 +188,31 @@ zero: the captured opening corpus has an opening net of `-49833.50`. Report that
 difference separately; do not manufacture a balancing ledger. Numeric column
 sums must disclose any empty observations excluded from arithmetic.
 
+**A Closing Stock ledger's closing is not opening plus movements (verified once on each of
+two synthetic TallyPrime 7.2 Silver books, 28 October 2026).** A ledger under Stock-in-Hand
+whose closing balance was keyed on Tally's screen keeps its opening as `TBALCLOSING`, and the
+change shows only in `DEBITTOTALS`: on a book not integrated with inventory, opening -1000.00,
+debit -400.00, credit empty, closing -1000.00 (keyed closing 1,400.00); on an integrated book,
+the same figures (Tally offers the closing-balance field on both). Tally's own Trial Balance
+screen shows the ledger as an Opening Stock line. On the non-integrated book its Profit and Loss
+and Balance Sheet used the keyed 1,400.00; on the integrated book they valued the stock from the
+stock item (1,200.00, 12 Nos) (that book's report figures are from screenshots kept on the lab
+machine, not a committed answer). Bridge returns the row as sent and adds `movements_differ_by`
+(closing minus opening, debit and credit, exactly, in Tally's sign, at the amounts' own number of
+decimal places) when that is not zero, counting an empty amount as zero, as the statements' row
+check does. That check is the same code: `profit_and_loss` and `balance_sheet` refuse a read
+(`statement_trial_balance_row_inconsistent`) where it differs. Every row of the committed Trial
+Balance captures adds up (known lab 6 rows, opening-year 8, dense month 123, year 7, stock book 9,
+several-currency 10). The raw XML of the two lab rows is not committed (the lab kept the tool
+answers), so the shape is pinned on the answers' values and on committed captures edited in one
+element. Other readers of `TBALCLOSING`, named and not changed here: `bridge-tax-audit`
+`book.rs` (`closing_paise` is read from `TBALCLOSING` and `movement_paise` is closing minus
+opening, so such a ledger shows no movement there; `financial_statements.rs` recomputes the
+closing stock from opening and movements and counts such ledgers as stale, and its text says the
+quirk occurs only on books not integrated with inventory, which the integrated book above
+contradicts; `stock.rs` `books_close_tb` still takes the raw closing) and the desktop Trial
+Balance workbook.
+
 The export includes dormant ledger masters that Tally's rendered report may
 omit. Stable paired bytes and bracketed company/mode/book-extent observations
 are bounded source evidence, not an atomic snapshot or a completeness proof.
@@ -416,6 +441,17 @@ This establishes only the exact request, licensed 7.1 instance, and synthetic
 company profile described here. It does **not** establish that other releases,
 modes, or Group shapes emit the field; Bridge must continue to fail closed when
 the response lacks or mismatches the selected company GUID.
+
+**Release 7.2 sends the computed field earlier in each row — PARTIAL; one book, one release, one send.** The
+same request on licensed TallyPrime 7.2 Silver (25 Oct 2026) against `BRIDGE TIEOUT B` returned a
+response of the same size (54,280 bytes) with the same 28 Group rows in the same order and every value
+equal to the 7.1 capture of that book. Inside each row the computed `BRIDGECOMPANYGUID` comes before
+Tally's `PRIMARYGRPPARENT`; on 7.1 it came after it. The reorder was seen in one send and was not repeated. The fixture is
+`statement_groups_stock_book_72_live.utf16le.xml` (sha256 `493256b2…`; provenance in
+`STATEMENT_CAPTURE_PROVENANCE.md`). The group readers take a row's children by name, so both
+captures give the same records; only the per-row source hash, taken over the row's bytes, differs
+(`tests/groups_release_72.rs`). A reader that depended on the order of a row's children would not be
+safe across the two releases. Not measured: another book on 7.2, Gold, another release.
 
 ### 8.2a Curated `BILLALLOCATIONS` drops the `On Account` type — **VERIFIED 2026-09-11; single instance**
 
@@ -684,6 +720,69 @@ on every voucher:
   another release, another book. `reference_date` is returned as Tally sent it (`YYYYMMDD`); a value that is not
   a date refuses the read (`voucher_reference_date_invalid`).
 
+### 8.2g Cost-centre allocations on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, one synthetic book**
+
+**Scope: TallyPrime 7.1 Silver, licensed, `education_mode: false`, synthetic company `BRIDGE SHAPE LAB` (Cost Centres setting No), one read of one day (5 Jun 2025): one Journal with two ledger entries.** Request and response
+retained with sha256 in `tests/fixtures/VOUCHER_COST_CENTRE_CAPTURE_PROVENANCE.md`; the request is the one the vouchers read
+sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
+
+- **Shape.** An entry that carries allocations holds one `CATEGORYALLOCATIONS.LIST` with `CATEGORY` (`Business Line`),
+  `ISDEEMEDPOSITIVE`, and one `COSTCENTREALLOCATIONS.LIST` per centre. Each centre carries `NAME` and a signed `AMOUNT`
+  (`Trading` -600.00 and `Assembly` -400.00, which add up to the entry's -1000.00), `PAYHEADSORTORDER` and
+  `EMPLOYEESORTORDER` (0, 0) and empty `ACTUALQTY` and `BILLEDQTY`.
+- **An entry without allocations has no `CATEGORYALLOCATIONS.LIST` element at all** in this read (the other entry of the
+  voucher; both entries carry a `BILLALLOCATIONS.LIST`, the first one empty). No empty container was observed in this read. Two captured import-verification reads (whose fetch does not ask for
+  allocation fields) hold an empty container on an entry; the parser reports that as present and not observed.
+- **What the tool returns.** An entry with allocations gains `cost_centre_allocations`, a list of
+  `{category, cost_centre, amount}` as sent (names trimmed, the amount as sent); an entry without them has no such key. An allocation list that cannot be read
+  whole (a centre with no name or no amount, an amount that is not a decimal, a centre named twice in one category, a
+  category named twice in one entry, a category without a name or without centres, a field sent twice, text that cannot
+  be decoded, an allocation list at a depth the reader does not take, or an empty container, which is reported as
+  present and not observed, never as no allocations) is not shown in part: the entry carries `cost_centre_allocations_unreadable`
+  with a reason and the rest of the response is unchanged. An empty amount is never read as zero.
+- **Second read, 27 Oct 2026: TallyPrime 7.2 Silver, synthetic company `BRIDGE COST KEY LAB` (Cost Centres setting
+  Yes), two reads of one day each, of vouchers keyed on Tally's screen.** Request and response retained with sha256 in
+  `tests/fixtures/VOUCHER_COST_CENTRE_KEYED_CAPTURE_PROVENANCE.md`. The shape is the one above.
+  - A Payment's expense entry holds one category with two centres, one of them under the other in the cost-centre
+    masters: an allocation names only the centre, not its parent.
+  - A Journal's expense entry holds two `CATEGORYALLOCATIONS.LIST`, one per category, and **each category's centres add
+    up to the whole entry's amount**. A category is a separate view of the same amount, not a share of it.
+  - The bank entry of each voucher carries no `CATEGORYALLOCATIONS.LIST`.
+  - The `vouchers` tool returned each allocation as sent. Its `summarise_by: cost_centre` relies on this: it refuses
+    (`summary_cost_centre_allocation_mismatch`) an entry where one category's centres do not add up to the entry, a
+    shape not observed.
+- **Not shown.** Quantities; a foreign-currency amount; an item invoice (its sales or purchase ledger's entry carries
+  the goods line, §12a.13, and no captured item invoice carries allocations; one beside the goods line is read, one inside it
+  is flagged `cost_centre_allocation_shape_unrecognised`, by test only); voucher types other than Journal and Payment;
+  another release or book; an entry whose allocations under one category do not add up to its amount (the vouchers read
+  does not check this; the summary refuses it).
+
+### 8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-28; TallyPrime 7.2, two synthetic books**
+
+**Scope: TallyPrime 7.2 Silver, licensed, `education_mode: false`, synthetic company `BRIDGE BANKREF LAB` (28 Oct 2026; a recapture of a 12 Oct run on 7.1 whose references the privacy scan could not carry, which is not committed), one read of five days (1 to 5 Apr 2026): five Contras of 50,000.00 between two bank ledgers, keyed in double entry on Tally's screen.** Request and response
+retained with sha256 in `tests/fixtures/VOUCHER_CONTRA_HAND_KEYED_CAPTURE_PROVENANCE.md`; the request is the one the vouchers read
+sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
+
+- **Where a hand-keyed transfer reference sits.** The voucher-level `REFERENCE` is empty on all five. A reference typed in the narration is only narration text. A reference typed in the bank allocation sits in `INSTRUMENTNUMBER` of the `BANKALLOCATIONS.LIST` on **each** of the voucher's two entries (voucher 2: `222222222222`, type `Same Bank Transfer`; voucher 5: a cheque number `123456`, type `Cheque` on one entry and `Cheque/DD` on the other). `TRANSACTIONID` was empty in every case.
+- **Every bank entry carries an allocation, with or without a number.** Vouchers 1, 3 and 4 carry one with a `TRANSACTIONTYPE` (`Cheque` or `Cheque/DD`) and an empty `<INSTRUMENTNUMBER/>`; the allocation's `INSTRUMENTDATE` equals the voucher date.
+- **The reconciliation fields, with nothing reconciled.** On all ten allocations `BANKERSDATE` was empty (`<BANKERSDATE/>`), `STATUS` was `No`, `BANKRECONSTATUS` (`TYPE="String"`) was `Available Only in Books` and `PAYMENTMODE` was `Transacted`. Counted with an XML parser over the capture. No entry of this book had been reconciled; a reconciled entry is in the next bullet, from another book.
+- **A reconciled entry (VERIFIED 2026-10-27; one run, TallyPrime 7.2 Silver, synthetic company `BRIDGE TRANSFER LAB`, five Contras of 50,000.00 between two bank ledgers).** Contras 1 and 2 were reconciled on screen on the second bank ledger with bank date 6 April 2026, and the same raw request read again. On exactly that entry of each of the two vouchers (`ALLLEDGERENTRIES.LIST[2]/BANKALLOCATIONS.LIST`) and nowhere else: `BANKERSDATE` went from empty to `20260406`, `BANKMANUALSTATUS` from empty to `Reconciled` and `BANKRECONSTATUS` from `Available Only in Books` to `Reconciled`; `STATUS` stayed `No`. Each voucher's `ALTERID` moved (1 to 6, 2 to 7) and the company's voucher mark from 5 to 7; the master mark did not move. The first bank ledger's entries of the same two vouchers and the other three Contras were byte-identical. The request and both responses are retained with their hashes on lab branch `lab/1231-bank-reconciliation-answers` at `bb6531ca`, not in this tree: before, 211,552 bytes, sha256 `262e30039b6879b0d9bd37cf00c1000eada923dd1344947049a9f1a49b6197de`; after, 211,698 bytes, sha256 `b9ac75ffa3218444277eeae7d6e8821d759180806bf75f390e004b2e5647cb57`. Blanking the bank date in Set Status to clear a manual reconciliation was refused by Tally (the bank date cannot be earlier than the reconciliation beginning date), so a reconciled and then cleared entry was not read. What the tool returns for such an entry follows from its five fields: the bank date, and a `status` of `No`; the tool has not been run against it.
+- **Elsewhere in the repository's captures.** The other committed voucher answers carry 365 `BANKALLOCATIONS.LIST` elements, every one with no children (one more, populated, is a project-authored fixture and is not evidence).
+- **What the tool returns.** Only when `vouchers` is called with `bank_allocations: true`: an entry with one or more allocations that have children gains `bank_allocations`, at most eight, each with `bank_date` (`BANKERSDATE`), `instrument_number`, `instrument_date`, `transaction_type` and `status`, every one `absent`, `empty` or a trimmed `value`; a date that is not `YYYYMMDD` is not shown. No reconciliation verdict is drawn, and neither `BANKRECONSTATUS` nor `BANKMANUALSTATUS` is read. A list that cannot be read whole (a field sent twice in one allocation, more than eight, an allocation list inside another list of the entry, an element inside a field that is read, an undecodable text, a date that is not a date) is not shown in part: the entry carries `bank_allocations_unreadable` with a reason and the rest of the response is unchanged. Without the argument, and in the registers, neither key is returned.
+- **Not shown.** A reconciled entry read through the tool, and a reconciled entry that was then cleared; other transaction types (NEFT, RTGS, IMPS) and whether any keeps a UTR in `TRANSACTIONID`; a cash deposit or withdrawal; Payment, Receipt and Journal vouchers; Gold and other releases; several currencies. That the number on one entry equals the number on the other is observed here for two vouchers and is not enforced by the tool.
+
+### 8.2i Goods lines on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, two synthetic books**
+
+**Scope: TallyPrime 7.1 Silver, licensed, `education_mode: false`; synthetic companies `BRIDGE SHAPE LAB` and `BRIDGE STOCK LAB`; item invoices that were imported or keyed for the lab books.** The request is the one the vouchers read sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c). Captures, each retained with its sha256: `voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml` (one day, 24 Apr 2025: a Payment and a Purchase; `tests/fixtures/GOODS_LINES_CAPTURE_PROVENANCE.md`), `sales-day/register_window_sales_day_live.utf16le.xml` and `register_window_taxed_sales_day_live.utf16le.xml` and `stock-lab-day/stock_lab_taxed_day_voucher_window_response.utf16le.xml` (one Sales line each), and `agent/vouchers-reference-date-year-rows.utf16le.xml` (one Purchase line).
+
+- **Where a goods line sits.** On an invoice-mode voucher (`ISINVOICE` `Yes`) each goods line is an `INVENTORYALLOCATIONS.LIST` directly under the `ALLLEDGERENTRIES.LIST` of the sales or purchase ledger it posts to, with `STOCKITEMNAME`, `RATE`, `AMOUNT`, `ACTUALQTY` and `BILLEDQTY` as direct children, and its godown and batch split as `BATCHALLOCATIONS.LIST` children of the line (`GODOWNNAME`, `BATCHNAME`, `AMOUNT`, `ACTUALQTY`, `BILLEDQTY`, `BATCHRATE`). Many other children are present and empty (GST overrides, `RATEDETAILS.LIST` rows, empty allocation lists).
+- **Text, not numbers.** A quantity is a number and a unit, usually with a leading space (` 666.667 Kgs`, ` 1 U.`; a unit can end in a dot); a rate is an amount per unit (`30.00/Kgs`, `100.00/U.`). Amounts are plain signed decimals: the Purchase line `-20000.00` with `ISDEEMEDPOSITIVE` `Yes`, a Sales line `100.00` with `No`, each of the same sign as its ledger entry.
+- **A split over two godowns.** The Purchase of 24 Apr 2025 carries one line, Hydrochloric Acid 33pc, 666.667 Kgs at 30.00/Kgs, -20000.00, with two batch rows: Main Location, batch H-2504-A, 300.000 Kgs, -9000.00; Factory Floor, batch H-2504-B, 366.667 Kgs, -11000.00. The batch amounts add up to the line amount; they do on every captured line.
+- **The same shape on TallyPrime 7.2.** The same book's vouchers from 1 Apr to 30 Jun 2025, read with the same request on TallyPrime 7.2 on 25 Oct 2026 (lab branch `lab/698-gst-ledgers-read-answers`, `a10-vouchers.xml`, 2,504,288 bytes, not committed here), hold 62 vouchers: 14 invoice-mode vouchers (12 Purchase, 2 Sales) carry one goods line each in this shape, one of them the line above; the Credit Note, the Debit Note and 8 Purchases are accounting-mode and carry none, nor do the other 38 (12 Payments, 7 Receipts, 4 Contras, 14 Journals and the Stock Journal). Counted with an XML parser.
+- **Where it is not.** That book's Stock Journal answered an `ALLLEDGERENTRIES.LIST` with no children in the 7.2 read above (#388; that answer is not committed, and no committed capture holds a Stock Journal), so a Stock Journal's stock is not in this read; neither is a Delivery Note's, Receipt Note's, Physical Stock's or Manufacturing Journal's (not captured). An `ALLINVENTORYENTRIES.*` fetch returns the same Purchase as one `ALLINVENTORYENTRIES.LIST` at the voucher level with the same two batch rows (lab branch `lab/missing-reads-answers`, `ans-a08.xml`); no shipped read sends that fetch.
+- **What the tool returns.** Only when `vouchers` is called with `goods_lines: true`: an entry with goods lines gains `goods_lines`, each with `stock_item` and with `actual_quantity`, `billed_quantity`, `rate` and `amount` as `absent`, `empty` or a trimmed `value`, and `batches` (`godown`, `batch`, both quantities, `amount`) when the line has batch rows. A line whose batch amounts do not add up to its amount, whose amount or a batch amount is not a decimal, or that names no item, a field sent twice, an element inside a field that is read, a line or batch list at another depth, more than 1,000 lines or 100 batch rows: the entry carries `goods_lines_unreadable` with a reason and no partial list, and the rest of the response is unchanged. Without the argument, and in the registers, neither key is returned.
+- **Not shown.** A Credit or Debit Note with items; discounts; additional cost; a bill of materials; a foreign-currency line; a voucher typed on Tally's screen; a compound unit; Gold, Education and releases other than 7.1 and (one book) 7.2.
+
 ### 8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**
 
 **Scope: TallyPrime 7.1 Silver, licensed, one company, 28 ledger masters (2026-09-12) and 36 (2026-09-30).** Captured from
@@ -753,4 +852,41 @@ written as an import-time rule.
 
 **Not established:** whether these six spellings hold across Tally versions or localisations. The
 captures are one instance. An unrecognised value is therefore surfaced, never guessed.
+
+### 8.4 A party's dated mailing details are in `LEDMAILINGDETAILS.LIST`, which the `FETCH` must name — **VERIFIED 2026-10-12; TallyPrime 7.1, one synthetic book**
+
+**Scope: TallyPrime 7.1 Silver, licensed, one synthetic company, one `List of Ledgers` read of eight ledgers.** The
+request and the answer are retained, byte for byte, as
+`tests/fixtures/agent/native-party-masters-mailing-details.request.utf16le.xml` and
+`tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml` (sizes and SHA-256 in
+`native-party-masters-mailing-details.PROVENANCE.md`). The request is the production party-master request (§8.1's
+fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the end of its `FETCH`.
+
+- **The address is in the dated list, not in the flat elements. VERIFIED.** For the party that holds an address, the
+  answer's `LEDADDRESS.LIST`, `LEDPINCODE` and `LEDGSTPINCODE` are empty (`LEDADDRESS.LIST` is a whitespace-only
+  placeholder) and `STATENAME` is absent, although the request names all four. The address is in that row's
+  `LEDMAILINGDETAILS.LIST`: an `ADDRESS.LIST` of two `ADDRESS` lines, then `APPLICABLEFROM` (`YYYYMMDD`), `PINCODE`,
+  `MAILINGNAME`, `STATE` and `COUNTRY`. An address line repeats inside `ADDRESS.LIST`; no other child repeated.
+- **Absence is a whitespace-only placeholder, in every row. VERIFIED.** The other seven ledgers (two more parties and five
+  that are not parties) carry `<LEDMAILINGDETAILS.LIST>` holding only whitespace, so a ledger with no address is an
+  element with no children, not a missing element.
+- **A `FETCH` that does not name the list does not get it. VERIFIED on this book.** The earlier read of the same book, whose
+  request differed from this one only by not naming `LEDMAILINGDETAILS.LIST` (1,744 bytes against 1,792), returned the
+  same eight ledgers with every other element the same and no mailing list on any row. Its answer is retained as
+  `tests/fixtures/agent/native-party-masters-without-mailing-details.utf16le.xml`; its request is not retained (it is the
+  request above without `, LEDMAILINGDETAILS.LIST`), and its size and hash are recorded in the provenance note, not
+  shown by a file.
+- **The element makes every row longer. VERIFIED on this book.** The answer is 20,896 bytes against 19,094 for the read
+  that did not name it. By ledger row (UTF-16 bytes, counted by structure): the one party that holds an address grew
+  from 3,010 to 3,958 (its mailing element is 934 bytes), and each of the other seven rows by 122 (an empty element is
+  108 bytes). A second entry on that party was then measured (TallyPrime 7.2, 2026-10-29, `lab/1490-mailing-captures-answers`): the answer grew from 20,896 to 21,840 bytes, so the second entry added 944 bytes and the party's row is 4,902; the eight ledgers average 2,612 bytes a ledger with one entry (20,896 / 8) and 2,730 with two (21,840 / 8). Bridge's per-ledger budget for a read that names the list is
+  5,000 bytes (above that largest row; it was 4,700 before the second entry was measured) against 3,750 for one that does not (UNVERIFIED: a party with three entries, longer address lines or a book of many populated parties has not been read). `ledger_masters` sends it only when asked (`include_mailing_details`, refused with `include_gst_details` because the request naming both has not been captured).
+- **Not shown (by the 7.1 capture).** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
+  sends them, was not measured there: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), an entry with no
+  `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers. The 7.2 read above has two entries on one
+  party, sent oldest first; three or more entries, an entry with no date and a book of many populated parties are not measured.
+
+Bridge reads the list into a dated history (`compliance.mailing_details` of `ledger_masters` with `include_mailing_details`, and the mailing columns of
+the party/ledger master workbook) and leaves the flat fields as returned. A response that carries no such element is
+reported as not observed, which is not the same as an empty history.
 

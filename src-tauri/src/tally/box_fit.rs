@@ -3,9 +3,10 @@
 //! monitor it opened on (#1832, #1780).
 //!
 //! A Windows message box cannot scroll. Measured in the lab (1920x1080 at 125
-//! percent, work area 1030 high): a box of 48 lines fitted (bottom edge 1023),
-//! one of 60 lines was 1,134 high with its top pinned at 0 and its buttons off
-//! the screen, and Windows neither clipped nor shrank it. A person who can see
+//! percent, work area 1030 high, this module's DPI-aware process): a box of 44
+//! lines is 1,011 high and fits; boxes of 48 and 60 lines are 1,087 and 1,315
+//! high, placed with their tops at 0 and their buttons off the screen, and
+//! Windows neither clipped nor shrank them. A person who can see
 //! only the top of such a box could answer it with `Y` having read none of the
 //! lines below the screen's edge. The caps on a text's lines are a guess about
 //! the screen; this measures the real box when it opens, in the dialog's own
@@ -116,7 +117,13 @@ pub(crate) fn outcome(result: i32, seen: Seen) -> Outcome {
 #[cfg(windows)]
 pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
     if !windows_hook::make_dpi_aware() {
-        // Rectangles could not be read in one unit, so no box is shown.
+        // Rectangles could not be read in one unit, so no box is shown. Said on
+        // the error output, so a run by hand on an older Windows names the cause.
+        use std::io::Write;
+        let _ = writeln!(
+            std::io::stderr(),
+            "box-fit: not per-monitor DPI aware (Windows 10 version 1703 or later is needed): no box shown"
+        );
         std::process::exit(0);
     }
     let Some(hook) = windows_hook::install() else {
@@ -194,13 +201,17 @@ mod windows_hook {
         // SAFETY: each pointer is the address of the exported function of
         // that name, whose signature is the one given here (user32.dll).
         unsafe {
-            let set =
-                std::mem::transmute::<*const c_void, extern "system" fn(*mut c_void) -> i32>(set);
-            let get =
-                std::mem::transmute::<*const c_void, extern "system" fn() -> *mut c_void>(get);
+            let set = std::mem::transmute::<
+                *const c_void,
+                unsafe extern "system" fn(*mut c_void) -> i32,
+            >(set);
+            let get = std::mem::transmute::<
+                *const c_void,
+                unsafe extern "system" fn() -> *mut c_void,
+            >(get);
             let same = std::mem::transmute::<
                 *const c_void,
-                extern "system" fn(*mut c_void, *mut c_void) -> i32,
+                unsafe extern "system" fn(*mut c_void, *mut c_void) -> i32,
             >(same);
             set(PER_MONITOR_AWARE_V2 as *mut c_void);
             same(get(), PER_MONITOR_AWARE_V2 as *mut c_void) != 0

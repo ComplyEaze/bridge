@@ -416,6 +416,68 @@ test("shows the observed closing empty count", async () => {
   root.unmount();
 });
 
+// #2068: a Closing Stock ledger whose closing balance was keyed on Tally's screen keeps its
+// opening as its closing. The row the backend marks (`movements_differ_by`, the captured row's
+// values) is shown as sent, with the gap beside its closing, and the backend's limitation is
+// shown before the totals. A row without the mark shows neither. "Short Ledger" is invented, to
+// show that a negative gap keeps its sign.
+test("marks a ledger whose closing is not its opening plus its movements, and says why", async () => {
+  const limitation = "1 ledger(s) carry movements_differ_by: their closing is not their opening plus their debit and credit totals, counting an empty amount as zero.";
+  const keyed = {
+    ...report,
+    read: {
+      ...report.read,
+      report: {
+        rows: [
+          ...report.read.report.rows,
+          { name: "Closing Stock", guid: "stock", parent: "Stock-in-Hand", opening: { state: "present", value: "-1000.00" }, debit: { state: "present", value: "-400.00" }, credit: { state: "present_empty" }, closing: { state: "present", value: "-1000.00" }, movements_differ_by: "400.00" },
+          { name: "Short Ledger", guid: "short", parent: "Sundry Debtors", opening: { state: "present", value: "5.00" }, debit: { state: "present_empty" }, credit: { state: "present_empty" }, closing: { state: "present_empty" }, movements_differ_by: "-5.00" },
+        ],
+      },
+    },
+    movements_differ_limitation: limitation,
+  };
+  queueInvoke({ responses: [keyed] });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => root.render(<TrialBalanceScreen config={{ host: "127.0.0.1", port: 9000 }} company={company} liveReadNavigationLocked={false} liveReadSuppressed={false} onChangeSetup={() => {}} onTallyReadActivityChange={() => {}} />));
+  await chooseEndDate(host);
+  await act(async () => button(host, "Refresh report").click());
+  const text = host.textContent ?? "";
+  expect(text).toContain(limitation);
+  expect(text.indexOf(limitation)).toBeLessThan(text.indexOf("Closing total"));
+  const rows = [...host.querySelectorAll("tbody tr")];
+  const stock = rows.find((row) => row.querySelector("th")?.textContent === "Closing Stock");
+  // The gap is the tool's `movements_differ_by` string in Tally's sign, shown with its sign kept
+  // (formatAmount, not the magnitude a debit or credit column shows).
+  expect(stock?.textContent).toContain("₹1,000.00 Dr · does not add up, movements_differ_by ₹400.00 (source signed)");
+  expect(stock?.textContent).toContain(`movements_differ_by ${formatAmount({ state: "present", value: "400.00" }, "₹", 2)} (`);
+  const short = rows.find((row) => row.querySelector("th")?.textContent === "Short Ledger");
+  expect(short?.textContent).toContain(`movements_differ_by ${formatAmount({ state: "present", value: "-5.00" }, "₹", 2)} (source signed)`);
+  // A negative gap keeps its sign, written with the screen's minus sign (U+2212).
+  expect(short?.textContent).toContain("movements_differ_by \u2212₹5.00 (source signed)");
+  const cash = rows.find((row) => row.querySelector("th")?.textContent === "Cash");
+  expect(cash?.textContent).not.toContain("does not add up");
+  await waitForParentDiscovery();
+  root.unmount();
+});
+
+test("shows no movements note or mark when every row adds up", async () => {
+  queueInvoke({ responses: [report] });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => root.render(<TrialBalanceScreen config={{ host: "127.0.0.1", port: 9000 }} company={company} liveReadNavigationLocked={false} liveReadSuppressed={false} onChangeSetup={() => {}} onTallyReadActivityChange={() => {}} />));
+  await chooseEndDate(host);
+  await act(async () => button(host, "Refresh report").click());
+  expect(host.textContent).toContain("Closing total");
+  expect(host.textContent).not.toContain("does not add up");
+  expect(host.querySelector(".trial-balance-movements-note")).toBeNull();
+  await waitForParentDiscovery();
+  root.unmount();
+});
+
 // bridge#709: a several-currency book's read covers its base-currency ledgers
 // only. The screen formats amounts in the identified base (not the first
 // master read), states the scope, names every ledger left out, and never

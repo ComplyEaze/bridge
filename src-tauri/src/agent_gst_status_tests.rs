@@ -376,6 +376,10 @@ fn a_deleted_flag_yes_refuses_a_state_and_only_both_absent_or_both_no_pass() {
 // The request.
 // ---------------------------------------------------------------------------------------------
 
+fn type_name(name: &str) -> read_profiles::GstStatusTypeName {
+    read_profiles::GstStatusTypeName::parse(name).expect("an admitted type name")
+}
+
 #[test]
 fn the_renderer_reproduces_the_request_the_lab_sent_character_for_character() {
     let sent = decode_utf16(AUGUST_REQUEST);
@@ -384,7 +388,7 @@ fn the_renderer_reproduces_the_request_the_lab_sent_character_for_character() {
         LAB_COMPANY,
         &tally_date("20260801"),
         &tally_date("20260831"),
-        LAB_TYPE,
+        &type_name(LAB_TYPE),
     )
     .unwrap();
     assert_eq!(rendered, sent);
@@ -393,7 +397,7 @@ fn the_renderer_reproduces_the_request_the_lab_sent_character_for_character() {
         LAB_COMPANY,
         &tally_date("20260801"),
         &tally_date("20260831"),
-        LAB_TYPE,
+        &type_name(LAB_TYPE),
     )
     .unwrap();
     assert_eq!(request.into_xml(), sent);
@@ -407,7 +411,7 @@ fn the_earlier_request_differs_only_by_the_cancelled_optional_and_post_dated_fie
         LAB_COMPANY,
         &tally_date("20260802"),
         &tally_date("20260803"),
-        LAB_TYPE,
+        &type_name(LAB_TYPE),
     )
     .unwrap();
     assert_ne!(rendered, earlier);
@@ -423,7 +427,7 @@ fn the_earlier_request_differs_only_by_the_cancelled_optional_and_post_dated_fie
 
 #[test]
 fn a_type_name_is_admitted_only_when_it_cannot_break_the_string_literal_it_is_quoted_into() {
-    let safe = read_profiles::gst_status_type_name_literal_safe;
+    let safe = |name: &str| read_profiles::GstStatusTypeName::parse(name).is_some();
     for admitted in [
         "BRIDGE Sales",
         "BRIDGE Sales Z1",
@@ -460,17 +464,36 @@ fn a_type_name_is_admitted_only_when_it_cannot_break_the_string_literal_it_is_qu
     }
 }
 
+/// The renderer takes a parsed name, so an unsafe one never reaches it: the
+/// tool's argument parse refuses it first, as `gst_status_type_name_invalid`.
 #[test]
-fn the_renderer_quotes_the_type_name_and_refuses_an_unsafe_one() {
+fn the_renderer_quotes_the_type_name_and_an_unsafe_one_is_refused_at_the_argument() {
     let (from, to) = (tally_date("20260802"), tally_date("20260803"));
-    let rendered =
-        read_profiles::render_gst_status_window(LAB_COMPANY, &from, &to, "BRIDGE Sales").unwrap();
+    let rendered = read_profiles::render_gst_status_window(
+        LAB_COMPANY,
+        &from,
+        &to,
+        &type_name("BRIDGE Sales"),
+    )
+    .unwrap();
     assert!(
         rendered.contains("AND $VoucherTypeName = \"BRIDGE Sales\"</SYSTEM>"),
         "{rendered}"
     );
+    let code = |name: &str| {
+        let args = serde_json::json!({
+            "company_guid": "g",
+            "from": "2026-08-02",
+            "to": "2026-08-03",
+            "voucher_type_name": name,
+        });
+        super::status_arguments(&args)
+            .err()
+            .map(|failure| failure.code)
+    };
+    // An empty name is refused earlier, as a missing argument.
+    assert_eq!(code(""), Some("voucher_type_name_required".to_string()));
     for refused in [
-        "",
         "a\"b",
         "a\\b",
         "a\u{7}b",
@@ -480,13 +503,8 @@ fn the_renderer_quotes_the_type_name_and_refuses_an_unsafe_one() {
         &"a".repeat(101),
     ] {
         assert_eq!(
-            read_profiles::render_gst_status_window(LAB_COMPANY, &from, &to, refused),
-            Err("gst_status_type_name_invalid".to_string()),
-            "{refused:?}"
-        );
-        assert_eq!(
-            read_profiles::gst_status_read(LAB_COMPANY, &from, &to, refused).map(|_| ()),
-            Err("gst_status_type_name_invalid".to_string()),
+            code(refused),
+            Some("gst_status_type_name_invalid".to_string()),
             "{refused:?}"
         );
     }
@@ -1438,6 +1456,7 @@ fn tool_server(port: u16, directory: &std::path::Path) -> Server {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }

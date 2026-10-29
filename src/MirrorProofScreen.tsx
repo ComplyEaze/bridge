@@ -180,12 +180,20 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
     action: "Some source records were rejected while this run was being read, so they are not in the local mirror. Do not rely on the mirror for this run's records until the cause of the rejection is understood; an unchanged retry is not expected to help.",
     retry: "not_useful",
   },
+  snapshot_commit_refused: {
+    title: "The local mirror refused to commit this run",
+    action: "Resuming will not help: the run's saved batch holds something the mirror will never accept, and the same commit is refused every time. Nothing was lost from the last verified baseline. Start a new read.",
+    retry: "not_useful",
+  },
   adaptive_window_limit_reached: {
     title: "Adaptive window safety limit reached",
     action: "Start a new run for a shorter requested period. ComplyEaze Bridge stopped before growing the durable split graph beyond its reviewed bound.",
     retry: "after_change",
   },
 };
+
+/** The failure code of a run whose commit the local mirror refuses on an invariant. */
+const COMMIT_REFUSED_CODE = "snapshot_commit_refused";
 
 export function guidanceForGap(code: string): GapGuidance {
   return (Object.prototype.hasOwnProperty.call(GAP_GUIDANCE, code) ? GAP_GUIDANCE[code] : undefined) ?? {
@@ -440,7 +448,11 @@ export function MirrorProofScreen({
           <span>{snapshotJob.verification ? `Result: ${formatIdentifier(snapshotJob.verification)}` : "No verification claim yet"}</span>
           {snapshotJob.failure_code && <span>Failure: {guidanceForGap(snapshotJob.failure_code).title}</span>}
           {snapshotJob.requires_resume && (
-            <span>{snapshotJob.resume_available ? "Worker detached: explicit resume required" : "Detached legacy state: inspect only"}</span>
+            <span>{snapshotJob.resume_available
+              ? "Worker detached: explicit resume required"
+              : snapshotJob.failure_code === COMMIT_REFUSED_CODE
+                ? "Commit refused: a resume cannot succeed. Start a new read."
+                : "Detached legacy state: inspect only"}</span>
           )}
         </section>
       )}
@@ -467,7 +479,7 @@ export function MirrorProofScreen({
                     <td>{formatIdentifier(run.pack_id ?? "unknown")}</td>
                     <td>{formatIdentifier(run.phase)}</td>
                     <td>{run.completed_windows}/{run.total_windows}</td>
-                    <td>{run.resume_available ? "Resume available" : run.requires_resume ? "Inspect only" : run.phase === "completed" || run.phase === "partial" || run.phase === "failed" || run.phase === "cancelled" ? "Terminal" : "Active"}</td>
+                    <td>{run.resume_available ? "Resume available" : run.requires_resume ? (run.failure_code === COMMIT_REFUSED_CODE ? "Commit refused" : "Inspect only") : run.phase === "completed" || run.phase === "partial" || run.phase === "failed" || run.phase === "cancelled" ? "Terminal" : "Active"}</td>
                     <td><button className="secondary-action" disabled={tallyAction !== null} onClick={() => setInspectedJob(run)}>Inspect</button></td>
                   </tr>
                 ))}

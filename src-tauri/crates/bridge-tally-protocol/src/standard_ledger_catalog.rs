@@ -57,6 +57,9 @@ pub enum StandardLedgerCatalogError {
     BillWiseFlagInvalid,
     /// A V2 catalogue row carried `ISBILLWISEON` more than once.
     BillWiseFlagRepeated,
+    /// A name-index row's `ALTERID` was absent, empty, repeated or not an
+    /// unsigned decimal number.
+    AlterIdInvalid,
 }
 
 impl std::fmt::Display for StandardLedgerCatalogError {
@@ -74,6 +77,7 @@ impl std::fmt::Display for StandardLedgerCatalogError {
                 "standard ledger catalog row had an unusable bill-wise flag"
             }
             Self::BillWiseFlagRepeated => "standard ledger catalog row repeated its bill-wise flag",
+            Self::AlterIdInvalid => "standard ledger catalog row had an unusable alter id",
         })
     }
 }
@@ -93,6 +97,7 @@ impl StandardLedgerCatalogError {
             Self::BillWiseFlagMissing => "ledger_catalogue_bill_wise_flag_missing",
             Self::BillWiseFlagInvalid => "ledger_catalogue_bill_wise_flag_invalid",
             Self::BillWiseFlagRepeated => "ledger_catalogue_bill_wise_flag_repeated",
+            Self::AlterIdInvalid => "ledger_catalogue_alter_id_invalid",
         }
     }
 }
@@ -131,7 +136,7 @@ pub fn parse_standard_ledger_identity_observation(
                     );
                 }
                 let observed =
-                    parse_standard_ledger_identity_row(&mut reader, &element, false, false)?;
+                    parse_standard_ledger_identity_row(&mut reader, &element, false, RowShape::V1)?;
                 if observed.company_name != expected_company_name {
                     anyhow::bail!(
                         "standard ledger identity collection did not confirm the requested company"
@@ -194,6 +199,12 @@ struct StandardLedgerCatalogEntry {
     /// 13 books, reference 9.4h, not reproducible from this repository); `None` otherwise. The identity is the GUID; neither
     /// spelling is.
     stored_name: Option<String>,
+    /// The names after the first in the first `LANGUAGENAME.LIST`: Tally's
+    /// aliases of this ledger (reference 9.4e, 9.4h), verbatim, each usable as
+    /// a ledger name and different from `name` and `stored_name`. They name
+    /// this ledger but are never its identity, and no request is built from
+    /// one: they only let a caller say which ledger a name belongs to.
+    aliases: Vec<String>,
     guid: String,
     /// The immediate `PARENT` group Tally returned for this ledger, or `None`
     /// when it returned none. A ledger exposes no `PARENTSTRUCTURE`, so this
@@ -218,6 +229,17 @@ impl StandardLedgerCatalog {
         self.entries
             .iter()
             .map(|entry| (entry.name.as_str(), entry.stored_name.as_deref()))
+    }
+
+    /// Every alias of every ledger, each paired with the row spelling of the
+    /// ledger that carries it. A ledger with no alias yields nothing.
+    pub fn aliases(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.entries.iter().flat_map(|entry| {
+            entry
+                .aliases
+                .iter()
+                .map(|alias| (entry.name.as_str(), alias.as_str()))
+        })
     }
 
     /// Each ledger paired with the immediate parent group Tally returned for
@@ -327,9 +349,9 @@ pub fn parse_standard_ledger_catalog_v2_with_identities(
 ) -> Result<StandardLedgerCatalogV2, StandardLedgerCatalogError> {
     let rows = parse_standard_ledger_catalog_rows(
         xml,
-        expected_company_name,
+        Some(expected_company_name),
         expected_company_guid,
-        true,
+        RowShape::V2,
     )?;
     let flags = rows
         .iter()
@@ -404,9 +426,9 @@ pub fn parse_standard_ledger_catalog_with_identities(
 ) -> Result<StandardLedgerCatalog, StandardLedgerCatalogError> {
     let rows = parse_standard_ledger_catalog_rows(
         xml,
-        expected_company_name,
+        Some(expected_company_name),
         expected_company_guid,
-        false,
+        RowShape::V1,
     )?;
     Ok(catalog_from_rows(rows))
 }
@@ -415,19 +437,37 @@ fn catalog_from_rows(rows: Vec<StandardLedgerCatalogRow>) -> StandardLedgerCatal
     StandardLedgerCatalog {
         entries: rows
             .into_iter()
-            .map(|row| StandardLedgerCatalogEntry {
-                stored_name: row.stored_name.filter(|stored| *stored != row.ledger.name),
-                name: row.ledger.name,
-                guid: row.guid,
-                parent: row
-                    .ledger
-                    .parent
-                    .nonempty_returned_text()
-                    .map(str::to_string),
-                parent_unsupported: row.parent_unsupported,
+            .map(|row| {
+                let aliases =
+                    distinct_aliases(row.aliases, &row.ledger.name, row.stored_name.as_deref());
+                StandardLedgerCatalogEntry {
+                    stored_name: row.stored_name.filter(|stored| *stored != row.ledger.name),
+                    aliases,
+                    name: row.ledger.name,
+                    guid: row.guid,
+                    parent: row
+                        .ledger
+                        .parent
+                        .nonempty_returned_text()
+                        .map(str::to_string),
+                    parent_unsupported: row.parent_unsupported,
+                }
             })
             .collect(),
     }
+}
+
+/// The aliases a ledger keeps: each once, in the order Tally listed them, and
+/// none that is the ledger's row spelling or its own name (a name the ledger
+/// already answers to is not an alias of it).
+fn distinct_aliases(listed: Vec<String>, name: &str, stored_name: Option<&str>) -> Vec<String> {
+    let mut kept = Vec::<String>::new();
+    for alias in listed {
+        if alias != name && Some(alias.as_str()) != stored_name && !kept.contains(&alias) {
+            kept.push(alias);
+        }
+    }
+    kept
 }
 
 /// Parses the documented `List of Ledgers` collection as a deliberately
@@ -440,13 +480,76 @@ pub fn parse_standard_ledger_catalog(
 ) -> Result<Vec<TallyLedger>, StandardLedgerCatalogError> {
     Ok(parse_standard_ledger_catalog_rows(
         xml,
-        expected_company_name,
+        Some(expected_company_name),
         expected_company_guid,
-        false,
+        RowShape::V1,
     )?
     .into_iter()
     .map(|row| row.ledger)
     .collect())
+}
+
+/// One ledger of the name index a ledger Create is checked against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LedgerNameRow {
+    /// Every `NAME` of every `NAME.LIST` under the row's `LANGUAGENAME.LIST`
+    /// elements, in document order: the stored name first, then the aliases.
+    /// Never empty. Verbatim, as Tally wrote them; the caller folds.
+    pub names: Vec<String>,
+    /// The row's `NAME` attribute when it is none of `names`. Tally leaves it
+    /// at the old spelling, until it restarts, when a Create it resolved to
+    /// this ledger rewrites the stored name
+    /// (`tests/fixtures/agent/masters-lab.PROVENANCE.md`), so the book may
+    /// still answer to it.
+    pub row_spelling: Option<String>,
+    /// A reserved ledger's built-in name (`RESERVEDNAME`) when it is neither
+    /// one of `names` nor the row spelling: the name a user renamed it from,
+    /// which the book may still answer to (not measured).
+    pub reserved_name: Option<String>,
+    /// The ledger's own `GUID`, unique across the answer.
+    pub guid: String,
+    /// The ledger's `ALTERID`.
+    pub alter_id: u64,
+}
+
+/// Parses the V3 catalogue answer ([`crate::ReadOnlyProfile::StandardLedgerCatalogV3`])
+/// into the ledgers a new ledger's name is checked against, refusing what the
+/// V1 and V2 parsers would pass where a gap could hide a name: a row without an
+/// `ALTERID` or a `LANGUAGENAME.LIST`, an empty or unusable name or alias, and
+/// anything but names or markup inside a `NAME.LIST`. A refused answer is no
+/// index, so the caller refuses the write. The company is bound by its GUID on
+/// every row. What it cannot check is that the answer holds every ledger:
+/// nothing in it states a row count (its `CMPINFO` `LEDGER` figure is not one),
+/// so a ledger Tally left out of the collection would read as absent.
+pub fn parse_ledger_name_index(
+    xml: &str,
+    expected_company_guid: &str,
+) -> Result<Vec<LedgerNameRow>, StandardLedgerCatalogError> {
+    parse_standard_ledger_catalog_rows(xml, None, expected_company_guid, RowShape::NameIndex)?
+        .into_iter()
+        .map(|row| {
+            row.bill_wise
+                .ok_or(StandardLedgerCatalogError::BillWiseFlagMissing)?;
+            let alter_id = row
+                .alter_id
+                .ok_or(StandardLedgerCatalogError::AlterIdInvalid)?;
+            if row.listed_names.is_empty() {
+                return Err(StandardLedgerCatalogError::LedgerNameUnusable);
+            }
+            let row_spelling =
+                (!row.listed_names.contains(&row.ledger.name)).then_some(row.ledger.name);
+            let reserved_name = row.reserved_name.filter(|reserved| {
+                !row.listed_names.contains(reserved) && row_spelling.as_ref() != Some(reserved)
+            });
+            Ok(LedgerNameRow {
+                names: row.listed_names,
+                row_spelling,
+                reserved_name,
+                guid: row.guid,
+                alter_id,
+            })
+        })
+        .collect()
 }
 
 /// The ledger GUIDs of one slice of the census (`crate::ledger_census`): the
@@ -607,17 +710,44 @@ fn parse_ledger_census_row(
 struct StandardLedgerCatalogRow {
     ledger: TallyLedger,
     stored_name: Option<String>,
+    aliases: Vec<String>,
     guid: String,
     parent_unsupported: bool,
     /// `None` for V1; a V2 parse refuses a row without one in the row parser.
     bill_wise: Option<BillWiseFlag>,
+    /// The name index's `ALTERID`; `None` for every other shape.
+    alter_id: Option<u64>,
+    /// The name index's names, in document order; empty for every other shape.
+    listed_names: Vec<String>,
+    /// The name index's non-empty `RESERVEDNAME`; `None` for every other shape.
+    reserved_name: Option<String>,
 }
 
+/// Which catalogue request a body answers, and so which row fields it must
+/// carry beyond the V1 identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RowShape {
+    V1,
+    /// One `ISBILLWISEON` per row.
+    V2,
+    /// The V3 request ([`parse_ledger_name_index`]): V2, one `ALTERID` per row,
+    /// and every name of every `LANGUAGENAME.LIST`, read strictly.
+    NameIndex,
+}
+
+impl RowShape {
+    fn reads_bill_wise(self) -> bool {
+        self != Self::V1
+    }
+}
+
+/// `expected_company_name` is `None` only for the name index, which binds the
+/// company by GUID as the group index does.
 fn parse_standard_ledger_catalog_rows(
     xml: &str,
-    expected_company_name: &str,
+    expected_company_name: Option<&str>,
     expected_company_guid: &str,
-    read_bill_wise: bool,
+    shape: RowShape,
 ) -> Result<Vec<StandardLedgerCatalogRow>, StandardLedgerCatalogError> {
     // The one rule every Tally read applies first (§1.1(d)): ledger names and
     // parents here must spell a forbidden reference exactly as the voucher
@@ -627,7 +757,9 @@ fn parse_standard_ledger_catalog_rows(
     let marked = crate::mark_forbidden_numeric_references(xml);
     let xml = marked.as_ref();
     validate_export_response(xml).map_err(|_| StandardLedgerCatalogError::MalformedResponse)?;
-    let expected_company_name = normalized_standard_value(expected_company_name, "company name")
+    let expected_company_name = expected_company_name
+        .map(|name| normalized_standard_value(name, "company name"))
+        .transpose()
         .map_err(|_| StandardLedgerCatalogError::BoundsViolation)?;
     let expected_company_guid = normalized_standard_company_guid(expected_company_guid)
         .map_err(|_| StandardLedgerCatalogError::BoundsViolation)?;
@@ -653,14 +785,16 @@ fn parse_standard_ledger_catalog_rows(
                 // malformed response, and saying so sent a previous diagnosis
                 // at the transport for three rounds.
                 let observed =
-                    parse_standard_ledger_identity_row(&mut reader, &element, true, read_bill_wise)
+                    parse_standard_ledger_identity_row(&mut reader, &element, true, shape)
                         .map_err(|error| {
                             error
                                 .downcast_ref::<StandardLedgerCatalogError>()
                                 .copied()
                                 .unwrap_or(StandardLedgerCatalogError::MalformedResponse)
                         })?;
-                if observed.company_name != expected_company_name
+                if expected_company_name
+                    .as_ref()
+                    .is_some_and(|expected| observed.company_name != *expected)
                     || !observed
                         .company_guid
                         .eq_ignore_ascii_case(&expected_company_guid)
@@ -686,15 +820,32 @@ fn parse_standard_ledger_catalog_rows(
                         opening_balance: None,
                     },
                     stored_name: observed.stored_name,
+                    aliases: observed.aliases,
                     guid: ledger_guid,
                     parent_unsupported: observed.parent_unsupported,
                     bill_wise: observed.bill_wise,
+                    alter_id: observed.alter_id,
+                    listed_names: observed.listed_names,
+                    reserved_name: observed.reserved_name,
                 });
             }
             Event::Start(element) => {
-                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
+                if shape == RowShape::NameIndex && ledger_outside_collection(&path, &name) {
+                    return Err(StandardLedgerCatalogError::MalformedResponse);
+                }
+                path.push(name)
             }
             Event::Empty(_) if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) => {
+                return Err(StandardLedgerCatalogError::MalformedResponse);
+            }
+            Event::Empty(element)
+                if shape == RowShape::NameIndex
+                    && ledger_outside_collection(
+                        &path,
+                        &element.name().as_ref().as_bytes().to_ascii_uppercase(),
+                    ) =>
+            {
                 return Err(StandardLedgerCatalogError::MalformedResponse);
             }
             Event::End(element) => pop_expected_path(&mut path, element.name().as_ref().as_bytes())
@@ -710,6 +861,18 @@ fn parse_standard_ledger_catalog_rows(
     }
 }
 
+/// Whether a `LEDGER` element at `path` is somewhere the name-index walk would
+/// step over it: anywhere but the collection, whose rows are read, and the
+/// `CMPINFO` block, whose bare `<LEDGER>` figure is a counter and not a row. A
+/// ledger the walk skipped would read as absent, and a Create of its name would
+/// alter it, so the answer is refused instead, as the group index refuses a
+/// stray `GROUP`.
+fn ledger_outside_collection(path: &[Vec<u8>], name: &[u8]) -> bool {
+    name == b"LEDGER"
+        && !path_eq(path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
+        && !path_eq(path, &[b"ENVELOPE", b"BODY", b"DESC", b"CMPINFO"])
+}
+
 struct StandardLedgerIdentityRow {
     company_name: String,
     company_guid: String,
@@ -717,25 +880,38 @@ struct StandardLedgerIdentityRow {
     /// The first `NAME` of the first `LANGUAGENAME.LIST`, read only when the
     /// row's own name is wanted; see [`walk_standard_ledger_identity_child`].
     stored_name: Option<String>,
+    /// Every later `NAME` of the same list: the ledger's aliases, as read.
+    aliases: Vec<String>,
     ledger_guid: Option<String>,
     parent: PartyLedgerMasterFieldObservation,
     parent_unsupported: bool,
     bill_wise: Option<BillWiseFlag>,
+    alter_id: Option<u64>,
+    listed_names: Vec<String>,
+    reserved_name: Option<String>,
 }
 
-/// `read_bill_wise` is the V2 shape: the row must carry one `ISBILLWISEON`.
+/// `shape` V2 or later: the row must carry one `ISBILLWISEON`.
 /// Without it, that element is as unexpected as any other field, so a V2 body
 /// fails the V1 parse as surely as a V1 body fails the V2 one.
 fn parse_standard_ledger_identity_row(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
     include_ledger_name: bool,
-    read_bill_wise: bool,
+    shape: RowShape,
 ) -> anyhow::Result<StandardLedgerIdentityRow> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
     let mut ledger_name = include_ledger_name
         .then(|| attr_value(element, b"NAME"))
         .flatten()
+        .map(|value| observed_standard_ledger_name(&value))
+        .transpose()?;
+    // The name index also keeps a reserved ledger's built-in name, which the
+    // book may still answer to after the ledger is renamed.
+    let reserved_name = (shape == RowShape::NameIndex)
+        .then(|| attr_value(element, b"RESERVEDNAME"))
+        .flatten()
+        .filter(|value| !value.trim().is_empty())
         .map(|value| observed_standard_ledger_name(&value))
         .transpose()?;
     let row_name = element.name().as_ref().as_bytes().to_ascii_uppercase();
@@ -745,15 +921,18 @@ fn parse_standard_ledger_identity_row(
     let mut parent = PartyLedgerMasterFieldObservation::NotObserved;
     let mut parent_seen = false;
     let mut parent_unsupported = false;
-    let mut stored_name = None;
+    let mut language_names = LanguageNames::default();
     let mut language_list_seen = false;
     let mut bill_wise = None::<BillWiseFlag>;
+    let mut alter_id = None::<u64>;
+    let mut listed_names = Vec::new();
+    let name_index = shape == RowShape::NameIndex;
     loop {
         match reader.read_event()? {
             Event::Start(child) => {
                 let child_name = child.name().as_ref().as_bytes().to_ascii_uppercase();
                 match child_name.as_slice() {
-                    b"ISBILLWISEON" if read_bill_wise => {
+                    b"ISBILLWISEON" if shape.reads_bill_wise() => {
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         // Every flag seen live is a Logical (§12a.15): a flag of
                         // another type, or with no type, is not read as one.
@@ -764,6 +943,15 @@ fn parse_standard_ledger_identity_row(
                             .ok_or(StandardLedgerCatalogError::BillWiseFlagInvalid)?;
                         if bill_wise.replace(BillWiseFlag::parse(&text)?).is_some() {
                             return Err(StandardLedgerCatalogError::BillWiseFlagRepeated.into());
+                        }
+                    }
+                    b"ALTERID" if name_index => {
+                        validate_only_attributes(&child, &[b"TYPE"])?;
+                        let value = read_optional_text(reader, child.name())?
+                            .and_then(|text| parse_alter_id(&text))
+                            .ok_or(StandardLedgerCatalogError::AlterIdInvalid)?;
+                        if alter_id.replace(value).is_some() {
+                            return Err(StandardLedgerCatalogError::AlterIdInvalid.into());
                         }
                     }
                     b"NAME" if include_ledger_name => {
@@ -854,11 +1042,19 @@ fn parse_standard_ledger_identity_row(
                             child.name().as_ref().as_bytes().to_ascii_uppercase(),
                         )?;
                     }
+                    // The name index takes every name of every list: each is a
+                    // spelling a new ledger must not collide with.
+                    b"LANGUAGENAME.LIST" if include_ledger_name && name_index => {
+                        listed_names.extend(walk_name_index_language_list(
+                            reader,
+                            child.name().as_ref().as_bytes(),
+                        )?);
+                    }
                     // Only the first list can name the ledger: a later list, and
                     // every `NAME` after the first in it, is an alias.
                     b"LANGUAGENAME.LIST" if include_ledger_name && !language_list_seen => {
                         language_list_seen = true;
-                        stored_name = walk_standard_ledger_identity_child(
+                        language_names = walk_standard_ledger_identity_child(
                             reader,
                             child.name().as_ref().as_bytes().to_ascii_uppercase(),
                             true,
@@ -893,9 +1089,15 @@ fn parse_standard_ledger_identity_row(
                 parent = PartyLedgerMasterFieldObservation::Returned(String::new());
             }
             Event::Empty(child)
-                if read_bill_wise && child.name().as_ref().eq_ignore_ascii_case("ISBILLWISEON") =>
+                if shape.reads_bill_wise()
+                    && child.name().as_ref().eq_ignore_ascii_case("ISBILLWISEON") =>
             {
                 return Err(StandardLedgerCatalogError::BillWiseFlagInvalid.into());
+            }
+            Event::Empty(child)
+                if name_index && child.name().as_ref().eq_ignore_ascii_case("ALTERID") =>
+            {
+                return Err(StandardLedgerCatalogError::AlterIdInvalid.into());
             }
             Event::Empty(_) => {
                 anyhow::bail!("standard ledger identity collection contained an empty row field")
@@ -922,12 +1124,94 @@ fn parse_standard_ledger_identity_row(
             anyhow::anyhow!("standard ledger identity collection omitted computed company GUID")
         })?,
         ledger_name,
-        stored_name,
+        stored_name: language_names.stored_name,
+        aliases: language_names.aliases,
         ledger_guid,
         parent,
         parent_unsupported,
         bill_wise,
+        alter_id,
+        listed_names,
+        reserved_name,
     })
+}
+
+/// Walks one `LANGUAGENAME.LIST` of a name-index row to its closing tag and
+/// returns every `NAME` of its one `NAME.LIST`, verbatim, in document order.
+/// It fails closed where the lenient walk below leaves a name unread: an empty
+/// or unusable name, a second `NAME.LIST`, or any element but `NAME.LIST` and
+/// `LANGUAGEID` in the list, or but `NAME` in the `NAME.LIST`.
+fn walk_name_index_language_list(
+    reader: &mut Reader<&[u8]>,
+    list_name: &[u8],
+) -> anyhow::Result<Vec<String>> {
+    let mut names = Vec::new();
+    let mut name_lists = 0_u32;
+    loop {
+        match reader.read_event()? {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("NAME.LIST") => {
+                validate_only_attributes(&child, &[b"TYPE"])?;
+                name_lists += 1;
+                loop {
+                    match reader.read_event()? {
+                        Event::Start(name) if name.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                            validate_only_attributes(&name, &[b"TYPE"])?;
+                            // Raw text first: markup or CDATA inside a name would
+                            // otherwise become part of a name no key can match.
+                            let raw = reader.read_text(name.name())?;
+                            if raw.contains('<') {
+                                return Err(StandardLedgerCatalogError::LedgerNameUnusable.into());
+                            }
+                            let value = quick_xml::escape::unescape(&raw)?;
+                            if value.trim().is_empty() {
+                                return Err(StandardLedgerCatalogError::LedgerNameUnusable.into());
+                            }
+                            names.push(observed_standard_ledger_name(&value)?);
+                        }
+                        Event::Empty(name) if name.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                            return Err(StandardLedgerCatalogError::LedgerNameUnusable.into());
+                        }
+                        Event::End(end)
+                            if end.name().as_ref().eq_ignore_ascii_case("NAME.LIST") =>
+                        {
+                            break;
+                        }
+                        Event::Comment(_) => {}
+                        _ => anyhow::bail!("ledger name index NAME.LIST held more than names"),
+                    }
+                }
+            }
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("LANGUAGEID") => {
+                validate_only_attributes(&child, &[b"TYPE"])?;
+                read_optional_text(reader, child.name())?;
+            }
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(list_name) =>
+            {
+                break
+            }
+            Event::Comment(_) => {}
+            _ => anyhow::bail!("ledger name index LANGUAGENAME.LIST held an unexpected field"),
+        }
+    }
+    if name_lists != 1 || names.is_empty() {
+        return Err(StandardLedgerCatalogError::LedgerNameUnusable.into());
+    }
+    Ok(names)
+}
+
+/// An unsigned decimal integer, as Tally writes an `ALTERID` (the captures
+/// carry a leading space, trimmed by the reader): digits only.
+fn parse_alter_id(text: &str) -> Option<u64> {
+    let digits = text.trim();
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    digits.parse().ok()
 }
 
 fn skip_standard_ledger_identity_child(
@@ -937,21 +1221,31 @@ fn skip_standard_ledger_identity_child(
     walk_standard_ledger_identity_child(reader, expected_name, false).map(|_| ())
 }
 
+/// The names a first `LANGUAGENAME.LIST` carries: the ledger's own name (its
+/// first `NAME`) and the later ones, which are aliases.
+#[derive(Debug, Default)]
+struct LanguageNames {
+    stored_name: Option<String>,
+    aliases: Vec<String>,
+}
+
 /// Walks one row child to its closing tag, as a skip does. With
 /// `capture_stored_name` it also returns the ledger's own name: the first
 /// `NAME` of the first `NAME.LIST` under `LANGUAGENAME.LIST`, read verbatim
 /// like the row's `NAME` attribute (reference 9.4h). Later names are aliases
-/// and are never identity. A first name that is empty, self-closing, not
-/// decodable or unusable as a ledger name leaves `None`, so the ledger keeps
-/// its row spelling, no alias is promoted, and the walk fails no read the skip
-/// used to pass: only the XML structure can fail it, as it could before.
+/// and are never identity: they are returned beside it, each read like the
+/// first and dropped when empty, not decodable or unusable as a ledger name. A
+/// first name that is empty, self-closing, not decodable or unusable as a
+/// ledger name leaves `None`, so the ledger keeps its row spelling, no alias is
+/// promoted, and the walk fails no read the skip used to pass: only the XML
+/// structure can fail it, as it could before.
 fn walk_standard_ledger_identity_child(
     reader: &mut Reader<&[u8]>,
     expected_name: Vec<u8>,
     capture_stored_name: bool,
-) -> anyhow::Result<Option<String>> {
+) -> anyhow::Result<LanguageNames> {
     let mut depth = 1_u32;
-    let mut stored_name = None;
+    let mut names = LanguageNames::default();
     let mut first_name_seen = false;
     let mut in_name_list = false;
     loop {
@@ -967,11 +1261,17 @@ fn walk_standard_ledger_identity_child(
                 // Not `read_identifier_text`: its `?` on a bad entity would refuse the
                 // whole catalogue for a name this walk can simply leave unread.
                 let raw = reader.read_text(child.name())?;
-                stored_name = quick_xml::escape::unescape(&raw)
-                    .ok()
-                    .map(|v| v.into_owned())
-                    .filter(|value| !value.trim().is_empty())
-                    .and_then(|value| observed_standard_ledger_name(&value).ok());
+                names.stored_name = usable_language_name(&raw);
+            }
+            Event::Start(child)
+                if capture_stored_name
+                    && depth == 2
+                    && in_name_list
+                    && first_name_seen
+                    && child.name().as_ref().eq_ignore_ascii_case("NAME") =>
+            {
+                let raw = reader.read_text(child.name())?;
+                names.aliases.extend(usable_language_name(&raw));
             }
             Event::Empty(child)
                 if capture_stored_name
@@ -1017,7 +1317,7 @@ fn walk_standard_ledger_identity_child(
                             "standard ledger identity collection closed an unexpected field"
                         );
                     }
-                    return Ok(stored_name);
+                    return Ok(names);
                 }
             }
             Event::DocType(_) | Event::PI(_) => {
@@ -1031,6 +1331,16 @@ fn walk_standard_ledger_identity_child(
             _ => {}
         }
     }
+}
+
+/// A language name as text: unescaped, not blank and usable as a ledger name,
+/// else `None`. Never an error: a name this walk cannot use is left unread.
+fn usable_language_name(raw: &str) -> Option<String> {
+    quick_xml::escape::unescape(raw)
+        .ok()
+        .map(|value| value.into_owned())
+        .filter(|value| !value.trim().is_empty())
+        .and_then(|value| observed_standard_ledger_name(&value).ok())
 }
 
 /// A ledger name is an **identity** value, not a display string: it is matched

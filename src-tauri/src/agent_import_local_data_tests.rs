@@ -120,6 +120,27 @@ fn a_lock_folder_outside_the_data_folder_is_counted_too_and_not_twice() {
     assert_eq!(class(&both, "locks").files, 3, "every lock folder");
 }
 
+/// A lab folder that is a link is not entered, so a kept read below the link's
+/// target is not counted either.
+#[cfg(unix)]
+#[test]
+fn a_kept_audit_read_behind_a_linked_lab_folder_is_not_counted() {
+    let directory = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    write(
+        &outside
+            .path()
+            .join("audit-reads")
+            .join("a".repeat(64))
+            .join("manifest.json"),
+        b"12",
+    );
+    std::os::unix::fs::symlink(outside.path(), directory.path().join("lab")).unwrap();
+    let report = build(directory.path(), &[]);
+    assert_eq!(*class(&report, "lab"), Class::default());
+    assert_eq!(report.folders_not_read, ["lab"]);
+}
+
 #[cfg(unix)]
 #[test]
 fn a_symlink_is_counted_and_never_followed() {
@@ -266,6 +287,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled: 1,
             unsettled_no_response: 1,
             unsettled_binding_refused: 0,
+            unsettled_reviewed: 0,
             no_dispatch_never_verified: 0
         })
     );
@@ -278,6 +300,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled: 0,
             unsettled_no_response: 0,
             unsettled_binding_refused: 0,
+            unsettled_reviewed: 0,
             no_dispatch_never_verified: 1
         })
     );
@@ -295,6 +318,7 @@ fn a_refused_binding_is_its_own_class_of_unsettled_batch() {
         unsettled: 3,
         unsettled_no_response: 1,
         unsettled_binding_refused: 1,
+        unsettled_reviewed: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
@@ -381,6 +405,7 @@ fn server_over(directory: &Path) -> crate::agent::Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -625,6 +650,26 @@ fn the_exit_status_is_zero_only_for_a_complete_report() {
     assert_eq!(exit_status(&report, true), 0);
 }
 
+/// An audit read a lab build kept is counted file by file as `lab`, its
+/// manifest and every part, not as one folder with nothing in it.
+#[test]
+fn a_kept_audit_read_is_counted_with_its_files_and_bytes() {
+    let directory = tempfile::tempdir().unwrap();
+    let read = directory
+        .path()
+        .join("lab")
+        .join("audit-reads")
+        .join("a".repeat(64));
+    write(&read.join("manifest.json"), b"12");
+    write(&read.join("parts").join("ledgers.xml"), b"345");
+    write(&read.join("parts").join("vouchers-2025-04-01.xml"), b"6789");
+    write(&directory.path().join("lab").join("x.request.xml"), b"1");
+    let report = build(directory.path(), &[]);
+    assert_eq!(class(&report, "lab").files, 4);
+    assert_eq!(class(&report, "lab").bytes, 10);
+    assert_eq!(report.other_directories, 0);
+}
+
 /// A folder with more entries than the cap is listed up to the cap and reported
 /// as capped, not as complete.
 #[test]
@@ -747,9 +792,14 @@ fn master_journal_text(verdict: bool, truncated: bool) -> String {
         "items": [{"name": "Synthetic One", "guid": sentinel_uuid(0x15ab).to_string(),
             "reason": null}]
     });
+    // A verified create rests on Tally's answer, recorded before the verdict.
+    let response = serde_json::json!({
+        "record_type": "master_dispatch_response", "batch_id": id, "batch_sha256": sha,
+        "response_sha256": "d".repeat(64), "counters": null
+    });
     let mut text = format!("{batch}\n{intent}\n");
     if verdict {
-        text.push_str(&format!("{verdict_line}\n"));
+        text.push_str(&format!("{response}\n{verdict_line}\n"));
     }
     if truncated {
         text.pop();
@@ -812,4 +862,26 @@ fn a_stage_left_beside_a_sidecar_is_counted_with_the_journal() {
     let report = build(root, &[]);
     assert_eq!(*class(&report, "journal"), Class { files: 1, bytes: 3 });
     assert_eq!(*class(&report, "other"), Class { files: 0, bytes: 0 });
+}
+
+/// A batch a person reviewed while it was matched by content only is counted
+/// in its own class, and in no other class of unsettled batch (#1039).
+#[test]
+fn a_reviewed_batch_is_its_own_class_of_unsettled_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 5,
+        sent_or_found: 5,
+        unsettled: 4,
+        unsettled_no_response: 1,
+        unsettled_binding_refused: 1,
+        unsettled_reviewed: 1,
+        no_dispatch_never_verified: 0,
+    });
+    let journal = &to_json(&report, SystemTime::now(), None)["journal"];
+    assert_eq!(journal["not_settled"], 4);
+    assert_eq!(journal["not_settled_reviewed_not_attributed"], 1);
+    assert_eq!(journal["not_settled_binding_refused"], 1);
+    assert_eq!(journal["not_settled_not_verified"], 1);
 }

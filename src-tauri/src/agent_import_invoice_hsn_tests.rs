@@ -238,6 +238,11 @@ fn the_row_in_force_is_the_latest_not_after_the_date() {
         step(vec![own("20260901", "998345")], DATE),
         HsnStep::Refused(NOT_MEASURED)
     );
+    // Eight digits that name no calendar day are no date (#2009).
+    assert_eq!(
+        step(vec![own("20251340", "998344")], DATE),
+        HsnStep::Refused(NOT_MEASURED)
+    );
 }
 
 /// Every row shape the lab did not answer refuses under its own code.

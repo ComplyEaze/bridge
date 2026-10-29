@@ -1,0 +1,4 @@
+src-tauri/src/sync/coordinator.rs
+src-tauri/src/sync/snapshot.rs
+src/MirrorProofScreen.tsx
+reviewer: lamemustafa

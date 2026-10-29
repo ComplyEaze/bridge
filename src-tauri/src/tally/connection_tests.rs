@@ -1810,6 +1810,82 @@ fn a_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     assert!(!super::compliance_estimate_unverified(with + 1, WithGstDetails).fits);
 }
 
+/// The read that names the mailing details (`include_mailing_details`, the workbook) is
+/// sized by its own estimate, above the shared one the registers keep and below
+/// the GST details read's; the limits are the constants' own quotients (#1490).
+#[test]
+fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
+    use super::ComplianceRead::{Standard, WithGstDetails, WithMailingDetails};
+    assert_eq!(
+        super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED,
+        5_000
+    );
+    // The figure stays above the largest row measured with the list named: the party with two
+    // dated entries (TallyPrime 7.2, 4,902 UTF-16 bytes), so a read of rows no larger than that
+    // stays under the budget it is divided from, with room for the response's envelope. It is
+    // not a bound on a row (#1490).
+    const {
+        assert!(super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED >= 4_902);
+    }
+    let standard = super::compliance_master_ledgers_per_read(Standard);
+    let mailing = super::compliance_master_ledgers_per_read(WithMailingDetails);
+    let details = super::compliance_master_ledgers_per_read(WithGstDetails);
+    assert_eq!(
+        (standard, mailing, details),
+        (4_266, 3_200, 2_000),
+        "the registers keep their limit; the others are the budget over their own estimates"
+    );
+    // A mark the registers admit is counted first when the mailing details are named.
+    assert_eq!(
+        super::admit_compliance_master_read(standard, None, Standard).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(mailing, None, WithMailingDetails).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(mailing + 1, None, WithMailingDetails).unwrap(),
+        super::ComplianceAdmission::CountFirst
+    );
+    assert_eq!(
+        super::parent_partition_limits(WithMailingDetails).max_ledgers_per_part,
+        mailing
+    );
+}
+
+/// The party/ledger master export asks for the mailing details only where the whole read
+/// fits their bound, so a book the standard request read before is never refused for the
+/// larger per-ledger estimate: a mark inside 3,200 is sent the mailing request, any larger
+/// mark (a group of 3,201 to 4,266 ledgers included) the standard one, and no other kind of
+/// read is changed (#1490).
+#[test]
+fn the_export_gives_up_the_mailing_details_for_a_book_past_their_bound() {
+    use super::ComplianceRead::{
+        Standard, WithGstDetails, WithMailingDetails, WithMailingDetailsWhereWholeReadFits as Ask,
+    };
+    let bound = super::compliance_master_ledgers_per_read(WithMailingDetails);
+    assert_eq!(bound, 3_200);
+    assert_eq!(Ask.resolved_for_mark(0), WithMailingDetails);
+    assert_eq!(Ask.resolved_for_mark(bound), WithMailingDetails);
+    assert_eq!(Ask.resolved_for_mark(bound + 1), Standard);
+    // The standard read admits 4,266 ledgers whole; none of them is refused on this path.
+    let standard_bound = super::compliance_master_ledgers_per_read(Standard);
+    assert_eq!(standard_bound, 4_266);
+    for mark in [bound + 1, standard_bound, standard_bound + 1, 400_000] {
+        let resolved = Ask.resolved_for_mark(mark);
+        assert_eq!(resolved, Standard, "mark {mark}");
+        assert_eq!(
+            super::admit_compliance_master_read(mark, None, resolved).is_ok(),
+            super::admit_compliance_master_read(mark, None, Standard).is_ok(),
+            "mark {mark}: the same admission as a standard read"
+        );
+    }
+    for other in [Standard, WithMailingDetails, WithGstDetails] {
+        assert_eq!(other.resolved_for_mark(bound + 1), other);
+    }
+}
+
 /// A book read in parts is split by the read's own ledger bound; every other
 /// limit is the shared one.
 #[test]

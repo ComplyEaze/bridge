@@ -101,7 +101,7 @@ pub enum CashAnswer {
     /// D1: from our own cash box. A Contra that can drive the cash book
     /// negative, so refused until the cash-book projection is built.
     OwnCashBox,
-    /// D2: cash sales not yet recorded. Refused: record them first.
+    /// D2: cash sales not yet recorded. Refused; `dont_know` instead.
     UnbookedCashSales,
     /// D3: a customer paid it in. Receipt, Dr bank, Cr the named customer.
     CustomerPaidIn,
@@ -175,13 +175,13 @@ impl CashAnswer {
     pub fn not_built(self) -> Option<&'static str> {
         match self {
             Self::PaidToSomeone => Some(
-                "cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; record it by hand, or answer dont_know so it posts to suspense for the CA",
+                "cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move",
             ),
             Self::OwnCashBox => Some(
-                "a deposit from the cash box is a Contra that can drive the cash book negative, and ComplyEaze Bridge cannot yet check the cash book's balance first; record it by hand, or answer dont_know so it posts to suspense for the CA",
+                "a deposit from the cash box is a Contra that can drive the cash book negative, and ComplyEaze Bridge cannot yet check the cash book's balance first; answer dont_know and the line is built to the suspense ledger, marked for the CA to move",
             ),
             Self::UnbookedCashSales => Some(
-                "record those cash sales or collections in Tally first; the deposit itself is then a Contra from the cash box, which ComplyEaze Bridge does not build yet",
+                "the cash sales or collections behind this deposit are not in the books, and ComplyEaze Bridge does not build those sales, or the Contra from the cash box, yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move",
             ),
             _ => None,
         }

@@ -27,6 +27,8 @@ fn remote_and_url_shaped_hosts_are_rejected() {
     for host in [
         "",
         "http://localhost",
+        "https://localhost",
+        "https://127.0.0.1:9000",
         "localhost/path",
         "user@localhost",
         "192.168.1.10",

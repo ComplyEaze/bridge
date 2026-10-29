@@ -512,6 +512,7 @@ async fn the_tool_needs_the_posting_opt_in() {
     let directory = tempfile::tempdir().unwrap();
     let server = Server::new(crate::agent::Settings {
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
         ..server_at(simulator.address(), directory.path())
             .settings
@@ -1310,7 +1311,7 @@ async fn a_review_of_the_captured_50_voucher_batch_binds_every_voucher() {
     for shown in [
         "Record that you reviewed 50 vouchers in \"BRIDGE AMEND LAB\"",
         "its voucher mark moved by 51 (from 1419 to 1470); Tally reported creating 50.",
-        "Dates: 20260401 to 20260401  ALTERIDs: 1420 to 1469",
+        "Dates: 1-Apr-2026 to 1-Apr-2026  ALTERIDs: 1420 to 1469",
         "Dr 1275  Cr 0  50 entries  \"Test Expense B\"",
         "Dr 0  Cr 1275  50 entries  \"Cash\"",
         "I reviewed these 50 vouchers in Tally.",

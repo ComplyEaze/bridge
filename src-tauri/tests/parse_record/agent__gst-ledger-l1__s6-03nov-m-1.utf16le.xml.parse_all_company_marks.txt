@@ -1,0 +1,11 @@
+# fixture: agent/gst-ledger-l1/s6-03nov-m-1.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE GST LEDGER LAB",
+        guid: "aae372c5-a894-491c-8843-5532e43d2d2f",
+        vouchers: 64,
+        masters: 225,
+    },
+])

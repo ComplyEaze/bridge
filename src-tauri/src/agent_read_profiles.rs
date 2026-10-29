@@ -1,6 +1,7 @@
 //! Read profiles for the local MCP adapter.
 use super::*;
 use bridge_tally_core::TallyDate;
+use bridge_tally_protocol::ledger_scope::LedgerScopeName;
 
 /// The FETCH list for reads that RETURN bill allocations.
 ///
@@ -43,9 +44,19 @@ use bridge_tally_core::TallyDate;
 /// synthetic book `BRIDGE SHAPE LAB` with this word added returned the element on every voucher
 /// (`TYPE="Date"`, empty on 66 of 67 and `YYYYMMDD` on one), and the answers were byte-equal to the
 /// same reads without it apart from the elements (protocol reference §8.2f).
-const AGENT_VOUCHER_FETCH: &str = "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
+pub(super) const AGENT_VOUCHER_FETCH: &str =
+    "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
 GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
 REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE";
+
+/// The window read's list without `REFERENCEDATE`: the list every ledger-scoped window read the lab
+/// sent carried (the bill trail's, #1356, on two books), and the book-wide window reads it was
+/// compared with. [`AGENT_VOUCHER_FETCH`] added `REFERENCEDATE` later (#1363) and has not been
+/// sent ledger-scoped, so it is not what a ledger-scoped read sends until a lab run does.
+const AGENT_LEDGER_WINDOW_FETCH: &str =
+    "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
+GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
+REFERENCE,ISINVOICE,PARTYGSTIN";
 
 /// The FETCH list for `ledger_movement`, which DISCARDS bill allocations.
 ///
@@ -156,6 +167,63 @@ pub(super) fn render_agent_voucher_census(
     to: &TallyDate,
     span: Option<AlterIdSpan>,
 ) -> Result<String, String> {
+    render_voucher_census(company, VoucherScope::Book, from, to, span)
+}
+
+/// The census of [`render_agent_voucher_census`] for the vouchers of one ledger (#485): the same
+/// light row per voucher, in the same window, read as a `Vouchers : Ledger` collection `CHILDOF`
+/// the ledger, always in an AlterID span (every answer observed was spanned; an unspanned ledger
+/// census has not been observed). Read on `BRIDGE CORPUS DENSE` (TallyPrime 7.2 Silver, 28 Oct
+/// 2026): a day of one ledger as 82 vouchers, equal to the book-wide read of that day; a year of
+/// another ledger as 248 vouchers over four spans, equal to its unspanned ledger-scoped read; an
+/// empty span an empty collection (protocol reference section 11c.6, lab
+/// `lab/485-ledger-census-spans-answers`). Sent by `ledger_movement` to plan its window (slice 2 of
+/// #485). Not observed: a name that matches no ledger, and whether a voucher
+/// with two lines on the ledger is listed twice.
+pub(super) fn render_agent_ledger_census(
+    company: &str,
+    ledger: &LedgerScopeName,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: AlterIdSpan,
+) -> Result<String, String> {
+    render_voucher_census(company, VoucherScope::Ledger(ledger), from, to, Some(span))
+}
+
+/// The vouchers a windowed request reads: the book's, or one ledger's (#485). A ledger enters a
+/// request only as a [`LedgerScopeName`], admitted once and closed.
+#[derive(Clone, Copy)]
+enum VoucherScope<'a> {
+    Book,
+    Ledger(&'a LedgerScopeName),
+}
+
+impl VoucherScope<'_> {
+    /// The collection's name (the request header's `ID` is the same) and its `TYPE` element, with
+    /// the `CHILDOF` element after it for a ledger. `book` and `ledger` are the two names.
+    fn collection(self, book: &'static str, ledger: &'static str) -> (&'static str, String) {
+        match self {
+            Self::Book => (book, "<TYPE>Voucher</TYPE>".to_string()),
+            Self::Ledger(name) => (
+                ledger,
+                format!(
+                    "<TYPE>Vouchers : Ledger</TYPE><CHILDOF>{}</CHILDOF>",
+                    xml_escape(name.as_str())
+                ),
+            ),
+        }
+    }
+}
+
+fn render_voucher_census(
+    company: &str,
+    scope: VoucherScope<'_>,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: Option<AlterIdSpan>,
+) -> Result<String, String> {
+    let (collection, type_element) =
+        scope.collection("Bridge Agent Voucher Census", "Bridge Agent Ledger Census");
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
     let span_filter = span.map(AlterIdSpan::filter).unwrap_or_default();
@@ -163,7 +231,7 @@ pub(super) fn render_agent_voucher_census(
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Voucher Census</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentCensus\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Voucher Census\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>GUID,ALTERID,DATE</FETCH><FILTERS>BridgeAgentCensus</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentCensus\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>GUID,ALTERID,DATE</FETCH><FILTERS>BridgeAgentCensus</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str())
     ))
 }
@@ -176,13 +244,82 @@ fn render_windowed_vouchers(
     fetch: &str,
     computes: &str,
 ) -> Result<String, String> {
+    render_scoped_vouchers(
+        company,
+        VoucherScope::Book,
+        from,
+        to,
+        alter_filter,
+        fetch,
+        computes,
+    )
+}
+
+/// The field list of a ledger-scoped voucher read: a closed set, never text from a caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum LedgerVoucherFields {
+    /// The movement read's: the three entry fields movement uses ([`AGENT_MOVEMENT_FETCH`]).
+    Movement,
+    /// The window read's list as the lab sent it ledger-scoped, before `REFERENCEDATE` was added to
+    /// the window read (#1363): every entry field and the invoice fields, ending `PARTYGSTIN`
+    /// ([`AGENT_LEDGER_WINDOW_FETCH`]).
+    Window,
+}
+
+impl LedgerVoucherFields {
+    fn fetch(self) -> &'static str {
+        match self {
+            Self::Movement => AGENT_MOVEMENT_FETCH,
+            Self::Window => AGENT_LEDGER_WINDOW_FETCH,
+        }
+    }
+}
+
+/// A voucher read (`Bridge Agent Ledger Vouchers`) for the vouchers of one ledger (#485): the
+/// book-wide read's window formula, read as a `Vouchers : Ledger` collection `CHILDOF` the ledger,
+/// with the field list `fields` names and nothing else different. Observed without an AlterID span
+/// only: with [`LedgerVoucherFields::Movement`] a month of one ledger as 21 vouchers, equal to the
+/// census rows of that month, whose lines sum to the committed one-month Trial Balance's debit for
+/// the ledger; [`LedgerVoucherFields::Window`] differs from it in the `FETCH` element alone and
+/// was read by the lab for the bill trail (#1356). A spanned form has not been observed and is not
+/// offered. `ledger_movement` sends the movement fields (#485), and the `outstandings` party detail
+/// the window fields (#1356).
+pub(super) fn render_agent_ledger_vouchers(
+    company: &str,
+    ledger: &LedgerScopeName,
+    fields: LedgerVoucherFields,
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Result<String, String> {
+    render_scoped_vouchers(
+        company,
+        VoucherScope::Ledger(ledger),
+        from,
+        to,
+        "",
+        fields.fetch(),
+        "",
+    )
+}
+
+fn render_scoped_vouchers(
+    company: &str,
+    scope: VoucherScope<'_>,
+    from: &TallyDate,
+    to: &TallyDate,
+    alter_filter: &str,
+    fetch: &str,
+    computes: &str,
+) -> Result<String, String> {
+    let (collection, type_element) =
+        scope.collection("Bridge Agent Vouchers", "Bridge Agent Ledger Vouchers");
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Vouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{alter_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Vouchers\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{fetch}</FETCH>{computes}<FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{collection}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{alter_filter}</SYSTEM><COLLECTION NAME=\"{collection}\" ISMODIFY=\"No\">{type_element}<FETCH>{fetch}</FETCH>{computes}<FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str())
     ))
 }
@@ -210,18 +347,61 @@ pub(super) fn render_agent_lab_inventory_vouchers(
     render_windowed_vouchers(company, from, to, "", AGENT_LAB_INVENTORY_VOUCHER_FETCH, "")
 }
 
-/// A voucher type's name is quoted into a TDL string literal in the status
-/// read, where XML escaping cannot protect it (Tally decodes `&quot;` before
-/// evaluating, #861), so a name is admitted only when it holds nothing a
-/// literal could be closed or broken by. `&`, `<`, `>` and `'` are refused as
-/// well: Tally's handling of them inside the literal has not been measured.
-pub(super) fn gst_status_type_name_literal_safe(name: &str) -> bool {
-    !name.is_empty()
-        && name.chars().count() <= 100
-        && name == name.trim()
-        && !name
-            .chars()
-            .any(|c| matches!(c, '"' | '\\' | '&' | '<' | '>' | '\'') || c.is_control())
+/// The candidate FETCH for a check that a supplier invoice is not already in the books (#1904):
+/// [`AGENT_VOUCHER_FETCH`] with its entry wildcard narrowed to the entry fields such a check reads
+/// and the bill allocations, nothing else changed. LAB-ONLY (feature `lab-writes`) until a lab
+/// sitting has compared it with the agent read on the same window: protocol reference §8.2a
+/// measured `ALLLEDGERENTRIES.BILLALLOCATIONS.*` on one 7.1 book only, and this exact list has never
+/// been sent to Tally.
+#[cfg(feature = "lab-writes")]
+const AGENT_LAB_PURCHASE_IDENTITY_FETCH: &str =
+    "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,\
+NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.LEDGERNAME,\
+ALLLEDGERENTRIES.AMOUNT,ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,ALLLEDGERENTRIES.BILLALLOCATIONS.*,\
+REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE";
+
+/// The candidate narrow read of [`AGENT_LAB_PURCHASE_IDENTITY_FETCH`], in the window shape and with
+/// the voucher-type class computes of [`render_agent_class_vouchers_in_span`], so the FETCH list is
+/// the only difference from the agent read it is compared with.
+#[cfg(feature = "lab-writes")]
+pub(super) fn render_agent_lab_purchase_identity_vouchers(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Result<String, String> {
+    render_windowed_vouchers(
+        company,
+        from,
+        to,
+        "",
+        AGENT_LAB_PURCHASE_IDENTITY_FETCH,
+        &voucher_type_class_computes(),
+    )
+}
+
+/// A voucher type's name as the status read quotes it into a TDL string
+/// literal, where XML escaping cannot protect it (Tally decodes `&quot;` before
+/// evaluating, #861). Parsed once, from the tool's argument: a name is admitted
+/// only when it holds nothing a literal could be closed or broken by. `&`, `<`,
+/// `>` and `'` are refused as well: Tally's handling of them inside the literal
+/// has not been measured.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct GstStatusTypeName(String);
+
+impl GstStatusTypeName {
+    pub(super) fn parse(name: &str) -> Option<Self> {
+        let admitted = !name.is_empty()
+            && name.chars().count() <= 100
+            && name == name.trim()
+            && !name
+                .chars()
+                .any(|c| matches!(c, '"' | '\\' | '&' | '<' | '>' | '\'') || c.is_control());
+        admitted.then(|| Self(name.to_string()))
+    }
+
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 /// The GST status of the vouchers of one type in a date window (R7, 10 Oct
@@ -237,7 +417,7 @@ pub(super) fn render_gst_status_window(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    type_name: &str,
+    type_name: &GstStatusTypeName,
 ) -> Result<String, String> {
     render_status_window(company, from, to, type_name, StatusFetch::Flags)
 }
@@ -252,7 +432,7 @@ pub(super) fn render_gst_uncertain_window(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    type_name: &str,
+    type_name: &GstStatusTypeName,
 ) -> Result<String, String> {
     render_status_window(company, from, to, type_name, StatusFetch::FlagsPartyAmount)
 }
@@ -284,21 +464,18 @@ fn render_status_window(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    type_name: &str,
+    type_name: &GstStatusTypeName,
     fetch: StatusFetch,
 ) -> Result<String, String> {
     let fetch_tail = fetch.tail();
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
-    if !gst_status_type_name_literal_safe(type_name) {
-        return Err("gst_status_type_name_invalid".to_string());
-    }
     // A quoted `$$Date:"…"` literal takes only a date (#861).
     let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN{fetch_tail}</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str()),
-        xml_escape(type_name)
+        xml_escape(type_name.as_str())
     ))
 }
 
@@ -306,7 +483,7 @@ pub(super) fn gst_uncertain_read(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    type_name: &str,
+    type_name: &GstStatusTypeName,
 ) -> Result<ReadRequest, String> {
     render_gst_uncertain_window(company, from, to, type_name).map(ReadRequest)
 }
@@ -315,7 +492,7 @@ pub(super) fn gst_status_read(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    type_name: &str,
+    type_name: &GstStatusTypeName,
 ) -> Result<ReadRequest, String> {
     render_gst_status_window(company, from, to, type_name).map(ReadRequest)
 }
@@ -380,6 +557,38 @@ pub(super) fn import_ledger_catalogue_read(company: &str) -> anyhow::Result<Read
         .map(ReadRequest)
 }
 
+/// The ledger name index a master post reads: the V3 ledger catalogue, the
+/// request `MasterAdmission` re-reads inside the queue, parsed by
+/// `agent_master_post::ledger_masters`.
+pub(super) fn ledger_name_index_read(company: &str) -> anyhow::Result<ReadRequest> {
+    use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
+    let validated = ValidatedCompanyName::new(company)
+        .map_err(|_| anyhow::anyhow!("master_request_invalid"))?;
+    Ok(ReadRequest(
+        ReadOnlyProfile::StandardLedgerCatalogV3 {
+            company: &validated,
+        }
+        .render(),
+    ))
+}
+
+/// The party/ledger master read restricted to the ledgers under one parent
+/// group: the request the compliance reader sends per parent part, used to read
+/// back the fields of one ledger a master post created. Its answer carries
+/// sensitive master values; the one caller projects each row onto the few
+/// fields it reads (`agent_master_verdict::PartyView`).
+pub(super) fn party_ledger_master_for_parent_read(
+    company: &str,
+    period: &bridge_tally_protocol::native_outstandings::NativeLedgerExportPeriod,
+    part: &bridge_tally_protocol::parent_partition::ParentPart,
+) -> ReadRequest {
+    ReadRequest(
+        bridge_tally_protocol::native_outstandings::render_party_ledger_master_request_for_parents(
+            company, period, part,
+        ),
+    )
+}
+
 pub(super) fn native_group_snapshot_read(company: &str) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(company),
@@ -404,21 +613,24 @@ pub(super) fn invoice_ledger_count_read(company: &str) -> ReadRequest {
 /// measured per-row Sales-class compute, for the duplicate-number check.
 pub(super) fn invoice_number_read(
     company: &str,
-    number: &str,
-    window: (&str, &str),
-) -> Option<ReadRequest> {
-    agent_import::invoice::render_invoice_number_request(company, number, window).map(ReadRequest)
+    number: &agent_import::invoice::InvoiceNumber,
+    window: (&TallyDate, &TallyDate),
+) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_invoice_number_request(
+        company, number, window,
+    ))
 }
 
 /// A posted invoice read back by type and number, every field the build wrote.
 pub(super) fn invoice_readback_read(
     company: &str,
-    type_guid: &str,
-    number: &str,
-    window: (&str, &str),
-) -> Option<ReadRequest> {
-    agent_import::invoice::render_invoice_readback_request(company, type_guid, number, window)
-        .map(ReadRequest)
+    type_guid: &agent_import::invoice::VoucherTypeGuid,
+    number: &agent_import::invoice::InvoiceNumber,
+    window: (&TallyDate, &TallyDate),
+) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_invoice_readback_request(
+        company, type_guid, number, window,
+    ))
 }
 
 /// The ledger listing with each ledger's GST rate and rounding, for the tax
@@ -427,11 +639,12 @@ pub(super) fn invoice_readback_read(
 /// date.
 pub(super) fn invoice_ledger_rates_scoped_read(
     company: &str,
-    window: (&str, &str),
+    window: (&TallyDate, &TallyDate),
     part: &bridge_tally_protocol::parent_partition::ParentPart,
-) -> Option<ReadRequest> {
-    agent_import::invoice::render_ledger_rates_request_for_parents(company, window, part)
-        .map(ReadRequest)
+) -> ReadRequest {
+    ReadRequest(
+        agent_import::invoice::render_ledger_rates_request_for_parents(company, window, part),
+    )
 }
 
 /// The group listing with each group's HSN/SAC rows, for the HSN/SAC check
@@ -476,6 +689,39 @@ pub(super) fn voucher_census_read(
     render_agent_voucher_census(company, from, to, span).map(ReadRequest)
 }
 
+/// The census request for the vouchers of `ledger` (#485): always spanned, the one form the lab
+/// observed. The caller supplies the span even for a book that fits one census request.
+pub(super) fn ledger_census_read(
+    company: &str,
+    ledger: &LedgerScopeName,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: AlterIdSpan,
+) -> Result<ReadRequest, String> {
+    render_agent_ledger_census(company, ledger, from, to, span).map(ReadRequest)
+}
+
+/// One part of a read of the vouchers of `ledger`: the movement read (#485), or the window read's
+/// fields for the `outstandings` party detail (#1356). Only these two were observed ledger-scoped,
+/// and only without an AlterID span, so any other shape or a part carrying a span is refused here,
+/// before it is rendered, with [`LEDGER_SCOPE_NEEDS_DAY_SPLIT`].
+pub(super) fn ledger_part_read(
+    shape: super::voucher_window::VoucherReadShape,
+    company: &str,
+    ledger: &LedgerScopeName,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: Option<AlterIdSpan>,
+) -> Result<ReadRequest, String> {
+    use super::voucher_window::VoucherReadShape;
+    let fields = match (shape, span) {
+        (VoucherReadShape::Movement, None) => LedgerVoucherFields::Movement,
+        (VoucherReadShape::EntryWildcard, None) => LedgerVoucherFields::Window,
+        _ => return Err(super::voucher_window::LEDGER_SCOPE_NEEDS_DAY_SPLIT.to_string()),
+    };
+    render_agent_ledger_vouchers(company, ledger, fields, from, to).map(ReadRequest)
+}
+
 #[cfg(feature = "lab-writes")]
 pub(super) fn lab_inventory_vouchers_read(
     company: &str,
@@ -483,6 +729,36 @@ pub(super) fn lab_inventory_vouchers_read(
     to: &TallyDate,
 ) -> Result<ReadRequest, String> {
     render_agent_lab_inventory_vouchers(company, from, to).map(ReadRequest)
+}
+
+#[cfg(feature = "lab-writes")]
+pub(super) fn lab_purchase_identity_vouchers_read(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Result<ReadRequest, String> {
+    render_agent_lab_purchase_identity_vouchers(company, from, to).map(ReadRequest)
+}
+
+/// The agent's class-resolved window read, unnarrowed: what `vouchers` sends when it filters by
+/// type, here the read the candidate narrow read is compared with.
+#[cfg(feature = "lab-writes")]
+pub(super) fn lab_agent_class_vouchers_read(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Result<ReadRequest, String> {
+    render_agent_class_vouchers_in_span(company, from, to, None).map(ReadRequest)
+}
+
+#[cfg(feature = "lab-writes")]
+pub(super) fn lab_voucher_key_probe_read(
+    company: &str,
+    day: &TallyDate,
+    term: super::lab::ProbeTerm,
+    key: &super::lab::ProbeKey,
+) -> Result<ReadRequest, String> {
+    super::lab::render_lab_voucher_key_probe(company, day, term, key).map(ReadRequest)
 }
 
 #[cfg(feature = "lab-writes")]
@@ -533,7 +809,13 @@ mod sealed_read_tests {
             standard_ledger_catalog_read(company).unwrap(),
             native_group_snapshot_read(company),
             voucher_census_read(company, &from, &to, span).unwrap(),
-            gst_status_read(company, &from, &to, "Sales").unwrap(),
+            gst_status_read(
+                company,
+                &from,
+                &to,
+                &GstStatusTypeName::parse("Sales").unwrap(),
+            )
+            .unwrap(),
         ];
         for shape in [
             super::super::voucher_window::VoucherReadShape::ImportVerification,

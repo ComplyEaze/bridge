@@ -3,6 +3,7 @@ pub(crate) mod approved_import;
 mod box_fit;
 pub mod connection;
 pub mod connector;
+pub(crate) mod ledger_create_item;
 pub mod runtime;
 pub(crate) mod standard_ledger_catalog;
 // Crate-internal only: `tally::runtime` is the sole consumer.
@@ -126,6 +127,11 @@ impl VerifiedCompanyIdentity {
 
     pub(crate) fn company_guid(&self) -> &str {
         self.company_guid.as_str()
+    }
+
+    /// The GUID as its parsed type, for a builder that puts it in a formula.
+    pub(crate) fn company_guid_value(&self) -> &bridge_tally_core::company_guid::CompanyGuid {
+        &self.company_guid
     }
 
     pub(crate) fn company_number(&self) -> &str {

@@ -1027,12 +1027,26 @@ pub enum SnapshotError {
     StateStore(#[source] sqlx::Error),
     #[error("mirror operation failed")]
     Mirror(#[from] MirrorError),
+    /// The mirror refused the commit on an invariant of the batch. The observations a batch holds
+    /// cannot be updated or deleted, so the same commit is refused again on every resume: unlike
+    /// the other mirror errors (a locked or full database), this one is not worth another try.
+    #[error("the mirror refused the commit on an invariant of the batch")]
+    CommitRefused,
     #[error("snapshot reconciliation failed")]
     Reconciliation(#[from] ReconciliationError),
     #[error("snapshot state invariant failed ({0})")]
     StateInvariant(&'static str),
     #[error("canonical state serialization failed")]
     Serialization,
+}
+
+/// What a failed `commit_batch` means for the run: an invariant of the batch is refused for good,
+/// anything else is the mirror failing in a way a later resume may get past.
+fn commit_error(error: MirrorError) -> SnapshotError {
+    match error {
+        MirrorError::VerificationInvariant => SnapshotError::CommitRefused,
+        other => SnapshotError::Mirror(other),
+    }
 }
 
 #[async_trait]
@@ -2843,7 +2857,7 @@ where
             Err(MirrorError::ConcurrentCheckpoint) => {
                 self.finish_checkpoint_conflict(plan, state).await
             }
-            Err(error) => Err(error.into()),
+            Err(error) => Err(commit_error(error)),
         }
     }
 
@@ -2962,7 +2976,7 @@ where
             Err(MirrorError::ConcurrentCheckpoint) => Err(SnapshotError::StateInvariant(
                 "terminal_checkpoint_conflict",
             )),
-            Err(error) => Err(error.into()),
+            Err(error) => Err(commit_error(error)),
         }
     }
 

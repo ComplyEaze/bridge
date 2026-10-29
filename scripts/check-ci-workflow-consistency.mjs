@@ -217,7 +217,7 @@ for (const [source, job, expected, digest] of [
 // And native, bundle-smoke and package run a local composite action before their scans; a local
 // action can call another, so every tracked file under .github/actions/ is pinned by its bytes.
 for (const [name, source, digest] of [
-  ["ci.yml", workflow, "25526dcdd7691fef35c27e07c0bb0291543cbf3ba55e7ac4ee40bd59f802b1e9"],
+  ["ci.yml", workflow, "37e4f47df2582a32e175b296dc710afb2b2f4be87e47fb7cd59d386199eeb2f1"],
   ["release-mcpb-preview.yml", releaseWorkflow, "c4a747416c492779cfd43305cfd619728d2c9821a17f3efb73da08f67dc56144"],
 ]) {
   const lines = source.split("\n");
@@ -425,8 +425,36 @@ if (stepBlock(frontendJob, "      - name: Restore Playwright browsers") !== play
 }
 const playwrightInstallAt = frontendJob.indexOf("      - name: Install Playwright browsers and system dependencies\n");
 const playwrightSaveAt = frontendJob.indexOf("      - name: Save Playwright browsers\n");
-if (stepBlock(frontendJob, "      - name: Save Playwright browsers") !== playwrightSave || frontendJob.split("actions/cache/save@").length !== 2 || playwrightInstallAt === -1 || playwrightSaveAt < playwrightInstallAt) {
+if (stepBlock(frontendJob, "      - name: Save Playwright browsers") !== playwrightSave || frontendJob.split("actions/cache/save@").length !== 3 || playwrightInstallAt === -1 || playwrightSaveAt < playwrightInstallAt) {
   failures.push("the Playwright browsers save step changed shape, or does not follow the install step; review it and update playwrightSave");
+}
+// The Playwright system packages (the .deb files apt downloads) are cached the same way and for the same reason: restored with
+// the restore action, saved by one pinned step after the install, only by push, manual and scheduled runs, under a key that names the
+// Playwright version and the runner image and with no restore-keys, so a pull-request or merge-queue ref can never write what a
+// later run copies into apt's archive directory (bridge#2056). The job holds exactly two cache save steps: this one and the browsers'.
+const playwrightDebsKey = "          key: playwright-debs-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-${{ steps.playwright-version.outputs.image }}";
+const playwrightDebsSave = [
+  "      - name: Save Playwright system packages",
+  "        if: ${{ steps.apt-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}",
+  "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+  "        with:",
+  "          path: ~/apt-debs",
+  playwrightDebsKey,
+].join("\n");
+const playwrightDebsRestore = [
+  "      - name: Restore Playwright system packages",
+  "        id: apt-cache",
+  "        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+  "        with:",
+  "          path: ~/apt-debs",
+  playwrightDebsKey,
+].join("\n");
+if (stepBlock(frontendJob, "      - name: Restore Playwright system packages") !== playwrightDebsRestore || frontendJob.indexOf("      - name: Restore Playwright system packages\n") > playwrightInstallAt) {
+  failures.push("the Playwright system packages restore step changed shape, or does not come before the install step: its key must equal the save step's and it must have no restore-keys; review it and update playwrightDebsRestore");
+}
+const playwrightDebsSaveAt = frontendJob.indexOf("      - name: Save Playwright system packages\n");
+if (stepBlock(frontendJob, "      - name: Save Playwright system packages") !== playwrightDebsSave || playwrightDebsSaveAt < playwrightInstallAt) {
+  failures.push("the Playwright system packages save step changed shape, or does not follow the install step; review it and update playwrightDebsSave");
 }
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
   if (name !== "ci.yml" && source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);

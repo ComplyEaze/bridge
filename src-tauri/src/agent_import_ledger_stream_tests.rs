@@ -508,6 +508,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled: 4,
             unsettled_no_response: 2,
             unsettled_binding_refused: 0,
+            unsettled_reviewed: 0,
             no_dispatch_never_verified: 1
         }
     );
@@ -519,6 +520,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled: 0,
             unsettled_no_response: 0,
             unsettled_binding_refused: 0,
+            unsettled_reviewed: 0,
             no_dispatch_never_verified: 0
         }
     );
@@ -1524,6 +1526,48 @@ fn a_record_covers_only_what_the_journal_held_before_its_mark_was_read() {
     );
 }
 
+/// An answer that reported `STATUS=0` failed whatever its counters say
+/// (IMPLEMENTATION_GUIDE.md §3.2, I6), so its `CREATED` proves no voucher
+/// landed: the post's floor stays its pre-POST mark (#2035).
+#[test]
+fn an_answer_reporting_status_zero_raises_no_floor() {
+    let failed = bridge_tally_protocol::parse_import_outcome(
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>11</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>",
+    )
+    .unwrap();
+    assert_eq!(failed.counters().created, 10);
+    assert_eq!(
+        failed.application_status(),
+        bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    );
+    let refused = placed("refused", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let seer = placed("seer", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![
+        record(&refused),
+        intent(&refused, Some(1)),
+        record(&StatusRecord::response(
+            &refused,
+            DispatchResponse {
+                request_sha256: "c".repeat(64),
+                response_sha256: "d".repeat(64),
+                bytes: 1,
+                outcome: Some(failed),
+            },
+        )),
+        record(&seer),
+        intent(&seer, Some(1)),
+    ];
+    let read = journal.len() as u64;
+    // The mark still reads 1: Tally created nothing for the refused post, so
+    // no record would be written for it.
+    assert!(!rollback_record_extends(Cursor::new(journal.concat()), "seer", 1, read).unwrap());
+    journal.push(seen(&seer, 1, read));
+    assert_eq!(cover(&journal, "refused").covered_by, None);
+    assert!(covered_by_records_of(Cursor::new(journal.concat()), "seer")
+        .unwrap()
+        .is_empty());
+}
+
 /// Only the same company, by all four fields, at the same Tally address.
 #[test]
 fn a_record_covers_no_batch_of_another_company_or_address() {
@@ -1645,4 +1689,302 @@ fn a_covered_posts_check_still_records_a_second_restore_that_reaches_a_later_pos
         10 + 2 * created,
         journal.len() as u64
     ));
+}
+
+fn refused_as(line: &ImportLedgerLine, code: &str) -> Vec<u8> {
+    record(&StatusRecord::post_span_verdict(
+        line,
+        &PostSpanVerdict::Refused(code.into()),
+    ))
+}
+
+fn reviewed(line: &ImportLedgerLine, state: ReviewedBinding) -> Vec<u8> {
+    record(&StatusRecord::content_review(line, state))
+}
+
+fn verified(line: &ImportLedgerLine) -> Vec<u8> {
+    record(
+        &serde_json::from_value::<StatusRecord>(json!({
+            "record_type":"verification_status","batch_id":line.batch_id,
+            "batch_sha256":line.sha256,"status":"posted_verified"
+        }))
+        .unwrap(),
+    )
+}
+
+/// The review that stands for `batch_id`, or the journal's refusal.
+fn review_of(journal: &[Vec<u8>], batch_id: &str) -> Result<Option<ReviewedBinding>, String> {
+    content_review(Cursor::new(journal.concat()), batch_id)
+}
+
+/// A content review (#1039) is admitted only after a native intent with a
+/// pre-POST mark, on a content-only state the journal holds: a refusal by any
+/// code but `span_identity_reused`, or no outcome and no verdict. Never while
+/// the batch reads verified, never twice while one stands, and never with a
+/// field of another record; no other record carries its field. It sets no
+/// status.
+#[test]
+fn a_content_review_is_admitted_only_on_a_content_only_state() {
+    use ReviewedBinding::{Refused, ResponseNotRecorded};
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let refused = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        answered(&p1),
+        refused_as(&p1, "span_step_not_created"),
+    ];
+    let unanswered = vec![record(&p1), intent(&p1, Some(4))];
+    let with = |base: &[Vec<u8>], more: &[Vec<u8>]| [base, more].concat();
+
+    let admitted = with(&refused, &[reviewed(&p1, Refused)]);
+    assert_eq!(review_of(&admitted, "p1"), Ok(Some(Refused)));
+    let snapshot = read_snapshot(Cursor::new(admitted.concat()), Some("p1"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.batch.status, "response_received");
+    let admitted = with(&unanswered, &[reviewed(&p1, ResponseNotRecorded)]);
+    assert_eq!(review_of(&admitted, "p1"), Ok(Some(ResponseNotRecorded)));
+    // An answer whose outcome did not parse is no outcome: the state holds.
+    let unparsed = StatusRecord::response(
+        &p1,
+        DispatchResponse {
+            request_sha256: "c".repeat(64),
+            response_sha256: "d".repeat(64),
+            bytes: 1,
+            outcome: None,
+        },
+    );
+    let admitted = with(
+        &unanswered,
+        &[record(&unparsed), reviewed(&p1, ResponseNotRecorded)],
+    );
+    assert_eq!(review_of(&admitted, "p1"), Ok(Some(ResponseNotRecorded)));
+
+    let refused_invalid = |journal: Vec<Vec<u8>>, why: &str| {
+        assert_eq!(
+            review_of(&journal, "p1"),
+            Err("import_ledger_invalid".to_string()),
+            "{why}"
+        );
+    };
+    refused_invalid(
+        vec![
+            record(&p1),
+            intent(&p1, Some(4)),
+            answered(&p1),
+            refused_as(&p1, IDENTITY_REUSED),
+            reviewed(&p1, Refused),
+        ],
+        "a refusal no review covers",
+    );
+    refused_invalid(
+        with(&refused[..3], &[reviewed(&p1, Refused)]),
+        "no refusal on file",
+    );
+    refused_invalid(
+        with(&refused[..3], &[reviewed(&p1, ResponseNotRecorded)]),
+        "an outcome on file",
+    );
+    refused_invalid(
+        with(&refused, &[reviewed(&p1, ResponseNotRecorded)]),
+        "the other state",
+    );
+    refused_invalid(
+        vec![
+            record(&p1),
+            intent(&p1, None),
+            reviewed(&p1, ResponseNotRecorded),
+        ],
+        "an intent with no pre-POST mark",
+    );
+    refused_invalid(
+        vec![record(&p1), reviewed(&p1, ResponseNotRecorded)],
+        "never sent",
+    );
+    refused_invalid(
+        with(
+            &unanswered,
+            &[verified(&p1), reviewed(&p1, ResponseNotRecorded)],
+        ),
+        "while verified",
+    );
+    refused_invalid(
+        with(&refused, &[reviewed(&p1, Refused), reviewed(&p1, Refused)]),
+        "a second while the first stands",
+    );
+    let mut extra = StatusRecord::content_review(&p1, Refused);
+    extra.pre_post_voucher_mark = Some(4);
+    refused_invalid(
+        with(&refused, &[record(&extra)]),
+        "a field of another record",
+    );
+    let mut stray = StatusRecord::stop_release(&p1, ReleaseSeen::Found);
+    stray.reviewed_binding = Some(Refused);
+    refused_invalid(
+        with(&refused, &[record(&stray)]),
+        "its field on another record",
+    );
+    let mut misnamed = StatusRecord::content_review(&p1, Refused);
+    misnamed.status = "posted_verified".into();
+    refused_invalid(with(&refused, &[record(&misnamed)]), "another status");
+}
+
+/// The record is written as `content_review` with its state in snake case. A
+/// build that does not know a record kind or a state refuses the whole
+/// journal holding it, as an older build does this one, never skipping it.
+#[test]
+fn a_record_kind_or_state_the_build_does_not_know_refuses_the_whole_journal() {
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let review = serde_json::to_value(StatusRecord::content_review(
+        &p1,
+        ReviewedBinding::ResponseNotRecorded,
+    ))
+    .unwrap();
+    assert_eq!(review["record_type"], "content_review");
+    assert_eq!(review["status"], "content_reviewed");
+    assert_eq!(review["reviewed_binding"], "response_not_recorded");
+    for (field, unknown) in [
+        ("record_type", "content_review_v2"),
+        ("reviewed_binding", "reviewed"),
+    ] {
+        let mut changed = review.clone();
+        changed[field] = json!(unknown);
+        let journal = vec![record(&p1), intent(&p1, Some(4)), record(&changed)];
+        assert_eq!(
+            review_of(&journal, "p1"),
+            Err("import_ledger_invalid".to_string()),
+            "{field}"
+        );
+        assert!(
+            settlement(Cursor::new(journal.concat())).is_err(),
+            "{field}"
+        );
+    }
+}
+
+/// A review stands until the batch reads `posted_verified`, an answer with an
+/// outcome is recorded, or a rollback covers the batch; each voids it for good.
+/// After a verified read or an answer a new review may be recorded where the
+/// state allows; after a cover none is, since the batch then reads rolled back
+/// and the journal keeps refusing a second review of it.
+#[test]
+fn a_content_review_is_voided_by_a_verified_read_an_answer_or_a_rollback() {
+    use ReviewedBinding::{Refused, ResponseNotRecorded};
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        reviewed(&p1, ResponseNotRecorded),
+    ];
+    assert_eq!(review_of(&journal, "p1"), Ok(Some(ResponseNotRecorded)));
+    journal.push(verified(&p1));
+    assert_eq!(review_of(&journal, "p1"), Ok(None));
+    journal.push(incomplete(&p1));
+    assert_eq!(review_of(&journal, "p1"), Ok(None), "void for good");
+    journal.push(reviewed(&p1, ResponseNotRecorded));
+    assert_eq!(review_of(&journal, "p1"), Ok(Some(ResponseNotRecorded)));
+    journal.push(answered(&p1));
+    assert_eq!(review_of(&journal, "p1"), Ok(None), "an answer voids it");
+
+    // A later answer voids a review of a lost answer, so the refusal its
+    // binding then records can be reviewed in turn.
+    let mut late = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        reviewed(&p1, ResponseNotRecorded),
+        answered(&p1),
+        refused_as(&p1, "span_step_not_created"),
+        reviewed(&p1, Refused),
+    ];
+    assert_eq!(review_of(&late, "p1"), Ok(Some(Refused)));
+    // A full record that reads verified voids it as a status record does.
+    let mut found = p1.clone();
+    found.status = "posted_verified".into();
+    late.push(record(&found));
+    assert_eq!(review_of(&late, "p1"), Ok(None));
+
+    // A rollback that covers the batch voids its review; one that does not
+    // cover it leaves the review standing.
+    let refused = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        answered(&p1),
+        refused_as(&p1, "span_step_not_created"),
+        reviewed(&p1, Refused),
+    ];
+    let floor = 4 + captured_outcome().counters().created;
+    let mut above = refused.clone();
+    above.push(seen(&p1, floor, refused.len() as u64));
+    assert_eq!(cover(&above, "p1").covered_by, None);
+    assert_eq!(review_of(&above, "p1"), Ok(Some(Refused)));
+    let mut below = refused.clone();
+    below.push(seen(&p1, floor - 1, refused.len() as u64));
+    assert!(cover(&below, "p1").covered_by.is_some());
+    assert_eq!(review_of(&below, "p1"), Ok(None));
+    // Reviews of other batches are their own.
+    assert_eq!(review_of(&refused, "p2"), Ok(None));
+}
+
+/// The local-data report counts a reviewed batch in its own bucket and in no
+/// other part of the unsettled batches; once voided, it is back where it was.
+#[test]
+fn a_reviewed_batch_is_counted_in_its_own_bucket_until_voided() {
+    use ReviewedBinding::{Refused, ResponseNotRecorded};
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let created = captured_outcome().counters().created;
+    let journal = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        answered(&p1),
+        refused_as(&p1, "span_step_not_created"),
+        record(&p2),
+        intent(&p2, Some(4 + created)),
+    ];
+    let counts = |journal: &[Vec<u8>]| {
+        let counted = settlement(Cursor::new(journal.concat())).unwrap();
+        (
+            counted.unsettled,
+            counted.unsettled_binding_refused,
+            counted.unsettled_no_response,
+            counted.unsettled_reviewed,
+        )
+    };
+    assert_eq!(counts(&journal), (2, 1, 1, 0));
+    let mut both = journal.clone();
+    both.push(reviewed(&p1, Refused));
+    assert_eq!(counts(&both), (2, 0, 1, 1));
+    both.push(reviewed(&p2, ResponseNotRecorded));
+    assert_eq!(counts(&both), (2, 0, 0, 2));
+    // A restore below both posts' floors voids both reviews.
+    let read = both.len() as u64;
+    both.push(seen(&p2, 1, read));
+    assert_eq!(counts(&both), (2, 1, 1, 0));
+}
+
+/// The writer's check: the review a record would stand as if appended, or the
+/// journal's refusal of it, so the writer appends only what the reader admits.
+#[test]
+fn the_writer_appends_only_a_review_the_journal_admits_and_holds_standing() {
+    use ReviewedBinding::Refused;
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let refused = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        answered(&p1),
+        refused_as(&p1, "span_step_not_created"),
+    ];
+    let after = |journal: &[Vec<u8>]| {
+        content_review_after(
+            Cursor::new(journal.concat()),
+            &StatusRecord::content_review(&p1, Refused),
+        )
+    };
+    assert_eq!(after(&refused), Ok(Some(Refused)));
+    let mut standing = refused.clone();
+    standing.push(reviewed(&p1, Refused));
+    assert!(after(&standing).is_err());
+    let mut covered = refused.clone();
+    covered.push(seen(&p1, 1, refused.len() as u64));
+    assert_eq!(after(&covered), Ok(None));
 }

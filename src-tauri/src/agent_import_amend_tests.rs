@@ -270,6 +270,59 @@ fn a_proposal_may_correct_amounts_and_dates_but_not_type_number_or_membership() 
     );
 }
 
+/// #1941: an amendment never changes a reference, against any build of the
+/// lineage: added, changed or removed, alone or beside another correction.
+/// An equal reference, set or not, is admitted with a corrected amount.
+#[test]
+fn a_proposal_may_not_change_a_reference_against_any_build() {
+    let with_reference = |id, amends, amount: &str, reference: Option<&str>| {
+        let mut line = build(id, amends, amount, "20260901");
+        line.vouchers[0].reference = reference.map(str::to_string);
+        line.sha256 = sha256_hex(
+            render_import_xml(
+                "Synthetic Accounts",
+                &line.vouchers,
+                line.identity_batch_id(),
+            )
+            .as_bytes(),
+        );
+        line
+    };
+    let changed = "import_amend_voucher_reference_changed";
+    // the original wrote REF-1
+    let original = with_reference(ORIGINAL, None, "12.50", Some("REF-1"));
+    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
+    for reference in [Some("REF-2"), None] {
+        let proposal = with_reference(AMENDMENT, None, "20.00", reference).vouchers;
+        assert_eq!(
+            lineage.admit_proposal(&proposal).err().unwrap(),
+            changed,
+            "{reference:?}"
+        );
+    }
+    let same = with_reference(AMENDMENT, None, "20.00", Some("REF-1")).vouchers;
+    assert_eq!(lineage.admit_proposal(&same), Ok(()));
+    // the original wrote none
+    let plain = build(ORIGINAL, None, "12.50", "20260901");
+    let lineage = lineage_of(&journal(&[&plain]), ORIGINAL).unwrap();
+    let added = with_reference(AMENDMENT, None, "12.50", Some("REF-1")).vouchers;
+    assert_eq!(lineage.admit_proposal(&added).err().unwrap(), changed);
+    let none = build(AMENDMENT, None, "20.00", "20260901").vouchers;
+    assert_eq!(lineage.admit_proposal(&none), Ok(()));
+    // only an older build differs (a lineage an earlier release let diverge):
+    // still refused, whichever build the book matches
+    let first = with_reference(AMENDMENT, Some(ORIGINAL), "15.00", Some("REF-2"));
+    let lineage = lineage_of(&journal(&[&original, &first]), ORIGINAL).unwrap();
+    for reference in ["REF-1", "REF-2"] {
+        let proposal = with_reference(UNRELATED, None, "18.00", Some(reference)).vouchers;
+        assert_eq!(
+            lineage.admit_proposal(&proposal).err().unwrap(),
+            changed,
+            "{reference}"
+        );
+    }
+}
+
 #[test]
 fn the_window_holds_where_a_voucher_is_and_where_the_amendment_moves_it() {
     let original = build(ORIGINAL, None, "12.50", "20260910");
@@ -530,6 +583,7 @@ async fn an_unknown_amendment_target_is_refused_before_any_tally_read() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let mut input = serde_json::to_value(payload()).unwrap();
@@ -558,6 +612,7 @@ fn simulated_server(directory: &std::path::Path, port: u16) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -1053,7 +1108,8 @@ fn baselines(pairs: &[(&str, u64)]) -> amend::VerifiedBaselines {
 
 /// An amendment built but never imported, differing only in a field the read
 /// does not carry, matches the book too; it has no verification of its own and
-/// must not hide the build that was verified (#239).
+/// must not hide the build that was verified (#239). Since #1941 a build can no
+/// longer differ in its reference; a lineage an earlier release built can.
 #[test]
 fn an_unimported_amendment_does_not_hide_the_verified_build() {
     let original = build(ORIGINAL, None, "12.50", "20260901");
@@ -1108,6 +1164,7 @@ fn a_second_amendment_is_decided_by_the_first_amendments_verification() {
 /// A reference-only amendment, imported and verified: the book matches both
 /// builds' compared fields, and only the amendment's record equals the book's
 /// ALTERID. The equal record admits it, whichever build comes first (#239).
+/// Only an earlier release could build one (#1941 refuses a reference change).
 #[test]
 fn the_build_whose_record_equals_the_book_admits_even_when_not_first() {
     let original = build(ORIGINAL, None, "12.50", "20260901");

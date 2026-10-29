@@ -991,6 +991,8 @@ fn the_already_posted_texts_send_a_declined_invoice_again_under_its_number() {
         assert!(text.contains("For any other voucher: if Tally rejected that batch"));
         assert!(text.contains("nothing in ComplyEaze Bridge puts it in the book yet"));
         assert!(!text.contains("enter the voucher in Tally"));
+        // A batch a restore may have emptied is no route either, and is said so (#1038).
+        assert!(text.contains("when verify_import reports that batch book_rolled_back"));
     }
     let build = super::super::super::BUILD_TXN_ALREADY_POSTED_NEXT_STEP;
     assert!(build.contains("never build it again under a new bridge_txn_id to retry it"));
@@ -1033,3 +1035,6 @@ fn the_approval_text_refusals_of_an_invoice_build_do_not_reach_other_vouchers() 
         assert_eq!(invoice_route_refusal(code.to_string()), code);
     }
 }
+
+#[path = "agent_import_content_review_tests.rs"]
+mod content_review_tests;

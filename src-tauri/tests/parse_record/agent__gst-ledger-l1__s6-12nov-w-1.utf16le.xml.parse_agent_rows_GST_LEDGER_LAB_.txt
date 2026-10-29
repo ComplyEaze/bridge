@@ -1,0 +1,42 @@
+# fixture: agent/gst-ledger-l1/s6-12nov-w-1.utf16le.xml
+# parser: parse_agent_rows(GST_LEDGER_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(9),
+        "amounts": Array [
+            Object {
+                "amount": String("-180.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("GS1 Rent"),
+            },
+            Object {
+                "amount": String("90.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Input CGST"),
+            },
+            Object {
+                "amount": String("90.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Input SGST"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20251112"),
+        "guid": String("aae372c5-a894-491c-8843-5532e43d2d2f-00000009"),
+        "is_invoice": Bool(false),
+        "master_id": String("9"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String(""),
+        "post_dated": Bool(false),
+        "voucher_class": String("Journal"),
+        "voucher_number": String("4"),
+        "voucher_type": String("Journal"),
+        "voucher_type_guid": String("aae372c5-a894-491c-8843-5532e43d2d2f-00000026"),
+        "voucher_type_reserved_name": String("Journal"),
+    },
+])

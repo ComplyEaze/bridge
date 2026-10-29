@@ -212,6 +212,46 @@ fn scan_directory(
     }
 }
 
+/// The audit reads a lab build kept (`lab/audit-reads/<read>/manifest.json` and
+/// `parts/`), each file counted as `lab`: they hold a book's raw answers, so
+/// their files and bytes are shown, not one folder with nothing in it.
+fn scan_audit_reads(report: &mut Report, reads: &Path) {
+    if is_link(reads) {
+        // Counted as a link by the lab scan, and not entered.
+        return;
+    }
+    let entries = match fs::read_dir(reads) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == ErrorKind::NotFound => return,
+        Err(_) => {
+            note_not_listed(report, "lab");
+            return;
+        }
+    };
+    for (seen, entry) in entries.enumerate() {
+        if seen >= ENTRY_CAP {
+            report.entry_cap_reached = true;
+            break;
+        }
+        let Ok(entry) = entry else {
+            report.unreadable += 1;
+            continue;
+        };
+        let read = entry.path();
+        match fs::symlink_metadata(&read) {
+            Ok(metadata) if metadata.is_dir() => {
+                scan_directory(report, "lab", &read, |_| "lab", &["parts"], ENTRY_CAP);
+                let parts = read.join("parts");
+                if !is_link(&parts) {
+                    scan_directory(report, "lab", &parts, |_| "lab", &[], ENTRY_CAP);
+                }
+            }
+            Ok(_) => report.account("lab", &read),
+            Err(_) => report.unreadable += 1,
+        }
+    }
+}
+
 /// Take stock of `root` (the agent data folder) and the endpoint coordination
 /// folders (one, or on Windows two: see `paths::dispatch_coordination_roots`)
 /// whose `native-dispatch-leases` hold the lease locks. Reads only.
@@ -279,18 +319,23 @@ pub(super) fn build(root: &Path, coordination: &[&Path]) -> Report {
         ENTRY_CAP,
     );
     // A subfolder that is a symlink was counted as a link by the scan above.
-    let subfolders: [(&'static str, ClassOf); 3] = [
-        ("imports", import_class),
-        ("bank-statements", |_| "bank_statements"),
-        ("lab", |_| "lab"),
+    let subfolders: [(&'static str, ClassOf, &[&str]); 3] = [
+        ("imports", import_class, &[]),
+        ("bank-statements", |_| "bank_statements", &[]),
+        ("lab", |_| "lab", &["audit-reads"]),
     ];
-    for (name, class) in subfolders {
+    for (name, class, known) in subfolders {
         let dir = root.join(name);
         if is_link(&dir) {
             // Counted as a link above, and not entered: its class is unseen.
             note_not_listed(&mut report, name);
         } else {
-            scan_directory(&mut report, name, &dir, class, &[], ENTRY_CAP);
+            scan_directory(&mut report, name, &dir, class, known, ENTRY_CAP);
+            // Only inside a lab folder that is not a link: a linked lab is
+            // never entered, so neither is anything below it.
+            if name == "lab" {
+                scan_audit_reads(&mut report, &dir.join("audit-reads"));
+            }
         }
     }
     scan_leases(&mut report, root, coordination);
@@ -456,9 +501,11 @@ pub(super) fn to_json(
             "not_settled": settlement.unsettled,
             "not_settled_no_response": settlement.unsettled_no_response,
             "not_settled_binding_refused": settlement.unsettled_binding_refused,
+            "not_settled_reviewed_not_attributed": settlement.unsettled_reviewed,
             "not_settled_not_verified": settlement.unsettled
                 - settlement.unsettled_no_response
-                - settlement.unsettled_binding_refused,
+                - settlement.unsettled_binding_refused
+                - settlement.unsettled_reviewed,
             "no_dispatch_never_verified": settlement.no_dispatch_never_verified,
         }),
     };

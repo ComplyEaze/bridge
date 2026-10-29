@@ -60,6 +60,51 @@ Ok([
             Object {
                 "amount": String("-2500.00"),
                 "bill_allocations": Array [],
+                "goods_lines": Array [
+                    Object {
+                        "actual_quantity": Object {
+                            "state": String("value"),
+                            "value": String("100.000 Kgs"),
+                        },
+                        "amount": Object {
+                            "state": String("value"),
+                            "value": String("-2500.00"),
+                        },
+                        "batches": Array [
+                            Object {
+                                "actual_quantity": Object {
+                                    "state": String("value"),
+                                    "value": String("100.000 Kgs"),
+                                },
+                                "amount": Object {
+                                    "state": String("value"),
+                                    "value": String("-2500.00"),
+                                },
+                                "batch": Object {
+                                    "state": String("value"),
+                                    "value": String("Primary Batch"),
+                                },
+                                "billed_quantity": Object {
+                                    "state": String("value"),
+                                    "value": String("100.000 Kgs"),
+                                },
+                                "godown": Object {
+                                    "state": String("value"),
+                                    "value": String("Main Location"),
+                                },
+                            },
+                        ],
+                        "billed_quantity": Object {
+                            "state": String("value"),
+                            "value": String("100.000 Kgs"),
+                        },
+                        "rate": Object {
+                            "state": String("value"),
+                            "value": String("25.00/Kgs"),
+                        },
+                        "stock_item": String("Soda Ash Light"),
+                    },
+                ],
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Purchase - Local"),
             },

@@ -31,7 +31,14 @@ const WHOLE_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/test
 const CASE_CHANGED_REQUEST: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-case-changed.request.utf16le.xml");
 const CASE_CHANGED_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-case-changed.utf16le.xml");
 
-const WINDOW: (&str, &str) = ("20260401", "20260801");
+/// The window the lab's rate requests carried: the financial year's start and
+/// the invoice date.
+fn window() -> (bridge_tally_core::TallyDate, bridge_tally_core::TallyDate) {
+    (
+        bridge_tally_core::TallyDate::parse("20260401").unwrap(),
+        bridge_tally_core::TallyDate::parse("20260801").unwrap(),
+    )
+}
 
 /// A captured file as text, without its byte order mark.
 fn captured(bytes: &[u8]) -> String {
@@ -146,8 +153,11 @@ fn the_lab_invoices_legs_make_the_request_the_lab_answered() {
             "Sundry Debtors"
         ]
     );
-    let rendered =
-        wire::render_ledger_rates_request_for_parents(PILOT, WINDOW, scope.part()).unwrap();
+    let rendered = wire::render_ledger_rates_request_for_parents(
+        PILOT,
+        (&window().0, &window().1),
+        scope.part(),
+    );
     assert_eq!(captured(SCOPED_HSN_REQUEST), rendered);
     // The same request without the fields is the one the lab answered on 10 Oct.
     assert_eq!(with_the_hsn_fields(captured(SCOPED_REQUEST)), rendered);
@@ -157,7 +167,11 @@ fn the_lab_invoices_legs_make_the_request_the_lab_answered() {
     shuffled.push("BRIDGE Walk-in");
     let again = scope_of(&pilot_catalogue(), &shuffled).unwrap();
     assert_eq!(
-        wire::render_ledger_rates_request_for_parents(PILOT, WINDOW, again.part()).unwrap(),
+        wire::render_ledger_rates_request_for_parents(
+            PILOT,
+            (&window().0, &window().1),
+            again.part()
+        ),
         rendered
     );
 }
@@ -209,8 +223,11 @@ fn an_answer_that_is_not_the_scopes_is_refused_on_its_rows() {
 #[test]
 fn the_case_changed_filter_is_the_request_the_lab_answered() {
     let scope = scope_of(&synthetic(&[("Sales", "SALES ACCOUNTS")]), &["Sales"]).unwrap();
-    let rendered =
-        wire::render_ledger_rates_request_for_parents(PILOT, WINDOW, scope.part()).unwrap();
+    let rendered = wire::render_ledger_rates_request_for_parents(
+        PILOT,
+        (&window().0, &window().1),
+        scope.part(),
+    );
     assert_eq!(
         with_the_hsn_fields(captured(CASE_CHANGED_REQUEST)),
         rendered

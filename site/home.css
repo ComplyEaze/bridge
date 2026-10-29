@@ -429,6 +429,8 @@ html.ce-live .download-block:focus-within { opacity: 1; transform: none; transit
 .read-on h3 { margin: 0 0 var(--space-3); font-size: 16px; font-weight: 600; color: var(--ink); }
 .read-on ul { margin: 0; padding-left: 20px; display: grid; gap: var(--space-2); font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
 .read-on a { color: var(--ink); text-underline-offset: 2px; }
+#at-a-glance ul { margin: 0; padding-left: 20px; display: grid; gap: var(--space-2); font-size: 15px; line-height: 1.55; color: var(--ink-soft); }
+#at-a-glance a { color: var(--ink); text-underline-offset: 2px; }
 
 .visually-hidden {
   position: absolute;

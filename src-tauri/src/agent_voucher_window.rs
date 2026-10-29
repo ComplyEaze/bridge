@@ -18,6 +18,7 @@
 use super::*;
 use bridge_tally_core::book_presence::WindowRead;
 use bridge_tally_core::{DateSpan, TallyDate};
+use bridge_tally_protocol::ledger_scope::LedgerScopeName;
 use chrono::NaiveDate;
 
 /// Predicted encoded bytes one windowed read may carry.
@@ -140,6 +141,24 @@ impl VoucherReadShape {
         }
     }
 }
+
+/// Whose vouchers a window read plans and reads (#485): the book's, or those of one ledger.
+///
+/// A ledger enters only as a [`LedgerScopeName`], which `ledger_movement` and the `outstandings`
+/// party detail (#1356) build once, from the catalogue's own spelling of a ledger they resolved. Everything planned from a ledger-scoped census
+/// counts that ledger's vouchers alone, so such a read is never a count of the book: it earns no
+/// [`BracketedCount`], and its census is not a scan of the book.
+#[derive(Clone, Copy)]
+pub(super) enum WindowScope<'a> {
+    Book,
+    Ledger(&'a LedgerScopeName),
+}
+
+/// A ledger-scoped plan that needs a part the lab has not observed ledger-scoped (an AlterID span
+/// within one day, or a shape other than the movement read and the window read's fields). Refused
+/// before any such request is rendered; `ledger_movement` and the `outstandings` party detail answer
+/// it by reading the book's window instead.
+pub(super) const LEDGER_SCOPE_NEEDS_DAY_SPLIT: &str = "ledger_scope_plan_needs_day_split";
 
 /// An AlterID range `(after, through]`. Within one day it divides a day too
 /// heavy for one read; in a census it bounds each census request by
@@ -310,11 +329,56 @@ pub(super) const BOOK_TOO_LARGE: &str = "voucher_window_book_too_large";
 /// mark — while every voucher export naming that ledger changed. A read
 /// bracketed on the voucher mark alone returned `complete` across a rename made
 /// between two of its parts.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+///
+/// The voucher mark is what every comparison, census and empty-book check uses,
+/// with an answer that omits `ALTVCHID` read as 0 ([`CompanyMarks::vouchers`]).
+/// Whether Tally reported it is kept beside it ([`CompanyMarks::reported_vouchers`]),
+/// so a caller shown the mark is told "no mark" rather than a 0 Tally never sent
+/// (AGENTS.md P3). Equality is over the two marks alone, so a mark Tally omitted in
+/// one read and sent as 0 in another is the same book, as it was before the flag
+/// existed: no bracket, drift check or held-page reuse decides differently.
+#[derive(Clone, Copy, Debug)]
 pub(super) struct CompanyMarks {
-    pub(super) vouchers: u64,
-    pub(super) masters: u64,
+    voucher_mark: Option<u64>,
+    master_mark: u64,
 }
+
+impl CompanyMarks {
+    /// The marks from an answer's voucher mark (`None` when the answer omitted
+    /// it) and its master mark.
+    pub(super) const fn new(vouchers: Option<u64>, masters: u64) -> Self {
+        Self {
+            voucher_mark: vouchers,
+            master_mark: masters,
+        }
+    }
+
+    /// The voucher mark every comparison uses: 0 when the answer omitted it.
+    pub(super) const fn vouchers(self) -> u64 {
+        match self.voucher_mark {
+            Some(mark) => mark,
+            None => 0,
+        }
+    }
+
+    /// The master mark.
+    pub(super) const fn masters(self) -> u64 {
+        self.master_mark
+    }
+
+    /// The voucher mark as Tally answered it: `None` when it was not reported.
+    pub(super) const fn reported_vouchers(self) -> Option<u64> {
+        self.voucher_mark
+    }
+}
+
+impl PartialEq for CompanyMarks {
+    fn eq(&self, other: &Self) -> bool {
+        self.vouchers() == other.vouchers() && self.masters() == other.masters()
+    }
+}
+
+impl Eq for CompanyMarks {}
 
 /// What a divided read observed that a replay of it must still hold: the marks
 /// it opened and closed on (equal, or it would have been refused), and the
@@ -512,6 +576,24 @@ impl WindowCensus {
     /// outside the window is not a count of this window.
     fn within(&self, from: NaiveDate, to: NaiveDate) -> bool {
         self.days.keys().all(|day| *day >= from && *day <= to)
+    }
+
+    /// Whether any voucher was counted on a day in `[from, to]`.
+    pub(super) fn holds_a_voucher_between(
+        &self,
+        from: &TallyDate,
+        to: &TallyDate,
+    ) -> Result<bool, ToolFailure> {
+        let (from, to) = (day_of(from)?, day_of(to)?);
+        if from > to {
+            return Err(ToolFailure::from("invalid_date_range".to_string()));
+        }
+        Ok(self.days.range(from..=to).next().is_some())
+    }
+
+    /// Whether the census counted no voucher at all.
+    pub(super) fn is_empty(&self) -> bool {
+        self.days.is_empty()
     }
 
     /// The day's counted AlterIDs inside `span`, or all of them.
@@ -1581,9 +1663,43 @@ impl Server {
         T: WindowRow,
         P: FnMut(&str) -> Result<Vec<T>, String>,
     {
-        read_voucher_window_with(
+        self.read_scoped_voucher_window(
+            identity,
+            WindowScope::Book,
+            company,
+            from,
+            to,
+            shape,
+            source,
+            limits,
+            parse,
+        )
+        .await
+    }
+
+    /// [`Self::read_voucher_window`] for the vouchers of `scope`. See
+    /// [`read_scoped_voucher_window_with`].
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn read_scoped_voucher_window<T, P>(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        scope: WindowScope<'_>,
+        company: &str,
+        from: &TallyDate,
+        to: &TallyDate,
+        shape: VoucherReadShape,
+        source: WindowPlanSource,
+        limits: WindowReadLimits,
+        parse: P,
+    ) -> Result<WindowReadOutcome<T>, ToolFailure>
+    where
+        T: WindowRow,
+        P: FnMut(&str) -> Result<Vec<T>, String>,
+    {
+        read_scoped_voucher_window_with(
             &AgentReader(self),
             identity,
+            scope,
             company,
             from,
             to,
@@ -1635,6 +1751,44 @@ where
     T: WindowRow,
     P: FnMut(&str) -> Result<Vec<T>, String>,
 {
+    read_scoped_voucher_window_with(
+        reader,
+        identity,
+        WindowScope::Book,
+        company,
+        from,
+        to,
+        shape,
+        source,
+        limits,
+        parse,
+    )
+    .await
+}
+
+/// [`read_voucher_window_with`] for the vouchers of `scope`: the book's, or one ledger's (#485).
+/// A ledger-scoped read plans from a census of that ledger's vouchers and sends only parts the lab
+/// has observed ledger-scoped; a plan that needs another is refused with
+/// [`LEDGER_SCOPE_NEEDS_DAY_SPLIT`], never sent. Every admission and the closing bracket are the
+/// book-wide read's.
+#[allow(clippy::too_many_arguments)]
+pub(super) async fn read_scoped_voucher_window_with<R, T, P>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    shape: VoucherReadShape,
+    source: WindowPlanSource,
+    limits: WindowReadLimits,
+    parse: P,
+) -> Result<WindowReadOutcome<T>, ToolFailure>
+where
+    R: WindowReader,
+    T: WindowRow,
+    P: FnMut(&str) -> Result<Vec<T>, String>,
+{
     reader.begin_window();
     if reader.seals_its_reads()
         && !matches!(source, WindowPlanSource::Estimate { known_marks: None })
@@ -1643,7 +1797,7 @@ where
     }
     let timed = TimedReader::new(reader, from, to);
     let read = read_voucher_window_timed(
-        &timed, identity, company, from, to, shape, source, limits, parse,
+        &timed, identity, scope, company, from, to, shape, source, limits, parse,
     )
     .await;
     let timings = timed.into_timings();
@@ -1667,6 +1821,7 @@ where
 async fn read_voucher_window_timed<R, T, P>(
     reader: &TimedReader<'_, R>,
     identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
@@ -1711,7 +1866,7 @@ where
             match witness {
                 Some(witness) => {
                     opening = Some(witness.marks);
-                    ceiling = witness.marks.vouchers.max(
+                    ceiling = witness.marks.vouchers().max(
                         witness
                             .census
                             .as_ref()
@@ -1737,6 +1892,7 @@ where
                 WindowPlanSource::Estimate { known_marks } => estimate_window_volume(
                     reader,
                     identity,
+                    scope,
                     company,
                     (from, to),
                     (first, last),
@@ -1757,7 +1913,7 @@ where
                 } => {
                     if let Some(counted) = &counted {
                         ceiling = marks
-                            .map_or(0, |marks| marks.vouchers)
+                            .map_or(0, |marks| marks.vouchers())
                             .max(counted.max_alter_id());
                     }
                     census = counted;
@@ -1772,7 +1928,7 @@ where
                     marks,
                 } => {
                     ceiling = marks
-                        .map_or(0, |marks| marks.vouchers)
+                        .map_or(0, |marks| marks.vouchers())
                         .max(counted.max_alter_id());
                     let plan = plan_window_reads(
                         first,
@@ -1829,8 +1985,14 @@ where
                 .into_failure());
             }
             dispatched += 1;
-            let request =
-                voucher_window_part_read(shape, company, &part.from, &part.to, part.span)?;
+            let request = match scope {
+                WindowScope::Book => {
+                    voucher_window_part_read(shape, company, &part.from, &part.to, part.span)?
+                }
+                WindowScope::Ledger(ledger) => {
+                    ledger_part_read(shape, company, ledger, &part.from, &part.to, part.span)?
+                }
+            };
             match reader
                 .read(identity, request, WindowReadKind::Part(part.clone()))
                 .await
@@ -1979,6 +2141,7 @@ where
     // one: it is itself the second read. A reader that does not seal closes
     // only a divided read, so closing the marks is what says the read was divided.
     let bracketed = (!replaying
+        && matches!(scope, WindowScope::Book)
         && !reader.seals_its_reads()
         && closed_on_opening_marks
         && census.as_ref().is_some_and(WindowCensus::names_every_guid))
@@ -2024,6 +2187,125 @@ impl Server {
     }
 }
 
+/// What a count-only read of a window established.
+pub(super) enum WindowCount {
+    /// The book holds no voucher, or fits one request, so its window is not
+    /// counted: a caller that needs the rows reads the window whole. `marks` are
+    /// the company marks this read took, or the ones it was given; `evidence` is
+    /// the read that took them, if it took any.
+    NotCounted {
+        marks: Option<CompanyMarks>,
+        evidence: Option<Evidence>,
+    },
+    /// Every voucher the window holds, counted per day, bracketed by the company
+    /// marks read before and after. No data part was sent.
+    Counted {
+        census: WindowCensus,
+        evidence: Evidence,
+    },
+}
+
+/// Count `window` with a census of its own and send no data part (#1240). A
+/// caller that needs only to know whether, and on which days, the window holds
+/// vouchers has what it needs from the census: its rows carry each voucher's
+/// day. Nothing is admitted against the count. A count taken in one request is
+/// one observation, as a window read whole is; a count divided into several
+/// spans is bracketed as a divided window read is: both company marks are read
+/// again after the last census request, and marks that moved refuse it
+/// ([`WINDOW_CHANGED_DURING_READ`]).
+pub(super) async fn count_window_only<R: WindowReader>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    (from, to): (&TallyDate, &TallyDate),
+    known_marks: Option<CompanyMarks>,
+    limits: WindowReadLimits,
+) -> Result<WindowCount, ToolFailure> {
+    reader.begin_window();
+    if reader.seals_its_reads() {
+        // A sealed record admits its data against a census; this reads none.
+        return Err(AUDIT_WINDOW_NEEDS_ITS_OWN_MARKS.to_string().into());
+    }
+    let days = (day_of(from)?, day_of(to)?);
+    if days.0 > days.1 {
+        return Err("invalid_date_range".to_string().into());
+    }
+    let mut preflight = None;
+    let mut opening = None;
+    let mut boundary = None;
+    let estimate = estimate_window_volume(
+        reader,
+        identity,
+        WindowScope::Book,
+        company,
+        (from, to),
+        days,
+        known_marks,
+        limits,
+        &mut preflight,
+        &mut opening,
+        &mut boundary,
+    )
+    .await
+    .map_err(|failure| with_prior(failure, &preflight, &None))?;
+    let census = match estimate {
+        Preflight::Whole { census: None, .. } => {
+            return Ok(WindowCount::NotCounted {
+                marks: opening,
+                evidence: preflight,
+            })
+        }
+        Preflight::Whole {
+            census: Some(census),
+            ..
+        }
+        | Preflight::Counted { census, .. } => census,
+    };
+    let mut closing = None;
+    if let Some(opened) = opening {
+        let spans = census_spans(opened.vouchers(), limits.census_capacity())
+            .map_or(usize::MAX, Iterator::count);
+        if spans > 1 {
+            let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
+                .await
+                .map_err(|failure| with_prior_closed(failure, &preflight, &None, &closing))?;
+            if closed != opened {
+                return Err(with_prior_closed(
+                    WINDOW_CHANGED_DURING_READ.to_string().into(),
+                    &preflight,
+                    &None,
+                    &closing,
+                ));
+            }
+        }
+    }
+    let evidence = chronological(&preflight, &None, &closing)
+        .unwrap_or_else(|| super::agent_import::local_evidence("voucher_window_count_empty"));
+    Ok(WindowCount::Counted { census, evidence })
+}
+
+impl Server {
+    /// [`count_window_only`] through the agent's own paired read.
+    pub(super) async fn count_voucher_window(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &str,
+        window: (&TallyDate, &TallyDate),
+        known_marks: Option<CompanyMarks>,
+        limits: WindowReadLimits,
+    ) -> Result<WindowCount, ToolFailure> {
+        count_window_only(
+            &AgentReader(self),
+            identity,
+            company,
+            window,
+            known_marks,
+            limits,
+        )
+        .await
+    }
+}
+
 async fn read_marks<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
@@ -2051,6 +2333,7 @@ async fn read_marks<R: WindowReader>(
 async fn estimate_window_volume<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
     company: &str,
     window: (&TallyDate, &TallyDate),
     days: (NaiveDate, NaiveDate),
@@ -2065,7 +2348,7 @@ async fn estimate_window_volume<R: WindowReader>(
         None => read_marks(reader, identity, company, preflight, boundary).await?,
     };
     *observed_marks = Some(marks);
-    let high_water = marks.vouchers;
+    let high_water = marks.vouchers();
     // Every voucher carries a distinct AlterID no greater than the high-water
     // mark (§10), so the book — and therefore any window of it — holds at
     // most `high_water` vouchers. A mark of zero is a company that has never
@@ -2080,7 +2363,7 @@ async fn estimate_window_volume<R: WindowReader>(
         });
     }
     let rows = census_window(
-        reader, identity, company, window, days, high_water, limits, preflight, boundary,
+        reader, identity, scope, company, window, days, high_water, limits, preflight, boundary,
     )
     .await?;
     let census = WindowCensus::from_census_rows(rows)
@@ -2126,6 +2409,7 @@ pub(super) fn census_read_count(
 async fn census_window<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
+    scope: WindowScope<'_>,
     company: &str,
     (from, to): (&TallyDate, &TallyDate),
     days: (NaiveDate, NaiveDate),
@@ -2146,7 +2430,21 @@ async fn census_window<R: WindowReader>(
     let mut spans = spans.peekable();
     let mut rows = Vec::new();
     while let Some(span) = spans.next() {
-        let request = voucher_census_read(company, from, to, span)?;
+        // A ledger census is always spanned, the one form observed: a book that fits
+        // one census request is asked over (0, high_water], the same rows.
+        let span = match scope {
+            WindowScope::Book => span,
+            WindowScope::Ledger(_) => Some(span.unwrap_or(AlterIdSpan {
+                after: 0,
+                through: high_water,
+            })),
+        };
+        let request = match (scope, span) {
+            (WindowScope::Ledger(ledger), Some(span)) => {
+                ledger_census_read(company, ledger, from, to, span)?
+            }
+            _ => voucher_census_read(company, from, to, span)?,
+        };
         let (xml, evidence) = match reader.read(identity, request, WindowReadKind::Census).await {
             Ok((xml, evidence, observed)) => {
                 observe_boundary(boundary, observed);
@@ -2467,12 +2765,12 @@ pub(super) fn split_verification_window(
 
 /// The company's marks, with a company that has never held a voucher read as a
 /// voucher mark of zero (Tally omits `ALTVCHID` for it; see
-/// `pre_import_mark_refusal`). A response the marks cannot be read from is
+/// `pre_import_mark_refusal`) and recorded as not reported. A response the marks cannot be read from is
 /// refused with the parser's own code — never read as an empty book, and never
 /// folded into a planning or bracket outcome that would hide which it was.
 pub(super) fn company_marks(xml: &str, company_guid: &str) -> Result<CompanyMarks, String> {
-    parse_company_marks(xml, company_guid)
-        .map(|(vouchers, masters)| CompanyMarks { vouchers, masters })
+    parse_company_marks_as_answered(xml, company_guid)
+        .map(|(vouchers, masters)| CompanyMarks::new(vouchers, masters))
 }
 
 /// Parse a census response into a [`CensusRow`] per voucher.

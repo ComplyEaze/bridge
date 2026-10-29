@@ -8,8 +8,9 @@
 //! `approved_import.rs`); this module adds a parallel, narrowly-scoped
 //! surface rather than changing those. Scope for this pass (3.1/3.2): the
 //! shared lab guard machinery (a later lab writer will reuse
-//! `admit_lab_target`) and one read-only tool, `lab_read_inventory`. No write
-//! path exists anywhere in this file.
+//! `admit_lab_target`) and one read-only tool, `lab_read_inventory`. No Tally
+//! write path exists anywhere in this file; it writes only lab evidence under
+//! the data folder (each exchange, and a kept audit read).
 //!
 //! No signed compatibility evidence exists for any inventory field read here
 //! on any Tally release/mode:
@@ -251,6 +252,117 @@ fn persist_lab_exchange(
         "response_sha256": response_sha256,
     });
     append_egress_line(&dir.join("lab-manifest.jsonl"), &record.to_string())
+}
+
+/// The guards a kept audit read must pass, before the read is made: the
+/// always-on lab preconditions (lab writes on, port 9001, a well-formed target
+/// and deny list), and the company being read being the lab's target. A run
+/// keeps a book only when `BRIDGE_LAB_TARGET_GUID` names it on purpose; the
+/// deny list never holds the target (`LabGuardConfig::from_values`), so the
+/// target check also keeps out every denied company.
+pub(super) fn admit_audit_read_capture(
+    server: &Server,
+    company_guid: &str,
+) -> Result<CaptureGrant, ToolFailure> {
+    let config = require_lab_read_guards(server)?;
+    capture_target_admitted(&config, company_guid).map_err(ToolFailure::from)?;
+    Ok(CaptureGrant(()))
+}
+
+/// Proof that `admit_audit_read_capture` passed for this call:
+/// `persist_audit_read` takes one, so a read cannot be kept without the guards.
+pub(super) struct CaptureGrant(());
+
+fn capture_target_admitted(config: &LabGuardConfig, company_guid: &str) -> Result<(), String> {
+    if company_guid.eq_ignore_ascii_case(&config.target_guid) {
+        Ok(())
+    } else {
+        Err("lab_audit_read_not_target".to_string())
+    }
+}
+
+/// Writes an admitted audit read to `data_dir/lab/audit-reads/<manifest
+/// sha256>/` as the directory `Read::open` and the crate's `local_parity`
+/// read, so a real-book parity record can be made from exactly what the audit
+/// read sent and admitted. The tool's answer does not change. The folder is
+/// new for each read: one that already exists is refused, never written into.
+/// It holds a book's raw answers and stays on this computer; it is written
+/// only for the lab's target company (`admit_audit_read_capture`). Nothing
+/// deletes it: committing none of it, and deleting a client book's copy at the
+/// end of its review cycle (the manifest line names the company), are the
+/// lab's own duties, not this code's.
+pub(super) fn persist_audit_read(
+    server: &Server,
+    _grant: CaptureGrant,
+    stored: &super::audit_read::StoredRead,
+) -> Result<(), String> {
+    let reads = lab_evidence_dir(server)?.join("audit-reads");
+    private_dir(&reads)?;
+    write_audit_read(&reads, stored)?;
+    let record = json!({
+        "tool": "audit_test_run",
+        "at": Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        "read_id": stored.read_id,
+        // The company, so a client book's copy can be found and deleted at
+        // the end of its review cycle.
+        "company_guid": stored.company_guid,
+        "manifest_sha256": stored.manifest_sha256,
+        "parts": stored.blobs.len(),
+    });
+    append_egress_line(
+        &lab_evidence_dir(server)?.join("lab-manifest.jsonl"),
+        &record.to_string(),
+    )
+}
+
+/// The read's own folder under `reads`, made new, then its manifest and parts.
+pub(super) fn write_audit_read(
+    reads: &std::path::Path,
+    stored: &super::audit_read::StoredRead,
+) -> Result<(), String> {
+    // A manifest path is `parts/` and one plain file name: anything else
+    // could leave the read's folder. Every name is checked before anything is
+    // written.
+    let parts = stored
+        .blobs
+        .iter()
+        .map(|(path, bytes)| {
+            path.strip_prefix("parts/")
+                .filter(|name| {
+                    !name.is_empty() && *name != ".." && *name != "." && !name.contains(['/', '\\'])
+                })
+                .map(|name| (name, bytes))
+                .ok_or_else(|| "lab_evidence_write_failed".to_string())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let dir = reads.join(&stored.manifest_sha256);
+    // Not recursive, so a folder that already exists is refused; owner-only
+    // from creation, as `ensure_private_directory` then checks.
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(&dir).map_err(|error| match error.kind() {
+        std::io::ErrorKind::AlreadyExists => "lab_audit_read_exists".to_string(),
+        _ => "lab_evidence_write_failed".to_string(),
+    })?;
+    private_dir(&dir)?;
+    private_dir(&dir.join("parts"))?;
+    write_private_file(&dir.join("manifest.json"), &stored.manifest)?;
+    for (name, bytes) in parts {
+        write_private_file(&dir.join("parts").join(name), bytes)?;
+    }
+    Ok(())
+}
+
+fn private_dir(dir: &std::path::Path) -> Result<(), String> {
+    ensure_private_directory(dir).map_err(|error| match error {
+        DirectoryAdmissionError::Unavailable => "lab_dir_unavailable".to_string(),
+        #[cfg(unix)]
+        DirectoryAdmissionError::Permissions => "lab_dir_permissions_failed".to_string(),
+    })
 }
 
 fn write_private_file(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
@@ -894,6 +1006,358 @@ pub(super) async fn lab_read_inventory(
 }
 
 // ---------------------------------------------------------------------------
+// The tool: lab_read_purchase_identity (#1904)
+// ---------------------------------------------------------------------------
+
+/// Differences listed at most, so a read that differs everywhere stays a small answer.
+const MAX_IDENTITY_DIFFERENCES: usize = 100;
+
+/// The widest window this tool reads, in days: both reads go out whole, unplanned, where the
+/// production read would plan a heavy window from a census and divide it, so the tool stays on
+/// windows the production read sends whole on a lab book.
+const MAX_IDENTITY_WINDOW_DAYS: usize = 31;
+
+/// Where two parsed reads of one window differ, keyed by the voucher's GUID (the parser refuses a
+/// repeated or missing one): a GUID one read has and the other lacks, and every row field whose
+/// value differs (`amounts` holds each entry's ledger, amount and side and its bill allocations).
+/// Only the fields the parser keeps are compared. Only the field's name is listed, never its
+/// values, which can be names from the book: the values are in the exchange this tool persists on
+/// the lab machine.
+fn purchase_identity_differences(agent: &[Value], narrow: &[Value]) -> Vec<Value> {
+    let by_guid = |rows: &[Value]| {
+        rows.iter()
+            .filter_map(|row| Some((row["guid"].as_str()?.to_string(), row.clone())))
+            .collect::<BTreeMap<_, _>>()
+    };
+    let (agent, narrow) = (by_guid(agent), by_guid(narrow));
+    let guids = agent
+        .keys()
+        .chain(narrow.keys())
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut out = Vec::new();
+    for guid in guids {
+        match (agent.get(guid), narrow.get(guid)) {
+            (Some(_), None) => out.push(json!({"guid": guid, "only_in": "agent"})),
+            (None, Some(_)) => out.push(json!({"guid": guid, "only_in": "narrow"})),
+            (Some(left), Some(right)) => {
+                let fields = left
+                    .as_object()
+                    .into_iter()
+                    .chain(right.as_object())
+                    .flat_map(|row| row.keys())
+                    .collect::<std::collections::BTreeSet<_>>();
+                for field in fields {
+                    if left.get(field) != right.get(field) {
+                        out.push(json!({"guid": guid, "field": field}));
+                    }
+                }
+            }
+            (None, None) => {}
+        }
+    }
+    out
+}
+
+/// One read's size: its rows and the characters of its decoded answer (the whole answer, envelope
+/// included; the wire carries it as UTF-16), per row.
+fn identity_read_size(xml: &str, rows: usize) -> Value {
+    let chars = xml.chars().count();
+    json!({
+        "rows": rows,
+        "response_chars": chars,
+        "response_chars_per_row": (rows > 0).then(|| chars / rows),
+    })
+}
+
+/// Whether `from..=to` spans at most [`MAX_IDENTITY_WINDOW_DAYS`] days.
+fn identity_window_fits(
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
+) -> bool {
+    let mut day = from.clone();
+    for _ in 1..MAX_IDENTITY_WINDOW_DAYS {
+        if &day >= to {
+            return true;
+        }
+        match day.next_day() {
+            Ok(next) => day = next,
+            Err(_) => return false,
+        }
+    }
+    &day >= to
+}
+
+/// LAB-ONLY: the candidate narrow read for a supplier invoice already in the books (#1904), sent
+/// beside the agent read it would replace, on the same window, through the same dispatch path, and
+/// compared field by field after the same parser. It writes nothing.
+pub(super) async fn lab_read_purchase_identity(
+    server: &Server,
+    args: &Value,
+) -> Result<ToolOutcome, ToolFailure> {
+    let guid = required_string(args, "company_guid")?;
+    let date = |key| -> Result<bridge_tally_core::TallyDate, ToolFailure> {
+        Ok(normalized_date(required_string(args, key)?)?)
+    };
+    let (from, to) = (date("from")?, date("to")?);
+    if from > to {
+        return Err("invalid_date_range".to_string().into());
+    }
+    if !identity_window_fits(&from, &to) {
+        return Err("lab_identity_window_too_wide".to_string().into());
+    }
+    require_lab_read_guards(server)?;
+    let (company, identity, mut evidence) = server.verified_company(guid).await?;
+    let result: Result<ToolOutcome, ToolFailure> = async {
+        let mut reads = Vec::new();
+        for (label, request) in [
+            (
+                "lab_read_purchase_identity.agent",
+                lab_agent_class_vouchers_read(identity.display_name(), &from, &to),
+            ),
+            (
+                "lab_read_purchase_identity.narrow",
+                lab_purchase_identity_vouchers_read(identity.display_name(), &from, &to),
+            ),
+        ] {
+            let request = request.map_err(ToolFailure::from)?;
+            let (xml, read_evidence) = lab_post_read(server, &identity, label, request).await?;
+            evidence = combine_evidence(evidence.clone(), read_evidence);
+            // A refusal of the narrow answer by the parser is a finding of this tool, not a
+            // failure of it: it is returned beside the agent read's size.
+            let parsed = parse_agent_rows(&xml, identity.company_guid());
+            if let Ok(rows) = &parsed {
+                if !window_honoured(rows, from.as_str(), to.as_str()) {
+                    return Err(ToolFailure::from("window_not_honoured".to_string())
+                        .with_prior_evidence(evidence.clone()));
+                }
+            }
+            reads.push((xml, parsed));
+        }
+        let (narrow_xml, narrow) = reads.pop().expect("two reads");
+        let (agent_xml, agent) = reads.pop().expect("two reads");
+        let agent =
+            agent.map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+        // Each read's window was checked against its own rows; a refused narrow answer was not.
+        let mut agent_size = identity_read_size(&agent_xml, agent.len());
+        agent_size["window_honoured"] = json!(true);
+        let mut result = json!({
+            "profile": "lab_read_purchase_identity_v1",
+            "agent": agent_size,
+        });
+        match narrow {
+            Err(code) => {
+                result["narrow"] = json!({"refused": code});
+            }
+            Ok(narrow) => {
+                let differences = purchase_identity_differences(&agent, &narrow);
+                let mut narrow_size = identity_read_size(&narrow_xml, narrow.len());
+                narrow_size["window_honoured"] = json!(true);
+                result["narrow"] = narrow_size;
+                // Two empty answers agree vacuously: no voucher was compared.
+                result["inconclusive"] = json!(agent.is_empty() && narrow.is_empty());
+                result["differences"] = json!({
+                    "total": differences.len(),
+                    "listed": differences.iter().take(MAX_IDENTITY_DIFFERENCES).collect::<Vec<_>>(),
+                    "listed_truncated": differences.len() > MAX_IDENTITY_DIFFERENCES,
+                });
+            }
+        }
+        Ok(ToolOutcome {
+            payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
+            evidence: evidence.clone(),
+            company_guid: Some(guid.to_string()),
+            truncated: false,
+        })
+    }
+    .await;
+    result.map_err(|failure| failure.with_prior_evidence(evidence))
+}
+
+// ---------------------------------------------------------------------------
+
+// The tool: lab_voucher_key_probe (#685)
+// ---------------------------------------------------------------------------
+
+/// The voucher method the probe's day-window formula compares with its key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ProbeTerm {
+    /// A voucher's own GUID: the control, measured to select one voucher
+    /// (protocol reference 9.15).
+    Guid,
+    /// `$RemoteID`: the question is whether it holds the client REMOTEID a
+    /// native post sent, which no read has returned so far (9.3).
+    RemoteId,
+}
+
+impl ProbeTerm {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "guid" => Ok(Self::Guid),
+            "remote_id" => Ok(Self::RemoteId),
+            _ => Err("lab_probe_term_invalid".to_string()),
+        }
+    }
+
+    fn method(self) -> &'static str {
+        match self {
+            Self::Guid => "$GUID",
+            Self::RemoteId => "$RemoteID",
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Guid => "guid",
+            Self::RemoteId => "remote_id",
+        }
+    }
+}
+
+/// A key the probe may compare: a lowercase UUID (the REMOTEID a native post
+/// minted), optionally followed by `-` and eight hex digits (a voucher's GUID:
+/// its company's GUID and its MasterID). The key lands inside a quoted TDL
+/// literal, which XML escaping cannot protect (#861), so it is admitted only
+/// from hex digits and hyphens in those groups (AGENTS.md P7).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ProbeKey(String);
+
+impl ProbeKey {
+    pub(super) fn new(value: &str) -> Result<Self, String> {
+        let groups = value.split('-').collect::<Vec<_>>();
+        let lengths: &[usize] = match groups.len() {
+            5 => &[8, 4, 4, 4, 12],
+            6 => &[8, 4, 4, 4, 12, 8],
+            _ => return Err("lab_probe_key_invalid".to_string()),
+        };
+        let admitted = groups.iter().zip(lengths).all(|(group, &length)| {
+            group.len() == length
+                && group
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        });
+        admitted
+            .then(|| Self(value.to_string()))
+            .ok_or_else(|| "lab_probe_key_invalid".to_string())
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// One day's vouchers whose `term` equals `key`, with the voucher's
+/// `$RemoteID` computed beside its identity, so one answer shows both whether
+/// the filter selected a voucher and what that method holds for it. The
+/// collection's ID is its name, and the day is a `TallyDate`.
+pub(super) fn render_lab_voucher_key_probe(
+    company: &str,
+    day: &bridge_tally_core::TallyDate,
+    term: ProbeTerm,
+    key: &ProbeKey,
+) -> Result<String, String> {
+    let company = ValidatedCompanyName::new(company.to_string())
+        .map_err(|_| "company_name_invalid".to_string())?;
+    let (day, method, key) = (day.as_str(), term.method(), key.as_str());
+    Ok(format!(
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Lab Voucher Key Probe</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{day}</SVFROMDATE><SVTODATE TYPE="Date">{day}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeLabKeyProbe">$Date &gt;= $$Date:"{day}" AND $Date &lt;= $$Date:"{day}" AND {method} = "{key}"</SYSTEM><COLLECTION NAME="Bridge Lab Voucher Key Probe" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERTYPENAME,GUID,MASTERID,ALTERID,ISCANCELLED,ISOPTIONAL</FETCH><COMPUTE>BRIDGEREMOTEID:$RemoteID</COMPUTE><FILTERS>BridgeLabKeyProbe</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+        xml_escape(company.as_str())
+    ))
+}
+
+/// The probe's answer. Only a row with a GUID is counted as a voucher: an
+/// earlier `$RemoteID` probe answered one empty `VOUCHER` whatever it asked,
+/// which must never read as a match (AGENTS.md P5).
+fn key_probe_result(
+    term: ProbeTerm,
+    key: &ProbeKey,
+    day: &bridge_tally_core::TallyDate,
+    rows: &[BTreeMap<String, String>],
+) -> Value {
+    let identified = rows
+        .iter()
+        .filter(|row| row.get("GUID").is_some_and(|guid| !guid.trim().is_empty()))
+        .collect::<Vec<_>>();
+    let vouchers = identified
+        .iter()
+        .take(KEY_PROBE_LISTED)
+        .map(|row| {
+            let remote_id = row.get("BRIDGEREMOTEID").map(|value| value.trim());
+            json!({
+                "guid": optional_field(row, "GUID"),
+                "master_id": optional_field(row, "MASTERID"),
+                "alter_id": optional_field(row, "ALTERID"),
+                "date": optional_field(row, "DATE"),
+                "voucher_type": optional_field(row, "VOUCHERTYPENAME"),
+                "cancelled": optional_field(row, "ISCANCELLED"),
+                "optional": optional_field(row, "ISOPTIONAL"),
+                "remote_id": optional_field(row, "BRIDGEREMOTEID"),
+                "remote_id_equals_key": remote_id
+                    .is_some_and(|remote_id| remote_id.eq_ignore_ascii_case(key.as_str())),
+                "remote_id_equals_guid": remote_id.is_some_and(|remote_id| {
+                    row.get("GUID")
+                        .is_some_and(|guid| guid.trim().eq_ignore_ascii_case(remote_id))
+                }),
+            })
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "term": term.name(),
+        "key": key.as_str(),
+        "date": day.as_str(),
+        "vouchers_with_guid": identified.len(),
+        "rows_without_guid": rows.len() - identified.len(),
+        "vouchers": vouchers,
+        "profile": "lab_voucher_key_probe_v1",
+    })
+}
+
+/// The probe reads only `BRIDGE_LAB_TARGET_GUID`'s company: a request shape
+/// not yet observed is sent to the book the lab set aside for it, never to
+/// another company loaded on the lab's port.
+fn probe_target_admitted(config: &LabGuardConfig, company_guid: &str) -> Result<(), String> {
+    company_guid
+        .trim()
+        .eq_ignore_ascii_case(&config.target_guid)
+        .then_some(())
+        .ok_or_else(|| "lab_probe_company_not_target".to_string())
+}
+
+/// The vouchers a probe answer lists; the count covers them all.
+const KEY_PROBE_LISTED: usize = 20;
+
+pub(super) async fn lab_voucher_key_probe(
+    server: &Server,
+    args: &Value,
+) -> Result<ToolOutcome, ToolFailure> {
+    let guid = required_string(args, "company_guid")?;
+    let day = normalized_date(required_string(args, "date")?)?;
+    let term = ProbeTerm::parse(required_string(args, "term")?)?;
+    let key = ProbeKey::new(required_string(args, "key")?)?;
+    // A read, with the always-on lab preconditions; unlike `lab_read_inventory`
+    // it reads only the lab's target company, since its request is a new shape.
+    let config = require_lab_read_guards(server)?;
+    probe_target_admitted(&config, guid)?;
+    let (company, identity, evidence) = server.verified_company(guid).await?;
+    let request = lab_voucher_key_probe_read(identity.display_name(), &day, term, &key)
+        .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+    let (xml, read_evidence) = lab_post_read(server, &identity, "lab_voucher_key_probe", request)
+        .await
+        .map_err(|failure| failure.with_prior_evidence(evidence.clone()))?;
+    let evidence = combine_evidence(evidence, read_evidence);
+    let rows = parse_lab_master_rows(&xml, "VOUCHER")
+        .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+    Ok(ToolOutcome {
+        payload: json!({
+            "company": company_json(&company, std::slice::from_ref(&company)),
+            "result": key_probe_result(term, &key, &day, &rows),
+        }),
+        evidence,
+        company_guid: Some(guid.to_string()),
+        truncated: false,
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Tests -- synthetic fixtures only (BRIDGE CORPUS GST-style shapes), no
 // client data, and no live Tally connection.
 // ---------------------------------------------------------------------------
@@ -917,6 +1381,26 @@ mod tests {
         ENV_MUTEX
             .lock()
             .unwrap_or_else(|poison| poison.into_inner())
+    }
+
+    /// A kept audit read is admitted only for the lab's target company, in
+    /// any case; any other company, a denied one included, is refused.
+    #[test]
+    fn only_the_lab_target_keeps_its_audit_read() {
+        let config =
+            LabGuardConfig::from_values(TARGET_GUID, &format!("{DENY_GUID_1},{DENY_GUID_2}"))
+                .unwrap();
+        assert!(capture_target_admitted(&config, &TARGET_GUID.to_uppercase()).is_ok());
+        for other in [
+            DENY_GUID_1,
+            DENY_GUID_2,
+            "00000000-0000-4000-8000-000000000002",
+        ] {
+            assert_eq!(
+                capture_target_admitted(&config, other),
+                Err("lab_audit_read_not_target".to_string())
+            );
+        }
     }
 
     fn synthetic_unit_collection() -> String {
@@ -1163,6 +1647,8 @@ mod tests {
             "lab_import_masters",
             "lab_import_vouchers",
             "lab_read_inventory",
+            "lab_read_purchase_identity",
+            "lab_voucher_key_probe",
         ] {
             assert_eq!(
                 names.iter().filter(|name| **name == lab).count(),
@@ -1685,6 +2171,7 @@ mod tests {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let expected = render_lab_master_collection(
@@ -1802,5 +2289,178 @@ mod tests {
                 kind.tally_type()
             );
         }
+    }
+
+    /// #1904: the candidate narrow read is the agent's class-resolved read with only its entry
+    /// wildcard narrowed, so a difference between the two answers is the FETCH list's alone.
+    #[test]
+    fn the_narrow_purchase_identity_read_differs_from_the_agent_read_only_in_its_entry_fields() {
+        let from = bridge_tally_core::TallyDate::parse("20251201").unwrap();
+        let to = bridge_tally_core::TallyDate::parse("20251231").unwrap();
+        let narrow =
+            render_agent_lab_purchase_identity_vouchers("BRIDGE GST LEDGER LAB", &from, &to)
+                .unwrap();
+        let agent =
+            render_agent_class_vouchers_in_span("BRIDGE GST LEDGER LAB", &from, &to, None).unwrap();
+        let entries = "ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,\
+ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,ALLLEDGERENTRIES.BILLALLOCATIONS.*,";
+        assert_eq!(narrow.matches(entries).count(), 1, "{narrow}");
+        assert_eq!(narrow.replace(entries, "ALLLEDGERENTRIES.*,"), agent);
+    }
+
+    #[test]
+    fn purchase_identity_differences_name_the_voucher_and_field_never_their_values() {
+        let row = |guid: &str, party: &str| {
+            json!({"guid": guid, "party": party, "reference": "GS1/P/0001",
+                   "amounts": [{"ledger": "Purchase - Goods", "amount": "-10000.00"}]})
+        };
+        let agent = vec![
+            row("g-1", "SYN GS1 Supplier B"),
+            row("g-2", "SYN GS1 Supplier B"),
+        ];
+        assert!(purchase_identity_differences(&agent, &agent.clone()).is_empty());
+        // A bill allocation the narrow read lost, a voucher only one read has.
+        let mut narrow = vec![agent[0].clone()];
+        narrow[0]["amounts"][0]["bill_allocations"] = json!([]);
+        let found = purchase_identity_differences(&agent, &narrow);
+        assert_eq!(
+            found,
+            vec![
+                json!({"guid": "g-1", "field": "amounts"}),
+                json!({"guid": "g-2", "only_in": "agent"}),
+            ]
+        );
+        assert!(!found
+            .iter()
+            .any(|item| item.to_string().contains("SYN GS1")));
+    }
+
+    #[test]
+    fn the_identity_read_takes_a_window_of_at_most_31_days() {
+        let date = |text: &str| bridge_tally_core::TallyDate::parse(text).unwrap();
+        assert!(identity_window_fits(&date("20251201"), &date("20251201")));
+        assert!(identity_window_fits(&date("20251201"), &date("20251231")));
+        assert!(!identity_window_fits(&date("20251201"), &date("20260101")));
+        assert!(identity_window_fits(&date("20250201"), &date("20250303")));
+        assert!(!identity_window_fits(&date("20250401"), &date("20260331")));
+    }
+
+    /// A native post's REMOTEID and a voucher GUID, from the merge gate's
+    /// synthetic-UUID registry (the second is BRIDGE SHAPE LAB's company GUID
+    /// with a MasterID).
+    const PROBE_REMOTE_ID: &str = "00000000-0000-4000-8000-000000000002";
+    const PROBE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ce";
+
+    fn probe_day() -> bridge_tally_core::TallyDate {
+        bridge_tally_core::TallyDate::parse("20250410".to_string()).unwrap()
+    }
+
+    #[test]
+    fn a_probe_key_is_a_lowercase_uuid_or_a_voucher_guid() {
+        for key in [PROBE_REMOTE_ID, PROBE_GUID] {
+            assert_eq!(ProbeKey::new(key).unwrap().as_str(), key);
+        }
+        for key in [
+            "",
+            "00000000-0000-4000-8000-00000000000",
+            "00000000-0000-4000-8000-0000000000022",
+            "00000000-0000-4000-8000-00000000000A",
+            "00000000-0000-4000-8000-00000000000\"",
+            "00000000-0000-4000-8000-000000000002 ",
+            "00000000000040008000000000000002",
+            "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000c",
+            "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ce-00000001",
+            "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000cg",
+        ] {
+            assert_eq!(
+                ProbeKey::new(key),
+                Err("lab_probe_key_invalid".to_string()),
+                "{key:?}"
+            );
+        }
+        assert_eq!(
+            ProbeTerm::parse("REMOTEID"),
+            Err("lab_probe_term_invalid".to_string())
+        );
+    }
+
+    #[test]
+    fn the_key_probe_request_has_the_term_and_key_as_its_only_variables() {
+        let key = ProbeKey::new(PROBE_REMOTE_ID).unwrap();
+        let request = |term| {
+            render_lab_voucher_key_probe("BRIDGE UPSERT LAB", &probe_day(), term, &key).unwrap()
+        };
+        assert_eq!(
+            request(ProbeTerm::RemoteId),
+            r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Lab Voucher Key Probe</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>BRIDGE UPSERT LAB</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">20250410</SVFROMDATE><SVTODATE TYPE="Date">20250410</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeLabKeyProbe">$Date &gt;= $$Date:"20250410" AND $Date &lt;= $$Date:"20250410" AND $RemoteID = "00000000-0000-4000-8000-000000000002"</SYSTEM><COLLECTION NAME="Bridge Lab Voucher Key Probe" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERTYPENAME,GUID,MASTERID,ALTERID,ISCANCELLED,ISOPTIONAL</FETCH><COMPUTE>BRIDGEREMOTEID:$RemoteID</COMPUTE><FILTERS>BridgeLabKeyProbe</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#
+        );
+        assert_eq!(
+            request(ProbeTerm::Guid),
+            request(ProbeTerm::RemoteId).replace(r#"AND $RemoteID = ""#, r#"AND $GUID = ""#)
+        );
+        for term in [ProbeTerm::Guid, ProbeTerm::RemoteId] {
+            assert!(
+                crate::tally::agent_read_request::AgentReadRequest::parse(request(term)).is_ok()
+            );
+        }
+    }
+
+    #[test]
+    fn a_probe_answer_counts_only_rows_with_a_guid_and_says_what_remote_id_holds() {
+        let answer = |remote_id: &str| {
+            format!(
+                "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+<VOUCHER REMOTEID=\"{PROBE_GUID}\" VCHTYPE=\"Payment\"><DATE>20250410</DATE>\
+<VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><GUID>{PROBE_GUID}</GUID><MASTERID>206</MASTERID>\
+<ALTERID>41</ALTERID><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL>\
+<BRIDGEREMOTEID>{remote_id}</BRIDGEREMOTEID></VOUCHER>\
+<VOUCHER>\r\n</VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
+            )
+        };
+        let key = ProbeKey::new(PROBE_REMOTE_ID).unwrap();
+        let read = |xml: &str| {
+            let rows = parse_lab_master_rows(xml, "VOUCHER").unwrap();
+            key_probe_result(ProbeTerm::RemoteId, &key, &probe_day(), &rows)
+        };
+        // $RemoteID holds the voucher's own GUID: the key is not there
+        let guid = read(&answer(PROBE_GUID));
+        assert_eq!(guid["vouchers_with_guid"], 1);
+        assert_eq!(
+            guid["rows_without_guid"], 1,
+            "the empty row is not a voucher"
+        );
+        assert_eq!(guid["vouchers"][0]["guid"], PROBE_GUID);
+        assert_eq!(guid["vouchers"][0]["master_id"], "206");
+        assert_eq!(guid["vouchers"][0]["remote_id_equals_guid"], true);
+        assert_eq!(guid["vouchers"][0]["remote_id_equals_key"], false);
+        // $RemoteID holds the key a native post sent
+        let sent = read(&answer(PROBE_REMOTE_ID));
+        assert_eq!(sent["vouchers"][0]["remote_id_equals_key"], true);
+        assert_eq!(sent["vouchers"][0]["remote_id_equals_guid"], false);
+        // only an empty row: no voucher, whatever the filter asked
+        let empty = read(
+            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+<VOUCHER></VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>",
+        );
+        assert_eq!(empty["vouchers_with_guid"], 0);
+        assert_eq!(empty["rows_without_guid"], 1);
+        assert_eq!(empty["vouchers"], json!([]));
+        assert_eq!(empty["term"], "remote_id");
+        assert_eq!(empty["key"], PROBE_REMOTE_ID);
+        assert_eq!(empty["date"], "20250410");
+    }
+
+    #[test]
+    fn the_key_probe_reads_only_the_lab_target_company() {
+        let config = LabGuardConfig::from_values(TARGET_GUID, "").unwrap();
+        assert_eq!(probe_target_admitted(&config, TARGET_GUID), Ok(()));
+        assert_eq!(
+            probe_target_admitted(&config, &TARGET_GUID.to_ascii_uppercase()),
+            Ok(())
+        );
+        assert_eq!(
+            probe_target_admitted(&config, DENY_GUID_1),
+            Err("lab_probe_company_not_target".to_string())
+        );
     }
 }

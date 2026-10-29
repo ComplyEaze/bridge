@@ -1,0 +1,79 @@
+# fixture: tests/fixtures/agent/masters-lab-ledger-index-baseline.utf16le.xml
+# parser: parse_ledger_name_index(MASTERS LAB)
+# source: captured
+Ok([
+    LedgerNameRow {
+        names: [
+            "Cash",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001f",
+        alter_id: 32,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Alias Target",
+            "MLab Alias Name",
+            "MLab Alias Two",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000cf",
+        alter_id: 211,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Case Target",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d0",
+        alter_id: 212,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Dash-Target",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d2",
+        alter_id: 214,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Exact Target",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000ce",
+        alter_id: 210,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Slash/Target",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d3",
+        alter_id: 215,
+    },
+    LedgerNameRow {
+        names: [
+            "MLab Space Target",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d1",
+        alter_id: 213,
+    },
+    LedgerNameRow {
+        names: [
+            "Profit & Loss A/c",
+        ],
+        row_spelling: None,
+        reserved_name: None,
+        guid: "f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001e",
+        alter_id: 31,
+    },
+])

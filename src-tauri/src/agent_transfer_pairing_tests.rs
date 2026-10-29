@@ -37,6 +37,26 @@ fn view_of(
     coverage: &Coverage,
     k_days: u32,
 ) -> TransferView {
+    // Every skip's own day counts as read whole, so that these tests keep asking
+    // what the statements and the pairing say; what a read of Tally adds is
+    // asked below, with `view_without_tally`.
+    transfer_pairing_view_with(
+        skips,
+        contras,
+        coverage,
+        &TallyDays::clean_for(skips),
+        k_days,
+    )
+    .expect("no duplicate keys")
+}
+
+/// The view as production builds it: no day of Tally has been read.
+fn view_without_tally(
+    skips: &[SkipFact],
+    contras: &[ContraFact],
+    coverage: &Coverage,
+    k_days: u32,
+) -> TransferView {
     transfer_pairing_view(skips, contras, coverage, k_days).expect("no duplicate keys")
 }
 
@@ -1048,7 +1068,7 @@ fn transfer_pairing_no_state_names_a_removed_contra() {
                     assert!(!candidates.contains(&gone));
                 }
                 SkipState::OtherSideUnverified { batch } => assert_ne!(batch, &gone.batch),
-                SkipState::NotFound | SkipState::NotEstablished => {}
+                SkipState::NotFound | SkipState::TallyUnchecked | SkipState::NotEstablished => {}
             }
         }
         for found in &view.double_booked {
@@ -1948,4 +1968,693 @@ fn transfer_pairing_a_flag_does_not_hide_why_a_referenced_skip_is_open() {
         state_of(&view, "st-1"),
         reversed_state(&[("batch-1", "t1")])
     );
+}
+
+/// A skip with no candidate whose other ledger's statements cover its date is
+/// `NotFound` only when a read of Tally covered the same day with no Contra
+/// between the two ledgers; without one it is `TallyUnchecked`; and where the
+/// statements do not cover the date it is `NotEstablished` whatever Tally read.
+#[test]
+fn not_found_needs_a_whole_day_read_of_tally_besides_the_statements() {
+    let coverage = january_covered();
+    let one = [skip("st-1")];
+    // no read of Tally: the production call
+    let view = view_without_tally(&one, &[], &coverage, 0);
+    assert_eq!(state_of(&view, "st-1"), SkipState::TallyUnchecked);
+    // the day read whole between these two ledgers
+    let view =
+        transfer_pairing_view_with(&one, &[], &coverage, &TallyDays::clean_for(&one), 0).unwrap();
+    assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
+    // a read of another day, other ledgers or another company does not count
+    for other in [
+        {
+            let mut s = skip("st-1");
+            s.date = date("20260106");
+            s
+        },
+        {
+            let mut s = skip("st-1");
+            s.other_ledger = ledger("b9");
+            s
+        },
+    ] {
+        let view =
+            transfer_pairing_view_with(&one, &[], &coverage, &TallyDays::clean_for(&[other]), 0)
+                .unwrap();
+        assert_eq!(state_of(&view, "st-1"), SkipState::TallyUnchecked);
+    }
+    // statements that do not cover the date: not established, read or not
+    let view = transfer_pairing_view_with(
+        &one,
+        &[],
+        &Coverage::default(),
+        &TallyDays::clean_for(&one),
+        0,
+    )
+    .unwrap();
+    assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
+}
+
+/// A read of Tally changes nothing about a row that has a candidate: only the
+/// absence of any candidate is said as `NotFound` or `TallyUnchecked`.
+#[test]
+fn a_read_of_tally_does_not_change_a_row_with_a_candidate() {
+    let coverage = january_covered();
+    let one = [skip("st-1")];
+    let contras = [contra("batch-1", "t1")];
+    let without = view_without_tally(&one, &contras, &coverage, 0);
+    let with =
+        transfer_pairing_view_with(&one, &contras, &coverage, &TallyDays::clean_for(&one), 0)
+            .unwrap();
+    assert_eq!(state_of(&without, "st-1"), state_of(&with, "st-1"));
+}
+
+/// The whole-day read (#1392), replayed on the answers the lab captured on
+/// BRIDGE TRANSFER LAB for 3 to 6 April 2026 (`fixtures/agent/
+/// whole-day-read-transfer-lab/PROVENANCE.md`). Every request is checked against
+/// the text of the one the lab sent (decoded, without the byte order mark), and
+/// every answer is what Tally returned to it; no answer here is written by
+/// hand. The lab read the marks once before the days and once after, and the two
+/// answers are byte-equal, so the first is served as each day's opening marks
+/// read; the spanned census is not sent by the code, and only its answer is
+/// compared with the unspanned one.
+mod whole_day {
+    use super::*;
+    use crate::agent::read_profiles::ReadRequest;
+    use crate::agent::voucher_parse::parse_agent_rows_withholding;
+    use crate::agent::voucher_window::{parse_voucher_census, WindowReadKind};
+    use crate::agent::{Evidence, ToolFailure};
+    use crate::tally::VerifiedCompanyIdentity;
+    use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
+    use std::sync::Mutex;
+
+    const LAB: &str = "BRIDGE TRANSFER LAB";
+    const LAB_GUID: &str = "d6e4c24f-8c7a-4797-93ec-e44bdff60bc9";
+
+    // The committed captures, one literal path each.
+    const M_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m.request.utf16le.xml");
+    const M1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m1.utf16le.xml");
+    const M2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml");
+    const D03_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.request.utf16le.xml");
+    const D03_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.utf16le.xml");
+    const D03_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c2.utf16le.xml");
+    const D03_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.request.utf16le.xml");
+    const D03_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.utf16le.xml");
+    const D04_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.request.utf16le.xml");
+    const D04_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.utf16le.xml");
+    const D04_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c2.utf16le.xml");
+    const D04_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.request.utf16le.xml");
+    const D04_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.utf16le.xml");
+    const D05_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.request.utf16le.xml");
+    const D05_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.utf16le.xml");
+    const D05_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c2.utf16le.xml");
+    const D05_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.request.utf16le.xml");
+    const D05_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.utf16le.xml");
+    const D06_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.request.utf16le.xml");
+    const D06_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.utf16le.xml");
+    const D06_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c2.utf16le.xml");
+    const D06_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.request.utf16le.xml");
+    const D06_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.utf16le.xml");
+    type Exchange = (&'static [u8], &'static [u8]);
+    /// An exchange whose answer may be a scripted refusal (`None`).
+    type Scripted = (&'static [u8], Option<&'static [u8]>);
+
+    fn utf16(bytes: &[u8]) -> String {
+        assert_eq!(bytes.len() % 2, 0, "a UTF-16 capture has an even length");
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+        .trim_start_matches('\u{feff}')
+        .to_string()
+    }
+
+    /// Serves the lab's answers in order, each only to the request the lab sent
+    /// for it. A request past the last, or a refusal scripted in place of an
+    /// answer (`None`), is how a read fails.
+    struct Captured(Mutex<Vec<Scripted>>, &'static str);
+
+    impl Captured {
+        fn of(exchanges: Vec<Exchange>) -> Self {
+            Self::at(exchanges, "ep")
+        }
+
+        /// The same, reading the Tally whose origin is `endpoint`.
+        fn at(exchanges: Vec<Exchange>, endpoint: &'static str) -> Self {
+            Self(
+                Mutex::new(
+                    exchanges
+                        .into_iter()
+                        .map(|(sent, answer)| (sent, Some(answer)))
+                        .collect(),
+                ),
+                endpoint,
+            )
+        }
+
+        fn left(&self) -> usize {
+            self.0.lock().unwrap().len()
+        }
+    }
+
+    impl DayReader for Captured {
+        fn endpoint_origin(&self) -> Result<EndpointOrigin, String> {
+            Ok(EndpointOrigin::new(self.1))
+        }
+    }
+
+    impl WindowReader for Captured {
+        fn evidence_copies(&self) -> u64 {
+            1
+        }
+
+        async fn read(
+            &self,
+            _identity: &VerifiedCompanyIdentity,
+            request: ReadRequest,
+            _kind: WindowReadKind,
+        ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
+            let (sent, answer) = {
+                let mut exchanges = self.0.lock().unwrap();
+                assert!(
+                    !exchanges.is_empty(),
+                    "an extra request: {}",
+                    request.as_str()
+                );
+                exchanges.remove(0)
+            };
+            assert_eq!(request.as_str(), utf16(sent), "the request the lab sent");
+            let answer = answer.ok_or_else(|| ToolFailure::from("scripted_refusal".to_string()))?;
+            Ok((
+                utf16(answer),
+                crate::agent::agent_import::local_evidence("captured"),
+                DateBoundaryProfile::ModeAgnostic,
+            ))
+        }
+    }
+
+    /// The reads one day needs, in the order the code sends them: the marks, the
+    /// day's census, the day's vouchers.
+    fn day_d03() -> Vec<Exchange> {
+        vec![(M_REQ, M1), (D03_C1_REQ, D03_C1), (D03_V_REQ, D03_V)]
+    }
+
+    fn day_d04() -> Vec<Exchange> {
+        vec![(M_REQ, M1), (D04_C1_REQ, D04_C1), (D04_V_REQ, D04_V)]
+    }
+
+    fn day_d05() -> Vec<Exchange> {
+        vec![(M_REQ, M1), (D05_C1_REQ, D05_C1), (D05_V_REQ, D05_V)]
+    }
+
+    fn day_d06() -> Vec<Exchange> {
+        vec![(M_REQ, M1), (D06_C1_REQ, D06_C1), (D06_V_REQ, D06_V)]
+    }
+
+    fn lab_days() -> [(&'static str, Vec<Exchange>); 4] {
+        [
+            ("20260403", day_d03()),
+            ("20260404", day_d04()),
+            ("20260405", day_d05()),
+            ("20260406", day_d06()),
+        ]
+    }
+
+    fn identity() -> VerifiedCompanyIdentity {
+        VerifiedCompanyIdentity::test_fixture(LAB, LAB_GUID)
+    }
+
+    fn endpoint() -> EndpointOrigin {
+        EndpointOrigin::new("ep")
+    }
+
+    /// A plan of exactly these days: skipped rows of the lab company on each.
+    fn plan_of(days: &[&str]) -> DayPlan {
+        let skips: Vec<SkipFact> = days.iter().map(|day| lab_skip(day, day)).collect();
+        DayPlan::of(
+            &skips,
+            &view_without_tally(&skips, &[], &lab_covered(), 0),
+            &identity(),
+            &Captured::of(Vec::new()),
+        )
+        .unwrap()
+    }
+
+    /// The lab company's skip, on a Tally of another origin.
+    fn on_another_endpoint(mut skip: SkipFact) -> SkipFact {
+        skip.key.endpoint_origin = EndpointOrigin::new("ep2");
+        skip
+    }
+
+    /// A skip of another company, on the same Tally.
+    fn of_another_company(mut skip: SkipFact) -> SkipFact {
+        skip.key.company = CompanyGuid::new("other");
+        skip
+    }
+
+    fn lab_skip(row: &str, day: &str) -> SkipFact {
+        let mut skip = skip(row);
+        skip.key.company = CompanyGuid::new(LAB_GUID);
+        skip.date = date(day);
+        skip.other_ledger = ledger("tlab-b");
+        skip.key.bank_ledger = ledger("tlab-a");
+        skip
+    }
+
+    fn lab_covered() -> Coverage {
+        covered_between("20260401", "20260430")
+    }
+
+    fn covered_between(from: &str, to: &str) -> Coverage {
+        // The statements of the lab company, of another company and of another
+        // Tally all cover these days, so that a skip of either of the others is
+        // `TallyUnchecked` and only the day's company and Tally keep it apart.
+        let mut coverage = Coverage::default();
+        for (company, origin) in [(LAB_GUID, "ep"), ("other", "ep"), (LAB_GUID, "ep2")] {
+            for bank in ["tlab-a", "tlab-b", "tlab-c", "tlab-z"] {
+                coverage
+                    .add(
+                        CompanyGuid::new(company),
+                        EndpointOrigin::new(origin),
+                        ledger(bank),
+                        window(from, to),
+                    )
+                    .unwrap();
+            }
+        }
+        coverage
+    }
+
+    async fn read_lab(days: &[&str], exchanges: Vec<Exchange>) -> (DayReads, usize) {
+        let reader = Captured::of(exchanges);
+        let reads = read_days(&reader, &identity(), LAB, &plan_of(days)).await;
+        (reads, reader.left())
+    }
+
+    #[test]
+    fn each_days_two_censuses_and_both_marks_reads_are_byte_identical() {
+        assert_eq!(D03_C1, D03_C2);
+        assert_eq!(D04_C1, D04_C2);
+        assert_eq!(D05_C1, D05_C2);
+        assert_eq!(D06_C1, D06_C2);
+        assert_eq!(M1, M2);
+        // the days are not one answer repeated
+        assert_ne!(D03_C1, D04_C1);
+        assert_ne!(D04_C1, D05_C1);
+    }
+
+    #[tokio::test]
+    async fn the_three_days_with_vouchers_are_read_whole_and_agree_with_their_census() {
+        let census = |name: &[u8], day: &str| {
+            let day = chrono::NaiveDate::parse_from_str(day, "%Y%m%d").unwrap();
+            parse_voucher_census(&utf16(name), (day, day), None).unwrap()
+        };
+        let censuses = [
+            ("20260403", census(D03_C1, "20260403"), 3),
+            ("20260404", census(D04_C1, "20260404"), 1),
+            ("20260405", census(D05_C1, "20260405"), 1),
+        ];
+        for (day, counted, vouchers) in censuses {
+            let exchanges = lab_days()
+                .into_iter()
+                .find(|(lab_day, _)| *lab_day == day)
+                .unwrap()
+                .1;
+            let (reads, left) = read_lab(&[day], exchanges).await;
+            assert_eq!(left, 0, "every captured request was sent, and no other");
+            assert!(reads.kept.is_empty(), "{day}: {:?}", reads.kept);
+            let [whole] = reads.whole.as_slice() else {
+                panic!("{day}: one whole day expected");
+            };
+            assert_eq!(whole.date(), &date(day));
+            assert_eq!(whole.guids().len(), vouchers);
+            // census and vouchers name the same vouchers
+            assert_eq!(
+                whole.guids(),
+                counted.iter().map(|row| row.guid.as_str()).collect(),
+                "{day}"
+            );
+            assert_eq!(counted.len(), vouchers);
+            // every voucher of the day is a Contra between the two banks
+            assert!(whole.has_entries_on("TLab Bank A", "TLab Bank B"));
+            assert!(whole.has_entries_on("tlab bank b ", "TLAB BANK A"));
+            assert!(!whole.has_entries_on("TLab Bank A", "TLab Bank C"));
+        }
+    }
+
+    #[tokio::test]
+    async fn the_empty_day_is_read_in_full_but_is_not_said_to_be_whole() {
+        assert_eq!(D06_C1, D06_V);
+        let (reads, left) = read_lab(&["20260406"], day_d06()).await;
+        assert_eq!(left, 0);
+        assert!(reads.whole.is_empty());
+        assert_eq!(
+            reads.kept,
+            [(date("20260406"), DayKept::NotWhole(NotWhole::Empty))]
+        );
+    }
+
+    #[tokio::test]
+    async fn four_days_are_read_newest_first_and_only_three_are_whole() {
+        let mut exchanges = Vec::new();
+        for (_, day) in lab_days().into_iter().rev() {
+            exchanges.extend(day);
+        }
+        let (reads, left) =
+            read_lab(&["20260403", "20260404", "20260405", "20260406"], exchanges).await;
+        assert_eq!(left, 0);
+        assert_eq!(
+            reads
+                .whole
+                .iter()
+                .map(|day| day.date().as_str())
+                .collect::<Vec<_>>(),
+            ["20260405", "20260404", "20260403"]
+        );
+        assert_eq!(reads.kept.len(), 1);
+        assert_eq!(reads.kept[0].0, date("20260406"));
+    }
+
+    #[tokio::test]
+    async fn a_failed_read_keeps_its_day_and_the_days_after_it_are_not_tried() {
+        let mut exchanges = day_d06();
+        // the 6 April read gets as far as the census; the vouchers are refused
+        exchanges.extend(day_d05());
+        let reader = Captured::of(exchanges);
+        reader.0.lock().unwrap()[2].1 = None;
+        let plan = plan_of(&["20260405", "20260406"]);
+        let reads = read_days(&reader, &identity(), LAB, &plan).await;
+        assert!(reads.whole.is_empty());
+        assert_eq!(
+            reads.kept,
+            [
+                (
+                    date("20260406"),
+                    DayKept::ReadFailed("scripted_refusal".to_string())
+                ),
+                (date("20260405"), DayKept::NotAttempted),
+            ]
+        );
+        assert_eq!(reader.left(), 3, "the days after the failure were not sent");
+    }
+
+    /// The two answers that make up a captured read of 3 April, as the parts of
+    /// a read and its rows: the same inputs `admit` takes from a real outcome.
+    fn lab_rows(day_file: &[u8], guid: &str) -> Vec<VoucherRow> {
+        parse_agent_rows_withholding(&utf16(day_file), guid).unwrap()
+    }
+
+    fn part(from: &str, to: &str) -> WindowPart {
+        WindowPart {
+            from: date(from),
+            to: date(to),
+            span: None,
+        }
+    }
+
+    fn admit(
+        day: &str,
+        parts: &[WindowPart],
+        counted: bool,
+        rows: &[VoucherRow],
+    ) -> Result<WholeDay, NotWhole> {
+        WholeDay::admit(
+            CompanyGuid::new(LAB_GUID),
+            endpoint(),
+            &date(day),
+            parts,
+            counted,
+            rows,
+        )
+    }
+
+    /// A read that is partial in any one way builds no whole day, whatever else
+    /// about it is right. The rows are the 3 April answer's, parsed as the code
+    /// parses them.
+    #[test]
+    fn a_partial_read_can_never_build_the_whole_day() {
+        let rows = lab_rows(D03_V, LAB_GUID);
+        assert_eq!(rows.len(), 3);
+        // the control: everything holds
+        assert!(admit("20260403", &[part("20260403", "20260403")], true, &rows).is_ok());
+        // no census counted the day
+        assert_eq!(
+            admit("20260403", &[part("20260403", "20260403")], false, &rows).unwrap_err(),
+            NotWhole::Uncounted
+        );
+        // a window of more than the day, or of another day, or of no part at all
+        for parts in [
+            vec![part("20260403", "20260404")],
+            vec![part("20260402", "20260403")],
+            vec![part("20260404", "20260404")],
+            vec![part("20260403", "20260403"), part("20260403", "20260404")],
+            vec![],
+        ] {
+            assert_eq!(
+                admit("20260403", &parts, true, &rows).unwrap_err(),
+                NotWhole::NotTheDay,
+                "{parts:?}"
+            );
+        }
+        // rows that are not the day's
+        assert_eq!(
+            admit("20260404", &[part("20260404", "20260404")], true, &rows).unwrap_err(),
+            NotWhole::NotTheDay
+        );
+        // no voucher at all
+        assert_eq!(
+            admit("20260403", &[part("20260403", "20260403")], true, &[]).unwrap_err(),
+            NotWhole::Empty
+        );
+    }
+
+    /// A voucher Tally stored as a foreign-currency composite is withheld by
+    /// the read; one withheld voucher keeps the whole day from being whole, even
+    /// beside vouchers read in full. The row is the committed capture of one.
+    #[test]
+    fn a_withheld_voucher_keeps_its_day_from_being_whole() {
+        let forex = parse_agent_rows_withholding(
+            &utf16(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-composite-20260915.utf16le.xml"
+            )),
+            "b14e9b2d-8a63-4779-804d-25d59eb787eb",
+        )
+        .unwrap();
+        assert!(matches!(forex[0], VoucherRow::Withheld(_)));
+        let mut rows = lab_rows(D03_V, LAB_GUID);
+        rows.extend(forex);
+        assert_eq!(
+            admit("20260403", &[part("20260403", "20260403")], true, &rows).unwrap_err(),
+            NotWhole::Withheld { vouchers: 1 }
+        );
+    }
+
+    /// The same refusal on a real outcome: the 3 April read with the census
+    /// that admitted it taken away is a read nothing but its own response
+    /// counts, and builds nothing.
+    #[tokio::test]
+    async fn a_real_read_whose_census_is_gone_builds_no_whole_day() {
+        let reader = Captured::of(day_d03());
+        let day = date("20260403");
+        let mut read = read_entry_window_rows_with(
+            &reader,
+            &identity(),
+            LAB,
+            &day,
+            &day,
+            VoucherReadShape::EntryWildcard,
+            VoucherComposites::Withhold,
+        )
+        .await
+        .unwrap();
+        let build = |read: &WindowReadOutcome<VoucherRow>| {
+            WholeDay::from_read(CompanyGuid::new(LAB_GUID), endpoint(), &day, read)
+        };
+        assert!(read.counted());
+        assert_eq!(build(&read).unwrap().guids().len(), 3);
+        read.witness = None;
+        assert_eq!(build(&read).unwrap_err(), NotWhole::Uncounted);
+    }
+
+    /// Days of skipped rows that stayed `TallyUnchecked` only, newest first, at
+    /// most four and within 31 days of the newest.
+    #[test]
+    fn the_plan_holds_only_the_unchecked_days_newest_first_within_the_caps() {
+        let plan_for = |skips: &[SkipFact], coverage: &Coverage| {
+            let view = view_without_tally(skips, &[], coverage, 0);
+            DayPlan::of(skips, &view, &identity(), &Captured::of(Vec::new())).unwrap()
+        };
+        let texts = |plan: &DayPlan| {
+            plan.days()
+                .iter()
+                .map(|day| day.as_str().to_string())
+                .collect::<Vec<_>>()
+        };
+        // six days: the four newest
+        let skips: Vec<SkipFact> = [
+            "20260402", "20260410", "20260411", "20260420", "20260421", "20260422",
+        ]
+        .iter()
+        .map(|day| lab_skip(&format!("st-{day}"), day))
+        .collect();
+        assert_eq!(
+            texts(&plan_for(&skips, &lab_covered())),
+            ["20260422", "20260421", "20260420", "20260411"]
+        );
+        assert_eq!(MAX_DAY_READS, 4);
+        // two skips on one day are one day
+        let mut twice = vec![lab_skip("st-1", "20260410"), lab_skip("st-2", "20260410")];
+        twice[1].amount = ExactDecimal::parse("700.00").unwrap();
+        assert_eq!(texts(&plan_for(&twice, &lab_covered())), ["20260410"]);
+        // 30 days before the newest is inside the 31, 31 days before is not
+        let spread = [
+            lab_skip("st-1", "20260331"),
+            lab_skip("st-2", "20260301"),
+            lab_skip("st-3", "20260228"),
+        ];
+        assert_eq!(
+            texts(&plan_for(&spread, &covered_between("20260201", "20260430"))),
+            ["20260331", "20260301"]
+        );
+        assert_eq!(MAX_DAY_SPAN, 31);
+        // a row with a candidate, one the statements do not cover, another
+        // company's and another Tally's (each covered, so each `TallyUnchecked`
+        // itself) are not asked about
+        let other_company = of_another_company(lab_skip("st-4", "20260415"));
+        let other_endpoint = on_another_endpoint(lab_skip("st-6", "20260414"));
+        let with_candidate = {
+            let mut skip = lab_skip("st-5", "20260416");
+            skip.reference = None;
+            skip
+        };
+        let mut carried = contra("batch-1", "t1");
+        carried.company = CompanyGuid::new(LAB_GUID);
+        carried.date = date("20260416");
+        carried.legs = [
+            ContraLeg {
+                ledger: ledger("tlab-b"),
+                side: Side::Debit,
+            },
+            ContraLeg {
+                ledger: ledger("tlab-a"),
+                side: Side::Credit,
+            },
+        ];
+        carried.statement_bank_ledger = ledger("tlab-b");
+        let skips = [
+            lab_skip("st-1", "20260410"),
+            lab_skip("st-2", "20260511"),
+            other_company,
+            other_endpoint,
+            with_candidate,
+        ];
+        let view = transfer_pairing_view(&skips, &[carried], &lab_covered(), 0).unwrap();
+        for row in ["st-4", "st-6"] {
+            let state = view
+                .skips
+                .iter()
+                .find(|(key, _)| key.row.as_str() == row)
+                .map(|(_, state)| state.clone())
+                .unwrap();
+            assert_eq!(state, SkipState::TallyUnchecked, "{row}");
+        }
+        let plan = DayPlan::of(&skips, &view, &identity(), &Captured::of(Vec::new())).unwrap();
+        assert_eq!(texts(&plan), ["20260410"]);
+        assert!(
+            DayPlan::of(&[], &view, &identity(), &Captured::of(Vec::new()))
+                .unwrap()
+                .days()
+                .is_empty()
+        );
+    }
+
+    /// What a whole day does to the view: a skip is `NotFound` only when its
+    /// own day was read whole and holds no voucher with entries on both of its
+    /// ledgers. The day is the captured 4 April, a Contra between the two banks.
+    #[tokio::test]
+    async fn a_whole_day_makes_a_row_not_found_only_where_it_holds_no_entry_on_both_ledgers() {
+        let (reads, _) = read_lab(&["20260404"], day_d04()).await;
+        let name_of = |guid: &LedgerGuid| match guid.as_str() {
+            "tlab-a" => Some("TLab Bank A".to_string()),
+            "tlab-b" => Some("TLab Bank B".to_string()),
+            "tlab-c" => Some("TLab Bank C".to_string()),
+            _ => None,
+        };
+        let between_the_banks = lab_skip("st-ab", "20260404");
+        let mut to_c = lab_skip("st-ac", "20260404");
+        to_c.other_ledger = ledger("tlab-c");
+        let mut unread_day = lab_skip("st-day", "20260405");
+        unread_day.other_ledger = ledger("tlab-c");
+        let mut unnamed = lab_skip("st-z", "20260404");
+        unnamed.other_ledger = ledger("tlab-z");
+        // the same skip as `st-ac`, of another company and on another Tally
+        let other_company = of_another_company({
+            let mut skip = to_c.clone();
+            skip.key.row = StatementRowId::new("st-co");
+            skip
+        });
+        let other_endpoint = on_another_endpoint({
+            let mut skip = to_c.clone();
+            skip.key.row = StatementRowId::new("st-ep");
+            skip
+        });
+        let skips = [
+            between_the_banks,
+            to_c,
+            unread_day,
+            unnamed,
+            other_company,
+            other_endpoint,
+        ];
+        let tally = TallyDays::from_whole_days(&reads.whole, &skips, name_of);
+        let coverage = lab_covered();
+        let view = transfer_pairing_view_with(&skips, &[], &coverage, &tally, 0).unwrap();
+        let state = |row: &str| {
+            view.skips
+                .iter()
+                .find(|(key, _)| key.row.as_str() == row)
+                .map(|(_, state)| state.clone())
+                .unwrap()
+        };
+        assert_eq!(state("st-ab"), SkipState::TallyUnchecked);
+        assert_eq!(state("st-ac"), SkipState::NotFound);
+        assert_eq!(state("st-day"), SkipState::TallyUnchecked);
+        assert_eq!(state("st-z"), SkipState::TallyUnchecked);
+        // a day read of this company on this Tally settles nothing of another
+        // company or of another Tally, though both are covered
+        assert_eq!(state("st-co"), SkipState::TallyUnchecked);
+        assert_eq!(state("st-ep"), SkipState::TallyUnchecked);
+        // no day read at all is the production call, and it keeps every row
+        let none = TallyDays::from_whole_days(&[], &skips, name_of);
+        let view = transfer_pairing_view_with(&skips, &[], &coverage, &none, 0).unwrap();
+        assert!(view
+            .skips
+            .values()
+            .all(|state| *state != SkipState::NotFound));
+    }
+
+    /// A plan is read only through the company and the Tally it was made for.
+    #[tokio::test]
+    async fn a_plan_made_for_another_tally_or_company_reads_nothing() {
+        let plan = plan_of(&["20260404"]);
+        let other_tally = Captured::at(day_d04(), "ep2");
+        let reads = read_days(&other_tally, &identity(), LAB, &plan).await;
+        let refused = [(
+            date("20260404"),
+            DayKept::ReadFailed(DAY_PLAN_FOR_ANOTHER_READ.to_string()),
+        )];
+        assert!(reads.whole.is_empty());
+        assert_eq!(reads.kept, refused);
+        assert_eq!(other_tally.left(), 3, "nothing was sent");
+        let other_company = Captured::of(day_d04());
+        let identity =
+            VerifiedCompanyIdentity::test_fixture(LAB, LAB_GUID.replace("60bc9", "60bc8"));
+        let reads = read_days(&other_company, &identity, LAB, &plan).await;
+        assert!(reads.whole.is_empty());
+        assert_eq!(reads.kept, refused);
+        assert_eq!(other_company.left(), 3, "nothing was sent");
+    }
 }

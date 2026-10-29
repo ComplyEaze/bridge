@@ -1,4 +1,4 @@
-# Results: #1356 party detail by ledger, 29 Oct 2026, through #2115's build at b85f9f99. On BRIDGE CORPUS DENSE the `outstandings` party detail for DN Party 001 to 30 June 2025, refused before the change, answered by the party's ledger: 61 vouchers `ledger_scoped`, the ledger matched exactly, all 61 bills `tied`. To 31 March 2026 (248 vouchers) it was refused: `native_outstandings_read_failed`, cause `request_deadline_exceeded`, after 31 requests answered and a 32nd held 20 s. Reads only; the marks did not move
+# Results: #1356 party detail by ledger, 29 Oct 2026, through #2115's build at b85f9f99. On BRIDGE CORPUS DENSE the `outstandings` party detail for DN Party 001 to 30 June 2025, refused before the change, answered by the party's ledger: 61 vouchers `ledger_scoped`, the ledger matched exactly, all 61 bills `tied`. To 31 March 2026 (248 vouchers) it was refused: `native_outstandings_read_failed`, cause `request_deadline_exceeded`, after 31 requests answered and a 32nd held 20 s. On the amendment, to 31 July 2025 (82 vouchers, past one part at the planner's 42 a part; the trail does not show the parts) it answered `ledger_scoped` with all 82 bills `tied`, and Tally's own Ledger Outstandings screen agrees with the 30 June read in count and total. Reads only; the marks did not move
 
 The sheet is `lab/1356-party-detail-by-ledger` at 805266060f8bff46b7f73b898ce92aed2146a7c3. `SHA256.txt` 3 of 3 equal.
 - **BUILD-T:** #2115 at head b85f9f9925192595042661434bfc2c4f64f9afe7, Bridge CI run 40769047507, artifact `unsigned-bundle-smoke-windows-latest`.
@@ -35,15 +35,32 @@ The failure is D3's 32nd request, a 770-byte post held 20,002 ms, outcome `reque
 
 **The finding:** to 30 June 2025 the new path answers as designed, the party read by its ledger and every bill tying. To 31 March 2026 the call fails on one Tally request held past ComplyEaze Bridge's 20-second limit. With 31 requests answered first, the census or the first date parts were read before it. Which step's request it was is **not established** by this row.
 
+## Amendment of 29 Oct 2026: D3', D4', D5' and D6 (sheet at 6faf4eb3, the same build and launch)
+**Result: the detail ran for 82 vouchers, past one part at the planner's figure of 42 a part.** D3' reaches the same path as D3, the party read by its ledger past one part, at a date whose bills read is about D1's size. It answered as the amendment expects.
+
+| call | as_of, detail | sent (UTC), seconds | answer |
+|---|---|---|---|
+| D3' (011) | 20250731, `bill_trail` | 00:13:22, 47.6 | `bills_listed`; `party_vouchers_read` **82**, no `company_vouchers_read`; `window_scope.basis` **`ledger_scoped`**, `vouchers_read` 82; `ledger_match` `exact`; **82 bills, every one `tied`** |
+
+- **P1 again** (008 to 010): the one company, `verified_tuple`, 29900 / 328.
+- **D4'** (012): D3' sent 114 requests, failed 0. The trail does not state the number of date parts.
+- **D5'** (013): 29900 / 328, equal.
+- **References:** in D1's 61 bills and D3''s 82, the references step by 120 from DN-INV-000120, except once: DN-INV-001920 is followed by DN-INV-002160. **DN-INV-002040 is in neither.**
+- **D6, Tally's Ledger Outstandings screen** for DN Party 001, 1-Apr-25 to 30-Jun-25:
+  - **61 bills** (26 on the first screen and 35 more);
+  - **no DN-INV-002040**: the list runs 24-Apr-25 DN-INV-001920, then 27-Apr-25 DN-INV-002160;
+  - total pending **27,15,644.20 Dr**, equal to the sum of D1's 61 bill balances (−2,715,644.20).
+
+  Tally's own report agrees with D1 in count, gap and total, so the missing 002040 is the book's own.
+
 **Confidence:** one sitting, PARTIAL until repeated.
 
 **Not covered:**
-- D6: Tally's Ledger Outstandings screen, not run without its word;
 - the request bytes, since nothing captured the traffic between the build and Tally;
 - a party name with any other character.
 
 ## Files
-- `answers/`: every tool answer whole, 000 to 007, with UTC send times and seconds.
+- `answers/`: every tool answer whole, 000 to 013 (008 onward the amendment's sitting), with UTC send times and seconds.
 - `client-log.txt`.
 - `notes.txt` (UTC).
 - `SCREENSHOTS.txt`: the captures by sha256; they stay on the lab PC.

@@ -10,3 +10,13 @@
 2026-10-29T00:01:47Z 006-d4-egress_log.json tool=egress_log secs=0.096 isError=False error=None saved_sha256=532a6449bb3cfd53c01357d5ff07a80ac7866683736371e35426885e488a3dad
 2026-10-29T00:02:19Z 007-d5-ledger_masters.json tool=ledger_masters secs=0.856 isError=False error=None saved_sha256=f996d3dcd3564e3abfc3c2535014a8a32eee3386881ce941a232bd86a88e3d6e
 2026-10-29T00:03:26Z session ended; server pid 22572 exit code 0
+2026-10-29T00:13:08Z exe sha256 1561c9f11f9a46e4af1072e5af34b292bf5fb965a0f6b0cf73f0728ec7037ebc ok; launch-env.json sha256 06f9c0f6409683ccada7f7746abffd16afb66d70a427a34be54e41094966adff; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-29T00:13:08Z launched pid 6868; stderr to server-stderr-20261029T001308Z.log
+2026-10-29T00:13:08Z initialized {'name': 'bridge-tally', 'version': '0.6.1'}
+2026-10-29T00:13:13Z 008-s2-p1-tally_status.json tool=tally_status secs=0.071 isError=False error=None saved_sha256=c338501d7cfb9881058df0dd6421c2315b020a948cfe70f49550a80a288c11bc
+2026-10-29T00:13:13Z 009-s2-p1-list_companies.json tool=list_companies secs=0.076 isError=False error=None saved_sha256=d6e245cdd8239af52bccef3a756d0ba36a72e91b598c956452bcfb2c0278344c
+2026-10-29T00:13:15Z 010-s2-p1-ledger_masters.json tool=ledger_masters secs=0.770 isError=False error=None saved_sha256=0f6ecf8bea305375f5f885e56a3b6c3384990a55cab8ff36a0b906e1cd6c8503
+2026-10-29T00:14:10Z 011-s2-d3p-outstandings.json tool=outstandings secs=47.577 isError=False error=None saved_sha256=ae18d8350b1d303fa44647b50c4ff7b83a3b9402a99a59d85ffc5b122897c305
+2026-10-29T00:14:25Z 012-s2-d4p-egress_log.json tool=egress_log secs=0.072 isError=False error=None saved_sha256=25cf5e81f001abd9b9bae9ad235a0e603d47f980c899053b45a817e61d04c58b
+2026-10-29T00:14:27Z 013-s2-d5p-ledger_masters.json tool=ledger_masters secs=0.813 isError=False error=None saved_sha256=af6d4e7945f8fa7425a73615258c9cc30f53b41666fa18654a9914b6f781e007
+2026-10-29T00:17:10Z session ended; server pid 6868 exit code 0

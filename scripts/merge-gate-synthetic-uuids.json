@@ -196,6 +196,14 @@
     {
       "uuid": "3fc2a3c7-1da8-4bc4-a472-44028cdebca7",
       "note": "company identifier of the synthetic lab company BRIDGE INTEGRATED CTRL LAB, created in the lab on 28 October 2026 with invented masters, as Tally returned it in captures of that day (lab branch lab/2068-integrated-write-control-answers at c539688fd75e6e92d0f79ff6c8ddb5adf435a85d); the ledger identifiers in the same captures are this value with a suffix"
+    },
+    {
+      "uuid": "1bb48be5-baba-45b2-90d8-7593244915a9",
+      "note": "company identifier of the synthetic lab company BRIDGE FOREXGROUP LAB (number 100090), created in the lab on 28 October 2026 with invented masters and vouchers keyed by hand (on 28 and again on 29 October), as Tally returned it in read-only captures on 29 October 2026 (lab branches lab/683-x1-forex-grouping-answers and lab/2071-forex-rerun-answers at 0d7eb0bf5cae)"
+    },
+    {
+      "uuid": "b14e9b2d-8a63-4779-804d-25d59eb787eb",
+      "note": "company identifier of the synthetic lab company BRIDGE CORPUS FOREX, created in the lab with invented masters, as Tally returned it in the several-currency captures committed in September 2026 (FOREX_601D_CAPTURE_PROVENANCE.md and the other FOREX captures under the protocol crate's test fixtures); the tests use it as that company's identifier"
     }
   ]
 }

@@ -692,41 +692,38 @@ fn unmeasured_shapes_refuse_and_either_group_order_reads() {
     );
 }
 
-/// The captured requests that name an item, by file. Each name is read back from the request as
-/// sent, its entities decoded once.
-const NAMED_REQUESTS: [&str; 20] = [
-    "r-4-stock-query-stockitemname",
-    "r-01-stock-query-carton-box-small",
-    "r-02-stock-query-caustic-soda-flakes",
-    "r-03-stock-query-cleaning-kit-a",
-    "r-09-stock-query-soda-ash-light",
-    "r-11-stock-query-zero-stock-item",
-    "r-12-stock-query-hcl-to-20250401",
-    "r-14-stock-query-cleaning-kit-a-to-20250401",
-    "r-15-stock-query-unknown-item",
-    "w-02-stock-query-kit-co-item-f1",
-    "w-03-stock-query-gauge-test-50l-f1",
-    "w-04-stock-query-owner-s-item-f1",
-    "w-05-stock-query-owner-s-item-f2",
-    "w-06-stock-query-quote-q-item-f1",
-    "w-07-stock-query-quote-q-item-f2",
-    "w-08-stock-query-alt-unit-item-f1",
-    "w-09-stock-query-mix-5-set-large-f1",
-    "w-10-stock-query-dash-item-7-f1",
-    "alt-a-04-stock-query-alt-unit-probe-a",
-    "alt-a-05-stock-query-alt-unit-probe-b",
-];
-
-fn captured_item_name(file: &str) -> String {
-    let bytes = capture(&format!("{file}.request.utf16le.xml"));
-    let units: Vec<u16> = bytes
-        .chunks_exact(2)
-        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-        .collect();
-    let text = String::from_utf16(&units).expect("UTF-16LE");
-    let (_, rest) = text.split_once("<STOCKITEMNAME>").expect(file);
-    let (name, _) = rest.split_once("</STOCKITEMNAME>").expect(file);
-    quick_xml::escape::unescape(name).expect(file).into_owned()
+/// Every committed request that names an item, read from the folder, with the name as sent, its
+/// entities decoded once. Requests with no `STOCKITEMNAME` (the bare one, the collection's) are
+/// not names.
+fn captured_item_names() -> Vec<(String, String)> {
+    let folder = format!("{}/tests/fixtures/stock-query", env!("CARGO_MANIFEST_DIR"));
+    let mut names = Vec::new();
+    for entry in std::fs::read_dir(&folder).expect("the capture folder") {
+        let file = entry
+            .expect("a folder entry")
+            .file_name()
+            .into_string()
+            .expect("ASCII");
+        if !file.ends_with(".request.utf16le.xml") {
+            continue;
+        }
+        let bytes = capture(&file);
+        let units: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect();
+        let text = String::from_utf16(&units).expect("UTF-16LE");
+        let Some((_, rest)) = text.split_once("<STOCKITEMNAME>") else {
+            continue;
+        };
+        let (name, _) = rest.split_once("</STOCKITEMNAME>").expect(&file);
+        names.push((
+            file.clone(),
+            quick_xml::escape::unescape(name).expect(&file).into_owned(),
+        ));
+    }
+    names.sort();
+    names
 }
 
 /// Every character the alphabet admits beyond letters, digits and the space is in a captured name,
@@ -734,10 +731,10 @@ fn captured_item_name(file: &str) -> String {
 /// one. For each, a capture holding it is the builder's bytes (the first test).
 #[test]
 fn the_admitted_punctuation_is_exactly_the_captured_punctuation() {
-    let names: Vec<String> = NAMED_REQUESTS
-        .iter()
-        .map(|file| captured_item_name(file))
-        .collect();
+    let named = captured_item_names();
+    // The twenty requests that name an item: a request the folder lost would not fail quietly.
+    assert_eq!(named.len(), 20);
+    let names: Vec<String> = named.into_iter().map(|(_, name)| name).collect();
     let captured: std::collections::BTreeSet<char> = names
         .iter()
         .flat_map(|name| name.chars())
@@ -846,5 +843,49 @@ fn each_line_meets_the_same_sittings_collection_closing() {
             NativeQuantityRead::Unread,
             "{item}"
         );
+    }
+}
+
+/// Punctuation sits only where a capture shows it: between letters, digits or spaces, never at
+/// either end and never touching other punctuation. And no printable ASCII character outside the
+/// measured set is admitted anywhere.
+#[test]
+fn punctuation_is_admitted_only_where_a_capture_shows_it() {
+    for refused in [
+        "-Item",
+        "Item,",
+        "&",
+        "--",
+        "'",
+        "\"Q\" Item",
+        "Item (Test)",
+        "(Test) Item",
+        "Mix 5%",
+        "A--B",
+        "Kit && Co",
+        "A,-B",
+        "A (/) B",
+        "A '' B",
+        "A -",
+        "- A",
+    ] {
+        assert_eq!(
+            MeasuredItemName::new(refused),
+            Err(StockQueryError::ItemNameUnmeasured),
+            "{refused:?}"
+        );
+    }
+    for c in (0x20u8..0x7f).map(char::from) {
+        let inner = format!("A{c}B");
+        let expected =
+            c.is_ascii_alphanumeric() || c == ' ' || STOCK_QUERY_MEASURED_PUNCTUATION.contains(&c);
+        assert_eq!(MeasuredItemName::new(&inner).is_ok(), expected, "{inner:?}");
+        if !expected {
+            assert_eq!(
+                MeasuredItemName::new(&inner),
+                Err(StockQueryError::ItemNameUnmeasured),
+                "{inner:?}"
+            );
+        }
     }
 }

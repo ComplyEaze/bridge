@@ -3189,7 +3189,16 @@ impl Server {
         let tail = read_egress_tail(&path, take)?;
         let evidence = Evidence {
             request_sha256: sha256_hex(b"egress_log"),
-            response_sha256: sha256_json(&tail.records),
+            // The records, and any torn records and unrepaired tail returned beside them.
+            response_sha256: if tail.torn.is_empty() && tail.unrepaired_tail_bytes.is_none() {
+                sha256_json(&tail.records)
+            } else {
+                sha256_json(&json!({
+                    "records": tail.records,
+                    "torn_records": tail.torn.iter().map(|torn| (torn.offset, torn.bytes, &torn.sha256)).collect::<Vec<_>>(),
+                    "unrepaired_tail_bytes": tail.unrepaired_tail_bytes,
+                }))
+            },
             bytes: 0,
             state: "complete",
             read_at: None,

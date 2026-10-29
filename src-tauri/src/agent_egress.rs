@@ -28,8 +28,9 @@ const RECORD_END: &[u8] = b"}\n";
 /// line invalid JSON, so a record cut just before its newline is never later read as a record.
 const TORN_SENTINEL: &[u8] = b"#\n";
 const TORN_RECORD_TYPE: &str = "torn_record";
-/// The most bytes one marker vouches for: one record's bound, and room for the debris of earlier
-/// repairs that were themselves cut short.
+/// The most bytes one marker vouches for, the sentinel it adds included: one record's bound, and
+/// room for the debris of earlier repairs that were themselves cut short. A longer run is refused,
+/// never given a marker the reader would refuse.
 const MAX_TORN_BYTES: usize = MAX_EGRESS_TAIL_BYTES + 16 * 1024;
 
 pub(super) fn canonical_company_guid(value: &str) -> Option<String> {
@@ -150,7 +151,7 @@ fn find_torn_tail(bytes: &[u8], from_file_start: bool) -> TornTail {
     let run = &bytes[start..];
     if run.is_empty() {
         TornTail::None
-    } else if run.len() <= MAX_TORN_BYTES && torn_shape(run) {
+    } else if run.len() + TORN_SENTINEL.len() <= MAX_TORN_BYTES && torn_shape(run) {
         TornTail::From(start)
     } else {
         TornTail::Unrecognised
@@ -183,6 +184,12 @@ fn repair_locked(
         .metadata()
         .map_err(|_| "egress_record_write_failed".to_string())?
         .len();
+    // Most appends find a record end: two bytes say so without reading the rest.
+    let last = read_end(file, length, RECORD_END.len())
+        .map_err(|_| "egress_record_write_failed".to_string())?;
+    if last.is_empty() || last == RECORD_END {
+        return Ok(());
+    }
     let bytes = read_end(file, length, MAX_TORN_BYTES + RECORD_END.len())
         .map_err(|_| "egress_record_write_failed".to_string())?;
     let from_file_start = bytes.len() as u64 == length;
@@ -247,6 +254,10 @@ fn classify(line: &[u8]) -> Line<'_> {
     let Ok(text) = std::str::from_utf8(line) else {
         return Line::Other;
     };
+    // A record is one JSON object; serde would also read a struct from an array.
+    if !text.starts_with('{') {
+        return Line::Other;
+    }
     match serde_json::from_str::<Kind>(text) {
         Ok(Kind { record_type }) if record_type.as_deref() == Some(TORN_RECORD_TYPE) => {
             serde_json::from_str::<TornRecord>(text).map_or(Line::Other, Line::Marker)

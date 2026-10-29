@@ -747,3 +747,48 @@ fn a_torn_tail_longer_than_a_record_is_refused_not_repaired() {
     );
     assert_eq!(fs::read(&path).unwrap(), bytes);
 }
+
+/// The bound counts the sentinel the repair adds: a run at the bound gets a marker the reader then
+/// honours, and a run one byte longer is refused and left as it was, never given a marker the
+/// reader would refuse for good.
+#[test]
+fn a_run_at_the_bound_is_repaired_and_one_byte_more_is_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    let at_bound = MAX_TORN_BYTES - TORN_SENTINEL.len();
+    for (run, repaired) in [(at_bound, true), (at_bound + 1, false)] {
+        let mut bytes = b"{\"a\":1}\n".to_vec();
+        bytes.extend(std::iter::repeat_n(b'z', run));
+        fs::write(&path, &bytes).unwrap();
+        let appended = append_egress_line(&path, r#"{"b":2}"#);
+        if repaired {
+            appended.unwrap();
+            // The record before the run lies past the scan's 256 KiB window: the marker's range,
+            // which starts before the window, is read back and checked from the file.
+            let tail = read_egress_tail(&path, 256).unwrap();
+            assert_eq!(tail.records, [r#"{"b":2}"#]);
+            assert!(tail.truncated);
+            assert_eq!(tail.torn.len(), 1);
+            assert_eq!(tail.torn[0].offset, 8);
+            assert_eq!(tail.torn[0].bytes, MAX_TORN_BYTES as u64);
+        } else {
+            assert_eq!(appended, Err("egress_log_incomplete".into()));
+            assert_eq!(fs::read(&path).unwrap(), bytes);
+        }
+    }
+}
+
+/// A line that is JSON but not an object is not a record, wherever it sits.
+#[test]
+fn a_json_line_that_is_not_an_object_is_refused_mid_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    for line in ["[null]", "[\"x\"]", "1", "\"text\""] {
+        fs::write(&path, format!("{{\"a\":1}}\n{line}\n{{\"b\":2}}\n")).unwrap();
+        assert_eq!(
+            read_egress_tail(&path, 20).unwrap_err(),
+            "egress_log_incomplete",
+            "{line}"
+        );
+    }
+}

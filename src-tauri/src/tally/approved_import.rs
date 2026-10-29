@@ -936,6 +936,13 @@ pub(crate) enum UnderLockRefusal {
     /// nothing is sent.
     #[error("post_mark_unrecorded")]
     MarkUnrecorded,
+    /// The aim read the company's voucher mark below a floor an earlier native
+    /// post of the company had proved (a restore), and the record of it could
+    /// not be written (#1050). No dispatch intent is recorded and nothing is
+    /// sent: once this post's vouchers raise the mark, no later reading could
+    /// see the restore.
+    #[error("post_rollback_unrecorded")]
+    RollbackUnrecorded,
     /// The approval could not be spent: it was revoked after this call took
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
@@ -988,6 +995,7 @@ impl UnderLockRefusal {
             Self::BatchChanged => "import_batch_changed",
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
+            Self::RollbackUnrecorded => "post_rollback_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
             Self::PreImageUnrecorded => "master_pre_image_unrecorded",
             Self::PreImageWriteFailed => "master_pre_image_write_failed",
